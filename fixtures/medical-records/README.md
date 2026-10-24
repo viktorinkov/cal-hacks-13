@@ -11,7 +11,7 @@ The event, venue and zone names come from placeholders. The claims agent compare
 | Template | Pages | Patient | Invoice (default) | Billed | Role in the demo |
 |---|---|---|---|---|---|
 | `first-aid-wrist` | 1 | Maya Chen | `FA-1024-0007` | $180.00 | Small claim that settles automatically. The event's own medical station treats a right wrist sprain on the incident night: she slipped on a spilled drink near `{{ZONE_NAME}}` at `{{EVENT_NAME}}`. |
-| `urgent-care-wrist` | 2 | Jordan Alvarez | `UC-2025-1188` | $1,240.00 | Larger claim that goes to the risk manager. Urgent care visit the day after the event. The patient has a left wrist sprain: he fell at `{{EVENT_NAME}}` when the crowd surged near `{{ZONE_NAME}}`. Covered amount is $895.00 after the fee schedule. |
+| `urgent-care-wrist` | 2 | Jordan Alvarez | `UC-2025-1188` | $1,308.00 | Larger claim that goes to the risk manager. Urgent care visit the day after the event. The patient has a left wrist sprain: he fell at `{{EVENT_NAME}}` when the crowd surged near `{{ZONE_NAME}}`. Covered amount is $895.00 after the fee schedule: six lines are cut to the schedule cap and the unrelated Tdap shot (90715) is excluded and flagged for a person. |
 | `urgent-care-ankle-home` | 2 | Sam Patel | `UC-2025-1201` | $565.00 | The claims agent finds that the injury happened at home. The codes and charges look routine, but the history says that he twisted the ankle playing basketball at home the evening before. He then attended `{{EVENT_NAME}}`, where it got worse. (The place-of-occurrence code Y92.009, private residence, is also in the assessment.) |
 
 On the 2-page records, page 1 is the clinical note and page 2 is the itemized bill.

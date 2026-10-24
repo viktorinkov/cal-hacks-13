@@ -85,8 +85,16 @@
       "units": 1,
       "charge_cents": 5000,
       "page": 2
+    },
+    {
+      "code": "90715",
+      "description": "Tdap vaccine, 7 years or older, intramuscular",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 6800,
+      "page": 2
     }
   ],
   "invoice_number": "UC-2025-1188",
-  "total_billed_cents": 124000
+  "total_billed_cents": 130800
 }
