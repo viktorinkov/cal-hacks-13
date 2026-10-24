@@ -192,12 +192,21 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 name = "band1t"
 version = "0.1.0"
 dependencies = [
- "hyphenate-core",
+ "bandit-insurance",
  "icu_calendar",
  "log",
  "serde",
  "serde_json",
  "spacetimedb",
+]
+
+[[package]]
+name = "bandit-insurance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1925,15 +1934,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "windows-registry",
-]
-
-[[package]]
-name = "hyphenate-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "sha2",
 ]
 
 [[package]]

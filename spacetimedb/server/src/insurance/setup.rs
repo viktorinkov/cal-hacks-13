@@ -60,10 +60,10 @@ pub fn upsert_coverage_rule(
 ) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
     let policy = ctx.db.insurance_policy().policy_number().find(&policy_number).ok_or_else(|| format!("no policy {policy_number}"))?;
-    if hyphenate_core::CoverKind::parse(&cover_kind).is_none() {
+    if bandit_insurance::CoverKind::parse(&cover_kind).is_none() {
         return Err(format!("unknown cover kind {cover_kind}"));
     }
-    if let Some(bad) = incident_kinds.iter().find(|k| hyphenate_core::IncidentKind::parse(k).is_none()) {
+    if let Some(bad) = incident_kinds.iter().find(|k| bandit_insurance::IncidentKind::parse(k).is_none()) {
         return Err(format!("unknown incident kind {bad}"));
     }
     let row = CoverageRuleRow {

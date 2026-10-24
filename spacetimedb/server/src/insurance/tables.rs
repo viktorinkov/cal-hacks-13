@@ -176,7 +176,7 @@ pub struct EvidencePack {
     pub claim_id: u64,
     pub version: u32,
     pub fact_count: u32,
-    /// SHA-256 over the version's facts (`hyphenate_core::pack`).
+    /// SHA-256 over the version's facts (`bandit_insurance::pack`).
     pub hash: String,
     pub built_at: Timestamp,
     pub corroboration: String,

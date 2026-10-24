@@ -149,7 +149,7 @@ fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str) -> Resul
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"360\"><rect width=\"640\" height=\"360\" fill=\"#222\"/>\
          <text x=\"16\" y=\"32\" fill=\"#eee\" font-family=\"monospace\">{} {} incident {} (synthetic frame)</text></svg>\n",
         cam.name,
-        hyphenate_core::time::local_datetime(micros(captured), app.tz()),
+        bandit_insurance::time::local_datetime(micros(captured), app.tz()),
         incident.id
     );
     let blob = app.blobs().put(frame.as_bytes())?;
@@ -210,7 +210,7 @@ fn template_patient(template: &str) -> Option<&'static str> {
 pub fn attach_record(app: &App, claim_id: u64, template: &str, suffix: Option<&str>, patient: Option<&str>) -> Result<Record> {
     let claim = app.claim(claim_id)?;
     let incident = app.incident(claim.incident_id)?;
-    let date = hyphenate_core::time::local_date(micros(incident.opened_at), app.tz());
+    let date = bandit_insurance::time::local_date(micros(incident.opened_at), app.tz());
     let dir = app.root.join("fixtures/medical-records");
     let source = dir.join("templates").join(format!("{template}.html"));
     if !source.is_file() {
@@ -223,7 +223,7 @@ pub fn attach_record(app: &App, claim_id: u64, template: &str, suffix: Option<&s
         html = html.replace(original, name);
     }
     let minute = |t: i64| {
-        let hms = hyphenate_core::time::local_hms(t, app.tz());
+        let hms = bandit_insurance::time::local_hms(t, app.tz());
         hms[..2].parse::<i32>().unwrap_or(0) * 60 + hms[3..5].parse::<i32>().unwrap_or(0)
     };
     // The visit is never earlier than the minute after the band raised the alarm.

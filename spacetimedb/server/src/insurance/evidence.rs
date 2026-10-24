@@ -10,15 +10,15 @@ use crate::safety::*;
 use crate::tables::*;
 use crate::venue::*;
 use crate::vision::*;
-use hyphenate_core::evidence::*;
-use hyphenate_core::{Check, CoverKind, Fact};
+use bandit_insurance::evidence::*;
+use bandit_insurance::{Check, CoverKind, Fact};
 use spacetimedb::{ReducerContext, Table};
 
 /// How far back the subject band's zone history is read.
 const PRESENCE_WINDOW_MICROS: i64 = 15 * 60 * 1_000_000;
 
-pub fn kind_of(claim: &Claim) -> hyphenate_core::IncidentKind {
-    hyphenate_core::IncidentKind::parse(&claim.incident_kind).unwrap_or(hyphenate_core::IncidentKind::Property)
+pub fn kind_of(claim: &Claim) -> bandit_insurance::IncidentKind {
+    bandit_insurance::IncidentKind::parse(&claim.incident_kind).unwrap_or(bandit_insurance::IncidentKind::Property)
 }
 
 pub fn cover_of(claim: &Claim) -> CoverKind {
@@ -29,10 +29,10 @@ pub fn policy_rule(ctx: &ReducerContext, policy_id: u64, cover: CoverKind) -> Op
     ctx.db.coverage_rule().policy_id().filter(policy_id).find(|r| r.cover_kind == cover.as_str())
 }
 
-pub fn core_rule(r: &CoverageRuleRow) -> hyphenate_core::coverage::CoverageRule {
-    hyphenate_core::coverage::CoverageRule {
+pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRule {
+    bandit_insurance::coverage::CoverageRule {
         cover_kind: CoverKind::parse(&r.cover_kind).unwrap_or(CoverKind::Property),
-        incident_kinds: r.incident_kinds.iter().filter_map(|k| hyphenate_core::IncidentKind::parse(k)).collect(),
+        incident_kinds: r.incident_kinds.iter().filter_map(|k| bandit_insurance::IncidentKind::parse(k)).collect(),
         per_claim_limit_cents: r.per_claim_limit_cents,
         aggregate_limit_cents: r.aggregate_limit_cents,
         deductible_cents: r.deductible_cents,
@@ -203,16 +203,16 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
 /// The record's encounter as a timestamp: its date and time of service in
 /// venue time, noon when the record gives no time.
 fn encounter_micros(r: &MedicalRecord, tz_offset_minutes: i32) -> Option<i64> {
-    let record: hyphenate_core::medical::ExtractedRecord = serde_json::from_str(&r.record_json).ok()?;
-    let days = hyphenate_core::time::parse_date(&record.encounter.date_of_service)?;
+    let record: bandit_insurance::medical::ExtractedRecord = serde_json::from_str(&r.record_json).ok()?;
+    let days = bandit_insurance::time::parse_date(&record.encounter.date_of_service)?;
     let (h, m) = record
         .encounter
         .time
         .split_once(':')
         .and_then(|(h, m)| Some((h.trim().parse::<i64>().ok()?, m.trim().parse::<i64>().ok()?)))
         .unwrap_or((12, 0));
-    let (y, mo, d) = hyphenate_core::time::civil_from_days(days);
-    Some(hyphenate_core::time::micros_at(y, mo, d, h, m, 0, tz_offset_minutes))
+    let (y, mo, d) = bandit_insurance::time::civil_from_days(days);
+    Some(bandit_insurance::time::micros_at(y, mo, d, h, m, 0, tz_offset_minutes))
 }
 
 /// Code checks on the filed medical record: patient, dates, injury code,
@@ -223,13 +223,13 @@ pub fn record_checks(ctx: &ReducerContext, claim: &Claim, input: &EvidenceInput)
     };
     let s = settings(ctx);
     let window = policy_rule(ctx, claim.policy_id, cover_of(claim)).map(|r| r.service_window_days).unwrap_or(0);
-    let incident_date = hyphenate_core::time::local_date(input.incident.opened_at, s.tz_offset_minutes);
+    let incident_date = bandit_insurance::time::local_date(input.incident.opened_at, s.tz_offset_minutes);
     let mut checks = Vec::new();
-    if let Ok(record) = serde_json::from_str::<hyphenate_core::medical::ExtractedRecord>(&rec.record_json) {
-        let valid = hyphenate_core::medical::ValidRecord { record, dropped: rec.dropped.clone() };
-        checks.extend(hyphenate_core::medical::record_checks(&valid, &claim.claimant_name, &incident_date, window));
-        let lines = hyphenate_core::fee_schedule::cover_lines(&valid, &incident_date, window);
-        checks.push(hyphenate_core::fee_schedule::lines_check(&lines));
+    if let Ok(record) = serde_json::from_str::<bandit_insurance::medical::ExtractedRecord>(&rec.record_json) {
+        let valid = bandit_insurance::medical::ValidRecord { record, dropped: rec.dropped.clone() };
+        checks.extend(bandit_insurance::medical::record_checks(&valid, &claim.claimant_name, &incident_date, window));
+        let lines = bandit_insurance::fee_schedule::cover_lines(&valid, &incident_date, window);
+        checks.push(bandit_insurance::fee_schedule::lines_check(&lines));
     }
     checks.push(duplicate_check(ctx, claim, &rec));
     checks
@@ -249,7 +249,7 @@ fn duplicate_check(ctx: &ReducerContext, claim: &Claim, rec: &MedicalRecord) -> 
         if norm(&other.patient_name) == norm(&rec.patient_name) && other.date_of_service == rec.date_of_service && other.billed_cents == rec.billed_cents {
             return Check::fail(
                 "record_duplicate",
-                format!("{} on {} for {} is already filed on claim {}", rec.patient_name, rec.date_of_service, hyphenate_core::money::format_cents(rec.billed_cents), other.claim_id),
+                format!("{} on {} for {} is already filed on claim {}", rec.patient_name, rec.date_of_service, bandit_insurance::money::format_cents(rec.billed_cents), other.claim_id),
             );
         }
     }
@@ -295,7 +295,7 @@ pub struct Pack {
     pub version: u32,
     pub hash: String,
     pub facts: Vec<Fact>,
-    pub corroboration: hyphenate_core::Corroboration,
+    pub corroboration: bandit_insurance::Corroboration,
     pub checks: Vec<Check>,
     pub input: EvidenceInput,
 }
@@ -306,8 +306,8 @@ pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
     let input = gather(ctx, claim);
     let s = settings(ctx);
     let facts = build_facts(&input);
-    let hash = hyphenate_core::pack::pack_sha256(&facts);
-    let (corroboration, mut checks) = hyphenate_core::corroboration::corroborate(&input, &config(&s));
+    let hash = bandit_insurance::pack::pack_sha256(&facts);
+    let (corroboration, mut checks) = bandit_insurance::corroboration::corroborate(&input, &config(&s));
     checks.extend(record_checks(ctx, claim, &input));
     checks.extend(claimant_check(ctx, claim));
     let version = claim.pack_version + 1;
@@ -385,9 +385,9 @@ pub fn pack_checks(ctx: &ReducerContext, claim_id: u64, version: u32) -> Vec<Che
         .map(|c| Check {
             name: c.name,
             result: match c.result.as_str() {
-                "pass" => hyphenate_core::CheckResult::Pass,
-                "fail" => hyphenate_core::CheckResult::Fail,
-                _ => hyphenate_core::CheckResult::Info,
+                "pass" => bandit_insurance::CheckResult::Pass,
+                "fail" => bandit_insurance::CheckResult::Fail,
+                _ => bandit_insurance::CheckResult::Info,
             },
             detail: c.detail,
             reader: reader_of(&c.reader),
@@ -395,16 +395,16 @@ pub fn pack_checks(ctx: &ReducerContext, claim_id: u64, version: u32) -> Vec<Che
         .collect()
 }
 
-fn reader_of(s: &str) -> hyphenate_core::Reader {
+fn reader_of(s: &str) -> bandit_insurance::Reader {
     match s {
-        "model" => hyphenate_core::Reader::Model,
-        "elastic" => hyphenate_core::Reader::Elastic,
-        _ => hyphenate_core::Reader::Code,
+        "model" => bandit_insurance::Reader::Model,
+        "elastic" => bandit_insurance::Reader::Elastic,
+        _ => bandit_insurance::Reader::Code,
     }
 }
 
-fn source_of(s: &str) -> hyphenate_core::Source {
-    use hyphenate_core::Source::*;
+fn source_of(s: &str) -> bandit_insurance::Source {
+    use bandit_insurance::Source::*;
     [BandReport, IncidentSnapshot, LightCircle, StaffNote, ZoneContext, Presence, VisionAssessment, MedicalRecord, Policy]
         .into_iter()
         .find(|src| src.as_str() == s)

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use bandit_bindings::ModelCallIn;
 use bandit_common::BlobStore;
 use claims_elastic::ClaimsIndex;
-use hyphenate_core::payloads::*;
+use bandit_insurance::payloads::*;
 use serde::de::DeserializeOwned;
 
 use crate::model::{Claude, Failed};

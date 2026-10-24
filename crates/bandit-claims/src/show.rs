@@ -377,7 +377,7 @@ pub fn verify_pack(app: &App, id: u64, print_lines: bool) -> Result<bool> {
     let mut ok = true;
     for p in &packs {
         let facts = core_facts(app, id, p.version)?;
-        let hash = hyphenate_core::pack::pack_sha256(&facts);
+        let hash = bandit_insurance::pack::pack_sha256(&facts);
         let same = hash == p.hash && (p.version != c.pack_version || hash == c.pack_hash);
         ok &= same;
         println!(
@@ -391,7 +391,7 @@ pub fn verify_pack(app: &App, id: u64, print_lines: bool) -> Result<bool> {
         );
         if print_lines && p.version == c.pack_version {
             for f in &facts {
-                println!("    {}", hyphenate_core::pack::canonical_line(f));
+                println!("    {}", bandit_insurance::pack::canonical_line(f));
             }
         }
     }
@@ -409,8 +409,8 @@ pub fn verify_pack(app: &App, id: u64, print_lines: bool) -> Result<bool> {
     Ok(ok)
 }
 
-fn core_facts(app: &App, id: u64, version: u32) -> Result<Vec<hyphenate_core::Fact>> {
-    use hyphenate_core::{Reader, Source};
+fn core_facts(app: &App, id: u64, version: u32) -> Result<Vec<bandit_insurance::Fact>> {
+    use bandit_insurance::{Reader, Source};
     let db = app.db()?;
     let sources = [
         Source::BandReport,
@@ -434,7 +434,7 @@ fn core_facts(app: &App, id: u64, version: u32) -> Result<Vec<hyphenate_core::Fa
             "elastic" => Reader::Elastic,
             other => bail!("fact {} has unknown reader {other}", f.id),
         };
-        out.push(hyphenate_core::Fact {
+        out.push(bandit_insurance::Fact {
             seq: f.seq,
             source,
             key: f.key,

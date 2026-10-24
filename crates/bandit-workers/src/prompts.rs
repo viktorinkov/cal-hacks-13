@@ -1,11 +1,11 @@
 //! Every system prompt, and the user turns that carry claim data in
 //! delimited blocks. Text inside a block is escaped so it cannot close it.
 
-use hyphenate_core::coverage::Amounts;
-use hyphenate_core::letters::{FAULT_PHRASES, LetterData};
-use hyphenate_core::money::format_cents;
-use hyphenate_core::payloads::ReviewPayload;
-use hyphenate_core::time::local_datetime;
+use bandit_insurance::coverage::Amounts;
+use bandit_insurance::letters::{FAULT_PHRASES, LetterData};
+use bandit_insurance::money::format_cents;
+use bandit_insurance::payloads::ReviewPayload;
+use bandit_insurance::time::local_datetime;
 use serde_json::Value;
 
 pub const EXTRACT_SYSTEM: &str = "\
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn letters_prompt_has_the_skeleton_and_amounts() {
         let d = testdata::letter_data();
-        let skeleton = hyphenate_core::letters::fnol_template(&d);
+        let skeleton = bandit_insurance::letters::fnol_template(&d);
         let text = letters_prompt(&d, &skeleton);
         assert!(text.contains("<fnol_skeleton>\nLIABILITY NOTICE OF OCCURRENCE"));
         assert!(text.contains("paid to the claimant: $895.00"));

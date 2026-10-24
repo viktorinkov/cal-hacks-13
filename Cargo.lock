@@ -227,8 +227,8 @@ dependencies = [
  "anyhow",
  "bandit-bindings",
  "bandit-common",
+ "bandit-insurance",
  "clap",
- "hyphenate-core",
  "spacetimedb-sdk",
 ]
 
@@ -274,15 +274,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bandit-insurance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "bandit-workers"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bandit-bindings",
  "bandit-common",
+ "bandit-insurance",
  "claims-elastic",
  "claude-client",
- "hyphenate-core",
  "reqwest",
  "serde",
  "serde_json",
@@ -1191,15 +1200,6 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "hyphenate-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "sha2",
 ]
 
 [[package]]

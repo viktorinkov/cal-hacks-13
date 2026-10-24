@@ -1,5 +1,5 @@
 [package]
-name = "hyphenate-core"
+name = "bandit-insurance"
 version.workspace = true
 edition.workspace = true
 

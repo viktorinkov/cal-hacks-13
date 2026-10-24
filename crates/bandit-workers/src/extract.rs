@@ -1,9 +1,9 @@
 //! `claim_record_extract`: Claude reads the medical record PDF into a structured record.
 
 use claude_client::{Effort, MessageRequest};
-use hyphenate_core::medical::{ExtractedRecord, ValidRecord, validate_record};
-use hyphenate_core::payloads::RecordExtractPayload;
-use hyphenate_core::schemas::medical_record_schema;
+use bandit_insurance::medical::{ExtractedRecord, ValidRecord, validate_record};
+use bandit_insurance::payloads::RecordExtractPayload;
+use bandit_insurance::schemas::medical_record_schema;
 use serde_json::Value;
 
 use crate::jobs::{Ctx, JobError, JobIn};
