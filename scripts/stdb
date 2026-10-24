@@ -1,0 +1,5 @@
+#!/bin/sh
+# The spacetime CLI with this checkout's own config, so the local dev login never touches ~/.config/spacetime.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SPACETIME="$(command -v spacetime || echo "$HOME/.local/bin/spacetime")"
+exec "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/cli.toml" "$@"

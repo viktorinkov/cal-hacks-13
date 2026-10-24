@@ -1,0 +1,39 @@
+{
+  "claim_id": 900101,
+  "pack_version": 2,
+  "venue_name": "Cal Hacks 13.0",
+  "incident_kind": "fall",
+  "cover_kind": "medical_payments",
+  "zone_id": 101,
+  "zone_name": "Main stage",
+  "incident_at_micros": 1792817110000000,
+  "local_time": "21:45",
+  "corroboration": "corroborated",
+  "witness_count": 3,
+  "minutes_to_first_note": 6,
+  "diagnoses": [
+    [
+      "S63.502A",
+      "Sprain of left wrist, initial encounter"
+    ],
+    [
+      "W01.0XXA",
+      "Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter"
+    ]
+  ],
+  "service_codes": [
+    "99204",
+    "73110",
+    "29125",
+    "L3908",
+    "99070",
+    "96372",
+    "J1885",
+    "90715"
+  ],
+  "record_hash": "eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4",
+  "billed_cents": 130800,
+  "covered_cents": 89500,
+  "payout_cents": 89500,
+  "property_description": ""
+}

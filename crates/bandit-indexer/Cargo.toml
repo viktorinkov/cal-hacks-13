@@ -1,0 +1,13 @@
+[package]
+name = "bandit-indexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bandit-bindings = { path = "../bandit-bindings" }
+bandit-common = { path = "../bandit-common" }
+anyhow = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_json = "1"
+spacetimedb-sdk = "2.13"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }

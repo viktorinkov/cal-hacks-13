@@ -1,0 +1,21 @@
+{
+  "id": "bandit.candidates",
+  "type": "esql",
+  "description": "The 5 records of one BandIt import run that best match a name or a description, across bandit-raw-pages and bandit-raw-orgs. Hybrid search: a keyword match on name and a semantic match on text, merged with reciprocal rank fusion. Use it to find which organization a prize tag, a person's company or a differently named sponsor refers to.",
+  "tags": [
+    "bandit"
+  ],
+  "configuration": {
+    "query": "FROM bandit-raw-pages, bandit-raw-orgs METADATA _id, _index, _score | WHERE run_id == ?run_id | FORK (WHERE MATCH(name, ?query) | SORT _score DESC | LIMIT 10) (WHERE MATCH(text, ?query) | SORT _score DESC | LIMIT 10) | FUSE | SORT _score DESC | EVAL text = SUBSTRING(text, 1, 200) | KEEP source_key, record_kind, name, domain, org_key, text | LIMIT 5",
+    "params": {
+      "run_id": {
+        "type": "string",
+        "description": "The import run id given in the task."
+      },
+      "query": {
+        "type": "string",
+        "description": "A name, prize tag or short description to look up, for example \"Annapurna Labs\" or \"Factory AI\"."
+      }
+    }
+  }
+}

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="default-invoice-suffix" content="2025-1201">
+<title>Wrenfield Urgent Care - Visit Note and Itemized Statement UC-{{INVOICE_SUFFIX}} (synthetic test data)</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 8.5pt; line-height: 1.28; color: #161616; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { position: relative; width: 8.5in; height: 11in; padding: 0.45in 0.6in 0.7in; overflow: hidden; break-after: page; }
+  .page:last-of-type { break-after: auto; }
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1d4e6b; padding-bottom: 6px; margin-bottom: 4px; }
+  .org-name { font-size: 15pt; font-weight: 700; color: #1d4e6b; letter-spacing: 0.01em; }
+  .org-sub { font-weight: 600; color: #333; margin: 1px 0 1px; }
+  .org .line { font-size: 8pt; color: #222; }
+  .doc-title { font-size: 11.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; text-align: right; }
+  table { border-collapse: collapse; width: 100%; }
+  table.mini { width: auto; margin-left: auto; font-size: 8pt; }
+  .mini th { text-align: right; font-weight: 600; color: #555; padding: 0.5px 8px 0.5px 0; white-space: nowrap; }
+  .mini td { text-align: left; padding: 0.5px 0; white-space: nowrap; }
+  .sec-title { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #1d4e6b; background: #e7eef3; border-left: 3px solid #1d4e6b; padding: 1.5px 6px; margin: 6px 0 3px; }
+  table.kv { table-layout: fixed; }
+  .kv th { text-align: left; font-weight: 600; color: #555; font-size: 7.5pt; padding: 1px 6px 1px 0; vertical-align: top; white-space: nowrap; }
+  .kv td { padding: 1px 10px 1px 0; vertical-align: top; }
+  p { margin: 0 0 2px; }
+  table.exam { table-layout: fixed; }
+  .exam th { width: 1.15in; text-align: left; font-weight: 600; color: #333; vertical-align: top; padding: 0.5px 6px 0.5px 0; }
+  .exam td { padding: 0.5px 0; vertical-align: top; }
+  .vitals span { margin-right: 12px; white-space: nowrap; }
+  ol.plan { margin: 0; padding-left: 15px; }
+  .grid th, .grid td { border: 1px solid #bccbd6; padding: 2px 6px; text-align: left; vertical-align: top; }
+  .grid thead th { white-space: nowrap; background: #e7eef3; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.04em; color: #333; }
+  .grid .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .grid .code { white-space: nowrap; font-weight: 600; }
+  .grid tfoot td { font-weight: 700; background: #f3f7fa; }
+  .charges td { padding-top: 4px; padding-bottom: 4px; }
+  table.totals { width: 3in; margin: 8px 0 0 auto; }
+  .totals th { text-align: left; font-weight: 600; padding: 2px 6px; }
+  .totals td { text-align: right; padding: 2px 6px; font-variant-numeric: tabular-nums; }
+  .totals tr.due th, .totals tr.due td { border-top: 2px solid #1d4e6b; font-weight: 700; font-size: 9.5pt; }
+  .esig { margin-top: 10px; padding-top: 3px; border-top: 1px solid #555; font-size: 8pt; }
+  .msg { margin-top: 12px; border: 1px solid #bccbd6; padding: 6px 8px; font-size: 8pt; }
+  .stub { margin-top: 22px; border-top: 1.5px dashed #777; padding-top: 8px; }
+  .stub .cut { font-size: 7pt; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stub-grid { display: flex; justify-content: space-between; gap: 24px; }
+  .stub-grid > div { flex: 1; }
+  .blank { display: inline-block; width: 1.3in; border-bottom: 1px solid #333; }
+  .footer { position: absolute; left: 0.6in; right: 0.6in; bottom: 0.38in; border-top: 1px solid #888; padding-top: 4px; display: flex; justify-content: space-between; font-size: 8pt; color: #222; }
+  .footer .synthetic { font-weight: 700; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<!-- Page 1: clinical note -->
+<div class="page">
+  <header class="doc-head">
+    <div class="org">
+      <div class="org-name">Wrenfield Urgent Care</div>
+      <div class="org-sub">Walk-in Urgent Care &middot; On-Site Digital X-ray</div>
+      <div class="line">880 Tamsin Street, Suite 120, Port Alder, CA 94999</div>
+      <div class="line">Tel (510) 555-0120 &middot; Fax (510) 555-0121 &middot; Group NPI 1730055519</div>
+    </div>
+    <div class="doc-id">
+      <div class="doc-title">Urgent Care Visit Note</div>
+      <table class="mini">
+        <tr><th>Date of service</th><td>{{NEXT_DATE}}</td></tr>
+        <tr><th>MRN</th><td>WUC-0048227</td></tr>
+        <tr><th>Account No.</th><td>A-77310466</td></tr>
+      </table>
+    </div>
+  </header>
+
+  <div class="sec-title">Patient</div>
+  <table class="kv">
+    <colgroup><col style="width:1.05in"><col style="width:2.35in"><col style="width:0.85in"><col style="width:1.15in"><col style="width:0.65in"><col></colgroup>
+    <tr><th>Name</th><td>Sam Patel</td><th>Date of birth</th><td>1997-11-21</td><th>Sex</th><td>M</td></tr>
+    <tr><th>Address</th><td colspan="3">3906 Ondine Terrace, Unit 12, Port Alder, CA 94996</td><th>Phone</th><td>(510) 555-0158</td></tr>
+    <tr><th>Financial class</th><td colspan="3">Self-pay; third-party liability claim (event medical payments)</td><th>PCP</th><td>None on file</td></tr>
+  </table>
+
+  <div class="sec-title">Visit</div>
+  <table class="kv">
+    <colgroup><col style="width:1.05in"><col style="width:2.35in"><col style="width:0.85in"><col style="width:1.15in"><col style="width:0.65in"><col></colgroup>
+    <tr><th>Date of service</th><td>{{NEXT_DATE}}</td><th>Arrival time</th><td>09:15</td><th>Visit type</th><td>New patient, walk-in</td></tr>
+    <tr><th>Provider</th><td>Nadia Ferro-Kimura, PA-C</td><th>NPI</th><td>1467550983</td><th>Discharged</th><td>10:05</td></tr>
+    <tr><th>Chief complaint</th><td colspan="5">Right ankle pain and swelling.</td></tr>
+  </table>
+
+  <div class="sec-title">History of Present Illness</div>
+  <p>Patient presents with right ankle pain and swelling. He states he twisted his right ankle (inversion injury) while playing pickup basketball at home on the evening of {{BEFORE_DATE_LONG}}, before attending {{EVENT_NAME}}. He was able to walk afterward and did not seek care that night. The pain and swelling got worse while he was walking around the event on {{INCIDENT_DATE_LONG}}, and today he has difficulty bearing full weight. Denies any new fall, twist, or other injury since the initial injury. Rates pain 6/10, lateral ankle, worse with weight bearing. Took ibuprofen 400 mg last night with partial relief. Denies numbness or tingling. No prior right ankle injury.</p>
+
+  <div class="sec-title">History / Review of Systems</div>
+  <table class="exam">
+    <tr><th>PMH / PSH</th><td>None / None</td></tr>
+    <tr><th>Medications</th><td>Ibuprofen as needed</td></tr>
+    <tr><th>Allergies</th><td>No known drug allergies</td></tr>
+    <tr><th>Social</th><td>Never smoker. Occasional alcohol. Graduate student.</td></tr>
+    <tr><th>ROS</th><td>Negative except as in HPI. Denies knee pain, back pain, fever.</td></tr>
+  </table>
+
+  <div class="sec-title">Vital Signs / Physical Exam</div>
+  <table class="exam">
+    <tr><th>Vitals (09:22)</th><td class="vitals"><span>BP 124/76</span><span>Pulse 76</span><span>Resp 14</span><span>SpO2 98% RA</span><span>Temp 98.2 &deg;F</span><span>Pain 6/10</span></td></tr>
+    <tr><th>General</th><td>Well appearing, alert and oriented, no acute distress.</td></tr>
+    <tr><th>Right ankle</th><td>Moderate swelling and ecchymosis over the lateral ankle. Tenderness over the anterior talofibular ligament and at the posterior edge of the distal lateral malleolus. No medial malleolus, base of fifth metatarsal, or navicular tenderness. Anterior drawer mildly lax, limited by guarding. Range of motion reduced due to pain.</td></tr>
+    <tr><th>Gait</th><td>Antalgic. Able to take four steps with a limp.</td></tr>
+    <tr><th>Right knee / foot</th><td>No tenderness. Proximal fibula non-tender.</td></tr>
+    <tr><th>Neurovascular</th><td>Dorsalis pedis and posterior tibial pulses 2+, capillary refill &lt; 2 s, sensation intact.</td></tr>
+    <tr><th>Skin</th><td>Intact. No abrasions or lacerations.</td></tr>
+  </table>
+
+  <div class="sec-title">Imaging</div>
+  <p><b>X-ray right ankle, 3 views (AP, lateral, mortise), {{NEXT_DATE}} 09:34.</b> Ordered per Ottawa ankle rules (posterior lateral malleolus tenderness). No acute fracture or dislocation. Ankle mortise congruent. Lateral soft-tissue swelling. <b>Impression:</b> soft-tissue swelling, no fracture. Final read concordant (Marcus Oyelaran-Byrd, MD, Radiology).</p>
+
+  <div class="sec-title">Assessment</div>
+  <table class="grid">
+    <thead><tr><th style="width:4%">#</th><th style="width:13%">ICD-10-CM</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="code">S93.401A</td><td>Sprain of unspecified ligament of right ankle, initial encounter</td></tr>
+      <tr><td>2</td><td class="code">Y93.67</td><td>Activity, basketball</td></tr>
+      <tr><td>3</td><td class="code">Y92.009</td><td>Unspecified place in unspecified non-institutional (private) residence as the place of occurrence</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sec-title">Plan / Procedures</div>
+  <ol class="plan">
+    <li>Posterior short leg splint (calf to foot) applied to the right, ankle in neutral. Neurovascular status intact after application.</li>
+    <li>Rest, ice 20 minutes every 2&ndash;3 hours, elevation. Weight bearing as tolerated in the splint; patient has crutches at home and was advised to use them as needed.</li>
+    <li>Ibuprofen 400&ndash;600 mg every 6&ndash;8 h with food as needed, or acetaminophen per label.</li>
+    <li>Gentle range-of-motion exercises when pain allows (handout given).</li>
+    <li>Follow up with sports medicine or orthopedics in 7&ndash;10 days if not improving. Return sooner for numbness, color change, or increasing pain.</li>
+  </ol>
+  <p style="margin-top:2px"><b>Disposition:</b> Discharged home in stable condition at 10:05. Patient verbalized understanding.</p>
+
+  <div class="esig">Electronically signed by <b>Nadia Ferro-Kimura, PA-C</b> (NPI 1467550983) on {{NEXT_DATE}} 10:30 &middot; Supervising physician: Corinne Vasquez-Hale, MD</div>
+
+  <div class="footer"><span class="synthetic">SYNTHETIC RECORD - TEST DATA - NOT A REAL PATIENT</span><span>Sam Patel &middot; MRN WUC-0048227 &middot; Page 1 of 2</span></div>
+</div>
+
+<!-- Page 2: itemized bill -->
+<div class="page">
+  <header class="doc-head">
+    <div class="org">
+      <div class="org-name">Wrenfield Urgent Care</div>
+      <div class="org-sub">Patient Billing Office</div>
+      <div class="line">880 Tamsin Street, Suite 120, Port Alder, CA 94999</div>
+      <div class="line">Billing (510) 555-0125 &middot; Group NPI 1730055519 &middot; Tax ID 00-5550120</div>
+    </div>
+    <div class="doc-id">
+      <div class="doc-title">Itemized Statement</div>
+      <table class="mini">
+        <tr><th>Invoice No.</th><td>UC-{{INVOICE_SUFFIX}}</td></tr>
+        <tr><th>Statement date</th><td>{{NEXT_DATE}}</td></tr>
+        <tr><th>Account No.</th><td>A-77310466</td></tr>
+        <tr><th>Payment due</th><td>Upon receipt</td></tr>
+      </table>
+    </div>
+  </header>
+
+  <div class="sec-title">Patient / Guarantor</div>
+  <table class="kv">
+    <colgroup><col style="width:1.15in"><col style="width:2.85in"><col style="width:1.0in"><col></colgroup>
+    <tr><th>Patient</th><td>Sam Patel</td><th>Date of birth</th><td>1997-11-21</td></tr>
+    <tr><th>Address</th><td>3906 Ondine Terrace, Unit 12, Port Alder, CA 94996</td><th>MRN</th><td>WUC-0048227</td></tr>
+    <tr><th>Guarantor</th><td>Self</td><th>Financial class</th><td>Self-pay; third-party claim</td></tr>
+    <tr><th>Rendering provider</th><td>Nadia Ferro-Kimura, PA-C (NPI 1467550983)</td><th>Place of service</th><td>20 &ndash; Urgent care facility</td></tr>
+  </table>
+
+  <div class="sec-title">Itemized Charges</div>
+  <table class="grid charges">
+    <thead><tr><th style="width:14%">Service date</th><th style="width:12%">CPT/HCPCS</th><th>Description</th><th style="width:7%" class="num">Units</th><th style="width:13%" class="num">Charge</th></tr></thead>
+    <tbody>
+      <tr><td>{{NEXT_DATE}}</td><td class="code">99203</td><td>New patient visit, low complexity</td><td class="num">1</td><td class="num">$185.00</td></tr>
+      <tr><td>{{NEXT_DATE}}</td><td class="code">73610</td><td>X-ray ankle, 3 views, right</td><td class="num">1</td><td class="num">$160.00</td></tr>
+      <tr><td>{{NEXT_DATE}}</td><td class="code">29515</td><td>Short leg splint application (calf to foot), right</td><td class="num">1</td><td class="num">$220.00</td></tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><th>Total charges</th><td>$565.00</td></tr>
+    <tr><th>Payments received</th><td>$0.00</td></tr>
+    <tr><th>Adjustments</th><td>$0.00</td></tr>
+    <tr class="due"><th>Balance due</th><td>$565.00</td></tr>
+  </table>
+
+  <div class="msg">This statement lists services provided on {{NEXT_DATE}}. Diagnosis codes and clinical details are on the visit note of the same date. If this visit is covered by another party (for example, an event or premises medical payments policy), give this statement and the visit note to that party and tell our billing office the claim number. Questions: (510) 555-0125, Monday&ndash;Friday 08:00&ndash;17:00.</div>
+
+  <div class="stub">
+    <div class="cut">Detach and return this portion with your payment</div>
+    <div class="stub-grid">
+      <div>
+        <b>Make checks payable to:</b><br>
+        Wrenfield Urgent Care<br>
+        880 Tamsin Street, Suite 120<br>
+        Port Alder, CA 94999
+      </div>
+      <div>
+        <table class="mini" style="margin-left:0">
+          <tr><th>Invoice No.</th><td>UC-{{INVOICE_SUFFIX}}</td></tr>
+          <tr><th>Account No.</th><td>A-77310466</td></tr>
+          <tr><th>Patient</th><td>Sam Patel</td></tr>
+          <tr><th>Amount due</th><td><b>$565.00</b></td></tr>
+          <tr><th>Amount enclosed</th><td><span class="blank"></span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer"><span class="synthetic">SYNTHETIC RECORD - TEST DATA - NOT A REAL PATIENT</span><span>UC-{{INVOICE_SUFFIX}} &middot; Page 2 of 2</span></div>
+</div>
+
+</body>
+</html>

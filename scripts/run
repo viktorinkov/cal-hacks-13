@@ -1,0 +1,31 @@
+#!/bin/sh
+# One command for the end-to-end run: sets up the database the first time, starts bandit-api with the
+# pages, bandit-indexer and bandit-workers, and opens the host portal and a simulated band's tap link.
+# E2E_TARGET=maincloud (default) uses the live database; E2E_TARGET=local uses scripts/e2e-server.
+# BANDIT_OPEN=0 skips opening the browser. Stop with Ctrl-C.
+set -e
+export E2E_TARGET="${E2E_TARGET:-maincloud}"
+. "$(dirname "$0")/e2e-env"
+cd "$ROOT"
+
+if [ ! -s "$DATA/identities/worker" ]; then
+  echo "first run on $E2E_TARGET: setting up the database"
+  scripts/e2e-setup
+fi
+
+# Restart the services if an earlier run left them behind.
+pkill -f "$CARGO_TARGET_DIR/debug/bandit-" 2>/dev/null || true
+scripts/e2e-services &
+SERVICES=$!
+trap 'kill $SERVICES 2>/dev/null; pkill -f "$CARGO_TARGET_DIR/debug/bandit-" 2>/dev/null' INT TERM EXIT
+
+until curl -s "http://$BANDIT_API_ADDR/health" | grep -q ok; do
+  kill -0 $SERVICES 2>/dev/null || { echo "the services stopped; see $DATA/logs" >&2; exit 1; }
+  sleep 1
+done
+if [ "${BANDIT_OPEN:-1}" = 1 ]; then
+  open "http://$BANDIT_API_ADDR/organizer?as=ops"
+  open "http://$BANDIT_API_ADDR/t/BANDIT-94"
+fi
+echo "running on $E2E_TARGET at http://$BANDIT_API_ADDR (Ctrl-C stops it)"
+wait $SERVICES

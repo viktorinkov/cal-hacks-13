@@ -1,0 +1,24 @@
+{
+  "mappings": {
+    "properties": {
+      "run_id": {
+        "type": "keyword"
+      },
+      "stage": {
+        "type": "keyword"
+      },
+      "at": {
+        "type": "date"
+      },
+      "duration_ms": {
+        "type": "long"
+      },
+      "counts": {
+        "type": "object"
+      },
+      "note": {
+        "type": "text"
+      }
+    }
+  }
+}

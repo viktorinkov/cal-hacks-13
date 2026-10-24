@@ -1,0 +1,472 @@
+{
+  "claim_id": 900102,
+  "pack_version": 2,
+  "pack_hash": "a4cdf1f6725b2d6df394368bb34a2f4d75a21c38230e3e857da8689acd39efa6",
+  "incident_kind": "sos",
+  "cover_kind": "medical_payments",
+  "zone_name": "Main stage",
+  "incident_time": "2026-10-24 20:31:40",
+  "claimant_name": "Sam Patel",
+  "corroboration": "corroborated",
+  "facts": [
+    {
+      "seq": 1,
+      "source": "incident_snapshot",
+      "key": "incident_kind",
+      "value": "sos",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident:42"
+    },
+    {
+      "seq": 2,
+      "source": "incident_snapshot",
+      "key": "opened_by",
+      "value": "band",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident:42"
+    },
+    {
+      "seq": 3,
+      "source": "incident_snapshot",
+      "key": "zone_id",
+      "value": "101",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident:42"
+    },
+    {
+      "seq": 4,
+      "source": "band_report",
+      "key": "band_id",
+      "value": "29",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 5,
+      "source": "band_report",
+      "key": "fall_flag",
+      "value": "0",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 6,
+      "source": "band_report",
+      "key": "sos_flag",
+      "value": "1",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 7,
+      "source": "band_report",
+      "key": "band_state",
+      "value": "3",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 8,
+      "source": "band_report",
+      "key": "neigh",
+      "value": "4",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 9,
+      "source": "band_report",
+      "key": "station_id",
+      "value": "4",
+      "observed_at": 1792899099000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 10,
+      "source": "incident_snapshot",
+      "key": "bands_present",
+      "value": "8, 15, 29, 40",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 11,
+      "source": "incident_snapshot",
+      "key": "band_count",
+      "value": "4",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 12,
+      "source": "incident_snapshot",
+      "key": "neigh_mean",
+      "value": "4.1",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 13,
+      "source": "incident_snapshot",
+      "key": "circle_bands",
+      "value": "8, 15",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "incident_snapshot:78"
+    },
+    {
+      "seq": 14,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 8 zone 101 rssi -58",
+      "observed_at": 1792899104000000,
+      "reader": "code",
+      "reference": "incident_band:42:8"
+    },
+    {
+      "seq": 15,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 15 zone 101 rssi -70",
+      "observed_at": 1792899107000000,
+      "reader": "code",
+      "reference": "incident_band:42:15"
+    },
+    {
+      "seq": 16,
+      "source": "staff_note",
+      "key": "note",
+      "value": "medic: guest pressed SOS for right ankle pain while walking near the stage, no fall seen, ankle wrapped, walked out with a friend",
+      "observed_at": 1792899540000000,
+      "reader": "code",
+      "reference": "incident_note:302"
+    },
+    {
+      "seq": 17,
+      "source": "zone_context",
+      "key": "zone_name",
+      "value": "Main stage",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 18,
+      "source": "zone_context",
+      "key": "zone_kind",
+      "value": "stage",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 19,
+      "source": "zone_context",
+      "key": "zone_area_m2",
+      "value": "1800.0",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 20,
+      "source": "zone_context",
+      "key": "zone_capacity",
+      "value": "2500",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 21,
+      "source": "zone_context",
+      "key": "nearby_booths",
+      "value": "Merch tent, Water station 2",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 22,
+      "source": "zone_context",
+      "key": "schedule_now",
+      "value": "Opening DJ set",
+      "observed_at": 1792899100000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 23,
+      "source": "presence",
+      "key": "zone_stay",
+      "value": "Main stage 19:55:00-now",
+      "observed_at": 1792896900000000,
+      "reader": "code",
+      "reference": "zone_visit:29"
+    },
+    {
+      "seq": 24,
+      "source": "medical_record",
+      "key": "record_patient",
+      "value": "Sam Patel",
+      "observed_at": 1792943400000000,
+      "reader": "model",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 25,
+      "source": "medical_record",
+      "key": "record_provider",
+      "value": "Wrenfield Urgent Care",
+      "observed_at": 1792943400000000,
+      "reader": "model",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 26,
+      "source": "medical_record",
+      "key": "record_date_of_service",
+      "value": "2026-10-25",
+      "observed_at": 1792943400000000,
+      "reader": "model",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 27,
+      "source": "medical_record",
+      "key": "record_diagnoses",
+      "value": "S93.401A Sprain of unspecified ligament of right ankle, initial encounter; Y93.67 Activity, basketball; Y92.009 Unspecified place in unspecified non-institutional (private) residence as the place of occurrence",
+      "observed_at": 1792943400000000,
+      "reader": "model",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 28,
+      "source": "medical_record",
+      "key": "record_billed_cents",
+      "value": "56500",
+      "observed_at": 1792943400000000,
+      "reader": "model",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 29,
+      "source": "medical_record",
+      "key": "record_covered_cents",
+      "value": "56500",
+      "observed_at": 1792943400000000,
+      "reader": "code",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 30,
+      "source": "medical_record",
+      "key": "record_sha256",
+      "value": "c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3",
+      "observed_at": 1792943400000000,
+      "reader": "code",
+      "reference": "blob:c1c51e7cc2e013a87ecab7311029ed6e0d04880228d49f903977b320b6e6e6c3"
+    },
+    {
+      "seq": 31,
+      "source": "policy",
+      "key": "policy_number",
+      "value": "GL-2026-0412",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 32,
+      "source": "policy",
+      "key": "insurer",
+      "value": "Harborline Mutual",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 33,
+      "source": "policy",
+      "key": "cover_kind",
+      "value": "medical_payments",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 34,
+      "source": "policy",
+      "key": "per_claim_limit_cents",
+      "value": "500000",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 35,
+      "source": "policy",
+      "key": "deductible_cents",
+      "value": "10000",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 36,
+      "source": "policy",
+      "key": "aggregate_remaining_cents",
+      "value": "2500000",
+      "observed_at": 1792947600000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    }
+  ],
+  "checks": [
+    {
+      "name": "witness_zone",
+      "result": "pass",
+      "detail": "2 of 2 witnesses in zone 101",
+      "reader": "code"
+    },
+    {
+      "name": "staff_note_time",
+      "result": "pass",
+      "detail": "first note 20:39:00, incident 20:31:40-20:50:00, window +30 min",
+      "reader": "code"
+    },
+    {
+      "name": "claimant_not_staff",
+      "result": "pass",
+      "detail": "Sam Patel holds no staff role",
+      "reader": "code"
+    },
+    {
+      "name": "record_duplicate",
+      "result": "pass",
+      "detail": "no other claim has this file, invoice, or patient, date and total",
+      "reader": "code"
+    },
+    {
+      "name": "record_patient_match",
+      "result": "pass",
+      "detail": "claimant \"Sam Patel\", record patient \"Sam Patel\"",
+      "reader": "code"
+    },
+    {
+      "name": "record_date_window",
+      "result": "pass",
+      "detail": "encounter 2026-10-25, incident 2026-10-24: 1 days after, window 30 days",
+      "reader": "code"
+    },
+    {
+      "name": "record_injury_code",
+      "result": "pass",
+      "detail": "diagnoses S93.401A, Y93.67, Y92.009",
+      "reader": "code"
+    },
+    {
+      "name": "record_totals",
+      "result": "pass",
+      "detail": "service lines sum to $565.00, total billed $565.00",
+      "reader": "code"
+    },
+    {
+      "name": "record_lines",
+      "result": "pass",
+      "detail": "3 covered, 0 reduced, 0 excluded",
+      "reader": "code"
+    },
+    {
+      "name": "elastic_validation",
+      "result": "pass",
+      "detail": "document passed the bandit-claims-validate pipeline",
+      "reader": "elastic"
+    }
+  ],
+  "amounts": {
+    "cost_cents": 56500,
+    "payout_cents": 56500,
+    "recoverable_cents": 46500,
+    "venue_cost_cents": 10000
+  },
+  "lines": [
+    {
+      "line_no": 1,
+      "code": "99203",
+      "description": "New patient visit, low complexity",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 18500,
+      "allowed_cents": 18500,
+      "covered_cents": 18500,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 2
+    },
+    {
+      "line_no": 2,
+      "code": "73610",
+      "description": "X-ray ankle, 3 views, right",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 16000,
+      "allowed_cents": 16000,
+      "covered_cents": 16000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 2
+    },
+    {
+      "line_no": 3,
+      "code": "29515",
+      "description": "Short leg splint application (calf to foot), right",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 22000,
+      "allowed_cents": 22000,
+      "covered_cents": 22000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 2
+    }
+  ],
+  "record_history": "Patient presents with right ankle pain and swelling. He states he twisted his right ankle (inversion injury) while playing pickup basketball at home on the evening of Friday, October 23, 2026, before attending Cal Hacks 13.0. He was able to walk afterward and did not seek care that night. The pain and swelling got worse while he was walking around the event on Saturday, October 24, 2026, and today he has difficulty bearing full weight. Denies any new fall, twist, or other injury since the initial injury. Rates pain 6/10, lateral ankle, worse with weight bearing. Took ibuprofen 400 mg last night with partial relief. Denies numbness or tingling. No prior right ankle injury.",
+  "record_reason": "Right ankle pain and swelling.",
+  "precedents": [
+    {
+      "reference": "history-02",
+      "outcome": "refused",
+      "payout_cents": 0,
+      "narrative": "Fall in zone Main stage left at 21:20; 2 light-circle witnesses in the same zone; medic note within 10 minutes; right ankle sprain, subsequent encounter S93.401D; urgent care visit with walking boot; record shows the ankle injury was first treated before the event.",
+      "score": 0.91
+    },
+    {
+      "reference": "history-06",
+      "outcome": "auto_settled",
+      "payout_cents": 6500,
+      "narrative": "Fall in zone Stage B at 23:25; 2 light-circle witnesses in the same zone; medic note within 8 minutes; right ankle sprain S93.401A; first aid only.",
+      "score": 0.87
+    },
+    {
+      "reference": "history-11",
+      "outcome": "refused",
+      "payout_cents": 0,
+      "narrative": "Fall in zone Main stage right at 22:40 during a headline set; no light-circle witnesses in the same zone; medic note within 41 minutes; right ankle sprain S93.401A; urgent care visit with x-ray; 2 light-circle witnesses heard the beacon from zone Food court, not the incident zone.",
+      "score": 0.83000004
+    }
+  ],
+  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event."
+}

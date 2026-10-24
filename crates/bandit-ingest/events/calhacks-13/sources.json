@@ -1,0 +1,76 @@
+{
+  "pages": [
+    {"source": "site", "kind": "event_site", "url": "https://www.calhacks.io/"},
+    {"source": "devpost", "kind": "devpost", "url": "https://cal-hacks-13-0.devpost.com/"},
+    {"source": "devpost_dates", "kind": "devpost_dates", "url": "https://cal-hacks-13-0.devpost.com/details/dates"}
+  ],
+  "datasets": [
+    {
+      "source": "linkedin",
+      "kind": "linkedin_company",
+      "dataset_id": "gd_l1vikfnt1wgvvqz95w",
+      "urls": [
+        "https://www.linkedin.com/company/annapurna-labs/",
+        "https://www.linkedin.com/company/anthropicresearch/",
+        "https://www.linkedin.com/company/clockwork-labs/",
+        "https://www.linkedin.com/company/microsoft/",
+        "https://www.linkedin.com/company/supercell/",
+        "https://www.linkedin.com/company/visa/",
+        "https://www.linkedin.com/company/afterquery/",
+        "https://www.linkedin.com/company/apify/",
+        "https://www.linkedin.com/company/armadin/",
+        "https://www.linkedin.com/company/bright-data/",
+        "https://www.linkedin.com/company/convex-dev/",
+        "https://www.linkedin.com/company/creaoai/",
+        "https://www.linkedin.com/company/meta/",
+        "https://www.linkedin.com/company/atlassian/",
+        "https://www.linkedin.com/company/canva/",
+        "https://www.linkedin.com/company/capital-one/",
+        "https://www.linkedin.com/company/citadel-llc/",
+        "https://www.linkedin.com/company/coinbase/",
+        "https://www.linkedin.com/company/crscreditapi/",
+        "https://www.linkedin.com/company/d.-e.-shaw-&-co./",
+        "https://www.linkedin.com/company/decagon-ai/",
+        "https://www.linkedin.com/company/engrammehq/",
+        "https://www.linkedin.com/company/figma/",
+        "https://www.linkedin.com/company/greptile/",
+        "https://www.linkedin.com/company/jane-street-global/",
+        "https://www.linkedin.com/company/listenlabss/",
+        "https://www.linkedin.com/company/moonpay/",
+        "https://www.linkedin.com/company/ginger-labs/",
+        "https://www.linkedin.com/company/runpod-io/",
+        "https://www.linkedin.com/company/scaleai/",
+        "https://www.linkedin.com/company/adobe/",
+        "https://www.linkedin.com/company/major-league-hacking/",
+        "https://www.linkedin.com/company/uc-berkeley-fung-institute-for-engineering-leadership/",
+        "https://www.linkedin.com/company/jukebox/",
+        "https://www.linkedin.com/company/illumio/",
+        "https://www.linkedin.com/company/the-house-fund/",
+        "https://www.linkedin.com/company/wajo-ai/",
+        "https://www.linkedin.com/company/celsius-inc-/",
+        "https://www.linkedin.com/company/harmless-harvest/",
+        "https://www.linkedin.com/company/asus/",
+        "https://www.linkedin.com/company/seeedstudio/"
+      ]
+    },
+    {
+      "source": "crunchbase",
+      "kind": "crunchbase_company",
+      "dataset_id": "gd_l1vijqt9jfj7olije",
+      "urls": [
+        "https://www.crunchbase.com/organization/hyphenate-ai",
+        "https://www.crunchbase.com/organization/clockwork-labs",
+        "https://www.crunchbase.com/organization/supercell",
+        "https://www.crunchbase.com/organization/visa"
+      ]
+    },
+    {
+      "source": "gmaps",
+      "kind": "google_maps",
+      "dataset_id": "gd_m8ebnr0q2qlklc02fz",
+      "urls": [
+        "https://www.google.com/maps/place/Palace+of+Fine+Arts/@37.8029,-122.4484,16z/data=!4m6!3m5!1s0x808586d510144681:0xe960db8a581aacf5!8m2!3d37.8029308!4d-122.4484231!16zL20vMDJqbjNx?hl=en"
+      ]
+    }
+  ]
+}

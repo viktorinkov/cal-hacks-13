@@ -1,0 +1,76 @@
+{
+  "document_kind": "first_aid_record",
+  "patient": {
+    "name": "Maya Chen",
+    "date_of_birth": "2001-03-14",
+    "page": 1
+  },
+  "provider": {
+    "name": "Event Medical Station - Cal Hacks 13.0",
+    "address": "Cal Hacks 13.0 venue",
+    "page": 1
+  },
+  "encounter": {
+    "date_of_service": "2026-10-24",
+    "time": "22:20",
+    "reason_for_visit": "Right wrist pain after a fall.",
+    "history": "Patient presented to the Event Medical Station on foot at 22:20, accompanied by a friend. At approximately 22:05, while attending Cal Hacks 13.0, she slipped on a spilled drink near Main stage and fell onto her outstretched right hand. She did not strike her head and had no loss of consciousness. She reports immediate pain over the back of the right wrist, rated 5/10, worse with wrist extension and gripping. Denies numbness, tingling, or any other injury. Right-hand dominant. No prior injury to the right wrist.",
+    "page": 1
+  },
+  "diagnoses": [
+    {
+      "code": "S63.501A",
+      "description": "Sprain of right wrist, initial encounter",
+      "page": 1
+    },
+    {
+      "code": "W01.0XXA",
+      "description": "Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter",
+      "page": 1
+    }
+  ],
+  "services": [
+    {
+      "code": "99211",
+      "description": "First-aid assessment",
+      "date_of_service": "2026-10-24",
+      "units": 1,
+      "charge_cents": 6500,
+      "page": 1
+    },
+    {
+      "code": "A6448",
+      "description": "Light compression bandage, elastic, width under 3 in",
+      "date_of_service": "2026-10-24",
+      "units": 1,
+      "charge_cents": 2500,
+      "page": 1
+    },
+    {
+      "code": "A9273",
+      "description": "Cold pack",
+      "date_of_service": "2026-10-24",
+      "units": 1,
+      "charge_cents": 3000,
+      "page": 1
+    },
+    {
+      "code": "L3908",
+      "description": "Wrist-hand orthosis, prefabricated, off-the-shelf",
+      "date_of_service": "2026-10-24",
+      "units": 1,
+      "charge_cents": 4000,
+      "page": 1
+    },
+    {
+      "code": "99070",
+      "description": "Supplies and materials",
+      "date_of_service": "2026-10-24",
+      "units": 1,
+      "charge_cents": 2000,
+      "page": 1
+    }
+  ],
+  "invoice_number": "FA-1024-0007",
+  "total_billed_cents": 18000
+}

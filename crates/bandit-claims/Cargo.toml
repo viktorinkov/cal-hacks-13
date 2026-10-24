@@ -1,0 +1,14 @@
+[package]
+name = "bandit-claims"
+version.workspace = true
+edition.workspace = true
+description = "Drives and shows BandIt's insurance claims flow from the command line"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+spacetimedb-sdk = { workspace = true }
+bandit-bindings = { path = "../bandit-bindings" }
+bandit-common = { path = "../bandit-common" }
+bandit-insurance = { path = "../bandit-insurance" }

@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+target/
+var/
+.dev/
+pipeline/data/
+__pycache__/
+*.pyc

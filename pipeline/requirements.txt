@@ -1,0 +1,5 @@
+pyserial
+requests
+Pillow
+pillow-heif
+opencv-python

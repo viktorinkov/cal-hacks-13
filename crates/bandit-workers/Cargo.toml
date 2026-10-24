@@ -1,0 +1,20 @@
+[package]
+name = "bandit-workers"
+version.workspace = true
+edition.workspace = true
+description = "Job runner for BandIt's insurance claims flow: Claude, Elastic and Nessie work for the SpacetimeDB module"
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+bandit-bindings = { path = "../bandit-bindings" }
+bandit-common = { path = "../bandit-common" }
+claims-elastic = { path = "../claims-elastic" }
+claude-client = { path = "../claude-client" }
+bandit-insurance = { path = "../bandit-insurance" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+spacetimedb-sdk.workspace = true
+tokio.workspace = true
+tracing.workspace = true

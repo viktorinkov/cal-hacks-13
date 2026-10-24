@@ -1,0 +1,194 @@
+version: "1"
+name: bandit-organize
+description: Organizes the raw records of one BandIt import run. Exact ES|QL joins first, then the bandit-organizer agent makes one decision per listed domain, prize, person and schedule item, then one document per run in bandit-bundles.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: run_id
+        type: string
+        required: true
+        description: The import run to organize.
+steps:
+  - name: join_orgs
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "organization_candidate"
+        | EVAL member_key = source_key
+        | KEEP run_id, domain, member_key
+        | LOOKUP JOIN bandit-raw-orgs ON run_id, domain
+        | RENAME source_key AS facts_key
+        | STATS member_keys = VALUES(member_key), facts_keys = VALUES(facts_key) BY domain
+        | SORT domain
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: join_keys
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND org_key != "" AND record_kind IN ("organization_candidate", "prize", "person_candidate")
+        | EVAL candidate = CASE(record_kind == "organization_candidate", source_key), linked = CASE(record_kind != "organization_candidate", source_key)
+        | STATS organization_candidates = VALUES(candidate), linked_records = VALUES(linked) BY org_key
+        | WHERE organization_candidates IS NOT NULL AND linked_records IS NOT NULL
+        | SORT org_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: join_schedule
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "schedule_item"
+        | EVAL slot_key = source_key, slot_name = name, slot_location = location_text
+        | KEEP run_id, location_norm, slot_key, slot_name, slot_location
+        | LOOKUP JOIN bandit-raw-plan ON run_id, location_norm
+        | EVAL zone_key = CASE(record_kind == "zone", source_key)
+        | STATS zone_keys = VALUES(zone_key), slot_name = VALUES(slot_name), slot_location = VALUES(slot_location) BY slot_key
+        | SORT slot_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: list_prizes
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "prize"
+        | KEEP source_key, name, org_key
+        | SORT source_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: list_people
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "person_candidate"
+        | KEEP source_key, name, role_text, org_key
+        | SORT source_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: org_schema
+    type: data.parseJson
+    source: |
+      {"type": "object", "required": ["domains", "gaps"],
+       "properties": {
+        "domains": {"type": "object", "additionalProperties": false,
+          "required": [{% for row in steps.join_orgs.output.values %}{{ row[2] | json }}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+          "properties": { {% for row in steps.join_orgs.output.values %}{{ row[2] | json }}: {"$ref": "#/definitions/decision"}{% unless forloop.last %}, {% endunless %}{% endfor %} }},
+        "gaps": {"type": "array", "items": {"type": "object", "required": ["key", "reason"], "properties": {"key": {"type": "string"}, "reason": {"type": "string"}}}}},
+       "definitions": {"decision": {"type": "object",
+        "required": ["key", "name", "facts_key", "category", "tags", "description", "match_method", "match_reason"],
+        "properties": {
+         "key": {"type": "string", "description": "org: followed by the primary domain; every domain of one organization has the same key"},
+         "name": {"type": "string"},
+         "facts_key": {"type": "string", "description": "source_key of the best company_facts record, or empty"},
+         "category": {"type": "string", "enum": ["ai", "developer_tools", "cloud", "data", "security", "fintech", "crypto", "venture", "design", "hardware", "gaming", "food_drink", "health", "education", "other"]},
+         "tags": {"type": "array", "maxItems": 5, "items": {"type": "string"}},
+         "description": {"type": "string", "description": "one or two sentences"},
+         "match_method": {"type": "string", "enum": ["exact_domain", "agent"]},
+         "match_reason": {"type": "string", "description": "one sentence"}}}}}
+
+  - name: organize_orgs
+    type: ai.agent
+    agent-id: bandit-organizer
+    create-conversation: true
+    reasoning-level: low
+    with:
+      message: |
+        Run id: {{ inputs.run_id }}
+        Section: organizations.
+
+        The workflow joined the organization candidates of this run to their company_facts records by website domain (ES|QL LOOKUP JOIN ON run_id, domain). One row per domain:
+        {% for row in steps.join_orgs.output.values %}- domain {{ row[2] }}: member_keys {{ row[0] | json }}, facts_keys {{ row[1] | json }}
+        {% endfor %}
+        Do this:
+        1. Read bandit.records(run_id, "organization_candidate") and bandit.records(run_id, "company_facts").
+        2. Return one decision per domain under domains, keyed by the domain exactly as written above.
+        3. A domain is its own organization with match_method "exact_domain", unless the matching ladder shows it is the same organization as another domain. Then both decisions carry the same key, name, facts_key, category, tags and description, and the merged one has match_method "agent" and a match_reason that names the evidence.
+        4. facts_key is the best of the organization's facts_keys. For an organization without facts_keys, look for its company_facts records with bandit.candidates and use one only when it is clearly about the same organization (match_method "agent").
+        Gaps in this section are about organizations only.
+      schema: "${{ steps.org_schema.output }}"
+
+  - name: link_schema
+    type: data.parseJson
+    source: |
+      {"type": "object", "required": ["prizes", "people", "schedule", "gaps"],
+       "properties": {
+        "prizes": {"type": "object", "additionalProperties": false,
+          "required": [{% for row in steps.list_prizes.output.values %}{{ row[0] | json }}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+          "properties": { {% for row in steps.list_prizes.output.values %}{{ row[0] | json }}: {"$ref": "#/definitions/link"}{% unless forloop.last %}, {% endunless %}{% endfor %} }},
+        "people": {"type": "object", "additionalProperties": false,
+          "required": [{% for row in steps.list_people.output.values %}{{ row[0] | json }}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+          "properties": { {% for row in steps.list_people.output.values %}{{ row[0] | json }}: {"$ref": "#/definitions/link"}{% unless forloop.last %}, {% endunless %}{% endfor %} }},
+        "schedule": {"type": "object", "additionalProperties": false,
+          "required": [{% for row in steps.join_schedule.output.values %}{{ row[3] | json }}{% unless forloop.last %}, {% endunless %}{% endfor %}],
+          "properties": { {% for row in steps.join_schedule.output.values %}{{ row[3] | json }}: {"$ref": "#/definitions/slot"}{% unless forloop.last %}, {% endunless %}{% endfor %} }},
+        "gaps": {"type": "array", "items": {"type": "object", "required": ["key", "reason"], "properties": {"key": {"type": "string"}, "reason": {"type": "string"}}}}},
+       "definitions": {
+        "link": {"type": "object", "required": ["organization_key", "reason"],
+         "properties": {"organization_key": {"type": "string"}, "reason": {"type": "string"}}},
+        "slot": {"type": "object", "required": ["zone_key", "organization_key", "reason"],
+         "properties": {"zone_key": {"type": "string"}, "organization_key": {"type": "string"}, "reason": {"type": "string"}}}}}
+
+  - name: link_records
+    type: ai.agent
+    agent-id: bandit-organizer
+    create-conversation: true
+    reasoning-level: low
+    with:
+      message: |
+        Run id: {{ inputs.run_id }}
+        Section: links.
+
+        Organizations of this run (an organization can span several domains):
+        {% for row in steps.join_orgs.output.values %}{% assign d = steps.organize_orgs.output.structured_output.domains[row[2]] %}- {{ d.key }}: {{ d.name }}, member_keys {{ row[0] | json }}
+        {% endfor %}
+        Exact key matches from the workflow (records that share a normalised org_key):
+        {% for row in steps.join_keys.output.values %}- org_key {{ row[2] }}: organization candidates {{ row[0] | json }}, linked records {{ row[1] | json }}
+        {% endfor %}
+        Prizes:
+        {% for row in steps.list_prizes.output.values %}- {{ row[0] }}: {{ row[1] }} (org_key {{ row[2] | json }})
+        {% endfor %}
+        People:
+        {% for row in steps.list_people.output.values %}- {{ row[0] }}: {{ row[1] }}, {{ row[2] }} (org_key {{ row[3] | json }})
+        {% endfor %}
+        Schedule items with the exact zone join (ES|QL LOOKUP JOIN to bandit-raw-plan ON run_id, location_norm):
+        {% for row in steps.join_schedule.output.values %}- {{ row[3] }}: {{ row[1] }} at {{ row[2] | json }}, exact zone {{ row[0] | json }}
+        {% endfor %}
+        Do this, with one decision per item keyed by its source_key:
+        1. prizes: use the exact key match when there is one (the organization whose member_keys contain that candidate); otherwise judge the prize name, often a sponsor tag in brackets, with bandit.candidates. A prize the event itself offers has organization_key "".
+        2. people: the organization the person works for (bandit.records(run_id, "person_candidate") has their fields), or "".
+        3. schedule: zone_key is the exact zone when there is one; otherwise a zone from bandit.records(run_id, "zone") only when its name clearly fits, else "". organization_key is the organization that clearly runs the item, else "".
+        Gaps in this section are about prizes, people and schedule items only.
+      schema: "${{ steps.link_schema.output }}"
+
+  - name: save_bundle
+    type: elasticsearch.index
+    with:
+      index: bandit-bundles
+      id: "{{ inputs.run_id }}"
+      refresh: wait_for
+      document:
+        run_id: "{{ inputs.run_id }}"
+        organizer: elastic_workflow
+        model: "{{ steps.organize_orgs.output.metadata.usage.connectorId }}"
+        org_rows: "${{ steps.join_orgs.output.values }}"
+        org_decisions: "${{ steps.organize_orgs.output.structured_output.domains }}"
+        prize_decisions: "${{ steps.link_records.output.structured_output.prizes }}"
+        person_decisions: "${{ steps.link_records.output.structured_output.people }}"
+        schedule_decisions: "${{ steps.link_records.output.structured_output.schedule }}"
+        gaps: "${{ steps.organize_orgs.output.structured_output.gaps | concat: steps.link_records.output.structured_output.gaps }}"
