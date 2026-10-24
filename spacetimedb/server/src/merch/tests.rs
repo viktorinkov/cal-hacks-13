@@ -3,7 +3,6 @@
 //! fails through the same reducers the worker calls.
 
 use super::*;
-use crate::jobs::*;
 use crate::roles::*;
 use crate::social::onboarding::update_profile;
 use crate::tables::*;
