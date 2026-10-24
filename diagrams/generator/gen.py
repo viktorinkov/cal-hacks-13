@@ -83,7 +83,7 @@ def architecture(y0):
     stations = S.box(60, L(bands.bottom) + 80, 200, "Station markers 101 to 105\nzone anchors, exit colours",
                      "device")
     gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
-    sim = S.box(460, 0, 300, "bandit-claims (demo tool)\ndrives demo bands 90 to 99 through report_sim_band and plants the claims", "rust",
+    sim = S.box(460, 0, 300, "bandit-claims (command-line tool)\ndrives simulated bands 90 to 99 through report_sim_band and plants the claims", "rust",
                 cy=L(venue.cy))
     bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band_reports every 250 ms, directives out",
                    "rust", cy=L(band1t.cy))
@@ -92,7 +92,7 @@ def architecture(y0):
                    cy=L(jobs.cy))
 
     # Rust services
-    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; POST /api/blobs, GET /recap/order, demo routes; holds the Elastic key", "rust")
+    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; POST /api/blobs, GET /recap/order, /api/dev routes; holds the Elastic key", "rust")
     indexer = S.box(1640, L(api.bottom) + 50, 300, "bandit-indexer\none-way copy of booths and interests into "
                                                     "Elastic", "rust")
     bd_label = "Bright Data Web MCP\nscrapes event pages, company pages, the venue on Google Maps and the floor plan"
@@ -120,7 +120,7 @@ def architecture(y0):
 
     zb = max(stdb_bottom, L(workers.bottom) + 30, L(vision.bottom) + 30)
     venue_z = S.zone(40, 200, 320, zb - 200, "Venue floor", "device")
-    S.zone(440, 200, 340, zb - 200, "Demo laptop, online through a phone hotspot", "rust")
+    S.zone(440, 200, 340, zb - 200, "Team laptop, online through a phone hotspot", "rust")
     S.zone(840, 190, 1950, top_h + 80, "Browsers", "web")
     stdb = S.zone(860, Y0, 620, zb - Y0, "SpacetimeDB Maincloud: the band1t module", "stdb")
     S.zone(1620, Y0, 340, zb - Y0, "Rust services", "rust")
@@ -307,8 +307,8 @@ def insurance(y0):
     S.link(settle, "b", letters, "t", fa=0.92, via=[(settle.x + 0.92 * settle.w, S.oy + 870), (letters.cx, S.oy + 870)])
 
     py = lanes["L6"][1] + 50
-    S.panel(40, py, 1180, "Live-learning demo",
-            "1. The fall from the demo becomes a claim. No rule exists yet, so it waits for a judge playing risk "
+    S.panel(40, py, 1180, "Live learning, as the judges see it",
+            "1. A live fall becomes a claim. No rule exists yet, so it waits for a judge playing risk "
             "manager on the Ops dashboard on their own phone.\n2. A late note makes the first tap fail as stale; the judge approves "
             "again. The payout lands in the wallet and rule v1 is created with the judge's name on it.\n3. A "
             "similar fall from the simulator settles in seconds under rule v1.\n4. A fake with witnesses in "
@@ -319,7 +319,7 @@ def insurance(y0):
             "closed as stale.\nSame bill scanned again: marked duplicate, pays nothing, refused as zero_payout."
             "\nInjured person is venue staff: refused at claim open; workers' comp applies.\nThree or more hurt in "
             "one incident: every claim goes to the adjuster.\nOnly code at claim open and the named approver refuse.", kind="bad")
-    S.panel(2560, py, 1340, "Accuracy run and scorecard, before the demo",
+    S.panel(2560, py, 1340, "Accuracy run and scorecard, before judging",
             "bandit-claims plants 3 rounds of 12 genuine claims and 6 decoys (sitting down, dropped phone, fake "
             "witnesses) through the same reducers a medic uses.\nStraight-through rate per round, rising as rules "
             "are learned.\nDollars wrongly paid on decoys: target $0.\nAuto-settle precision and recall; bill-review "
@@ -439,7 +439,7 @@ def hardware(y0):
                                   "105; anchor the zones and glow the exit colour", "device", cy=L(lite.cy))
     gateway = S.box(800, 0, 440, "Gateway x1\nXIAO ESP32-C3 on USB, id 200; one JSON line per packet; sends each "
                                  "command 3 times", "device", cy=L(full.cy))
-    bridge = S.box(1400, 0, 400, "bandit-bridge on the demo laptop\nUSB serial at 115200 baud", "rust",
+    bridge = S.box(1400, 0, 400, "bandit-bridge on the team laptop\nUSB serial at 115200 baud", "rust",
                    cy=L(gateway.cy))
     cam = S.box(1400, 0, 400, "Overhead phone camera on a stand\n(TBD Leo)", "tbd", cy=L(lite.cy))
     bands = S.zone(60, L(lite.y) - 50, 500, L(full.bottom) - L(lite.y) + 70, "9 bands, one firmware", "device",
