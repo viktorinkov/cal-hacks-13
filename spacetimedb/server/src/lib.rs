@@ -5,6 +5,14 @@ pub mod tuning;
 pub mod sweep;
 pub mod tables;
 
+pub mod roles;
+pub mod venue;
+pub mod social;
+pub mod insurance;
+pub mod jobs;
+pub mod safety;
+pub mod vision;
+
 use spacetimedb::{ReducerContext, Table};
 use tables::*;
 
