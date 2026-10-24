@@ -97,7 +97,7 @@ enum Cmd {
     /// Show the approval grid and approve with exactly what it shows
     Approve {
         claim: u64,
-        /// dana, sam or priya (default: the person the claim waits for)
+        /// The actor who decides (default: ops, the organizer)
         #[arg(long = "as")]
         as_: Option<String>,
         /// Ceiling for the learned rule, in dollars
@@ -117,7 +117,7 @@ enum Cmd {
         #[arg(long)]
         reason: String,
     },
-    /// The insurer paid the venue (as Priya)
+    /// The insurer paid the venue (recorded by the organizer)
     InsurerPaid {
         claim: u64,
         #[arg(long)]
@@ -125,7 +125,7 @@ enum Cmd {
         #[arg(long = "ref")]
         reference: String,
     },
-    /// Ask for a recovery letter on a settled property claim (as Dana)
+    /// Ask for a recovery letter on a settled property claim (as the organizer)
     Recovery {
         claim: u64,
         #[arg(long)]

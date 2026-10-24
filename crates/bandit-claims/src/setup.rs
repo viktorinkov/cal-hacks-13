@@ -48,11 +48,11 @@ pub fn run(app: &App) -> Result<Sim> {
     call!(db, start_job_reaper_then())?;
     println!("watch      safety watch (500 ms) and job reaper (10 s) started");
 
-    let dana = app.actor("dana")?;
+    let ops = app.actor("ops")?;
     let (start, end) = this_month(app.tz())?;
-    call!(dana, upsert_insurance_policy_then(POLICY.into(), "Northwind Mutual".into(), "claims@northwind.test".into(), start, end))?;
+    call!(ops, upsert_insurance_policy_then(POLICY.into(), "Northwind Mutual".into(), "claims@northwind.test".into(), start, end))?;
     call!(
-        dana,
+        ops,
         upsert_coverage_rule_then(
             POLICY.into(),
             "medical_payments".into(),
@@ -65,12 +65,9 @@ pub fn run(app: &App) -> Result<Sim> {
         )
     )?;
     call!(
-        dana,
+        ops,
         upsert_coverage_rule_then(POLICY.into(), "property".into(), vec!["property".into()], 1_000_000, 5_000_000, 50_000, 0, true)
     )?;
-    call!(dana, set_authority_limit_then("floor_manager".into(), 1, Some(50_000), Some(ids["sam"]), "Sam Okafor".into()))?;
-    call!(dana, set_authority_limit_then("risk_manager".into(), 2, Some(500_000), Some(ids["dana"]), "Dana Ruiz".into()))?;
-    call!(dana, set_authority_limit_then("adjuster".into(), 3, None, Some(ids["priya"]), "Priya Nair".into()))?;
     let tz = app.tz();
     println!(
         "policy     {POLICY} Northwind Mutual (claims@northwind.test), {} to {}",
@@ -79,7 +76,7 @@ pub fn run(app: &App) -> Result<Sim> {
     );
     println!("cover      medical_payments (sos, fall): $5,000.00 per claim, $25,000.00 aggregate, $0.00 deductible, 365 days");
     println!("cover      property: $10,000.00 per claim, $50,000.00 aggregate, $500.00 deductible");
-    println!("authority  floor_manager $500.00 Sam Okafor, risk_manager $5,000.00 Dana Ruiz, adjuster no limit Priya Nair");
+    println!("approvals  claims no learned rule settles wait for the organizer (ops)");
 
     let vision = app.actor("vision")?;
     call!(vision, upsert_camera_then("overhead pit".into(), main.id, "overhead".into()))?;

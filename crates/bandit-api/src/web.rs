@@ -25,9 +25,6 @@ pub const SESSION_HEADER: &str = "x-bandit-session";
 const ACTORS: &[(&str, &str)] = &[
     ("ops", "Ops desk (organizer)"),
     ("medic", "Ari Ramos (medic)"),
-    ("sam", "Sam Okafor (floor manager)"),
-    ("dana", "Dana Ruiz (risk manager)"),
-    ("priya", "Priya Nair (adjuster, Northwind Mutual)"),
     ("photographer", "Event photographer"),
     ("jordan", "Jordan Alvarez (attendee, band 90)"),
     ("maya", "Maya Chen (attendee, band 91)"),

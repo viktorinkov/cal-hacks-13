@@ -46,9 +46,6 @@ impl World {
             ("worker", "worker", "bandit-workers"),
             ("medic", "medic", "Ari Medic"),
             ("ops", "ops", "Ops desk"),
-            ("sam", "floor_manager", "Sam Okafor"),
-            ("dana", "risk_manager", "Dana Ruiz"),
-            ("priya", "adjuster", "Priya Nair"),
             ("vision", "vision", "bandit-vision"),
             ("sim", "simulator", "bandit-claims"),
         ] {
@@ -97,14 +94,11 @@ impl World {
             t.db.band().insert(band(b, 101));
         }
         let w = World { t };
-        w.as_("dana", |ctx| {
+        w.as_("ops", |ctx| {
             let start = spacetimedb::Timestamp::from_micros_since_unix_epoch(micros_at(2026, 10, 1, 0, 0, 0, PDT));
             upsert_insurance_policy(ctx, "GL-2026-04417".into(), "Northwind Mutual".into(), "claims@northwind.test".into(), start, start + TimeDuration::from_micros(365 * 86_400_000_000))?;
             upsert_coverage_rule(ctx, "GL-2026-04417".into(), "medical_payments".into(), vec!["sos".into(), "fall".into()], 500_000, 2_500_000, 0, 365, true)?;
-            upsert_coverage_rule(ctx, "GL-2026-04417".into(), "property".into(), vec!["property".into()], 1_000_000, 5_000_000, 50_000, 0, true)?;
-            set_authority_limit(ctx, "floor_manager".into(), 1, Some(50_000), Some(id("sam")), "Sam Okafor".into())?;
-            set_authority_limit(ctx, "risk_manager".into(), 2, Some(500_000), Some(id("dana")), "Dana Ruiz".into())?;
-            set_authority_limit(ctx, "adjuster".into(), 3, None, Some(id("priya")), "Priya Nair".into())
+            upsert_coverage_rule(ctx, "GL-2026-04417".into(), "property".into(), vec!["property".into()], 1_000_000, 5_000_000, 50_000, 0, true)
         });
         w
     }
@@ -267,9 +261,9 @@ fn call(kind: &str) -> ModelCallIn {
     ModelCallIn { kind: kind.into(), model_requested: "claude-opus-5-5".into(), model_used: "claude-opus-5-5".into(), status: "ok".into(), ..Default::default() }
 }
 
-/// Jordan's urgent-care visit: covered $895.00 after the fee schedule, above
-/// the floor manager's $500 ceiling, so it goes to Dana Ruiz. Her approval
-/// teaches the rule that settles the next small fall on its own.
+/// Jordan's urgent-care visit: covered $895.00 after the fee schedule, with no
+/// rule yet, so it goes to the organizer. The approval teaches the rule that
+/// settles the next small fall on its own.
 fn approve_larger_fall(w: &World) -> Claim {
     let incident = w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]);
     let claim = w.treat_and_resolve(incident);
@@ -284,24 +278,24 @@ fn approve_larger_fall(w: &World) -> Claim {
     w.review(claim.id, "consistent", "supported", None);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
-    assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("risk_manager", "Dana Ruiz", id("dana")));
+    assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
-    let stale = w.try_as("dana", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
+    let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
     assert!(stale.unwrap_err().starts_with("stale"));
-    assert!(w.try_as("sam", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true)).is_err());
-    w.as_("dana", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    assert!(w.try_as("medic", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true)).is_err());
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
     w.pay(claim.id);
     w.claim(claim.id)
 }
 
 #[test]
-fn larger_fall_goes_to_the_named_risk_manager() {
+fn larger_fall_goes_to_the_organizer() {
     let w = World::new();
     let c = approve_larger_fall(&w);
     assert_eq!(c.status, ClaimStatus::Settled);
     assert_eq!(c.decided_by, "approver");
     let rule = w.t.db.settlement_rule().iter().find(|r| r.status == "active").unwrap();
-    assert_eq!((rule.incident_kind.as_str(), rule.ceiling_cents, rule.version, rule.approver_name.as_str()), ("fall", 89_500, 1, "Dana Ruiz"));
+    assert_eq!((rule.incident_kind.as_str(), rule.ceiling_cents, rule.version, rule.approver_name.as_str()), ("fall", 89_500, 1, "Ops desk"));
     assert_eq!(
         w.ledger(c.id),
         [
@@ -314,7 +308,7 @@ fn larger_fall_goes_to_the_named_risk_manager() {
         ]
     );
     w.open_job(KIND_DRAFT, c.id);
-    w.as_("priya", |ctx| record_insurer_payment(ctx, c.id, 89_500, "NWM-55120".into()));
+    w.as_("ops", |ctx| record_insurer_payment(ctx, c.id, 89_500, "NWM-55120".into()));
     assert_eq!(w.claim(c.id).status, ClaimStatus::Reconciled);
 }
 
@@ -356,7 +350,7 @@ fn the_claims_agent_stops_an_injury_that_happened_at_home() {
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
     assert!(c.status_note.starts_with("claims agent: needs_human: causation"), "{}", c.status_note);
-    assert_eq!(c.routed_to_name, "Dana Ruiz");
+    assert_eq!(c.routed_to_name, "Organizer");
 }
 
 #[test]
@@ -391,7 +385,7 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
     let w = World::new();
     let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
     w.as_("vision", |ctx| upsert_camera(ctx, "overhead pit".into(), zone, "overhead".into()));
-    w.as_("sam", |ctx| open_incident(ctx, "property".into(), zone, 0, "speaker knocked off its stand at Main stage".into()));
+    w.as_("ops", |ctx| open_incident(ctx, "property".into(), zone, 0, "speaker knocked off its stand at Main stage".into()));
     let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Property).unwrap();
     let cam = w.t.db.camera().iter().next().unwrap().id;
     let frame_at = w.t.clock.now();
@@ -413,8 +407,8 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
         )
     });
     w.advance(600);
-    w.as_("sam", |ctx| add_incident_note(ctx, incident.id, "repair estimate from the AV vendor".into(), Some(240_000)));
-    w.as_("sam", |ctx| resolve_incident(ctx, incident.id, "area cleared".into()));
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "repair estimate from the AV vendor".into(), Some(240_000)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "area cleared".into()));
     let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
     assert_eq!(claim.status, ClaimStatus::Verifying);
     assert_eq!((claim.payout_cents, claim.recoverable_cents, claim.venue_cost_cents), (240_000, 190_000, 50_000));
@@ -422,9 +416,9 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
     w.verify(claim.id);
     w.review(claim.id, "consistent", "supported", None);
     let c = w.claim(claim.id);
-    assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Dana Ruiz"));
-    w.as_("dana", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
-    w.as_("dana", |ctx| request_recovery_letter(ctx, c.id, "Stagecraft AV".into(), "ops@stagecraft.test".into()));
+    assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    w.as_("ops", |ctx| request_recovery_letter(ctx, c.id, "Stagecraft AV".into(), "ops@stagecraft.test".into()));
     let job = w.open_job(KIND_RECOVERY, c.id);
     let p: RecoveryPayload = serde_json::from_str(&job.payload).unwrap();
     assert_eq!(p.letter.amounts.venue_cost_cents, 50_000);
@@ -457,7 +451,7 @@ fn injured_staff_are_excluded_from_medical_payments() {
 }
 
 #[test]
-fn three_people_hurt_at_once_go_to_the_adjuster_on_one_notice() {
+fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     let w = World::new();
     approve_larger_fall(&w);
     w.advance(3600);
@@ -473,9 +467,9 @@ fn three_people_hurt_at_once_go_to_the_adjuster_on_one_notice() {
     w.verify(first.id);
     w.review(first.id, "consistent", "supported", None);
     let claim = w.claim(first.id);
-    assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Priya Nair"));
+    assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
     assert!(claim.status_note.starts_with("3 people hurt in Main stage"), "{}", claim.status_note);
-    w.as_("priya", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone(), None, false));
+    w.as_("ops", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone(), None, false));
     w.pay(claim.id);
     let p: DraftPayload = serde_json::from_str(&w.open_job(KIND_DRAFT, claim.id).payload).unwrap();
     assert_eq!(p.letter.related_claims.len(), 2, "{:?}", p.letter.related_claims);

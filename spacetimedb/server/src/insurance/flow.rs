@@ -1,6 +1,6 @@
 //! A claim's life: open from a resolved incident, file and read the medical
 //! record, verify in Elastic, review by the claims agent, decide in code,
-//! approve or refuse by the named person, pay, reconcile with the insurer.
+//! approve or refuse by the organizer, pay, reconcile with the insurer.
 
 use super::evidence::*;
 use super::*;
@@ -246,7 +246,7 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &hyphenate_core::e
 /// Files the medical record PDF (already in the blob store) for an injury claim.
 #[spacetimedb::reducer]
 pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: String, page_count: u32) -> Result<(), String> {
-    require_role(ctx, &["medic", "ops", "floor_manager", "risk_manager"])?;
+    require_role(ctx, &["medic", "ops"])?;
     let claim = claim_by_id(ctx, claim_id)?;
     if claim.status != ClaimStatus::AwaitingRecord {
         return Err(format!("claim {claim_id} is not waiting for a medical record"));
@@ -564,11 +564,11 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     let occurrence = occurrence(ctx, claim.incident_id);
     if occurrence.len() >= MASS_OCCURRENCE && !matches!(decision, Decision::Refuse { .. }) {
         let reason = format!(
-            "{} people hurt in {} within 5 minutes: auto-settle is off and the adjuster handles every claim of the occurrence",
+            "{} people hurt in {} within 5 minutes: auto-settle is off and the organizer decides every claim of the occurrence",
             occurrence.len(),
             claim.zone_name
         );
-        route_to(ctx, claim, "adjuster", reason);
+        route(ctx, claim, reason);
         return Ok(());
     }
     match decision {
@@ -584,48 +584,30 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     }
 }
 
-/// With this many people hurt in one occurrence, every claim goes to the adjuster.
+/// With this many people hurt in one occurrence, the organizer decides every claim.
 const MASS_OCCURRENCE: usize = 3;
 
-/// Sends the claim to the named person on one rung of the authority matrix.
-fn route_to(ctx: &ReducerContext, claim: Claim, role: &str, reason: String) {
-    let limit = ctx.db.authority_limit().role().find(&role.to_string());
+/// The name every routed claim waits for.
+const ORGANIZER: &str = "Organizer";
+
+/// Sends the claim to the organizer: anyone with `ops`, after the event.
+fn route(ctx: &ReducerContext, claim: Claim, reason: String) {
     save(
         ctx,
         Claim {
             status: ClaimStatus::Routed,
             status_note: reason,
-            routed_to_role: role.into(),
-            routed_to: limit.as_ref().and_then(|l| l.assignee).unwrap_or(Identity::ZERO),
-            routed_to_name: limit.map(|l| l.assignee_name).unwrap_or_default(),
+            routed_to_role: "ops".into(),
+            routed_to: Identity::ZERO,
+            routed_to_name: ORGANIZER.into(),
             ..claim
         },
     );
 }
 
-/// Sends the claim to the lowest rung of the authority matrix whose ceiling
-/// covers the payout, and names the person on it.
-fn route(ctx: &ReducerContext, claim: Claim, reason: String) {
-    let limits: Vec<hyphenate_core::authority::AuthorityLimit> = ctx
-        .db
-        .authority_limit()
-        .iter()
-        .map(|l| hyphenate_core::authority::AuthorityLimit { role: l.role, rank: l.rank, ceiling_cents: l.ceiling_cents, assignee_name: l.assignee_name })
-        .collect();
-    let target = hyphenate_core::authority::route(&limits, claim.payout_cents).cloned();
-    let (role, name) = target.map(|t| (t.role, t.assignee_name)).unwrap_or(("risk_manager".into(), String::new()));
-    let assignee = ctx.db.authority_limit().role().find(&role).and_then(|l| l.assignee).unwrap_or(Identity::ZERO);
-    save(
-        ctx,
-        Claim {
-            status: ClaimStatus::Routed,
-            status_note: reason,
-            routed_to_role: role,
-            routed_to: assignee,
-            routed_to_name: name,
-            ..claim
-        },
-    );
+/// The person deciding, for the approval and the learned rule: their `ops` label, else "Organizer".
+fn organizer_name(ctx: &ReducerContext) -> String {
+    ctx.db.staff_role().identity().filter(ctx.sender()).find(|r| r.role == "ops").map(|r| r.label).unwrap_or_else(|| ORGANIZER.into())
 }
 
 fn refuse(ctx: &ReducerContext, claim: Claim, reason: String, decided_by: &str) -> Result<Claim, String> {
@@ -718,7 +700,7 @@ pub fn record_claim_payout(ctx: &ReducerContext, job_id: u64, customer_id: Strin
 /// Queues the Nessie deposit again after it failed.
 #[spacetimedb::reducer]
 pub fn retry_claim_payout(ctx: &ReducerContext, claim_id: u64) -> Result<(), String> {
-    require_role(ctx, &["risk_manager", "adjuster"])?;
+    require_role(ctx, &["ops"])?;
     let claim = claim_by_id(ctx, claim_id)?;
     if claim.status != ClaimStatus::Paying {
         return Err(format!("claim {claim_id} is not waiting for its payout"));
@@ -786,7 +768,7 @@ fn related_claims(ctx: &ReducerContext, claim: &Claim) -> Vec<String> {
         .collect()
 }
 
-/// The named approver checks the claim; the reducer fails closed when the
+/// The organizer checks the claim; the reducer fails closed when the
 /// amount or the pack on their screen is no longer current.
 fn approver_check(ctx: &ReducerContext, claim: &Claim, pack_hash_seen: &str) -> Result<(), String> {
     if claim.status != ClaimStatus::Routed {
@@ -818,8 +800,7 @@ pub fn approve_claim(
     if now.payout_cents != claim.payout_cents || amount_seen_cents != claim.payout_cents {
         return Err(format!("stale: the payout is now {}", hyphenate_core::money::format_cents(now.payout_cents)));
     }
-    let limit = ctx.db.authority_limit().role().find(&claim.routed_to_role);
-    let approver_name = limit.as_ref().map(|l| l.assignee_name.clone()).unwrap_or_default();
+    let approver_name = organizer_name(ctx);
     let approval = ctx.db.approval().insert(Approval {
         id: 0,
         claim_id,
@@ -849,9 +830,9 @@ pub fn approve_claim(
             cover_kind: cover.as_str().into(),
             zone_id: 0,
             requires_corroborated: true,
-            ceiling_cents: learned_ceiling(requested_ceiling_cents, claim.payout_cents, limit.and_then(|l| l.ceiling_cents)),
+            ceiling_cents: learned_ceiling(requested_ceiling_cents, claim.payout_cents, None),
             approver: ctx.sender(),
-            approver_name,
+            approver_name: approver_name.clone(),
             approver_role: claim.routed_to_role.clone(),
             approval_id: approval.id,
             version,
@@ -859,7 +840,7 @@ pub fn approve_claim(
             created_at: ctx.timestamp,
         });
     }
-    let claim = save(ctx, Claim { decided_by: "approver".into(), ..claim });
+    let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
     settle(ctx, claim, "approved")
 }
 
@@ -870,7 +851,7 @@ pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String,
     if reason.trim().is_empty() {
         return Err("a refusal needs a reason".into());
     }
-    let approver_name = ctx.db.authority_limit().role().find(&claim.routed_to_role).map(|l| l.assignee_name).unwrap_or_default();
+    let approver_name = organizer_name(ctx);
     ctx.db.approval().insert(Approval {
         id: 0,
         claim_id,
@@ -891,7 +872,7 @@ pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String,
 /// The insurer's payment closes the receivable (J4).
 #[spacetimedb::reducer]
 pub fn record_insurer_payment(ctx: &ReducerContext, claim_id: u64, amount_cents: u64, reference: String) -> Result<(), String> {
-    require_role(ctx, &["risk_manager", "adjuster"])?;
+    require_role(ctx, &["ops"])?;
     let claim = claim_by_id(ctx, claim_id)?;
     if claim.status != ClaimStatus::Settled {
         return Err(format!("claim {claim_id} is not settled"));
@@ -912,7 +893,7 @@ pub fn record_insurer_payment(ctx: &ReducerContext, claim_id: u64, amount_cents:
 /// Asks Claude for a recovery letter to whoever was handling the damaged equipment.
 #[spacetimedb::reducer]
 pub fn request_recovery_letter(ctx: &ReducerContext, claim_id: u64, counterparty_name: String, counterparty_contact: String) -> Result<(), String> {
-    require_role(ctx, &["risk_manager", "adjuster"])?;
+    require_role(ctx, &["ops"])?;
     let claim = claim_by_id(ctx, claim_id)?;
     if cover_of(&claim) != CoverKind::Property || !matches!(claim.status, ClaimStatus::Settled | ClaimStatus::Reconciled) {
         return Err(format!("claim {claim_id} is not a settled property claim"));

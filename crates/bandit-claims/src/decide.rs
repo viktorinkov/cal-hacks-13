@@ -8,7 +8,6 @@ use spacetimedb_sdk::Table;
 
 /// What the approver sees, captured once so the reducer gets exactly that.
 pub struct Grid {
-    pub claim: Claim,
     pub payout_cents: u64,
     pub pack_hash: String,
 }
@@ -54,16 +53,16 @@ pub fn grid(app: &App, claim_id: u64, verbose: bool) -> Result<Grid> {
             say!(app, "  agent        {}", c.review_verdict);
         }
     }
-    Ok(Grid { payout_cents: c.payout_cents, pack_hash: c.pack_hash.clone(), claim: c })
+    Ok(Grid { payout_cents: c.payout_cents, pack_hash: c.pack_hash.clone() })
 }
 
 fn claimant(c: &Claim) -> &str {
     if c.claimant_name.is_empty() { "the venue" } else { &c.claimant_name }
 }
 
-/// The actor who decides: `as_`, else the person the claim waits for, else Dana.
-fn decider(c: &Claim, as_: Option<&str>) -> String {
-    as_.map(str::to_string).or_else(|| approver_for_role(&c.routed_to_role).map(str::to_string)).unwrap_or_else(|| "dana".into())
+/// The actor who decides: `as_`, else the organizer, whom every routed claim waits for.
+fn decider(as_: Option<&str>) -> String {
+    as_.unwrap_or("ops").to_string()
 }
 
 /// Shows the grid and approves with exactly what it showed (or, with `stale`,
@@ -78,7 +77,7 @@ pub fn approve(
     verbose: bool,
 ) -> Result<Claim> {
     let g = grid(app, claim_id, verbose)?;
-    let who = decider(&g.claim, as_);
+    let who = decider(as_);
     let conn = app.actor(&who)?;
     let name = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
     let amount = if stale { g.payout_cents + 10_000 } else { g.payout_cents };
@@ -126,7 +125,7 @@ pub fn approve(
 
 pub fn refuse(app: &App, claim_id: u64, as_: Option<&str>, reason: &str, verbose: bool) -> Result<Claim> {
     let g = grid(app, claim_id, verbose)?;
-    let who = decider(&g.claim, as_);
+    let who = decider(as_);
     let conn = app.actor(&who)?;
     let name = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
     say!(app, "{name} refuses on pack {}: {reason}", short_hash(&g.pack_hash));
@@ -136,9 +135,9 @@ pub fn refuse(app: &App, claim_id: u64, as_: Option<&str>, reason: &str, verbose
     Ok(c)
 }
 
-/// The insurer's payment against the receivable (J4), as Priya by default.
+/// The insurer's payment against the receivable (J4), recorded by the organizer by default.
 pub fn insurer_paid(app: &App, claim_id: u64, amount: u64, reference: &str, as_: Option<&str>) -> Result<Claim> {
-    let conn = app.actor(as_.unwrap_or("priya"))?;
+    let conn = app.actor(as_.unwrap_or("ops"))?;
     let c = app.claim(claim_id)?;
     say!(app, "Northwind Mutual paid {} on claim {claim_id} ({reference}); recoverable was {}", money(amount), money(c.recoverable_cents));
     call!(conn, record_insurer_payment_then(claim_id, amount, reference.to_string()))?;
@@ -147,9 +146,9 @@ pub fn insurer_paid(app: &App, claim_id: u64, amount: u64, reference: &str, as_:
     Ok(c)
 }
 
-/// Asks the worker for a recovery letter to whoever handled the damaged equipment, as Dana by default.
+/// Asks the worker for a recovery letter to whoever handled the damaged equipment, as the organizer by default.
 pub fn recovery(app: &App, claim_id: u64, to: &str, contact: &str, as_: Option<&str>) -> Result<()> {
-    let conn = app.actor(as_.unwrap_or("dana"))?;
+    let conn = app.actor(as_.unwrap_or("ops"))?;
     call!(conn, request_recovery_letter_then(claim_id, to.to_string(), contact.to_string()))?;
     say!(app, "recovery   letter to {to} ({contact}) requested on claim {claim_id}; `letters {claim_id}` prints it once drafted");
     Ok(())

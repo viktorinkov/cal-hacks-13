@@ -19,7 +19,7 @@
       "recoverable_cents": 79500,
       "venue_cost_cents": 10000
     },
-    "decision_text": "approved by Dana Ruiz (risk_manager)",
+    "decision_text": "approved by Ops desk (ops)",
     "fact_lines": [
       "[1] incident_kind = fall",
       "[2] opened_by = band",

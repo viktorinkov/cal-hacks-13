@@ -1,19 +1,19 @@
-// The host portal: the live event from the bands, alerts, who joined, insurance claims from the
+// The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the import runs, Kibana, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
-// and the module checks every role again. The owner also grants and revokes roles from the attendee list.
+// and the module checks every role again. The medic works incidents during the event; the organizer
+// decides the claims afterwards.
 
 import {
-  act, actors, config, connect, date, field, h, idToken, money, mount, playedToken, risk, short, signIn,
+  act, actors, config, connect, date, field, h, idToken, money, mount, risk, signIn,
   signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
 import type { DbConnection } from '../module_bindings';
-import type { AttendeeOut, Claim } from '../module_bindings/types';
+import type { Claim } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
   'SELECT * FROM my_owner',
-  'SELECT * FROM owner_staff_roles',
   'SELECT * FROM event_state',
   'SELECT * FROM venue',
   'SELECT * FROM zone',
@@ -38,7 +38,6 @@ const QUERIES = [
   'SELECT * FROM board_approvals',
   'SELECT * FROM board_ledger',
   'SELECT * FROM board_rules',
-  'SELECT * FROM board_authority',
   'SELECT * FROM board_policies',
   'SELECT * FROM medic_medical_cards',
 ];
@@ -56,10 +55,8 @@ let people: Actor[] = [];
 let tab = location.hash.slice(1);
 let openClaim: bigint | undefined;
 
-/** The staff roles the owner grants from the attendee list. */
-const STAFF_ROLES = ['ops', 'medic', 'floor_manager', 'risk_manager', 'adjuster'];
-/** The roles the claims routing names as approvers, in the authority matrix's order. */
-const APPROVERS = ['floor_manager', 'risk_manager', 'adjuster'];
+/** The staff roles: the organizer (ops) and the medic. */
+const STAFF_ROLES = ['ops', 'medic'];
 /** The simulated bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
 const SIM_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 
@@ -112,15 +109,15 @@ function header() {
   const state = conn.db.eventState.id.find(0);
   const ended = state?.ended ?? false;
   return [
-    h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} host portal`),
+    h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} organizer portal`),
     h('p', {},
-      cfg.simulate && h('label', { class: 'check' }, 'Play as',
-        h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
-          h('option', { value: '' }, 'choose a person'),
+      signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
+    h('p', {},
+      cfg.simulate && h('label', { class: 'check' }, 'Test as',
+        h('select', { onchange: (e: Event) => { const v = (e.target as HTMLSelectElement).value; location.search = v ? `?as=${v}` : ''; } },
+          h('option', { value: '' }, 'myself'),
           people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
-      !as && signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')],
-      !as && !idToken() && cfg.auth_client_id && h('button', { onclick: signIn }, 'Sign in with email'),
-      h('span', { class: 'muted' }, ` Identity ${short(conn.identity!)}: ${roleList.length ? roleList.join(', ') : 'no staff role yet'}`)),
+      h('span', { class: 'muted' }, ` Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`)),
     can('ops') && h('p', {},
       ended
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
@@ -130,13 +127,21 @@ function header() {
   ];
 }
 
-/** A signed-in person with no staff role sees their identity, for the owner to grant a role to. */
+/** A signed-in person with no staff role sees the code the organizer adds them by. */
 function noRole() {
   return h('section', {},
-    h('h3', {}, 'This page is for event staff'),
-    h('p', {}, 'Show this code to the module owner, who grants your role:'),
-    h('p', { class: 'big' }, h('code', {}, short(conn.identity!))),
-    h('p', { class: 'muted' }, `Full identity ${conn.identity!.toHexString()}`));
+    h('h3', {}, 'This account has no staff role'),
+    h('p', {}, 'The organizer portal is for the event\'s organizer and medics. To get access, send this code to the organizer:'),
+    h('p', {}, h('code', {}, conn.identity!.toHexString())));
+}
+
+/** The first screen: staff sign in before they see anything. */
+function signInScreen() {
+  return [
+    h('h2', {}, 'BandIt organizer portal'),
+    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, claims and the end of the event.'),
+    h('button', { onclick: signIn }, 'Sign in with email'),
+  ];
 }
 
 // --- Live -----------------------------------------------------------------------------------
@@ -189,31 +194,20 @@ function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
   const real = all.filter(a => !a.simulated).length;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
-  const owner = isOwner();
-  const staff = [...conn.db.ownerStaffRoles.iter()];
-  const grant = (a: AttendeeOut) => {
-    const role = field(document.getElementById('app')!, `grant-${a.nodeId}`);
-    return act(() => conn.reducers.grantRole({ identity: a.identity, role, label: a.displayName }));
-  };
   const takeBack = (bandId: number, name: string) =>
     confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
       && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `Attendees (${real} people, ${all.length - real} simulated)`),
     h('table', {},
-      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined'), owner && h('th', {}, 'Staff role')),
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
       all.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' simulated')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
           a.bandId > 0 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
-        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt)),
-        owner && h('td', {},
-          staff.filter(r => r.identity.isEqual(a.identity)).map(r => h('div', {}, r.role, ' ',
-            h('button', { class: 'link', onclick: () => act(() => conn.reducers.revokeRole({ identity: a.identity, role: r.role })) }, 'revoke'))),
-          !a.simulated && [h('select', { name: `grant-${a.nodeId}` }, STAFF_ROLES.map(r => h('option', { value: r }, r))),
-            h('button', { onclick: () => grant(a) }, 'Grant')])))));
+        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
 }
 
 // --- Claims ---------------------------------------------------------------------------------
@@ -249,7 +243,7 @@ function incidentDesk() {
           h('input', { name: `text-${i.id}`, placeholder: 'Treatment note', required: true }),
           h('input', { name: `cost-${i.id}`, placeholder: 'Cost in dollars (optional)', inputmode: 'decimal' }),
           h('button', {}, 'Add note')),
-        can('ops', 'medic', 'floor_manager') && h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
+        can('ops', 'medic') && h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
     }));
 }
 
@@ -315,13 +309,18 @@ function statusOf(c: Claim) {
 }
 
 /** The approver's queue: the claims routed to the caller, oldest first. */
+/** Can the caller approve or refuse this claim: the person it waits for, or anyone holding its role. */
+function decides(c: Claim): boolean {
+  return c.routedTo.isEqual(conn.identity!) || can(c.routedToRole);
+}
+
+/** The organizer's queue: claims no learned rule settled, oldest first. */
 function myQueue() {
-  const me = conn.identity!;
-  const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && c.routedTo.isEqual(me)).sort((a, b) => Number(a.id - b.id));
-  if (!can(...APPROVERS)) return null;
+  const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && decides(c)).sort((a, b) => Number(a.id - b.id));
+  if (!can('ops')) return null;
   return h('section', { class: mine.length ? 'alert' : '' },
     h('h3', {}, `Waiting for your decision (${mine.length})`),
-    !mine.length && h('p', { class: 'muted' }, 'Nothing for you right now. Claims above your authority go to the next approver; small ones settle on their own under a learned rule.'),
+    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Claims a learned rule covers settle on their own.'),
     h('ul', {}, mine.map(c => h('li', {},
       h('button', { class: 'link', onclick: () => { openClaim = c.id; render(); } }, `#${c.id}`),
       ` ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}, ${money(c.payoutCents)}: ${c.statusNote}`))));
@@ -329,18 +328,17 @@ function myQueue() {
 
 function claimList() {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(b.id - a.id));
-  const me = conn.identity!;
   return h('section', {},
     h('h3', {}, 'All claims'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. Resolving an injury incident with a note opens one.'),
     claims.length > 0 && h('table', {},
       h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Payout'), h('th', {}, 'Waiting for')),
-      claims.map(c => h('tr', { class: c.routedTo.isEqual(me) ? 'alert' : '' },
+      claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => { openClaim = c.id; render(); } }, `#${c.id}`)),
         h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
         h('td', {}, money(c.payoutCents)),
-        h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName} (${c.routedToRole})${c.routedTo.isEqual(me) ? ', you' : ''}` : '')))));
+        h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : '')))));
 }
 
 async function fileRecord(claimId: bigint, form: HTMLFormElement) {
@@ -407,14 +405,14 @@ function claimDetail(id: bigint) {
     h('p', {}, h('b', {}, statusOf(c)), `: ${c.statusNote}`),
     h('p', {}, `Cost ${money(c.costCents)} · payout ${money(c.payoutCents)} · recoverable from the insurer ${money(c.recoverableCents)} · venue pays ${money(c.venueCostCents)}`),
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
-    c.status.tag === 'AwaitingRecord' && can('medic', 'ops', 'floor_manager', 'risk_manager') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
+    c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.simulate && h('label', {}, 'or a sample record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
-    c.status.tag === 'Routed' && (c.routedTo.isEqual(conn.identity!)
-      ? h('div', {}, h('h4', {}, `Your decision (${c.routedToName}, ${c.routedToRole})`), decide(c))
-      : h('p', {}, h('b', {}, `Waiting for ${c.routedToName} (${c.routedToRole}).`), ' Only the person the claim is routed to can approve or refuse it.')),
+    c.status.tag === 'Routed' && (decides(c)
+      ? h('div', {}, h('h4', {}, 'Your decision'), decide(c))
+      : h('p', {}, h('b', {}, `Waiting for the ${c.routedToName.toLowerCase()}.`))),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
     record && record.status !== 'extracted' && [h('h4', {}, 'Medical record'),
@@ -446,7 +444,6 @@ function claimDetail(id: bigint) {
 
 function rules() {
   const rows = [...conn.db.boardRules.iter()].sort((a, b) => b.version - a.version);
-  const authority = [...conn.db.boardAuthority.iter()].sort((a, b) => a.rank - b.rank);
   const policy = conn.db.boardPolicies.iter().next().value;
   return h('section', {},
     h('h3', {}, 'Learned rules'),
@@ -454,8 +451,6 @@ function rules() {
     h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${r.coverKind}`),
       h('td', {}, `up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
       h('td', {}, `from ${r.approverName} (${r.approverRole})`), h('td', {}, r.status)))),
-    h('h3', {}, 'Who approves what'),
-    h('table', {}, authority.map(a => h('tr', {}, h('td', {}, a.role), h('td', {}, a.assigneeName), h('td', {}, a.ceilingCents !== undefined ? `up to ${money(a.ceilingCents)}` : 'no limit')))),
     policy && h('p', { class: 'muted' }, `Policy ${policy.policyNumber} with ${policy.insurerName}. Medical payments used ${money(policy.medicalUsedCents)}, property used ${money(policy.propertyUsedCents)}.`));
 }
 
@@ -498,10 +493,9 @@ function render() {
 
 async function main() {
   cfg = await config();
+  // Sign-in comes first wherever SpacetimeAuth is set up; testing as someone else is only offered after it.
+  if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.simulate) people = await actors();
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.simulate) {
-    return mount('app', h('h2', {}, 'Host portal'), h('button', { onclick: signIn }, 'Sign in with email'));
-  }
   conn = await connect(QUERIES, render);
   window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);

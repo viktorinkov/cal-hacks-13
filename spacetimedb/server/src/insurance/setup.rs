@@ -1,9 +1,8 @@
-//! Setup reducers: the policy, its covers, the authority matrix and the
-//! verification settings. The claims story seeds them once from `bandit-claims setup`.
+//! Setup reducers: the policy, its covers and the verification settings. The claims story seeds them once from `bandit-claims setup`.
 
 use super::*;
 use crate::roles::*;
-use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 #[spacetimedb::reducer]
 pub fn upsert_insurance_policy(
@@ -14,7 +13,7 @@ pub fn upsert_insurance_policy(
     period_start: Timestamp,
     period_end: Timestamp,
 ) -> Result<(), String> {
-    require_role(ctx, &["risk_manager"])?;
+    require_role(ctx, &["ops"])?;
     if policy_number.trim().is_empty() || period_end <= period_start {
         return Err("a policy needs a number and a period that ends after it starts".into());
     }
@@ -59,7 +58,7 @@ pub fn upsert_coverage_rule(
     service_window_days: u32,
     active: bool,
 ) -> Result<(), String> {
-    require_role(ctx, &["risk_manager"])?;
+    require_role(ctx, &["ops"])?;
     let policy = ctx.db.insurance_policy().policy_number().find(&policy_number).ok_or_else(|| format!("no policy {policy_number}"))?;
     if hyphenate_core::CoverKind::parse(&cover_kind).is_none() {
         return Err(format!("unknown cover kind {cover_kind}"));
@@ -90,29 +89,6 @@ pub fn upsert_coverage_rule(
     Ok(())
 }
 
-/// Sets one rung of the authority matrix and the named person on it.
-#[spacetimedb::reducer]
-pub fn set_authority_limit(
-    ctx: &ReducerContext,
-    role: String,
-    rank: u8,
-    ceiling_cents: Option<u64>,
-    assignee: Option<Identity>,
-    assignee_name: String,
-) -> Result<(), String> {
-    require_role(ctx, &["risk_manager"])?;
-    if !["floor_manager", "risk_manager", "adjuster"].contains(&role.as_str()) {
-        return Err(format!("{role} is not an approver role"));
-    }
-    let row = AuthorityLimitRow { role: role.clone(), rank, ceiling_cents, assignee, assignee_name, updated_by: ctx.sender(), updated_at: ctx.timestamp };
-    if ctx.db.authority_limit().role().find(&role).is_some() {
-        ctx.db.authority_limit().role().update(row);
-    } else {
-        ctx.db.authority_limit().insert(row);
-    }
-    Ok(())
-}
-
 #[spacetimedb::reducer]
 pub fn set_insurance_settings(
     ctx: &ReducerContext,
@@ -123,7 +99,7 @@ pub fn set_insurance_settings(
     tz_offset_minutes: i32,
     review_required: bool,
 ) -> Result<(), String> {
-    require_role(ctx, &["risk_manager"])?;
+    require_role(ctx, &["ops"])?;
     let s = settings(ctx);
     ctx.db.insurance_settings().id().update(InsuranceSettings {
         venue_name,

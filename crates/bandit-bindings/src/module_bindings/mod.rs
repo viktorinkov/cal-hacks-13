@@ -35,7 +35,6 @@ pub mod blob_ref_table;
 pub mod blob_ref_type;
 pub mod board_approvals_table;
 pub mod board_attendees_table;
-pub mod board_authority_table;
 pub mod board_checks_table;
 pub mod board_facts_table;
 pub mod board_ledger_table;
@@ -210,7 +209,6 @@ pub mod open_incidents_table;
 pub mod organization_in_type;
 pub mod organization_table;
 pub mod organization_type;
-pub mod owner_staff_roles_table;
 pub mod owner_table;
 pub mod owner_type;
 pub mod people_link_table;
@@ -254,7 +252,6 @@ pub mod schedule_slot_table;
 pub mod schedule_slot_type;
 pub mod section_count_type;
 pub mod send_command_reducer;
-pub mod set_authority_limit_reducer;
 pub mod set_exit_reducer;
 pub mod set_insurance_settings_reducer;
 pub mod set_low_vis_reducer;
@@ -353,7 +350,6 @@ pub use blob_ref_table::*;
 pub use blob_ref_type::BlobRef;
 pub use board_approvals_table::*;
 pub use board_attendees_table::*;
-pub use board_authority_table::*;
 pub use board_checks_table::*;
 pub use board_facts_table::*;
 pub use board_ledger_table::*;
@@ -528,7 +524,6 @@ pub use open_incidents_table::*;
 pub use organization_in_type::OrganizationIn;
 pub use organization_table::*;
 pub use organization_type::Organization;
-pub use owner_staff_roles_table::*;
 pub use owner_table::*;
 pub use owner_type::Owner;
 pub use people_link_table::*;
@@ -572,7 +567,6 @@ pub use schedule_slot_table::*;
 pub use schedule_slot_type::ScheduleSlot;
 pub use section_count_type::SectionCount;
 pub use send_command_reducer::send_command;
-pub use set_authority_limit_reducer::set_authority_limit;
 pub use set_exit_reducer::set_exit;
 pub use set_insurance_settings_reducer::set_insurance_settings;
 pub use set_low_vis_reducer::set_low_vis;
@@ -881,13 +875,6 @@ pub enum Reducer {
         arg: u8,
         arg_2: u8,
     },
-    SetAuthorityLimit {
-        role: String,
-        rank: u8,
-        ceiling_cents: Option<u64>,
-        assignee: Option<__sdk::Identity>,
-        assignee_name: String,
-    },
     SetExit {
         target: u8,
         colour: u8,
@@ -1080,7 +1067,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
-            Reducer::SetAuthorityLimit { .. } => "set_authority_limit",
             Reducer::SetExit { .. } => "set_exit",
             Reducer::SetInsuranceSettings { .. } => "set_insurance_settings",
             Reducer::SetLowVis { .. } => "set_low_vis",
@@ -1526,19 +1512,6 @@ impl __sdk::Reducer for Reducer {
                 arg: arg.clone(),
                 arg_2: arg_2.clone(),
             }),
-            Reducer::SetAuthorityLimit {
-                role,
-                rank,
-                ceiling_cents,
-                assignee,
-                assignee_name,
-            } => __sats::bsatn::to_vec(&set_authority_limit_reducer::SetAuthorityLimitArgs {
-                role: role.clone(),
-                rank: rank.clone(),
-                ceiling_cents: ceiling_cents.clone(),
-                assignee: assignee.clone(),
-                assignee_name: assignee_name.clone(),
-            }),
             Reducer::SetExit { target, colour } => {
                 __sats::bsatn::to_vec(&set_exit_reducer::SetExitArgs {
                     target: target.clone(),
@@ -1779,7 +1752,6 @@ pub struct DbUpdate {
     blob_ref: __sdk::TableUpdate<BlobRef>,
     board_approvals: __sdk::TableUpdate<Approval>,
     board_attendees: __sdk::TableUpdate<AttendeeOut>,
-    board_authority: __sdk::TableUpdate<AuthorityLimitRow>,
     board_checks: __sdk::TableUpdate<ClaimCheck>,
     board_facts: __sdk::TableUpdate<EvidenceFact>,
     board_ledger: __sdk::TableUpdate<LedgerEntry>,
@@ -1861,7 +1833,6 @@ pub struct DbUpdate {
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
     owner: __sdk::TableUpdate<Owner>,
-    owner_staff_roles: __sdk::TableUpdate<StaffRole>,
     people_link: __sdk::TableUpdate<PeopleLink>,
     person: __sdk::TableUpdate<Person>,
     person_claim: __sdk::TableUpdate<PersonClaim>,
@@ -1933,9 +1904,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_attendees" => db_update
                     .board_attendees
                     .append(board_attendees_table::parse_table_update(table_update)?),
-                "board_authority" => db_update
-                    .board_authority
-                    .append(board_authority_table::parse_table_update(table_update)?),
                 "board_checks" => db_update
                     .board_checks
                     .append(board_checks_table::parse_table_update(table_update)?),
@@ -2179,9 +2147,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(owner_table::parse_table_update(table_update)?),
-                "owner_staff_roles" => db_update
-                    .owner_staff_roles
-                    .append(owner_staff_roles_table::parse_table_update(table_update)?),
                 "people_link" => db_update
                     .people_link
                     .append(people_link_table::parse_table_update(table_update)?),
@@ -2523,9 +2488,6 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<Approval>("board_approvals", &self.board_approvals);
         diff.board_attendees =
             cache.apply_diff_to_table::<AttendeeOut>("board_attendees", &self.board_attendees);
-        diff.board_authority = cache
-            .apply_diff_to_table::<AuthorityLimitRow>("board_authority", &self.board_authority)
-            .with_updates_by_pk(|row| &row.role);
         diff.board_checks =
             cache.apply_diff_to_table::<ClaimCheck>("board_checks", &self.board_checks);
         diff.board_facts =
@@ -2600,8 +2562,6 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<WalletEntry>("my_wallet_entries", &self.my_wallet_entries);
         diff.open_incidents =
             cache.apply_diff_to_table::<Incident>("open_incidents", &self.open_incidents);
-        diff.owner_staff_roles =
-            cache.apply_diff_to_table::<StaffRole>("owner_staff_roles", &self.owner_staff_roles);
         diff.social_attendees =
             cache.apply_diff_to_table::<Attendee>("social_attendees", &self.social_attendees);
         diff.social_encounters = cache
@@ -2656,9 +2616,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_attendees" => db_update
                     .board_attendees
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "board_authority" => db_update
-                    .board_authority
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_checks" => db_update
                     .board_checks
@@ -2902,9 +2859,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "owner" => db_update
                     .owner
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "owner_staff_roles" => db_update
-                    .owner_staff_roles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
@@ -3042,9 +2996,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_attendees" => db_update
                     .board_attendees
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "board_authority" => db_update
-                    .board_authority
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_checks" => db_update
                     .board_checks
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3288,9 +3239,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "owner_staff_roles" => db_update
-                    .owner_staff_roles
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3407,7 +3355,6 @@ pub struct AppliedDiff<'r> {
     blob_ref: __sdk::TableAppliedDiff<'r, BlobRef>,
     board_approvals: __sdk::TableAppliedDiff<'r, Approval>,
     board_attendees: __sdk::TableAppliedDiff<'r, AttendeeOut>,
-    board_authority: __sdk::TableAppliedDiff<'r, AuthorityLimitRow>,
     board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
     board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
     board_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
@@ -3489,7 +3436,6 @@ pub struct AppliedDiff<'r> {
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     owner: __sdk::TableAppliedDiff<'r, Owner>,
-    owner_staff_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     people_link: __sdk::TableAppliedDiff<'r, PeopleLink>,
     person: __sdk::TableAppliedDiff<'r, Person>,
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
@@ -3558,11 +3504,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<AttendeeOut>(
             "board_attendees",
             &self.board_attendees,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AuthorityLimitRow>(
-            "board_authority",
-            &self.board_authority,
             event,
         );
         callbacks.invoke_table_row_callbacks::<ClaimCheck>(
@@ -3834,11 +3775,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Owner>("owner", &self.owner, event);
-        callbacks.invoke_table_row_callbacks::<StaffRole>(
-            "owner_staff_roles",
-            &self.owner_staff_roles,
-            event,
-        );
         callbacks.invoke_table_row_callbacks::<PeopleLink>("people_link", &self.people_link, event);
         callbacks.invoke_table_row_callbacks::<Person>("person", &self.person, event);
         callbacks.invoke_table_row_callbacks::<PersonClaim>(
@@ -4600,7 +4536,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         blob_ref_table::register_table(client_cache);
         board_approvals_table::register_table(client_cache);
         board_attendees_table::register_table(client_cache);
-        board_authority_table::register_table(client_cache);
         board_checks_table::register_table(client_cache);
         board_facts_table::register_table(client_cache);
         board_ledger_table::register_table(client_cache);
@@ -4682,7 +4617,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         owner_table::register_table(client_cache);
-        owner_staff_roles_table::register_table(client_cache);
         people_link_table::register_table(client_cache);
         person_table::register_table(client_cache);
         person_claim_table::register_table(client_cache);
@@ -4726,7 +4660,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "blob_ref",
         "board_approvals",
         "board_attendees",
-        "board_authority",
         "board_checks",
         "board_facts",
         "board_ledger",
@@ -4802,7 +4735,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "open_incidents",
         "organization",
         "owner",
-        "owner_staff_roles",
         "people_link",
         "person",
         "person_claim",

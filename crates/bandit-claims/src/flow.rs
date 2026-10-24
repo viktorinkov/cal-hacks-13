@@ -117,27 +117,27 @@ pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Resul
     Ok(claim)
 }
 
-/// The floor manager logs damaged equipment; with `camera` the vision stub
+/// The organizer logs damaged equipment; with `camera` the vision stub
 /// confirms it from a frame first. Resolves the incident and returns the claim.
 pub fn property(app: &App, zone_name: &str, note: &str, cost_cents: u64, camera: bool) -> Result<Option<Claim>> {
     let db = app.db()?;
     let zone = app.zone_by_name(zone_name)?;
-    let sam = app.actor("sam")?;
+    let ops = app.actor("ops")?;
     let before = db.db.incident().iter().map(|i| i.id).max().unwrap_or(0);
-    call!(sam, open_incident_then("property".into(), zone.id, 0, note.to_string()))?;
+    call!(ops, open_incident_then("property".into(), zone.id, 0, note.to_string()))?;
     let incident =
         until(4.0, || db.db.incident().iter().find(|i| i.id > before && i.kind == IncidentKind::Property && i.zone_id == zone.id))
             .context("the property incident did not appear")?;
-    say!(app, "incident {}  property  {}  opened {} by Sam Okafor: {note}", incident.id, zone.name, app.hms(incident.opened_at));
+    say!(app, "incident {}  property  {}  opened {} by the organizer: {note}", incident.id, zone.name, app.hms(incident.opened_at));
     if camera {
         vision_stub(app, &incident, &zone, note)?;
     }
     call!(
-        sam,
+        ops,
         add_incident_note_then(incident.id, format!("repair estimate from the AV vendor: {}", money(cost_cents)), Some(cost_cents))
     )?;
-    say!(app, "note       Sam Okafor logged the repair cost {}", money(cost_cents));
-    resolve(app, incident.id, "area cleared, equipment sent for repair", "sam")
+    say!(app, "note       the organizer logged the repair cost {}", money(cost_cents));
+    resolve(app, incident.id, "area cleared, equipment sent for repair", "ops")
 }
 
 /// Plays the vision service: a frame in the blob store, the property event and a confirmed assessment.
