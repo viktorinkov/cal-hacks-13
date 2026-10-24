@@ -32,7 +32,7 @@ pub struct WalletEntry {
     pub created_at: Timestamp,
 }
 
-/// Queues the wallet for an attendee who has none and none on the way. Called when they save their name.
+/// Queues the wallet for an attendee who has none and none on the way.
 pub fn open_for(ctx: &ReducerContext, a: &Attendee) {
     if a.simulated || ctx.db.claimant_account().identity().find(a.identity).is_some() {
         return;
@@ -42,6 +42,17 @@ pub fn open_for(ctx: &ReducerContext, a: &Attendee) {
     }
     let payload = serde_json::json!({ "name": a.display_name, "opening_cents": OPENING_CENTS });
     jobs::enqueue(ctx, KIND_WALLET_OPEN, payload.to_string(), "attendee", a.node_id);
+}
+
+/// The attendee connects their Capital One wallet during band setup; the worker opens it on Nessie.
+#[spacetimedb::reducer]
+pub fn connect_wallet(ctx: &ReducerContext) -> Result<(), String> {
+    let a = ctx.db.attendee().identity().find(ctx.sender()).ok_or("claim your band first")?;
+    if a.display_name.is_empty() {
+        return Err("add your name first".into());
+    }
+    open_for(ctx, &a);
+    Ok(())
 }
 
 /// The worker opened the Nessie customer and account.

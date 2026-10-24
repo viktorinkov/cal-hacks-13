@@ -49,6 +49,7 @@ import ClearReducer from "./clear_reducer";
 import CommandSentReducer from "./command_sent_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
 import ConfirmMedicalCardReducer from "./confirm_medical_card_reducer";
+import ConnectWalletReducer from "./connect_wallet_reducer";
 import EndEventReducer from "./end_event_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
@@ -864,6 +865,7 @@ const reducersSchema = __reducers(
   __reducerSchema("command_sent", CommandSentReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
   __reducerSchema("confirm_medical_card", ConfirmMedicalCardReducer),
+  __reducerSchema("connect_wallet", ConnectWalletReducer),
   __reducerSchema("end_event", EndEventReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),

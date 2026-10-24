@@ -1,9 +1,10 @@
 // The band's tap link, /t/BANDIT-0n. During the event it is only the band setup: sign in, claim the
-// band by pressing it, name, socials, the medical history and insurance PDFs, then a thank-you.
+// band by pressing it, name, socials, the medical history and insurance PDFs, the Capital One wallet,
+// then a thank-you.
 // When the host ends the event, the same page turns into the recap.
 
 import {
-  act, api, apiSession, config, connect, finishSignIn, h, idToken, mount, playedToken, signIn, signOut,
+  act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, signIn, signOut,
   signedInEmail, PLATFORMS,
 } from '../lib';
 import { recap, type Recap } from '../recap';
@@ -34,7 +35,7 @@ const QUERIES = [
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
 const bandId = Number(token.replace('BANDIT-', ''));
 
-type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'done';
+type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'wallet' | 'done';
 
 let conn: DbConnection;
 let simulate = false;
@@ -201,14 +202,14 @@ function profileStep() {
 function cardStep() {
   const docs = [...conn.db.myMedicalDocuments.iter()];
   if (!docs.length) {
-    step = 'done';
-    return thanks();
+    step = 'wallet';
+    return walletStep();
   }
   const reading = docs.filter(d => d.status === 'reading');
   const card = conn.db.myMedicalCard.iter().next().value;
   if (reading.length || !card) {
     return [h('h2', {}, 'Claude is reading your documents'), h('p', { class: 'muted' }, 'This takes a few seconds.'),
-      h('button', { class: 'link', onclick: () => go('done') }, 'Check later')];
+      h('button', { class: 'link', onclick: () => go('wallet') }, 'Check later')];
   }
   const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
   return [
@@ -220,7 +221,31 @@ function cardStep() {
       card.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), card.emergencyContact),
       card.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${card.insurer} ${card.plan}, member ${card.memberId}, group ${card.groupNumber}${card.insurerPhone ? `, ${card.insurerPhone}` : ''}`),
       docs.some(d => d.status === 'failed') && h('p', { class: 'error' }, 'One document could not be read.')),
-    h('button', { onclick: () => act(() => conn.reducers.confirmMedicalCard({})).then(ok => ok && go('done')) }, 'Looks right'),
+    h('button', { onclick: () => act(() => conn.reducers.confirmMedicalCard({})).then(ok => ok && go('wallet')) }, 'Looks right'),
+  ];
+}
+
+let walletAsked = false;
+
+/** The Capital One wallet: claim payouts land in it, and merch after the event is paid from it. */
+function walletStep() {
+  const w = conn.db.myWallet.iter().next().value;
+  if (w) {
+    return [
+      h('h2', {}, 'Your wallet is connected'),
+      h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`),
+      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue's insurance pays into it, and after the event you can buy merch with your photos from it.`),
+      h('button', { onclick: () => go('done') }, 'Continue'),
+    ];
+  }
+  if (walletAsked) {
+    return [h('h2', {}, 'Connecting your Capital One wallet'), h('p', { class: 'muted' }, 'Opening your account…')];
+  }
+  return [
+    h('h2', {}, 'Connect your Capital One wallet'),
+    h('p', {}, "If you get hurt here, the venue's insurance pays into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
+    h('button', { onclick: () => act(() => conn.reducers.connectWallet({})).then(ok => { if (ok) { walletAsked = true; render(); } }) }, 'Connect'),
+    h('button', { class: 'link', onclick: () => go('done') }, 'Skip'),
   ];
 }
 
@@ -241,6 +266,7 @@ function setup() {
     case 'insurance': return documentStep('insurance', 'profile');
     case 'profile': return profileStep();
     case 'card': return cardStep();
+    case 'wallet': return walletStep();
     default: return thanks();
   }
 }

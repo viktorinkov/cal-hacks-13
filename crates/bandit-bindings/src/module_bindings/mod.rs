@@ -87,6 +87,7 @@ pub mod command_table;
 pub mod command_type;
 pub mod complete_job_reducer;
 pub mod confirm_medical_card_reducer;
+pub mod connect_wallet_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
 pub mod crowd_member_table;
@@ -400,6 +401,7 @@ pub use command_table::*;
 pub use command_type::Command;
 pub use complete_job_reducer::complete_job;
 pub use confirm_medical_card_reducer::confirm_medical_card;
+pub use connect_wallet_reducer::connect_wallet;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
 pub use crowd_member_table::*;
@@ -705,6 +707,7 @@ pub enum Reducer {
         result: String,
     },
     ConfirmMedicalCard,
+    ConnectWallet,
     CrowdTick {
         timer: CrowdTimer,
     },
@@ -1022,6 +1025,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
             Reducer::ConfirmMedicalCard => "confirm_medical_card",
+            Reducer::ConnectWallet => "connect_wallet",
             Reducer::CrowdTick { .. } => "crowd_tick",
             Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
@@ -1209,6 +1213,9 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::ConfirmMedicalCard => {
                 __sats::bsatn::to_vec(&confirm_medical_card_reducer::ConfirmMedicalCardArgs {})
+            }
+            Reducer::ConnectWallet => {
+                __sats::bsatn::to_vec(&connect_wallet_reducer::ConnectWalletArgs {})
             }
             Reducer::CrowdTick { timer } => {
                 __sats::bsatn::to_vec(&crowd_tick_reducer::CrowdTickArgs {

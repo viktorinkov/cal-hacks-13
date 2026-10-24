@@ -144,6 +144,7 @@ impl World {
     /// Signs up and opens the wallet the way the worker does.
     fn sign_up(&self, name: &str) {
         self.as_(name, |ctx| update_profile(ctx, name.into(), true));
+        self.as_(name, crate::wallet::connect_wallet);
         let job = self.lease(crate::wallet::KIND_WALLET_OPEN);
         self.as_("worker", |ctx| record_wallet(ctx, job.id, format!("cust-{name}"), format!("acct-{name}")));
     }
@@ -242,12 +243,13 @@ fn templates_load_with_prices_and_sponsor_booths_and_reload_in_place() {
 }
 
 #[test]
-fn saving_a_name_opens_a_funded_wallet_once() {
+fn connecting_the_wallet_opens_it_once() {
     let w = World::new();
     w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya Chen".into(), true));
-    w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya C.".into(), true));
+    w.as_("Maya Chen", crate::wallet::connect_wallet);
+    w.as_("Maya Chen", crate::wallet::connect_wallet);
     let opening: Vec<Job> = w.t.db.job().kind().filter(crate::wallet::KIND_WALLET_OPEN).collect();
-    assert_eq!(opening.len(), 1, "a second save while the wallet opens queues nothing");
+    assert_eq!(opening.len(), 1, "a second connect while the wallet opens queues nothing");
     assert!(my_wallet(&w.view("Maya Chen")).is_none());
 
     let job = w.lease(crate::wallet::KIND_WALLET_OPEN);
@@ -340,6 +342,7 @@ fn a_failed_purchase_frees_the_money_and_the_wallet_cannot_overspend() {
     let tee = w.template("tee.png");
     w.end_event();
     w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya Chen".into(), true));
+    w.as_("Maya Chen", crate::wallet::connect_wallet);
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "S".into())).unwrap_err().contains("opening"));
     let job = w.lease(crate::wallet::KIND_WALLET_OPEN);
     w.as_("worker", |ctx| record_wallet(ctx, job.id, "c".into(), "a".into()));
