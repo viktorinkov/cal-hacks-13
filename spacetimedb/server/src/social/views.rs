@@ -365,11 +365,11 @@ pub struct MyPhoto {
     pub caption: String,
     /// suggested or confirmed: your own tag on this photo.
     pub status: String,
-    /// The other people who confirmed they are in it.
+    /// The other people the bands put in it, minus anyone who removed their tag.
     pub people: Vec<PersonCard>,
 }
 
-/// Photos you are tagged in, with everyone else who confirmed.
+/// Photos you are tagged in, with everyone else the bands put in them.
 #[spacetimedb::view(accessor = my_photos, public)]
 pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
     let me = ctx.sender();
@@ -385,7 +385,7 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
                 .photo_tag()
                 .photo_id()
                 .filter(p.id)
-                .filter(|o| o.attendee != me && o.status == "confirmed")
+                .filter(|o| o.attendee != me && o.status != "removed")
                 .filter_map(|o| person_card(ctx, o.attendee))
                 .collect();
             Some(MyPhoto {
