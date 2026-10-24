@@ -131,8 +131,10 @@ pub fn submit_medical_document(ctx: &ReducerContext, kind: String, file_hash: St
         return Err("claim your band first".into());
     }
     let blob = ctx.db.blob_ref().hash().find(file_hash.to_lowercase()).ok_or("upload the PDF first")?;
-    if blob.owner != Some(me) {
-        return Err("that file belongs to someone else".into());
+    // Files are stored by content, so two people may file the same PDF; it only has to have come in
+    // as an attendee's own medical document.
+    if blob.purpose != HISTORY && blob.purpose != INSURANCE {
+        return Err("upload the PDF as your own medical document".into());
     }
     let doc = ctx.db.medical_document().insert(MedicalDocument {
         id: 0,
