@@ -87,7 +87,10 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
     h('h2', {}, `Band ${bandId} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
-    demo && bandId >= 90 && h('button', { class: 'demo', onclick: () => act(() => fetch(`/api/dev/press/${bandId}`, { method: 'POST' })) }, 'Demo: press the band for me'),
+    demo && bandId >= 90 && h('button', { class: 'demo', onclick: () => act(async () => {
+      const res = await fetch(`/api/dev/press/${bandId}`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json()).error);
+    }) }, 'Demo: press the band for me'),
   ];
 }
 

@@ -140,8 +140,8 @@ export async function connect(queries: string[], onChange: () => void): Promise<
         c.subscriptionBuilder()
           .onApplied(() => {
             watch(c, onChange);
-            onChange();
             resolve(c);
+            setTimeout(onChange, 0);
           })
           .onError(ctx => reject((ctx as any).event ?? new Error('subscription failed')))
           .subscribe(queries);
