@@ -19,7 +19,7 @@ pub const LAST_SIM_BAND: u8 = 89;
 const FIRST_TESTER_BAND: u8 = 90;
 const LAST_TESTER_BAND: u8 = 99;
 const CROWD_TICK_SECONDS: u64 = 5;
-/// Each tick two people spend together counts this many seconds, so links appear within a minute.
+/// Each tick two crowd members spend together counts this many seconds, so links appear within a minute.
 const TOGETHER_SECONDS_PER_TICK: u32 = 30;
 const GROUP_SIZE: u8 = 3;
 /// Chance per tick that two strangers in the same zone talk.
@@ -119,6 +119,13 @@ pub fn start_crowd(ctx: &ReducerContext, size: u8) -> Result<(), String> {
     Ok(())
 }
 
+/// Crowd members' time runs fast so links appear within a minute; a tester's band (90 to 99) counts
+/// real time, so its recap shows the minutes the tester actually spent.
+fn seconds_per_tick(a: u8, b: u8) -> u32 {
+    let tester = |x: u8| (FIRST_TESTER_BAND..=LAST_TESTER_BAND).contains(&x);
+    if tester(a) || tester(b) { CROWD_TICK_SECONDS as u32 } else { TOGETHER_SECONDS_PER_TICK }
+}
+
 /// Two simulated bands spent this tick close together, as band1t's radio encounter would record it.
 fn together(ctx: &ReducerContext, a: u8, b: u8) {
     let key = pair_key(a, b);
@@ -126,7 +133,7 @@ fn together(ctx: &ReducerContext, a: u8, b: u8) {
         Some(e) => {
             ctx.db.encounter().key().update(Encounter {
                 last_seen: ctx.timestamp,
-                seconds_close: e.seconds_close + TOGETHER_SECONDS_PER_TICK,
+                seconds_close: e.seconds_close + seconds_per_tick(a, b),
                 ..e
             });
         }

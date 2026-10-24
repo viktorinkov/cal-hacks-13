@@ -68,6 +68,13 @@ function spaceTime(conn: DbConnection) {
   if (!visits.length) return h('p', { class: 'muted' }, 'No stays recorded for your band.');
   const zones = [...new Set([...visits.map(v => v.zoneName), ...met.map(e => e.zoneName)])];
   const end = (v: (typeof visits)[number]) => Math.min(close, v.endedAt?.toDate().getTime() ?? close);
+  // Back-to-back visits to the same zone (a band re-heard its station) read as one stay.
+  const stays: { zoneName: string; start: number; end: number }[] = [];
+  for (const v of visits) {
+    const start = v.startedAt.toDate().getTime(), last = stays[stays.length - 1];
+    if (last && last.zoneName === v.zoneName && start - last.end < 60_000) last.end = Math.max(last.end, end(v));
+    else stays.push({ zoneName: v.zoneName, start, end: end(v) });
+  }
   const t0 = Math.min(...visits.map(v => v.startedAt.toDate().getTime()), ...met.map(e => e.startedAt.toDate().getTime()));
   const t1 = Math.max(...visits.map(end), ...met.map(e => Math.min(close, e.lastSeenAt.toDate().getTime())));
   // Drawn at the section's own width so the text stays readable on a phone. Each zone is a label
@@ -80,11 +87,11 @@ function spaceTime(conn: DbConnection) {
     svg.appendChild(s('text', { x: left, y: i * row + 14 }, z));
     svg.appendChild(s('line', { x1: left, x2: W - right, y1: i * row + 31, y2: i * row + 31, class: 'grid' }));
   });
-  for (const v of visits) {
+  for (const v of stays) {
     const y = zones.indexOf(v.zoneName) * row + 20;
-    const a = x(v.startedAt.toDate().getTime()), b = x(end(v));
+    const a = x(v.start), b = x(v.end);
     const bar = s('rect', { x: a, y, width: Math.max(3, b - a), height: 22, rx: 4, class: 'stay' });
-    bar.appendChild(s('title', {}, `${v.zoneName}: ${time(v.startedAt)} to ${clock(end(v))}`));
+    bar.appendChild(s('title', {}, `${v.zoneName}: ${clock(v.start)} to ${clock(v.end)}`));
     svg.appendChild(bar);
   }
   for (const e of met) {
@@ -98,10 +105,9 @@ function spaceTime(conn: DbConnection) {
   return [
     svg,
     h('p', { class: 'muted' }, 'Bars are where your band was; pink dots are when you met someone.'),
-    h('ul', { class: 'cards' }, visits.map(v => h('li', {},
-      `${time(v.startedAt)} to ${clock(end(v))} `, h('b', {}, v.zoneName),
-      ` · ${Math.max(1, Math.round((end(v) - v.startedAt.toDate().getTime()) / 60000))} min`,
-      v.booths.length > 0 && h('div', { class: 'muted' }, v.booths.join(', '))))),
+    h('ul', { class: 'cards' }, stays.map(v => h('li', {},
+      `${clock(v.start)} to ${clock(v.end)} `, h('b', {}, v.zoneName),
+      ` · ${Math.max(1, Math.round((v.end - v.start) / 60000))} min`))),
   ];
 }
 
