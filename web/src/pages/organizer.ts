@@ -447,6 +447,14 @@ function claimsTab() {
 
 // --- Merch --------------------------------------------------------------------------------
 
+/** Template thumbnails, kept across redraws so the images don't blank out each second. */
+const thumbs = new Map<string, HTMLElement>();
+
+function thumb(url: string, title: string) {
+  if (!thumbs.has(url)) thumbs.set(url, h('a', { href: url, target: '_blank' }, h('img', { src: url, width: 64, alt: title })));
+  return thumbs.get(url)!;
+}
+
 /** The loaded templates and every attendee's order: who, what, the size, the status and the Nessie purchase. */
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
@@ -460,7 +468,7 @@ function merchTab() {
       templates.length > 0 && h('table', {},
         h('tr', {}, h('th', {}, 'Image'), h('th', {}, 'Title'), h('th', {}, 'Kind'), h('th', {}, 'Price'), h('th', {}, 'Photo area'), h('th', {}, 'Sponsor booths')),
         templates.map(t => h('tr', {},
-          h('td', {}, h('a', { href: t.imageUrl, target: '_blank' }, h('img', { src: t.imageUrl, width: 64, alt: t.title }))),
+          h('td', {}, thumb(t.imageUrl, t.title)),
           h('td', {}, t.title, h('div', { class: 'muted' }, t.name)), h('td', {}, t.kind), h('td', {}, money(t.priceCents)),
           h('td', {}, `${t.photoW}×${t.photoH} at ${t.photoX},${t.photoY}`),
           h('td', {}, t.boothIds.length ? booths(t.boothIds) : h('span', { class: 'muted' }, 'plain')))))),
