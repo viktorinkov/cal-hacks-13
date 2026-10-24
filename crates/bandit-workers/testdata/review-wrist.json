@@ -1,0 +1,555 @@
+{
+  "claim_id": 900101,
+  "pack_version": 2,
+  "pack_hash": "8e7cd3c8adbb18207c3593daf92d42d141bd46129e0e37b3881e5905a592804a",
+  "incident_kind": "fall",
+  "cover_kind": "medical_payments",
+  "zone_name": "Main stage",
+  "incident_time": "2026-10-24 21:45:10",
+  "claimant_name": "Jordan Alvarez",
+  "corroboration": "corroborated",
+  "facts": [
+    {
+      "seq": 1,
+      "source": "incident_snapshot",
+      "key": "incident_kind",
+      "value": "fall",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident:41"
+    },
+    {
+      "seq": 2,
+      "source": "incident_snapshot",
+      "key": "opened_by",
+      "value": "band",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident:41"
+    },
+    {
+      "seq": 3,
+      "source": "incident_snapshot",
+      "key": "zone_id",
+      "value": "101",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident:41"
+    },
+    {
+      "seq": 4,
+      "source": "band_report",
+      "key": "band_id",
+      "value": "17",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 5,
+      "source": "band_report",
+      "key": "fall_flag",
+      "value": "1",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 6,
+      "source": "band_report",
+      "key": "sos_flag",
+      "value": "0",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 7,
+      "source": "band_report",
+      "key": "band_state",
+      "value": "3",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 8,
+      "source": "band_report",
+      "key": "neigh",
+      "value": "6",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 9,
+      "source": "band_report",
+      "key": "station_id",
+      "value": "4",
+      "observed_at": 1792903508000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 10,
+      "source": "incident_snapshot",
+      "key": "bands_present",
+      "value": "12, 17, 23, 31, 44",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 11,
+      "source": "incident_snapshot",
+      "key": "band_count",
+      "value": "5",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 12,
+      "source": "incident_snapshot",
+      "key": "neigh_mean",
+      "value": "6.2",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 13,
+      "source": "incident_snapshot",
+      "key": "circle_bands",
+      "value": "12, 23, 31",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "incident_snapshot:77"
+    },
+    {
+      "seq": 14,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 12 zone 101 rssi -61",
+      "observed_at": 1792903515000000,
+      "reader": "code",
+      "reference": "incident_band:41:12"
+    },
+    {
+      "seq": 15,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 23 zone 101 rssi -67",
+      "observed_at": 1792903516000000,
+      "reader": "code",
+      "reference": "incident_band:41:23"
+    },
+    {
+      "seq": 16,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 31 zone 101 rssi -72",
+      "observed_at": 1792903519000000,
+      "reader": "code",
+      "reference": "incident_band:41:31"
+    },
+    {
+      "seq": 17,
+      "source": "staff_note",
+      "key": "note",
+      "value": "medic: guest fell when the crowd surged at the front of the stage, left wrist pain and swelling, ice and compression wrap applied, advised urgent care if pain persists",
+      "observed_at": 1792903890000000,
+      "reader": "code",
+      "reference": "incident_note:301"
+    },
+    {
+      "seq": 18,
+      "source": "zone_context",
+      "key": "zone_name",
+      "value": "Main stage",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 19,
+      "source": "zone_context",
+      "key": "zone_kind",
+      "value": "stage",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 20,
+      "source": "zone_context",
+      "key": "zone_area_m2",
+      "value": "1800.0",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 21,
+      "source": "zone_context",
+      "key": "zone_capacity",
+      "value": "2500",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 22,
+      "source": "zone_context",
+      "key": "nearby_booths",
+      "value": "Merch tent, Water station 2",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 23,
+      "source": "zone_context",
+      "key": "schedule_now",
+      "value": "Headline set",
+      "observed_at": 1792903510000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 24,
+      "source": "presence",
+      "key": "zone_stay",
+      "value": "East entrance 20:58:00-21:10:00",
+      "observed_at": 1792900680000000,
+      "reader": "code",
+      "reference": "zone_visit:17"
+    },
+    {
+      "seq": 25,
+      "source": "presence",
+      "key": "zone_stay",
+      "value": "Main stage 21:10:00-now",
+      "observed_at": 1792901400000000,
+      "reader": "code",
+      "reference": "zone_visit:17"
+    },
+    {
+      "seq": 26,
+      "source": "medical_record",
+      "key": "record_patient",
+      "value": "Jordan Alvarez",
+      "observed_at": 1792947900000000,
+      "reader": "model",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 27,
+      "source": "medical_record",
+      "key": "record_provider",
+      "value": "Wrenfield Urgent Care",
+      "observed_at": 1792947900000000,
+      "reader": "model",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 28,
+      "source": "medical_record",
+      "key": "record_date_of_service",
+      "value": "2026-10-25",
+      "observed_at": 1792947900000000,
+      "reader": "model",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 29,
+      "source": "medical_record",
+      "key": "record_diagnoses",
+      "value": "S63.502A Sprain of left wrist, initial encounter; W01.0XXA Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter",
+      "observed_at": 1792947900000000,
+      "reader": "model",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 30,
+      "source": "medical_record",
+      "key": "record_billed_cents",
+      "value": "130800",
+      "observed_at": 1792947900000000,
+      "reader": "model",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 31,
+      "source": "medical_record",
+      "key": "record_covered_cents",
+      "value": "89500",
+      "observed_at": 1792947900000000,
+      "reader": "code",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 32,
+      "source": "medical_record",
+      "key": "record_sha256",
+      "value": "eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4",
+      "observed_at": 1792947900000000,
+      "reader": "code",
+      "reference": "blob:eb94d5aea042de5ad3f3a094d9b26c990f88787d8bfdc8fd008d5e4c0136bdd4"
+    },
+    {
+      "seq": 33,
+      "source": "policy",
+      "key": "policy_number",
+      "value": "GL-2026-0412",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 34,
+      "source": "policy",
+      "key": "insurer",
+      "value": "Harborline Mutual",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 35,
+      "source": "policy",
+      "key": "cover_kind",
+      "value": "medical_payments",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 36,
+      "source": "policy",
+      "key": "per_claim_limit_cents",
+      "value": "500000",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 37,
+      "source": "policy",
+      "key": "deductible_cents",
+      "value": "10000",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 38,
+      "source": "policy",
+      "key": "aggregate_remaining_cents",
+      "value": "2500000",
+      "observed_at": 1792951200000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    }
+  ],
+  "checks": [
+    {
+      "name": "witness_zone",
+      "result": "pass",
+      "detail": "3 of 3 witnesses in zone 101",
+      "reader": "code"
+    },
+    {
+      "name": "staff_note_time",
+      "result": "pass",
+      "detail": "first note 21:51:30, incident 21:45:10-22:05:00, window +30 min",
+      "reader": "code"
+    },
+    {
+      "name": "claimant_not_staff",
+      "result": "pass",
+      "detail": "Jordan Alvarez holds no staff role",
+      "reader": "code"
+    },
+    {
+      "name": "record_duplicate",
+      "result": "pass",
+      "detail": "no other claim has this file, invoice, or patient, date and total",
+      "reader": "code"
+    },
+    {
+      "name": "record_patient_match",
+      "result": "pass",
+      "detail": "claimant \"Jordan Alvarez\", record patient \"Jordan Alvarez\"",
+      "reader": "code"
+    },
+    {
+      "name": "record_date_window",
+      "result": "pass",
+      "detail": "encounter 2026-10-25, incident 2026-10-24: 1 days after, window 30 days",
+      "reader": "code"
+    },
+    {
+      "name": "record_injury_code",
+      "result": "pass",
+      "detail": "diagnoses S63.502A, W01.0XXA",
+      "reader": "code"
+    },
+    {
+      "name": "record_totals",
+      "result": "pass",
+      "detail": "service lines sum to $1,308.00, total billed $1,308.00",
+      "reader": "code"
+    },
+    {
+      "name": "record_lines",
+      "result": "fail",
+      "detail": "1 covered, 6 reduced, 1 excluded; not on the schedule: 90715",
+      "reader": "code"
+    },
+    {
+      "name": "elastic_validation",
+      "result": "pass",
+      "detail": "document passed the bandit-claims-validate pipeline",
+      "reader": "elastic"
+    }
+  ],
+  "amounts": {
+    "cost_cents": 89500,
+    "payout_cents": 89500,
+    "recoverable_cents": 79500,
+    "venue_cost_cents": 10000
+  },
+  "lines": [
+    {
+      "line_no": 1,
+      "code": "99204",
+      "description": "New patient visit, moderate complexity",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 38500,
+      "allowed_cents": 27500,
+      "covered_cents": 27500,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $275.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 2,
+      "code": "73110",
+      "description": "X-ray wrist, 3 views, left",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 21500,
+      "allowed_cents": 16500,
+      "covered_cents": 16500,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $165.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 3,
+      "code": "29125",
+      "description": "Short arm splint application, static, left",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 29500,
+      "allowed_cents": 21000,
+      "covered_cents": 21000,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $210.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 4,
+      "code": "L3908",
+      "description": "Wrist-hand orthosis, prefabricated, off-the-shelf",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 14500,
+      "allowed_cents": 9500,
+      "covered_cents": 9500,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $95.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 5,
+      "code": "99070",
+      "description": "Supplies and materials",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 6000,
+      "allowed_cents": 6000,
+      "covered_cents": 6000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 2
+    },
+    {
+      "line_no": 6,
+      "code": "96372",
+      "description": "Therapeutic injection, intramuscular",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 9000,
+      "allowed_cents": 6500,
+      "covered_cents": 6500,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $65.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 7,
+      "code": "J1885",
+      "description": "Ketorolac tromethamine injection, 15 mg",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 5000,
+      "allowed_cents": 2500,
+      "covered_cents": 2500,
+      "outcome": "reduced",
+      "reason": "reduced to the schedule cap of $25.00 per unit",
+      "page": 2
+    },
+    {
+      "line_no": 8,
+      "code": "90715",
+      "description": "Tdap vaccine, 7 years or older, intramuscular",
+      "service_date": "2026-10-25",
+      "units": 1,
+      "billed_cents": 6800,
+      "allowed_cents": 0,
+      "covered_cents": 0,
+      "outcome": "excluded",
+      "reason": "not on the venue fee schedule",
+      "page": 2
+    }
+  ],
+  "record_history": "Patient presents with left wrist pain and swelling. Last night, Saturday, October 24, 2026, at approximately 21:45, he was attending Cal Hacks 13.0 when the crowd surged near Main stage and he fell, landing on the outstretched left wrist. He did not strike his head and had no loss of consciousness. He was seen at the event's on-site first-aid station, where ice and a compression wrap were applied. Pain has persisted overnight with increasing swelling. Rates pain 6/10, dorsal wrist, worse with gripping and wrist extension. Took acetaminophen 1,000 mg at 07:00 today with minimal relief. Denies numbness, tingling, weakness, or other injuries. Right-hand dominant. No prior left wrist injury.",
+  "record_reason": "Left wrist pain and swelling after a fall last night.",
+  "precedents": [
+    {
+      "reference": "history-04",
+      "outcome": "auto_settled",
+      "payout_cents": 9800,
+      "narrative": "Fall in zone Main stage left at 22:10 during a headline set; 3 light-circle witnesses in the same zone; medic note within 12 minutes; right wrist sprain S63.501A; first aid only.",
+      "score": 0.91
+    },
+    {
+      "reference": "history-19",
+      "outcome": "auto_settled",
+      "payout_cents": 5500,
+      "narrative": "Fall in zone Main stage left at 22:30 during a headline set; 4 light-circle witnesses in the same zone; medic note within 9 minutes; left wrist sprain S63.502A; first aid only.",
+      "score": 0.87
+    },
+    {
+      "reference": "history-26",
+      "outcome": "refused",
+      "payout_cents": 0,
+      "narrative": "Fall in zone Stage B at 22:05; no light-circle witnesses in the same zone; medic note within 35 minutes; right wrist sprain S63.501A; first aid only; 3 light-circle witnesses were in zone Lagoon path at the reported time.",
+      "score": 0.83000004
+    }
+  ],
+  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event."
+}
