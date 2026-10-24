@@ -22,8 +22,8 @@ STDB, ELASTIC, CAPONE, BRIGHT, SEEED = (logo(n) for n in (
 MARK_H = {STDB: 38, ELASTIC: 46, CAPONE: 46, BRIGHT: 44, SEEED: 26}
 CLAUDE, VULTR, RUST, CADDY, ESP, NFC, TS, BUN = (logo(n + ".svg") for n in (
     "claude", "vultr", "rust", "caddy", "espressif", "nfc", "typescript", "bun"))
-PYTHON, OPENCV, NUMPY, THREE, SPARK, COLMAP = (logo(n + ".svg") for n in (
-    "python", "opencv", "numpy", "threedotjs", "spark", "colmap"))
+PYTHON, OPENCV, NUMPY, THREE, SPARK, COLMAP, KIBANA = (logo(n + ".svg") for n in (
+    "python", "opencv", "numpy", "threedotjs", "spark", "colmap", "kibana"))
 USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK = (logo(f"icon-{n}.svg") for n in (
     "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
     "footprints"))
@@ -143,6 +143,7 @@ def architecture(y0):
     A, Bc, C, D_, E = 60, 720, 1440, 2380, 3120
     r0, z, r1, r2, r3 = 210, 450, 520, 720, 920
     web = B(C, r0, SCREENS, "web", w=640, icons=SCREEN_ICONS)
+    auth = SV(Bc, r0, STDB, "SpacetimeAuth (sign-in)", w=480)
     bd = SV(D_, r0, BRIGHT, "Web MCP (scraper)", w=460)
     bands = B(A, r1, "band\nstation marker", "device", w=400, icons={0: WATCH, 1: RADIO})
     cams = B(A, r3, "security camera\none per zone", "device", w=400, icons={0: CAMERA})
@@ -164,6 +165,7 @@ def architecture(y0):
     H(cams, secview, "streams video")
     H(secview, stdb, "reports sighting", y=secview.cy)
     V(web, stdb, "subscribes", both=True)
+    H(auth, web, "signs in")
     V(bd, ingest, "scrapes", x=ingest.right - 60)
     H(ingest, stdb, "imports event")
     H(stdb, api, "reads rows")
@@ -280,12 +282,18 @@ def evidence(y0):
           lambda x, y: B(x, y, "bandit-api\nGET /api/recap", "rust", w=480, h=160, icons={0: RUST}),
           lambda x, y: B(x, y, "recap (/t/code)", "web", w=480, h=160, icons={0: PHONE})], ["ranks", "orders lists"]),
     ]
+    zones = []
     for i, (name, makers, labels) in enumerate(lanes):
         top = 170 + i * 270
-        Z(40, top, 2040, 250, name, "ext")
+        zones.append(Z(40, top, 2040, 250, name, "ext"))
         boxes = [mk(80 + j * 740, top + 64) for j, mk in enumerate(makers)]
         for a, b, lbl in zip(boxes, boxes[1:], labels):
             H(a, b, lbl)
+    # Kibana: the organizer's screen for the event data and the past claims
+    kib = B(2260, 0, "Kibana\n(dashboards)", "ext", w=420, h=380, icons={0: KIBANA}, fill=WHITE,
+            cy=(zones[0].bottom + zones[1].y) / 2 - S.oy)
+    H(zones[0], kib, "shows", y=zones[0].cy)
+    H(zones[1], kib, "shows", y=zones[1].cy)
     return S.end_frame()
 
 
@@ -308,6 +316,8 @@ def insurance(y0):
     payout = SV(c[4], r1, CAPONE, "Nessie (payout)", w=480)
     rule = B(c[4], 0, "rule match", "stdb", w=480, h=220, shape="diamond", cy=r2 + BH / 2)
     org = B(c[4], r3, "organizer portal\n(/organizer, Claims)", "web", w=480, icons={0: MONITOR})
+    venue = B(c[4], r3 + BH + 140, "venue damage", "stdb")
+    V(org, venue, "opens claim", x=org.x + 0.3 * org.w)
     V(attendee, tap, "opens")
     H(tap, file_, "files claim")
     H(file_, pack, "opens claim", y=file_.cy)
