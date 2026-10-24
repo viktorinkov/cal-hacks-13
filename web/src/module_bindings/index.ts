@@ -40,6 +40,7 @@ import ApproveClaimReducer from "./approve_claim_reducer";
 import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
+import BuyMerchReducer from "./buy_merch_reducer";
 import ClaimBandReducer from "./claim_band_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
 import ClaimPersonReducer from "./claim_person_reducer";
@@ -60,6 +61,7 @@ import ImportEventReducer from "./import_event_reducer";
 import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
+import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
 import OpenIncidentReducer from "./open_incident_reducer";
@@ -67,6 +69,7 @@ import PlaceBoothReducer from "./place_booth_reducer";
 import RecordClaimPayoutReducer from "./record_claim_payout_reducer";
 import RecordInsurerPaymentReducer from "./record_insurer_payment_reducer";
 import RecordModelCallReducer from "./record_model_call_reducer";
+import RecordWalletReducer from "./record_wallet_reducer";
 import RefuseClaimReducer from "./refuse_claim_reducer";
 import RegisterBlobReducer from "./register_blob_reducer";
 import RegisterBridgeReducer from "./register_bridge_reducer";
@@ -92,6 +95,7 @@ import SetRssiReducer from "./set_rssi_reducer";
 import SetSocialHandleReducer from "./set_social_handle_reducer";
 import SetThresholdsReducer from "./set_thresholds_reducer";
 import SetZoneStationReducer from "./set_zone_station_reducer";
+import SettleMerchOrderReducer from "./settle_merch_order_reducer";
 import SleepBandsReducer from "./sleep_bands_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
 import StartFindReducer from "./start_find_reducer";
@@ -144,6 +148,7 @@ import GatewayRow from "./gateway_table";
 import ImportRunRow from "./import_run_table";
 import IncidentBandsRow from "./incident_bands_table";
 import LinkRow from "./link_table";
+import MerchTemplateRow from "./merch_template_table";
 import MyAttendeeRow from "./my_attendee_table";
 import MyBandRow from "./my_band_table";
 import MyClaimQueueRow from "./my_claim_queue_table";
@@ -151,10 +156,14 @@ import MyClaimsRow from "./my_claims_table";
 import MyEncountersRow from "./my_encounters_table";
 import MyGraphRow from "./my_graph_table";
 import MyHandlesRow from "./my_handles_table";
+import MyMerchOrdersRow from "./my_merch_orders_table";
+import MyMerchSuggestionsRow from "./my_merch_suggestions_table";
 import MyPhotosRow from "./my_photos_table";
 import MyRolesRow from "./my_roles_table";
 import MySharedVisitsRow from "./my_shared_visits_table";
 import MyVisitsRow from "./my_visits_table";
+import MyWalletRow from "./my_wallet_table";
+import MyWalletEntriesRow from "./my_wallet_entries_table";
 import OpenIncidentsRow from "./open_incidents_table";
 import OrganizationRow from "./organization_table";
 import PaymentRow from "./payment_table";
@@ -324,6 +333,24 @@ const tablesSchema = __schema({
       { name: 'link_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, LinkRow),
+  merchTemplate: __table({
+    name: 'merch_template',
+    indexes: [
+      { accessor: 'id', name: 'merch_template_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'name', name: 'merch_template_name_idx_btree', algorithm: 'btree', columns: [
+        'name',
+      ] },
+      { accessor: 'price_cents', name: 'merch_template_price_cents_idx_btree', algorithm: 'btree', columns: [
+        'priceCents',
+      ] },
+    ],
+    constraints: [
+      { name: 'merch_template_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'merch_template_name_key', constraint: 'unique', columns: ['name'] },
+    ],
+  }, MerchTemplateRow),
   organization: __table({
     name: 'organization',
     indexes: [
@@ -683,6 +710,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyHandlesRow),
+  myMerchOrders: __table({
+    name: 'my_merch_orders',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyMerchOrdersRow),
+  myMerchSuggestions: __table({
+    name: 'my_merch_suggestions',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyMerchSuggestionsRow),
   myPhotos: __table({
     name: 'my_photos',
     indexes: [
@@ -711,6 +752,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyVisitsRow),
+  myWallet: __table({
+    name: 'my_wallet',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyWalletRow),
+  myWalletEntries: __table({
+    name: 'my_wallet_entries',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyWalletEntriesRow),
   openIncidents: __table({
     name: 'open_incidents',
     indexes: [
@@ -791,6 +846,7 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_medic", AssignMedicReducer),
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
+  __reducerSchema("buy_merch", BuyMerchReducer),
   __reducerSchema("claim_band", ClaimBandReducer),
   __reducerSchema("claim_job", ClaimJobReducer),
   __reducerSchema("claim_person", ClaimPersonReducer),
@@ -811,6 +867,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_band", IngestBandReducer),
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
+  __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
   __reducerSchema("open_incident", OpenIncidentReducer),
@@ -818,6 +875,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_claim_payout", RecordClaimPayoutReducer),
   __reducerSchema("record_insurer_payment", RecordInsurerPaymentReducer),
   __reducerSchema("record_model_call", RecordModelCallReducer),
+  __reducerSchema("record_wallet", RecordWalletReducer),
   __reducerSchema("refuse_claim", RefuseClaimReducer),
   __reducerSchema("register_blob", RegisterBlobReducer),
   __reducerSchema("register_bridge", RegisterBridgeReducer),
@@ -843,6 +901,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_social_handle", SetSocialHandleReducer),
   __reducerSchema("set_thresholds", SetThresholdsReducer),
   __reducerSchema("set_zone_station", SetZoneStationReducer),
+  __reducerSchema("settle_merch_order", SettleMerchOrderReducer),
   __reducerSchema("sleep_bands", SleepBandsReducer),
   __reducerSchema("start_crowd", StartCrowdReducer),
   __reducerSchema("start_find", StartFindReducer),
@@ -870,6 +929,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
     readonly "import_run": Omit<typeof tablesSchema.schemaType.tables["importRun"], "accessorName"> & { readonly accessorName: "import_run" };
+    /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
+    readonly "merch_template": Omit<typeof tablesSchema.schemaType.tables["merchTemplate"], "accessorName"> & { readonly accessorName: "merch_template" };
     /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
     readonly "schedule_slot": Omit<typeof tablesSchema.schemaType.tables["scheduleSlot"], "accessorName"> & { readonly accessorName: "schedule_slot" };
     /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
@@ -934,6 +995,10 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_graph": Omit<typeof tablesSchema.schemaType.tables["myGraph"], "accessorName"> & { readonly accessorName: "my_graph" };
     /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
     readonly "my_handles": Omit<typeof tablesSchema.schemaType.tables["myHandles"], "accessorName"> & { readonly accessorName: "my_handles" };
+    /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
+    readonly "my_merch_orders": Omit<typeof tablesSchema.schemaType.tables["myMerchOrders"], "accessorName"> & { readonly accessorName: "my_merch_orders" };
+    /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
+    readonly "my_merch_suggestions": Omit<typeof tablesSchema.schemaType.tables["myMerchSuggestions"], "accessorName"> & { readonly accessorName: "my_merch_suggestions" };
     /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
     readonly "my_photos": Omit<typeof tablesSchema.schemaType.tables["myPhotos"], "accessorName"> & { readonly accessorName: "my_photos" };
     /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -942,6 +1007,10 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_shared_visits": Omit<typeof tablesSchema.schemaType.tables["mySharedVisits"], "accessorName"> & { readonly accessorName: "my_shared_visits" };
     /** @deprecated Use `myVisits` instead. This alias will be removed in the next major version. */
     readonly "my_visits": Omit<typeof tablesSchema.schemaType.tables["myVisits"], "accessorName"> & { readonly accessorName: "my_visits" };
+    /** @deprecated Use `myWallet` instead. This alias will be removed in the next major version. */
+    readonly "my_wallet": Omit<typeof tablesSchema.schemaType.tables["myWallet"], "accessorName"> & { readonly accessorName: "my_wallet" };
+    /** @deprecated Use `myWalletEntries` instead. This alias will be removed in the next major version. */
+    readonly "my_wallet_entries": Omit<typeof tablesSchema.schemaType.tables["myWalletEntries"], "accessorName"> & { readonly accessorName: "my_wallet_entries" };
     /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
     readonly "open_incidents": Omit<typeof tablesSchema.schemaType.tables["openIncidents"], "accessorName"> & { readonly accessorName: "open_incidents" };
     /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
@@ -983,6 +1052,7 @@ const REMOTE_MODULE = {
 const tableAccessorAliases = {
   "event_state": "eventState",
   "import_run": "importRun",
+  "merch_template": "merchTemplate",
   "schedule_slot": "scheduleSlot",
   "zone_visit": "zoneVisit",
   "api_sessions": "apiSessions",
@@ -1015,10 +1085,14 @@ const tableAccessorAliases = {
   "my_encounters": "myEncounters",
   "my_graph": "myGraph",
   "my_handles": "myHandles",
+  "my_merch_orders": "myMerchOrders",
+  "my_merch_suggestions": "myMerchSuggestions",
   "my_photos": "myPhotos",
   "my_roles": "myRoles",
   "my_shared_visits": "mySharedVisits",
   "my_visits": "myVisits",
+  "my_wallet": "myWallet",
+  "my_wallet_entries": "myWalletEntries",
   "open_incidents": "openIncidents",
   "social_attendees": "socialAttendees",
   "social_encounters": "socialEncounters",
@@ -1053,6 +1127,8 @@ export type DbView = __DbViewBase & {
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __DbViewBase["importRun"];
+  /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
+  readonly "merch_template": __DbViewBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
   readonly "schedule_slot": __DbViewBase["scheduleSlot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
@@ -1117,6 +1193,10 @@ export type DbView = __DbViewBase & {
   readonly "my_graph": __DbViewBase["myGraph"];
   /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
   readonly "my_handles": __DbViewBase["myHandles"];
+  /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_orders": __DbViewBase["myMerchOrders"];
+  /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_suggestions": __DbViewBase["myMerchSuggestions"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __DbViewBase["myPhotos"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -1125,6 +1205,10 @@ export type DbView = __DbViewBase & {
   readonly "my_shared_visits": __DbViewBase["mySharedVisits"];
   /** @deprecated Use `myVisits` instead. This alias will be removed in the next major version. */
   readonly "my_visits": __DbViewBase["myVisits"];
+  /** @deprecated Use `myWallet` instead. This alias will be removed in the next major version. */
+  readonly "my_wallet": __DbViewBase["myWallet"];
+  /** @deprecated Use `myWalletEntries` instead. This alias will be removed in the next major version. */
+  readonly "my_wallet_entries": __DbViewBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __DbViewBase["openIncidents"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
@@ -1153,6 +1237,8 @@ export type Tables = __TablesBase & {
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __TablesBase["importRun"];
+  /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
+  readonly "merch_template": __TablesBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
   readonly "schedule_slot": __TablesBase["scheduleSlot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
@@ -1217,6 +1303,10 @@ export type Tables = __TablesBase & {
   readonly "my_graph": __TablesBase["myGraph"];
   /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
   readonly "my_handles": __TablesBase["myHandles"];
+  /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_orders": __TablesBase["myMerchOrders"];
+  /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_suggestions": __TablesBase["myMerchSuggestions"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __TablesBase["myPhotos"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -1225,6 +1315,10 @@ export type Tables = __TablesBase & {
   readonly "my_shared_visits": __TablesBase["mySharedVisits"];
   /** @deprecated Use `myVisits` instead. This alias will be removed in the next major version. */
   readonly "my_visits": __TablesBase["myVisits"];
+  /** @deprecated Use `myWallet` instead. This alias will be removed in the next major version. */
+  readonly "my_wallet": __TablesBase["myWallet"];
+  /** @deprecated Use `myWalletEntries` instead. This alias will be removed in the next major version. */
+  readonly "my_wallet_entries": __TablesBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __TablesBase["openIncidents"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */

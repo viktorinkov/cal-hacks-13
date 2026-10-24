@@ -56,7 +56,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/photo", file("photo.html"))
         .route_service("/style.css", file("style.css"))
         .nest_service("/js", ServeDir::new(web.root.join("web/dist")))
-        .nest_service("/merch", ServeDir::new(web.root.join("assets/merch")))
+        .nest_service("/assets/merch", ServeDir::new(web.root.join("assets/merch")))
         .nest_service("/fixtures", ServeDir::new(web.root.join("fixtures/medical-records/rendered")))
         .route("/config.json", get(config))
         .route("/api/blobs", post(upload))

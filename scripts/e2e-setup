@@ -27,7 +27,10 @@ if [ "$E2E_TARGET" = local ] || [ -n "$E2E_BUNDLE" ]; then
   call import_event "$(python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); print(json.dumps(b[0] if isinstance(b, list) else b))' "$BUNDLE")"
 fi
 
-# Insurance: actors, roles, policy, authority matrix, camera, bridge and the four attendees.
+# Merch: the templates in assets/merch, matched to the sponsors' booths.
+scripts/merch-setup
+
+# Insurance: actors, roles, policy, authority matrix, camera, simulated bands and the four attendees.
 ./target/debug/bandit-claims setup
 
 # Identities for the services and the photographer, saved in the same token store.

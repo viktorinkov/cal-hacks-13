@@ -5,7 +5,7 @@ import {
   act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, risk, signIn,
   signOut, signedInEmail, handleLinks, BAND_STATES, EXIT_COLOURS, PLATFORMS,
 } from '../lib';
-import { recap, type Recap } from '../recap';
+import { recap, wallet, type Recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 
 const QUERIES = [
@@ -16,6 +16,11 @@ const QUERIES = [
   'SELECT * FROM my_encounters',
   'SELECT * FROM my_photos',
   'SELECT * FROM my_claims',
+  'SELECT * FROM merch_template',
+  'SELECT * FROM my_merch_orders',
+  'SELECT * FROM my_merch_suggestions',
+  'SELECT * FROM my_wallet_entries',
+  'SELECT * FROM my_wallet',
   'SELECT * FROM event_state',
   'SELECT * FROM venue',
   'SELECT * FROM zone',
@@ -221,6 +226,7 @@ function home() {
     bandCard(),
     venue(),
     claims(),
+    wallet(conn),
     profile(),
   ];
 }

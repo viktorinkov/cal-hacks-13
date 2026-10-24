@@ -730,6 +730,78 @@ export const MedicalRecord = __t.object("MedicalRecord", {
 });
 export type MedicalRecord = __Infer<typeof MedicalRecord>;
 
+export const MerchOrder = __t.object("MerchOrder", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  size: __t.string(),
+  amountCents: __t.u64(),
+  status: __t.string(),
+  failure: __t.string(),
+  nessiePurchaseId: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type MerchOrder = __Infer<typeof MerchOrder>;
+
+export const MerchShop = __t.object("MerchShop", {
+  id: __t.u8(),
+  nessieMerchantId: __t.string(),
+});
+export type MerchShop = __Infer<typeof MerchShop>;
+
+export const MerchSuggestion = __t.object("MerchSuggestion", {
+  rank: __t.u32(),
+  templateId: __t.u64(),
+  title: __t.string(),
+  kind: __t.string(),
+  priceCents: __t.u64(),
+  imageUrl: __t.string(),
+  width: __t.u32(),
+  height: __t.u32(),
+  photoX: __t.u32(),
+  photoY: __t.u32(),
+  photoW: __t.u32(),
+  photoH: __t.u32(),
+  photoId: __t.u64(),
+  photoUrl: __t.string(),
+  minutes: __t.f32(),
+});
+export type MerchSuggestion = __Infer<typeof MerchSuggestion>;
+
+export const MerchTemplate = __t.object("MerchTemplate", {
+  id: __t.u64(),
+  name: __t.string(),
+  title: __t.string(),
+  kind: __t.string(),
+  priceCents: __t.u64(),
+  imageUrl: __t.string(),
+  width: __t.u32(),
+  height: __t.u32(),
+  photoX: __t.u32(),
+  photoY: __t.u32(),
+  photoW: __t.u32(),
+  photoH: __t.u32(),
+  boothIds: __t.array(__t.u64()),
+  updatedAt: __t.timestamp(),
+});
+export type MerchTemplate = __Infer<typeof MerchTemplate>;
+
+export const MerchTemplateIn = __t.object("MerchTemplateIn", {
+  name: __t.string(),
+  title: __t.string(),
+  kind: __t.string(),
+  width: __t.u32(),
+  height: __t.u32(),
+  photoX: __t.u32(),
+  photoY: __t.u32(),
+  photoW: __t.u32(),
+  photoH: __t.u32(),
+  sponsors: __t.array(__t.string()),
+});
+export type MerchTemplateIn = __Infer<typeof MerchTemplateIn>;
+
 export const ModelCall = __t.object("ModelCall", {
   id: __t.u64(),
   jobId: __t.u64(),
@@ -838,6 +910,13 @@ export const MyVisit = __t.object("MyVisit", {
   minutes: __t.f32(),
 });
 export type MyVisit = __Infer<typeof MyVisit>;
+
+export const MyWallet = __t.object("MyWallet", {
+  accountId: __t.string(),
+  balanceCents: __t.i64(),
+  openedAt: __t.timestamp(),
+});
+export type MyWallet = __Infer<typeof MyWallet>;
 
 export const Organization = __t.object("Organization", {
   id: __t.u64(),
@@ -1245,6 +1324,17 @@ export const Visit = __t.object("Visit", {
   updatedAt: __t.timestamp(),
 });
 export type Visit = __Infer<typeof Visit>;
+
+export const WalletEntry = __t.object("WalletEntry", {
+  id: __t.u64(),
+  identity: __t.identity(),
+  kind: __t.string(),
+  amountCents: __t.i64(),
+  memo: __t.string(),
+  nessieId: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type WalletEntry = __Infer<typeof WalletEntry>;
 
 export const Zone = __t.object("Zone", {
   id: __t.u64(),

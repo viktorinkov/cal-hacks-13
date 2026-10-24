@@ -1,10 +1,11 @@
 // The recap the tap link shows once the host ends the event: where you were and when (live from
 // SpacetimeDB), the people and booths you spent time with (ranked by Elastic through bandit-api),
-// your photos with the people in them and tap-to-share, and merch made from them.
+// your photos with the people in them and tap-to-share, merch made from them, and the Nessie wallet
+// that pays for it.
 
-import { h, handleLinks, time } from './lib';
+import { act, date, field, h, handleLinks, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
-import type { MyPhoto } from './module_bindings/types';
+import type { MerchSuggestion, MyPhoto } from './module_bindings/types';
 
 export type Recap = {
   display_name: string;
@@ -12,20 +13,6 @@ export type Recap = {
   suggested_booths: { booth_id: number; name: string; zone_name: string; minutes: number; score: number | null }[];
   suggestions_ranked: boolean;
 };
-
-type Template = { width: number; height: number; photo_area: { x: number; y: number; w: number; h: number } };
-
-const MERCH_NAMES: Record<string, string> = {
-  'tee.png': 'T-shirt',
-  'mug.png': 'Mug',
-  'poster.png': 'Poster',
-  'tee_spacetimedb.png': 'SpacetimeDB T-shirt',
-  'mug_elastic.png': 'Elastic mug',
-  'poster_booth_crawl.png': 'Booth crawl poster',
-};
-
-let templates: Record<string, Template> | undefined;
-fetch('/merch/templates.json').then(r => r.json()).then(t => (templates = t.templates));
 
 const SVG = 'http://www.w3.org/2000/svg';
 function s(tag: string, attrs: Record<string, string | number>, text?: string): SVGElement {
@@ -117,59 +104,74 @@ function photos(conn: DbConnection, event: string) {
       h('div', {}, p.people.length ? ['With ', p.people.map((x, i) => [i ? ', ' : '', x.name])] : 'Just you'),
       h('div', {}, p.people.map(x => handleLinks(x.handles))),
       h('button', { onclick: () => share(p, event) }, 'Share'),
-      p.status === 'suggested' && h('button', { class: 'link', onclick: () => conn.reducers.respondPhotoTag({ tagId: p.tagId, confirm: false }) }, 'Not me')))));
+      p.status === 'suggested' && [
+        h('button', { onclick: () => act(() => conn.reducers.respondPhotoTag({ tagId: p.tagId, confirm: true })) }, "That's me"),
+        h('button', { class: 'link', onclick: () => act(() => conn.reducers.respondPhotoTag({ tagId: p.tagId, confirm: false })) }, 'Not me')]))));
 }
 
-/** Which templates to offer: sponsor merch for the sponsor booths you visited, then the plain ones. */
-function merchPicks(data: Recap | undefined, mine: MyPhoto[]) {
-  const visited = (data?.suggested_booths ?? []).filter(b => b.minutes > 0).map(b => b.name.toLowerCase());
-  const picks: string[] = [];
-  if (visited.some(b => b.includes('spacetimedb'))) picks.push('tee_spacetimedb.png');
-  if (visited.some(b => b.includes('elastic'))) picks.push('mug_elastic.png');
-  if (visited.length >= 3) picks.push('poster_booth_crawl.png');
-  picks.push('tee.png', 'mug.png', 'poster.png');
-  return mine.length ? picks : [];
-}
-
-/** The template with the photo cover-cropped into its green box. */
-function mockup(file: string, photoUrl: string) {
-  const canvas = h('canvas', { class: 'mockup' }) as HTMLCanvasElement;
-  const t = templates?.[file];
-  if (!t) return canvas;
-  canvas.width = t.width;
-  canvas.height = t.height;
+/** The template image with the photo cover-cropped into its photo box, scaled by CSS. */
+function mockup(t: MerchSuggestion) {
+  const canvas = h('canvas', { class: 'mockup', width: t.width, height: t.height }) as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
   const base = new Image();
-  const photo = new Image();
+  const img = new Image();
   let loaded = 0;
   const draw = () => {
     if (++loaded < 2) return;
     ctx.drawImage(base, 0, 0, t.width, t.height);
-    const a = t.photo_area;
-    const scale = Math.max(a.w / photo.width, a.h / photo.height);
-    const sw = a.w / scale, sh = a.h / scale;
-    ctx.drawImage(photo, (photo.width - sw) / 2, (photo.height - sh) / 2, sw, sh, a.x, a.y, a.w, a.h);
+    const sc = Math.max(t.photoW / img.width, t.photoH / img.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(t.photoX, t.photoY, t.photoW, t.photoH);
+    ctx.clip();
+    ctx.drawImage(img, t.photoX + (t.photoW - img.width * sc) / 2, t.photoY + (t.photoH - img.height * sc) / 2, img.width * sc, img.height * sc);
+    ctx.restore();
   };
   base.onload = draw;
-  photo.onload = draw;
-  base.src = `/merch/${file}`;
-  photo.src = photoUrl;
+  img.onload = draw;
+  base.src = t.imageUrl;
+  img.src = t.photoUrl;
   return canvas;
 }
 
 const mockups = new Map<string, HTMLCanvasElement>();
 
-function merch(conn: DbConnection, data: Recap | undefined) {
-  const mine = [...conn.db.myPhotos.iter()];
-  const picks = merchPicks(data, mine);
-  if (!picks.length) return h('p', { class: 'muted' }, 'Merch appears once a photo of you is in.');
-  const photo = mine[0];
-  return h('div', { class: 'merch' }, picks.map(file => {
-    const key = `${file}:${photo.photoId}`;
-    if (!mockups.has(key)) mockups.set(key, mockup(file, photo.url));
-    return h('figure', {}, mockups.get(key)!, h('figcaption', {}, h('b', {}, MERCH_NAMES[file] ?? file),
-      h('div', { class: 'muted' }, `with your photo from ${photo.zoneName}`)));
-  }));
+export function wallet(conn: DbConnection) {
+  const w = conn.db.myWallet.iter().next().value;
+  const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
+  return h('section', {},
+    h('h3', {}, 'Your BandIt wallet'),
+    w ? h('p', { class: 'big' }, money(w.balanceCents), h('span', { class: 'muted' }, ` · Capital One Nessie account ${w.accountId.slice(0, 8)}`))
+      : h('p', { class: 'muted' }, 'Opening your wallet…'),
+    entries.length > 0 && h('table', {}, entries.map(e => h('tr', {},
+      h('td', {}, date(e.createdAt)), h('td', {}, e.memo || e.kind), h('td', { class: e.amountCents < 0n ? '' : 'pass' }, money(e.amountCents))))));
+}
+
+function merch(conn: DbConnection) {
+  const picks = [...conn.db.myMerchSuggestions.iter()].sort((a, b) => a.rank - b.rank);
+  const orders = [...conn.db.myMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
+  const titles = new Map([...conn.db.merchTemplate.iter()].map(t => [t.id, t.title]));
+  const buy = async (e: Event, t: MerchSuggestion) => {
+    e.preventDefault();
+    const size = t.kind === 'tee' ? field(e.target as HTMLElement, 'size') : '';
+    await act(() => conn.reducers.buyMerch({ templateId: t.templateId, photoId: t.photoId, size }));
+  };
+  return [
+    !picks.length && h('p', { class: 'muted' }, 'Merch appears once you confirm a photo of you above ("That\'s me").'),
+    h('div', { class: 'merch' }, picks.map(t => {
+      const key = `${t.templateId}:${t.photoId}`;
+      if (!mockups.has(key)) mockups.set(key, mockup(t));
+      return h('figure', {}, mockups.get(key)!,
+        h('figcaption', {},
+          h('b', {}, t.title), ` · ${money(t.priceCents)}`,
+          t.minutes > 0 && h('div', { class: 'muted' }, `${Math.round(t.minutes)} min at this sponsor's booth`),
+          h('form', { onsubmit: (e: Event) => buy(e, t) },
+            t.kind === 'tee' && h('select', { name: `size` }, ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x))),
+            h('button', {}, `Buy ${money(t.priceCents)}`))));
+    })),
+    orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
+      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · Nessie purchase ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
+  ];
 }
 
 export function recap(conn: DbConnection, data: Recap | undefined) {
@@ -185,6 +187,7 @@ export function recap(conn: DbConnection, data: Recap | undefined) {
       people(data)),
     h('section', {}, h('h3', {}, 'Booths you spent time at'), booths(data)),
     h('section', {}, h('h3', {}, 'Your photos'), photos(conn, event)),
-    h('section', {}, h('h3', {}, 'Make it merch'), merch(conn, data)),
+    h('section', {}, h('h3', {}, 'Make it merch'), merch(conn)),
+    wallet(conn),
   ];
 }
