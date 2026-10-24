@@ -55,6 +55,9 @@ MAPPINGS = {
         'width': {'type': 'integer'},
         'height': {'type': 'integer'},
         'session': {'type': 'keyword'},
+        'source': {'type': 'keyword'},
+        'location': {'type': 'geo_point'},
+        'gps_accuracy_m': {'type': 'float'},
     },
 }
 
