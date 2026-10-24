@@ -204,7 +204,8 @@ export async function api<T>(path: string, session: string, init: RequestInit = 
 // --- Formatting and DOM ---------------------------------------------------------------------
 
 export function money(cents: bigint | number): string {
-  return `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = Number(cents) / 100;
+  return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function time(t: Timestamp | undefined): string {
@@ -246,15 +247,26 @@ export function mount(id: string, ...children: Child[]) {
   const root = document.getElementById(id)!;
   const active = document.activeElement as HTMLInputElement | null;
   const keep = new Map<string, string>();
+  const ticked = new Map<string, boolean>();
   root.querySelectorAll('input[name], textarea[name], select[name]').forEach(e => {
     const i = e as HTMLInputElement;
-    if (i.type !== 'checkbox' && i.type !== 'file') keep.set(i.name, i.value);
+    if (i.type === 'checkbox') ticked.set(i.name, i.checked);
+    else if (i.type !== 'file') keep.set(i.name, i.value);
   });
+  // A chosen file cannot be set back on a new input, so the old file inputs move into the new tree,
+  // matched in order when they ask for the same kind of file.
+  const files = [...root.querySelectorAll('input[type=file]')] as HTMLInputElement[];
   const focused = active && root.contains(active) ? active.getAttribute('name') : null;
   root.replaceChildren(h('div', {}, ...children));
   root.querySelectorAll('input[name], textarea[name], select[name]').forEach(e => {
     const i = e as HTMLInputElement;
-    if (keep.has(i.name) && i.dataset.fresh === undefined) i.value = keep.get(i.name)!;
+    if (i.type === 'checkbox') {
+      if (ticked.has(i.name)) i.checked = ticked.get(i.name)!;
+    } else if (keep.has(i.name) && i.dataset.fresh === undefined) i.value = keep.get(i.name)!;
+  });
+  ([...root.querySelectorAll('input[type=file]')] as HTMLInputElement[]).forEach((fresh, n) => {
+    const old = files[n];
+    if (old && old.files?.length && old.accept === fresh.accept && old.name === fresh.name) fresh.replaceWith(old);
   });
   if (focused) (root.querySelector(`[name="${focused}"]`) as HTMLElement | null)?.focus();
 }

@@ -1,15 +1,19 @@
 // The host portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the import runs, Kibana, and "Event ended".
+// One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
+// and the module checks every role again. The owner also grants and revokes roles from the attendee list.
 
 import {
   act, actors, config, connect, date, field, h, idToken, money, mount, playedToken, risk, short, signIn,
   signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
 import type { DbConnection } from '../module_bindings';
-import type { Claim } from '../module_bindings/types';
+import type { AttendeeOut, Claim } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
+  'SELECT * FROM my_owner',
+  'SELECT * FROM owner_staff_roles',
   'SELECT * FROM event_state',
   'SELECT * FROM venue',
   'SELECT * FROM zone',
@@ -49,17 +53,61 @@ const SAMPLE_RECORDS: [string, string][] = [
 let conn: DbConnection;
 let cfg: Config;
 let people: Actor[] = [];
-let tab = location.hash.slice(1) || 'live';
+let tab = location.hash.slice(1);
 let openClaim: bigint | undefined;
 
-const tabs: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana'], ['simulate', 'Simulate']];
+/** The staff roles the owner grants from the attendee list. */
+const STAFF_ROLES = ['ops', 'medic', 'floor_manager', 'risk_manager', 'adjuster'];
+/** The roles the claims routing names as approvers, in the authority matrix's order. */
+const APPROVERS = ['floor_manager', 'risk_manager', 'adjuster'];
+/** The simulated bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
+const SIM_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
+
+function roles(): Set<string> {
+  return new Set([...conn.db.myRoles.iter()].map(r => r.role));
+}
+
+/** The module owner passes every role check, as in the module. */
+function isOwner(): boolean {
+  return conn.db.myOwner.count() > 0;
+}
+
+function can(...wanted: string[]): boolean {
+  if (isOwner()) return true;
+  const mine = roles();
+  return wanted.some(r => mine.has(r));
+}
+
+/** Every tab, for anyone with a staff role; nothing for anyone else. */
+function tabs(): [string, string][] {
+  if (!can(...STAFF_ROLES)) return [];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana']];
+  return cfg.simulate ? [...all, ['simulate', 'Simulate']] : all;
+}
 
 function zoneName(id: bigint) {
   return conn.db.zone.id.find(id)?.name ?? 'no zone';
 }
 
+/** Who wears each band, by the host's attendee list. */
+function wearers(): Map<number, string> {
+  return new Map([...conn.db.boardAttendees.iter()].filter(a => a.bandId).map(a => [a.bandId, a.displayName]));
+}
+
+/** A band is alive when it was heard in the last 5 s, else stale. */
+function alive(bandId: number): boolean {
+  const b = conn.db.band.id.find(bandId);
+  return !!b && b.online && Date.now() - b.lastSeen.toDate().getTime() < 5000;
+}
+
+function bandStatus(bandId: number): string {
+  if (!bandId) return 'no band';
+  if (!conn.db.band.id.find(bandId)) return 'never heard';
+  return alive(bandId) ? 'alive' : 'stale';
+}
+
 function header() {
-  const roles = [...conn.db.myRoles.iter()].map(r => `${r.role} (${r.label})`);
+  const roleList = [...(isOwner() ? ['owner'] : []), ...[...conn.db.myRoles.iter()].map(r => `${r.role} (${r.label})`)];
   const as = new URLSearchParams(location.search).get('as') ?? '';
   const state = conn.db.eventState.id.find(0);
   const ended = state?.ended ?? false;
@@ -72,14 +120,23 @@ function header() {
           people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
       !as && signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')],
       !as && !idToken() && cfg.auth_client_id && h('button', { onclick: signIn }, 'Sign in with email'),
-      h('span', { class: 'muted' }, ` Identity ${short(conn.identity!)}: ${roles.length ? roles.join(', ') : 'no staff role yet (the owner grants it with grant_role)'}`)),
-    h('p', {},
+      h('span', { class: 'muted' }, ` Identity ${short(conn.identity!)}: ${roleList.length ? roleList.join(', ') : 'no staff role yet'}`)),
+    can('ops') && h('p', {},
       ended
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
           h('button', { onclick: () => act(() => conn.reducers.reopenEvent({})) }, 'Reopen the event')]
         : h('button', { onclick: () => confirm('End the event? Every tap link switches to the recap.') && act(() => conn.reducers.endEvent({})) }, 'Event ended')),
-    h('nav', {}, tabs.filter(([key]) => key !== 'simulate' || cfg.simulate).map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
+    h('nav', {}, tabs().map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
   ];
+}
+
+/** A signed-in person with no staff role sees their identity, for the owner to grant a role to. */
+function noRole() {
+  return h('section', {},
+    h('h3', {}, 'This page is for event staff'),
+    h('p', {}, 'Show this code to the module owner, who grants your role:'),
+    h('p', { class: 'big' }, h('code', {}, short(conn.identity!))),
+    h('p', { class: 'muted' }, `Full identity ${conn.identity!.toHexString()}`));
 }
 
 // --- Live -----------------------------------------------------------------------------------
@@ -93,15 +150,18 @@ function live() {
   const alerts = bands.filter(b => b.sos || b.fall);
   const inside = [...conn.db.zoneVisit.iter()].filter(v => v.left === undefined);
   const incidents = [...conn.db.openIncidents.iter()];
+  const names = wearers();
+  const wearer = (band: number) => names.has(band) ? ` (${names.get(band) || 'no name yet'})` : '';
   return [
     (alerts.length > 0 || incidents.length > 0) && h('section', { class: 'alert' },
       h('h3', {}, 'Alerts'),
       h('ul', {},
         alerts.map(b => {
           const z = zones.find(z => z.stationId === b.zone);
-          return h('li', {}, h('b', {}, b.fall ? 'Fall' : 'SOS'), ` on band ${b.id} in ${z?.name ?? 'no zone'}: the bands around it show the light circle.`);
+          return h('li', {}, h('b', {}, b.fall ? 'Fall' : 'SOS'), ` on band ${b.id}${wearer(b.id)} in ${z?.name ?? 'no zone'}: the bands around it show the light circle.`);
         }),
-        incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, band ${i.subjectBand}, ${i.status.tag}, opened ${time(i.openedAt)}`)))),
+        incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${i.subjectBand}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
+          h('a', { href: '#claims' }, 'open in Claims'))))),
     h('section', {},
       h('h3', {}, 'Zones'),
       h('p', {}, settings?.lowVis
@@ -128,47 +188,68 @@ function live() {
 function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
   const real = all.filter(a => !a.simulated).length;
+  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const owner = isOwner();
+  const staff = [...conn.db.ownerStaffRoles.iter()];
+  const grant = (a: AttendeeOut) => {
+    const role = field(document.getElementById('app')!, `grant-${a.nodeId}`);
+    return act(() => conn.reducers.grantRole({ identity: a.identity, role, label: a.displayName }));
+  };
+  const takeBack = (bandId: number, name: string) =>
+    confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
+      && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `Attendees (${real} people, ${all.length - real} simulated)`),
     h('table', {},
-      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined'), owner && h('th', {}, 'Staff role')),
       all.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' simulated')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
+        h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
+          a.bandId > 0 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
-        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
+        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt)),
+        owner && h('td', {},
+          staff.filter(r => r.identity.isEqual(a.identity)).map(r => h('div', {}, r.role, ' ',
+            h('button', { class: 'link', onclick: () => act(() => conn.reducers.revokeRole({ identity: a.identity, role: r.role })) }, 'revoke'))),
+          !a.simulated && [h('select', { name: `grant-${a.nodeId}` }, STAFF_ROLES.map(r => h('option', { value: r }, r))),
+            h('button', { onclick: () => grant(a) }, 'Grant')])))));
 }
 
 // --- Claims ---------------------------------------------------------------------------------
 
+/** Open incidents: the medic takes one, opens the medical card, notes the cost and resolves it. */
 function incidentDesk() {
-  const incidents = [...conn.db.openIncidents.iter()];
+  const incidents = [...conn.db.openIncidents.iter()].sort((a, b) => Number(a.id - b.id));
   const notes = [...conn.db.boardNotes.iter()];
+  const names = wearers();
+  const medic = can('medic');
   return h('section', {},
-    h('h3', {}, 'Open incidents (medic)'),
+    h('h3', {}, 'Open incidents'),
     !incidents.length && h('p', { class: 'muted' }, 'None. A fall or SOS on a band opens one here.'),
     incidents.map(i => {
       const mine = notes.filter(n => n.incidentId === i.id);
       const note = async (e: Event) => {
         e.preventDefault();
         const f = e.target as HTMLFormElement;
-        const cost = field(f, 'cost');
+        const cost = field(f, `cost-${i.id}`);
         const ok = await act(() => conn.reducers.addIncidentNote({
-          incidentId: i.id, text: field(f, 'text'), costCents: cost ? BigInt(Math.round(Number(cost) * 100)) : undefined,
+          incidentId: i.id, text: field(f, `text-${i.id}`), costCents: cost ? BigInt(Math.round(Number(cost) * 100)) : undefined,
         }));
         if (ok) f.reset();
       };
+      const who = i.subjectBand ? `band ${i.subjectBand}${names.has(i.subjectBand) ? ` (${names.get(i.subjectBand) || 'no name yet'})` : ''}` : 'no band';
       return h('div', { class: 'incident' },
-        h('p', {}, h('b', {}, `Incident ${i.id}: ${i.kind.tag}`), ` in ${zoneName(i.zoneId)}, band ${i.subjectBand}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
+        h('p', {}, h('b', {}, `Incident ${i.id}: ${i.kind.tag}`), ` in ${zoneName(i.zoneId)}, ${who}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
         h('ul', {}, mine.map(n => h('li', {}, `${time(n.createdAt)} ${n.authorRole}: ${n.text}${n.costCents !== undefined ? ` (${money(n.costCents)})` : ''}`))),
-        i.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: i.id })) }, 'Take it'),
-        i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${i.subjectBand} for the medical card`),
+        medic && i.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: i.id })) }, 'Take it'),
+        medic && i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${i.subjectBand} for the medical card`),
         medicCard(i.id),
         h('form', { onsubmit: note },
-          h('input', { name: `text`, placeholder: 'Treatment note', required: true }),
-          h('input', { name: `cost`, placeholder: 'Cost in dollars (optional)', inputmode: 'decimal' }),
+          h('input', { name: `text-${i.id}`, placeholder: 'Treatment note', required: true }),
+          h('input', { name: `cost-${i.id}`, placeholder: 'Cost in dollars (optional)', inputmode: 'decimal' }),
           h('button', {}, 'Add note')),
-        h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
+        can('ops', 'medic', 'floor_manager') && h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
     }));
 }
 
@@ -177,6 +258,7 @@ function medicCard(incidentId: bigint) {
   const m = [...conn.db.medicMedicalCards.iter()].find(c => c.incidentId === incidentId);
   if (!m) return null;
   const c = m.card;
+  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`), h('p', {}, 'No medical card on file.'));
   const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
   return h('section', { class: 'alert' },
     h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
@@ -194,35 +276,62 @@ async function post(path: string) {
   if (!res.ok) throw new Error((await res.json()).error);
 }
 
-/** The simulated bands 90 to 99: who wears them, where they are, and buttons to walk or drop them. */
+function toClaims(ok: boolean) {
+  if (!ok) return;
+  tab = 'claims';
+  location.hash = 'claims';
+  render();
+}
+
+/** The simulated bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
 function simulateTab() {
-  const owners = new Map([...conn.db.boardAttendees.iter()].filter(a => a.bandId >= 90).map(a => [a.bandId, a.displayName]));
+  const owners = wearers();
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
-  const bands = [...conn.db.band.iter()].filter(b => b.id >= 90 && b.id <= 99 && owners.has(b.id)).sort((a, b) => a.id - b.id);
   return h('section', {},
     h('h3', {}, 'Simulated bands'),
-    h('p', { class: 'muted' }, 'Bands 90 to 93 are the claims story\'s attendees; 94 to 99 are the ones testers claim from a tap link. A fall uses two of the story attendees as the bands around it.'),
-    !bands.length && h('p', { class: 'muted' }, 'No simulated band is claimed yet. Open /t/BANDIT-94 and press it.'),
-    h('table', {}, bands.map(b => h('tr', {},
-      h('td', {}, h('b', {}, `Band ${b.id}`), ` ${owners.get(b.id)}`),
-      h('td', {}, zones.find(z => z.stationId === b.zone)?.name ?? 'no zone'),
-      h('td', {}, b.id >= 94 && zones.map(z => h('button', { class: 'sim', disabled: z.stationId === b.zone || undefined,
-        onclick: () => act(() => post(`/api/dev/move/${b.id}/${z.stationId}`)) }, z.name))),
-      h('td', {}, h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/fall/${b.id}`)).then(ok => { if (ok) { tab = 'claims'; location.hash = 'claims'; render(); } }) }, 'Fall here'))))),
+    h('p', { class: 'muted' }, 'Bands 90 to 93 are the claims story\'s attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here. A fall uses two of the story attendees as the bands around it, and they stay in that zone afterwards.'),
+    h('table', {},
+      h('tr', {}, h('th', {}, 'Band'), h('th', {}, 'Wearer'), h('th', {}, 'Zone'), h('th', {}, 'Walk to'), h('th', {})),
+      SIM_BANDS.map(id => {
+        const b = conn.db.band.id.find(id);
+        const claimed = owners.has(id);
+        return h('tr', {},
+          h('td', {}, h('b', {}, `Band ${id}`), h('div', { class: alive(id) ? 'pass' : 'muted' }, alive(id) ? 'alive' : 'stale')),
+          h('td', {}, claimed ? owners.get(id) || '(no name yet)' : h('span', { class: 'muted' }, 'not claimed')),
+          h('td', {}, zones.find(z => z.stationId === b?.zone)?.name ?? 'no zone'),
+          h('td', {}, zones.map(z => h('button', { class: 'sim', disabled: z.stationId === b?.zone || undefined,
+            onclick: () => act(() => post(`/api/dev/move/${id}/${z.stationId}`)) }, z.name))),
+          h('td', {},
+            id >= 94 && h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/press/${id}`)) }, 'Press'),
+            claimed && h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/fall/${id}`)).then(toClaims) }, 'Fall here')));
+      })),
     h('h3', {}, 'Property damage'),
     h('p', { class: 'muted' }, 'A venue camera sees a speaker knocked off its stand; the vision check confirms it and a property claim opens.'),
-    zones.map(z => h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(ok => { if (ok) { tab = 'claims'; location.hash = 'claims'; render(); } }) }, `Speaker breaks in ${z.name}`)));
+    zones.map(z => h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(toClaims) }, `Speaker breaks in ${z.name}`)));
 }
 
 function statusOf(c: Claim) {
   return c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 }
 
+/** The approver's queue: the claims routed to the caller, oldest first. */
+function myQueue() {
+  const me = conn.identity!;
+  const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && c.routedTo.isEqual(me)).sort((a, b) => Number(a.id - b.id));
+  if (!can(...APPROVERS)) return null;
+  return h('section', { class: mine.length ? 'alert' : '' },
+    h('h3', {}, `Waiting for your decision (${mine.length})`),
+    !mine.length && h('p', { class: 'muted' }, 'Nothing for you right now. Claims above your authority go to the next approver; small ones settle on their own under a learned rule.'),
+    h('ul', {}, mine.map(c => h('li', {},
+      h('button', { class: 'link', onclick: () => { openClaim = c.id; render(); } }, `#${c.id}`),
+      ` ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}, ${money(c.payoutCents)}: ${c.statusNote}`))));
+}
+
 function claimList() {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(b.id - a.id));
   const me = conn.identity!;
   return h('section', {},
-    h('h3', {}, 'Claims'),
+    h('h3', {}, 'All claims'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. Resolving an injury incident with a note opens one.'),
     claims.length > 0 && h('table', {},
       h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Payout'), h('th', {}, 'Waiting for')),
@@ -250,6 +359,9 @@ async function fileRecord(claimId: bigint, form: HTMLFormElement) {
   await conn.reducers.submitMedicalRecord({ claimId, fileHash: blob.hash, pageCount: blob.pages });
 }
 
+/** Claims whose approver unticked "learn"; kept here because each redraw makes a fresh checkbox. */
+const noLearn = new Set<bigint>();
+
 function decide(c: Claim) {
   const approve = async (e: Event) => {
     e.preventDefault();
@@ -258,7 +370,7 @@ function decide(c: Claim) {
     await act(() => conn.reducers.approveClaim({
       claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash,
       requestedCeilingCents: ceiling ? BigInt(Math.round(Number(ceiling) * 100)) : undefined,
-      learn: (f.elements.namedItem('learn') as HTMLInputElement).checked,
+      learn: !noLearn.has(c.id),
     }));
   };
   const refuse = async (e: Event) => {
@@ -268,7 +380,8 @@ function decide(c: Claim) {
   };
   return h('div', {},
     h('form', { onsubmit: approve },
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'learn', checked: true }), 'Learn a rule from this approval, so similar claims settle on their own'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
+        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims settle on their own'),
       h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' })),
       h('button', {}, `Approve ${money(c.payoutCents)}`)),
     h('form', { onsubmit: refuse },
@@ -294,16 +407,21 @@ function claimDetail(id: bigint) {
     h('p', {}, h('b', {}, statusOf(c)), `: ${c.statusNote}`),
     h('p', {}, `Cost ${money(c.costCents)} · payout ${money(c.payoutCents)} · recoverable from the insurer ${money(c.recoverableCents)} · venue pays ${money(c.venueCostCents)}`),
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
-    c.status.tag === 'AwaitingRecord' && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
+    c.status.tag === 'AwaitingRecord' && can('medic', 'ops', 'floor_manager', 'risk_manager') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
-      h('label', {}, 'Clinic PDF', h('input', { type: 'file', accept: 'application/pdf' })),
+      h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.simulate && h('label', {}, 'or a sample record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
-    c.status.tag === 'Routed' && h('div', {}, h('h4', {}, `Your decision (${c.routedToName}, ${c.routedToRole})`), decide(c)),
+    c.status.tag === 'Routed' && (c.routedTo.isEqual(conn.identity!)
+      ? h('div', {}, h('h4', {}, `Your decision (${c.routedToName}, ${c.routedToRole})`), decide(c))
+      : h('p', {}, h('b', {}, `Waiting for ${c.routedToName} (${c.routedToRole}).`), ' Only the person the claim is routed to can approve or refuse it.')),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
-    record && [h('h4', {}, 'Medical record, read by Claude'),
-      h('p', {}, `${record.status}: ${record.documentKind} for ${record.patientName} from ${record.providerName} on ${record.dateOfService}, invoice ${record.invoiceNumber}. Billed ${money(record.billedCents)}, covered ${money(record.coveredCents)}.`),
+    record && record.status !== 'extracted' && [h('h4', {}, 'Medical record'),
+      h('p', {}, record.status === 'reading' ? 'Claude is reading the PDF.' : `Claude could not read it: ${record.dropped.join('; ')}`, ' ',
+        h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, 'Open the PDF'))],
+    record && record.status === 'extracted' && [h('h4', {}, 'Medical record, read by Claude'),
+      h('p', {}, `${record.documentKind} for ${record.patientName} from ${record.providerName} on ${record.dateOfService}, invoice ${record.invoiceNumber}. Billed ${money(record.billedCents)}, covered ${money(record.coveredCents)}.`),
       record.reasonForVisit && h('p', {}, `Reason: ${record.reasonForVisit}. ${record.history}`),
       h('p', {}, `Diagnoses: ${record.diagnoses.join('; ')}`),
       record.dropped.length > 0 && h('p', {}, `Dropped: ${record.dropped.join('; ')}`),
@@ -342,7 +460,7 @@ function rules() {
 }
 
 function claimsTab() {
-  return [incidentDesk(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+  return [incidentDesk(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
 }
 
 // --- Imports and Kibana ---------------------------------------------------------------------
@@ -362,8 +480,18 @@ function data() {
   ];
 }
 
+// The page redraws on every change and every second; holding off while a button is pressed keeps a
+// click from landing on a button that was just replaced.
+let pressing = false;
+document.addEventListener('pointerdown', () => { pressing = true; }, true);
+document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; }, 100), true);
+
 function render() {
-  if (!conn) return;
+  if (!conn || pressing) return;
+  const open = tabs();
+  if (!open.length) return mount('app', header(), noRole());
+  // A tab the caller's roles do not open falls back to their first one.
+  if (!open.some(([key]) => key === tab)) tab = open[0][0];
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'data' ? data() : tab === 'simulate' ? simulateTab() : live();
   mount('app', header(), body);
 }
@@ -375,7 +503,7 @@ async function main() {
     return mount('app', h('h2', {}, 'Host portal'), h('button', { onclick: signIn }, 'Sign in with email'));
   }
   conn = await connect(QUERIES, render);
-  window.addEventListener('hashchange', () => { tab = location.hash.slice(1) || 'live'; render(); });
+  window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);
 }
 

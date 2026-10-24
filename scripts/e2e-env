@@ -5,13 +5,16 @@ SPACETIME="$(command -v spacetime || echo "$HOME/.local/bin/spacetime")"
 E2E_TARGET="${E2E_TARGET:-local}"
 case "$E2E_TARGET" in
   local)
-    export SPACETIMEDB_URL=http://127.0.0.1:3097 SPACETIMEDB_DATABASE=bandit-e2e
-    export ELASTIC_INDEX_PREFIX=bandit-e2e
+    # E2E_LOCAL_PORT and E2E_LOCAL_PREFIX let a second checkout run its own private server.
+    export SPACETIMEDB_URL=http://127.0.0.1:${E2E_LOCAL_PORT:-3097} SPACETIMEDB_DATABASE=bandit-e2e
+    export ELASTIC_INDEX_PREFIX=${E2E_LOCAL_PREFIX:-bandit-e2e}
     STDB_SERVER=e2e-local
     ;;
   maincloud)
     export SPACETIMEDB_URL=https://maincloud.spacetimedb.com SPACETIMEDB_DATABASE=bandit-calhacks13-sp82j
     export ELASTIC_INDEX_PREFIX=bandit
+    # The SpacetimeAuth client the pages sign in with (public, PKCE, no secret).
+    export SPACETIMEAUTH_CLIENT_ID=client_034lYVa0v5zqZJQWQktByi
     STDB_SERVER=maincloud
     ;;
   *) echo "E2E_TARGET must be local or maincloud" >&2; exit 1 ;;

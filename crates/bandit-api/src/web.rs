@@ -88,7 +88,7 @@ async fn config(State(app): AppState) -> Json<Value> {
     let kibana = w.kibana_url.trim_end_matches('/');
     let dashboards: Vec<Value> = [
         ("Import run", "bandit-pipeline-calhacks-13"),
-        ("Event story", "bandit-event-calhacks-13"),
+        ("Sponsors and prizes", "bandit-event-calhacks-13"),
         ("Claims", "bandit-claims"),
     ]
     .iter()
@@ -262,9 +262,9 @@ fn sim_token(app: &App) -> ApiResult<String> {
         .map_err(|e| error(StatusCode::CONFLICT, format!("{e:#}")))
 }
 
-/// Simulation only: walks a simulated band to another zone's station.
+/// Simulation only: walks a simulated band (90 to 99) to another zone's station.
 async fn move_band(State(app): AppState, Path((band, station)): Path<(u8, u8)>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate || !TAP_SIM_BANDS.contains(&band) {
+    if !app.web.simulate || !(90..=99).contains(&band) {
         return Err(error(StatusCode::NOT_FOUND, "only simulated bands move from here"));
     }
     let token = sim_token(&app)?;
@@ -291,8 +291,8 @@ pub async fn heartbeat(app: Arc<App>) {
     }
 }
 
-/// Simulation only: renders one of the synthetic clinic records for the claim's incident date and time and
-/// files it as the medic, through `bandit-claims attach-record`.
+/// Simulation only: renders one of the synthetic clinic records, made out to the claimant, for the
+/// claim's incident date and time, and files it as the medic through `bandit-claims attach-record`.
 async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64, String)>) -> ApiResult<Json<Value>> {
     if !app.web.simulate {
         return Err(error(StatusCode::NOT_FOUND, "sample records are off"));
@@ -300,23 +300,33 @@ async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64,
     if !["first-aid-wrist", "urgent-care-wrist", "urgent-care-ankle-home"].contains(&template.as_str()) {
         return Err(error(StatusCode::BAD_REQUEST, "unknown sample record"));
     }
-    let filed = claims_cli(&app, &["attach-record", "--claim", &claim.to_string(), "--template", &template]).await?;
+    let filed = claims_cli(&app, &["attach-record", "--claim", &claim.to_string(), "--template", &template, "--for-claimant"]).await?;
     Ok(Json(json!({ "filed": filed })))
 }
 
 /// Simulation only: the band falls where it is, with two of the claims story's attendees as the
-/// bands around it, through `bandit-claims fall`. Its heartbeat pauses meanwhile so the fall shows.
+/// bands around it, through `bandit-claims fall`. The heartbeats of the band and the witnesses pause
+/// meanwhile so the fall shows; the witnesses stay where they gathered round.
 async fn fall(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Value>> {
     if !app.web.simulate || !(90..=99).contains(&band) {
         return Err(error(StatusCode::NOT_FOUND, "only simulated bands fall from here"));
     }
     let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
-    let witnesses: Vec<String> = [90u8, 92, 93, 91].iter().filter(|w| **w != band).take(2).map(|w| w.to_string()).collect();
-    let paused = app.web.sim_bands.lock().unwrap().remove(&band);
-    let out = claims_cli(&app, &["fall", "--band", &band.to_string(), "--witnesses", &witnesses.join(","), "--station", &station.to_string(), "--witness-station", &station.to_string()]).await;
+    let witnesses: Vec<u8> = [90u8, 92, 93, 91].into_iter().filter(|w| *w != band).take(2).collect();
+    let (paused, gathered) = {
+        let mut sims = app.web.sim_bands.lock().unwrap();
+        let paused = sims.remove(&band);
+        let gathered: Vec<u8> = witnesses.iter().copied().filter(|w| sims.remove(w).is_some()).collect();
+        (paused, gathered)
+    };
+    let list: Vec<String> = witnesses.iter().map(u8::to_string).collect();
+    let out = claims_cli(&app, &["fall", "--band", &band.to_string(), "--witnesses", &list.join(","), "--station", &station.to_string(), "--witness-station", &station.to_string()]).await;
+    let mut sims = app.web.sim_bands.lock().unwrap();
     if let Some(s) = paused {
-        app.web.sim_bands.lock().unwrap().insert(band, s);
+        sims.insert(band, s);
     }
+    sims.extend(gathered.into_iter().map(|w| (w, station)));
+    drop(sims);
     Ok(Json(json!({ "fell": out? })))
 }
 

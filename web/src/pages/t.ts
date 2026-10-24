@@ -7,7 +7,7 @@ import {
   act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, signIn, signOut,
   signedInEmail, PLATFORMS,
 } from '../lib';
-import { recap, type Recap } from '../recap';
+import { recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 
 const QUERIES = [
@@ -43,8 +43,6 @@ let claimError = '';
 let claimAsked = false;
 let step: Step = 'name';
 let session = '';
-let recapData: Recap | undefined;
-let recapLoading = false;
 
 function go(next: Step) {
   step = next;
@@ -161,7 +159,7 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
     h('h2', {}, title),
     h('p', {}, why),
     h('form', { onsubmit: (e: Event) => act(() => upload(e)) },
-      h('label', {}, 'PDF', h('input', { type: 'file', accept: 'application/pdf' })),
+      h('label', {}, 'PDF', h('input', { type: 'file', name: kind, accept: 'application/pdf' })),
       h('button', {}, 'Upload')),
     simulate && h('button', { class: 'sim', onclick: () => act(async () => {
       await fileDocument(kind, await (await fetch(`/samples/${sample}`)).arrayBuffer());
@@ -191,7 +189,7 @@ function profileStep() {
     h('ul', { class: 'cards' }, matches.map(p => {
       const org = conn.db.organization.id.find(p.organizationId);
       return h('li', {},
-        h('b', {}, p.displayName), ` ${p.title ? p.title + ', ' : ''}${org?.name ?? ''} (${p.kind})`,
+        h('b', {}, p.displayName), ` ${[p.title, org?.name].filter(Boolean).join(', ')} (${p.kind})`,
         h('button', { onclick: () => act(() => conn.reducers.claimPerson({ personId: p.id })).then(() => go('card')) }, 'This is me'));
     })),
     h('button', { class: 'link', onclick: () => go('card') }, 'None of these'),
@@ -258,6 +256,16 @@ function thanks() {
   ];
 }
 
+function resumeStep(): Step {
+  if (!conn.db.myAttendee.iter().next().value?.displayName) return 'name';
+  const docs = [...conn.db.myMedicalDocuments.iter()];
+  if (!docs.some(d => d.kind === 'history')) return 'history';
+  if (!docs.some(d => d.kind === 'insurance')) return 'insurance';
+  if (conn.db.myMedicalCard.iter().next().value?.status !== 'confirmed') return 'card';
+  if (!conn.db.myWallet.iter().next().value) return 'wallet';
+  return 'done';
+}
+
 function setup() {
   switch (step) {
     case 'name': return nameStep();
@@ -271,19 +279,6 @@ function setup() {
   }
 }
 
-async function loadRecap() {
-  if (recapLoading || recapData) return;
-  recapLoading = true;
-  try {
-    if (!session) session = await apiSession(conn);
-    recapData = await api<Recap>('/api/recap', session);
-  } catch (e: any) {
-    document.getElementById('error')!.textContent = `Recap ranking: ${e?.message ?? e}`;
-  }
-  recapLoading = false;
-  render();
-}
-
 function render() {
   if (!conn) return;
   const mb = conn.db.myBand.iter().next().value;
@@ -292,8 +287,7 @@ function render() {
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'));
   if (mb && mb.bandId === bandId && mb.status === 'claimed') {
     if (ended) {
-      loadRecap();
-      return mount('app', top, recap(conn, recapData));
+      return mount('app', top, recap(conn, render));
     }
     return mount('app', top, setup());
   }
@@ -309,15 +303,17 @@ async function main() {
   const cfg = await config();
   simulate = cfg.simulate;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
-  if (cfg.auth_client_id && !idToken() && !(await playedToken())) {
+  const guest = sessionStorage.getItem('bandit-guest') === '1';
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
     return mount('app', h('h2', {}, `Band ${bandId}`), h('p', {}, 'Sign in with your email to make this band yours.'),
-      h('button', { onclick: signIn }, 'Sign in with email'));
+      h('button', { onclick: signIn }, 'Sign in with email'),
+      simulate && h('button', { class: 'sim', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   conn = await connect(QUERIES, render);
   const mb = conn.db.myBand.iter().next().value;
   if (!mb || (mb.bandId === bandId && mb.status !== 'claimed')) await tryClaim();
-  // Someone who finished setup earlier lands on the thank-you.
-  if (conn.db.myAttendee.iter().next().value?.displayName) step = 'done';
+  // Someone who reloads mid-setup picks up at the first step they have not finished.
+  step = resumeStep();
   // The claim countdown ticks every second until the band is claimed.
   setInterval(() => {
     const claimed = conn.db.myBand.iter().next().value?.status === 'claimed';

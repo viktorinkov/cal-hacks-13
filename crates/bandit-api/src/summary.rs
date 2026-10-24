@@ -132,7 +132,8 @@ pub struct PhotoOut {
     pub zone_id: u64,
     pub zone_name: String,
     pub caption: String,
-    /// The other people the bands put in it, minus anyone who removed their tag.
+    /// The other people the bands put in it, minus anyone who removed their tag: by name for the
+    /// people you hung out with, as "someone" otherwise.
     pub people: Vec<Person>,
 }
 
@@ -253,7 +254,10 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
                 .photo_tags
                 .iter()
                 .filter(|t| t.photo_id == p.id && t.attendee != who && t.status != "removed")
-                .filter_map(|t| person(rows, t.attendee))
+                .filter_map(|t| {
+                    let card = person(rows, t.attendee)?;
+                    Some(if met(rows, who, t.attendee) { card } else { someone() })
+                })
                 .collect(),
         })
         .collect();
@@ -415,6 +419,23 @@ fn person(rows: &Rows, id: Identity) -> Option<Person> {
     })
 }
 
+/// Whether `who` hung out with `other`: a met encounter between the two.
+fn met(rows: &Rows, who: Identity, other: Identity) -> bool {
+    rows.encounters
+        .iter()
+        .any(|e| other_of(e.attendee_a, e.attendee_b, who) == Some(other))
+}
+
+/// Someone in your photo you did not hang out with: no name, no socials.
+fn someone() -> Person {
+    Person {
+        node_id: 0,
+        name: "someone".into(),
+        photo_url: String::new(),
+        handles: BTreeMap::new(),
+    }
+}
+
 fn other_of(a: Identity, b: Identity, who: Identity) -> Option<Identity> {
     if a == who {
         Some(b)
@@ -561,6 +582,7 @@ mod tests {
                 attendee(2, "Bo", true),
                 attendee(3, "Cy", false),
                 attendee(4, "Di", true),
+                attendee(5, "Ed", true),
             ],
             handles: vec![
                 handle(1, 2, "instagram", "bo.builds"),
@@ -624,6 +646,7 @@ mod tests {
                 tag(2, 1, 2, "confirmed"),
                 tag(3, 1, 3, "confirmed"),
                 tag(4, 1, 4, "suggested"),
+                tag(7, 1, 5, "suggested"),
                 tag(5, 2, 1, "confirmed"),
                 tag(6, 3, 1, "removed"),
             ],
@@ -677,7 +700,8 @@ mod tests {
         assert_eq!(robots.zone_name, "Expo");
         assert_eq!(robots.caption, "Robots!");
         let names: Vec<&str> = robots.people.iter().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, vec!["Bo", "Di"]);
+        assert_eq!(names, vec!["Bo", "Di", "someone"]);
+        assert!(robots.people[2].handles.is_empty());
     }
 
     #[test]

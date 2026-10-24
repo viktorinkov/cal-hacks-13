@@ -7,6 +7,7 @@ import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
 import AddIncidentNoteReducer from "../add_incident_note_reducer";
+import AddOwnerReducer from "../add_owner_reducer";
 import ApplyMedicalExtractReducer from "../apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "../apply_medical_record_reducer";
 import ApproveClaimReducer from "../approve_claim_reducer";
@@ -46,6 +47,7 @@ import RefuseClaimReducer from "../refuse_claim_reducer";
 import RegisterBlobReducer from "../register_blob_reducer";
 import RegisterBridgeReducer from "../register_bridge_reducer";
 import RegisterPhotoReducer from "../register_photo_reducer";
+import ReleaseBandReducer from "../release_band_reducer";
 import RemoveSocialHandleReducer from "../remove_social_handle_reducer";
 import ReopenEventReducer from "../reopen_event_reducer";
 import ReportPropertyEventReducer from "../report_property_event_reducer";
@@ -86,6 +88,7 @@ import UpsertCoverageRuleReducer from "../upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "../upsert_insurance_policy_reducer";
 
 export type AddIncidentNoteParams = __Infer<typeof AddIncidentNoteReducer>;
+export type AddOwnerParams = __Infer<typeof AddOwnerReducer>;
 export type ApplyMedicalExtractParams = __Infer<typeof ApplyMedicalExtractReducer>;
 export type ApplyMedicalRecordParams = __Infer<typeof ApplyMedicalRecordReducer>;
 export type ApproveClaimParams = __Infer<typeof ApproveClaimReducer>;
@@ -125,6 +128,7 @@ export type RefuseClaimParams = __Infer<typeof RefuseClaimReducer>;
 export type RegisterBlobParams = __Infer<typeof RegisterBlobReducer>;
 export type RegisterBridgeParams = __Infer<typeof RegisterBridgeReducer>;
 export type RegisterPhotoParams = __Infer<typeof RegisterPhotoReducer>;
+export type ReleaseBandParams = __Infer<typeof ReleaseBandReducer>;
 export type RemoveSocialHandleParams = __Infer<typeof RemoveSocialHandleReducer>;
 export type ReopenEventParams = __Infer<typeof ReopenEventReducer>;
 export type ReportPropertyEventParams = __Infer<typeof ReportPropertyEventReducer>;

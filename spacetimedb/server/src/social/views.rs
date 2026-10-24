@@ -361,7 +361,27 @@ pub struct MyPhoto {
     pub people: Vec<PersonCard>,
 }
 
-/// Photos you are tagged in, with everyone else the bands put in them.
+/// Whether `me` hung out with `other`: a met encounter between the two.
+fn met(ctx: &ViewContext, me: Identity, other: Identity) -> bool {
+    ctx.db.social_encounter().attendee_a().filter(me).any(|e| e.met && e.attendee_b == other)
+        || ctx.db.social_encounter().attendee_b().filter(me).any(|e| e.met && e.attendee_a == other)
+}
+
+/// Someone in your photo you did not hang out with: no name, no socials.
+fn someone() -> PersonCard {
+    PersonCard {
+        name: "someone".into(),
+        photo_url: String::new(),
+        person_id: 0,
+        title: String::new(),
+        organization: String::new(),
+        node_id: 0,
+        handles: Vec::new(),
+    }
+}
+
+/// Photos you are tagged in, with everyone else the bands put in them: by name and socials for the
+/// people you hung out with, as "someone" otherwise.
 #[spacetimedb::view(accessor = my_photos, public)]
 pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
     let me = ctx.sender();
@@ -378,7 +398,10 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
                 .photo_id()
                 .filter(p.id)
                 .filter(|o| o.attendee != me && o.status != "removed")
-                .filter_map(|o| person_card(ctx, o.attendee))
+                .filter_map(|o| {
+                    let card = person_card(ctx, o.attendee)?;
+                    Some(if met(ctx, me, o.attendee) { card } else { someone() })
+                })
                 .collect();
             Some(MyPhoto {
                 tag_id: t.id,

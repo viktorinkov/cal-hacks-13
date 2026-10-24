@@ -8,3 +8,7 @@
 - Open pull requests with a title only and an empty description.
 - Viktor's branches start with `vik-`.
 - Push changes regularly instead of holding them until the end.
+
+## Writing
+
+- Never use the word "demo" anywhere in the project: not in docs, code, comments, file names, folder names, branch names or commit messages. This is a hackathon project, so say what the thing is instead, for example "scripted bands", "test attendees" or "the scripted claims run".

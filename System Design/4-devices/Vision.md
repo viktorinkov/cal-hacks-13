@@ -44,7 +44,7 @@ Not responsible for:
 
 ### Leo's defaults (TBD -- LEO): `bandit-vision`
 
-One Rust process, `bandit-vision`, on the demo laptop. All of this is Leo's to change.
+One Rust process, `bandit-vision`, on the venue laptop. All of this is Leo's to change.
 
 - Camera. One phone on a light stand looking straight down on the pit. It serves JPEG snapshots over the team phone's hotspot. The camera covers one zone, the pit.
 - Frames. `bandit-vision` pulls one frame per second at 1280x720 into a 10 s ring buffer, so an event can be looked at from 4 s before to 3 s after the moment.
@@ -101,7 +101,7 @@ flowchart LR
 
 All five tables and the view are owned by this file. The module defines them only while Vision exists.
 
-`camera`: one row per camera; the demo has one.
+`camera`: one row per camera; the event has one.
 
 | Field | Meaning |
 |---|---|
@@ -266,7 +266,7 @@ sequenceDiagram
 
 | Decision | Why |
 |---|---|
-| (TBD -- LEO) One overhead phone camera on a light stand over the pit | the pit is where the density demo, the fall and the SOS happen |
+| (TBD -- LEO) One overhead phone camera on a light stand over the pit | the pit is where the crowd density step, the fall and the SOS happen |
 | (TBD -- LEO) The phone serves JPEG snapshots over the hotspot; `bandit-vision` pulls 1 frame per second at 1280x720 into a 10 s ring buffer; the pit check uses every third frame | 1280x720 is the size Claude reads well; one frame a second fills the 8-frame bundle around an event, and a pit reading every 3 s is enough for a tick that already smooths over seconds |
 | (TBD -- LEO) YOLO person and pose models through ONNX Runtime inside `bandit-vision`, no sidecar | one Rust process to run and restart on the laptop |
 | (TBD -- LEO) Live, Claude is used only for event assessment (fall or SOS confirmation, property damage), with the same Anthropic key and account as the workers | Claude makes the judgment; counting and person-down run locally; one key to manage |
