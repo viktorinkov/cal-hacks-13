@@ -86,6 +86,9 @@ pub fn print_incident(app: &App, id: u64) -> Result<()> {
     Ok(())
 }
 
+/// How long the medic takes to reach someone in the scripted runs.
+pub const RESPONSE_SECS: u64 = 20;
+
 /// The medic takes the incident and writes the treatment note.
 pub fn treat(app: &App, incident: u64, note: &str) -> Result<()> {
     let medic = app.actor("medic")?;
@@ -223,9 +226,11 @@ pub fn attach_record(app: &App, claim_id: u64, template: &str, suffix: Option<&s
     if let (Some(name), Some(original)) = (patient, template_patient(template)) {
         html = html.replace(original, name);
     }
-    let local = hyphenate_core::time::local_hms(micros(incident.opened_at), app.tz());
-    let minute = local[..2].parse::<i32>().unwrap_or(0) * 60 + local[3..5].parse::<i32>().unwrap_or(0);
-    let html = align_times(&html, template, minute);
+    let minute = |t: i64| {
+        let hms = hyphenate_core::time::local_hms(t, app.tz());
+        hms[..2].parse::<i32>().unwrap_or(0) * 60 + hms[3..5].parse::<i32>().unwrap_or(0)
+    };
+    let html = align_times(&html, template, minute(micros(incident.opened_at)), minute(now_micros()));
     let template_arg = out_dir.join(format!("claim-{claim_id}-{template}.html"));
     std::fs::write(&template_arg, html)?;
     let out = out_dir.join(format!("claim-{claim_id}-{template}.pdf"));
@@ -271,17 +276,21 @@ pub fn file_record(app: &App, claim_id: u64, sha256: &str, size_bytes: u64, page
 }
 
 /// The templates are written for an injury at a fixed evening time; this
-/// moves the record's clock times so the injury happens when the band said.
-/// First aid: every time on the record keeps its distance from the 22:05
-/// injury. Urgent care (the next morning): only the injury time moves, and
-/// "last night" becomes "yesterday" unless the fall was in the evening.
-fn align_times(html: &str, template: &str, minute: i32) -> String {
+/// moves the record's clock times to the real story: the injury at the
+/// minute the band reported it. First aid: the visit starts the minute the
+/// record is filed and every later time keeps its distance from it. Urgent
+/// care (the next morning): only the injury time moves, and "last night"
+/// becomes "yesterday" unless the fall was in the evening.
+fn align_times(html: &str, template: &str, injury: i32, seen: i32) -> String {
     let hm = |m: i32| format!("{:02}:{:02}", m.rem_euclid(1440) / 60, m.rem_euclid(60));
     match template {
-        "first-aid-wrist" => shift_clock(html, minute - (22 * 60 + 5)),
+        "first-aid-wrist" => {
+            let held = html.replace("approx. 22:05", "approx. @INJURY@").replace("approximately 22:05", "approximately @INJURY@");
+            shift_clock(&held, seen - (22 * 60 + 20)).replace("@INJURY@", &hm(injury))
+        }
         "urgent-care-wrist" => {
-            let html = html.replace("approximately 21:45", &format!("approximately {}", hm(minute)));
-            if minute >= 18 * 60 {
+            let html = html.replace("approximately 21:45", &format!("approximately {}", hm(injury)));
+            if injury >= 18 * 60 {
                 html
             } else {
                 html.replace("Last night,", "Yesterday,").replace("a fall last night", "a fall yesterday")
@@ -345,13 +354,15 @@ mod tests {
     }
 
     #[test]
-    fn aligns_the_urgent_care_injury_time() {
+    fn aligns_record_times_with_the_incident() {
         let t = "a fall last night. Last night, X, at approximately 21:45, arrived 10:40";
-        assert_eq!(
-            align_times(t, "urgent-care-wrist", 14 * 60 + 3),
-            "a fall yesterday. Yesterday, X, at approximately 14:03, arrived 10:40"
-        );
-        assert_eq!(align_times(t, "urgent-care-wrist", 22 * 60), "a fall last night. Last night, X, at approximately 22:00, arrived 10:40");
+        let day = "a fall yesterday. Yesterday, X, at approximately 14:03, arrived 10:40";
+        assert_eq!(align_times(t, "urgent-care-wrist", 14 * 60 + 3, 14 * 60 + 4), day);
+        let night = "a fall last night. Last night, X, at approximately 22:00, arrived 10:40";
+        assert_eq!(align_times(t, "urgent-care-wrist", 22 * 60, 22 * 60), night);
+        let fa = "seen 22:20, incident approx. 22:05, at 22:20. At approximately 22:05, released 22:50";
+        let moved = "seen 01:08, incident approx. 01:07, at 01:08. At approximately 01:07, released 01:38";
+        assert_eq!(align_times(fa, "first-aid-wrist", 60 + 7, 60 + 8), moved);
     }
 
     #[test]

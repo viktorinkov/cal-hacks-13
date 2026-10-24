@@ -13,7 +13,7 @@ use std::io::BufRead;
 const FLOW_SECS: u64 = 360;
 
 pub fn run(app: &App, pause: bool) -> Result<()> {
-    setup::run(app)?;
+    let bridge = setup::run(app)?;
     let existing = app.db()?.db.claim().count();
     if existing > 0 {
         println!(
@@ -24,11 +24,11 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     if !app.worker_active() {
         println!("\nnote: {}", app.worker_hint());
     }
-    let bridge = Bridge::open(app)?;
-    let mut crowd: Vec<(u8, Pose)> = (1..=9u8).map(|b| (b, Pose::at(MAIN_STAGE))).collect();
-    crowd[7].1 = Pose::at(HACKER_HALL);
+    let main = app.station(MAIN_STAGE)?;
+    let mut crowd: Vec<(u8, Pose)> = (1..=9u8).map(|b| (b, Pose::at(main))).collect();
+    crowd[7].1 = Pose::at(app.station(HACKING_FLOOR)?);
     bridge.place(&crowd);
-    println!("\ncrowd      bands 1-9 online: Sam Patel (8) in Hacker hall, everyone else at Main stage");
+    println!("\ncrowd      bands 1-9 online: Sam Patel (8) on the Hacking floor, everyone else at Main stage");
 
     step(pause, "1. Jordan Alvarez falls in the Main stage pit; bands 2, 4 and 9 around him light the circle")?;
     let jordan = injury(
@@ -38,7 +38,7 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
         MAIN_STAGE,
         &[2, 4, 9],
         MAIN_STAGE,
-        "left wrist pain after the crowd surged; wrapped, cold pack, referred to urgent care",
+        "on scene in the pit: left wrist pain and swelling after the crowd surged; wrapping the wrist, referring him to urgent care",
     )?;
     flow::attach_record(app, jordan, "urgent-care-wrist", None, None)?;
     let c = show::wait_for(app, jordan, FLOW_SECS, |c| !in_pipeline(c.status))?;
@@ -62,32 +62,33 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
         MAIN_STAGE,
         &[1, 5],
         MAIN_STAGE,
-        "right wrist sprain after slipping on a spilled drink; wrapped, cold pack, first aid",
+        "on scene near the stage: right wrist pain after slipping on a spilled drink; walking her to the medical station",
     )?;
     flow::attach_record(app, maya, "first-aid-wrist", None, None)?;
     show::wait_for(app, maya, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, maya)?;
 
-    step(pause, "3. Sam Patel goes down in Hacker hall; his urgent-care record says he hurt the ankle at home")?;
+    step(pause, "3. Sam Patel goes down on the Hacking floor; his urgent-care record says he hurt the ankle at home")?;
     let sam = injury(
         app,
         &bridge,
         8,
-        HACKER_HALL,
+        HACKING_FLOOR,
         &[4, 9],
-        HACKER_HALL,
-        "right ankle pain and swelling after a stumble; splinted, referred to urgent care",
+        HACKING_FLOOR,
+        "on scene at the tables: right ankle pain and swelling after a stumble; splinting it, referring him to urgent care",
     )?;
     flow::attach_record(app, sam, "urgent-care-ankle-home", None, None)?;
     show::wait_for(app, sam, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, sam)?;
 
-    step(pause, "4. Lee Park's band reports a fall at Main stage, but the light circle forms in Sponsor hall")?;
-    let lee = injury(app, &bridge, 6, MAIN_STAGE, &[1, 2, 5], SPONSOR_HALL, "says they fell; no visible injury, ice pack given")?;
+    step(pause, "4. Lee Park's band reports a fall at Main stage, but the light circle forms on Sponsor row")?;
+    let lee =
+        injury(app, &bridge, 6, MAIN_STAGE, &[1, 2, 5], SPONSOR_ROW, "on scene: says they fell; no visible injury, giving an ice pack")?;
     show::summary(app, lee)?;
 
     step(pause, "5. A speaker falls off its stand at Main stage; the overhead camera sees it")?;
-    let speaker = flow::property(app, "Main stage", "speaker knocked off its stand into the pit", 240_000, true)?
+    let speaker = flow::property(app, MAIN_STAGE, "speaker knocked off its stand into the pit", 240_000, true)?
         .context("no claim opened for the speaker")?;
     let c = show::wait_for(app, speaker.id, FLOW_SECS, |c| !in_pipeline(c.status))?;
     if c.status == ClaimStatus::Routed {
@@ -121,10 +122,12 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     show::letters(app, jordan)
 }
 
-/// One injury from fall to an open claim: the band, the medic, resolution.
-fn injury(app: &App, bridge: &Bridge, band: u8, station: u8, witnesses: &[u8], witness_station: u8, note: &str) -> Result<u64> {
-    let incident = flow::fall(app, bridge, band, station, witnesses, witness_station)?;
+/// One injury from fall to an open claim: the band, the medic on scene, resolution.
+fn injury(app: &App, bridge: &Bridge, band: u8, zone: &str, witnesses: &[u8], witness_zone: &str, note: &str) -> Result<u64> {
+    let incident = flow::fall(app, bridge, band, app.station(zone)?, witnesses, app.station(witness_zone)?)?;
     flow::print_incident(app, incident.id)?;
+    println!("medic      Ari Ramos is on the way ({} s)", flow::RESPONSE_SECS);
+    sleep_ms(flow::RESPONSE_SECS * 1000);
     flow::treat(app, incident.id, note)?;
     let claim = flow::resolve(app, incident.id, "treated on site", "medic")?.context("no claim opened")?;
     Ok(claim.id)

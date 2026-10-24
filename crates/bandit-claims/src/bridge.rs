@@ -60,8 +60,8 @@ impl Bridge {
         let bridge = Bridge::start(conn);
         let db = app.db()?;
         let rows: Vec<Band> = db.db.band().iter().collect();
-        let poses: Vec<(u8, Pose)> =
-            rows.iter().map(|b| (b.id, Pose::at(if b.zone == 0 { crate::app::MAIN_STAGE } else { b.zone }))).collect();
+        let main = app.station(crate::app::MAIN_STAGE).unwrap_or(0);
+        let poses: Vec<(u8, Pose)> = rows.iter().map(|b| (b.id, Pose::at(if b.zone == 0 { main } else { b.zone }))).collect();
         bridge.shared.lock().unwrap().wake = rows.iter().filter(|b| !b.online).map(|b| b.id).collect();
         bridge.place(&poses);
         Ok(bridge)
@@ -123,7 +123,7 @@ impl Bridge {
 
     /// A press on the band's button, as the claim flow expects after an NFC tap.
     pub fn press(&self, id: u8) {
-        let p = self.pose(id).unwrap_or(Pose::at(crate::app::MAIN_STAGE));
+        let p = self.pose(id).unwrap_or(Pose::at(0));
         self.place(&[(id, Pose { flags: p.flags | F_PRESS, ..p })]);
         sleep_ms(400);
         self.place(&[(id, p)]);

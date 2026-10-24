@@ -30,10 +30,10 @@ pub const STAFF: &[(&str, &str, &str)] = &[
 pub const ATTENDEES: &[(&str, &str, u8)] =
     &[("maya", "Maya Chen", 3), ("jordan", "Jordan Alvarez", 7), ("sam-patel", "Sam Patel", 8), ("lee", "Lee Park", 6)];
 
-/// Stations that anchor the three zones.
-pub const MAIN_STAGE: u8 = 101;
-pub const SPONSOR_HALL: u8 = 102;
-pub const HACKER_HALL: u8 = 103;
+/// Zones the story uses, looked up by name: the venue import decides their stations.
+pub const MAIN_STAGE: &str = "Main stage";
+pub const SPONSOR_ROW: &str = "Sponsor row";
+pub const HACKING_FLOOR: &str = "Hacking floor";
 
 /// Who acts for each rung of the authority matrix.
 pub fn approver_for_role(role: &str) -> Option<&'static str> {
@@ -203,6 +203,22 @@ impl App {
             let names: Vec<String> = db.db.zone().iter().map(|z| z.name).collect();
             format!("no zone {name:?} (zones: {})", names.join(", "))
         })
+    }
+
+    /// The station that anchors the named zone.
+    pub fn station(&self, zone_name: &str) -> Result<u8> {
+        let zone = self.zone_by_name(zone_name)?;
+        if zone.station_id == 0 {
+            bail!("zone {} has no station", zone.name);
+        }
+        Ok(zone.station_id)
+    }
+
+    /// Zones that have a station, Main stage first.
+    pub fn stationed_zones(&self) -> Result<Vec<Zone>> {
+        let mut zones: Vec<Zone> = self.db()?.db.zone().iter().filter(|z| z.station_id != 0).collect();
+        zones.sort_by_key(|z| (z.name != MAIN_STAGE, z.station_id));
+        Ok(zones)
     }
 
     pub fn zone_by_station(&self, station: u8) -> Option<Zone> {
