@@ -107,23 +107,6 @@ pub struct MySharedVisit {
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub struct StoryPersonOut {
-    pub line: String,
-    pub person: PersonCard,
-}
-
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub struct MyStory {
-    pub status: String,
-    pub title: String,
-    pub body: String,
-    pub highlights: Vec<String>,
-    pub people: Vec<StoryPersonOut>,
-    pub source: String,
-    pub updated_at: Timestamp,
-}
-
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub struct ClaimedPerson {
     pub person_id: u64,
 }
@@ -209,25 +192,6 @@ pub fn my_shared_visits(ctx: &ViewContext) -> Vec<MySharedVisit> {
     .collect()
 }
 
-#[spacetimedb::view(accessor = my_story, public)]
-pub fn my_story(ctx: &ViewContext) -> Option<MyStory> {
-    let s = ctx.db.summary_story().attendee().find(ctx.sender())?;
-    let people = s
-        .people
-        .iter()
-        .filter_map(|p| Some(StoryPersonOut { line: p.line.clone(), person: person_card(ctx, p.attendee)? }))
-        .collect();
-    Some(MyStory {
-        status: s.status,
-        title: s.title,
-        body: s.body,
-        highlights: s.highlights,
-        people,
-        source: s.source,
-        updated_at: s.updated_at,
-    })
-}
-
 /// Profiles already taken, so the "is this you?" list can leave them out.
 #[spacetimedb::view(accessor = claimed_people, public)]
 pub fn claimed_people(ctx: &AnonymousViewContext) -> Vec<ClaimedPerson> {
@@ -290,13 +254,6 @@ pub fn social_shared_visits(ctx: &ViewContext) -> Vec<SharedVisit> {
     ctx.db.shared_visit().zone_id().filter(0u64..).collect()
 }
 
-#[spacetimedb::view(accessor = social_stories, public)]
-pub fn social_stories(ctx: &ViewContext) -> Vec<SummaryStory> {
-    if !allowed(ctx, &["worker", "api"]) {
-        return Vec::new();
-    }
-    ctx.db.summary_story().job_id().filter(0u64..).collect()
-}
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub struct GraphLink {
@@ -396,4 +353,67 @@ pub fn event_graph(ctx: &AnonymousViewContext) -> Vec<EventLink> {
             weight: l.weight,
         })
         .collect()
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub struct MyPhoto {
+    pub tag_id: u64,
+    pub photo_id: u64,
+    pub url: String,
+    pub taken_at: Timestamp,
+    pub zone_name: String,
+    pub caption: String,
+    /// suggested or confirmed: your own tag on this photo.
+    pub status: String,
+    /// The other people who confirmed they are in it.
+    pub people: Vec<PersonCard>,
+}
+
+/// Photos you are tagged in, with everyone else who confirmed.
+#[spacetimedb::view(accessor = my_photos, public)]
+pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
+    let me = ctx.sender();
+    ctx.db
+        .photo_tag()
+        .attendee()
+        .filter(me)
+        .filter(|t| t.status != "removed")
+        .filter_map(|t| {
+            let p = ctx.db.photo().id().find(t.photo_id)?;
+            let people = ctx
+                .db
+                .photo_tag()
+                .photo_id()
+                .filter(p.id)
+                .filter(|o| o.attendee != me && o.status == "confirmed")
+                .filter_map(|o| person_card(ctx, o.attendee))
+                .collect();
+            Some(MyPhoto {
+                tag_id: t.id,
+                photo_id: p.id,
+                url: p.url,
+                taken_at: p.taken_at,
+                zone_name: zone_name(ctx, p.zone_id),
+                caption: p.caption,
+                status: t.status,
+                people,
+            })
+        })
+        .collect()
+}
+
+#[spacetimedb::view(accessor = social_photos, public)]
+pub fn social_photos(ctx: &ViewContext) -> Vec<Photo> {
+    if !allowed(ctx, &["api"]) {
+        return Vec::new();
+    }
+    ctx.db.photo().zone_id().filter(0u64..).collect()
+}
+
+#[spacetimedb::view(accessor = social_photo_tags, public)]
+pub fn social_photo_tags(ctx: &ViewContext) -> Vec<PhotoTag> {
+    if !allowed(ctx, &["api"]) {
+        return Vec::new();
+    }
+    ctx.db.photo_tag().photo_id().filter(0u64..).collect()
 }
