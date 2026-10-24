@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// medic's filing to the named approver's decision, the merch templates and orders, the Kibana
-// dashboards, and "Event ended".
+// medic's filing to the named approver's decision, the event graph with its photos, the merch templates
+// and orders, the Kibana dashboards, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -9,7 +9,7 @@ import {
   act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
   signOut, signedInEmail, time, type Config, EXIT_COLOURS,
 } from '../lib';
-import { graphTab } from '../graph';
+import { graphTab, showPhotoInGraph } from '../graph';
 import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import type { DbConnection } from '../module_bindings';
 import type { Claim } from '../module_bindings/types';
@@ -43,6 +43,7 @@ const QUERIES = [
   'SELECT * FROM board_policies',
   'SELECT * FROM medic_medical_cards',
   'SELECT * FROM event_graph',
+  'SELECT * FROM board_photos',
   'SELECT * FROM merch_template',
   'SELECT * FROM board_merch_orders',
 ];
@@ -84,7 +85,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['merch', 'Merch'], ['kibana', 'Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['kibana', 'Kibana']];
   return cfg.test_mode ? [...all, ['bands', 'Bands']] : all;
 }
 
@@ -457,6 +458,33 @@ function claimsTab() {
   return [incidentDesk(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
 }
 
+// --- Photos -------------------------------------------------------------------------------
+
+/** Photo elements, kept across redraws so the images don't reload each second. */
+const pictures = new Map<string, HTMLElement>();
+
+function picture(url: string) {
+  if (!pictures.has(url)) pictures.set(url, h('a', { href: url, target: '_blank' }, h('img', { src: url, alt: '' })));
+  return pictures.get(url)!;
+}
+
+/** Every event photo, newest first: where and when, and the people the bands put in it. */
+function photosTab() {
+  const photos = [...conn.db.boardPhotos.iter()].sort((a, b) => Number(b.takenAt.microsSinceUnixEpoch - a.takenAt.microsSinceUnixEpoch));
+  const names = new Map([...conn.db.boardAttendees.iter()].map(a => [a.nodeId, a.displayName]));
+  const show = (id: bigint) => { tab = 'graph'; location.hash = 'graph'; render(); showPhotoInGraph(id); };
+  return h('section', {},
+    h('h3', {}, `Photos (${photos.length})`),
+    !photos.length && h('p', { class: 'muted' }, 'No photos yet. A photographer adds them on /photo, and the people whose bands were in that zone at that moment are tagged.'),
+    h('div', { class: 'photos' }, photos.map(p => h('figure', {},
+      picture(p.url),
+      h('figcaption', {},
+        h('b', {}, p.caption || 'Event photo'),
+        h('div', { class: 'muted' }, `${p.zoneName}, ${date(p.takenAt)}`),
+        h('div', {}, p.nodeIds.length ? p.nodeIds.map(id => names.get(id) || 'no name yet').join(', ') : h('span', { class: 'muted' }, 'Nobody tagged')),
+        p.nodeIds.length > 0 && h('button', { class: 'link', onclick: () => show(p.id) }, 'Show in the event graph'))))));
+}
+
 // --- Merch --------------------------------------------------------------------------------
 
 /** Template thumbnails, kept across redraws so the images don't blank out each second. */
@@ -517,7 +545,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'merch' ? merchTab() : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
   mount('app', header(), body);
 }
 

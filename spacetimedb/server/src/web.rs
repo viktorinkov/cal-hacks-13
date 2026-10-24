@@ -230,3 +230,41 @@ pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
         })
         .collect()
 }
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BoardPhoto {
+    pub id: u64,
+    pub url: String,
+    pub taken_at: Timestamp,
+    pub zone_name: String,
+    pub caption: String,
+    /// The graph nodes of the findable people the bands put in it.
+    pub node_ids: Vec<u64>,
+}
+
+/// Every event photo with the people in it, for the host portal's photos and event graph.
+#[spacetimedb::view(accessor = board_photos, public)]
+pub fn board_photos(ctx: &ViewContext) -> Vec<BoardPhoto> {
+    if !is_staff(ctx) {
+        return Vec::new();
+    }
+    ctx.db
+        .photo()
+        .zone_id()
+        .filter(0u64..)
+        .map(|p| BoardPhoto {
+            node_ids: ctx
+                .db
+                .photo_tag()
+                .photo_id()
+                .filter(p.id)
+                .filter_map(|t| ctx.db.attendee().identity().find(t.attendee).filter(|a| a.findable).map(|a| a.node_id))
+                .collect(),
+            zone_name: ctx.db.zone().id().find(p.zone_id).map(|z| z.name).unwrap_or_default(),
+            id: p.id,
+            url: p.url,
+            taken_at: p.taken_at,
+            caption: p.caption,
+        })
+        .collect()
+}
