@@ -601,7 +601,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 **Used by**
 
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Claims queue (Hyphenate.md)" panel row, the incident card controls and the Report property damage button.
-- [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): step 9 and the finance track row.
+- [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): the accuracy run before the demo (step 0c), step 9 and the finance track row.
 - [Payments-Nessie](Payments-Nessie.md): Hyphenate is one caller of `request_payout`.
 - [Simulator](../3-services/Simulator.md): `plant_medic_visit` feeds this file's claims.
 - [Elastic](Elastic.md): `bandit-claims` holds this file's de-identified claim copies.
@@ -614,8 +614,8 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - Remove the `ref_kind = claim` row from the payout callers table and the Hyphenate hook bullet in `settle_payout` in Payments-Nessie.md.
 - Remove the `via = claim` row from the access log table in Medical-ID.md.
 - Remove the Hyphenate use cases from Anthropic-Agent.md, and the Hyphenate.md parts of Simulator.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the demo claims and the seeded staff grant).
-- Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed and their interface, decision and Kibana mentions) and the claim precedent rows in Architecture.md and SpacetimeDB.md.
-- Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, step 9 in Flows.md, the prize row in Architecture.md, the Hyphenate.md rows in Attendee-App.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the Hyphenate row in Decisions.md, and the Hyphenate row and node in README.md.
+- Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
+- Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, the Hyphenate.md rows in Flows.md (the risk manager, step 0c, step 9, its diagram index row, its failure row and its decision row), the prize row in Architecture.md, the Hyphenate.md rows in Attendee-App.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the two Hyphenate.md rows in Decisions.md, and the Hyphenate row and node in README.md.
 - Drop the roles `floor_manager`, `risk_manager` and `adjuster` from SpacetimeDB.md and Ops-Dashboard.md; nothing else uses them.
 
 ## Decisions

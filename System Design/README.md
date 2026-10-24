@@ -49,7 +49,7 @@ Core components are what the safety demo needs. Optional components are features
 | [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the post-event summary, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
 | [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, orders from the recap page | Social; uses Payments-Nessie when present |
 | [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a Nessie sandbox wallet per attendee, merch checkout in the app after the event, claim payouts | Attendee-App |
-| [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | evidence packs, coverage in code, authority matrix, learned rules, ledger, letters | Safety; uses Medical-ID, Payments-Nessie, Anthropic-Agent, Vision, Simulator when present |
+| [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims demo, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Medical-ID, Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
 | [Elastic.md](7-integrations/Elastic.md) | Organizer and search | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, search by meaning, the dashed "into the same things" links, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
 | [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
@@ -76,6 +76,7 @@ flowchart LR
   Hyp -.-> AI
   Hyp -.-> Vision
   Hyp -.-> Sim
+  Hyp -.-> Ela
   Med -.-> AI
   Soc -.-> AI
   Soc -.-> Vision

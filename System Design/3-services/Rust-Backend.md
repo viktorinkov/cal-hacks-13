@@ -24,11 +24,11 @@ Every process, where it runs, what it may do in the database, and what it talks 
 |---|---|---|---|---|---|
 | `bandit` module | `bandit-module` | SpacetimeDB Maincloud | runs inside the database | nothing outside the database | none |
 | `bandit-bridge` | `bandit-bridge` | demo laptop | `bridge` | the gateway over USB serial | its SpacetimeDB token |
-| Simulator.md: `bandit-sim` | `bandit-sim` | demo laptop | `simulator` | nothing outside | its SpacetimeDB token |
-| `bandit-ingest` | `bandit-ingest` | demo laptop, before the event | `ingest` | the `bandit` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
+| Simulator.md: `bandit-sim` | `bandit-sim` | demo laptop | `simulator` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB token |
+| `bandit-ingest` | `bandit-ingest` | demo laptop, before the event | `ingest` | the `bandit` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Hyphenate.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Fly.io Machine | `indexer` | Elastic Serverless: the search copy, including the `bandit-people` sync of each findable attendee's interests | SpacetimeDB token, Elastic key |
 | `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store and the kept attendee tokens on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key |
-| `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume, the Resend mail API for the recap email; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie | SpacetimeDB token, `RESEND_API_KEY`; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie key |
+| `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume, the Resend mail API for the recap email; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie; Elastic.md, Hyphenate.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token, `RESEND_API_KEY`; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie key; Elastic.md, Hyphenate.md: Elastic claims key |
 | Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | demo laptop | `vision` | the overhead phone camera, `bandit-api` for frame uploads; Anthropic-Agent.md: Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
 
 ## Design
@@ -170,6 +170,7 @@ sequenceDiagram
 | Elastic.md: `GET /search/booths`, `GET /search/memories`, `GET /search/photos`, `GET /graph/similar` | meaning-ranked search proxies holding the Elastic key; each builds the caller's filter from `api_sessions` and the `api_presence_windows` view before Elastic ranks; `/graph/similar` returns attendee ids ranked by shared interests | [Elastic](../7-integrations/Elastic.md) |
 | BrightData.md: `POST /claim/person` | start a claim on an unclaimed exhibitor, speaker, sponsor or artist profile; the attendee confirms it by pressing their band | [BrightData](../7-integrations/BrightData.md) |
 | Medical-ID.md: `POST /api/medical/document` | upload the medical PDF as `owner_only`, call `submit_medical_document`, which enqueues `medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
+| Hyphenate.md: `POST /api/claims/bill` | upload an urgent-care bill PDF (at most 10 MB) as `staff` from the Ops dashboard's incident card, for callers holding `medic` or `ops`; call `submit_claim_bill`, which enqueues `bill_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
 | Social.md: photographer photo upload, share-link page | photos in; the public page for a share token | [Social](../6-features/Social.md) |
 
 ### `bandit-workers`: the job runner
@@ -206,7 +207,8 @@ stateDiagram-v2
 | `recap_email` | make a random token, call `issue_recap_link` with its hash, then send the attendee one email with the link `https://<host>/summary/<token>` through the Resend API | [Attendee-App](../5-apps/Attendee-App.md) |
 | Medical-ID.md: `medical_extract` | PDF to a validated medical card through Claude | [Medical-ID](../6-features/Medical-ID.md) |
 | Payments-Nessie.md: `nessie_onboard`, `nessie_purchase`, `nessie_payout` | create the bank customer and account at sign-up; settle a merch purchase confirmed in the app after the event; pay out a settled claim | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
-| Hyphenate.md: `claim_draft`, `recovery_letter` | first notice of loss and claim summary; recovery query letter | [Hyphenate](../7-integrations/Hyphenate.md) |
+| Hyphenate.md: `bill_extract`, `causation_review`, `claim_draft`, `recovery_letter` | bill PDF to validated service lines through Claude, priced later by the module; a causation verdict from the pack's facts, with no amounts; the first notice of loss in ACORD 3 layout and the claim summaries; the recovery query letter | [Hyphenate](../7-integrations/Hyphenate.md) |
+| Elastic.md, Hyphenate.md: `claim_precedent` | build the de-identified claim copy in code, index it into `bandit-claims` through `bandit-claims-validate`, rank it against the seeded past claims, and submit the ids and scores with `attach_claim_precedents` | [Hyphenate](../7-integrations/Hyphenate.md), [Elastic](../7-integrations/Elastic.md) |
 | Vision.md (TBD -- LEO): `photo_features` | not a `bandit-workers` handler; `bandit-vision` claims it with the `vision` role | [Vision](../4-devices/Vision.md) |
 
 ### Health and logs
