@@ -250,11 +250,18 @@ export function mount(id: string, ...children: Child[]) {
     const i = e as HTMLInputElement;
     if (i.type !== 'checkbox' && i.type !== 'file') keep.set(i.name, i.value);
   });
+  // A chosen file cannot be set back on a new input, so the old file inputs move into the new tree,
+  // matched in order when they ask for the same kind of file.
+  const files = [...root.querySelectorAll('input[type=file]')] as HTMLInputElement[];
   const focused = active && root.contains(active) ? active.getAttribute('name') : null;
   root.replaceChildren(h('div', {}, ...children));
   root.querySelectorAll('input[name], textarea[name], select[name]').forEach(e => {
     const i = e as HTMLInputElement;
     if (keep.has(i.name) && i.dataset.fresh === undefined) i.value = keep.get(i.name)!;
+  });
+  ([...root.querySelectorAll('input[type=file]')] as HTMLInputElement[]).forEach((fresh, n) => {
+    const old = files[n];
+    if (old && old.files?.length && old.accept === fresh.accept && old.name === fresh.name) fresh.replaceWith(old);
   });
   if (focused) (root.querySelector(`[name="${focused}"]`) as HTMLElement | null)?.focus();
 }
