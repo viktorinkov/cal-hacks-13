@@ -111,9 +111,7 @@ uint32_t  lastGuidePulse = 0;
 bool      sleepPending = false;              // 10 s hold reached: ring dark, sleep on release
 
 uint16_t  seq = 0;
-uint8_t   lastCmdFrom = 0;
-uint16_t  lastCmdSeq = 0;
-uint32_t  lastCmdAt = 0;
+CmdDedupe dedupe;
 uint32_t  beaconSlot = 0, nextBeacon = 0, nextHeard = 0, nextDensity = 0;   // beacons: 100 ms grid + 0..30 ms jitter
 
 inline bool before(uint32_t now, uint32_t until) { return (int32_t)(until - now) > 0; }
@@ -392,10 +390,7 @@ void serviceBattery(uint32_t now) {
 // ------------------------------------------------------------------ gateway commands
 void handleCmd(const Pkt& p, uint32_t now) {
   if (!cfg.id || (p.target != ID_ALL_BANDS && p.target != cfg.id)) return;
-  if (p.id == lastCmdFrom && p.seq == lastCmdSeq && now - lastCmdAt < 1000) return;   // 3 repeats, act once
-  lastCmdFrom = p.id;
-  lastCmdSeq = p.seq;
-  lastCmdAt = now;
+  if (dedupe.seen(p.id, p.seq, now)) return;   // 3 repeats, act once
   emitf("{\"event\":\"cmd\",\"cmd\":%u,\"arg\":%u,\"arg2\":%u}", p.cmd, p.arg, p.arg2);
   const uint32_t hold = p.arg2 * 100UL;
   switch (p.cmd) {

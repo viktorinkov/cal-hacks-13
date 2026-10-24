@@ -17,9 +17,7 @@ LineReader lines;
 uint8_t  stationId = 0, colourIdx = 1, mode = M_BREATHE, bright = 120;
 bool     dirty = false;
 uint16_t seq = 0;
-uint8_t  lastCmdFrom = 0;
-uint16_t lastCmdSeq = 0;
-uint32_t lastCmdAt = 0;
+CmdDedupe dedupe;
 
 uint8_t defaultColour(uint8_t id) {
   return (id >= ID_STATION_MIN && id <= ID_STATION_MIN + N_EXIT - 1) ? id - 100 : 1;
@@ -57,10 +55,7 @@ bool validMode(long m) { return m == M_BREATHE || m == M_CHASE || m == M_STROBE 
 
 void handleCmd(const Pkt& p, uint32_t now) {
   if (!stationId || (p.target != stationId && p.target != ID_ALL_STATIONS)) return;
-  if (p.id == lastCmdFrom && p.seq == lastCmdSeq && now - lastCmdAt < 1000) return;
-  lastCmdFrom = p.id;
-  lastCmdSeq = p.seq;
-  lastCmdAt = now;
+  if (dedupe.seen(p.id, p.seq, now)) return;
   switch (p.cmd) {
     case CMD_EXIT:
       if (p.arg >= 1 && p.arg <= N_EXIT && p.arg != colourIdx) {

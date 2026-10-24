@@ -203,6 +203,17 @@ class LineReader {
   bool   skip_ = false;
 };
 
+// The gateway repeats every command 3 times and interleaves the repeats of commands sent back to back, so receivers
+// remember the last few (sender, seq) pairs and act on each command once.
+class CmdDedupe {
+ public:
+  bool seen(uint8_t from, uint16_t seq, uint32_t now);   // true if this command was already handled
+ private:
+  struct Entry { uint8_t from; uint16_t seq; uint32_t at; };
+  Entry   e_[8] = {};
+  uint8_t next_ = 0;
+};
+
 int  splitWords(char* s, char** out, int max);
 bool parseLong(const char* s, long& v);
 bool parseFloat(const char* s, float& v);

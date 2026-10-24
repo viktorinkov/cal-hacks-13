@@ -129,6 +129,14 @@ char* LineReader::poll(Stream& s) {
   return nullptr;
 }
 
+bool CmdDedupe::seen(uint8_t from, uint16_t seq, uint32_t now) {
+  for (const auto& x : e_)
+    if (x.at && x.from == from && x.seq == seq && now - x.at < 1000) return true;
+  e_[next_] = Entry{from, seq, now ? now : 1};
+  next_ = (next_ + 1) % 8;
+  return false;
+}
+
 int splitWords(char* s, char** out, int max) {
   int n = 0;
   char* save = nullptr;
