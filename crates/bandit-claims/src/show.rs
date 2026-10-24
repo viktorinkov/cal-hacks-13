@@ -26,7 +26,7 @@ pub fn claims(app: &App) -> Result<()> {
             status_name(c.status),
             money(c.payout_cents),
             clip(if c.routed_to_name.is_empty() { "-" } else { &c.routed_to_name }, 14),
-            c.status_note
+            clip(&c.status_note, 110)
         );
     }
     Ok(())

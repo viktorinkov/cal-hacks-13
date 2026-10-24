@@ -18,6 +18,7 @@ pub const DEFAULT_DATABASE: &str = "bandit-insurance";
 /// Staff actors: token name, role, label.
 pub const STAFF: &[(&str, &str, &str)] = &[
     ("worker", "worker", "bandit-workers"),
+    ("sim", "simulator", "bandit-claims"),
     ("vision", "vision", "bandit-vision"),
     ("ops", "ops", "Ops desk"),
     ("medic", "medic", "Ari Ramos"),
@@ -28,7 +29,7 @@ pub const STAFF: &[(&str, &str, &str)] = &[
 
 /// Attendees: token name, display name, band.
 pub const ATTENDEES: &[(&str, &str, u8)] =
-    &[("maya", "Maya Chen", 3), ("jordan", "Jordan Alvarez", 7), ("sam-patel", "Sam Patel", 8), ("lee", "Lee Park", 6)];
+    &[("jordan", "Jordan Alvarez", 90), ("maya", "Maya Chen", 91), ("sam-patel", "Sam Patel", 92), ("lee", "Lee Park", 93)];
 
 /// Zones the story uses, looked up by name: the venue import decides their stations.
 pub const MAIN_STAGE: &str = "Main stage";
@@ -48,7 +49,6 @@ pub fn approver_for_role(role: &str) -> Option<&'static str> {
 /// Tables the owner connection mirrors (private ones included).
 const TABLES: &[&str] = &[
     "staff_role",
-    "bridge",
     "band",
     "band_owner",
     "attendee",

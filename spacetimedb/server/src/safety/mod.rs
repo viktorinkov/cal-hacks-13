@@ -17,6 +17,11 @@ const REOPEN_GRACE_MICROS: i64 = 10_000_000;
 
 pub const STAFF_ROLES: &[&str] = &["ops", "medic", "floor_manager", "risk_manager", "adjuster"];
 
+/// Band ids the claims demo simulates. No real band carries them (the fleet is
+/// 1 to 9, social's simulated crowd starts at 10), so a rehearsal on the live
+/// database never touches real hardware or the real bridge.
+pub const SIM_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
+
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IncidentKind {
     Sos,
@@ -304,6 +309,54 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
     Ok(())
 }
 
+/// A simulated band's beacon, written the way band1t's ingest writes a real
+/// one (the band row, plus `event` rows when SOS, fall or press rise), but only
+/// for `SIM_BANDS` and only by the `simulator` role.
+#[spacetimedb::reducer]
+pub fn report_sim_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state: u8, neigh: u8, sos: bool, fall: bool, press: bool) -> Result<(), String> {
+    require_role(ctx, &["simulator"])?;
+    if !SIM_BANDS.contains(&band_id) {
+        return Err(format!("simulated bands are {} to {}", SIM_BANDS.start(), SIM_BANDS.end()));
+    }
+    let flags = sos as u8 * F_SOS | fall as u8 * F_FALL | press as u8 * F_PRESS | F_MPU | F_MOTOR;
+    let prev = ctx.db.band().id().find(band_id);
+    let row = Band {
+        id: band_id,
+        state,
+        flags,
+        neigh,
+        zone: station_id,
+        bat: 90,
+        find: 0,
+        rssi: -55,
+        seq: prev.as_ref().map(|b| b.seq.wrapping_add(1)).unwrap_or(1),
+        sos,
+        fall,
+        pressed: press,
+        low_battery: false,
+        has_mpu: true,
+        has_motor: true,
+        online: true,
+        last_seen: ctx.timestamp,
+    };
+    let was = |f: fn(&Band) -> bool| prev.as_ref().is_some_and(f);
+    if sos && !was(|b| b.sos) {
+        crate::log_event(ctx, band_id, EventKind::SosRaised, "simulated");
+    }
+    if fall && !was(|b| b.fall) {
+        crate::log_event(ctx, band_id, EventKind::Fall, "simulated");
+    }
+    if press && !was(|b| b.pressed) {
+        crate::log_event(ctx, band_id, EventKind::Press, "simulated");
+    }
+    if prev.is_some() {
+        ctx.db.band().id().update(row);
+    } else {
+        ctx.db.band().insert(row);
+    }
+    Ok(())
+}
+
 /// Starts the 500 ms band watch. Idempotent; the demo setup calls it once.
 #[spacetimedb::reducer]
 pub fn start_safety_watch(ctx: &ReducerContext) -> Result<(), String> {
@@ -387,7 +440,7 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
         resolution,
         ..i
     });
-    if band_id != 0 {
+    if band_id != 0 && !SIM_BANDS.contains(&band_id) {
         crate::commands::enqueue(ctx, band_id, "clear", 0, 0);
     }
     crate::insurance::on_incident_resolved(ctx, &resolved)

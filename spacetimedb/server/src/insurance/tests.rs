@@ -50,6 +50,7 @@ impl World {
             ("dana", "risk_manager", "Dana Ruiz"),
             ("priya", "adjuster", "Priya Nair"),
             ("vision", "vision", "bandit-vision"),
+            ("sim", "simulator", "bandit-claims"),
         ] {
             t.db.staff_role().insert(StaffRole {
                 id: 0,
@@ -496,4 +497,21 @@ fn the_same_invoice_on_another_claim_goes_to_a_person() {
     let dup = checks.iter().find(|c| c.name == "record_duplicate").unwrap();
     assert_eq!(dup.result, hyphenate_core::CheckResult::Fail);
     assert!(dup.detail.starts_with("invoice FA-1024-0007"), "{}", dup.detail);
+}
+
+#[test]
+fn simulated_bands_raise_incidents_without_the_bridge() {
+    let w = World::new();
+    assert!(w.try_as("sim", |ctx| report_sim_band(ctx, 7, 101, 3, 4, false, true, false)).is_err());
+    w.as_("sim", |ctx| report_sim_band(ctx, 95, 101, 3, 4, false, true, false));
+    for b in [96u8, 97] {
+        w.as_("sim", |ctx| report_sim_band(ctx, b, 101, S_NEAR_SOS, 5, false, false, false));
+    }
+    w.watch();
+    w.advance(1);
+    w.watch();
+    let incident = w.t.db.incident().subject_band().filter(95u8).next().expect("incident from a simulated fall");
+    assert_eq!(incident.kind, IncidentKind::Fall);
+    assert_eq!(w.t.db.incident_band().incident_id().filter(incident.id).filter(|r| r.role == "witness").count(), 2);
+    assert!(w.t.db.event().iter().any(|e| e.band_id == 95 && e.kind == EventKind::Fall));
 }

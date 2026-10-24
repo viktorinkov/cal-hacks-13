@@ -2,7 +2,7 @@
 //! rule settling a small fall on its own to a refusal that lists its checks.
 
 use crate::app::*;
-use crate::bridge::{Bridge, Pose};
+use crate::sim::{Pose, SIM_BANDS, Sim};
 use crate::{decide, flow, setup, show};
 use anyhow::{Context, Result};
 use bandit_bindings::*;
@@ -13,7 +13,7 @@ use std::io::BufRead;
 const FLOW_SECS: u64 = 360;
 
 pub fn run(app: &App, pause: bool) -> Result<()> {
-    let bridge = setup::run(app)?;
+    let sim = setup::run(app)?;
     let existing = app.db()?.db.claim().count();
     if existing > 0 {
         println!(
@@ -25,21 +25,14 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
         println!("\nnote: {}", app.worker_hint());
     }
     let main = app.station(MAIN_STAGE)?;
-    let mut crowd: Vec<(u8, Pose)> = (1..=9u8).map(|b| (b, Pose::at(main))).collect();
-    crowd[7].1 = Pose::at(app.station(HACKING_FLOOR)?);
-    bridge.place(&crowd);
-    println!("\ncrowd      bands 1-9 online: Sam Patel (8) on the Hacking floor, everyone else at Main stage");
+    let mut crowd: Vec<(u8, Pose)> = SIM_BANDS.map(|b| (b, Pose::at(main))).collect();
+    crowd[2].1 = Pose::at(app.station(HACKING_FLOOR)?);
+    sim.place(&crowd);
+    println!("\ncrowd      simulated bands 90-99 online: Sam Patel (92) on the Hacking floor, everyone else at Main stage");
 
-    step(pause, "1. Jordan Alvarez falls in the Main stage pit; bands 2, 4 and 9 around him light the circle")?;
-    let jordan = injury(
-        app,
-        &bridge,
-        7,
-        MAIN_STAGE,
-        &[2, 4, 9],
-        MAIN_STAGE,
-        "on scene in the pit: left wrist pain and swelling after the crowd surged; wrapping the wrist, referring him to urgent care",
-    )?;
+    step(pause, "1. Jordan Alvarez falls in the Main stage pit; bands 94, 95 and 96 around him light the circle")?;
+    let note = "on scene in the pit: left wrist pain and swelling after the crowd surged; wrapping the wrist, referring him to urgent care";
+    let jordan = injury(app, &sim, 90, MAIN_STAGE, &[94, 95, 96], MAIN_STAGE, note)?;
     flow::attach_record(app, jordan, "urgent-care-wrist", None, None)?;
     let c = show::wait_for(app, jordan, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, jordan)?;
@@ -54,37 +47,23 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
         println!("claim {jordan} did not wait for a person ({}); the story continues", status_name(c.status));
     }
 
-    step(pause, "2. A minute later Maya Chen slips near the stage; bands 1 and 5 light the circle")?;
-    let maya = injury(
-        app,
-        &bridge,
-        3,
-        MAIN_STAGE,
-        &[1, 5],
-        MAIN_STAGE,
-        "on scene near the stage: right wrist pain after slipping on a spilled drink; walking her to the medical station",
-    )?;
+    step(pause, "2. A minute later Maya Chen slips near the stage; bands 97 and 98 light the circle")?;
+    let note = "on scene near the stage: right wrist pain after slipping on a spilled drink; walking her to the medical station";
+    let maya = injury(app, &sim, 91, MAIN_STAGE, &[97, 98], MAIN_STAGE, note)?;
     flow::attach_record(app, maya, "first-aid-wrist", None, None)?;
     show::wait_for(app, maya, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, maya)?;
 
     step(pause, "3. Sam Patel goes down on the Hacking floor; his urgent-care record says he hurt the ankle at home")?;
-    let sam = injury(
-        app,
-        &bridge,
-        8,
-        HACKING_FLOOR,
-        &[4, 9],
-        HACKING_FLOOR,
-        "on scene at the tables: right ankle pain and swelling after a stumble; splinting it, referring him to urgent care",
-    )?;
+    let note = "on scene at the tables: right ankle pain and swelling after a stumble; splinting it, referring him to urgent care";
+    let sam = injury(app, &sim, 92, HACKING_FLOOR, &[94, 99], HACKING_FLOOR, note)?;
     flow::attach_record(app, sam, "urgent-care-ankle-home", None, None)?;
     show::wait_for(app, sam, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, sam)?;
 
     step(pause, "4. Lee Park's band reports a fall at Main stage, but the light circle forms on Sponsor row")?;
-    let lee =
-        injury(app, &bridge, 6, MAIN_STAGE, &[1, 2, 5], SPONSOR_ROW, "on scene: says they fell; no visible injury, giving an ice pack")?;
+    let note = "on scene: says they fell; no visible injury, giving an ice pack";
+    let lee = injury(app, &sim, 93, MAIN_STAGE, &[95, 96, 97], SPONSOR_ROW, note)?;
     show::summary(app, lee)?;
 
     step(pause, "5. A speaker falls off its stand at Main stage; the overhead camera sees it")?;
@@ -111,7 +90,7 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
         println!("claim {jordan} is {}, not settled; skipping the insurer payment", status_name(c.status));
     }
     show::summary(app, jordan)?;
-    drop(bridge);
+    drop(sim);
 
     println!("\nclaims");
     show::claims(app)?;
@@ -123,8 +102,8 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
 }
 
 /// One injury from fall to an open claim: the band, the medic on scene, resolution.
-fn injury(app: &App, bridge: &Bridge, band: u8, zone: &str, witnesses: &[u8], witness_zone: &str, note: &str) -> Result<u64> {
-    let incident = flow::fall(app, bridge, band, app.station(zone)?, witnesses, app.station(witness_zone)?)?;
+fn injury(app: &App, sim: &Sim, band: u8, zone: &str, witnesses: &[u8], witness_zone: &str, note: &str) -> Result<u64> {
+    let incident = flow::fall(app, sim, band, app.station(zone)?, witnesses, app.station(witness_zone)?)?;
     flow::print_incident(app, incident.id)?;
     println!("medic      Ari Ramos is on the way ({} s)", flow::RESPONSE_SECS);
     sleep_ms(flow::RESPONSE_SECS * 1000);

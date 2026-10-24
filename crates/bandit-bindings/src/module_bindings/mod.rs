@@ -192,6 +192,7 @@ pub mod register_bridge_reducer;
 pub mod register_photo_reducer;
 pub mod remove_social_handle_reducer;
 pub mod report_property_event_reducer;
+pub mod report_sim_band_reducer;
 pub mod request_payment_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
@@ -459,6 +460,7 @@ pub use register_bridge_reducer::register_bridge;
 pub use register_photo_reducer::register_photo;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use report_property_event_reducer::report_property_event;
+pub use report_sim_band_reducer::report_sim_band;
 pub use request_payment_reducer::request_payment;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
@@ -722,6 +724,15 @@ pub enum Reducer {
         confidence: f32,
         frame_hashes: Vec<String>,
     },
+    ReportSimBand {
+        band_id: u8,
+        station_id: u8,
+        state: u8,
+        neigh: u8,
+        sos: bool,
+        fall: bool,
+        press: bool,
+    },
     RequestPayment {
         band_id: u8,
         amount_cents: u32,
@@ -927,6 +938,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterPhoto { .. } => "register_photo",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
+            Reducer::ReportSimBand { .. } => "report_sim_band",
             Reducer::RequestPayment { .. } => "request_payment",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
@@ -1272,6 +1284,23 @@ impl __sdk::Reducer for Reducer {
                 description: description.clone(),
                 confidence: confidence.clone(),
                 frame_hashes: frame_hashes.clone(),
+            }),
+            Reducer::ReportSimBand {
+                band_id,
+                station_id,
+                state,
+                neigh,
+                sos,
+                fall,
+                press,
+            } => __sats::bsatn::to_vec(&report_sim_band_reducer::ReportSimBandArgs {
+                band_id: band_id.clone(),
+                station_id: station_id.clone(),
+                state: state.clone(),
+                neigh: neigh.clone(),
+                sos: sos.clone(),
+                fall: fall.clone(),
+                press: press.clone(),
             }),
             Reducer::RequestPayment {
                 band_id,
