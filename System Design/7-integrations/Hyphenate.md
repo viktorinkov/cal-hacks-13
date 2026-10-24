@@ -1,6 +1,6 @@
 # Hyphenate
 
-Hyphenate is BandIt's incident-to-claim workflow, built for the "autonomous systems for finance" track. It turns a resolved safety incident into a hashed evidence pack, reads the urgent-care bill into service lines and prices each line against a fee schedule, asks Claude whether the injury follows from the incident, decides in code whether the venue's insurance covers it and for how much, and then takes one of three routes: settle it automatically under a rule a person approved earlier, wait for the person whose authority covers the amount, or refuse it and show every check. Money moves on a double-entry ledger and lands in the attendee's Nessie wallet. One pattern runs through all of it: code checks the facts and computes every amount, the model reads and explains, a person approves anything material, and each approval becomes a rule that settles the next claim of that shape without anyone.
+Hyphenate is BandIt's incident-to-claim workflow, built for the "autonomous systems for finance" track. It turns a resolved safety incident into a hashed evidence pack, reads the urgent-care bill into service lines and prices each line against a fee schedule, asks Claude whether the injury follows from the incident, decides in code whether the venue's insurance covers it and for how much, and then takes one of three routes: settle it automatically under a rule a person approved earlier, wait for the person whose authority covers the amount, or refuse it in code and show every check. Money moves on a double-entry ledger and lands in the attendee's Nessie wallet. One pattern runs through all of it: code checks the facts and computes every amount, the model reads and explains, a person approves anything material, and each approval becomes a rule that settles the next claim of that shape without anyone.
 
 In finance terms: the reserve is a general-ledger entry, the insurer receivable is order-to-cash, the bill review and the claimant payment are procure-to-pay, and the reconciliation closes the receivable when the insurer pays. The demo shows the system learning live: a judge approves the first claim as the venue's risk manager, and the next similar claim settles in seconds under the rule that approval created.
 
@@ -12,14 +12,15 @@ Responsibilities:
 - Bill review: read the urgent-care bill into service lines with Claude (`claim_record_extract`), price every line in code against the seeded `fee_schedule`, and catch duplicate bills across all claims.
 - Build and hash the evidence pack from rows the safety system and the bill review already wrote; never from new sensing.
 - Check corroboration in code: two independent sources agree on time and zone.
-- Refuse in code what the policy does not cover: venue staff, duplicate bills, disputed evidence, zero payout.
-- Ask Claude for a causation review (`claim_review`) that can stop money but never changes an amount.
+- Refuse in code at claim open, and store and list every check: disputed evidence, a staff claimant, no cover, a zero payout. After that only the named approver can refuse a claim.
+- Ask Claude for a causation review (`claim_review`) that can flag a claim and route it to a person, but never refuses it and never changes an amount.
 - Compute coverage and amounts in integer cents from `coverage_rule` and the priced bill lines.
 - Decide the outcome: auto-settle, route to the role whose authority covers the amount, or refuse. A mass incident always goes to the insurer's adjuster.
 - Learn: turn a human approval into a versioned `settlement_rule` with a ceiling clamped to the approver's authority.
 - Post balanced `ledger_entry` journals for every money movement and keep the claim status honest about them.
 - Draft the first notice of loss in the layout of ACORD 3, the claim summary and recovery letters through `bandit-workers` jobs.
-- Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](Payments-Nessie.md).
+- Own `claimant_account`, each attendee's one Nessie account, where claim payouts land.
+- Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](Payments-Nessie.md); the wallet is the same `claimant_account`, which it opens at sign-up.
 - Simulator.md: score the accuracy run of planted claims on the Claims queue.
 - Elastic.md: send a de-identified copy of each claim to Elastic and record its similar past claims as checks.
 
@@ -40,8 +41,8 @@ Non-responsibilities:
 |---|---|---|---|---|
 | Hook in `resolve_incident` | in | `band1t` module (Safety.md) | incident id; writes the subject's `injured_party` row for a `sos` or `fall`, then opens a claim for every injured party with a first-aid cost or a bill, or for a `property` incident with a cost note | same transaction, module-internal call to the `open_claim` logic |
 | `add_injured_party` | in | the assigned `medic`, `ops` | open incident id, a band picked from the snapshot's bands present, first-aid cost in cents | reducer; writes `injured_party` |
-| `POST /api/claims/bill` | in | Ops dashboard incident card ("Attach bill"), roles `medic` and `ops`; Simulator.md: `bandit-sim` for incidents on simulated bands | the bill PDF (multipart, at most 10 MB), incident id, injured party id, the caller's `api_session` token | HTTPS to `bandit-api`; stored as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| `submit_medical_record` | in | `bandit-api` (role `api`) | incident id, injured party id, `blob_ref` id, file SHA-256, page count, uploader identity | reducer; writes `medical_record`, rejects an identical file, enqueues `claim_record_extract`, opens the claim when the incident is already resolved |
+| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Simulator.md: the `bandit-claims` tool for incidents on demo bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| `submit_medical_record` | in | the incident card as the signed-in staff member (roles `medic`, `ops`, `floor_manager`, `risk_manager`) | incident id, injured party id, the file's SHA-256 (its registered `blob_ref`), page count; the caller is the uploader | reducer; writes `medical_record`, rejects an identical file, enqueues `claim_record_extract`, opens the claim when the incident is already resolved |
 | `apply_medical_record` | in | role `worker` | job id, bill id, validated header and lines, `model_call` id | reducer; rejects a stale lease; prices the lines and runs the duplicate check |
 | `enter_claim_lines` | in | `risk_manager`, `adjuster` | bill id, header and lines typed from the PDF | reducer; same pricing and duplicate check |
 | `submit_claim_review` | in | role `worker` | job id, claim id, verdict, cited fact ids, explanation, `model_call` id | reducer; rejects a stale lease; decides the outcome |
@@ -87,7 +88,7 @@ A claim opens from an incident, never from a form: one claim per injured person 
 
 Claude reads the bill; code decides every amount. The urgent-care bill is a PDF. In the demo it is a synthetic one.
 
-Upload. "Attach bill" on the incident card sends the PDF to `POST /api/claims/bill` with the caller's `api_session` token. `bandit-api` checks the caller holds `medic` or `ops` (Simulator.md: or is `bandit-sim`, for an incident on a simulated band), checks the content type is PDF and the size is at most 10 MB, stores it through the shared blob upload with access class `staff`, counts the pages and calls `submit_medical_record`. The reducer writes a `medical_record` row in status `uploaded`. A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
+Upload. "Attach bill" on the incident card sends the PDF to `POST /api/blobs` with purpose `medical`. `bandit-api` takes a PDF of at most 10 MB, stores it in the blob store under its SHA-256, registers it with `register_blob` and access class `staff`, counts the pages and returns the hash and the page count. The card then calls `submit_medical_record` with them as the signed-in staff member. The reducer accepts `medic`, `ops`, `floor_manager` and `risk_manager` (Simulator.md: the `bandit-claims` tool files planted bills as its `medic` demo identity), refuses a hash that is not a registered `blob_ref`, and writes a `medical_record` row in status `uploaded`. A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
 
 Extraction. The worker sends the PDF to Claude as a document block with a JSON schema ([Anthropic-Agent](Anthropic-Agent.md)). Claude returns the header (provider name, provider NPI, invoice number, patient name and service date as printed, billed total, the visit reason as printed) and one line per service (code as printed, description, units, billed amount, page). Claude never sees the fee schedule and returns no paid amounts. Code validates before `apply_medical_record` accepts the record: the lines sum to the billed total, every amount is a positive whole number of cents, every line cites a page within the page count, and the NPI passes its check digit. A bill that fails validation twice is `failed`, and its claim waits for a person, who types the lines from the PDF with `enter_claim_lines`. Typed lines go through the same pricing and the same duplicate check.
 
@@ -123,7 +124,7 @@ Duplicate check. Code compares every priced bill with every earlier bill, on any
 | Provider and invoice | the same provider NPI and the same invoice number |
 | Patient, date and total | the same injured attendee, the same service date and the same billed total |
 
-A match with a bill on another claim sets the bill to `duplicate` with `duplicate_of` and the keys that matched, and the claim is refused with reason `duplicate_bill`; its checks name the earlier claim. A match with a bill on the same claim (the medic attached it twice) sets only the later bill to `duplicate`, and its lines are not paid.
+A match with a bill on another claim sets the bill to `duplicate` with `duplicate_of` and the keys that matched, and its lines are not paid; the claim's checks name the earlier claim. A claim with nothing else to pay is then refused as `zero_payout`. A match with a bill on the same claim (the medic attached it twice) sets only the later bill to `duplicate`, and its lines are not paid.
 
 ### Evidence pack
 
@@ -170,7 +171,7 @@ Outcomes, stored in `evidence_pack.corroboration`:
 
 - `corroborated`: both sources agree. Eligible for auto-settle.
 - `uncorroborated`: no second source exists. Routed to a person, who decides with their own eyes; never auto-settled. A `property` incident has no band, and an added injured party's only witness is the person who added them, so both are always `uncorroborated`.
-- `disputed`: a second source exists and disagrees on time or zone, or the assessment says not confirmed. The claim is refused, and `checks` lists each comparison with both values, so the refusal shows everywhere it looked.
+- `disputed`: a second source exists and disagrees on time or zone, or the assessment says not confirmed. Code refuses the claim with the failed check's name as `refusal_reason`: `witness_zone` when the light circle's witness bands sit in another zone, `staff_note_time` when the medic's note falls outside the window, and Vision.md (TBD -- LEO): `vision_confirmed`, `vision_zone` or `vision_time` when the camera disagrees. `checks` lists each comparison with both values, so the refusal shows everywhere it looked.
 
 The rule is deliberately dumb: equality on zone id and a window on time. A judge, an adjuster or an auditor can re-run it by hand.
 
@@ -195,14 +196,16 @@ Computation, in order:
 3. `recoverable_cents` = max(`payout_cents` - `deductible_cents`, 0). This is what the insurer owes the venue.
 4. `venue_cost_cents` = `payout_cents` - `recoverable_cents`.
 
-Code refuses the claim at this point, with the reason in `checks` and no journal posted, when any of these holds:
+Code refuses the claim at this point, at claim open, when any of these holds. The reason goes to `refusal_reason`, every check is stored in `checks` and listed in the Claims queue, and no journal is posted.
 
-| Check | Reason |
+| Check | `refusal_reason` |
 |---|---|
-| The injured person holds a venue staff role (`owner`, `organizer`, `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`); the `adjuster` works for the insurer and is not venue staff | `staff_injury`: medical payments excludes the venue's own employees; report it under workers' compensation |
-| A bill on the claim duplicates a bill on another claim | `duplicate_bill` |
-| Corroboration is `disputed` | `disputed` |
-| No active cover for the incident kind, or `payout_cents` = 0 | `no_cover` |
+| Corroboration is `disputed` | the failed corroboration check: `witness_zone`, `staff_note_time`; Vision.md (TBD -- LEO): `vision_confirmed`, `vision_zone`, `vision_time` |
+| The injured person holds a venue staff role (`owner`, `organizer`, `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`); the `adjuster` works for the insurer and is not venue staff | `claimant_not_staff`: medical payments excludes the venue's own employees; report it under workers' compensation |
+| No active cover for the incident kind | `no_cover` |
+| `payout_cents` = 0 | `zero_payout` |
+
+Nothing else refuses a claim on its own. Claude's causation review and Elastic.md's validation can only flag a claim, which routes it to a person. After claim open, only the named approver refuses, with `refuse_claim`.
 
 One more code check routes rather than refuses: a bill whose service date is before the incident or more than 3 days after it (starting value) sends the claim to a person, with both dates in `checks`.
 
@@ -220,7 +223,7 @@ The worker sends the pack's facts by id: the band's flag, time and zone, the wit
 | `doubt` | never auto-settles; routed to the role whose authority covers the amount, with Claude's explanation and the cited lines at the top of the approval grid |
 | `none`: no usable answer (refusal, two failed validations, a dead job, or Anthropic-Agent.md deleted) | treated as `doubt` |
 
-Claude's judgment can stop money but never changes an amount: its input has no amounts, its output has no amount field, and the coverage function never reads it.
+Claude's judgment can hold a claim for a person but never refuses it and never changes an amount: its input has no amounts, its output has no amount field, and the coverage function never reads it.
 
 ### Three outcomes and the learning loop
 
@@ -232,7 +235,7 @@ flowchart TD
   O -->|"bill attached"| B["claim_record_extract (Claude), then price lines and duplicate check (code)"]
   O -->|"no bill"| K
   B --> K["pack: evidence_fact rows, SHA-256"]
-  K --> C{"code checks: corroboration, staff, duplicate, cover"}
+  K --> C{"code checks: corroboration, staff, cover, payout"}
   C -->|"fails"| X["Outcome 3: refused, checks listed"]
   C -->|"pass, J1 reserve"| CR["claim_review (Claude): follows or doubt"]
   CR --> S{"rule matches, corroborated, follows, not mass, within ceiling"}
@@ -256,7 +259,7 @@ Outcome 1, auto-settle. Fires only when all of these hold: corroboration is `cor
 
 Outcome 2, route. Everything else with a positive payout goes to the lowest role in `authority_limit` whose ceiling covers `payout_cents`, or to `adjuster` for a mass incident. The claim stores `routed_to_role`, the Claims queue shows it to that role, and nothing moves until that person acts.
 
-Outcome 3, refuse. A failed code check or a human refusal. The claim keeps its pack and `checks`, so the reason is always on screen.
+Outcome 3, refuse. Either code refuses at claim open (disputed evidence, a staff claimant, no cover, a zero payout), or the named approver refuses a routed claim. Claude and Elastic never refuse. The claim keeps its pack and `checks`, so the reason is always on screen.
 
 ### Authority matrix and learned rules
 
@@ -311,7 +314,7 @@ The question this diagram answers: which statuses a claim can be in, and what mo
 ```mermaid
 stateDiagram-v2
   [*] --> evidence: open_claim, bills being read
-  evidence --> refused: staff, duplicate, disputed or no cover
+  evidence --> refused: disputed, staff, no cover or zero payout
   evidence --> reviewing: checks pass, J1 reserve, claim_review
   evidence --> routed: property claim, J1 reserve
   reviewing --> settling: rule matched, J2
@@ -385,9 +388,9 @@ A `property` claim pays the venue's repair vendor, who has no Nessie account in 
 
 ### Elastic.md: similar past claims
 
-Every claim gets a precedent search, and its results are only ever checks. When a pack version is built, the module enqueues `claim_verify`. The worker builds a de-identified document in code: the claim id and pack version, the incident kind, cover kind, zone id and time, the amounts (cost, allowed, payout), the bill's service codes, the corroboration result and witness count, and a narrative built by code from a fixed template ("fall in zone 102 at 22:14, 3 witness bands in the same zone, medic note 12 min later, urgent-care bill with codes 99204, 73110, 29125, L3908, 99051"). It holds no names, no attendee or band ids and no medical free text: no note text, no visit reason, nothing from the medical card. The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which validates each document, then ranks it by meaning against the 30 seeded past claims and takes the top 3 (starting value) ([Elastic](Elastic.md)).
+Every claim gets a precedent search, and its results are only ever checks. When a pack version is built, the module enqueues `claim_verify`. The worker builds a de-identified document in code: the claim id and pack version, the incident kind, cover kind, zone id and time, the amounts (cost, allowed, payout), the bill's service codes, the corroboration result and witness count, and a narrative built by code from a fixed template ("fall in zone 102 at 22:14, 3 witness bands in the same zone, medic note 12 min later, urgent-care bill with codes 99204, 73110, 29125, L3908, 99051"). It holds no names, no attendee or band ids and no medical free text: no note text, no visit reason, nothing from the medical card. The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which marks each document valid or invalid and never rejects it, then ranks it by meaning against the 30 seeded past claims and takes the top 3 (starting value) ([Elastic](Elastic.md)).
 
-`submit_claim_checks` (role `worker`, rejects a stale lease) writes one `claim_precedent` row per result: the past claim's id and its score. The Claims queue lists them under the claim's checks as "similar past claim P-014, score 0.82". They are not pack facts, are not hashed, never change an amount and never change the route; a claim decides the same way with or without them.
+`submit_claim_checks` (role `worker`, rejects a stale lease) writes the validation result as a check, and one `claim_precedent` row per result: the past claim's id and its score. A copy the pipeline marks invalid flags the claim: the check fails, and the claim routes to a person with the pipeline's errors listed. It is never refused for it. The Claims queue lists the precedents under the claim's checks as "similar past claim P-014, score 0.82". They are not pack facts, are not hashed, and never change an amount or the route.
 
 **Dashboard: Claims evidence.** One Kibana dashboard over `bandit-claims`, saved with the project setup: claims tonight by outcome, payout by zone, incident kind by outcome, and the 30 past claims beside tonight's. The team opens it in the demo next to the Claims queue. It reads only the de-identified copies and decides nothing ([Elastic](Elastic.md)).
 
@@ -411,10 +414,10 @@ sequenceDiagram
   participant C as Claude
   participant J as Judge as risk_manager
   participant N as Nessie
-  participant S as bandit-sim
+  participant S as bandit-claims tool (Simulator.md)
   Note over Med,M: 1. The fall
   Med->>M: add_incident_note, resolve_incident
-  Med->>M: Attach bill, through bandit-api
+  Med->>M: Attach bill: POST /api/blobs, then submit_medical_record
   M->>M: open_claim, claim in evidence, job claim_record_extract
   Note over M,C: 2. Bill review
   W->>C: claim_record_extract (PDF)
@@ -442,8 +445,8 @@ sequenceDiagram
   M->>M: paid $440, follows, rule v1 matches
   M->>M: J1, J2, J3: settled in seconds
   Note over M,S: 7. The refusal
-  S->>M: plant a fake: witnesses in zone 105
-  M->>M: disputed: refused, every check listed
+  S->>M: plant Lee's fake claim, witnesses in zone 105
+  M->>M: witness_zone fails, refused by code, every check listed
 ```
 
 Step by step (illustrative numbers):
@@ -463,33 +466,33 @@ Step by step (illustrative numbers):
 3. Claude's review. The pack is `corroborated` (note at 22:26 within 30 min; witnesses in zone 102: 3 of 3). Claude's verdict is `follows`: the band's fall flag at 22:14 in zone 102, three witness bands in the same zone, the medic's wrist note 12 minutes later and a same-night urgent-care visit for a wrist injury after a fall. The explanation has no figures; the amount is already fixed.
 4. The first claim routes. No rule exists, and $625 is above the floor manager's $500, so the claim waits for `risk_manager`: the judge. While the judge reads the grid, the medic adds a late note (a sling at the first-aid point, $25) and ops taps Rebuild pack. The judge's first tap on Approve carries $625 and the v1 SHA, so it fails as stale and the grid reloads with $650 and the v2 SHA. This is the fail-closed edge case, live. The judge approves again with the suggested tolerance of $1,000.
 5. Money moves. J1 already reserved $625 and then $25; J2 books the $650 receivable (deductible 0); the Nessie deposit of $650 lands in the teammate's wallet in the attendee app, and J3 posts. The notice in ACORD 3 layout, drafted for pack v2, is ready to send. Rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling min($1,000, $5,000) = $1,000, stamped with the judge's display name.
-6. The payoff. The simulator plants a second, similar fall on a simulated band, with its own medic visit and bill (billed $675, paid $440). It passes the same code checks and the same causation review, matches rule v1 and settles in seconds: "Settled under rule v1, approved by <the judge's display name> 2 minutes ago". Its claimant is simulated and has no wallet, so the payout opens a Nessie account for it, and J3 posts when the deposit lands.
-7. The refusal. The simulator plants a fake: a fall flag in zone 102 whose witness bands all sit in zone 105. Corroboration is `disputed`, the claim is refused before any money moves, and the screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
+6. The payoff. The `bandit-claims` tool (Simulator.md) plants a second, similar fall on a demo band, with its own medic visit and bill (billed $675, paid $440). It passes the same code checks and the same causation review, matches rule v1 and settles in seconds: "Settled under rule v1, approved by <the judge's display name> 2 minutes ago". Its claimant is simulated and has no wallet, so the payout opens a Nessie account for it, and J3 posts when the deposit lands.
+7. The refusal. The `bandit-claims` tool (Simulator.md) plants a fake claim for Lee, a simulated attendee: a fall flag in zone 102 whose witness bands all sit in zone 105. The `witness_zone` check fails, so corroboration is `disputed`, and code refuses the claim at claim open with reason `witness_zone`, before Claude's review and before any money moves. The screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
 
 The one fallback: if the judge's approval cannot be made live (the phone cannot connect, or the step runs out of time), the organizer loads the fallback rule v1 with `load_fallback_rule`, and steps 6 and 7 run unchanged.
 
 ### Edge cases
 
-Two are shown live; the simulator's stress-test run shows the other three before the demo, and the Claims queue keeps their results.
+Two are shown live; the `bandit-claims` tool's stress-test run (Simulator.md) shows the other three before the demo, and the Claims queue keeps their results.
 
 | Case | What judges see | Guardrail |
 |---|---|---|
-| The urgent-care record says the injury happened at home | Stress test: Claude's review says `doubt`, citing the visit reason line; the claim waits for a person with the explanation on top of the grid | Claude can stop money but never change it; no review, or a doubt, means no auto-settle |
-| Witness bands sit in a different zone | Live, step 7: refused, with the band's zone and every witness's zone side by side | the corroboration rule in code: equality on zone id |
+| The urgent-care record says the injury happened at home | Stress test: Claude's review says `doubt`, citing the visit reason line; the claim waits for a person with the explanation on top of the grid | Claude can hold money for a person but never refuse or change it; no review, or a doubt, means no auto-settle |
+| Witness bands sit in a different zone | Live, step 7: Lee's fake claim is refused by code as `witness_zone`, with the band's zone and every witness's zone side by side | the corroboration rule in code: equality on zone id |
 | The amount changes while the approver is looking | Live, step 4: the approval fails as stale, and the grid reloads with the new amount and SHA | `approve_claim` compares the amount and SHA seen with the current ones and fails closed |
-| The same bill is filed again as a new scan | Stress test: refused as `duplicate_bill`; the checks name the earlier claim and the matching provider NPI and invoice number | the duplicate check across all claims, in code |
-| The injured person is venue staff | Stress test: refused as `staff_injury`: medical payments excludes the venue's own employees, and workers' compensation applies | the staff check in code, on the injured person's `staff_role` rows |
+| The same bill is filed again as a new scan | Stress test: the bill is marked `duplicate` and pays nothing, so the claim is refused as `zero_payout`; the checks name the earlier claim and the matching provider NPI and invoice number | the duplicate check across all claims, in code |
+| The injured person is venue staff | Stress test: refused as `claimant_not_staff`: medical payments excludes the venue's own employees, and workers' compensation applies | the staff check in code, on the injured person's `staff_role` rows |
 
 ### Simulator.md: accuracy run and scorecard
 
-[Simulator](../3-services/Simulator.md) plants claims through the same reducers a real medic uses, and Hyphenate's decision code never reads which ones were planted. Before the demo it runs three rounds under the accuracy-run policy. Each round plants 12 genuine claims (8 falls and 4 SOS, paid amounts from $150 to $1,800) and 6 decoys (starting values):
+The `bandit-claims` command-line tool ([Simulator](../3-services/Simulator.md)) plants claims through the same reducers a real medic uses, and Hyphenate's decision code never reads which ones were planted. Before the demo its `scorecard` command runs three rounds under the accuracy-run policy. Each round plants 12 genuine claims (8 falls and 4 SOS, paid amounts from $150 to $1,800) and 6 decoys (starting values):
 
 | Planted type | How it is planted | What should stop it |
 |---|---|---|
 | Genuine | a fall or SOS, witnesses in the same zone, a medic note in the window, a bill dated that night | nothing: paid, by a rule when one fits, otherwise by a person |
 | Sitting down | a fall flag, witnesses, a medic note "no injury found", and a bill for a visit anyway | Claude's causation review (`doubt`), then a person refuses it |
-| Dropped phone | a fall flag, witnesses, a medic note "phone screen broken, no injury", and a phone repair invoice as the bill | code: no line is on the fee schedule and the invoice has no provider NPI, so the payout is 0 |
-| Fake witnesses | a fall flag whose witness bands sit in another zone | code: corroboration `disputed` |
+| Dropped phone | a fall flag, witnesses, a medic note "phone screen broken, no injury", and a phone repair invoice as the bill | code: no line is on the fee schedule and the invoice has no provider NPI, so the payout is 0 and the claim is refused as `zero_payout` |
+| Fake witnesses | a fall flag whose witness bands sit in another zone | code: `witness_zone` fails, refused at claim open |
 
 Between rounds the run waits until a team member, as risk manager, has worked the queue: genuine claims approved with learn on, decoys refused. Round 1 starts with no rules, so every genuine claim needs a person. The approvals create rules for `fall` and `sos`, and approving a bigger claim later raises a ceiling by a new version, clamped to the approver's authority. Round 3 should need people only for claims above the ceilings and for decoys.
 
@@ -534,6 +537,7 @@ erDiagram
 
 | Table | One row is | Key fields |
 |---|---|---|
+| `claimant_account` | one attendee's Nessie account, the only one they have | `identity` (the attendee, primary key), `customer_id`, `account_id`, `created_at`; written by `record_claim_payout` for a claimant who has none; Payments-Nessie.md: written by `record_wallet` at sign-up, and used as the BandIt wallet |
 | `insurance_policy` | one policy | insurer name, policy number, `purpose` (`event`, `accuracy_run`), period start and end, FNOL contact, the venue's name and address for the notice, `aggregate_used_cents` per cover kind (updated by code at settlement) |
 | `coverage_rule` | one cover under a policy | see Coverage and amounts |
 | `fee_schedule` | one service code the policy pays | `code`, `description`, `cap_cents`, `cover_kind`, `active` |
@@ -557,7 +561,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 |---|---|---|
 | `open_claim` | `ops`, `floor_manager`, `risk_manager`, `adjuster`; also called by the `resolve_incident` hook and by `submit_medical_record` | opens a claim per injured party, or rebuilds a routed claim's pack; once bills are priced: pack, corroboration, coverage, the refusal checks, J1, `claim_review` |
 | `add_injured_party` | the assigned `medic`, `ops` | `injured_party` for a band in the open incident's snapshot |
-| `submit_medical_record` | `api` | `medical_record`, the identical-file check, `claim_record_extract`; opens the claim when the incident is resolved |
+| `submit_medical_record` | `medic`, `ops`, `floor_manager`, `risk_manager` | files a bill uploaded through `POST /api/blobs`: `medical_record`, the identical-file check, `claim_record_extract`; opens the claim when the incident is resolved |
 | `apply_medical_record` | `worker` | validates the record, prices the lines, duplicate check; builds the pack when the claim's last bill is done; rejects a stale lease |
 | `enter_claim_lines` | `risk_manager`, `adjuster` | typed lines for a `failed` bill, then the same steps |
 | `submit_claim_review` | `worker` | stores the verdict and decides the outcome: auto-settle (J2, payout) or route; rejects a stale lease |
@@ -594,8 +598,8 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `job`, `blob_ref`, `register_blob`, `staff_role`, `attendee`, roles, the hook mechanism inside core reducers, the seed.
 - [Safety](../6-features/Safety.md): `incident`, `incident_snapshot`, `incident_band`, `incident_note` with `cost_cents`, `resolve_incident`, `open_incident` for `property`.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the Claims queue, the incident card controls (Attach bill, Add injured person), the Report property damage button and the staff panel grant for the judge.
-- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` blob upload behind `POST /api/claims/bill`, and the `bandit-workers` handlers.
-- Payments-Nessie.md: the `claim_payout` work in `bandit-workers` and the wallet (`claimant_account`, `wallet_entry`). Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
+- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` blob upload `POST /api/blobs` with purpose `medical`, and the `bandit-workers` handlers.
+- Payments-Nessie.md: the `claim_payout` work in `bandit-workers`, which fills this file's `claimant_account`, and the wallet's `wallet_entry`. Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
 - Anthropic-Agent.md: `claude-client`, `model_call`, the prompts for `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`. Without it, bill lines are typed with `enter_claim_lines`, every injury claim's causation is `none` and goes to a person, and letters are templates.
 - Medical-ID.md: `medical_card` as an evidence source, `medical_access_log` for the read. Without it, the pack has no card facts.
 - Vision.md (TBD -- LEO): `vision_assessment`, `camera` zones, frame blobs and `property_event`. Without it, the medic note and witnesses are the second source, and property incidents come only from the staff button.
@@ -606,13 +610,14 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Claims queue (Hyphenate.md)" panel row, the incident card controls and the Report property damage button.
 - [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): the accuracy run before the demo (step 0c), step 9 and the finance track row.
-- [Payments-Nessie](Payments-Nessie.md): claim payouts are the money that comes into the wallet.
+- [Payments-Nessie](Payments-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes at sign-up.
 - [Simulator](../3-services/Simulator.md): `plant_medic_visit` feeds this file's claims.
 - [Elastic](Elastic.md): `bandit-claims` holds this file's de-identified claim copies.
 
 **If you delete this file**
 
-- Drop the tables above (`insurance_policy`, `coverage_rule`, `fee_schedule`, `injured_party`, `medical_record`, `claim_line`, `claim`, `evidence_fact`, `evidence_pack`, `settlement_rule`, `authority_limit`, `approval`, `ledger_entry`, `claim_precedent`), the reducers above, the job kinds `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter`, `claim_verify` and `claim_payout`, and the endpoint `POST /api/claims/bill`.
+- Drop the tables above (`insurance_policy`, `coverage_rule`, `fee_schedule`, `injured_party`, `medical_record`, `claim_line`, `claim`, `evidence_fact`, `evidence_pack`, `settlement_rule`, `authority_limit`, `approval`, `ledger_entry`, `claim_precedent`), the reducers above, the job kinds `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter`, `claim_verify` and `claim_payout`, and the bill upload's `medical` purpose of `POST /api/blobs`.
+- Do not drop `claimant_account`: move its definition into [Payments-Nessie](Payments-Nessie.md), which keeps writing it for the wallet through `record_wallet`.
 - Remove the Hyphenate hook bullet from `resolve_incident` in Safety.md and SpacetimeDB.md, the Hyphenate.md rows in SpacetimeDB.md's registry and roles tables, and the policy, coverage, authority, fee schedule and fallback rule files from the seed.
 - Remove the Hyphenate.md rows in Ops-Dashboard.md: the Claims queue with its scorecard, the incident card controls, the Report property damage button, their interface and subscription rows and the decision on the judge's grant. Staff can still open a `property` incident with the core Open incident control.
 - Remove the Hyphenate.md lines in Payments-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
@@ -635,13 +640,15 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | The fee schedule caps are starting values set in the seed | the venue's insurer sets the real schedule; the demo needs one that reduces one line and excludes another |
 | A bill with no valid provider NPI pays nothing | it is not a medical provider's bill, and the NPI is also the provider key for the duplicate check |
 | Duplicates are matched on the identical file, provider and invoice number, and patient, service date and total, across all claims and policies | a re-scan changes the file hash but not the invoice, and a retyped invoice still has the same patient, date and total |
-| Claude's causation review can only send a claim to a person; no answer counts as a doubt | a judgment about why someone was hurt should be able to stop money, and must never be able to move it |
+| Claude's causation review can only send a claim to a person; no answer counts as a doubt | a judgment about why someone was hurt should be able to hold money for a person, and must never be able to move it or refuse it |
+| Only code at claim open and the named approver refuse a claim; Claude's review and Elastic.md's validation only flag and route | a model or a search never takes money from a person on its own; every refusal is a check anyone can re-run, or a person's name |
 | A staff injury is refused, not routed | medical payments excludes the venue's own employees; workers' compensation pays them, so no approver could pay it |
 | Three or more injured in one incident turns auto-settle off for all of them and sends them to the adjuster with one notice | one occurrence with many people hurt can use up the event's aggregate limit, so the insurer decides them together |
 | An added injured party's claim is always `uncorroborated` | the only witness to their injury is the medic who added them, so a person decides |
 | The first notice of loss follows the ACORD 3 sections; code fills every field it can and Claude writes only the free text | insurers read that layout, and every figure in it then comes from code |
 | A refusal writes a ceiling-0 rule version only when the rule would have settled that claim | a decoy refused for its own reason must not switch off a good rule during the accuracy run |
 | A learned rule matches only while its policy's period is open; it does not carry over to the next event | the rule is an approval under this policy's limits; a new policy starts with no rules |
+| Payments-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens at sign-up | one Nessie account per attendee, so a payout and a merch purchase show in one balance |
 | A claimant with no wallet, such as a simulated one, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
 | Evidence windows: camera frames within 120 s of the band's flag time, the medic note within 30 min of resolution, the bill's service date within 3 days; all starting values, calibrate at the venue | wide enough for a real medic visit and an urgent-care trip, narrow enough that another event's paperwork cannot corroborate |
 | J1 is posted when a claim passes the code checks; a claim refused by them posts nothing | nothing was reserved, so nothing needs reversing; J1r then always means a refusal after the reserve |

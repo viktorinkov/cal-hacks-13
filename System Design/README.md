@@ -43,12 +43,12 @@ Core components are what the safety demo needs. Optional components are features
 | [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, medic approach, evacuation, override | SpacetimeDB, Hardware, Gateway-Bridge |
 | [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for the organizer, the big-screen graph | SpacetimeDB, Safety |
 | [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, profile and consent, live view, medic view, the recap page | SpacetimeDB |
-| [Simulator.md](3-services/Simulator.md) | `bandit-sim` | optional | a simulated crowd with simulated owners through the same reducers, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
+| [Simulator.md](3-services/Simulator.md) | The in-module crowd and the demo bands, driven by `bandit-claims` | optional | a simulated crowd with simulated owners inside the module, demo bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
 | [Vision.md](4-devices/Vision.md) | Vision service (TBD -- LEO) | optional | camera counts, person-down alerts, incident assessments, photo features | SpacetimeDB; uses Anthropic-Agent when present |
 | [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | medical PDF to a structured card, the medic access rule, the medic tap flow | Attendee-App; uses Anthropic-Agent when present |
 | [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
 | [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
-| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App |
+| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Hyphenate when present |
 | [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims demo, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Medical-ID, Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
 | [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
@@ -72,6 +72,7 @@ flowchart LR
   Merch --> Soc
   Merch --> Pay
   Merch -.-> BD
+  Pay -.-> Hyp
   Hyp -.-> Med
   Hyp -.-> Pay
   Hyp -.-> AI

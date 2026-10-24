@@ -9,7 +9,7 @@ Responsibilities:
 - Hold the raw scraped records of one import run in three raw indices: `bandit-raw-pages`, `bandit-raw-orgs`, `bandit-raw-plan`.
 - Run the organizer. The Workflow `bandit-organize` makes the exact joins with fixed ES|QL `LOOKUP JOIN` steps, then calls the Agent Builder agent `bandit-organizer` with a JSON schema for the fuzzy remainder. The result is one structured bundle in `bandit-bundles`: organisations deduplicated, each organisation's facts merged across its site, LinkedIn and Crunchbase records, booths linked to organisations and people, categories and tags, schedule slots matched to stages and zones, and gaps flagged. The agent may fill a gap with at most 10 Bright Data MCP calls per run.
 - Keep a one-way copy of booths and of findable attendees' memories and interests in three indices: `bandit-booths`, `bandit-memories`, `bandit-people`.
-- Order the recap's suggestions. `GET /recap/order` in `bandit-api` takes the candidates SpacetimeDB lists for the caller (people from `my_encounters`, booths from `my_visits`) and returns them in order of meaning. `bandit-api` holds every Elastic credential; browsers never talk to Elastic.
+- Order the recap's suggestions. `GET /recap/order` in `bandit-api` takes the candidates SpacetimeDB lists for the caller (people from `my_encounters`, booths from `my_visits`) and returns them in order of meaning. The recap's shared visits (`my_shared_visits`) stay in time order and are not sent. `bandit-api` holds every Elastic credential; browsers never talk to Elastic.
 - Hyphenate.md: hold the index `bandit-claims` and its ingest pipeline `bandit-claims-validate`, and rank each de-identified claim copy by meaning against 30 seeded past claims.
 - Give the team its Kibana views: the Workflows execution view of `bandit-organize`, the organizer's tool calls in Agent Builder, and three dashboards: Import run, Event story and Interest map. Hyphenate.md: the Claims evidence dashboard.
 
@@ -58,6 +58,7 @@ Each store does what it is best at. SpacetimeDB owns all live state and every wr
 | "Show my timeline" | SpacetimeDB | Exact `visit` and `social_encounter` rows for one attendee, already a view |
 | "Who did I hang out with tonight?" | SpacetimeDB, `my_encounters` | Exact encounter rows the bands measured; `findable` is checked in the view |
 | "Which booths did I spend time at?" | SpacetimeDB, `my_visits` | Exact visit rows with minutes |
+| "Who was I in the same place with for a while?" | SpacetimeDB, `my_shared_visits` | Exact `shared_visit` rows: two findable attendees' visits to one zone that overlapped for at least 5 min |
 | "Which booths and companies tie the crowd together?" | SpacetimeDB, the people graph | `visited`, `works_at` and `exhibits` links to shared booth and company nodes, pushed live to the ops screen through `event_graph` |
 | "Of the people I hung out with, who is most into the same things as me?" | Elastic, `GET /recap/order` | Two people who visited different booths can still care about the same things; only embeddings of the booth texts can tell. The answer is an order, never a new name on the list |
 | "Of the booths I visited, which fit me best?" | Elastic, `GET /recap/order` | My interests matched to booth descriptions by meaning |
@@ -281,7 +282,7 @@ The consent switch `findable` is defined in [SpacetimeDB](../2-data/SpacetimeDB.
 
 ### Part three: ordering the recap's suggestions
 
-The recap page ([Attendee-App](../5-apps/Attendee-App.md)) shows two lists of suggestions: the people the attendee hung out with, from `my_encounters` (with Meta handles while the person is `findable`), and the booths they spent time at, from `my_visits` ([Social](../6-features/Social.md)). SpacetimeDB decides who and what is on each list. Elastic only decides the order, so the people and booths closest to what the attendee was into come first. There is no query box: the attendee's own `interests` text is the query.
+The recap page ([Attendee-App](../5-apps/Attendee-App.md)) shows two lists of suggestions: the people the attendee hung out with, from `my_encounters` (with Meta handles while the person is `findable`), and the booths they spent time at, from `my_visits` ([Social](../6-features/Social.md)). Next to them it shows the shared visits from `my_shared_visits`, in time order, which Elastic does not order. SpacetimeDB decides who and what is on each list. Elastic only decides the order of the first two, so the people and booths closest to what the attendee was into come first. There is no query box: the attendee's own `interests` text is the query.
 
 **`GET /recap/order`.** One route in `bandit-api`, handler `rank_recap`, called by the recap page with the `api_session` token. [Rust-Backend](../3-services/Rust-Backend.md) owns the process; this file owns the route.
 
@@ -309,7 +310,7 @@ sequenceDiagram
   API->>ES: semantic query on bandit-booths description, filtered to the candidate booth ids
   ES-->>API: ranked attendee ids and booth ids
   API-->>APP: people ids and booth ids in order
-  APP->>STDB: render the cards from my_encounters and my_visits
+  APP->>STDB: render the cards from my_encounters, my_visits and my_shared_visits
 ```
 
 ### Hyphenate.md: similar past claims, `bandit-claims` and `bandit-claims-validate`
@@ -333,16 +334,16 @@ sequenceDiagram
 | `witness_count` | integer | witness bands in the subject's zone |
 | `narrative` | semantic_text, `.jina-embeddings-v5-text-small` | one sentence built by code from a fixed template, such as "fall in zone 102 at 22:14, 3 witness bands in the same zone, medic note 12 min later, urgent-care bill with codes 99204, 73110, 29125, L3908, 99051" |
 
-**`bandit-claims-validate`** is the index's final pipeline, so no write can skip it. It fails the document, and so the write, when:
+**`bandit-claims-validate`** is the index's final pipeline, so no write can skip it. It never rejects a document. It writes `validation.valid` and one entry in `validation.errors` for each of these:
 
 - a required field is missing (`claim_id`, `origin`, `incident_kind`, `cover_kind`, `zone_id`, `occurred_at`, `narrative`);
 - an amount is negative or not a whole number of cents;
 - `origin`, `incident_kind`, `cover_kind` or `corroboration` holds a value outside its list above;
-- the document holds any field outside the table above, so a name or a note that slipped into the copy is refused, not stored.
+- the document holds a field outside the table above.
 
-The mapping is strict as well, so an unknown field fails twice over.
+The worker passes the result to Hyphenate.md's `submit_claim_checks`. An invalid copy flags the claim, which routes it to a person with the errors listed; Elastic never refuses a claim. The copy builder in code uses fixed fields and a fixed template, so no name or note can reach the copy.
 
-**The search.** After the write, the worker runs one `semantic` query on `narrative` with the copy's own narrative as the query text, filtered to `origin` `seed` and the same `cover_kind`, and takes the top 3 (starting value). It writes the past-claim ids and scores to SpacetimeDB with Hyphenate.md's `submit_claim_checks`, which rejects a stale lease. The precedents are checks on the claim, shown in the Claims queue; they never change an amount or a route, and a claim decides the same way without them.
+**The search.** After the write, the worker runs one `semantic` query on `narrative` with the copy's own narrative as the query text, filtered to `origin` `seed` and the same `cover_kind`, and takes the top 3 (starting value). It writes the past-claim ids and scores to SpacetimeDB with Hyphenate.md's `submit_claim_checks`, which rejects a stale lease. The precedents are information on the claim, shown in the Claims queue; they never change an amount or a route.
 
 ### Part four: Kibana, what the team shows
 
@@ -399,7 +400,7 @@ Every dashboard is saved with the project setup, so it shows the saved import ru
 | The agent merges two different organisations | Wrong facts on a booth | A merge needs a domain match or a ladder candidate, never a name alone; every merge carries a reason, and the team reads them on the Import run dashboard before the load stage |
 | The gap-fill tool runs away (too many calls, or a person's page) | Credits spent, scope rule broken | Three holds: the instruction caps it at 10 per run, the Bright Data zone token has its own spending limit, and the Rust validation drops any gap-fill record of kind person and rejects a bundle over the cap |
 | Elastic Serverless unreachable | `GET /recap/order` fails | `bandit-api` returns an unavailable error, and the recap page shows both lists by minutes. Hyphenate.md: the `claim_verify` job fails after its attempts, and the claim carries no precedent checks and decides the same way. Nothing live reads Elastic |
-| Hyphenate.md: `bandit-claims-validate` refuses a claim copy | No precedents for that claim | The job fails with the pipeline's reason in its `fail_job` record and the workers' heartbeat counts it as an error; the claim decides the same way, and the refused copy is a bug in the copy builder, never stored |
+| Hyphenate.md: `bandit-claims-validate` marks a claim copy invalid | The claim is flagged | `submit_claim_checks` stores the pipeline's errors as a failed check, and the claim routes to a person; it is never refused for it |
 | `bandit-indexer` down | New visits and interests are not copied | The heartbeat stops and the Ops dashboard shows the indexer red; the recap order uses the last copy; on restart the initial sync re-delivers every row and idempotent writes make the catch-up safe |
 | `findable` switched off after indexing | Stale documents of an attendee who is no longer findable | The attendee drops out of the Social views; the indexer deletes their documents by query on `attendee_id`, and the encounter documents that name them |
 
@@ -447,7 +448,7 @@ Every dashboard is saved with the project setup, so it shows the saved import ru
 | The joins of exhibitor records to booth geometry happen once, in the `LOOKUP JOIN` steps | One owner per step; the map stage in `bandit-ingest` only produces geometry |
 | The people graph's links live in SpacetimeDB; Elastic draws nothing on the graph, and nothing about the graph flows back | Links are exact, private facts that change live |
 | Hyphenate.md: a de-identified copy of each claim goes to `bandit-claims`; precedents come back only as past-claim ids and scores, written by `bandit-workers` through `submit_claim_checks`, and never change an amount | Ranking similar past claims by meaning is what Elastic does best; money, routes and live state stay in SpacetimeDB |
-| Hyphenate.md: `bandit-claims-validate` is the index's final pipeline and refuses any field outside its list | A name or a note that slips into a claim copy is refused at the door, never stored |
+| Hyphenate.md: `bandit-claims-validate` is the index's final pipeline; it never rejects a document, it marks it valid or invalid, and an invalid copy flags the claim and routes it to a person | Elastic checks data and never decides money; a person looks at anything it flags |
 | Kibana Graph is not used; the network picture in Kibana is the Vega panel on the Interest map | Graph is unavailable on Elastic Cloud Serverless, and it discovers links from co-occurring terms, while the links are already rows in SpacetimeDB |
 | SpacetimeDB decides who and what is on the recap list; Elastic only orders it, through `GET /recap/order` | The list is exact and private and comes from what the bands measured; meaning is the one thing only Elastic's embeddings add, and a stranger can never appear |
 | There is no typed query; the caller's own `interests` text is the only query | The recap shows suggestions, not search results |

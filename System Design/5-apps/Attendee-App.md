@@ -1,6 +1,6 @@
 # Attendee app
 
-The attendee app is the web app that opens when a phone taps a band's NFC sticker. It is the attendee's whole relationship with BandIt: claiming the band by pressing its button, a short onboarding, the `findable` consent switch, a live mirror of the band and of how busy the venue is, and the recap page after the event. It also renders the medic view, because every band carries exactly one URL and the caller's role, not the URL, decides what that URL shows. It runs in the phone browser, signs the attendee in with SpacetimeAuth, reads everything from the `band1t` module through SpacetimeDB's TypeScript client SDK, and calls `bandit-api` only for file uploads, the profile claim and the order of the recap's suggestions.
+The attendee app is the web app that opens when a phone taps a band's NFC sticker. It is the attendee's whole relationship with BandIt: claiming the band by pressing its button, a short onboarding, the `findable` consent switch, a live mirror of the band and of how busy the venue is, and the recap page after the event. It also renders the medic view, because every band carries exactly one URL and the caller's role, not the URL, decides what that URL shows. It runs in the phone browser, signs the attendee in with SpacetimeAuth, reads everything from the `band1t` module through SpacetimeDB's TypeScript client SDK, and calls `bandit-api` only for file uploads and the order of the recap's suggestions.
 
 ## Role in the system
 
@@ -27,17 +27,17 @@ Not responsible for:
 | Interface | Direction | Between | What flows | Transport |
 |---|---|---|---|---|
 | NFC tag URL | in | phone OS to app | `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api` ([Rust-Backend](../3-services/Rust-Backend.md)); the token is the path | NDEF URL read by the OS, opened in the browser |
-| Static bundle | in | `bandit-api` to browser | the app itself, served from the same origin as the upload, claim and recap order endpoints, so no cross-origin setup is needed | HTTPS |
+| Static bundle | in | `bandit-api` to browser | the app itself, served from the same origin as the upload and recap order endpoints, so no cross-origin setup is needed | HTTPS |
 | SpacetimeAuth sign-in | both | app and SpacetimeAuth | the magic-link email sign-in; an OpenID Connect ID token back | HTTPS, OpenID Connect |
 | SpacetimeDB connection | both | app and `band1t` module | the ID token, subscriptions, reducer calls | TypeScript client SDK over WebSocket |
 | Own-row views | in | module to app | `my_roles`, `my_attendee`, `my_consent`, `my_band` (bands the caller owns or is the claim candidate for), `my_band_report`, `my_incident` (status and snapshot of the caller's own incidents), `my_presence` (the space-time view), `my_jobs` | SDK subscription |
-| Public venue rows | in | module to app | `venue` (with `ended_at`, which turns the page into the recap), `zone`, `booth`, `schedule_slot`, `exit` (name and colour for the banner), `zone_state`, `venue_mode` | SDK subscription |
+| Public venue rows | in | module to app | `venue`, `event_state` (its `ended` flag turns the page into the recap), `zone`, `booth`, `schedule_slot`, `exit` (name and colour for the banner), `zone_state`, `venue_mode` | SDK subscription |
 | Reducers | out | app to module | `claim_band`, `update_profile` (display name), `set_consent`, `release_band` (the owner gives the band up, until the event ends), `open_api_session` (once per page load, see Identity) | SDK reducer call |
-| Blob upload | out | app to `bandit-api` | files for features that need them, with the API session token; `bandit-api` stores the file, calls `register_blob` and returns the `blob_ref` id | HTTPS, endpoint in [Rust-Backend](../3-services/Rust-Backend.md) |
+| Blob upload | out | app to `bandit-api` | files for features that need them through `POST /api/blobs`, with the API session token; `bandit-api` stores the file under its SHA-256, calls `register_blob` and returns the hash and the URL `/blobs/<sha256>` | HTTPS, endpoint in [Rust-Backend](../3-services/Rust-Backend.md) |
 | Medical-ID.md | both | app, module and `bandit-api` | the PDF through `POST /api/medical/document` with the API session token, then the confirm-card screen for the extracted `medical_card`; the medic view opened from `/t/BANDIT-0n` for role `medic`, which calls `request_medical_card` with the token and reads the `medic_medical_card` view | HTTPS and SDK |
 | Payments-Nessie.md | in | module to app | the wallet view on `/me` and on the recap page: the balance from `my_wallet` and the movements from `my_wallet_entries`. The wallet opens by itself when `update_profile` saves the display name | SDK |
-| Social.md | both | app and module | the onboarding socials step: the attendee types their Instagram, Facebook and Threads handles, saved with `set_social_handle` into `social_handle`; the social part of the recap page through `my_visits`, `my_encounters`, `my_photos` (with `respond_photo_tag`) and `my_share_links`; the "My graph" screen drawn from the `my_graph` view; the photographer route (role `photographer`) that uploads a photo and calls `register_photo` | SDK and HTTPS |
-| BrightData.md | both | app, module and `bandit-api` | the profile claim step: the app lists unclaimed `person` rows (exhibitor, speaker or artist scraped from event pages) whose name matches the typed display name; the attendee picks one, the app calls `POST /claim/person`, `bandit-api` calls `request_person_claim`, and the attendee confirms by pressing their band, which completes `confirm_person_claim` | HTTPS and SDK |
+| Social.md | both | app and module | the onboarding socials step: the attendee types their Instagram, Facebook and Threads handles, saved with `set_social_handle` into `social_handle`; the social part of the recap page through `my_visits`, `my_encounters`, `my_shared_visits`, `my_photos` (with `respond_photo_tag`) and `my_share_links`; the "My graph" screen drawn from the `my_graph` view; the photographer route (role `photographer`) that uploads a photo through `POST /api/blobs` and calls `register_photo` with its URL | SDK and HTTPS |
+| BrightData.md | both | app and module | the profile claim step: the app lists the `person` rows (exhibitor, speaker or artist scraped from event pages) whose name matches the typed display name and that `claimed_people` does not list; the attendee picks one and the app calls `claim_person`, which works only for an attendee who already owns a band | SDK |
 | Hyphenate.md | in | module to app | the venue's `insurance_policy` details on the profile | SDK |
 | Elastic.md | out | app to `bandit-api` | `GET /recap/order` when the recap page opens: the order of the recap's people and booths. The lists themselves come from the app's own subscriptions. Without Elastic.md, the app orders both lists by minutes together | HTTPS |
 | Merch.md | both | app and module | the merch section at the bottom of the recap page: suggestions from `my_merch_suggestions`, the preview that places the photo in the template's photo area, the one-tap "Buy" that calls `buy_merch` as the signed-in attendee, and `my_merch_orders` | SDK |
@@ -59,12 +59,12 @@ The medic view renders at `/t/{token}` rather than at a separate path because th
 The landing route works out who tapped which band. Band rows are private, and `my_band` returns only bands the caller owns or is the claim candidate for, so the route learns a band's status by trying to claim it: `claim_band` accepts, which starts the press window, or rejects. Nothing is lost by trying, because a claim completes only with a press on that band.
 
 1. Sign in. With no SpacetimeAuth session in this browser, the app shows the sign-in screen: the attendee types an email and opens the magic link (see Identity). The tap token stays in the URL, so the route continues after the sign-in.
-2. Connect to SpacetimeDB with the ID token and subscribe to `my_roles`, `my_attendee`, `my_band` and `venue`.
+2. Connect to SpacetimeDB with the ID token and subscribe to `my_roles`, `my_attendee`, `my_band` and `event_state`.
 3. Staff roles are checked first. Medical-ID.md: role `medic` gets the medic view for this band's wearer. Roles are granted at setup by the organizer with `grant_role` from the [Ops dashboard](Ops-Dashboard.md).
-4. `my_band` already holds a band with this token: the caller owns it. Home at `/me`, which is the recap page once `venue.ended_at` is set.
+4. `my_band` already holds a band with this token: the caller owns it. Home at `/me`, which is the recap page once `event_state.ended` is set.
 5. Otherwise call `claim_band` with the token:
    - accepted: the band blinks white; show the claim screen ("Press the button on your band").
-   - rejected: the "taken" page, which says only that the band is taken. Anyone can read the tag, so this page reveals nothing about the owner. After the event `claim_band` is always refused, so a stranger always gets this page.
+   - rejected: the "taken" page, which says only that the band is taken. Anyone can read the tag, so this page reveals nothing about the owner. After the event every band keeps its owner, so a stranger who taps a claimed band always gets this page.
 
 The flowchart below answers one question: which screen does a tap open, in the order the checks run.
 
@@ -74,13 +74,13 @@ flowchart TD
     Sess -->|"no"| SignIn["Sign-in screen: email, then the magic link"]
     SignIn -->|"ID token"| Conn["Connect with the ID token"]
     Sess -->|"yes"| Conn
-    Conn -->|"subscribe: my_roles, my_attendee, my_band, venue"| Medic{"role medic"}
+    Conn -->|"subscribe: my_roles, my_attendee, my_band, event_state"| Medic{"role medic"}
     Medic -->|"yes"| MedicView["Medic view (Medical-ID.md)"]
     Medic -->|"no"| Mine{"my_band holds this token"}
     Mine -->|"yes, caller owns it"| Home["Home /me; the recap page once the event has ended"]
     Mine -->|"no"| Start["call claim_band(token)"]
     Start -->|"accepted, band blinks white"| Claim["Claim screen: press your band"]
-    Start -->|"rejected, or the event has ended"| Taken["Taken page: the band is taken, nothing more"]
+    Start -->|"rejected"| Taken["Taken page: the band is taken, nothing more"]
     Claim -->|"press confirmed, then onboarding"| Home
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
     classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
@@ -94,7 +94,7 @@ flowchart TD
 
 One sign-in, for attendees and staff alike: the SpacetimeAuth magic link. SpacetimeAuth is SpacetimeDB's own OpenID Connect provider, in beta. BandIt turns on its magic-link email sign-in only, with no other providers. The attendee types an email, opens the link SpacetimeAuth sends, and comes back to the app with an ID token. The SDK presents that token to SpacetimeDB, which derives the identity from the token's issuer and subject. So the same person is the same attendee on every device and in every browser: signing in again with the same email gives the same identity. The `attendee` row is keyed by this identity: `claim_band` creates it blank and `update_profile` fills it. BandIt keeps no password and no email address, and sends no email: the address belongs to the SpacetimeAuth sign-in only. The band press proves who holds the band at claim time; the sign-in proves who the attendee is at every later visit.
 
-Talking to `bandit-api` as that same attendee. `bandit-api` is not a SpacetimeDB client of the phone's connection, so it cannot see who is calling by itself. On every page load the app generates a random token, calls `open_api_session` with the token's hash (the module binds the hash to the caller's identity in an `api_session` row with an expiry), and then sends the plain token in a header on every `bandit-api` request (uploads, profile claim, recap order). `bandit-api` hashes it and looks the hash up in its `api_sessions` subscription, which gives it the attendee id without any JWT verification ([SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md)). The token lives in memory, not in storage.
+Talking to `bandit-api` as that same attendee. `bandit-api` is not a SpacetimeDB client of the phone's connection, so it cannot see who is calling by itself. On every page load the app generates a random token, calls `open_api_session` with the token's hash (the module binds the hash to the caller's identity in an `api_session` row with an expiry), and then sends the plain token in a header on every `bandit-api` request (uploads, recap order). `bandit-api` hashes it and looks the hash up in its `api_sessions` subscription, which gives it the attendee id without any JWT verification ([SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md)). The token lives in memory, not in storage.
 
 A lost session (private browsing, cleared site data, a new phone, an iOS home-screen web app with its own storage) does not lose the attendee: they sign in again with the same email, get the same identity, and their band is still theirs. A band claimed by mistake is one ops action: `release_band` on the [Ops dashboard](Ops-Dashboard.md) unclaims the band, and the wearer claims it again by press. The old `attendee` row stays; only the band link moves.
 
@@ -109,7 +109,7 @@ The tap alone proves nothing, because anyone can read the tag. The press proves 
 5. The app's `my_band` subscription updates with the owner set; the screen says "It's yours" and continues with onboarding.
 6. Onboarding, in order, each step skippable except the first:
    - Display name: `update_profile`. There is no company field. Payments-Nessie.md: saving the name also opens the attendee's $200 demo wallet, with no extra screen, for merch and claim payouts.
-   - BrightData.md: the profile claim. The app lists unclaimed `person` rows whose name matches the typed display name, each with a "This is me" button. The attendee taps theirs; the app calls `POST /claim/person`, `bandit-api` calls `request_person_claim`, the band blinks white again, and the attendee presses it. The press completes `confirm_person_claim`, which writes the attendee identity onto the `person` row ([BrightData](../7-integrations/BrightData.md)).
+   - BrightData.md: the profile claim. The app lists the `person` rows whose name matches the typed display name and that `claimed_people` does not list, each with a "This is me" button. The attendee taps theirs, and the app calls `claim_person`. There is no second press: the band claim one step earlier made the attendee a band owner, and `claim_person` refuses anyone who owns no band with "claim your band first". It writes a `person_claim` row and copies the profile's organisation and headshot onto the attendee ([BrightData](../7-integrations/BrightData.md)).
    - The `findable` switch, off by default: `set_consent` (see Profile and consent).
    - Social.md: add your socials. The attendee types their Instagram, Facebook and Threads handles, and the app saves each with `set_social_handle`. No other networks are asked for, and nobody's profile is looked up or scraped ([Social](../6-features/Social.md)).
    - Medical-ID.md: upload a medical PDF through `POST /api/medical/document`, then the confirm-card screen once `medical_extract` has produced the `medical_card`.
@@ -231,9 +231,9 @@ flowchart LR
 
 ### After the event
 
-There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the organizer: when the organizer presses "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `venue.ended_at`. Every open attendee page subscribes to `venue`, so it switches from "Now" to "Your event" live, with no reload.
+There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the organizer: when the organizer presses "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so it switches from "Now" to "Your event" live, with no reload. `reopen_event` clears it and switches the pages back, for running the demo again.
 
-Later, the attendee reopens their tap link `/t/BANDIT-0n` (or `/me`) on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, `claim_band` and `release_band` are refused, so every band keeps its owner for the recap.
+Later, the attendee reopens their tap link `/t/BANDIT-0n` (or `/me`) on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, `release_band` is refused, so every band keeps its owner for the recap.
 
 The sequence below answers one question: how the organizer's press turns every open page into the recap, and how the attendee opens it again later.
 
@@ -245,8 +245,8 @@ sequenceDiagram
     participant Q as Attendee, another device later
     participant Auth as SpacetimeAuth
     Host->>Mod: end_event
-    Mod->>Mod: venue.ended_at = now, claim_band and release_band refused from now on
-    Mod-->>P: venue row update (subscription)
+    Mod->>Mod: event_state.ended set, release_band refused from now on
+    Mod-->>P: event_state row update (subscription)
     P->>P: switch from "Now" to "Your event", no reload
     Q->>Q: open /t/BANDIT-03
     Q->>Auth: sign in: email, then the magic link
@@ -258,7 +258,7 @@ sequenceDiagram
 The recap page, top to bottom. How it looks is front end and not designed here.
 
 1. The space-time view: the attendee's own zone timeline, rendered on the phone from `my_presence` (one `presence_sample` per 5 s while the band was alive): "20:10 to 20:40 near Stage B".
-2. Social.md: the social part: the people you hung out with and the Meta handles of those who are `findable` (`my_encounters`), the booths you spent time at with their descriptions (`my_visits`), both by minutes together; photos you are tagged in, with the people in each, a Share button that opens the phone's share sheet and the tag answer `respond_photo_tag` (`my_photos`); share links (`my_share_links`); and the "My graph" tab (see My graph above).
+2. Social.md: the social part: the people you hung out with and the Meta handles of those who are `findable` (`my_encounters`), the booths you spent time at with their descriptions (`my_visits`), both by minutes together; the people you were in the same place with for a while, with the zone, its booths and the minutes, in time order (`my_shared_visits`); photos you are tagged in, with the people in each, a Share button that opens the phone's share sheet and the tag answer `respond_photo_tag` (`my_photos`); share links (`my_share_links`); and the "My graph" tab (see My graph above).
 3. Merch.md: the merch suggestions and checkout: up to three templates from `my_merch_suggestions`, each with one of your own photos placed in its photo area, bought with one tap on "Buy" (`buy_merch`, paid from the wallet) and shown in `my_merch_orders`.
 
 Every call on the recap page runs as the signed-in attendee. Other sections, each separable:
@@ -272,7 +272,7 @@ Every call on the recap page runs as the signed-in attendee. Other sections, eac
 - Android opens an NDEF URL in the default browser from the system tag dispatch when the phone is unlocked.
 - Every view whose input is a band (the band claim and the medic view) starts from the OS opening the tag URL, so it works the same on both platforms with no in-page NFC reading.
 - The tag is an NTAG215 holding one NDEF URL on the `bandit-api` host, locked read-only once written ([Hardware](../4-devices/Hardware.md)).
-- Simulator.md: simulated bands have no tag and an empty `nfc_token`; the simulator registers each one with a simulated owner through its own path ([Simulator](../3-services/Simulator.md)).
+- Simulator.md: crowd bands have no tag and an empty `nfc_token`, and `start_crowd` gives each a simulated owner inside the module. The demo bands 94 to 99 have a tap link (`/t/BANDIT-94` to `/t/BANDIT-99`) but no tag: a tester opens it and claims the band with `bandit-api`'s demo press instead of a real press ([Simulator](../3-services/Simulator.md)).
 
 ## Failure modes and fallbacks
 
@@ -289,7 +289,7 @@ Every call on the recap page runs as the signed-in attendee. Other sections, eac
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): views `my_roles`, `my_attendee`, `my_consent`, `my_band`, `my_band_report`, `my_incident`, `my_presence`, `my_jobs`; public `venue` (with `ended_at`), `zone`, `booth`, `schedule_slot`, `exit`, `zone_state`, `venue_mode`; reducers `claim_band`, `update_profile`, `set_consent`, `release_band`, `open_api_session`; the band fields `owner`, `claim_candidate`, `claim_pending_until`; SpacetimeAuth as the one sign-in.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): views `my_roles`, `my_attendee`, `my_consent`, `my_band`, `my_band_report`, `my_incident`, `my_presence`, `my_jobs`; public `venue`, `event_state`, `zone`, `booth`, `schedule_slot`, `exit`, `zone_state`, `venue_mode`; reducers `claim_band`, `update_profile`, `set_consent`, `release_band`, `open_api_session`; the band fields `owner`, `claim_candidate`, `claim_pending_until`; SpacetimeAuth as the one sign-in.
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md) and [Hardware](../4-devices/Hardware.md): the IDENT state, the press flag and the forced-state command that make claim by press work.
 - [Safety](../6-features/Safety.md): the meaning of band states, risk levels, evacuation, exit colours and the vibration on full bands.
 - [Rust-Backend](../3-services/Rust-Backend.md): `bandit-api` serves the bundle on the public host, the blob upload endpoint and the `api_sessions` lookup.
@@ -323,11 +323,11 @@ Every call on the recap page runs as the signed-in attendee. Other sections, eac
 | There is no recap email; `end_event` turns every open page into the recap live, and the tap link `/t/{token}` opens it again later for the band's signed-in owner | the band's own URL is the way back, and the sign-in proves who is opening it |
 | The recap page runs top to bottom: the space-time view, the social part, then the merch suggestions and checkout | the night first, the people second, shopping last |
 | Socials are typed by the attendee at onboarding | no verification flow to build, and nobody's profile is scraped |
-| The profile claim is confirmed by pressing the band | the same gesture as the band claim, with no email round trip |
+| BrightData.md: the profile claim is one tap, open only to an attendee who already owns a band | the band claim's press already proved who holds the band, so there is no second press and no email round trip |
 | Payments-Nessie.md: the wallet opens when the display name is saved, with no screen of its own | every judge has a funded wallet for merch and claim payouts, with nothing to type |
 | The medic view renders at `/t/{token}` and starts from the OS opening the tag | one URL per band, and the same flow on iPhone and Android |
-| The app has no merchant route; BandIt takes no payments at the venue | the band press is kept for claiming a band and a profile; merch is paid in the app after the event |
+| The app has no merchant route; BandIt takes no payments at the venue | the band press is kept for claiming a band; merch is paid in the app after the event |
 | Guidance on the phone repeats the band: the exit colour, the exit name, and a note that full bands vibrate along the route | the ring has no compass, so colour and vibration are the band's guidance and the phone backs them up |
 | Socials are Instagram, Facebook and Threads handles only, and onboarding has no company field | Meta is the sponsor track; `works_at` links come only from the import and a claimed profile |
 | "My graph" draws its links from the `my_graph` subscription only | SpacetimeDB holds the measured, private facts and pushes them live; there are no links between people who never met |
-| Elastic.md: the recap's lists come from `my_encounters` and `my_visits`; `GET /recap/order` only orders them | nobody appears who was not measured with the attendee; meaning changes only the order |
+| Elastic.md: the recap's lists come from `my_encounters`, `my_visits` and `my_shared_visits`; `GET /recap/order` only orders the people and booths | nobody appears who was not measured with the attendee; meaning changes only the order |

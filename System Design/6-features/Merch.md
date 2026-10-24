@@ -25,10 +25,10 @@ Non-responsibilities:
 | In | Project setup (role `ops` or `ingest`), after the event import | every template in `assets/merch/templates.json`, through `load_merch_templates` | SDK, before the event |
 | In | Attendee app | `buy_merch` (template id, photo id, size) | SpacetimeDB TypeScript SDK |
 | In | [Social](Social.md) tables | `visit` (minutes per booth), `photo` (zone and time), `photo_tag` (the caller's confirmed tags) | Module tables, read by the view and the reducer |
-| In | Core tables | `booth`, `blob_ref`, `job`; BrightData.md: `organization`, to match sponsor names | Module tables |
+| In | Core tables | `booth`, `blob_ref`, `job`, `event_state`; BrightData.md: `organization`, to match sponsor names | Module tables |
 | In | [Payments-Nessie](../7-integrations/Payments-Nessie.md) | the caller's wallet (`claimant_account`) and its spendable balance (`wallet_entry`) | Module tables, read by `buy_merch` |
 | Out | Attendee app | The public table `merch_template`; the views `my_merch_suggestions` and `my_merch_orders` | Subscription |
-| Out | Attendee app, through `bandit-api` | The template images, as static files served with the app; the photo through the blob download (access class `shared`) | HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| Out | Attendee app, through `bandit-api` | The template images, as static files served with the app; the photo from its `photo.url`, `/blobs/<sha256>`, served by `GET /blobs/{hash}` (access class `shared`) | HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Out | `bandit-workers` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)) | The job `merch_purchase`: order id, account id, merchant id (empty before the first purchase), amount in cents, memo | `job` table |
 | In | `bandit-workers` (role `worker`) | `settle_merch_order` with the job id, the merchant id and the purchase id | Reducer |
 
@@ -90,11 +90,11 @@ flowchart TD
 3. Then plain templates before sponsor templates, so an attendee who never stopped at a sponsor booth sees the plain tee, mug and poster first.
 4. Then the newest photo.
 
-The view returns the top 3. Each row holds what the app needs to draw it: the rank, the template's id, title, kind, price, image address, size and photo area, the photo id and where to fetch the photo, and the minutes. A typical first suggestion: the photo taken at the Elastic booth where the attendee spent 40 minutes, on `mug_elastic.png`. There is no job, no AI and no Claude. The view recomputes when a visit or a tag changes, so removing a tag takes that photo out at once.
+The view returns the top 3. Each row holds what the app needs to draw it: the rank, the template's id, title, kind, price, image address, size and photo area, the photo id and its `url` (`/blobs/<sha256>`), and the minutes. A typical first suggestion: the photo taken at the Elastic booth where the attendee spent 40 minutes, on `mug_elastic.png`. There is no job, no AI and no Claude. The view recomputes when a visit or a tag changes, so removing a tag takes that photo out at once.
 
 ### The preview
 
-The merch section is the bottom of the recap page, after the space-time view and the social part ([Attendee-App](../5-apps/Attendee-App.md)). For each suggestion the app draws the template image and places the photo over the green photo area, scaled to cover the area and centred, so whatever spills over the edges is cropped and no green shows. The app scales the photo area by the drawn size over `width` and `height`. The photo comes from the blob download. The server renders nothing; an order stores the template and the photo, which is all a printer would need.
+The merch section is the bottom of the recap page, after the space-time view and the social part ([Attendee-App](../5-apps/Attendee-App.md)). For each suggestion the app draws the template image and places the photo over the green photo area, scaled to cover the area and centred, so whatever spills over the edges is cropped and no green shows. The app scales the photo area by the drawn size over `width` and `height`. The photo comes from its `url` in the blob store, through `GET /blobs/{hash}`. The server renders nothing; an order stores the template and the photo, which is all a printer would need.
 
 ### From photo to order
 
@@ -120,7 +120,7 @@ sequenceDiagram
 ```
 
 1. **Suggest.** The recap page subscribes to `my_merch_suggestions` and shows the three previews, each with its price, next to the wallet balance from `my_wallet` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
-2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended (`venue.ended_at` is set), that the size fits the kind, that the caller has a confirmed tag on the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price. It then writes a `merch_order` in status `paying`, with the template's price as `amount_cents`, and enqueues `merch_purchase`. From then on the order's amount is held: the spendable balance leaves it out, so a second tap cannot spend the same money.
+2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended (`event_state.ended` is set, otherwise "merch opens in your recap once the event ends"), that the size fits the kind, that the caller has a confirmed tag on the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price. It then writes a `merch_order` in status `paying`, with the template's price as `amount_cents`, and enqueues `merch_purchase`. From then on the order's amount is held: the spendable balance leaves it out, so a second tap cannot spend the same money.
 3. **Settle.** `bandit-workers` records the purchase on the attendee's Nessie account and calls `settle_merch_order` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)). The reducer rejects a stale lease, stores the merchant in `merch_shop` if it is not there yet, adds a `purchase` entry of minus the amount to `wallet_entry`, and sets the order `paid` with the Nessie purchase id.
 
 There is no separate confirm step. The tap on "Buy" is the attendee's confirmation, and the SpacetimeAuth sign-in proves who is buying on any device.
@@ -170,9 +170,9 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 
 - [Social](Social.md): `visit`, `photo`, `photo_tag` and the confirmed-tag rule. Merch cannot run without it.
 - [Payments-Nessie](../7-integrations/Payments-Nessie.md): the wallet (`claimant_account`, `wallet_entry`), its spendable balance, and the `merch_purchase` work in `bandit-workers`. Merch cannot run without it, because every order is paid from the wallet.
-- [SpacetimeDB](../2-data/SpacetimeDB.md): `booth`, `blob_ref`, `job`.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): `booth`, `blob_ref`, `job`, `event_state`.
 - BrightData.md: the imported `organization` rows that sponsor names match. Without it, load only the plain templates.
-- [Rust-Backend](../3-services/Rust-Backend.md): `bandit-api` serves the template images with the app and the photos through the blob download.
+- [Rust-Backend](../3-services/Rust-Backend.md): `bandit-api` serves the template images with the app and the photos through `GET /blobs/{hash}`.
 - [Attendee-App](../5-apps/Attendee-App.md): the merch section at the bottom of the recap page, the preview and the "Buy" button, all run as the signed-in attendee.
 
 **Used by**

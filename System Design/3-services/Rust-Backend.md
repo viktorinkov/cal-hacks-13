@@ -24,10 +24,10 @@ Every process, where it runs, what it may do in the database, and what it talks 
 |---|---|---|---|---|---|
 | `band1t` module | `bandit-module` | SpacetimeDB Maincloud | runs inside the database | nothing outside the database | none |
 | `bandit-bridge` | `bandit-bridge` | demo laptop | `bridge` | the gateway over USB serial | its SpacetimeDB token |
-| Simulator.md: `bandit-sim` | `bandit-sim` | demo laptop | `simulator` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB token |
+| Simulator.md: the `bandit-claims` command-line tool | `bandit-claims` | demo laptop | `simulator` (its `sim` identity, for the demo bands); Hyphenate.md: the demo identities it plays, among them `medic` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
 | `bandit-ingest` | `bandit-ingest` | demo laptop, before the event | `ingest` | the `band1t` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Hyphenate.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Fly.io Machine | `indexer` | Elastic Serverless: the one-way copy, including the `bandit-people` sync of each findable attendee's interests | SpacetimeDB token, Elastic key |
-| `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key |
+| `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key; Simulator.md: the `simulator` token for the demo routes |
 | `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie; Elastic.md, Hyphenate.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie base URL and key; Elastic.md, Hyphenate.md: Elastic claims key |
 | Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | demo laptop | `vision` | the overhead phone camera, `bandit-api` for frame uploads; Anthropic-Agent.md: Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
 
@@ -46,7 +46,7 @@ flowchart LR
   Module["bandit-module, WASM inside SpacetimeDB"]
   subgraph Services["Service binaries"]
     Bridge["bandit-bridge"]
-    Sim["bandit-sim"]
+    Sim["bandit-claims (Simulator.md)"]
     Indexer["bandit-indexer"]
     API["bandit-api"]
     Ingest["bandit-ingest"]
@@ -81,7 +81,7 @@ flowchart LR
 | `bandit-bindings` | library | client bindings generated from the module, plus one helper that connects with a saved token and reports the service's identity | this file |
 | `bandit-common` | library | config loading, structured logging, the 5 s heartbeat, and the blob store (a folder on the Fly volume) | this file |
 | `claude-client` | library | the only way any process calls Claude; also records every call | [Anthropic-Agent](../7-integrations/Anthropic-Agent.md) |
-| `bandit-bridge`, `bandit-sim`, `bandit-ingest`, `bandit-indexer`, `bandit-api`, `bandit-workers` | binaries | the processes in the Interfaces table | their docs |
+| `bandit-bridge`, `bandit-claims`, `bandit-ingest`, `bandit-indexer`, `bandit-api`, `bandit-workers` | binaries | the processes in the Interfaces table | their docs |
 | Vision.md (TBD -- LEO): `bandit-vision` | binary | the vision service; it calls Claude through `claude-client` like the workers do | [Vision](../4-devices/Vision.md) |
 
 The two browser apps use TypeScript bindings generated from the same module, so the web and Rust sides cannot drift apart either.
@@ -96,7 +96,7 @@ Each process reaches the database the same way, as a SpacetimeDB client of Mainc
 - A Fly volume attached to that Machine holds the blob store folder and the three services' credentials files. Both processes that write blobs, `bandit-api` and `bandit-workers`, run on that Machine and share the folder directly.
 - `bandit-api` serves the Ops dashboard and the attendee app as static files from that host. The NFC tags hold that host, so judges open the app on their own phones, and the apps' uploads and API calls go to the same origin with no cross-origin setup.
 - The demo laptop runs `bandit-bridge`, because it needs the gateway's USB cable, and runs `bandit-ingest` once before the event.
-- Simulator.md: `bandit-sim` runs on the demo laptop.
+- Simulator.md: the `bandit-claims` command-line tool runs on the demo laptop.
 - Vision.md (TBD -- LEO): `bandit-vision` runs on the demo laptop.
 
 ### Service identity and roles
@@ -151,7 +151,7 @@ sequenceDiagram
   API-->>A: response with SpacetimeDB ids
 ```
 
-**Blob storage.** An upload is streamed into the blob store folder on the Fly volume, hashed with SHA-256, and registered with `register_blob`, which writes a `blob_ref` row with content type, size, hash, owner and an access class (`owner_only`, `staff`, `shared`). The `api` and `worker` roles may call `register_blob`, since workers also produce files such as letters; `bandit-workers` reads and writes the folder directly because it runs on the same Machine. Downloads go through `bandit-api`, which checks the caller against the access class. Large files never go into SpacetimeDB rows, because big rows slow commits and subscriptions.
+**Blob storage.** An upload, `POST /api/blobs` with a purpose, is streamed into the blob store folder on the Fly volume, stored under its SHA-256, and registered with `register_blob`, which writes a `blob_ref` row with content type, size, hash, owner and an access class (`owner_only`, `staff`, `shared`). The `api` and `worker` roles may call `register_blob`, since workers also produce files such as letters; `bandit-workers` reads and writes the folder directly because it runs on the same Machine. `bandit-api` answers with the hash, the page count of a PDF and the URL `/blobs/<sha256>`. Downloads go through `GET /blobs/{hash}` on `bandit-api`, which checks the caller against the access class. Large files never go into SpacetimeDB rows, because big rows slow commits and subscriptions.
 
 **Endpoint registry.** Core endpoints are below; each optional feature adds its own rows and owns their behaviour.
 
@@ -159,13 +159,13 @@ sequenceDiagram
 |---|---|---|
 | health | liveness for the dashboard and scripts | this file |
 | app files | the Ops dashboard and attendee app bundles, and every app route including `/t/BANDIT-0n` | this file |
-| blob upload | stream a file in, hash it, call `register_blob` | this file |
-| blob download | serve a file if the caller passes its access class | this file |
+| `POST /api/blobs` | stream a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Hyphenate.md: purpose `medical` as `staff`); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
+| `GET /blobs/{hash}` | serve a stored file by its hash if the caller passes its access class | this file |
 | Elastic.md: `GET /recap/order` | handler `rank_recap`: orders the caller's recap people and booths by meaning, holding the Elastic key; the candidates come from Social.md's views `social_encounters` and `social_visits`, never from Elastic | [Elastic](../7-integrations/Elastic.md) |
-| BrightData.md: `POST /claim/person` | start a claim on an unclaimed exhibitor, speaker, sponsor or artist profile; the attendee confirms it by pressing their band | [BrightData](../7-integrations/BrightData.md) |
 | Medical-ID.md: `POST /api/medical/document` | upload the medical PDF as `owner_only`, call `submit_medical_document`, which enqueues `medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
-| Hyphenate.md: `POST /api/claims/bill` | upload an urgent-care bill PDF (at most 10 MB) as `staff` from the Ops dashboard's incident card, for callers holding `medic` or `ops`; call `submit_medical_record`, which enqueues `claim_record_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
-| Social.md: photographer photo upload, share-link page | photos in; the public page for a share token | [Social](../6-features/Social.md) |
+| Hyphenate.md: bill upload | the Ops dashboard's incident card uploads an urgent-care bill PDF (at most 10 MB) through `POST /api/blobs` with purpose `medical`, then calls `submit_medical_record` as the signed-in staff member, which enqueues `claim_record_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
+| Social.md: photographer photo upload, share-link page | photos in through `POST /api/blobs` with purpose `photo`; the public page for a share token | [Social](../6-features/Social.md) |
+| Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | demo mode only: press a demo band 94 to 99 or move it to a station, through `report_sim_band` as the `simulator` identity; the pressed bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
 
 ### `bandit-workers`: the job runner
 
@@ -218,9 +218,9 @@ Both profiles use the one Maincloud database.
 | Profile | Bands | Use |
 |---|---|---|
 | Live demo | real bands through the bridge | the judged demo |
-| Simulator.md: Rehearsal | virtual bands and replayed bridge logs only, under virtual ids | practising the choreography without wearers |
+| Simulator.md: Rehearsal | demo bands and replayed bridge logs only, on the demo ids 90 to 99 | practising the choreography without wearers |
 
-Simulator.md: in the live demo, up to 200 virtual bands run alongside the real ones.
+Simulator.md: in the live demo, the crowd (up to 80 bands inside the module) and the 10 demo bands run alongside the real ones.
 
 ## Failure modes and fallbacks
 

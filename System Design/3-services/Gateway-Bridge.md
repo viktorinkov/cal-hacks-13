@@ -19,7 +19,7 @@ Explicit non-responsibilities:
 
 - It decides nothing about safety: no incident logic, no exit assignment, no density. Those live in the module ([Safety](../6-features/Safety.md)). The bridge is a courier with a memory.
 - It holds no truth. Everything it knows is in `band_report`, `service_heartbeat` or its raw log, and a restart loses nothing the system needs.
-- It never speaks for simulated bands (ids 1000 and above); [Simulator](Simulator.md) reports those itself.
+- It never speaks for simulated bands (Simulator.md: the crowd, ids 10 to 89, and the demo bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
 - It does not synchronise clocks. It timestamps lines with the laptop clock on receipt and sends ages, not timestamps.
 - It runs no feature flow. It relays the claim blink down and the press flag up, and the module decides.
 
@@ -150,7 +150,7 @@ Latency from a button press to the module: up to 100 ms for the next beacon, ser
 
 ### Server intent: the three subscriptions
 
-The bridge subscribes to `staff_directives` (every `band_directive` row), `staff_commands` (the `band_command` rows not yet acknowledged) and `fleet_config`. Each subscription update wakes the reconciler. The bridge acts on directives for targets 0, 1 to 9 and 101 to 105 and ignores targets at 1000 and above, which belong to the simulator. For stations the only meaningful directive fields are exit colour and a forced mode (0 breathe, 1 chase, 9 off).
+The bridge subscribes to `staff_directives` (every `band_directive` row), `staff_commands` (the `band_command` rows not yet acknowledged) and `fleet_config`. Each subscription update wakes the reconciler. The bridge acts on directives for targets 0, 1 to 9 and 101 to 105 and ignores band targets 10 to 99, which belong to the simulator (Simulator.md). For stations the only meaningful directive fields are exit colour and a forced mode (0 breathe, 1 chase, 9 off).
 
 A directive addressed to a band overrides the all-bands directive (target 0) field by field, so a venue-wide evacuation (target 0, forced GUIDE) and a per-band exit colour (target 3, exit 2) combine into "band 3 shows GUIDE in magenta". Who writes which directive, and when, is in [Safety](../6-features/Safety.md) (evacuation, medic approach, exit assignment) and [Attendee-App](../5-apps/Attendee-App.md) (IDENT for claiming).
 
@@ -207,9 +207,9 @@ The reconciler is idempotent: running it twice queues nothing new, because the q
 
 ### Press to confirm
 
-The button is the consent step for claiming a band and, BrightData.md: for claiming a scraped profile. The server opens an 8 s window and makes the band blink white (IDENT); a beacon from that band with the press flag inside the window confirms. The bridge's job is to deliver the blink and forward the press quickly; the decision is the module's.
+The button is the consent step for claiming a band. The server opens an 8 s window and makes the band blink white (IDENT); a beacon from that band with the press flag inside the window confirms. The bridge's job is to deliver the blink and forward the press quickly; the decision is the module's.
 
-The round trip, the same for both claims.
+The round trip.
 
 ```mermaid
 sequenceDiagram
@@ -231,7 +231,7 @@ sequenceDiagram
     R->>G: cmd <id> state 8 1 (the forced blink expires)
 ```
 
-Two details make this robust. The press flag is accumulated with OR in the fleet map, so it cannot fall between two batches. And the module, not the bridge, decides whether the press was inside the window, so a late or duplicated report cannot confirm anything. If no press arrives, the blink ends on its own after 8 s and the bridge sends nothing. [Attendee-App](../5-apps/Attendee-App.md) owns the band claim; BrightData.md: the profile claim starts with `request_person_claim` instead of `claim_band` and ends in `confirm_person_claim`, over the same round trip.
+Two details make this robust. The press flag is accumulated with OR in the fleet map, so it cannot fall between two batches. And the module, not the bridge, decides whether the press was inside the window, so a late or duplicated report cannot confirm anything. If no press arrives, the blink ends on its own after 8 s and the bridge sends nothing. [Attendee-App](../5-apps/Attendee-App.md) owns the band claim.
 
 ### Rate limiting and safety rules on the command line
 
@@ -285,13 +285,13 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 **Used by**
 
 - [Safety](../6-features/Safety.md): every directive and buzz cue (exit guidance, evacuation, medic approach, the light-circle alert, manual override) reaches a band through the reconciler and the command queue; every SOS, fall and press reaches the module through the batcher.
-- [Attendee-App](../5-apps/Attendee-App.md) and [BrightData](../7-integrations/BrightData.md): the press-to-confirm round trip for the band claim and the profile claim.
+- [Attendee-App](../5-apps/Attendee-App.md): the press-to-confirm round trip for the band claim.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): fleet liveness, loss and service health from `band_report` and `service_heartbeat`.
 - [Simulator](Simulator.md): replays the bridge's raw log and shares `bandit-protocol`.
 
 **If you delete this file**
 
-- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md) feeds `ingest_band_reports`.
+- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s demo bands report, through `report_sim_band`.
 - Move the `bandit-protocol` crate description to [Simulator](Simulator.md), which still needs it.
 - Remove the `bridge` role and the bridge rows from the service tables in [Rust-Backend](Rust-Backend.md) and [Architecture](../1-overview/Architecture.md), and the `bandit-bridge` row from the service health panel in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
 - In [Safety](../6-features/Safety.md), note that `band_directive` and `band_command` rows have no consumer for real bands.

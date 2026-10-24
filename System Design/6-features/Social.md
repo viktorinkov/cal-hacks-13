@@ -7,13 +7,14 @@ The social layer turns zone-level presence into memories: where an attendee spen
 Responsibilities:
 
 - Derive `visit` rows from `presence_sample` in the social step of `memory_tick`, and write `social_encounter` rows there once two `findable` owners have been together for 3 minutes. The encounter rule is Leo's (TBD -- LEO).
+- Write `shared_visit` rows in the same step when two `findable` attendees' visits to one zone overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value), for the recap.
 - Hold the people graph: derive `people_link` rows in the same step and serve them through `my_graph` and `event_graph`.
 - Own the socials step of onboarding: the attendee types their handles into `social_handle`.
-- BrightData.md: place the profile claim ("Is this you", confirmed by a band press) in the same onboarding flow. The `person` rows, the claim reducers and `POST /claim/person` belong to [BrightData](../7-integrations/BrightData.md).
-- Hold `social_handle` and show it only to people who share an encounter with its owner, while the owner has `findable` on.
+- BrightData.md: place the profile claim ("Is this you", one tap by an attendee who already owns a band) in the same onboarding flow. The `person` rows, `claim_person` and `person_claim` belong to [BrightData](../7-integrations/BrightData.md).
+- Hold `social_handle` and show it only to people who share an encounter or a shared visit with its owner, while the owner has `findable` on.
 - Register photographer photos, suggest `photo_tag` rows from presence and consent, and let attendees confirm or remove them.
 - Provide the social part of the recap page as views keyed on the caller, and `share_link` tokens.
-- Give `bandit-indexer` and `bandit-api` the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only.
+- Give `bandit-indexer` and `bandit-api` the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only, and give the service roles `social_shared_visits`.
 - Give meaning to the consent switch `findable`, set through `set_consent`.
 
 Non-responsibilities:
@@ -28,15 +29,15 @@ Non-responsibilities:
 
 | Direction | Who | What flows | Transport |
 |---|---|---|---|
-| In | `memory_tick` (core, every 5 s) | Calls the social step after writing `presence_sample`; the step reads `presence_sample`, `band`, `attendee`, `consent`, `booth` and writes `visit`, `social_encounter`, `people_link` | In-module call (one line to remove) |
+| In | `memory_tick` (core, every 5 s) | Calls the social step after writing `presence_sample`; the step reads `presence_sample`, `band`, `attendee`, `consent`, `booth` and writes `visit`, `social_encounter`, `shared_visit`, `people_link` | In-module call (one line to remove) |
 | In | BrightData.md: imported rows | `organization`, the booth's organisation and a claimed `person` row's organisation, read by the social step for `exhibits` and `works_at` links | Module tables |
-| In | Simulator.md: simulated attendees | One simulated `attendee` per simulated band, from the simulator's seed: a made-up display name, Meta handles in `social_handle`, `findable` on; marked by the band's `simulated` flag | Module tables |
+| In | Simulator.md: the crowd | One simulated `attendee` per crowd band, written by `start_crowd`: a made-up display name, one Instagram handle in `social_handle`, `findable` on; marked by the band's `simulated` flag. `crowd_tick` writes the crowd's `presence_sample` rows | Module tables |
 | In | Attendee app | `set_social_handle`, `remove_social_handle`, `respond_photo_tag`, `create_share_link`, `revoke_share_link` | SpacetimeDB TypeScript SDK |
-| In | BrightData.md: profile claim | `person` rows (name, role, organisation; claimed identity once claimed), used as a display name once claimed; the claim itself (`POST /claim/person` and the confirming band press) is defined in [BrightData](../7-integrations/BrightData.md) | Module table; HTTPS to `bandit-api` |
-| In | Photographer route of the attendee app (role `photographer`) | Photo bytes to `bandit-api`, then `register_photo` with the `blob_ref` id, capture time and caption; `hide_photo` | HTTPS upload, then SDK |
-| In | `bandit-api` (role `api`) | `register_blob` for the uploaded photo (access class `shared`) | SDK |
+| In | BrightData.md: profile claim | `person` rows (name, role, organisation, headshot) and the `claimed_people` view; `claim_person`, called by the signed-in app, copies a claimed profile onto the attendee and is defined in [BrightData](../7-integrations/BrightData.md) | Module tables |
+| In | Photographer route of the attendee app (role `photographer`) | Photo bytes to `bandit-api` through `POST /api/blobs` with purpose `photo`, then `register_photo` with the returned URL `/blobs/<sha256>`, the capture time, the zone and an optional caption; `hide_photo` | HTTPS upload, then SDK |
+| In | `bandit-api` (role `api`) | `register_blob` for the uploaded photo, stored under its SHA-256 (access class `shared`) | SDK |
 | In | Vision.md (TBD -- LEO): `bandit-vision` | `submit_photo_features` for a `photo_features` job: people count and caption | SDK (role `vision`) |
-| Out | Attendee app | Views keyed on the caller: `my_visits`, `my_encounters`, `my_graph`, `my_photos`, `my_share_links` | Subscription |
+| Out | Attendee app | Views keyed on the caller: `my_visits`, `my_encounters`, `my_shared_visits`, `my_graph`, `my_photos`, `my_share_links` | Subscription |
 | Out | Ops dashboard big screen | View `event_graph`: the anonymous whole-event graph | Subscription |
 | Out | `bandit-api` | `share_link` rows and the rows a link selects, for the public share page; Elastic.md: `social_encounters` and `social_visits`, the recap candidates for `GET /recap/order` | Subscription (role `api`) |
 | Out | Elastic.md: `bandit-indexer` | the views `social_attendees`, `social_visits` and `social_encounters`, findable attendees only, into `bandit-memories` and `bandit-people`; never `social_handle` or photos | Subscription (role `indexer`) |
@@ -47,7 +48,7 @@ Non-responsibilities:
 
 ### From presence to visits and encounters
 
-Presence is the only input: every 5 s `memory_tick` writes one `presence_sample` (band, zone, time) per live band. The social step runs right after, inside the same scheduled reducer, and considers only bands that have an owner, so unclaimed bands create no memories. Simulator.md: every simulated band has a simulated owner, so the simulated crowd creates visits, encounters and graph links through this same step, and the big screen shows a real-looking crowd.
+Presence is the only input: every 5 s `memory_tick` writes one `presence_sample` (band, zone, time) per live band. The social step runs right after, inside the same scheduled reducer, and considers only bands that have an owner, so unclaimed bands create no memories. Simulator.md: every crowd band has a simulated owner, and `crowd_tick` writes the crowd's `presence_sample` rows, so the simulated crowd creates visits, encounters, shared visits and graph links through this same step, and the big screen shows a real-looking crowd.
 
 The question this diagram answers: what each memory row is derived from.
 
@@ -57,12 +58,14 @@ flowchart TD
     PS -->|"owned bands only"| ST["social step of memory_tick"]
     ST -->|"same zone 2 min or more"| V[("visit, names the zone's booth")]
     ST -->|"both findable, together 3 min (TBD -- LEO)"| E[("social_encounter")]
+    V -->|"two findable visits to one zone overlap 300 s"| SV[("shared_visit")]
     V --> SUM["recap views keyed on the caller"]
+    SV --> SUM
     V -->|"visited"| PL[("people_link")]
     E -->|"met"| PL
     E --> SUM
     classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
-    class BR,PS,ST,V,E,PL,SUM stdb
+    class BR,PS,ST,V,E,SV,PL,SUM stdb
 ```
 
 **Visits.** A visit is one attendee staying in one zone. The step keeps, per band, its current zone and how long it has been there, and a zone change counts only once 2 consecutive samples agree. A visit opens when the band has been in the zone for 2 minutes (starting value, calibrate at the venue) and closes when the band has been out of that zone for 2 minutes (starting value, calibrate at the venue), so a short walk past the boundary does not split it. In the demo layout each booth zone holds one booth, so a visit records that booth; a zone with no booth (the pit, an entrance) leaves `booth_id` empty. Why 2 minutes: the band's zone is "loudest station in the last 3 s", which flaps at boundaries, and 2 minutes of persistence filters that without hiding a real stop.
@@ -89,6 +92,20 @@ flowchart TD
 | `status` | `open`, `closed` |
 
 What an encounter shows each side: "Sam, 40 minutes together in Zone B around 21:10", with Sam's socials. Both sides see each other at the same moment, because the encounter exists only when both are `findable`.
+
+**Shared visits.** A shared visit is two attendees who were in the same place for a while: people you were near at a booth, whether or not you met. When the social step opens or grows a visit of a `findable` attendee, it compares it with the other `findable` attendees' visits to the same zone. Where two visits overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value, calibrate at the venue), it writes one `shared_visit` row for that pair of visits and grows `overlap_minutes` while both stay. A shared visit is not a `people_link` kind and adds nothing to the graph: it is two people measured in the same zone at the same time, shown in the recap next to the encounters.
+
+| `shared_visit` field | Meaning |
+|---|---|
+| `id` | Assigned by SpacetimeDB |
+| `attendee_a`, `attendee_b` | The pair, lower id first |
+| `zone_id` | Where |
+| `visit_a`, `visit_b` | The two overlapping visits, one per attendee |
+| `started_at` | When the overlap began |
+| `overlap_minutes` | Minutes both have been there together so far |
+| `updated_at` | Last change |
+
+What a shared visit shows each side: "You and Maya were both at the Elastic booth for 25 minutes from 21:40", with Maya's card while she is `findable`.
 
 ### People graph
 
@@ -134,13 +151,13 @@ Two views read the table:
 | `my_graph` | each attendee, keyed on the caller | the caller's own links, plus the other `findable` attendees linked to the same booths and organisations; people the caller met appear by display name, everyone else as "someone" |
 | `event_graph` | the Ops dashboard's big screen; an anonymous view, the same for every subscriber | every link as node ids, kinds and minutes only: no names, zones or timestamps |
 
-The attendee app and the Ops dashboard draw both views in the browser ([Attendee-App](../5-apps/Attendee-App.md), [Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Nothing on the graph comes from Elastic, and there are no links between people who never met.
+The attendee app and the Ops dashboard draw both views in the browser ([Attendee-App](../5-apps/Attendee-App.md), [Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Nothing on the graph comes from Elastic, and there are no links between people who never met. Shared visits stay off the graph; they appear only in the two attendees' recaps.
 
 ### Onboarding: profile and socials
 
 The socials step comes right after tap to join in the attendee app ([Attendee-App](../5-apps/Attendee-App.md)). There is no sign-in with a social provider and no verification.
 
-**BrightData.md: the profile claim.** When the app asks for a display name, it shows the unclaimed `person` profiles (exhibitors, speakers, sponsors and artists, built from the event's own pages) whose name matches what the attendee typed: the "Is this you" step. The attendee taps theirs and confirms by pressing their band, the same press-to-confirm as the band claim. The app calls `POST /claim/person`; `request_person_claim`, `confirm_person_claim` and the press step are defined in [BrightData](../7-integrations/BrightData.md). A claimed profile gives the attendee its name as their display name and, when the profile names an organisation, a `works_at` link in the people graph. Attendees without a profile skip the step.
+**BrightData.md: the profile claim.** When the app asks for a display name, it shows the unclaimed `person` profiles (exhibitors, speakers, sponsors and artists, built from the event's own pages) whose name matches what the attendee typed: the "Is this you" step. The attendee taps theirs, and the signed-in app calls `claim_person`, which accepts the claim only from an attendee who already owns a band; `claim_person`, `person_claim` and `claimed_people` are defined in [BrightData](../7-integrations/BrightData.md). A claimed profile gives the attendee its name as their display name when they have none, its headshot as their photo and, when the profile names an organisation, a `works_at` link in the people graph. Attendees without a profile skip the step.
 
 **Socials.** The app then asks for the attendee's Meta handles, with or without a claimed profile: Instagram, Facebook and Threads, no other networks. Each one is a `social_handle` row written by `set_social_handle` with the platform and the handle exactly as typed. The owner changes or removes them later from the same screen. Onboarding has no company field: `works_at` comes only from the import and a claimed profile.
 
@@ -152,11 +169,11 @@ The socials step comes right after tap to join in the attendee app ([Attendee-Ap
 | `value` | The handle, as typed |
 | `linked_at` | When it was set |
 
-**Who sees a handle.** A handle is never shown on a profile, a booth page or a share page. The view `my_encounters` joins the counterpart's `social_handle` rows only while the counterpart has `findable` on; that join condition is the whole rule. Turning `findable` off removes the person's name and handles from every counterpart's list at once and closes their open encounters. Reducers: `set_social_handle` and `remove_social_handle`, owner only.
+**Who sees a handle.** A handle is never shown on a profile, a booth page or a share page. The views `my_encounters` and `my_shared_visits` join the counterpart's `social_handle` rows only while the counterpart has `findable` on; that join condition is the whole rule. Turning `findable` off removes the person's name and handles from every counterpart's list at once and closes their open encounters. Reducers: `set_social_handle` and `remove_social_handle`, owner only.
 
 ### Photos and tagging
 
-The photographer route is part of the attendee app, gated by the `photographer` role like the medic route. It uploads a photo to `bandit-api`, which stores the bytes in the blob store and calls `register_blob` with access class `shared`; the route then calls `register_photo` with the `blob_ref` id, the capture time and an optional caption. The photographer wears a band, so the photo's zone is the zone of the photographer's band at `taken_at`.
+The photographer route is part of the attendee app, gated by the `photographer` role like the medic route. It uploads a photo to `bandit-api` through `POST /api/blobs` with purpose `photo`. `bandit-api` stores the bytes in the blob store under their SHA-256, calls `register_blob` with access class `shared` and returns the URL `/blobs/<sha256>`, which `GET /blobs/{hash}` serves ([Rust-Backend](../3-services/Rust-Backend.md)). The route then calls `register_photo` with that URL, the capture time, the zone and an optional caption. The photographer picks the zone the photo was taken in from the venue's zones.
 
 The question this diagram answers: how a photo becomes suggested tags that attendees confirm, and where Vision joins in.
 
@@ -167,12 +184,12 @@ sequenceDiagram
     participant M as band1t module
     participant V as bandit-vision (TBD -- LEO)
     participant AT as attendee app
-    PH->>API: photo upload, HTTPS
-    API->>API: store bytes in the blob store
+    PH->>API: POST /api/blobs, purpose photo
+    API->>API: store bytes under their SHA-256
     API->>M: register_blob, access class shared
-    API-->>PH: blob_ref id
-    PH->>M: register_photo, blob_ref id, taken_at, caption
-    M->>M: zone of the photographer band at taken_at
+    API-->>PH: URL /blobs/ plus the SHA-256
+    PH->>M: register_photo, url, taken_at, zone, caption
+    M->>M: bands in that zone at taken_at
     M->>M: suggested photo_tag rows, ranked, cap 8
     M-->>V: photo_features job
     V->>M: submit_photo_features, people count
@@ -189,9 +206,9 @@ Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `b
 |---|---|
 | `id` | Assigned by SpacetimeDB |
 | `photographer_attendee_id` | Who uploaded (role `photographer`) |
-| `blob_ref_id` | The bytes, access class `shared` |
+| `url` | `/blobs/<sha256>`: where the bytes are served from, access class `shared` |
 | `taken_at` | Capture time from the file, else upload time |
-| `zone_id` | The photographer's band zone at `taken_at` |
+| `zone_id` | The zone the photographer picked, where the photo was taken |
 | `caption` | From the photographer, or from Vision (TBD -- LEO) |
 | `people_count` | From Vision (TBD -- LEO), empty until then |
 | `status` | `uploaded`, `tagged`, `hidden` |
@@ -214,10 +231,11 @@ After the event these views are the social part of the recap page ([Attendee-App
 |---|---|
 | `my_visits` | The caller's `visit` rows joined with `zone` and `booth` names and the booth text, with minutes, plus the most visited booths |
 | `my_encounters` | The people the caller hung out with: each `social_encounter` with the counterpart's display name, zone, time, minutes and `social_handle` rows, while the counterpart is `findable` |
+| `my_shared_visits` | The people the caller was in the same place with: each `shared_visit` with the zone, the zone's booths, the start, the overlap minutes and the other person's card (display name and `social_handle` rows), while that person is `findable` |
 | `my_photos` | Photos where the caller has a `suggested` or `confirmed` tag, with the other confirmed people by display name when the caller has an encounter with them, otherwise as "someone" |
 | `my_share_links` | The caller's links and what each exposes |
 
-The timeline is `my_visits` in time order with the gaps filled from `presence_sample` at zone level, computed in the app. The people and booths go by minutes together. Elastic.md: the recap orders them with `GET /recap/order`, closest to what the attendee was into first; the views never depend on Elastic.
+The timeline is `my_visits` in time order with the gaps filled from `presence_sample` at zone level, computed in the app. The people and booths go by minutes together, and the shared visits go in time order. Elastic.md: the recap orders them with `GET /recap/order`, closest to what the attendee was into first; the views never depend on Elastic.
 
 Three service views give the findable rows to `bandit-indexer` and `bandit-api` (roles `indexer` and `api`). A person who turns `findable` off drops out of all three at once.
 
@@ -226,6 +244,8 @@ Three service views give the findable rows to `bandit-indexer` and `bandit-api` 
 | `social_attendees` | findable attendees: id and display name |
 | `social_visits` | visits of findable attendees, with booth, zone, times and minutes |
 | `social_encounters` | encounters whose two attendees are both findable, with zone, times and minutes |
+
+`social_shared_visits` gives the shared visits, which are built only between findable attendees, to the service roles `indexer`, `worker` and `api`.
 
 
 ### Share links
@@ -245,7 +265,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 
 | Switch (`consent`, set by `set_consent`) | Effect here |
 |---|---|
-| `findable` | On: encounters and graph links with this person are created, they can be suggested as a tag in photos, and the people they hung out with see their display name and socials. Off: no encounters and no tag suggestions, their graph links are deleted, and their name and handles leave every list; they can still be a photographer |
+| `findable` | On: encounters, shared visits and graph links with this person are created, they can be suggested as a tag in photos, and the people they hung out with see their display name and socials. Off: no encounters, no shared visits and no tag suggestions, their graph links are deleted, and their name and handles leave every list; they can still be a photographer |
 
 ## Failure modes and fallbacks
 
@@ -265,7 +285,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 - [Rust-Backend](../3-services/Rust-Backend.md): `bandit-api` for photo upload and the share page.
 - [Hardware](../4-devices/Hardware.md): zone-level presence (band, zone, time) as the firmware reports it today.
 - BrightData.md: `person` rows and the profile claim; `organization` and the booth's organisation for `works_at` and `exhibits` links. Without it, attendees type a display name and their socials, and the graph has no company nodes.
-- Simulator.md: simulated attendees for the simulated bands. Without it, the graph holds real attendees only.
+- Simulator.md: the crowd's simulated attendees from `start_crowd`, and `crowd_tick`. Without it, the graph holds real attendees only.
 - Vision.md (TBD -- LEO): people count and captions. Without it, tags use presence only with the default cap of 8.
 - This file does not depend on [Elastic](../7-integrations/Elastic.md); Elastic copies its findable rows to order the recap's suggestions.
 
@@ -279,8 +299,8 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 
 **If you delete this file**
 
-- Remove the social step bullet from `memory_tick` in [SpacetimeDB](../2-data/SpacetimeDB.md), the Social.md rows in its registry tables, the Social.md note on `display_name`, and the tables `visit`, `social_encounter`, `people_link`, `social_handle`, `photo`, `photo_tag`, `share_link`, and the views `my_graph`, `event_graph`, `social_attendees`, `social_visits` and `social_encounters`.
-- Remove the Social.md row from the endpoint registry in [Rust-Backend](../3-services/Rust-Backend.md) (photo upload, share page), the socials onboarding step, the graph screen, the photographer route and the recap's social part from [Attendee-App](../5-apps/Attendee-App.md), the `photographer` role row and the big-screen graph from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the simulated attendees and their handles from the seed of [Simulator](../3-services/Simulator.md), demo steps 5 and 6a in [Flows](../1-overview/Flows.md), the memories row in the data ownership table of [Architecture](../1-overview/Architecture.md), and the Social.md row from the README components table.
+- Remove the social step bullet from `memory_tick` in [SpacetimeDB](../2-data/SpacetimeDB.md), the Social.md rows in its registry tables, the Social.md note on `display_name`, and the tables `visit`, `social_encounter`, `shared_visit`, `people_link`, `social_handle`, `photo`, `photo_tag`, `share_link`, and the views `my_shared_visits`, `my_graph`, `event_graph`, `social_attendees`, `social_visits`, `social_encounters` and `social_shared_visits`.
+- Remove the Social.md row from the endpoint registry in [Rust-Backend](../3-services/Rust-Backend.md) (photo upload, share page) and the Social.md `photo` purpose of `POST /api/blobs`, the socials onboarding step, the graph screen, the photographer route and the recap's social part from [Attendee-App](../5-apps/Attendee-App.md), the `photographer` role row and the big-screen graph from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the crowd (`start_crowd`, `stop_crowd`, `crowd_tick` and its simulated attendees) from [Simulator](../3-services/Simulator.md), demo steps 5 and 6a in [Flows](../1-overview/Flows.md), the memories row in the data ownership table of [Architecture](../1-overview/Architecture.md), and the Social.md row from the README components table.
 - Remove the `bandit-memories` and `bandit-people` indices, `GET /recap/order` and the "Interest map" dashboard from [Elastic](../7-integrations/Elastic.md), and the photo tagging consumer and `photo_features` job from [Vision](../4-devices/Vision.md).
 - The profile claim stays with [BrightData](../7-integrations/BrightData.md); a claimed `person` row then has no handles attached.
 - Delete [Merch](Merch.md) too: every suggestion starts from a visit and a confirmed photo defined here.
@@ -295,18 +315,19 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | Socials are Meta only (Instagram, Facebook, Threads), typed by the attendee at onboarding; no provider sign-in and no `verified` state | Meta is the sponsor track; typing needs no provider approval, and a handle is shown only to people who hung out with its owner |
 | Onboarding has no company field; `works_at` comes only from the import and a claimed profile | Every company link then comes from the event's own pages, and onboarding stays short |
 | No Bandshake and no connection requests: an encounter between two `findable` attendees is the connection, and each sees the other's name and socials | The project description: find who you hung out with and their Insta, afterwards |
-| A handle has no per-handle sharing mode; every handle goes to the owner's encounter counterparts while `findable` is on | One switch, one rule; the former `on_connect` mode was built on connection requests |
+| A handle has no per-handle sharing mode; every handle goes to the owner's encounter and shared-visit counterparts while `findable` is on | One switch, one rule; the former `on_connect` mode was built on connection requests |
 | The share page shows display names only, never handles | The page is public to anyone with the link; `findable` shares socials with the people you hung out with, not with the public |
 | A photo is shared with one tap through the phone's share sheet; BandIt never logs in to a social network or tags anyone there | tags come from zone and time, not faces, so they name people in the recap but are not tags to post |
-| The photo's zone is always the photographer's band zone; the route cannot type a zone | The photographer wears a band; one source of the zone keeps tagging exact |
+| The photographer picks the photo's zone from the venue's zones, and tags come from the bands in that zone at `taken_at` | The photographer knows where the shot was taken, and the zone list is the same one the bands report, so tagging stays exact |
 | After the event the attendee reaches the social part of the recap page from their tap link `/t/{token}`, signed in with SpacetimeAuth, on any device | The band's own URL is the way back, and the sign-in proves it is them ([Attendee-App](../5-apps/Attendee-App.md)) |
 | An encounter starts when two `findable` owners have been in one zone together for 3 minutes (starting value); the rule is Leo's to replace (TBD -- LEO), and the rest of the design reads only the encounter rows | What counts as two people having met is spatial and vision work, so the rule can change without touching the recap, the graph or merch |
 | Photo tags come from presence and Vision's people count only | The design uses the band firmware as it is |
 | The recap's social part is the attendee's own visits, people and photos; there is no written story | The project description asks for the night back, not a story; the views already give it |
 | The people graph lives in SpacetimeDB as the derived table `people_link`, written by the social step; Elastic draws nothing on it | Every link is an exact fact the bands measured, it must reach every screen live, and `findable` must be enforced in the views; there are no links between people who never met |
-| Elastic.md: the recap's people come from `my_encounters` and its booths from `my_visits`; Elastic only orders them | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
+| Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and its shared visits from `my_shared_visits`; Elastic only orders the people and booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
 | `bandit-indexer` and `bandit-api` read the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only | `findable` is enforced once, in the module, before anything leaves it |
+| A shared visit is two `findable` attendees' visits to one zone that overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value); it is a recap row, not a `people_link` kind | People you were in the same place with for a while belong in the recap next to the people you met, while the graph keeps only measured meetings and visits |
 | Shared booths and companies are shared nodes, never pairs of people | One link per person instead of one per pair, and the shared node is what forms the cluster |
 | Links appear when a visit reaches 2 minutes or an encounter opens at 3 minutes (starting values, calibrate at the venue) | Each threshold is the one that opens the visit or the encounter, so the graph and the recap agree |
 | `event_graph` is one anonymous view with node ids, kinds and minutes only | The big screen shows the shape of the crowd to everyone in the room without naming anyone |
-| Simulated bands get simulated owners from the simulator's seed, with `findable` on, made-up names and Meta handles, going through the same social step | The big screen shows a real-looking crowd instead of at most 9 people; the band's `simulated` flag tells them apart |
+| Simulator.md: crowd bands get simulated owners from `start_crowd`, with `findable` on, made-up names and Meta handles, going through the same social step | The big screen shows a real-looking crowd instead of at most 9 people; the band's `simulated` flag tells them apart |

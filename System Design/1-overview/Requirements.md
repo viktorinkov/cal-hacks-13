@@ -31,7 +31,7 @@ Core requirements are what the safety demo needs. Rows that start with a file na
 | F13 | BrightData.md: load any event's real organisations, booths, floor plan and schedule from its public pages, given as start URLs in the event's seed | [BrightData](../7-integrations/BrightData.md) |
 | F14 | Elastic.md: organize the scraped records into one checked bundle, and order each attendee's recap suggestions by meaning | [Elastic](../7-integrations/Elastic.md) |
 | F15 | Vision.md (TBD -- LEO): count people from a camera and confirm falls from frames | [Vision](../4-devices/Vision.md) |
-| F16 | Simulator.md: run a crowd of virtual bands through the same path as real ones | [Simulator](../3-services/Simulator.md) |
+| F16 | Simulator.md: run a simulated crowd inside the module and ten demo bands that report into the same tables as real ones | [Simulator](../3-services/Simulator.md) |
 | F17 | When the organizer presses "Event ended", turn every open attendee page into the recap page live, and reopen it from the tap link for the band's signed-in owner on any device | [Attendee-App](../5-apps/Attendee-App.md) |
 
 ## Non-functional requirements
@@ -57,7 +57,7 @@ BandIt is sized for the demo, with headroom from the simulator.
 | Station markers | 2 to 5 (ids 101 to 105), one per zone | zone-level presence only, never x/y |
 | Gateway | 1 (id 200) on USB to the demo laptop | one bridge process |
 | Beacons | 10 per second per band | about 90 serial lines per second from the real fleet |
-| Simulated bands | up to 200 | 800 reports per second, sent as batches of 50, about 16 reducer calls per second |
+| Simulator.md: simulated bands | a crowd of up to 80 (ids 10 to 89) and 10 demo bands (ids 90 to 99) | the crowd moves inside the module every 5 s and sends no reports; the demo bands report once a second through `report_sim_band`, about 10 reducer calls per second |
 | Real band reports to the module | one batch every 250 ms | 4 reducer calls per second from the bridge |
 | Venue tick | every 500 ms | zone state and exits recomputed twice a second |
 | Clients | 1 Ops dashboard, a few medic phones, tens of attendee phones | subscriptions carry only changes |

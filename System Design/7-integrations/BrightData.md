@@ -8,9 +8,9 @@ Responsibilities:
 
 - Fetch any event's public pages through the Bright Data Web MCP, starting from the start URLs in the event's seed: the event's site, its exhibitor or sponsor list, its schedule and its floor plan image; then each organisation's own site and its company facts. Keep a dated snapshot of every fetch.
 - Build the booth geometry: Claude's `floorplan_check` reads booth numbers and their positions from the floor plan image, the hall's real width from the seed turns pixels into plan metres, and each booth gets the nearest station's zone.
-- Build unclaimed `person` profiles from event pages only (speakers, judges, sponsor representatives, exhibitor contacts, artists), and let a person claim theirs at onboarding by pressing their band.
+- Build unclaimed `person` profiles from event pages only (speakers, judges, sponsor representatives, exhibitor contacts, artists), and let an attendee who has claimed their band claim their profile at onboarding with one tap.
 - Validate the organized bundle in Rust, keep the last good bundle, and load it with `import_event`, keyed by stable source keys so reruns are idempotent. Every scraped row carries `source_url` and `fetched_at`.
-- Own the optional tables `hall`, `organization` and `person`, the reducers `import_event`, `request_person_claim` and `confirm_person_claim`, and the route `POST /claim/person` in `bandit-api`.
+- Own the optional tables `hall`, `organization`, `person` and `person_claim`, the reducers `import_event` and `claim_person`, and the view `claimed_people`.
 - Report progress through `heartbeat` while it runs, like every Rust service.
 
 Non-responsibilities:
@@ -36,15 +36,14 @@ Elastic.md: the organize stage turns the records into the bundle. Without Elasti
 | Elastic.md: raw indices and the organizer | out and in | `bandit-ingest`, organize stage | parsed JSON records, map-stage geometry and the core station and zone rows out to `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; one `bandit-organize` workflow execution per run; back comes the bundle document from `bandit-bundles` | HTTPS Bulk API and Workflows API with the Elastic ingest key ([Elastic](Elastic.md)) |
 | `import_event` reducer | out | `bandit-ingest`, load stage (role `ingest`) | the whole bundle; back come row counts per section | SpacetimeDB Rust client SDK, one reducer call, one transaction |
 | `heartbeat` reducer | out | `bandit-ingest` while running | name, version, pages fetched, records built, rows imported, failures, every 5 s | SpacetimeDB reducer call |
-| `POST /claim/person` | in | Attendee app (caller identified by `api_session`) | the `person` id the attendee says is them; `bandit-api` calls `request_person_claim`, and the caller's band blinks white | HTTPS JSON on `bandit-api` |
-| Band press | in | `ingest_band_reports` ([SpacetimeDB](../2-data/SpacetimeDB.md)) | a press from the claimant's band inside the 8 s window; the BrightData.md press consumer runs `confirm_person_claim` in the same transaction | press flag in the batched band reports |
-| Loaded rows | out | `bandit-indexer` ([Elastic](Elastic.md)), Attendee app, Ops dashboard | `organization`, `booth`, `hall`, `schedule_slot`, `person` rows by subscription | SpacetimeDB subscription |
+| `claim_person` reducer | in | Attendee app, signed in as the attendee | the `person` id the attendee says is them; refused unless the caller already owns a band | SpacetimeDB reducer call |
+| Loaded rows | out | `bandit-indexer` ([Elastic](Elastic.md)), Attendee app, Ops dashboard | `organization`, `booth`, `hall`, `schedule_slot`, `person` rows by subscription; the attendee app also reads `claimed_people` | SpacetimeDB subscription |
 
 ## Design
 
 ### Scope rule
 
-The scrape covers the event and organisations, never people. The only person records are unclaimed profiles built from pages the event itself publishes (a speaker page, a judge list, a sponsor's named representative, an exhibitor's listed contact, an artist on the line-up), and they hold only what that page says: name, role, organisation and the page it came from. Handles come from the attendee: their Instagram, Facebook and Threads handles, typed at onboarding ([Social](../6-features/Social.md)), with or without a claimed profile. So every fact about a person in the system is one the event published or the person entered.
+The scrape covers the event and organisations, never people. The only person records are unclaimed profiles built from pages the event itself publishes (a speaker page, a judge list, a sponsor's named representative, an exhibitor's listed contact, an artist on the line-up), and they hold only what that page says: name, role, organisation, the photo it shows and the page it came from. Handles come from the attendee: their Instagram, Facebook and Threads handles, typed at onboarding ([Social](../6-features/Social.md)), with or without a claimed profile. So every fact about a person in the system is one the event published or the person entered.
 
 ### Sources
 
@@ -210,41 +209,42 @@ The bundle has one section per table, loaded in dependency order inside the one 
 | `role` | text | as listed |
 | `organization_id` | id, optional | the organisation the page lists them under |
 | `kind` | text | `speaker`, `exhibitor_contact`, `sponsor_rep`, `artist` |
-| `claim_candidate` | identity, optional | the attendee whose claim is waiting for a press |
-| `claim_pending_until` | timestamp, optional | end of that press window, 8 s after the request |
-| `claimed_identity` | identity, optional | the attendee who claimed the profile |
-| `claimed_at` | timestamp, optional | |
+| `headshot_url` | text | the photo the event page shows for the person; empty when it shows none |
 
-Attendees read `display_name`, `role`, `organization_id` and whether the profile is claimed; the claim fields stay private.
+`person` is public. Who claimed a profile is kept apart, in `person_claim`.
 
-### The profile claim, confirmed by a band press
+**`person_claim`** (one claimed profile; private):
 
-A person listed by the event can claim their profile in the onboarding flow, right after claiming the band. The proof is the same as for the band: a press on the band they hold. The claim uses no email and no sign-in.
+| Field | Type | Meaning |
+|---|---|---|
+| `attendee` | identity, primary key | the attendee who claimed it; one profile per attendee |
+| `person_id` | id | the claimed profile; one attendee per profile |
+| `claimed_at` | timestamp | |
 
-1. The attendee has claimed their band by press and typed a display name ([Attendee-App](../5-apps/Attendee-App.md)). The app lists the unclaimed `person` rows whose `display_name` matches what they typed: "Is this you?" Attendees with no match never see the step.
-2. The attendee taps their profile. The app calls `POST /claim/person` with the `person` id. `bandit-api` finds the caller through `api_session` and calls `request_person_claim`.
-3. `request_person_claim` (person id, claiming identity; role `api`) rejects a profile that is already claimed, or that has another attendee's press window open, and a caller who owns no band. Otherwise it sets `claim_candidate` and `claim_pending_until` (now plus 8 s) and upserts a `band_directive` for the caller's band with forced state IDENT (8) for 8 s, reason `person_claim`. The band blinks white and the app says "Press your band to confirm this is you".
-4. The attendee presses. The press reaches `ingest_band_reports` in the next bridge batch. The BrightData.md press consumer runs right after the band claim consumer ([SpacetimeDB](../2-data/SpacetimeDB.md)): a press from a band whose owner is the `claim_candidate` of a `person` row with an open window runs `confirm_person_claim`.
-5. `confirm_person_claim` (person id, claiming identity) runs in the same transaction as the press; no client calls it. It sets `claimed_identity` and `claimed_at`, clears the candidate fields, and deletes the IDENT directive; the bridge then lets the forced blink expire ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). The app sees the profile turn claimed through its subscription and continues with the socials step ([Social](../6-features/Social.md)).
+The view `claimed_people` is anonymous and returns only the claimed `person_id` values, so the app can leave taken profiles out of "Is this you?" without learning who took them.
 
-The claim adds one thing to the people graph. Social.md: the claimed profile's `organization_id` gives the attendee their `works_at` link in `people_link`; a claimed profile is the only source of that link for an attendee, because onboarding asks for no company. The attendee's handles come from the socials step whether or not a profile was claimed. The first confirmed claim wins.
+### The profile claim, for band owners
 
-The sequence answers: how does a press on the band confirm "this profile is me"?
+A person listed by the event can claim their profile in the onboarding flow, after claiming the band. The proof is the band claim they already made: only an attendee who owns a band can claim a profile, and only the band claim's press makes someone a band owner. The claim needs no second press, no email and no `bandit-api` route.
+
+1. The attendee has claimed their band by press and typed a display name ([Attendee-App](../5-apps/Attendee-App.md)). The app lists the `person` rows whose `display_name` matches what they typed and that `claimed_people` does not list: "Is this you?" Attendees with no match never see the step.
+2. The attendee taps their profile. The signed-in app calls `claim_person` with the `person` id.
+3. `claim_person` (person id; the caller is the attendee) checks, in order: the caller owns a band (`band.owner`, [SpacetimeDB](../2-data/SpacetimeDB.md)), otherwise it refuses with "claim your band first"; the profile exists, otherwise "no such profile"; nobody else holds the profile, otherwise "this profile is already claimed"; the caller holds no other profile, otherwise "you already claimed a profile". A repeat call for the profile the caller already holds changes nothing.
+4. It writes the `person_claim` row and copies the profile onto the caller's `attendee` row: the `person_id`, the profile's `organization_id`, its `headshot_url` as `photo_url`, and its `display_name` only when the attendee has not typed one. The app sees the profile turn claimed through its subscription and continues with the socials step ([Social](../6-features/Social.md)).
+
+The claim adds one thing to the people graph. Social.md: the claimed profile's `organization_id` gives the attendee their `works_at` link in `people_link`, written in the same transaction; a claimed profile is the only source of that link for an attendee, because onboarding asks for no company. The attendee's handles come from the socials step whether or not a profile was claimed. The first claim wins.
+
+The sequence answers: how does a band owner claim "this profile is me"?
 
 ```mermaid
 sequenceDiagram
-  participant App as Attendee app
-  participant API as bandit-api
+  participant App as Attendee app, signed in
   participant Mod as band1t module
-  participant Band as Band and gateway
-  App->>App: "Is this you?" lists unclaimed person rows matching the typed name
-  App->>API: POST /claim/person (person id, session token)
-  API->>Mod: request_person_claim (person id, caller identity)
-  Mod->>Mod: set claim_candidate, window now + 8 s, IDENT directive on the caller's band
-  Note over App,Band: band blinks white, app says "Press your band"
-  Band->>Mod: press flag in the next batch (ingest_band_reports)
-  Mod->>Mod: BrightData.md press consumer runs confirm_person_claim
-  Mod-->>App: person row now claimed (subscription)
+  App->>App: "Is this you?" lists person rows matching the typed name, minus claimed_people
+  App->>Mod: claim_person (person id)
+  Mod->>Mod: caller owns a band, profile free, caller holds no other profile
+  Mod->>Mod: write person_claim, copy the profile onto the attendee row
+  Mod-->>App: profile now claimed (subscription)
   App->>App: continue with the socials step
 ```
 
@@ -288,15 +288,15 @@ sequenceDiagram
 | `floorplan_check` returns null for a booth, or a booth is farther than 40 m from every station | Booth without a position or a zone | It loads flagged; ops drags it into place on the Ops dashboard map before doors open |
 | Elastic.md: the organizer run fails, or its bundle fails validation | No new bundle | The load stage loads the last good bundle it saved |
 | A reference inside the bundle does not resolve | `import_event` would create dangling rows | `import_event` validates everything first and aborts the whole call; the previous load stays as it was |
-| No press reaches the module within 8 s during the profile claim | Claim times out | The window passes, the IDENT directive ends on its own, and the screen offers "Try again" |
-| Two attendees try to claim the same profile | Identity conflict | `request_person_claim` rejects a profile that is claimed or has another attendee's window open; the first confirmed claim wins |
+| An attendee who owns no band tries to claim a profile | No proof of who they are | `claim_person` refuses with "claim your band first"; the app shows the band claim screen |
+| Two attendees try to claim the same profile | Identity conflict | `claim_person` refuses a profile that is already claimed; the first claim wins, and `claimed_people` hides it from everyone else's list |
 
 ## Dependencies
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone`, `station` (with `plan_x_m`, `plan_y_m`), `booth` (with `booth_number`, `organization_id`, `hall_id`, `plan_x_m`, `plan_y_m`, `placement_source`, `source_url`, `fetched_at`), `schedule_slot`, `band`, `band_directive`, `blob_ref`, `api_session`; reducers `heartbeat`, `grant_role`, `register_blob`, `upsert_booth`, and the press consumer step in `ingest_band_reports`; the `ingest` and `api` roles; the core zone and station seed.
-- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that hosts `POST /claim/person` and the blob endpoint.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone`, `station` (with `plan_x_m`, `plan_y_m`), `booth` (with `booth_number`, `organization_id`, `hall_id`, `plan_x_m`, `plan_y_m`, `placement_source`, `source_url`, `fetched_at`), `schedule_slot`, `band` (its `owner`), `attendee`, `blob_ref`, `api_session`; reducers `heartbeat`, `grant_role`, `register_blob`, `upsert_booth`; the `ingest` and `api` roles; the core zone and station seed.
+- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that hosts the blob endpoint.
 - [Elastic](Elastic.md): the raw indices and the `bandit-organize` workflow for the organize stage. Without it, no scraped bundle is loaded.
 - [Anthropic-Agent](Anthropic-Agent.md): `claude-client`, the `floorplan_check` use case, `model_call`. Anthropic-Agent.md: without it, booths load without positions and ops drags each one into place.
 - [Social](../6-features/Social.md): the onboarding socials step that follows the profile claim (optional; without it a claimed `person` simply has no handles).
@@ -313,8 +313,8 @@ sequenceDiagram
 **If you delete this file**
 
 - `bandit-ingest` keeps only its seed mode, which loads the hand-written seed files through the setup reducers ([SpacetimeDB](../2-data/SpacetimeDB.md)). Remove its scraping stages and the BrightData.md parts of its rows in [Rust-Backend](../3-services/Rust-Backend.md) and [Architecture](../1-overview/Architecture.md) (interfaces, data ownership and failure tables).
-- Remove `import_event`, `request_person_claim`, `confirm_person_claim`, `hall`, `organization` and `person` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field row on `booth`, the BrightData.md note on the `venue` origin fields, the BrightData.md press consumer in `ingest_band_reports`, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
-- Remove the `POST /claim/person` route from [Rust-Backend](../3-services/Rust-Backend.md), the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Is this you?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
+- Remove `import_event`, `claim_person`, `claimed_people`, `hall`, `organization`, `person` and `person_claim` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field rows on `booth` and `attendee`, the BrightData.md note on the `venue` origin fields, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
+- Remove the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Is this you?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
 - Remove the `floorplan_check` row from [Anthropic-Agent](Anthropic-Agent.md).
 - [Merch](../6-features/Merch.md) loads only its plain templates, because sponsor names have no organisations to match.
 - [Elastic](Elastic.md) loses its organizer and keeps the copy of hand-entered booths. Booths, schedule slots and the venue row are entered by hand through `upsert_booth`, `upsert_schedule_slot` and the seed. Behaviour elsewhere is unchanged, because everything reads SpacetimeDB rows either way.
@@ -324,8 +324,9 @@ sequenceDiagram
 | Decision | Why |
 |---|---|
 | The floor plan has one path: Bright Data captures the published image, Claude `floorplan_check` reads booth numbers and positions, the hall's real width typed in the seed converts pixels to metres, and ops drags any misplaced booth on the Ops dashboard map | One pipeline to build and rehearse; a wrong position is fixed in seconds by hand, so no second reading method is needed |
-| No exhibitor contact export, no `claim_contact` table, no email; a profile claim is confirmed by a press on the attendee's band | The band press already proves who holds the band, the attendee learned it one step earlier, and it needs no email round trip |
-| The profile claim blinks the band white (IDENT) for 8 s, like the band claim | Same visible prompt and same window as the press the attendee just did |
+| No exhibitor contact export, no `claim_contact` table, no email; `claim_person` accepts a claim only from an attendee who already owns a band | The band claim's press already proved who holds the band one step earlier, so the profile claim needs no second press and no email round trip |
+| The signed-in app calls `claim_person` directly; there is no `bandit-api` route for it | The caller's SpacetimeDB identity is the attendee, so the module checks everything itself |
+| One profile per attendee and one attendee per profile; the first claim wins | A profile is one listed person, so a second claimant is refused rather than merged |
 | No merch scraping | [Merch](../6-features/Merch.md) loads a few hand-made templates from its own file |
 | Only the Bright Data Web MCP, in Pro mode, with the tools named above | One product and one token to set up; the credits cover the Pro tools |
 | No Claude merge of organisation facts (`scrape_extract` is removed) | The Elastic organizer is the one place facts are merged across sources |

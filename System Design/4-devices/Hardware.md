@@ -96,7 +96,7 @@ Points that matter to the rest of the system:
 
 - Power path. One protected 500 mAh cell is wired directly to the XIAO's battery pads, with no connector. The XIAO charges it over USB-C and runs from it otherwise. The ring and the motor run from the battery rail, not from the XIAO's regulator, because the 5 V pin is live only on USB. There is no power switch: a band is on while its battery is connected.
 - The button is a plain tactile switch on a GPIO with the internal pull-up. The firmware debounces it (a press shorter than 30 ms is ignored) and tells a short press from a 3 s hold.
-- The NFC sticker is passive and has no electrical connection to the board. A phone reads it; the band never knows it was tapped. This is why a tap always needs the button as the consent step, for claiming a band ([Attendee-App](../5-apps/Attendee-App.md)) and, BrightData.md: for claiming a profile.
+- The NFC sticker is passive and has no electrical connection to the board. A phone reads it; the band never knows it was tapped. This is why a tap always needs the button as the consent step for claiming a band ([Attendee-App](../5-apps/Attendee-App.md)).
 - The IMU is read over I2C at 50 Hz with the accelerometer at plus or minus 8 g. The motor is driven by PWM at about 70 percent duty, so a full 4.2 V cell does not overdrive a 3 V motor.
 - A resistor divider on A0 can give a battery percentage, but it is not fitted by default (`HAS_VBAT_DIV 0`). Most bands therefore report `bat` 255 (unknown) and never set the low-battery flag.
 
@@ -356,7 +356,7 @@ The buzz carries no direction; the colour does. The two patterns differ from the
 | No acknowledgement from bands | commands are fire and forget, repeated three times | the bridge reconciles against the state the band reports rather than trusting delivery |
 | The gateway does not buffer | it has no storage and prints as it hears | the bridge reads continuously; a paused reader loses packets |
 | Zone, not position | a band knows only its loudest station | everything downstream is zone-level |
-| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; simulated ids from 1000 never go on air ([Simulator](../3-services/Simulator.md)) |
+| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
 | No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the demo |
 
 ### Calibration as a system process
@@ -400,16 +400,15 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): the wire protocol and the state precedence.
 - [Safety](../6-features/Safety.md): local density, SOS, fall and light-circle behaviour, zone reports, forced states, exit colours and the two buzz cues.
 - [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md): the NFC token and the IDENT blink for claiming.
-- [BrightData](../7-integrations/BrightData.md): the press that confirms a profile claim.
-- [Simulator](../3-services/Simulator.md): imitates the band's density, smoothing and state precedence for virtual bands.
+- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the demo bands.
 - [Social](../6-features/Social.md): zone-level presence.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the fleet panel, state legend, calibration controls and manual override.
 
 **If you delete this file**
 
-- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md) becomes the only source of `ingest_band_reports`.
+- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s demo bands become the only band reports, through `report_sim_band`.
 - Remove the Band, Station marker and Gateway rows from the component table in [Architecture](../1-overview/Architecture.md) and the device nodes from its diagrams.
-- Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md), and the press-to-confirm step from the band claim and, in [BrightData](../7-integrations/BrightData.md), the profile claim.
+- Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md), and the press-to-confirm step from the band claim.
 - In [Safety](../6-features/Safety.md), remove the band-based density estimate, the light circle and both buzz cues; the camera estimate (TBD -- LEO) would stand alone.
 
 ## Decisions

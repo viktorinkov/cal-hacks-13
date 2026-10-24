@@ -68,7 +68,7 @@ flowchart LR
 
 The attendee app saves the display name with `update_profile` ([Attendee-App](../5-apps/Attendee-App.md)). The reducer then enqueues `wallet_open` with the name and the opening amount, 20000 cents ($200, starting value). It skips simulated attendees, attendees who already have a wallet, and attendees whose `wallet_open` job is still open, so saving the name again queues nothing. The worker creates the customer and a `Checking` account named "BandIt wallet" with $200, then calls `record_wallet` with both ids. The reducer rejects a stale lease, writes the `claimant_account` row and adds an `opening` entry of +20000. The demo opens a new account rather than linking an existing one, so every judge has a funded wallet, with no bank details typed and no screen of its own.
 
-The table is named `claimant_account` because claim payouts were its first use. It holds every attendee's wallet.
+Hyphenate.md: `claimant_account` is defined in [Hyphenate](Hyphenate.md), which pays claims into it. The wallet writes the same row at sign-up, so claim payouts and merch purchases use one Nessie account per attendee. It holds every attendee's wallet.
 
 | `claimant_account` field | Meaning |
 |---|---|
@@ -178,6 +178,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 **Depends on**
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `attendee`, `staff_role`, `job`, the job reducers, `update_profile`.
+- Hyphenate.md: the definition of `claimant_account`. Without Hyphenate.md, the table moves into this file unchanged ([Hyphenate](Hyphenate.md)).
 - [Attendee-App](../5-apps/Attendee-App.md): the name step and the wallet view.
 - [Rust-Backend](../3-services/Rust-Backend.md): `bandit-workers` and the Nessie base URL and key in its configuration.
 - Nessie (external): sandbox availability and the api key.
@@ -191,9 +192,9 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 **If you delete this file**
 
 - Delete [Merch](../6-features/Merch.md) too: every order is paid from the wallet.
-- Drop `claimant_account`, `wallet_entry`, `record_wallet`, the views `my_wallet` and `my_wallet_entries`, the job kind `wallet_open` and its call in `update_profile`, and the `nessie` module in `bandit-workers`.
+- Drop `wallet_entry`, `record_wallet`, the views `my_wallet` and `my_wallet_entries`, the job kind `wallet_open` and its call in `update_profile`, and the `nessie` module in `bandit-workers`.
 - Remove the wallet view in Attendee-App.md.
-- Remove the `claim_payout` job and `record_claim_payout` in Hyphenate.md; every payout becomes ledger-only.
+- Remove the `claim_payout` job and `record_claim_payout` in Hyphenate.md; every payout becomes ledger-only. Drop `claimant_account` from Hyphenate.md too: without the wallet and `claim_payout`, nothing writes it.
 - Remove the Nessie settings from Rust-Backend.md's process table and the Payments-Nessie.md row from its handler registry.
 - Remove the Payments-Nessie.md registry rows in SpacetimeDB.md, the Nessie node, the prize row and the "Nessie is down" failure row in Architecture.md, the payment steps in Flows.md, and the Payments-Nessie row and node in README.md.
 
@@ -206,7 +207,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 | The balance is the sum of `wallet_entry` in the module, never Nessie's balance | The sandbox never moves an account's balance; the module's sum is exact and live |
 | `buy_merch` checks the spendable balance and holds the amount in the same transaction; orders still being paid count as spent | The sandbox's overdraft behaviour never matters, and two taps cannot spend the same money |
 | Checkout is one tap, with no separate confirm call | `buy_merch` runs as the signed-in attendee, so the tap is the confirmation |
-| BandIt takes no payments at the venue: no merchant terminal, no `merchant` role, no payment prompt on the band | The money moments are merch after the event and claim payouts; the band press stays for claiming a band and a profile |
+| BandIt takes no payments at the venue: no merchant terminal, no `merchant` role, no payment prompt on the band | The money moments are merch after the event and claim payouts; the band press stays for claiming a band |
 | No venue receiving account; the purchase from the attendee's account is the money movement shown | One Nessie call per purchase, and the purchase is visible in the sandbox |
 | There is no merchant table; the first purchase creates the "BandIt merch" Nessie merchant, and `merch_shop` keeps its id | Nothing to seed, and the merchant exists as soon as anyone buys |
 | Every Nessie job is safe to retry, through kept ids and reuse by memo | A worker that stops after Nessie answered never opens a second account or buys twice |

@@ -26,7 +26,8 @@ Non-responsibilities:
 
 | Direction | Counterpart | What flows | Tables or reducers | Transport |
 |---|---|---|---|---|
-| In | `bandit-bridge`, `bandit-sim` | per band: `neigh`, `zone`, `state`, SOS, fall and press flags, every 250 ms | `band_report` through `ingest_band_reports` | reducer |
+| In | `bandit-bridge` | per band: `neigh`, `zone`, `state`, SOS, fall and press flags, every 250 ms | `band_report` through `ingest_band_reports` | reducer |
+| In | Simulator.md: the `bandit-claims` tool and `bandit-api` demo routes | the same fields for demo bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
 | In | Venue seed | zones with areas, zone graph with distances, exits with colours and status, stations | `zone`, `zone_link`, `exit`, `station` | seed load |
 | In | Ops (calibration screen) | measured points mapping `neigh` to people per square metre | `calibration_point` through `set_calibration` | TypeScript SDK |
 | In | Ops | mode, blocked exits, pinned exit, pinned risk, forced states, reset | `set_venue_mode`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
