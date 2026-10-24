@@ -10,8 +10,8 @@ fn panel(grid: (u32, u32, u32, u32), config: Value) -> Value {
     json!({ "type": "vis", "grid": { "x": grid.0, "y": grid.1, "w": grid.2, "h": grid.3 }, "config": config })
 }
 
-fn metric(grid: (u32, u32, u32, u32), title: &str, query: String) -> Value {
-    panel(grid, json!({ "type": "metric", "title": title, "data_source": esql(query), "metrics": [{ "type": "primary", "column": "n" }] }))
+fn metric(grid: (u32, u32, u32, u32), title: &str, query: String, column: &str) -> Value {
+    panel(grid, json!({ "type": "metric", "title": title, "data_source": esql(query), "metrics": [{ "type": "primary", "column": column }] }))
 }
 
 fn bar(grid: (u32, u32, u32, u32), title: &str, query: String, x: &str, y: &str) -> Value {
@@ -58,13 +58,13 @@ fn pipeline(cfg: &Config, run_id: &str) -> Value {
                 "**{}**, run `{run_id}`. Bright Data scraped the event pages and the company datasets. The records landed in the raw indices, ES|QL `LOOKUP JOIN` made the exact joins, and the Agent Builder agent `bandit-organizer` resolved the rest and gave a reason for every decision. The checked bundle then went into SpacetimeDB in one `import_event` transaction.",
                 cfg.event.name
             )),
-            metric((0, y1, 12, 8), "Raw records from Bright Data", format!("{raw} | STATS n = COUNT()")),
-            metric((12, y1, 12, 8), "Organizations after merging", format!("{decisions} | WHERE decision_kind == \"organization\" | STATS n = COUNT()")),
-            metric((24, y1, 12, 8), "Matches only the agent could make", format!("{decisions} | WHERE match_method == \"agent\" | STATS n = COUNT()")),
-            metric((36, y1, 12, 8), "Gaps flagged for review", format!("{decisions} | WHERE decision_kind == \"gap\" | STATS n = COUNT()")),
+            metric((0, y1, 12, 8), "Raw records from Bright Data", format!("{raw} | STATS records = COUNT()"), "records"),
+            metric((12, y1, 12, 8), "Organizations after merging", format!("{decisions} | WHERE decision_kind == \"organization\" | STATS organizations = COUNT()"), "organizations"),
+            metric((24, y1, 12, 8), "Matches only the agent could make", format!("{decisions} | WHERE match_method == \"agent\" | STATS merges = COUNT()"), "merges"),
+            metric((36, y1, 12, 8), "Gaps flagged for review", format!("{decisions} | WHERE decision_kind == \"gap\" | STATS gaps = COUNT()"), "gaps"),
             bar((0, y2, 24, 14), "Records by source and kind", format!("{raw} | EVAL source = CONCAT(MV_FIRST(SPLIT(source_key, \":\")), \" · \", record_kind) | STATS n = COUNT() BY source | SORT n DESC"), "source", "n"),
             pie((24, y2, 24, 14), "How each organization was matched", format!("{decisions} | WHERE decision_kind == \"organization\" | STATS n = COUNT() BY match_method"), "match_method", "n"),
-            table((0, y3, 48, 16), "Organizer decisions and reasons", format!("{decisions} | WHERE decision_kind != \"gap\" | STATS n = COUNT() BY name, decision_kind, match_method, category, reason | SORT match_method, name | LIMIT 300"), &["name", "decision_kind", "match_method", "category", "reason"], &["n"]),
+            table((0, y3, 48, 16), "Organizer decisions and reasons", format!("{decisions} | WHERE decision_kind != \"gap\" | EVAL rank = CASE(match_method == \"agent\", 0, decision_kind == \"organization\", 1, 2) | STATS rows = COUNT() BY rank, name, decision_kind, match_method, category, reason | SORT rank, name | LIMIT 300"), &["name", "decision_kind", "match_method", "category", "reason"], &["rows"]),
             bar((0, y4, 24, 12), "Pipeline steps (ms)", format!("FROM bandit-pipeline-events | {run} | STATS ms = SUM(duration_ms) BY stage | SORT ms DESC"), "stage", "ms"),
             table((24, y4, 24, 12), "Gaps", format!("{decisions} | WHERE decision_kind == \"gap\" | STATS n = COUNT() BY key, reason | LIMIT 100"), &["key", "reason"], &["n"]),
         ]
@@ -79,10 +79,10 @@ fn event(cfg: &Config, run_id: &str) -> Value {
         "title": format!("BandIt · {} · sponsors and prizes", cfg.event.name),
         "description": "The event's sponsors, prizes and companies as Bright Data scraped them and Elastic organized them.",
         "panels": [
-            metric((0, 0, 12, 8), "Prize cash (USD)", format!("{pages} | WHERE record_kind == \"prize\" | STATS n = SUM(fields.cash_usd)")),
-            metric((12, 0, 12, 8), "Prizes", format!("{pages} | WHERE record_kind == \"prize\" | STATS n = COUNT()")),
-            metric((24, 0, 12, 8), "Sponsors and partners", format!("{decisions} | STATS n = COUNT()")),
-            metric((36, 0, 12, 8), "Company profiles (LinkedIn, Crunchbase)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | STATS n = COUNT()")),
+            metric((0, 0, 12, 8), "Prize cash", format!("{pages} | WHERE record_kind == \"prize\" | STATS usd = SUM(fields.cash_usd)"), "usd"),
+            metric((12, 0, 12, 8), "Prizes", format!("{pages} | WHERE record_kind == \"prize\" | STATS prizes = COUNT()"), "prizes"),
+            metric((24, 0, 12, 8), "Sponsors and partners", format!("{decisions} | STATS organizations = COUNT()"), "organizations"),
+            metric((36, 0, 12, 8), "Company profiles (LinkedIn, Crunchbase)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | STATS profiles = COUNT()"), "profiles"),
             bar((0, 8, 24, 16), "Prize cash by sponsor", format!("{pages} | WHERE record_kind == \"prize\" | EVAL sponsor = CASE(role_text == \"\" OR role_text IS NULL, \"{}\", role_text) | STATS cash = SUM(fields.cash_usd) BY sponsor | SORT cash DESC | LIMIT 25", cfg.event.name), "sponsor", "cash"),
             pie((24, 8, 24, 16), "Sponsors by category (assigned by the agent)", format!("{decisions} | STATS n = COUNT() BY category"), "category", "n"),
             bar((0, 24, 24, 14), "Sponsors by tier", format!("{pages} | WHERE record_kind == \"organization_candidate\" AND tier_text IS NOT NULL AND tier_text != \"\" | STATS n = COUNT() BY tier_text"), "tier_text", "n"),
