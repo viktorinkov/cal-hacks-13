@@ -3,7 +3,7 @@
 // then a thank-you.
 // When the host ends the event, the same page turns into the recap.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
-// for first aid, which the module hands out only while the band has an open SOS or fall incident.
+// for first aid.
 
 import {
   act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
@@ -151,7 +151,7 @@ async function fileDocument(kind: 'history' | 'insurance', bytes: ArrayBuffer) {
 function documentStep(kind: 'history' | 'insurance', next: Step) {
   const title = kind === 'history' ? 'Your medical history' : 'Your health insurance';
   const why = kind === 'history'
-    ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. Claude reads it into your medical card. A medic sees the card only if you fall or press SOS, and only by tapping your band.'
+    ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. Claude reads it into your medical card. A medic sees the card by tapping your band.'
     : 'Upload your insurance card as a PDF, front and back. It goes on the same medical card, so the medic and the clinic have it.';
   const sample = kind === 'history' ? 'medical-history.pdf' : 'insurance-card.pdf';
   const upload = async (e: Event) => {
@@ -294,7 +294,7 @@ function isMedic(): boolean {
 /** `asking` until the module answers the tap, then `granted` or the reason it refused. */
 let tap = 'asking';
 
-/** The medic's tap: the module checks the role and the open incident, and logs the granted read. */
+/** The medic's tap: the module checks the role and logs the read. */
 async function tapAsMedic() {
   tap = 'asking';
   try {
@@ -311,24 +311,18 @@ function medicView() {
   const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && i.kind.tag !== 'Property');
   const title = h('h2', {}, `Medic view: band ${bandId}`);
   const again = h('button', { class: 'link', onclick: tapAsMedic }, 'Tap again');
-  if (m && incident) {
+  if (m) {
     return [
       title,
-      h('p', {}, `${incident.kind.tag} incident ${incident.id}, ${incident.status.tag.toLowerCase()}, opened ${time(incident.openedAt)} by ${incident.openedBy}.`),
-      incident.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: incident.id })) }, 'Take it'),
+      incident && [
+        h('p', {}, `${incident.kind.tag} incident ${incident.id}, ${incident.status.tag.toLowerCase()}, opened ${time(incident.openedAt)} by ${incident.openedBy}.`),
+        incident.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: incident.id })) }, 'Take it'),
+      ],
       medicalCard(m),
-      h('p', {}, h('a', { href: `/organizer${location.search}#claims` }, 'Notes, cost and resolve on the incident desk')),
+      incident && h('p', {}, h('a', { href: `/organizer${location.search}#claims` }, 'Notes, cost and resolve on the incident desk')),
     ];
   }
-  if (tap === 'asking' || (tap === 'granted' && incident)) return [title, h('p', { class: 'muted' }, 'Opening the medical card…')];
-  if (tap === 'granted') return [title, h('p', {}, 'The incident is resolved, so the medical card is closed.'), again];
-  if (tap.includes('no open SOS or fall')) {
-    return [
-      title,
-      h('p', {}, `Band ${bandId} has no open SOS or fall, so its medical card stays closed.`),
-      h('button', { onclick: () => act(() => conn.reducers.medicOpenIncident({ bandId })).then(ok => { if (ok) return tapAsMedic(); }) }, 'Open an SOS and show the card'),
-    ];
-  }
+  if (tap === 'asking' || tap === 'granted') return [title, h('p', { class: 'muted' }, 'Opening the medical card…')];
   if (tap.includes('nobody wears')) return [title, h('p', {}, `Nobody wears band ${bandId}.`), again];
   return [title, h('p', { class: 'error' }, tap), again];
 }
