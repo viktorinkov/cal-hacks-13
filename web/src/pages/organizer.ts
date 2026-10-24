@@ -8,6 +8,7 @@ import {
   act, actors, config, connect, date, field, h, idToken, money, mount, risk, signIn,
   signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
+import { graphTab } from '../graph';
 import type { DbConnection } from '../module_bindings';
 import type { Claim } from '../module_bindings/types';
 
@@ -40,6 +41,7 @@ const QUERIES = [
   'SELECT * FROM board_rules',
   'SELECT * FROM board_policies',
   'SELECT * FROM medic_medical_cards',
+  'SELECT * FROM event_graph',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -78,7 +80,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['data', 'Imports and Kibana']];
   return cfg.simulate ? [...all, ['simulate', 'Simulate']] : all;
 }
 
@@ -487,7 +489,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'data' ? data() : tab === 'simulate' ? simulateTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'data' ? data() : tab === 'simulate' ? simulateTab() : live();
   mount('app', header(), body);
 }
 

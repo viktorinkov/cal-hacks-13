@@ -7,9 +7,13 @@
     "bindings": "spacetime generate --lang typescript --out-dir src/module_bindings --bin-path ../target/wasm32-unknown-unknown/release/band1t.wasm -y"
   },
   "dependencies": {
+    "graphology": "0.26.0",
+    "graphology-layout-forceatlas2": "0.10.1",
+    "sigma": "3.0.2",
     "spacetimedb": "2.13.0"
   },
   "devDependencies": {
+    "graphology-types": "0.24.8",
     "typescript": "5.6.3"
   }
 }
