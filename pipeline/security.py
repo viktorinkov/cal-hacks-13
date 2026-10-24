@@ -39,7 +39,7 @@ the radio has an SOS, the flash is marked on the live feed, on the lit snapshot 
 sounds until a acknowledges it. A red 4 Hz flash with no SOS on the radio only gets a quiet yellow marker. Each
 located SOS saves the view and the last 3 s of video under pipeline/data/security/ and a line in events.jsonl.
 An SOS stays on screen until the radio reports it cleared. q quits. --record FILE.mp4 also writes the whole view to a
-video (a backup for the demo, or a record of the night), at --record-fps (30, the camera's rate).
+video (a backup if the live feed drops, or a record of the night), at --record-fps (30, the camera's rate).
 
 Radio positions: watch also follows the newest pipeline/data/positions_*.jsonl (or --positions), written by
 firmware/tools/ranging.py track --anchors ... --positions .... Every placed band is a dot on the map. An SOS band's
