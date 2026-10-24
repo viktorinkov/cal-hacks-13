@@ -1,0 +1,23 @@
+#!/bin/sh
+# One attendee goes through the real onboarding on the local dev database: tap band 3, press it
+# (sent as the bridge would send it), then name, Instagram and the pre-populated profile.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SPACETIME="$(command -v spacetime || echo "$HOME/.local/bin/spacetime")"
+DB="-s local3091 bandit-social-dev"
+staff() { "$ROOT/scripts/stdb" call $DB "$@" 2>&1 | grep -v UNSTABLE; }
+attendee() { "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" call $DB "$@" 2>&1 | grep -v UNSTABLE; }
+"$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" server add --url http://127.0.0.1:3091 local3091 --no-fingerprint >/dev/null 2>&1
+"$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" login show 2>/dev/null | grep -q identity \
+  || "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" login --server-issued-login local3091 >/dev/null
+beacon() { echo "{\"id\":3,\"rssi\":-50,\"flags\":$1,\"neigh\":0,\"zone\":102,\"bat\":255,\"state\":0,\"seq\":$2,\"find\":0}"; }
+staff register_bridge
+staff ingest_band "$(beacon 0 1)"
+attendee claim_band '"BANDIT-03"'
+echo "tapped: band 3 blinks white (state 8) and waits for the press"
+staff ingest_band "$(beacon 4 2)"
+sleep 2
+attendee update_profile '"Viktor"' true
+attendee set_social_handle '"instagram"' '"viktorinkovski"'
+attendee claim_person 1
+"$ROOT/scripts/q" "SELECT band_id FROM band_owner WHERE band_id = 3"
+"$ROOT/scripts/q" "SELECT display_name, findable, person_id, organization_id FROM attendee WHERE simulated = false"

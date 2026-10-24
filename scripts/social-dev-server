@@ -1,0 +1,5 @@
+#!/bin/sh
+# A private local SpacetimeDB on 127.0.0.1:3091 with its data in .dev/stdb-data.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$ROOT/.dev/stdb-data"
+exec "$ROOT/scripts/stdb" start --listen-addr 127.0.0.1:3091 --data-dir "$ROOT/.dev/stdb-data" --non-interactive
