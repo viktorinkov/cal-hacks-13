@@ -1,0 +1,58 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Settings {
+    pub id: u8,
+    pub yellow: u8,
+    pub red: u8,
+    pub neigh_rssi: i8,
+    pub circle_rssi: i8,
+    pub low_vis: bool,
+    pub override_density: bool,
+}
+
+impl __sdk::InModule for Settings {
+    type Module = super::RemoteModule;
+}
+
+pub struct SettingsCols {
+    pub id: __sdk::__query_builder::Col<Settings, u8>,
+    pub yellow: __sdk::__query_builder::Col<Settings, u8>,
+    pub red: __sdk::__query_builder::Col<Settings, u8>,
+    pub neigh_rssi: __sdk::__query_builder::Col<Settings, i8>,
+    pub circle_rssi: __sdk::__query_builder::Col<Settings, i8>,
+    pub low_vis: __sdk::__query_builder::Col<Settings, bool>,
+    pub override_density: __sdk::__query_builder::Col<Settings, bool>,
+}
+
+impl __sdk::__query_builder::HasCols for Settings {
+    type Cols = SettingsCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        SettingsCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            yellow: __sdk::__query_builder::Col::new(table_name, "yellow"),
+            red: __sdk::__query_builder::Col::new(table_name, "red"),
+            neigh_rssi: __sdk::__query_builder::Col::new(table_name, "neigh_rssi"),
+            circle_rssi: __sdk::__query_builder::Col::new(table_name, "circle_rssi"),
+            low_vis: __sdk::__query_builder::Col::new(table_name, "low_vis"),
+            override_density: __sdk::__query_builder::Col::new(table_name, "override_density"),
+        }
+    }
+}
+
+pub struct SettingsIxCols {
+    pub id: __sdk::__query_builder::IxCol<Settings, u8>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Settings {
+    type IxCols = SettingsIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        SettingsIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Settings {}

@@ -1,0 +1,37 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "properties": {
+      "run_id": {
+        "type": "keyword"
+      },
+      "decision_kind": {
+        "type": "keyword"
+      },
+      "key": {
+        "type": "keyword"
+      },
+      "organization_key": {
+        "type": "keyword"
+      },
+      "name": {
+        "type": "keyword"
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "match_method": {
+        "type": "keyword"
+      },
+      "reason": {
+        "type": "text"
+      },
+      "at": {
+        "type": "date"
+      }
+    }
+  }
+}

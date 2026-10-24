@@ -1,0 +1,46 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "properties": {
+      "run_id": {
+        "type": "keyword"
+      },
+      "organizer": {
+        "type": "keyword"
+      },
+      "model": {
+        "type": "keyword"
+      },
+      "org_rows": {
+        "type": "object",
+        "enabled": false
+      },
+      "org_decisions": {
+        "type": "object",
+        "enabled": false
+      },
+      "prize_decisions": {
+        "type": "object",
+        "enabled": false
+      },
+      "person_decisions": {
+        "type": "object",
+        "enabled": false
+      },
+      "schedule_decisions": {
+        "type": "object",
+        "enabled": false
+      },
+      "gaps": {
+        "properties": {
+          "key": {
+            "type": "keyword"
+          },
+          "reason": {
+            "type": "text"
+          }
+        }
+      }
+    }
+  }
+}

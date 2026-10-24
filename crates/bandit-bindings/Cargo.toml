@@ -1,0 +1,8 @@
+[package]
+name = "bandit-bindings"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+spacetimedb-sdk = "2.13"
+anyhow = "1"

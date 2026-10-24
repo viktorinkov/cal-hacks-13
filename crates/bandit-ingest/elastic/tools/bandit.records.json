@@ -1,0 +1,21 @@
+{
+  "id": "bandit.records",
+  "type": "esql",
+  "description": "Every raw record of one kind in one BandIt import run, sorted by source_key, at most 300 rows, text cut to 300 characters, plus the record's extra fields (fields.*, for example fields.logo_alt or fields.organization_text). Kinds: organization_candidate, prize, person_candidate, schedule_item, venue_fact (bandit-raw-pages), company_facts, venue_place (bandit-raw-orgs), zone, booth_spot (bandit-raw-plan).",
+  "tags": [
+    "bandit"
+  ],
+  "configuration": {
+    "query": "FROM bandit-raw-pages, bandit-raw-orgs, bandit-raw-plan | WHERE run_id == ?run_id AND record_kind == ?record_kind | EVAL text = SUBSTRING(text, 1, 300) | KEEP source_key, name, aliases, domain, org_key, tier_text, role_text, location_text, location_norm, start_text, end_text, text, fields.* | SORT source_key | LIMIT 300",
+    "params": {
+      "run_id": {
+        "type": "string",
+        "description": "The import run id given in the task."
+      },
+      "record_kind": {
+        "type": "string",
+        "description": "One record kind, for example organization_candidate or company_facts."
+      }
+    }
+  }
+}

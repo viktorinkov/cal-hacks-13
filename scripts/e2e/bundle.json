@@ -1,0 +1,509 @@
+{
+ "run_id": "e2e-seed-1",
+ "organizer": "Cal Hacks",
+ "bundle_hash": "e2e-seed-1",
+ "venue": {
+  "source_key": "cal-hacks-13",
+  "name": "Cal Hacks 13.0",
+  "venue_name": "Palace of Fine Arts",
+  "address": "3601 Lyon St, San Francisco, CA",
+  "latitude": 37.8029,
+  "longitude": -122.4484,
+  "website": "https://www.calhacks.io/",
+  "timezone": "America/Los_Angeles",
+  "starts_at": {
+   "some": {
+    "__timestamp_micros_since_unix_epoch__": 1792742950328029
+   }
+  },
+  "ends_at": {
+   "some": {
+    "__timestamp_micros_since_unix_epoch__": 1793002150328029
+   }
+  },
+  "description": "Cal Hacks 13.0 at the Palace of Fine Arts",
+  "facts": [],
+  "source_url": "https://www.calhacks.io/",
+  "fetched_at": {
+   "__timestamp_micros_since_unix_epoch__": 1792829350328029
+  }
+ },
+ "zones": [
+  {
+   "source_key": "zone:entrance",
+   "name": "Entrance and concierge",
+   "kind": "entrance",
+   "station_id": 101,
+   "plan_x_m": 8.0,
+   "plan_y_m": 30.0,
+   "area_sq_m": 300.0,
+   "capacity": 200,
+   "exit_colour": 1,
+   "description": "Main doors and the concierge desk near the entrance"
+  },
+  {
+   "source_key": "zone:hacking-floor",
+   "name": "Hacking floor",
+   "kind": "floor",
+   "station_id": 102,
+   "plan_x_m": 55.0,
+   "plan_y_m": 30.0,
+   "area_sq_m": 2400.0,
+   "capacity": 1500,
+   "exit_colour": 0,
+   "description": "Team tables in the middle of the hall"
+  },
+  {
+   "source_key": "zone:sponsor-row",
+   "name": "Sponsor row",
+   "kind": "sponsor",
+   "station_id": 103,
+   "plan_x_m": 95.0,
+   "plan_y_m": 12.0,
+   "area_sq_m": 600.0,
+   "capacity": 400,
+   "exit_colour": 0,
+   "description": "Sponsor tables along the north wall"
+  },
+  {
+   "source_key": "zone:stage",
+   "name": "Main stage",
+   "kind": "stage",
+   "station_id": 104,
+   "plan_x_m": 110.0,
+   "plan_y_m": 42.0,
+   "area_sq_m": 500.0,
+   "capacity": 600,
+   "exit_colour": 2,
+   "description": "Opening and closing ceremonies, talks"
+  },
+  {
+   "source_key": "zone:food",
+   "name": "Food and drinks",
+   "kind": "food",
+   "station_id": 105,
+   "plan_x_m": 35.0,
+   "plan_y_m": 54.0,
+   "area_sq_m": 400.0,
+   "capacity": 300,
+   "exit_colour": 0,
+   "description": "Meals, snacks and partner drinks"
+  }
+ ],
+ "organizations": [
+  {
+   "source_key": "org:spacetimedb",
+   "name": "SpacetimeDB",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://spacetimedb.com",
+   "domain": "spacetimedb.com",
+   "logo_url": "",
+   "description": "SpacetimeDB at Cal Hacks 13.0",
+   "category": "database",
+   "tags": [
+    "database",
+    "realtime",
+    "multiplayer"
+   ],
+   "industry": "database",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:elastic",
+   "name": "Elastic",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://elastic.co",
+   "domain": "elastic.co",
+   "logo_url": "",
+   "description": "Elastic at Cal Hacks 13.0",
+   "category": "search",
+   "tags": [
+    "search",
+    "vector",
+    "observability"
+   ],
+   "industry": "search",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:meta",
+   "name": "Meta",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://meta.com",
+   "domain": "meta.com",
+   "logo_url": "",
+   "description": "Meta's mission is to build the future of human connection and the technology that makes it possible. Our technologies help people connect, find communities, and grow businesses. When Facebook launched in 2004, it changed the way people connect. Apps like Messenger, Instagram and WhatsApp further empowered billions around the world. Now, Meta is moving beyond 2D screens toward immersive and intelli",
+   "category": "social",
+   "tags": [
+    "social",
+    "ai",
+    "llama"
+   ],
+   "industry": "social",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:anthropic",
+   "name": "Anthropic",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://anthropic.com",
+   "domain": "anthropic.com",
+   "logo_url": "",
+   "description": "We're an AI research company that builds reliable, interpretable, and steerable AI systems. Our first product is Claude, an AI assistant for tasks at any scale. Our research interests span multiple areas including natural language, human feedback, scaling laws, reinforcement learning, code generation, and interpretability.",
+   "category": "ai",
+   "tags": [
+    "ai",
+    "claude",
+    "agents"
+   ],
+   "industry": "ai",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:brightdata",
+   "name": "Bright Data",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://brightdata.com",
+   "domain": "brightdata.com",
+   "logo_url": "",
+   "description": "Bright Data is the leading web data infrastructure powering AI and BI, trusted by over 50,000 companies - from top AI innovators to global leaders in eCommerce, financial services, market research, cybersecurity, travel, martech, and beyond. Our platform enables teams to seamlessly discover, access, extract, and interact with web data at unmatched scale, speed, and accuracy - including global prox",
+   "category": "data",
+   "tags": [
+    "scraping",
+    "web data"
+   ],
+   "industry": "data",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:capitalone",
+   "name": "Capital One",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://capitalone.com",
+   "domain": "capitalone.com",
+   "logo_url": "",
+   "description": "At Capital One, we're making things better for our customers and associates through innovation and collaboration. We were founded on the belief that everyone deserves financial freedom\u2014and are dedicated to a world where all have equal opportunity to prosper. Banking is in our DNA, but we are so much more than a bank. We always think about what\u2019s next\u2014and how we can bring our customers the tools ne",
+   "category": "fintech",
+   "tags": [
+    "banking",
+    "payments",
+    "nessie"
+   ],
+   "industry": "fintech",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "org:hyphenate",
+   "name": "Hyphenate",
+   "kind": "sponsor",
+   "sponsor_tier": "sponsor",
+   "website": "https://hyphenate.ai",
+   "domain": "hyphenate.ai",
+   "logo_url": "",
+   "description": "Hyphenate is the autonomous finance platform for the office of the CFO. It automates the accounting and the operations, across revenue, cash, close, and consolidation, and across every entity and subledger, layering onto the ERP and core systems a company already has. No rip-and-replace.\n\nWhat makes Hyphenate different: instead of asking a team to write prompts or configure rules, it learns how a ",
+   "category": "fintech",
+   "tags": [
+    "finance",
+    "accounting",
+    "insurance"
+   ],
+   "industry": "fintech",
+   "headquarters": "",
+   "size_range": "",
+   "founded_year": 0,
+   "linkedin_url": "",
+   "prizes": [],
+   "crunchbase_url": "",
+   "funding_summary": "",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  }
+ ],
+ "people": [
+  {
+   "source_key": "person:spacetimedb-dev",
+   "display_name": "Sam Rivera",
+   "kind": "speaker",
+   "role": "speaker",
+   "title": "Developer relations",
+   "organization_key": "org:spacetimedb",
+   "bio": "",
+   "headshot_url": "",
+   "links": [],
+   "source_url": "",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "person:elastic-dev",
+   "display_name": "Ada Park",
+   "kind": "exhibitor",
+   "role": "exhibitor",
+   "title": "Developer advocate",
+   "organization_key": "org:elastic",
+   "bio": "",
+   "headshot_url": "",
+   "links": [],
+   "source_url": "",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  }
+ ],
+ "booths": [
+  {
+   "source_key": "booth:spacetimedb",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:spacetimedb",
+   "booth_number": "S1",
+   "name": "SpacetimeDB booth",
+   "kind": "sponsor",
+   "description": "SpacetimeDB at Cal Hacks 13.0",
+   "tags": [
+    "database",
+    "realtime",
+    "multiplayer"
+   ],
+   "plan_x_m": 80.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:elastic",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:elastic",
+   "booth_number": "S2",
+   "name": "Elastic booth",
+   "kind": "sponsor",
+   "description": "Elastic at Cal Hacks 13.0",
+   "tags": [
+    "search",
+    "vector",
+    "observability"
+   ],
+   "plan_x_m": 85.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:meta",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:meta",
+   "booth_number": "S3",
+   "name": "Meta booth",
+   "kind": "sponsor",
+   "description": "Meta's mission is to build the future of human connection and the technology that makes it possible. Our technologies help people connect, find communities, and grow businesses. When Facebook launched in 2004, it changed the way people connect. Apps like Messenger, Instagram and WhatsApp further empowered billions around the world. Now, Meta is moving beyond 2D screens toward immersive and intelli",
+   "tags": [
+    "social",
+    "ai",
+    "llama"
+   ],
+   "plan_x_m": 90.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:anthropic",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:anthropic",
+   "booth_number": "S4",
+   "name": "Anthropic booth",
+   "kind": "sponsor",
+   "description": "We're an AI research company that builds reliable, interpretable, and steerable AI systems. Our first product is Claude, an AI assistant for tasks at any scale. Our research interests span multiple areas including natural language, human feedback, scaling laws, reinforcement learning, code generation, and interpretability.",
+   "tags": [
+    "ai",
+    "claude",
+    "agents"
+   ],
+   "plan_x_m": 95.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:brightdata",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:brightdata",
+   "booth_number": "S5",
+   "name": "Bright Data booth",
+   "kind": "sponsor",
+   "description": "Bright Data is the leading web data infrastructure powering AI and BI, trusted by over 50,000 companies - from top AI innovators to global leaders in eCommerce, financial services, market research, cybersecurity, travel, martech, and beyond. Our platform enables teams to seamlessly discover, access, extract, and interact with web data at unmatched scale, speed, and accuracy - including global prox",
+   "tags": [
+    "scraping",
+    "web data"
+   ],
+   "plan_x_m": 100.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:capitalone",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:capitalone",
+   "booth_number": "S6",
+   "name": "Capital One booth",
+   "kind": "sponsor",
+   "description": "At Capital One, we're making things better for our customers and associates through innovation and collaboration. We were founded on the belief that everyone deserves financial freedom\u2014and are dedicated to a world where all have equal opportunity to prosper. Banking is in our DNA, but we are so much more than a bank. We always think about what\u2019s next\u2014and how we can bring our customers the tools ne",
+   "tags": [
+    "banking",
+    "payments",
+    "nessie"
+   ],
+   "plan_x_m": 105.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:hyphenate",
+   "zone_key": "zone:sponsor-row",
+   "organization_key": "org:hyphenate",
+   "booth_number": "S7",
+   "name": "Hyphenate booth",
+   "kind": "sponsor",
+   "description": "Hyphenate is the autonomous finance platform for the office of the CFO. It automates the accounting and the operations, across revenue, cash, close, and consolidation, and across every entity and subledger, layering onto the ERP and core systems a company already has. No rip-and-replace.\n\nWhat makes Hyphenate different: instead of asking a team to write prompts or configure rules, it learns how a ",
+   "tags": [
+    "finance",
+    "accounting",
+    "insurance"
+   ],
+   "plan_x_m": 110.0,
+   "plan_y_m": 12.0,
+   "placement": "import",
+   "source_url": "https://www.calhacks.io/",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:hardware-lab",
+   "zone_key": "zone:hacking-floor",
+   "organization_key": "",
+   "booth_number": "H4",
+   "name": "Hardware lab",
+   "kind": "lab",
+   "description": "Soldering irons, 3D printers and parts",
+   "tags": [
+    "hardware"
+   ],
+   "plan_x_m": 55.0,
+   "plan_y_m": 40.0,
+   "placement": "import",
+   "source_url": "",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  },
+  {
+   "source_key": "booth:medical",
+   "zone_key": "zone:stage",
+   "organization_key": "",
+   "booth_number": "M1",
+   "name": "Event medical station",
+   "kind": "medical",
+   "description": "First aid, staffed all night",
+   "tags": [
+    "medical"
+   ],
+   "plan_x_m": 110.0,
+   "plan_y_m": 48.0,
+   "placement": "import",
+   "source_url": "",
+   "fetched_at": {
+    "__timestamp_micros_since_unix_epoch__": 1792829350328029
+   }
+  }
+ ],
+ "schedule": []
+}

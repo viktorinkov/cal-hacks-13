@@ -1,0 +1,498 @@
+{
+  "claim_id": 900103,
+  "pack_version": 2,
+  "pack_hash": "b3e2d437032ffd220846941f07585e0fed5c22aa9a5434ad82f6ee6e83e641ac",
+  "incident_kind": "fall",
+  "cover_kind": "medical_payments",
+  "zone_name": "Main stage",
+  "incident_time": "2026-10-24 22:06:20",
+  "claimant_name": "Maya Chen",
+  "corroboration": "corroborated",
+  "facts": [
+    {
+      "seq": 1,
+      "source": "incident_snapshot",
+      "key": "incident_kind",
+      "value": "fall",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident:43"
+    },
+    {
+      "seq": 2,
+      "source": "incident_snapshot",
+      "key": "opened_by",
+      "value": "band",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident:43"
+    },
+    {
+      "seq": 3,
+      "source": "incident_snapshot",
+      "key": "zone_id",
+      "value": "101",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident:43"
+    },
+    {
+      "seq": 4,
+      "source": "band_report",
+      "key": "band_id",
+      "value": "5",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 5,
+      "source": "band_report",
+      "key": "fall_flag",
+      "value": "1",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 6,
+      "source": "band_report",
+      "key": "sos_flag",
+      "value": "0",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 7,
+      "source": "band_report",
+      "key": "band_state",
+      "value": "3",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 8,
+      "source": "band_report",
+      "key": "neigh",
+      "value": "5",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 9,
+      "source": "band_report",
+      "key": "station_id",
+      "value": "4",
+      "observed_at": 1792904779000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 10,
+      "source": "incident_snapshot",
+      "key": "bands_present",
+      "value": "5, 9, 21, 33",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 11,
+      "source": "incident_snapshot",
+      "key": "band_count",
+      "value": "4",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 12,
+      "source": "incident_snapshot",
+      "key": "neigh_mean",
+      "value": "5.0",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 13,
+      "source": "incident_snapshot",
+      "key": "circle_bands",
+      "value": "9, 21",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "incident_snapshot:79"
+    },
+    {
+      "seq": 14,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 9 zone 101 rssi -55",
+      "observed_at": 1792904783000000,
+      "reader": "code",
+      "reference": "incident_band:43:9"
+    },
+    {
+      "seq": 15,
+      "source": "light_circle",
+      "key": "witness",
+      "value": "band 21 zone 101 rssi -66",
+      "observed_at": 1792904788000000,
+      "reader": "code",
+      "reference": "incident_band:43:21"
+    },
+    {
+      "seq": 16,
+      "source": "staff_note",
+      "key": "note",
+      "value": "medic: guest slipped on a spilled drink near the stage and fell on her right hand, walked to the medical station for a wrap and splint",
+      "observed_at": 1792905120000000,
+      "reader": "code",
+      "reference": "incident_note:303"
+    },
+    {
+      "seq": 17,
+      "source": "zone_context",
+      "key": "zone_name",
+      "value": "Main stage",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 18,
+      "source": "zone_context",
+      "key": "zone_kind",
+      "value": "stage",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 19,
+      "source": "zone_context",
+      "key": "zone_area_m2",
+      "value": "1800.0",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 20,
+      "source": "zone_context",
+      "key": "zone_capacity",
+      "value": "2500",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 21,
+      "source": "zone_context",
+      "key": "nearby_booths",
+      "value": "Merch tent, Water station 2",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 22,
+      "source": "zone_context",
+      "key": "schedule_now",
+      "value": "Headline set",
+      "observed_at": 1792904780000000,
+      "reader": "code",
+      "reference": "zone:101"
+    },
+    {
+      "seq": 23,
+      "source": "presence",
+      "key": "zone_stay",
+      "value": "Main stage 21:30:00-now",
+      "observed_at": 1792902600000000,
+      "reader": "code",
+      "reference": "zone_visit:5"
+    },
+    {
+      "seq": 24,
+      "source": "medical_record",
+      "key": "record_patient",
+      "value": "Maya Chen",
+      "observed_at": 1792950000000000,
+      "reader": "model",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 25,
+      "source": "medical_record",
+      "key": "record_provider",
+      "value": "Event Medical Station - Cal Hacks 13.0",
+      "observed_at": 1792950000000000,
+      "reader": "model",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 26,
+      "source": "medical_record",
+      "key": "record_date_of_service",
+      "value": "2026-10-24",
+      "observed_at": 1792950000000000,
+      "reader": "model",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 27,
+      "source": "medical_record",
+      "key": "record_diagnoses",
+      "value": "S63.501A Sprain of right wrist, initial encounter; W01.0XXA Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter",
+      "observed_at": 1792950000000000,
+      "reader": "model",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 28,
+      "source": "medical_record",
+      "key": "record_billed_cents",
+      "value": "18000",
+      "observed_at": 1792950000000000,
+      "reader": "model",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 29,
+      "source": "medical_record",
+      "key": "record_covered_cents",
+      "value": "18000",
+      "observed_at": 1792950000000000,
+      "reader": "code",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 30,
+      "source": "medical_record",
+      "key": "record_sha256",
+      "value": "6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68",
+      "observed_at": 1792950000000000,
+      "reader": "code",
+      "reference": "blob:6045127cf17400f94044bbeafb24e8ed80cf5f820e94d137eac18b756e424a68"
+    },
+    {
+      "seq": 31,
+      "source": "policy",
+      "key": "policy_number",
+      "value": "GL-2026-0412",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 32,
+      "source": "policy",
+      "key": "insurer",
+      "value": "Harborline Mutual",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 33,
+      "source": "policy",
+      "key": "cover_kind",
+      "value": "medical_payments",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 34,
+      "source": "policy",
+      "key": "per_claim_limit_cents",
+      "value": "500000",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 35,
+      "source": "policy",
+      "key": "deductible_cents",
+      "value": "10000",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    },
+    {
+      "seq": 36,
+      "source": "policy",
+      "key": "aggregate_remaining_cents",
+      "value": "2500000",
+      "observed_at": 1792908000000000,
+      "reader": "code",
+      "reference": "insurance_policy:1"
+    }
+  ],
+  "checks": [
+    {
+      "name": "witness_zone",
+      "result": "pass",
+      "detail": "2 of 2 witnesses in zone 101",
+      "reader": "code"
+    },
+    {
+      "name": "staff_note_time",
+      "result": "pass",
+      "detail": "first note 22:12:00, incident 22:06:20-22:40:00, window +30 min",
+      "reader": "code"
+    },
+    {
+      "name": "claimant_not_staff",
+      "result": "pass",
+      "detail": "Maya Chen holds no staff role",
+      "reader": "code"
+    },
+    {
+      "name": "record_duplicate",
+      "result": "pass",
+      "detail": "no other claim has this file, invoice, or patient, date and total",
+      "reader": "code"
+    },
+    {
+      "name": "record_patient_match",
+      "result": "pass",
+      "detail": "claimant \"Maya Chen\", record patient \"Maya Chen\"",
+      "reader": "code"
+    },
+    {
+      "name": "record_date_window",
+      "result": "pass",
+      "detail": "encounter 2026-10-24, incident 2026-10-24: 0 days after, window 30 days",
+      "reader": "code"
+    },
+    {
+      "name": "record_injury_code",
+      "result": "pass",
+      "detail": "diagnoses S63.501A, W01.0XXA",
+      "reader": "code"
+    },
+    {
+      "name": "record_totals",
+      "result": "pass",
+      "detail": "service lines sum to $180.00, total billed $180.00",
+      "reader": "code"
+    },
+    {
+      "name": "record_lines",
+      "result": "pass",
+      "detail": "5 covered, 0 reduced, 0 excluded",
+      "reader": "code"
+    },
+    {
+      "name": "elastic_validation",
+      "result": "pass",
+      "detail": "document passed the bandit-claims-validate pipeline",
+      "reader": "elastic"
+    }
+  ],
+  "amounts": {
+    "cost_cents": 18000,
+    "payout_cents": 18000,
+    "recoverable_cents": 8000,
+    "venue_cost_cents": 10000
+  },
+  "lines": [
+    {
+      "line_no": 1,
+      "code": "99211",
+      "description": "First-aid assessment",
+      "service_date": "2026-10-24",
+      "units": 1,
+      "billed_cents": 6500,
+      "allowed_cents": 6500,
+      "covered_cents": 6500,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 1
+    },
+    {
+      "line_no": 2,
+      "code": "A6448",
+      "description": "Light compression bandage, elastic, width under 3 in",
+      "service_date": "2026-10-24",
+      "units": 1,
+      "billed_cents": 2500,
+      "allowed_cents": 2500,
+      "covered_cents": 2500,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 1
+    },
+    {
+      "line_no": 3,
+      "code": "A9273",
+      "description": "Cold pack",
+      "service_date": "2026-10-24",
+      "units": 1,
+      "billed_cents": 3000,
+      "allowed_cents": 3000,
+      "covered_cents": 3000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 1
+    },
+    {
+      "line_no": 4,
+      "code": "L3908",
+      "description": "Wrist-hand orthosis, prefabricated, off-the-shelf",
+      "service_date": "2026-10-24",
+      "units": 1,
+      "billed_cents": 4000,
+      "allowed_cents": 4000,
+      "covered_cents": 4000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 1
+    },
+    {
+      "line_no": 5,
+      "code": "99070",
+      "description": "Supplies and materials",
+      "service_date": "2026-10-24",
+      "units": 1,
+      "billed_cents": 2000,
+      "allowed_cents": 2000,
+      "covered_cents": 2000,
+      "outcome": "covered",
+      "reason": "within the schedule",
+      "page": 1
+    }
+  ],
+  "record_history": "Patient presented to the Event Medical Station on foot at 22:20, accompanied by a friend. At approximately 22:05, while attending Cal Hacks 13.0, she slipped on a spilled drink near Main stage and fell onto her outstretched right hand. She did not strike her head and had no loss of consciousness. She reports immediate pain over the back of the right wrist, rated 5/10, worse with wrist extension and gripping. Denies numbness, tingling, or any other injury. Right-hand dominant. No prior injury to the right wrist.",
+  "record_reason": "Right wrist pain after a fall.",
+  "precedents": [
+    {
+      "reference": "history-04",
+      "outcome": "auto_settled",
+      "payout_cents": 9800,
+      "narrative": "Fall in zone Main stage left at 22:10 during a headline set; 3 light-circle witnesses in the same zone; medic note within 12 minutes; right wrist sprain S63.501A; first aid only.",
+      "score": 0.91
+    },
+    {
+      "reference": "history-19",
+      "outcome": "auto_settled",
+      "payout_cents": 5500,
+      "narrative": "Fall in zone Main stage left at 22:30 during a headline set; 4 light-circle witnesses in the same zone; medic note within 9 minutes; left wrist sprain S63.502A; first aid only.",
+      "score": 0.87
+    },
+    {
+      "reference": "history-26",
+      "outcome": "refused",
+      "payout_cents": 0,
+      "narrative": "Fall in zone Stage B at 22:05; no light-circle witnesses in the same zone; medic note within 35 minutes; right wrist sprain S63.501A; first aid only; 3 light-circle witnesses were in zone Lagoon path at the reported time.",
+      "score": 0.83000004
+    }
+  ],
+  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event."
+}

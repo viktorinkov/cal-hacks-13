@@ -1,0 +1,100 @@
+{
+  "document_kind": "urgent_care_record",
+  "patient": {
+    "name": "Jordan Alvarez",
+    "date_of_birth": "1999-08-02",
+    "page": 1
+  },
+  "provider": {
+    "name": "Wrenfield Urgent Care",
+    "address": "880 Tamsin Street, Suite 120, Port Alder, CA 94999",
+    "page": 1
+  },
+  "encounter": {
+    "date_of_service": "2026-10-25",
+    "time": "10:40",
+    "reason_for_visit": "Left wrist pain and swelling after a fall last night.",
+    "history": "Patient presents with left wrist pain and swelling. Last night, Saturday, October 24, 2026, at approximately 21:45, he was attending Cal Hacks 13.0 when the crowd surged near Main stage and he fell, landing on the outstretched left wrist. He did not strike his head and had no loss of consciousness. He was seen at the event's on-site first-aid station, where ice and a compression wrap were applied. Pain has persisted overnight with increasing swelling. Rates pain 6/10, dorsal wrist, worse with gripping and wrist extension. Took acetaminophen 1,000 mg at 07:00 today with minimal relief. Denies numbness, tingling, weakness, or other injuries. Right-hand dominant. No prior left wrist injury.",
+    "page": 1
+  },
+  "diagnoses": [
+    {
+      "code": "S63.502A",
+      "description": "Sprain of left wrist, initial encounter",
+      "page": 1
+    },
+    {
+      "code": "W01.0XXA",
+      "description": "Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter",
+      "page": 1
+    }
+  ],
+  "services": [
+    {
+      "code": "99204",
+      "description": "New patient visit, moderate complexity",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 38500,
+      "page": 2
+    },
+    {
+      "code": "73110",
+      "description": "X-ray wrist, 3 views, left",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 21500,
+      "page": 2
+    },
+    {
+      "code": "29125",
+      "description": "Short arm splint application, static, left",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 29500,
+      "page": 2
+    },
+    {
+      "code": "L3908",
+      "description": "Wrist-hand orthosis, prefabricated, off-the-shelf",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 14500,
+      "page": 2
+    },
+    {
+      "code": "99070",
+      "description": "Supplies and materials",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 6000,
+      "page": 2
+    },
+    {
+      "code": "96372",
+      "description": "Therapeutic injection, intramuscular",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 9000,
+      "page": 2
+    },
+    {
+      "code": "J1885",
+      "description": "Ketorolac tromethamine injection, 15 mg",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 5000,
+      "page": 2
+    },
+    {
+      "code": "90715",
+      "description": "Tdap vaccine, 7 years or older, intramuscular",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 6800,
+      "page": 2
+    }
+  ],
+  "invoice_number": "UC-2025-1188",
+  "total_billed_cents": 130800
+}

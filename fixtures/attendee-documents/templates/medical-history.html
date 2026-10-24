@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Patient Health Summary (synthetic test data)</title>
+<style>
+  @page { size: letter; margin: 0.6in; }
+  body { font: 11pt/1.4 Helvetica, Arial, sans-serif; color: #111; }
+  h1 { font-size: 16pt; margin: 0 0 2px; }
+  .clinic { color: #444; margin-bottom: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 14px; }
+  th, td { text-align: left; border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; }
+  th { background: #eee; }
+  h2 { font-size: 12pt; margin: 14px 0 4px; border-bottom: 1px solid #999; }
+  .footer { position: fixed; bottom: 0; left: 0; right: 0; font-size: 8pt; color: #a00; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<h1>Patient Health Summary</h1>
+<div class="clinic">Harbor Family Medicine, 214 Laurel St, Santa Barbara, CA 93101 &middot; (805) 555-0190</div>
+<table>
+  <tr><th>Patient</th><td>Alex Rivera</td><th>Date of birth</th><td>03/14/2003</td></tr>
+  <tr><th>MRN</th><td>HFM-0072215</td><th>Summary date</th><td>09/30/2026</td></tr>
+  <tr><th>Primary care</th><td>Dana Whitfield, MD</td><th>Blood type</th><td>O positive (O+)</td></tr>
+</table>
+<h2>Allergies</h2>
+<table>
+  <tr><th>Allergen</th><th>Reaction</th><th>Severity</th></tr>
+  <tr><td>Penicillin</td><td>Hives, facial swelling</td><td>Severe</td></tr>
+  <tr><td>Peanuts</td><td>Anaphylaxis</td><td>Severe, carries epinephrine auto-injector</td></tr>
+</table>
+<h2>Active conditions</h2>
+<table>
+  <tr><th>Condition</th><th>Since</th><th>Notes</th></tr>
+  <tr><td>Asthma, mild persistent</td><td>2011</td><td>Triggered by exercise and smoke</td></tr>
+  <tr><td>Type 1 diabetes</td><td>2015</td><td>Insulin pump; check glucose if confused or unresponsive</td></tr>
+</table>
+<h2>Current medications</h2>
+<table>
+  <tr><th>Medication</th><th>Dose</th></tr>
+  <tr><td>Albuterol inhaler</td><td>90 mcg, 2 puffs as needed</td></tr>
+  <tr><td>Insulin lispro (pump)</td><td>basal 0.8 units/hour</td></tr>
+  <tr><td>EpiPen (epinephrine auto-injector)</td><td>0.3 mg as needed for anaphylaxis</td></tr>
+</table>
+<h2>Emergency contact</h2>
+<table>
+  <tr><th>Name</th><th>Relation</th><th>Phone</th></tr>
+  <tr><td>Maria Rivera</td><td>Mother</td><td>(805) 555-0142</td></tr>
+</table>
+<div class="footer"><span>SYNTHETIC RECORD - TEST DATA - NOT A REAL PATIENT</span><span>HFM-0072215 &middot; Page 1 of 1</span></div>
+</body>
+</html>

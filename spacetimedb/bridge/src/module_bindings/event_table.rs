@@ -1,0 +1,199 @@
+#![allow(unused, clippy::all)]
+use super::event_kind_type::EventKind;
+use super::event_type::Event;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct EventTableHandle<'ctx> {
+    imp: __sdk::TableHandle<Event>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct EventTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for EventTableAccessor {
+    type Row = Event;
+    type Handle<'db> = EventTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.event()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait EventTableAccess {
+    #[allow(non_snake_case)]
+    fn event(&self) -> EventTableHandle<'_>;
+}
+
+impl EventTableAccess for super::RemoteTables {
+    fn event(&self) -> EventTableHandle<'_> {
+        EventTableHandle {
+            imp: self.imp.get_table::<Event>("event"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct EventInsertCallbackId(__sdk::CallbackId);
+pub struct EventDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for EventTableHandle<'ctx> {
+    type Row = Event;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = Event> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for EventTableHandle<'ctx> {
+    type Row = Event;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = Event> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = EventInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> EventInsertCallbackId {
+        EventInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: EventInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = EventDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> EventDeleteCallbackId {
+        EventDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: EventDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for EventTableHandle<'ctx> {
+    type InsertCallbackId = EventInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> EventInsertCallbackId {
+        EventInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: EventInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for EventTableHandle<'ctx> {
+    type DeleteCallbackId = EventDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> EventDeleteCallbackId {
+        EventDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: EventDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+pub struct EventUpdateCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableWithPrimaryKey for EventTableHandle<'ctx> {
+    type UpdateCallbackId = EventUpdateCallbackId;
+
+    fn on_update(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row, &Self::Row) + Send + 'static,
+    ) -> EventUpdateCallbackId {
+        EventUpdateCallbackId(self.imp.on_update(Box::new(callback)))
+    }
+
+    fn remove_on_update(&self, callback: EventUpdateCallbackId) {
+        self.imp.remove_on_update(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithUpdate for EventTableHandle<'ctx> {
+    type UpdateCallbackId = EventUpdateCallbackId;
+
+    fn on_update(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row, &Self::Row) + Send + 'static,
+    ) -> EventUpdateCallbackId {
+        EventUpdateCallbackId(self.imp.on_update(Box::new(callback)))
+    }
+
+    fn remove_on_update(&self, callback: EventUpdateCallbackId) {
+        self.imp.remove_on_update(callback.0)
+    }
+}
+
+pub struct EventIdUnique<'ctx> {
+    imp: __sdk::UniqueConstraintHandle<Event, u64>,
+    phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+impl<'ctx> EventTableHandle<'ctx> {
+    pub fn id(&self) -> EventIdUnique<'ctx> {
+        EventIdUnique {
+            imp: self.imp.get_unique_constraint::<u64>("id"),
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'ctx> EventIdUnique<'ctx> {
+    pub fn find(&self, col_val: &u64) -> Option<Event> {
+        self.imp.find(col_val)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<Event>("event");
+    _table.add_unique_constraint::<u64>("id", |row| &row.id);
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<Event>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<Event>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait eventQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn event(&self) -> __sdk::__query_builder::Table<Event>;
+}
+
+impl eventQueryTableAccess for __sdk::QueryTableAccessor {
+    fn event(&self) -> __sdk::__query_builder::Table<Event> {
+        __sdk::__query_builder::Table::new("event")
+    }
+}

@@ -1,0 +1,34 @@
+# Sourced by the e2e scripts. E2E_TARGET=local (default) uses a private SpacetimeDB on 127.0.0.1:3097;
+# E2E_TARGET=maincloud uses the live database bandit-calhacks13-sp82j.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SPACETIME="$(command -v spacetime || echo "$HOME/.local/bin/spacetime")"
+E2E_TARGET="${E2E_TARGET:-local}"
+case "$E2E_TARGET" in
+  local)
+    # E2E_LOCAL_PORT and E2E_LOCAL_PREFIX let a second checkout run its own private server.
+    export SPACETIMEDB_URL=http://127.0.0.1:${E2E_LOCAL_PORT:-3097} SPACETIMEDB_DATABASE=bandit-e2e
+    export ELASTIC_INDEX_PREFIX=${E2E_LOCAL_PREFIX:-bandit-e2e}
+    STDB_SERVER=e2e-local
+    ;;
+  maincloud)
+    export SPACETIMEDB_URL=https://maincloud.spacetimedb.com SPACETIMEDB_DATABASE=bandit-calhacks13-sp82j
+    export ELASTIC_INDEX_PREFIX=bandit
+    # The SpacetimeAuth client the pages sign in with (public, PKCE, no secret).
+    export SPACETIMEAUTH_CLIENT_ID=client_034lYVa0v5zqZJQWQktByi
+    STDB_SERVER=maincloud
+    ;;
+  *) echo "E2E_TARGET must be local or maincloud" >&2; exit 1 ;;
+esac
+export BANDIT_DATA_DIR=".dev/e2e-$E2E_TARGET"
+export BANDIT_API_ADDR="${BANDIT_API_ADDR:-127.0.0.1:8097}"
+DATA="$ROOT/$BANDIT_DATA_DIR"
+# One build folder for the module and the services, without debug info, to save disk.
+export CARGO_TARGET_DIR="$ROOT/target" CARGO_PROFILE_DEV_DEBUG=0
+mkdir -p "$DATA/spacetime"
+# The owner's CLI: a private config for the local server, Viktor's own login for Maincloud.
+if [ "$E2E_TARGET" = local ]; then
+  stdb() { "$SPACETIME" --config-path "$DATA/spacetime/cli.toml" "$@"; }
+else
+  stdb() { "$SPACETIME" "$@"; }
+  export BANDIT_OWNER_TOKEN="$(sed -n 's/^spacetimedb_token *= *"\(.*\)"/\1/p' "$HOME/.config/spacetime/cli.toml")"
+fi

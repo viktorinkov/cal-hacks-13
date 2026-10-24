@@ -1,0 +1,3208 @@
+{
+  "run_id": "calhacks-13-20261024t0828z",
+  "organizer": "elastic_workflow",
+  "bundle_hash": "ee6cb7f314dd6010be9346fe42522632bffcc952e69bc782dead3f80c434882a",
+  "venue": {
+    "source_key": "event:calhacks-13",
+    "name": "Cal Hacks 13.0",
+    "venue_name": "Palace of Fine Arts",
+    "address": "3301 Lyon St, San Francisco, CA 94123, United States",
+    "latitude": 37.8029308,
+    "longitude": -122.4484231,
+    "website": "https://www.calhacks.io/",
+    "timezone": "America/Los_Angeles",
+    "starts_at": {
+      "some": {
+        "__timestamp_micros_since_unix_epoch__": 1792803600000000
+      }
+    },
+    "ends_at": {
+      "some": {
+        "__timestamp_micros_since_unix_epoch__": 1792944000000000
+      }
+    },
+    "description": "This Greco-Roman palace & architectural attraction hosts an ever-changing roster of performing arts.",
+    "facts": [
+      {
+        "label": "Address",
+        "value": "3601 Lyon St, San Francisco, CA 94123, USA"
+      },
+      {
+        "label": "Submission deadline",
+        "value": "Oct 25, 2026 @ 9:00am PDT"
+      },
+      {
+        "label": "Dates",
+        "value": "Submissions: October 23 at 6:00pm PDT to October 25 at 9:00am PDT"
+      },
+      {
+        "label": "Can I start on my project before the hackathon?",
+        "value": "You cannot work on a project you started before the hackathon. Ideation before the hackathon is allowed, but all implementation must occur during the hackathon.\n\nI can’t wait until the weekend to get started at Cal Hacks!\n\nWe will be launching a whole month of tech talks, workshops, and hack nights leading up to Cal Hacks 13.0! Stay tuned for more information!"
+      },
+      {
+        "label": "Do I get guaranteed admission if I apply early?",
+        "value": "No, but chances are much higher!"
+      },
+      {
+        "label": "Do I have to be in-person?",
+        "value": "Yes, you and your team will all have to be in-person at the Palace of Fine Arts to participate in the hackathon."
+      },
+      {
+        "label": "Do I have to have a team to participate?",
+        "value": "Not at all! You can come with a team or solo. Whatever works for you!\n\nWe will be hosting more relaxed socials before the hackathon to meet like-minded builders. As well as a team matching event during the event itself."
+      },
+      {
+        "label": "Do you have a waitlist or accept walk-ins on the day-of?",
+        "value": "Unfortunately, only hackers who were accepted and confirmed by the deadlines will be allowed in the venue. We will not make exceptions. However, we hold multiple events a year — be on the lookout for upcoming events in 2027!"
+      },
+      {
+        "label": "How do I apply?",
+        "value": "Apply at hive.hackberkeley.org by September 13 (priority) / September 20 (regular)!"
+      },
+      {
+        "label": "How many people can be on a single team?",
+        "value": "Up to 4 people can be part of a single team."
+      },
+      {
+        "label": "I applied! What’s next?",
+        "value": "If you applied during the priority application cycle, you will get one of the following decisions a few days after the deadline: accepted, deferred, or rejected. If you were accepted, you will need to confirm your spot before the provided deadline to attend Cal Hacks 13.0!"
+      },
+      {
+        "label": "If I don’t meet the qualifications to participate, can I volunteer to be a judge or mentor?",
+        "value": "Yes! Applications can be submitted at hive.hackberkeley.org. Note that judges and mentors must have completed their undergraduate studies to be eligible."
+      },
+      {
+        "label": "Still have questions?",
+        "value": "Reach out to us at <team@hackberkeley.org>!"
+      },
+      {
+        "label": "What experience level is needed to attend?",
+        "value": "All experience levels are welcome!"
+      },
+      {
+        "label": "What is Cal Hacks?",
+        "value": "Cal Hacks is a 3-day hackathon, where hackers creatively collaborate on innovative technology for a chance to win prizes including cash, and attend workshops and panels to learn more about emerging tech!"
+      },
+      {
+        "label": "What qualifies as a beginner team?",
+        "value": "Every team member must be a first-time hacker. Note that attending a prior hackathon and not submitting a project or demoing still counts as having prior experience. We will be verifying with outside sources upon choosing winners."
+      },
+      {
+        "label": "What should I bring?",
+        "value": "You should bring a school/gov ID, laptop and chargers, headphones, and anything else you need to stay through the weekend."
+      },
+      {
+        "label": "Where is Cal Hacks?",
+        "value": "Palace of Fine Arts! The schedule and more details will be sent closer to the event!"
+      },
+      {
+        "label": "Who are your hosts?",
+        "value": "We’re Hackathons @ Berkeley, the team behind Cal Hacks and the UC Berkeley AI Hackathon. We ourselves are a team of students wanting to cultivate a space where people can build without boundaries!"
+      },
+      {
+        "label": "Who can apply?",
+        "value": "Cal Hacks is open to undergraduate and graduate students as well as new grads of under 1 year from all colleges and universities. Those who graduated prior to Fall 2025 will not qualify."
+      },
+      {
+        "label": "Who can participate?",
+        "value": "Cal Hacks is open to undergraduate and graduate students as well as new grads of under 1 year from all colleges and universities. We have had 300+ universities represented at past editions and are partnering with clubs at other colleges throughout the US."
+      },
+      {
+        "label": "Why are there two timelines for applying?",
+        "value": "If you’d like to hear a decision earlier (for planning or financial purposes), the priority deadline is there to ensure you hear back by September 17!"
+      },
+      {
+        "label": "Will food be provided?",
+        "value": "Yes! Meals and snacks will be provided."
+      },
+      {
+        "label": "Will my travel be reimbursed?",
+        "value": "This year, we will be offering travel stipends to a limited number of hackers with regional caps based on the region you are coming from. The application for travel stipend is embedded into the hacker application as an optional question. Choosing whether or not to apply for travel stipend will not affect your chances of being admitted as a hacker. Hackers who are admitted and applied for travel stipend will be informed of their travel stipend decision at the same time as their admission decision. Regional cap amounts will be determined at the same time travel stipend decisions are released.\n\nHowever, for most attendees, hackers will be in charge of getting themselves to the venue. There’s reliable public transportation in the Bay, such as CalTrain, BART, and buses in San Francisco. We will also be offering a free hacker bus from the BART line to the Palace of Fine Arts for accepted and confirmed hackers – more details to come!"
+      },
+      {
+        "label": "Will there be hardware I can use?",
+        "value": "Yes! We will provide hardware that you can borrow for your projects."
+      },
+      {
+        "label": "Will there be overnight accommodations?",
+        "value": "Yes! Hacking all night is fun, but you can also get some rest! We will have a sleeping room in the venue, and there are many local hotels within a 10 minute walk should you opt to book one."
+      },
+      {
+        "label": "Will the Wi-Fi work this year?",
+        "value": "We understand the frustration around the Wi-Fi service at Cal Hacks 12.0 — trust us, we were frustrated too. We are doing everything in our power and making heavy investments to ensure that Wi-Fi runs smoothly this year."
+      },
+      {
+        "label": "rating",
+        "value": "4.8"
+      },
+      {
+        "label": "phone",
+        "value": "+1 415-360-3731"
+      },
+      {
+        "label": "hours",
+        "value": "[]"
+      }
+    ],
+    "source_url": "https://www.google.com/maps/place/Palace+of+Fine+Arts/@37.8029,-122.4484,16z/data=!4m6!3m5!1s0x808586d510144681:0xe960db8a581aacf5!8m2!3d37.8029308!4d-122.4484231!16zL20vMDJqbjNx?hl=en",
+    "fetched_at": {
+      "__timestamp_micros_since_unix_epoch__": 1792830928000000
+    }
+  },
+  "zones": [
+    {
+      "source_key": "zone:entrance",
+      "name": "Entrance and concierge",
+      "kind": "entrance",
+      "station_id": 101,
+      "plan_x_m": 8.0,
+      "plan_y_m": 30.0,
+      "area_sq_m": 300.0,
+      "capacity": 200,
+      "exit_colour": 1,
+      "description": "Main doors and the concierge desk near the entrance"
+    },
+    {
+      "source_key": "zone:hacking-floor",
+      "name": "Hacking floor",
+      "kind": "floor",
+      "station_id": 102,
+      "plan_x_m": 55.0,
+      "plan_y_m": 30.0,
+      "area_sq_m": 2400.0,
+      "capacity": 1500,
+      "exit_colour": 0,
+      "description": "Team tables in the middle of the hall"
+    },
+    {
+      "source_key": "zone:sponsor-row",
+      "name": "Sponsor row",
+      "kind": "sponsor",
+      "station_id": 103,
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "area_sq_m": 600.0,
+      "capacity": 400,
+      "exit_colour": 0,
+      "description": "Sponsor tables along the north wall"
+    },
+    {
+      "source_key": "zone:stage",
+      "name": "Main stage",
+      "kind": "stage",
+      "station_id": 104,
+      "plan_x_m": 110.0,
+      "plan_y_m": 42.0,
+      "area_sq_m": 500.0,
+      "capacity": 600,
+      "exit_colour": 2,
+      "description": "Opening and closing ceremonies, talks"
+    },
+    {
+      "source_key": "zone:food",
+      "name": "Food and drinks",
+      "kind": "food",
+      "station_id": 105,
+      "plan_x_m": 35.0,
+      "plan_y_m": 54.0,
+      "area_sq_m": 400.0,
+      "capacity": 300,
+      "exit_colour": 0,
+      "description": "Meals, snacks and partner drinks"
+    }
+  ],
+  "organizations": [
+    {
+      "source_key": "org:a16z.com",
+      "name": "a16z",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://a16z.com/college-talent/",
+      "domain": "a16z.com",
+      "logo_url": "",
+      "description": "a16z (Andreessen Horowitz) is a venture capital firm, listed as a Bronze sponsor of the event.",
+      "category": "venture",
+      "tags": [
+        "sponsor",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:adobe.com",
+      "name": "Adobe",
+      "kind": "sponsor",
+      "sponsor_tier": "Partner",
+      "website": "https://www.adobe.com/",
+      "domain": "adobe.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQHilaKdJueUVg/company-logo_200_200/B56ZodIp56HUAM-/0/1761425400480?e=2147483647&v=beta&t=-tNun5V2BRDck_2umtf0ZcPnEoaTicnbr3RnWud4Eag",
+      "description": "Adobe is a global software company for digital creativity and experiences, a Partner of the event.",
+      "category": "design",
+      "tags": [
+        "creative",
+        "software",
+        "partner"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Jose, CA",
+      "size_range": "10,001+ employees",
+      "founded_year": 1982,
+      "linkedin_url": "https://www.linkedin.com/company/adobe",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:afterquery.com",
+      "name": "AfterQuery",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.afterquery.com/",
+      "domain": "afterquery.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4D0BAQEoXHrGXFjgwg/company-logo_200_200/B4DZ1u0YwFHIAM-/0/1775680720224/afterquery_logo?e=2147483647&v=beta&t=AX1Ig3ZrcQWoTt-D5qweXWcaqdQeOp73-SQHFLTR4-U",
+      "description": "AfterQuery is an applied research lab curating data solutions to accelerate foundation model development, a Silver sponsor.",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "research",
+        "data"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, CA",
+      "size_range": "51-200 employees",
+      "founded_year": 2025,
+      "linkedin_url": "https://www.linkedin.com/company/afterquery",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:amazon.jobs",
+      "name": "Annapurna Labs",
+      "kind": "sponsor",
+      "sponsor_tier": "Anchor",
+      "website": "https://amazon.jobs/content/en/teams/annapurna-labs",
+      "domain": "amazon.jobs",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQHXcfe-KCondg/company-logo_200_200/B4EaCCSTJCIcAE-/0/1788892230487/annapurna_labs_logo?e=2147483647&v=beta&t=mU_gELU3d4xX8K5e36wYXZ3EJDv-TSyHyakH_wgjhwQ",
+      "description": "Annapurna Labs (Amazon) builds custom silicon such as Graviton and Trainium chips powering AI and cloud infrastructure; an Anchor sponsor.",
+      "category": "hardware",
+      "tags": [
+        "silicon",
+        "cloud",
+        "ai"
+      ],
+      "industry": "Artificial Intelligence",
+      "headquarters": "",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 2011,
+      "linkedin_url": "https://www.linkedin.com/company/annapurna-labs",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:anthropic.com",
+      "name": "Anthropic",
+      "kind": "sponsor",
+      "sponsor_tier": "Anchor",
+      "website": "https://www.anthropic.com/",
+      "domain": "anthropic.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQFMhKgeR7EYAg/company-logo_200_200/company-logo_200_200/0/1719256413073/anthropicresearch_logo?e=2147483647&v=beta&t=cmrBQ-Norz8fecFdOgU9UhbYOUI0faNbFew_EmrcekM",
+      "description": "Anthropic is an AI research company building reliable, interpretable AI systems including Claude; an Anchor sponsor.",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "research",
+        "claude"
+      ],
+      "industry": "Research Services",
+      "headquarters": "",
+      "size_range": "501-1,000 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/anthropicresearch",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:apify.com",
+      "name": "Apify",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://apify.com/",
+      "domain": "apify.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4D0BAQF7OnC-r1njIA/company-logo_200_200/B4DZwd3LFrHEAI-/0/1770027528966/apify_logo?e=2147483647&v=beta&t=3P-kpqqDp-xRunnoe7qQwvZ3DazE1KnOdCiVlTREoJQ",
+      "description": "Apify is a marketplace of tools (Actors) for automating web data extraction and AI integrations; a Silver sponsor.",
+      "category": "data",
+      "tags": [
+        "web-data",
+        "automation",
+        "ai"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "Prague",
+      "size_range": "201-500 employees",
+      "founded_year": 2016,
+      "linkedin_url": "https://www.linkedin.com/company/apify",
+      "prizes": [
+        "1st Place Best use of Apify ($2000)",
+        "2nd Place Best use of Apify ($1000)",
+        "3rd Place Best use of Apify ($800)",
+        "4th Place Best use of Apify ($400)",
+        "5th Place Best use of Apify ($400)",
+        "Best Actor sponsored by Apify ($400)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:armadin.com",
+      "name": "Armadin",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.armadin.com/",
+      "domain": "armadin.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQEk6o3oZwX2cQ/company-logo_200_200/B56ZzWDob1J8AI-/0/1773117802501/armadin_logo?e=2147483647&v=beta&t=-f0995fkDmLZdAMnJFftEqw82vAVJayIx8h-8AvuJQw",
+      "description": "Armadin is an AI-native cybersecurity company building autonomous red-team agents; a Silver sponsor.",
+      "category": "security",
+      "tags": [
+        "cybersecurity",
+        "ai",
+        "agents"
+      ],
+      "industry": "Computer and Network Security",
+      "headquarters": "Palo Alto, California",
+      "size_range": "51-200 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/armadin",
+      "prizes": [
+        "Best Security Hack ($996)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:asus.com",
+      "name": "ASUS",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://asus.com",
+      "domain": "asus.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQGIg__IXk05Eg/company-logo_200_200/company-logo_200_200/0/1663035290881/asus_logo?e=2147483647&v=beta&t=SvH76G5jks-J4YpwHJBfMXn-fka3IiPLFi-DSj8Y7Ok",
+      "description": "ASUS is a global technology hardware manufacturer, a Partner of the event.",
+      "category": "hardware",
+      "tags": [
+        "hardware",
+        "devices",
+        "partner"
+      ],
+      "industry": "Computer Hardware Manufacturing",
+      "headquarters": "Taipei City, Taipei",
+      "size_range": "10,001+ employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/asus",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:atlassian.com",
+      "name": "Atlassian",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.atlassian.com/",
+      "domain": "atlassian.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQGeyLL6crkJKg/company-logo_200_200/company-logo_200_200/0/1735593604612/atlassian_logo?e=2147483647&v=beta&t=MDQ6y7lHkorfEXX4hBye7e2Xn1V3FG1tLoKieqjj-Ik",
+      "description": "Atlassian powers team collaboration software, a Bronze sponsor.",
+      "category": "developer_tools",
+      "tags": [
+        "collaboration",
+        "software",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Sydney, NSW",
+      "size_range": "10,001+ employees",
+      "founded_year": 2002,
+      "linkedin_url": "https://www.linkedin.com/company/atlassian",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:berkeley.edu",
+      "name": "Fung Institute for Engineering Leadership",
+      "kind": "sponsor",
+      "sponsor_tier": "Partner",
+      "website": "https://funginstitute.berkeley.edu/",
+      "domain": "berkeley.edu",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQFBsnt47oYriw/company-logo_200_200/B56Zwv75RRIQAI-/0/1770330756456?e=2147483647&v=beta&t=xHRJymx850Er65x464YMSRGjaTva_hNPyw4iEZJLwWA",
+      "description": "The Fung Institute for Engineering Leadership at UC Berkeley trains engineers to also be leaders; a Partner of the event.",
+      "category": "education",
+      "tags": [
+        "education",
+        "berkeley",
+        "engineering"
+      ],
+      "industry": "Higher Education",
+      "headquarters": "Berkeley, California",
+      "size_range": "51-200 employees",
+      "founded_year": 2010,
+      "linkedin_url": "https://www.linkedin.com/company/uc-berkeley-fung-institute-for-engineering-leadership",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:bitdeer.ai",
+      "name": "Bitdeer",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.bitdeer.ai/en",
+      "domain": "bitdeer.ai",
+      "logo_url": "",
+      "description": "Bitdeer offers an AI Model Studio for compute and model workloads; a Silver sponsor offering prize credits.",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "gpu",
+        "cloud",
+        "silver"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "1st Place Best Use of Bitdeer AI Model Studio ($500)",
+        "2nd Place Best Use of Bitdeer AI Model Studio ($200)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:brightdata.com",
+      "name": "Bright Data",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://brightdata.com/",
+      "domain": "brightdata.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQHfQMczcuM6Fw/company-logo_200_200/B4EZtP2cAVJQAI-/0/1766571229617/bright_data_logo?e=2147483647&v=beta&t=_Vj8cnbgi3NUXGjVZX--aUdOgM9bHilcUkAJSQSN6x0",
+      "description": "Bright Data is a web data infrastructure company powering AI and BI use cases; a Silver sponsor.",
+      "category": "data",
+      "tags": [
+        "web-data",
+        "proxy",
+        "ai"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, California",
+      "size_range": "501-1,000 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/bright-data",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:canva.com",
+      "name": "Canva",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.canva.com/about/",
+      "domain": "canva.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/C4D0BAQGO1uzGzmVB-A/company-logo_200_200/company-logo_200_200/0/1656630679668/canva_logo?e=2147483647&v=beta&t=2ggRiaeV8uAoFvTEl96N8SEVL2KswkMmXUughhv8NRg",
+      "description": "Canva is a visual communications and design platform, a Bronze sponsor.",
+      "category": "design",
+      "tags": [
+        "design",
+        "templates",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Surry Hills, New South Wales",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 2012,
+      "linkedin_url": "https://www.linkedin.com/company/canva",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:capitalone.com",
+      "name": "Capital One",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.capitalone.com/about/",
+      "domain": "capitalone.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/C560BAQF0OgQyRZ9yAA/company-logo_200_200/company-logo_200_200/0/1635782718446/capital_one_logo?e=2147483647&v=beta&t=EdvNN6BepIhdQnc9udE-QlqxASeRgfZxEr0ZYI4s6cQ",
+      "description": "Capital One is a major financial services and banking company, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "banking",
+        "finance",
+        "bronze"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "McLean, Va",
+      "size_range": "10,001+ employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/capital-one",
+      "prizes": [
+        "Best Use of Nessie ($1200)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:cartesia.ai",
+      "name": "Cartesia",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.cartesia.ai/",
+      "domain": "cartesia.ai",
+      "logo_url": "",
+      "description": "Cartesia is an AI company offering voice/model technology, a Silver sponsor offering device prizes.",
+      "category": "ai",
+      "tags": [
+        "voice-ai",
+        "silver"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "Best Use of Cartesia ($1516)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:celsius.com",
+      "name": "Celsius",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://celsius.com",
+      "domain": "celsius.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQEhvrkflTEViw/company-logo_200_200/B4EZ0_3ziVHAAI-/0/1774893087161/celsius_inc__logo?e=2147483647&v=beta&t=t6ossTruIiAa56Dx7vp9EUySyeAQwbqAQFbFBZfO0Xg",
+      "description": "Celsius is a global beverage company making the CELSIUS zero-sugar energy drink, a Partner of the event.",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "energy-drink",
+        "partner"
+      ],
+      "industry": "Food and Beverage Retail",
+      "headquarters": "Boca Raton, Florida",
+      "size_range": "501-1,000 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/celsius-inc-",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:citadel.com",
+      "name": "Citadel",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.citadel.com/",
+      "domain": "citadel.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQEr0zQ5jE04zA/company-logo_200_200/company-logo_200_200/0/1688575029322/citadel_llc_logo?e=2147483647&v=beta&t=W9lZ28zWyi1Zlda38sUctiBx-3T_gZbi6gNR0hvzLj0",
+      "description": "Citadel is a leading global investment and trading firm, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "Miami, Florida",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 1990,
+      "linkedin_url": "https://www.linkedin.com/company/citadel-llc",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:coinbase.com",
+      "name": "Coinbase",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.coinbase.com/developer-platform",
+      "domain": "coinbase.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQHQJxIt9C0pHA/company-logo_200_200/B4EZ755_FYJIAE-/0/1782309188193/coinbase_logo?e=2147483647&v=beta&t=78GWOoY-2Fddi5FTLZ4NY_SYVOJdteeVX4FdkKi30gM",
+      "description": "Coinbase is a trusted crypto platform and exchange, a Bronze sponsor.",
+      "category": "crypto",
+      "tags": [
+        "crypto",
+        "exchange",
+        "bronze"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "Remote First",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/coinbase",
+      "prizes": [
+        "Best Use of x402 by Coinbase ($2000)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:context.dev",
+      "name": "Context",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://context.dev",
+      "domain": "context.dev",
+      "logo_url": "",
+      "description": "Context is a sponsor of the event with a dedicated site organization record on context.dev.",
+      "category": "developer_tools",
+      "tags": [
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:convex.dev",
+      "name": "Convex",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.convex.dev/",
+      "domain": "convex.dev",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQEtODWbqjdhQg/company-logo_200_200/company-logo_200_200/0/1736194456966/convex_dev_logo?e=2147483647&v=beta&t=Wq7oPBzONbOv4Y2D_NZdrcHh6AvFFbfEbsKzTfKuafo",
+      "description": "Convex is an open-source reactive database for web app developers, a Silver sponsor.",
+      "category": "developer_tools",
+      "tags": [
+        "database",
+        "backend",
+        "silver"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "San Francisco, California",
+      "size_range": "11-50 employees",
+      "founded_year": 2021,
+      "linkedin_url": "https://www.linkedin.com/company/convex-dev",
+      "prizes": [
+        "Best use of Convex ($1308)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:council.health",
+      "name": "Council Health",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://council.health/",
+      "domain": "council.health",
+      "logo_url": "",
+      "description": "Council Health is a Bronze sponsor of the event.",
+      "category": "health",
+      "tags": [
+        "health",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:creao.ai",
+      "name": "Creao AI",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://creao.ai/",
+      "domain": "creao.ai",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQFOAyLAbjG7XA/company-logo_200_200/B56aA2v1X6HUAE-/0/1787624904381/creaoai_logo?e=2147483647&v=beta&t=ukFj_SHtEVXUncm3Mq_mrTQT7bHHoamVKp7jgnQEpnU",
+      "description": "CREAO is an AI-native platform for building and running agents that execute complete workflows, a Silver sponsor.",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "agents",
+        "workflow"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "Cupertino, California",
+      "size_range": "11-50 employees",
+      "founded_year": 2024,
+      "linkedin_url": "https://www.linkedin.com/company/creaoai",
+      "prizes": [
+        "1st Place Best AI-First Disruptor ($8760)",
+        "1st Place Best One-Person Company ($8760)",
+        "1st Place Best Team Empowerment ($8760)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:crscreditapi.com",
+      "name": "CRS Credit",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://crscreditapi.com/",
+      "domain": "crscreditapi.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQEUDhfE6c1dvQ/company-logo_200_200/B4EZnzixHiKwAM-/0/1760727601925/crscreditapi_logo?e=2147483647&v=beta&t=eAVNa3iMy8NQobFEgGaVt-Bvv_whFRER1cyreqQ5xJ8",
+      "description": "CRS is an independent data infrastructure platform powering modern credit decisioning, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "credit",
+        "data",
+        "fraud"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "San Francisco, California",
+      "size_range": "51-200 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/crscreditapi",
+      "prizes": [
+        "Best Financial AI Agent ($500)",
+        "Best Identity / Fraud Innovation",
+        "Best Overall CRS Hack ($1000)",
+        "Most Unexpected Use of CRS"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:cursor.com",
+      "name": "SpaceXAI",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://cursor.com",
+      "domain": "cursor.com",
+      "logo_url": "",
+      "description": "The only organization candidate found on cursor.com is named SpaceXAI, which does not clearly correspond to any known Cursor product; needs verification.",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:decagon.ai",
+      "name": "Decagon",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://decagon.ai/",
+      "domain": "decagon.ai",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQERFjMES1gskg/company-logo_200_200/B56ZsoPQVkI0AM-/0/1765906647558/decagon_ai_logo?e=2147483647&v=beta&t=W7IZz1B6McijKvn3ODATgHphWcpNIgar69JFar0BJUk",
+      "description": "Decagon is a conversational AI platform for concierge customer experiences, a Bronze sponsor.",
+      "category": "ai",
+      "tags": [
+        "conversational-ai",
+        "customer-experience",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, California",
+      "size_range": "501-1,000 employees",
+      "founded_year": 2023,
+      "linkedin_url": "https://www.linkedin.com/company/decagon-ai",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:deshaw.com",
+      "name": "D. E. Shaw Group",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.deshaw.com/",
+      "domain": "deshaw.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/C4D0BAQFmyEBRsJiPhw/company-logo_200_200/company-logo_200_200/0/1630553047727/d_e_shaw__co_logo?e=2147483647&v=beta&t=pXtMkQ3mx-5Tu_CVe0yT1RTDdGFM9beRFX6YJq6Zbm0",
+      "description": "The D. E. Shaw group is a quantitative investment firm, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "New York, NY",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 1988,
+      "linkedin_url": "https://www.linkedin.com/company/d.-e.-shaw-&-co.",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:drinknixie.com",
+      "name": "Nixie",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://drinknixie.com",
+      "domain": "drinknixie.com",
+      "logo_url": "",
+      "description": "Nixie is a beverage brand and a Partner of the event.",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "partner"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:elastic.co",
+      "name": "Elastic",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.elastic.co/",
+      "domain": "elastic.co",
+      "logo_url": "",
+      "description": "Elastic is the company behind Elasticsearch, offering search and data platform tools; a Silver sponsor with Agent Builder prizes.",
+      "category": "data",
+      "tags": [
+        "search",
+        "data",
+        "silver"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "1st Place Best use of the Elastic Agent Builder on a Serverless instance ($1200)",
+        "2nd Place Best use of the Elastic Agent Builder on a Serverless instance ($1436)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:engramme.com",
+      "name": "Engramme AI",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.engramme.com/",
+      "domain": "engramme.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQFuxCXuC2YuoQ/company-logo_200_200/B56ZnezaPDJ8AI-/0/1760379643191/memorymachines_logo?e=2147483647&v=beta&t=ycWUY_fBi3nY2fLLib1h0Ybd7nrzOLxsdTkzS1cba7U",
+      "description": "Engramme is building the API for human memory, a Bronze sponsor.",
+      "category": "ai",
+      "tags": [
+        "memory",
+        "ai",
+        "research"
+      ],
+      "industry": "Research Services",
+      "headquarters": "San Francisco, CA",
+      "size_range": "2-10 employees",
+      "founded_year": 2025,
+      "linkedin_url": "https://www.linkedin.com/company/engrammehq",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:factory.ai",
+      "name": "Factory",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://factory.com/",
+      "domain": "factory.ai",
+      "logo_url": "",
+      "description": "Factory (Factory AI) is an AI coding agent platform, a Silver sponsor.",
+      "category": "ai",
+      "tags": [
+        "coding-agent",
+        "ai",
+        "silver"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "Best Use of the Factory Droid SDK ($2000)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:fetch.ai",
+      "name": "Fetch.ai",
+      "kind": "sponsor",
+      "sponsor_tier": "Golden Bear",
+      "website": "https://www.fetch.ai/",
+      "domain": "fetch.ai",
+      "logo_url": "",
+      "description": "Fetch.ai builds autonomous agent technology, a Golden Bear (top) sponsor.",
+      "category": "ai",
+      "tags": [
+        "agents",
+        "blockchain",
+        "golden-bear"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "1st Place Best Use of Fetch.ai ($1500)",
+        "2nd Place Best Use of Fetch.ai ($1000)",
+        "3rd Place Best Use of Fetch.ai ($500)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:figma.com",
+      "name": "Figma",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.figma.com/careers/",
+      "domain": "figma.com",
+      "logo_url": "",
+      "description": "Figma is a collaborative design platform, a Bronze sponsor with a Figma Agent prize category.",
+      "category": "design",
+      "tags": [
+        "design",
+        "collaboration",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "Best Design ($1000)",
+        "Best Use Case of Figma ($1000)",
+        "Best Use Case of Figma Agent ($1000)",
+        "Most Creative ($1000)",
+        "Most Creative Use Case of Figma Agent ($1000)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:finchnode.org",
+      "name": "FinchNode",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://finchnode.org",
+      "domain": "finchnode.org",
+      "logo_url": "",
+      "description": "FinchNode is a sponsor of the event.",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:greptile.com",
+      "name": "Greptile",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.greptile.com/",
+      "domain": "greptile.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQE8tnWiA02OCg/company-logo_200_200/B56Z2TOlyHIsAI-/0/1776291569102/greptile_logo?e=2147483647&v=beta&t=bY9btxNJ7E2nWe6joJOCniVFlwyvo9o4x_d7M8vXBnA",
+      "description": "Greptile builds AI agents that review pull requests with full codebase context, a Bronze sponsor.",
+      "category": "developer_tools",
+      "tags": [
+        "code-review",
+        "ai",
+        "agents"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "San Francisco, California",
+      "size_range": "11-50 employees",
+      "founded_year": 2024,
+      "linkedin_url": "https://www.linkedin.com/company/greptile",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:harmlessharvest.com",
+      "name": "Harmless Harvest",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://harmlessharvest.com",
+      "domain": "harmlessharvest.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQGAGZjKybTtoQ/company-logo_200_200/company-logo_200_200/0/1667582190222/harmless_harvest_logo?e=2147483647&v=beta&t=DBL9N4FGL_rgdk4Sf25v9JF6qYSYi-VSFO6dcw8jFzg",
+      "description": "Harmless Harvest is a food & beverage company known for coconut water, a Partner of the event.",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "coconut-water",
+        "partner"
+      ],
+      "industry": "Food and Beverage Services",
+      "headquarters": "Oakland, California",
+      "size_range": "201-500 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/harmless-harvest",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:hyphenate.ai",
+      "name": "Hyphenate",
+      "kind": "sponsor",
+      "sponsor_tier": "Anchor",
+      "website": "https://hyphenate.ai/",
+      "domain": "hyphenate.ai",
+      "logo_url": "https://images.crunchbase.com/image/upload/c_pad,h_170,w_170,f_auto,b_white,q_auto:eco,dpr_4/58c765da57884fa49dc7b75764b678ef",
+      "description": "Hyphenate is an autonomous finance platform for the office of the CFO, an Anchor sponsor.",
+      "category": "fintech",
+      "tags": [
+        "finance",
+        "automation",
+        "cfo"
+      ],
+      "industry": "Accounting, Finance, Software",
+      "headquarters": "New York, New York, United States, North America",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "1st Place The Hyphenated Enterprise: Autonomous Systems for Finance ($8000)",
+        "2nd Place The Hyphenated Enterprise: Autonomous Systems for Finance ($5000)",
+        "3rd Place The Hyphenated Enterprise: Autonomous Systems for Finance ($3000)"
+      ],
+      "crunchbase_url": "https://www.crunchbase.com/organization/hyphenate-ai",
+      "funding_summary": "1 funding rounds, last seed",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:illumio.com",
+      "name": "Illumio",
+      "kind": "sponsor",
+      "sponsor_tier": "Partner",
+      "website": "https://www.illumio.com/",
+      "domain": "illumio.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQFoizPEFmyakQ/company-logo_200_200/company-logo_200_200/0/1729803311245/illumio_logo?e=2147483647&v=beta&t=gKci3xRIDIw-rPNEiZYbPsmLzDy9_IK2bcxaYY3Kvso",
+      "description": "Illumio is a leader in ransomware and breach containment security, a Partner of the event.",
+      "category": "security",
+      "tags": [
+        "cybersecurity",
+        "breach-containment",
+        "partner"
+      ],
+      "industry": "Computer and Network Security",
+      "headquarters": "Sunnyvale, California",
+      "size_range": "501-1,000 employees",
+      "founded_year": 2013,
+      "linkedin_url": "https://www.linkedin.com/company/illumio",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:illy.com",
+      "name": "illy",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://illy.com",
+      "domain": "illy.com",
+      "logo_url": "",
+      "description": "illy is a coffee brand and a Partner of the event.",
+      "category": "food_drink",
+      "tags": [
+        "coffee",
+        "partner"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:janestreet.com",
+      "name": "Jane Street",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.janestreet.com/",
+      "domain": "janestreet.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQGDwkF0pxTSjg/company-logo_200_200/company-logo_200_200/0/1700507376786/jane_street_global_logo?e=2147483647&v=beta&t=Zueimo_ftClwHS3SBZnhNcTcdREIFCdBucqUSWDtG6s",
+      "description": "Jane Street is a quantitative trading firm, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "quant",
+        "bronze"
+      ],
+      "industry": "Financial Services",
+      "headquarters": "New York, NY",
+      "size_range": "1,001-5,000 employees",
+      "founded_year": 2000,
+      "linkedin_url": "https://www.linkedin.com/company/jane-street-global",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:jukeboxprint.com",
+      "name": "Jukebox",
+      "kind": "partner",
+      "sponsor_tier": "Partner",
+      "website": "https://www.jukeboxprint.com/",
+      "domain": "jukeboxprint.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQHRGLFwZ_ZSrg/company-logo_200_200/B56Z77JWE4LAAI-/0/1782329991699/jukebox_logo?e=2147483647&v=beta&t=8dWdULbnp6liSVG1Ywp8TeEgGNU3AsP9Q9TYOVr4csY",
+      "description": "Jukebox helps brands and teams bring ideas to life through premium custom print, a Partner of the event.",
+      "category": "other",
+      "tags": [
+        "print",
+        "merchandise",
+        "partner"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Richmond, British Columbia",
+      "size_range": "51-200 employees",
+      "founded_year": 2009,
+      "linkedin_url": "https://www.linkedin.com/company/jukebox",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:listenlabs.com",
+      "name": "Listen Labs",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://listenlabs.com/",
+      "domain": "listenlabs.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQF2yR9x0jkikg/company-logo_200_200/B56aBYlF.ZIAAI-/0/1788192514284/listenlabss_logo?e=2147483647&v=beta&t=wR3PFhIwPd3IzF7WVDInT1etlfL6TNShXgjt4OEEuW0",
+      "description": "Listen Labs is an autonomous AI market researcher, a Bronze sponsor.",
+      "category": "ai",
+      "tags": [
+        "market-research",
+        "ai",
+        "bronze"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "San Francisco, California",
+      "size_range": "51-200 employees",
+      "founded_year": 2023,
+      "linkedin_url": "https://www.linkedin.com/company/listenlabss",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:llamaventures.vc",
+      "name": "Llama Ventures",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://llamaventures.vc",
+      "domain": "llamaventures.vc",
+      "logo_url": "",
+      "description": "Llama Ventures is a venture capital firm and sponsor of the event.",
+      "category": "venture",
+      "tags": [
+        "venture-capital",
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:mana.space",
+      "name": "Mana",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://mana.space",
+      "domain": "mana.space",
+      "logo_url": "",
+      "description": "Mana is a sponsor of the event.",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:meta.com",
+      "name": "Meta",
+      "kind": "sponsor",
+      "sponsor_tier": "Silver",
+      "website": "https://www.meta.com/about/",
+      "domain": "meta.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQHpGLIanfsREg/company-logo_200_200/B56aDarbc1IwAI-/0/1790375213168/meta_logo?e=2147483647&v=beta&t=KjcBhI-y4HnYFwfwTOhcDaJDAZ9vOGFqTP903x9mp7M",
+      "description": "Meta builds technologies that help people connect, find communities, and grow businesses, a Silver sponsor with a Round 2 Hackathon prize.",
+      "category": "ai",
+      "tags": [
+        "social",
+        "ai",
+        "silver"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Menlo Park, CA",
+      "size_range": "10,001+ employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/meta",
+      "prizes": [
+        "Meta/Facebook: Bringing People Closer Together with AI"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:microsoft.com",
+      "name": "Microsoft",
+      "kind": "sponsor",
+      "sponsor_tier": "Golden Bear",
+      "website": "https://www.microsoft.com/en-us",
+      "domain": "microsoft.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=2147483647&v=beta&t=ts9MGrTk7Lz3R1bmAfzCL8euuuuPWPCoXfdiLA2_IzM",
+      "description": "Microsoft empowers every person and organization to achieve more through technology, a Golden Bear sponsor.",
+      "category": "cloud",
+      "tags": [
+        "cloud",
+        "software",
+        "golden-bear"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Redmond, Washington",
+      "size_range": "10,001+ employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/microsoft",
+      "prizes": [
+        "1st Place Built for the Real World ($3800)",
+        "2nd Place Microsoft Customer Impact Award"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:mlh.com",
+      "name": "MLH",
+      "kind": "partner",
+      "sponsor_tier": "Partner",
+      "website": "https://www.mlh.com/",
+      "domain": "mlh.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/C4E0BAQGhPso1lpxl1w/company-logo_200_200/company-logo_200_200/0/1630604451789/major_league_hacking_logo?e=2147483647&v=beta&t=Q-BoCkAtSsYvF0t2vqIfvxU8D-zeymPRd4h5VEDqbZM",
+      "description": "Major League Hacking (MLH) is a global hackathon community empowering developers, a Partner of the event.",
+      "category": "education",
+      "tags": [
+        "hackathons",
+        "community",
+        "partner"
+      ],
+      "industry": "Software Development",
+      "headquarters": "New York, NY",
+      "size_range": "11-50 employees",
+      "founded_year": 2012,
+      "linkedin_url": "https://www.linkedin.com/company/major-league-hacking",
+      "prizes": [
+        "Best Domain Name from GoDaddy Registry",
+        "Best Use of Gemini API",
+        "Best Use of Snowflake API",
+        "Best Use of Solana",
+        "Best Use of Tiger Data",
+        "Best Use of Vultr",
+        "Commit Fellowship Prize Category"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:moonpay.com",
+      "name": "MoonPay",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.moonpay.com/",
+      "domain": "moonpay.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQHlaph_qWt7MA/company-logo_200_200/company-logo_200_200/0/1702140517386/moonpay_logo?e=2147483647&v=beta&t=EMk0nnl7Bz2W37cdURwDZr7QvQFlivTOwurL0tFwe_U",
+      "description": "MoonPay simplifies buying, selling, and trading crypto using everyday payment methods, a Bronze sponsor.",
+      "category": "crypto",
+      "tags": [
+        "crypto",
+        "payments",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "Remote",
+      "size_range": "201-500 employees",
+      "founded_year": 2018,
+      "linkedin_url": "https://www.linkedin.com/company/moonpay",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:moss.dev",
+      "name": "Moss",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.moss.dev/",
+      "domain": "moss.dev",
+      "logo_url": "",
+      "description": "Moss is a Bronze sponsor of the event, offering an Airpod Max/pro prize.",
+      "category": "other",
+      "tags": [
+        "sponsor",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [
+        "Best Use of Moss ($996)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:nooks.ai",
+      "name": "Nooks",
+      "kind": "sponsor",
+      "sponsor_tier": "",
+      "website": "https://nooks.ai",
+      "domain": "nooks.ai",
+      "logo_url": "",
+      "description": "Nooks is a sponsor of the event.",
+      "category": "ai",
+      "tags": [
+        "sales",
+        "ai",
+        "sponsor"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:notability.com",
+      "name": "Notability",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://notability.com/",
+      "domain": "notability.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQEqLhauLl2OKA/company-logo_200_200/B56Zisz3z4G0AQ-/0/1755245936120/ginger_labs_logo?e=2147483647&v=beta&t=2GcQ7roBgy69L1-eqNK7tkdKjbl7LKwFQD6mL5NB8U0",
+      "description": "Notability builds tools to help people capture notes and learn better, a Bronze sponsor.",
+      "category": "education",
+      "tags": [
+        "notes",
+        "productivity",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, California",
+      "size_range": "51-200 employees",
+      "founded_year": 2008,
+      "linkedin_url": "https://www.linkedin.com/company/ginger-labs",
+      "prizes": [
+        "Best Use of Notability ($396)"
+      ],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:redbull.com",
+      "name": "Red Bull",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://redbull.com",
+      "domain": "redbull.com",
+      "logo_url": "",
+      "description": "Red Bull is an energy drink brand and a Partner of the event.",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "energy-drink",
+        "partner"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:runpod.io",
+      "name": "Runpod",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.runpod.io/",
+      "domain": "runpod.io",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQGrNly9MQkkCw/company-logo_200_200/B56ZdGd3mAHEAM-/0/1749233924959/runpod_io_logo?e=2147483647&v=beta&t=Na8q1zvbybaNWy6ERTJziOaIbz4xbIY0HUNF-8bZG-I",
+      "description": "Runpod is the AI Developer Cloud for building, training, and scaling AI applications, a Bronze sponsor.",
+      "category": "cloud",
+      "tags": [
+        "gpu",
+        "ai",
+        "cloud"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, CA",
+      "size_range": "51-200 employees",
+      "founded_year": 2022,
+      "linkedin_url": "https://www.linkedin.com/company/runpod-io",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:rysesupps.com",
+      "name": "RYSE",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://rysesupps.com",
+      "domain": "rysesupps.com",
+      "logo_url": "",
+      "description": "RYSE is a Partner of the event.",
+      "category": "other",
+      "tags": [
+        "partner"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:savvywealth.com",
+      "name": "Savvy",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.savvywealth.com",
+      "domain": "savvywealth.com",
+      "logo_url": "",
+      "description": "Savvy (Savvy Wealth) is a wealth management fintech company, a Bronze sponsor.",
+      "category": "fintech",
+      "tags": [
+        "wealth",
+        "finance",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:scale.com",
+      "name": "Scale AI",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://scale.com/",
+      "domain": "scale.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQGppg_SIVolcw/company-logo_200_200/B56Z45XUDRHEAE-/0/1779078873572/scaleai_logo?e=2147483647&v=beta&t=pKr1o0TXdS5IoqNmxjv9-r6FNybjO7v2oW485VxAFEY",
+      "description": "Scale AI develops reliable AI systems and provides data infrastructure for AI applications, a Bronze sponsor.",
+      "category": "ai",
+      "tags": [
+        "data",
+        "ai",
+        "bronze"
+      ],
+      "industry": "Software Development",
+      "headquarters": "San Francisco, California",
+      "size_range": "501-1,000 employees",
+      "founded_year": 2016,
+      "linkedin_url": "https://www.linkedin.com/company/scaleai",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:seeedstudio.com",
+      "name": "Seeed Studio",
+      "kind": "partner",
+      "sponsor_tier": "",
+      "website": "https://seeedstudio.com",
+      "domain": "seeedstudio.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQEaZe2ZqQe8Jw/company-logo_200_200/B56ZWO28AZHsAM-/0/1741858521848/seeedstudio_logo?e=2147483647&v=beta&t=tbNU-DKG0FxgagD_8O51XOsWvzA4FB0cd4FqNvLODG4",
+      "description": "Seeed Studio provides open hardware technology and agile manufacturing services, a Partner of the event.",
+      "category": "hardware",
+      "tags": [
+        "hardware",
+        "manufacturing",
+        "partner"
+      ],
+      "industry": "Technology, Information and Internet",
+      "headquarters": "Shenzhen, Guangdong",
+      "size_range": "201-500 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/seeedstudio",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:spacetimedb.com",
+      "name": "SpacetimeDB",
+      "kind": "sponsor",
+      "sponsor_tier": "Anchor",
+      "website": "https://spacetimedb.com/",
+      "domain": "spacetimedb.com",
+      "logo_url": "https://images.crunchbase.com/image/upload/c_pad,h_170,w_170,f_auto,b_white,q_auto:eco,dpr_4/aecjqjmhpezktoburj1z",
+      "description": "SpacetimeDB is a backend system for real-time apps and games, developed by Clockwork Labs; an Anchor sponsor.",
+      "category": "developer_tools",
+      "tags": [
+        "database",
+        "backend",
+        "gaming"
+      ],
+      "industry": "Internet, MMO Games, Online Games, Video Games",
+      "headquarters": "San Francisco, California, United States, North America",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "https://www.crunchbase.com/organization/clockwork-labs",
+      "funding_summary": "4 funding rounds, last series_a",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:supercell.com",
+      "name": "Supercell",
+      "kind": "sponsor",
+      "sponsor_tier": "Golden Bear",
+      "website": "https://supercell.com/en/",
+      "domain": "supercell.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4D0BAQGCalRnrUP58Q/company-logo_200_200/company-logo_200_200/0/1736756886674/supercell_logo?e=2147483647&v=beta&t=a7DJ8XM-1uPltTwalOW2uXf5aU17ztPgz7coYZJ-X30",
+      "description": "Supercell is a Finnish mobile games company known for Clash of Clans and Clash Royale, a Golden Bear sponsor.",
+      "category": "gaming",
+      "tags": [
+        "mobile-games",
+        "gaming",
+        "golden-bear"
+      ],
+      "industry": "Computer Games",
+      "headquarters": "Helsinki, Southern Finland",
+      "size_range": "501-1,000 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/supercell",
+      "prizes": [],
+      "crunchbase_url": "https://www.crunchbase.com/organization/supercell",
+      "funding_summary": "3 funding rounds, last series_b",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:thehouse.fund",
+      "name": "The House Fund",
+      "kind": "partner",
+      "sponsor_tier": "Partner",
+      "website": "https://thehouse.fund/",
+      "domain": "thehouse.fund",
+      "logo_url": "https://media.licdn.com/dms/image/v2/C560BAQGvDBdadV7hmw/company-logo_200_200/company-logo_200_200/0/1630627495170/the_house_fund_logo?e=2147483647&v=beta&t=vumoP4tJ5yOQZv77PqRfzP9TdGZbR62PvmtACst3OL8",
+      "description": "The House Fund is a pre-seed and early stage venture capital fund focused on Berkeley startups, a Partner of the event.",
+      "category": "venture",
+      "tags": [
+        "venture-capital",
+        "berkeley",
+        "partner"
+      ],
+      "industry": "Venture Capital and Private Equity Principals",
+      "headquarters": "Berkeley",
+      "size_range": "2-10 employees",
+      "founded_year": 2016,
+      "linkedin_url": "https://www.linkedin.com/company/the-house-fund",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:visa.com",
+      "name": "Visa",
+      "kind": "sponsor",
+      "sponsor_tier": "Golden Bear",
+      "website": "https://www.visa.com/en-us",
+      "domain": "visa.com",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D4E0BAQHxjaJMTFrv2A/company-logo_200_200/B4EaFfOI9yIYAE-/0/1792598905031/visa_logo?e=2147483647&v=beta&t=eFdRr556rKV_2oYsVwks9MBB4Zeeu-2SUSVeJTaGVcY",
+      "description": "Visa is a world leader in digital payments facilitating transactions globally, a Golden Bear sponsor.",
+      "category": "fintech",
+      "tags": [
+        "payments",
+        "finance",
+        "golden-bear"
+      ],
+      "industry": "IT Services and IT Consulting",
+      "headquarters": "Foster City, California",
+      "size_range": "10,001+ employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/visa",
+      "prizes": [
+        "Best use of Reimagining Shopping sponsored by Visa ($5000)"
+      ],
+      "crunchbase_url": "https://www.crunchbase.com/organization/visa",
+      "funding_summary": "1 funding rounds, last post_ipo_equity",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "org:wajo.ai",
+      "name": "Wajo AI",
+      "kind": "sponsor",
+      "sponsor_tier": "Partner",
+      "website": "https://wajo.ai/",
+      "domain": "wajo.ai",
+      "logo_url": "https://media.licdn.com/dms/image/v2/D560BAQHobMZHuM5fnA/company-logo_200_200/B56aA3tRrSJ4AI-/0/1787641011126/wajo_ai_logo?e=2147483647&v=beta&t=ULXOlH6wSCovCXSIHGHxRNFIDEfAxHbqxyx3vstuNZk",
+      "description": "Wajo builds proactive, self-learning action agents that complete real-world tasks, a Partner of the event.",
+      "category": "ai",
+      "tags": [
+        "agents",
+        "consumer",
+        "partner"
+      ],
+      "industry": "Artificial Intelligence",
+      "headquarters": "",
+      "size_range": "2-10 employees",
+      "founded_year": 0,
+      "linkedin_url": "https://www.linkedin.com/company/wajo-ai",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "org:ycombinator.com",
+      "name": "Y Combinator",
+      "kind": "sponsor",
+      "sponsor_tier": "Bronze",
+      "website": "https://www.ycombinator.com/",
+      "domain": "ycombinator.com",
+      "logo_url": "",
+      "description": "Y Combinator is a startup accelerator, a Bronze sponsor.",
+      "category": "venture",
+      "tags": [
+        "accelerator",
+        "startups",
+        "bronze"
+      ],
+      "industry": "",
+      "headquarters": "",
+      "size_range": "",
+      "founded_year": 0,
+      "linkedin_url": "",
+      "prizes": [],
+      "crunchbase_url": "",
+      "funding_summary": "",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    }
+  ],
+  "people": [
+    {
+      "source_key": "site:person:enoreyes",
+      "display_name": "Eno Reyes",
+      "kind": "speaker",
+      "role": "opening speaker",
+      "title": "FOUNDER & CTO",
+      "organization_key": "org:factory.ai",
+      "bio": "Among the world’s leading AI agent platforms (and already a Cal Hacks sponsor).",
+      "headshot_url": "",
+      "links": [],
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "site:person:ryanpetersen",
+      "display_name": "Ryan Petersen",
+      "kind": "speaker",
+      "role": "opening speaker",
+      "title": "CEO & CO-FOUNDER",
+      "organization_key": "",
+      "bio": "The world’s leading AI-powered global logistics platform.",
+      "headshot_url": "",
+      "links": [],
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "site:person:sergeylevine",
+      "display_name": "Sergey Levine",
+      "kind": "speaker",
+      "role": "closing speaker",
+      "title": "CO-FOUNDER",
+      "organization_key": "",
+      "bio": "One of the world’s most cited roboticists and a UC Berkeley AI professor.\nThe world’s leading AGI platform for software-powered robotics.",
+      "headshot_url": "",
+      "links": [],
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    }
+  ],
+  "booths": [
+    {
+      "source_key": "booth:a16z.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:a16z.com",
+      "booth_number": "",
+      "name": "a16z",
+      "kind": "sponsor",
+      "description": "a16z (Andreessen Horowitz) is a venture capital firm, listed as a Bronze sponsor of the event.",
+      "tags": [
+        "venture",
+        "sponsor",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:adobe.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:adobe.com",
+      "booth_number": "",
+      "name": "Adobe",
+      "kind": "sponsor",
+      "description": "Adobe is a global software company for digital creativity and experiences, a Partner of the event.",
+      "tags": [
+        "design",
+        "creative",
+        "software",
+        "partner"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:afterquery.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:afterquery.com",
+      "booth_number": "",
+      "name": "AfterQuery",
+      "kind": "sponsor",
+      "description": "AfterQuery is an applied research lab curating data solutions to accelerate foundation model development, a Silver sponsor.",
+      "tags": [
+        "ai",
+        "ai",
+        "research",
+        "data"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:amazon.jobs",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:amazon.jobs",
+      "booth_number": "",
+      "name": "Annapurna Labs",
+      "kind": "sponsor",
+      "description": "Annapurna Labs (Amazon) builds custom silicon such as Graviton and Trainium chips powering AI and cloud infrastructure; an Anchor sponsor.",
+      "tags": [
+        "hardware",
+        "silicon",
+        "cloud",
+        "ai"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:anthropic.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:anthropic.com",
+      "booth_number": "",
+      "name": "Anthropic",
+      "kind": "sponsor",
+      "description": "Anthropic is an AI research company building reliable, interpretable AI systems including Claude; an Anchor sponsor.",
+      "tags": [
+        "ai",
+        "ai",
+        "research",
+        "claude"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:apify.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:apify.com",
+      "booth_number": "",
+      "name": "Apify",
+      "kind": "sponsor",
+      "description": "Apify is a marketplace of tools (Actors) for automating web data extraction and AI integrations; a Silver sponsor.",
+      "tags": [
+        "data",
+        "web-data",
+        "automation",
+        "ai"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:armadin.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:armadin.com",
+      "booth_number": "",
+      "name": "Armadin",
+      "kind": "sponsor",
+      "description": "Armadin is an AI-native cybersecurity company building autonomous red-team agents; a Silver sponsor.",
+      "tags": [
+        "security",
+        "cybersecurity",
+        "ai",
+        "agents"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:atlassian.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:atlassian.com",
+      "booth_number": "",
+      "name": "Atlassian",
+      "kind": "sponsor",
+      "description": "Atlassian powers team collaboration software, a Bronze sponsor.",
+      "tags": [
+        "developer_tools",
+        "collaboration",
+        "software",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:berkeley.edu",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:berkeley.edu",
+      "booth_number": "",
+      "name": "Fung Institute for Engineering Leadership",
+      "kind": "sponsor",
+      "description": "The Fung Institute for Engineering Leadership at UC Berkeley trains engineers to also be leaders; a Partner of the event.",
+      "tags": [
+        "education",
+        "education",
+        "berkeley",
+        "engineering"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:bitdeer.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:bitdeer.ai",
+      "booth_number": "",
+      "name": "Bitdeer",
+      "kind": "sponsor",
+      "description": "Bitdeer offers an AI Model Studio for compute and model workloads; a Silver sponsor offering prize credits.",
+      "tags": [
+        "ai",
+        "ai",
+        "gpu",
+        "cloud",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:brightdata.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:brightdata.com",
+      "booth_number": "",
+      "name": "Bright Data",
+      "kind": "sponsor",
+      "description": "Bright Data is a web data infrastructure company powering AI and BI use cases; a Silver sponsor.",
+      "tags": [
+        "data",
+        "web-data",
+        "proxy",
+        "ai"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:canva.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:canva.com",
+      "booth_number": "",
+      "name": "Canva",
+      "kind": "sponsor",
+      "description": "Canva is a visual communications and design platform, a Bronze sponsor.",
+      "tags": [
+        "design",
+        "design",
+        "templates",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:capitalone.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:capitalone.com",
+      "booth_number": "",
+      "name": "Capital One",
+      "kind": "sponsor",
+      "description": "Capital One is a major financial services and banking company, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "banking",
+        "finance",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:cartesia.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:cartesia.ai",
+      "booth_number": "",
+      "name": "Cartesia",
+      "kind": "sponsor",
+      "description": "Cartesia is an AI company offering voice/model technology, a Silver sponsor offering device prizes.",
+      "tags": [
+        "ai",
+        "voice-ai",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:citadel.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:citadel.com",
+      "booth_number": "",
+      "name": "Citadel",
+      "kind": "sponsor",
+      "description": "Citadel is a leading global investment and trading firm, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:coinbase.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:coinbase.com",
+      "booth_number": "",
+      "name": "Coinbase",
+      "kind": "sponsor",
+      "description": "Coinbase is a trusted crypto platform and exchange, a Bronze sponsor.",
+      "tags": [
+        "crypto",
+        "crypto",
+        "exchange",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:context.dev",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:context.dev",
+      "booth_number": "",
+      "name": "Context",
+      "kind": "sponsor",
+      "description": "Context is a sponsor of the event with a dedicated site organization record on context.dev.",
+      "tags": [
+        "developer_tools",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:convex.dev",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:convex.dev",
+      "booth_number": "",
+      "name": "Convex",
+      "kind": "sponsor",
+      "description": "Convex is an open-source reactive database for web app developers, a Silver sponsor.",
+      "tags": [
+        "developer_tools",
+        "database",
+        "backend",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:council.health",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:council.health",
+      "booth_number": "",
+      "name": "Council Health",
+      "kind": "sponsor",
+      "description": "Council Health is a Bronze sponsor of the event.",
+      "tags": [
+        "health",
+        "health",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:creao.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:creao.ai",
+      "booth_number": "",
+      "name": "Creao AI",
+      "kind": "sponsor",
+      "description": "CREAO is an AI-native platform for building and running agents that execute complete workflows, a Silver sponsor.",
+      "tags": [
+        "ai",
+        "ai",
+        "agents",
+        "workflow"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:crscreditapi.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:crscreditapi.com",
+      "booth_number": "",
+      "name": "CRS Credit",
+      "kind": "sponsor",
+      "description": "CRS is an independent data infrastructure platform powering modern credit decisioning, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "credit",
+        "data",
+        "fraud"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:cursor.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:cursor.com",
+      "booth_number": "",
+      "name": "SpaceXAI",
+      "kind": "sponsor",
+      "description": "The only organization candidate found on cursor.com is named SpaceXAI, which does not clearly correspond to any known Cursor product; needs verification.",
+      "tags": [
+        "other",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:decagon.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:decagon.ai",
+      "booth_number": "",
+      "name": "Decagon",
+      "kind": "sponsor",
+      "description": "Decagon is a conversational AI platform for concierge customer experiences, a Bronze sponsor.",
+      "tags": [
+        "ai",
+        "conversational-ai",
+        "customer-experience",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:deshaw.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:deshaw.com",
+      "booth_number": "",
+      "name": "D. E. Shaw Group",
+      "kind": "sponsor",
+      "description": "The D. E. Shaw group is a quantitative investment firm, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:elastic.co",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:elastic.co",
+      "booth_number": "",
+      "name": "Elastic",
+      "kind": "sponsor",
+      "description": "Elastic is the company behind Elasticsearch, offering search and data platform tools; a Silver sponsor with Agent Builder prizes.",
+      "tags": [
+        "data",
+        "search",
+        "data",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:engramme.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:engramme.com",
+      "booth_number": "",
+      "name": "Engramme AI",
+      "kind": "sponsor",
+      "description": "Engramme is building the API for human memory, a Bronze sponsor.",
+      "tags": [
+        "ai",
+        "memory",
+        "ai",
+        "research"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:factory.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:factory.ai",
+      "booth_number": "",
+      "name": "Factory",
+      "kind": "sponsor",
+      "description": "Factory (Factory AI) is an AI coding agent platform, a Silver sponsor.",
+      "tags": [
+        "ai",
+        "coding-agent",
+        "ai",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:fetch.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:fetch.ai",
+      "booth_number": "",
+      "name": "Fetch.ai",
+      "kind": "sponsor",
+      "description": "Fetch.ai builds autonomous agent technology, a Golden Bear (top) sponsor.",
+      "tags": [
+        "ai",
+        "agents",
+        "blockchain",
+        "golden-bear"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:figma.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:figma.com",
+      "booth_number": "",
+      "name": "Figma",
+      "kind": "sponsor",
+      "description": "Figma is a collaborative design platform, a Bronze sponsor with a Figma Agent prize category.",
+      "tags": [
+        "design",
+        "design",
+        "collaboration",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:finchnode.org",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:finchnode.org",
+      "booth_number": "",
+      "name": "FinchNode",
+      "kind": "sponsor",
+      "description": "FinchNode is a sponsor of the event.",
+      "tags": [
+        "other",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:greptile.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:greptile.com",
+      "booth_number": "",
+      "name": "Greptile",
+      "kind": "sponsor",
+      "description": "Greptile builds AI agents that review pull requests with full codebase context, a Bronze sponsor.",
+      "tags": [
+        "developer_tools",
+        "code-review",
+        "ai",
+        "agents"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:hyphenate.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:hyphenate.ai",
+      "booth_number": "",
+      "name": "Hyphenate",
+      "kind": "sponsor",
+      "description": "Hyphenate is an autonomous finance platform for the office of the CFO, an Anchor sponsor.",
+      "tags": [
+        "fintech",
+        "finance",
+        "automation",
+        "cfo"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:illumio.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:illumio.com",
+      "booth_number": "",
+      "name": "Illumio",
+      "kind": "sponsor",
+      "description": "Illumio is a leader in ransomware and breach containment security, a Partner of the event.",
+      "tags": [
+        "security",
+        "cybersecurity",
+        "breach-containment",
+        "partner"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:janestreet.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:janestreet.com",
+      "booth_number": "",
+      "name": "Jane Street",
+      "kind": "sponsor",
+      "description": "Jane Street is a quantitative trading firm, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "trading",
+        "quant",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:listenlabs.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:listenlabs.com",
+      "booth_number": "",
+      "name": "Listen Labs",
+      "kind": "sponsor",
+      "description": "Listen Labs is an autonomous AI market researcher, a Bronze sponsor.",
+      "tags": [
+        "ai",
+        "market-research",
+        "ai",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:llamaventures.vc",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:llamaventures.vc",
+      "booth_number": "",
+      "name": "Llama Ventures",
+      "kind": "sponsor",
+      "description": "Llama Ventures is a venture capital firm and sponsor of the event.",
+      "tags": [
+        "venture",
+        "venture-capital",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:mana.space",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:mana.space",
+      "booth_number": "",
+      "name": "Mana",
+      "kind": "sponsor",
+      "description": "Mana is a sponsor of the event.",
+      "tags": [
+        "other",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:meta.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:meta.com",
+      "booth_number": "",
+      "name": "Meta",
+      "kind": "sponsor",
+      "description": "Meta builds technologies that help people connect, find communities, and grow businesses, a Silver sponsor with a Round 2 Hackathon prize.",
+      "tags": [
+        "ai",
+        "social",
+        "ai",
+        "silver"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:microsoft.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:microsoft.com",
+      "booth_number": "",
+      "name": "Microsoft",
+      "kind": "sponsor",
+      "description": "Microsoft empowers every person and organization to achieve more through technology, a Golden Bear sponsor.",
+      "tags": [
+        "cloud",
+        "cloud",
+        "software",
+        "golden-bear"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:moonpay.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:moonpay.com",
+      "booth_number": "",
+      "name": "MoonPay",
+      "kind": "sponsor",
+      "description": "MoonPay simplifies buying, selling, and trading crypto using everyday payment methods, a Bronze sponsor.",
+      "tags": [
+        "crypto",
+        "crypto",
+        "payments",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:moss.dev",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:moss.dev",
+      "booth_number": "",
+      "name": "Moss",
+      "kind": "sponsor",
+      "description": "Moss is a Bronze sponsor of the event, offering an Airpod Max/pro prize.",
+      "tags": [
+        "other",
+        "sponsor",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:nooks.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:nooks.ai",
+      "booth_number": "",
+      "name": "Nooks",
+      "kind": "sponsor",
+      "description": "Nooks is a sponsor of the event.",
+      "tags": [
+        "ai",
+        "sales",
+        "ai",
+        "sponsor"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:notability.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:notability.com",
+      "booth_number": "",
+      "name": "Notability",
+      "kind": "sponsor",
+      "description": "Notability builds tools to help people capture notes and learn better, a Bronze sponsor.",
+      "tags": [
+        "education",
+        "notes",
+        "productivity",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:runpod.io",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:runpod.io",
+      "booth_number": "",
+      "name": "Runpod",
+      "kind": "sponsor",
+      "description": "Runpod is the AI Developer Cloud for building, training, and scaling AI applications, a Bronze sponsor.",
+      "tags": [
+        "cloud",
+        "gpu",
+        "ai",
+        "cloud"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:savvywealth.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:savvywealth.com",
+      "booth_number": "",
+      "name": "Savvy",
+      "kind": "sponsor",
+      "description": "Savvy (Savvy Wealth) is a wealth management fintech company, a Bronze sponsor.",
+      "tags": [
+        "fintech",
+        "wealth",
+        "finance",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:scale.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:scale.com",
+      "booth_number": "",
+      "name": "Scale AI",
+      "kind": "sponsor",
+      "description": "Scale AI develops reliable AI systems and provides data infrastructure for AI applications, a Bronze sponsor.",
+      "tags": [
+        "ai",
+        "data",
+        "ai",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:spacetimedb.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:spacetimedb.com",
+      "booth_number": "",
+      "name": "SpacetimeDB",
+      "kind": "sponsor",
+      "description": "SpacetimeDB is a backend system for real-time apps and games, developed by Clockwork Labs; an Anchor sponsor.",
+      "tags": [
+        "developer_tools",
+        "database",
+        "backend",
+        "gaming"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:supercell.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:supercell.com",
+      "booth_number": "",
+      "name": "Supercell",
+      "kind": "sponsor",
+      "description": "Supercell is a Finnish mobile games company known for Clash of Clans and Clash Royale, a Golden Bear sponsor.",
+      "tags": [
+        "gaming",
+        "mobile-games",
+        "gaming",
+        "golden-bear"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:visa.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:visa.com",
+      "booth_number": "",
+      "name": "Visa",
+      "kind": "sponsor",
+      "description": "Visa is a world leader in digital payments facilitating transactions globally, a Golden Bear sponsor.",
+      "tags": [
+        "fintech",
+        "payments",
+        "finance",
+        "golden-bear"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    },
+    {
+      "source_key": "booth:wajo.ai",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:wajo.ai",
+      "booth_number": "",
+      "name": "Wajo AI",
+      "kind": "sponsor",
+      "description": "Wajo builds proactive, self-learning action agents that complete real-world tasks, a Partner of the event.",
+      "tags": [
+        "ai",
+        "agents",
+        "consumer",
+        "partner"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://www.calhacks.io/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830493000000
+      }
+    },
+    {
+      "source_key": "booth:ycombinator.com",
+      "zone_key": "zone:sponsor-row",
+      "organization_key": "org:ycombinator.com",
+      "booth_number": "",
+      "name": "Y Combinator",
+      "kind": "sponsor",
+      "description": "Y Combinator is a startup accelerator, a Bronze sponsor.",
+      "tags": [
+        "venture",
+        "accelerator",
+        "startups",
+        "bronze"
+      ],
+      "plan_x_m": 95.0,
+      "plan_y_m": 12.0,
+      "placement": "zone",
+      "source_url": "https://cal-hacks-13-0.devpost.com/",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830495000000
+      }
+    }
+  ],
+  "schedule": [
+    {
+      "source_key": "devpost_dates:slot:submissions20261023t1800000700",
+      "title": "Submissions",
+      "kind": "other",
+      "description": "",
+      "location_text": "",
+      "zone_key": "",
+      "booth_key": "",
+      "host_organization_key": "",
+      "speaker_keys": [],
+      "starts_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792803600000000
+      },
+      "ends_at": {
+        "some": {
+          "__timestamp_micros_since_unix_epoch__": 1792944000000000
+        }
+      },
+      "source_url": "https://cal-hacks-13-0.devpost.com/details/dates",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830498000000
+      }
+    },
+    {
+      "source_key": "devpost_dates:slot:winnersannounced20261025t1600000700",
+      "title": "Winners Announced",
+      "kind": "other",
+      "description": "",
+      "location_text": "",
+      "zone_key": "",
+      "booth_key": "",
+      "host_organization_key": "",
+      "speaker_keys": [],
+      "starts_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792969200000000
+      },
+      "ends_at": {
+        "none": []
+      },
+      "source_url": "https://cal-hacks-13-0.devpost.com/details/dates",
+      "fetched_at": {
+        "__timestamp_micros_since_unix_epoch__": 1792830498000000
+      }
+    }
+  ]
+}

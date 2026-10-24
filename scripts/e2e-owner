@@ -1,0 +1,6 @@
+#!/bin/sh
+# Makes an identity an owner of the E2E_TARGET database, so its browser sign-in on /organizer can grant
+# roles. The identity is the "Full identity" line the host portal shows. Usage: scripts/e2e-owner <identity>
+set -e
+. "$(dirname "$0")/e2e-env"
+stdb call -s "$STDB_SERVER" "$SPACETIMEDB_DATABASE" add_owner "\"0x${1#0x}\"" 2>&1 | grep -v UNSTABLE || true

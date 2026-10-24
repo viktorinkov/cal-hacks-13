@@ -1,0 +1,45 @@
+{
+  "claim_id": 900104,
+  "letter": {
+    "claim_id": 900104,
+    "pack_sha256": "1342136e3718dd65483d9851a07013e3b998fd17cb62a7052405c52aacff6b05",
+    "policy_number": "GL-2026-0412",
+    "insurer_name": "Harborline Mutual",
+    "fnol_contact": "newloss@harborline.example",
+    "venue_name": "Cal Hacks 13.0",
+    "claimant_name": "Cal Hacks 13.0",
+    "incident_kind": "property",
+    "zone_name": "Stage B",
+    "incident_time": "2026-10-24 23:40:00",
+    "amounts": {
+      "cost_cents": 240000,
+      "payout_cents": 240000,
+      "recoverable_cents": 190000,
+      "venue_cost_cents": 50000
+    },
+    "decision_text": "approved by Ops desk (ops)",
+    "fact_lines": [
+      "[1] incident_kind = property",
+      "[2] opened_by = ops",
+      "[3] zone_id = 102",
+      "[4] note = ops: line-array speaker knocked off its stand during load-out, cabinet cracked, repair quote from the audio vendor",
+      "[5] cost_cents = 240000",
+      "[6] note = ops: the Stagecraft Rentals crew was striking the stage when it happened",
+      "[7] zone_name = Stage B",
+      "[8] zone_kind = stage",
+      "[9] zone_area_m2 = 900.0",
+      "[10] zone_capacity = 1200",
+      "[11] nearby_booths = none",
+      "[12] schedule_now = Load-out",
+      "[13] policy_number = GL-2026-0412",
+      "[14] insurer = Harborline Mutual",
+      "[15] cover_kind = property",
+      "[16] per_claim_limit_cents = 1000000",
+      "[17] deductible_cents = 50000",
+      "[18] aggregate_remaining_cents = 5000000"
+    ],
+    "counterparty_name": "Stagecraft Rentals",
+    "counterparty_contact": "ops@stagecraft.example",
+    "related_claims": []
+  }
+}

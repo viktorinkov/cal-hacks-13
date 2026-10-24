@@ -1,0 +1,3 @@
+#!/bin/sh
+# Run one SQL query against the local social dev database.
+"$(dirname "$0")/stdb" sql -s local3091 bandit-social-dev "$1" 2>&1 | grep -v UNSTABLE

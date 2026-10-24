@@ -1,0 +1,4 @@
+#!/bin/sh
+# One SQL query against the E2E_TARGET database, as its owner.
+. "$(dirname "$0")/e2e-env"
+stdb sql -s "$STDB_SERVER" "$SPACETIMEDB_DATABASE" "$1" 2>&1 | grep -v UNSTABLE

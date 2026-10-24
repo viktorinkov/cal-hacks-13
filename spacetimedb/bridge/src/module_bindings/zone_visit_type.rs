@@ -1,0 +1,54 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct ZoneVisit {
+    pub id: u64,
+    pub band_id: u8,
+    pub zone: u8,
+    pub entered: __sdk::Timestamp,
+    pub left: Option<__sdk::Timestamp>,
+}
+
+impl __sdk::InModule for ZoneVisit {
+    type Module = super::RemoteModule;
+}
+
+pub struct ZoneVisitCols {
+    pub id: __sdk::__query_builder::Col<ZoneVisit, u64>,
+    pub band_id: __sdk::__query_builder::Col<ZoneVisit, u8>,
+    pub zone: __sdk::__query_builder::Col<ZoneVisit, u8>,
+    pub entered: __sdk::__query_builder::Col<ZoneVisit, __sdk::Timestamp>,
+    pub left: __sdk::__query_builder::Col<ZoneVisit, Option<__sdk::Timestamp>>,
+}
+
+impl __sdk::__query_builder::HasCols for ZoneVisit {
+    type Cols = ZoneVisitCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        ZoneVisitCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
+            zone: __sdk::__query_builder::Col::new(table_name, "zone"),
+            entered: __sdk::__query_builder::Col::new(table_name, "entered"),
+            left: __sdk::__query_builder::Col::new(table_name, "left"),
+        }
+    }
+}
+
+pub struct ZoneVisitIxCols {
+    pub band_id: __sdk::__query_builder::IxCol<ZoneVisit, u8>,
+    pub id: __sdk::__query_builder::IxCol<ZoneVisit, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for ZoneVisit {
+    type IxCols = ZoneVisitIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        ZoneVisitIxCols {
+            band_id: __sdk::__query_builder::IxCol::new(table_name, "band_id"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for ZoneVisit {}

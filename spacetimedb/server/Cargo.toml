@@ -1,0 +1,18 @@
+[package]
+name = "band1t"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spacetimedb = "2.13"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bandit-insurance = { path = "../../crates/bandit-insurance" }
+
+[dev-dependencies]
+spacetimedb = { version = "2.13", features = ["test-utils"] }
+icu_calendar = "~2.1"

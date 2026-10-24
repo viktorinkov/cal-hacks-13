@@ -1,0 +1,1571 @@
+{
+  "run_id": "calhacks-13-20261024t0828z",
+  "organizer": "elastic_workflow",
+  "model": ".anthropic-claude-5-sonnet-chat_completion",
+  "organizations": [
+    {
+      "key": "org:a16z.com",
+      "name": "a16z",
+      "domain": "a16z.com",
+      "member_keys": [
+        "devpost:org:a16z",
+        "site:org:a16z.com"
+      ],
+      "facts_key": "",
+      "category": "venture",
+      "tags": [
+        "sponsor",
+        "bronze"
+      ],
+      "description": "a16z (Andreessen Horowitz) is a venture capital firm, listed as a Bronze sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only candidates on a16z.com are devpost and site organization records for a16z."
+    },
+    {
+      "key": "org:adobe.com",
+      "name": "Adobe",
+      "domain": "adobe.com",
+      "member_keys": [
+        "site:org:adobe.com",
+        "devpost:org:adobe"
+      ],
+      "facts_key": "linkedin:org:adobe.com",
+      "category": "design",
+      "tags": [
+        "creative",
+        "software",
+        "partner"
+      ],
+      "description": "Adobe is a global software company for digital creativity and experiences, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates both named Adobe on adobe.com, with matching LinkedIn facts."
+    },
+    {
+      "key": "org:afterquery.com",
+      "name": "AfterQuery",
+      "domain": "afterquery.com",
+      "member_keys": [
+        "site:org:afterquery.com",
+        "devpost:org:afterquery"
+      ],
+      "facts_key": "linkedin:org:afterquery.com",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "research",
+        "data"
+      ],
+      "description": "AfterQuery is an applied research lab curating data solutions to accelerate foundation model development, a Silver sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share afterquery.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:amazon.jobs",
+      "name": "Annapurna Labs",
+      "domain": "amazon.jobs",
+      "member_keys": [
+        "site:org:amazon.com",
+        "devpost:org:annapurnalabs"
+      ],
+      "facts_key": "linkedin:org:amazon.jobs",
+      "category": "hardware",
+      "tags": [
+        "silicon",
+        "cloud",
+        "ai"
+      ],
+      "description": "Annapurna Labs (Amazon) builds custom silicon such as Graviton and Trainium chips powering AI and cloud infrastructure; an Anchor sponsor.",
+      "match_method": "agent",
+      "match_reason": "devpost:org:annapurnalabs on amazon.jobs and site:org:amazon.com both named Annapurna Labs, merged as one organization."
+    },
+    {
+      "key": "org:anthropic.com",
+      "name": "Anthropic",
+      "domain": "anthropic.com",
+      "member_keys": [
+        "devpost:org:anthropic",
+        "site:org:anthropic.com"
+      ],
+      "facts_key": "linkedin:org:anthropic.com",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "research",
+        "claude"
+      ],
+      "description": "Anthropic is an AI research company building reliable, interpretable AI systems including Claude; an Anchor sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share anthropic.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:apify.com",
+      "name": "Apify",
+      "domain": "apify.com",
+      "member_keys": [
+        "devpost:org:apify",
+        "site:org:apify.com"
+      ],
+      "facts_key": "linkedin:org:apify.com",
+      "category": "data",
+      "tags": [
+        "web-data",
+        "automation",
+        "ai"
+      ],
+      "description": "Apify is a marketplace of tools (Actors) for automating web data extraction and AI integrations; a Silver sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share apify.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:armadin.com",
+      "name": "Armadin",
+      "domain": "armadin.com",
+      "member_keys": [
+        "site:org:armadin.com",
+        "devpost:org:armadin"
+      ],
+      "facts_key": "linkedin:org:armadin.com",
+      "category": "security",
+      "tags": [
+        "cybersecurity",
+        "ai",
+        "agents"
+      ],
+      "description": "Armadin is an AI-native cybersecurity company building autonomous red-team agents; a Silver sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share armadin.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:asus.com",
+      "name": "ASUS",
+      "domain": "asus.com",
+      "member_keys": [
+        "site:org:asus.com"
+      ],
+      "facts_key": "linkedin:org:asus.com",
+      "category": "hardware",
+      "tags": [
+        "hardware",
+        "devices",
+        "partner"
+      ],
+      "description": "ASUS is a global technology hardware manufacturer, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Single site candidate on asus.com matches the LinkedIn facts record."
+    },
+    {
+      "key": "org:atlassian.com",
+      "name": "Atlassian",
+      "domain": "atlassian.com",
+      "member_keys": [
+        "devpost:org:atlassian",
+        "site:org:atlassian.com"
+      ],
+      "facts_key": "linkedin:org:atlassian.com",
+      "category": "developer_tools",
+      "tags": [
+        "collaboration",
+        "software",
+        "bronze"
+      ],
+      "description": "Atlassian powers team collaboration software, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share atlassian.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:berkeley.edu",
+      "name": "Fung Institute for Engineering Leadership",
+      "domain": "berkeley.edu",
+      "member_keys": [
+        "devpost:org:funginstituteforengineeringleadership",
+        "site:org:berkeley.edu"
+      ],
+      "facts_key": "linkedin:org:berkeley.edu",
+      "category": "education",
+      "tags": [
+        "education",
+        "berkeley",
+        "engineering"
+      ],
+      "description": "The Fung Institute for Engineering Leadership at UC Berkeley trains engineers to also be leaders; a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share berkeley.edu with matching LinkedIn facts record for the Fung Institute."
+    },
+    {
+      "key": "org:bitdeer.ai",
+      "name": "Bitdeer",
+      "domain": "bitdeer.ai",
+      "member_keys": [
+        "site:org:bitdeer.ai",
+        "devpost:org:bitdeer"
+      ],
+      "facts_key": "",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "gpu",
+        "cloud",
+        "silver"
+      ],
+      "description": "Bitdeer offers an AI Model Studio for compute and model workloads; a Silver sponsor offering prize credits.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share bitdeer.ai; no company_facts record was found for this domain."
+    },
+    {
+      "key": "org:brightdata.com",
+      "name": "Bright Data",
+      "domain": "brightdata.com",
+      "member_keys": [
+        "site:org:brightdata.com",
+        "devpost:org:brightdata"
+      ],
+      "facts_key": "linkedin:org:brdta.com",
+      "category": "data",
+      "tags": [
+        "web-data",
+        "proxy",
+        "ai"
+      ],
+      "description": "Bright Data is a web data infrastructure company powering AI and BI use cases; a Silver sponsor.",
+      "match_method": "agent",
+      "match_reason": "The LinkedIn facts record on brdta.com is named 'Bright Data' and describes the identical company as the brightdata.com candidates, indicating a short-link domain."
+    },
+    {
+      "key": "org:canva.com",
+      "name": "Canva",
+      "domain": "canva.com",
+      "member_keys": [
+        "site:org:canva.com",
+        "devpost:org:canva"
+      ],
+      "facts_key": "linkedin:org:canva.com",
+      "category": "design",
+      "tags": [
+        "design",
+        "templates",
+        "bronze"
+      ],
+      "description": "Canva is a visual communications and design platform, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share canva.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:capitalone.com",
+      "name": "Capital One",
+      "domain": "capitalone.com",
+      "member_keys": [
+        "site:org:capitalone.com",
+        "devpost:org:capitalone"
+      ],
+      "facts_key": "linkedin:org:capitalone.com",
+      "category": "fintech",
+      "tags": [
+        "banking",
+        "finance",
+        "bronze"
+      ],
+      "description": "Capital One is a major financial services and banking company, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share capitalone.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:cartesia.ai",
+      "name": "Cartesia",
+      "domain": "cartesia.ai",
+      "member_keys": [
+        "site:org:cartesia.ai",
+        "devpost:org:cartesia"
+      ],
+      "facts_key": "",
+      "category": "ai",
+      "tags": [
+        "voice-ai",
+        "silver"
+      ],
+      "description": "Cartesia is an AI company offering voice/model technology, a Silver sponsor offering device prizes.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share cartesia.ai; no company_facts record found."
+    },
+    {
+      "key": "org:celsius.com",
+      "name": "Celsius",
+      "domain": "celsius.com",
+      "member_keys": [
+        "site:org:celsius.com"
+      ],
+      "facts_key": "linkedin:org:celsiusholdingsinc.com",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "energy-drink",
+        "partner"
+      ],
+      "description": "Celsius is a global beverage company making the CELSIUS zero-sugar energy drink, a Partner of the event.",
+      "match_method": "agent",
+      "match_reason": "The LinkedIn facts record on celsiusholdingsinc.com is named CELSIUS, exactly matching the celsius.com site candidate's brand name."
+    },
+    {
+      "key": "org:citadel.com",
+      "name": "Citadel",
+      "domain": "citadel.com",
+      "member_keys": [
+        "devpost:org:citadel",
+        "site:org:citadel.com"
+      ],
+      "facts_key": "linkedin:org:citadel.com",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "description": "Citadel is a leading global investment and trading firm, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share citadel.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:coinbase.com",
+      "name": "Coinbase",
+      "domain": "coinbase.com",
+      "member_keys": [
+        "site:org:coinbase.com",
+        "devpost:org:coinbase"
+      ],
+      "facts_key": "linkedin:org:coinbase.com",
+      "category": "crypto",
+      "tags": [
+        "crypto",
+        "exchange",
+        "bronze"
+      ],
+      "description": "Coinbase is a trusted crypto platform and exchange, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share coinbase.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:context.dev",
+      "name": "Context",
+      "domain": "context.dev",
+      "member_keys": [
+        "site:org:context.dev"
+      ],
+      "facts_key": "",
+      "category": "developer_tools",
+      "tags": [
+        "sponsor"
+      ],
+      "description": "Context is a sponsor of the event with a dedicated site organization record on context.dev.",
+      "match_method": "exact_domain",
+      "match_reason": "Only candidate on context.dev; no matching company_facts found."
+    },
+    {
+      "key": "org:convex.dev",
+      "name": "Convex",
+      "domain": "convex.dev",
+      "member_keys": [
+        "devpost:org:convex",
+        "site:org:convex.dev"
+      ],
+      "facts_key": "linkedin:org:convex.dev",
+      "category": "developer_tools",
+      "tags": [
+        "database",
+        "backend",
+        "silver"
+      ],
+      "description": "Convex is an open-source reactive database for web app developers, a Silver sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share convex.dev with matching LinkedIn facts."
+    },
+    {
+      "key": "org:council.health",
+      "name": "Council Health",
+      "domain": "council.health",
+      "member_keys": [
+        "devpost:org:councilhealth"
+      ],
+      "facts_key": "",
+      "category": "health",
+      "tags": [
+        "health",
+        "bronze"
+      ],
+      "description": "Council Health is a Bronze sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only devpost candidate for council.health; no company_facts found."
+    },
+    {
+      "key": "org:creao.ai",
+      "name": "Creao AI",
+      "domain": "creao.ai",
+      "member_keys": [
+        "site:org:creao.ai",
+        "devpost:org:creaoai"
+      ],
+      "facts_key": "linkedin:org:creao.ai",
+      "category": "ai",
+      "tags": [
+        "ai",
+        "agents",
+        "workflow"
+      ],
+      "description": "CREAO is an AI-native platform for building and running agents that execute complete workflows, a Silver sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share creao.ai with matching LinkedIn facts."
+    },
+    {
+      "key": "org:crscreditapi.com",
+      "name": "CRS Credit",
+      "domain": "crscreditapi.com",
+      "member_keys": [
+        "site:org:crscreditapi.com",
+        "devpost:org:crscredit"
+      ],
+      "facts_key": "linkedin:org:crscreditapi.com",
+      "category": "fintech",
+      "tags": [
+        "credit",
+        "data",
+        "fraud"
+      ],
+      "description": "CRS is an independent data infrastructure platform powering modern credit decisioning, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share crscreditapi.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:cursor.com",
+      "name": "SpaceXAI",
+      "domain": "cursor.com",
+      "member_keys": [
+        "site:org:cursor.com"
+      ],
+      "facts_key": "",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "description": "The only organization candidate found on cursor.com is named SpaceXAI, which does not clearly correspond to any known Cursor product; needs verification.",
+      "match_method": "exact_domain",
+      "match_reason": "Single site candidate record uses domain cursor.com but is named SpaceXAI, an unresolved naming mismatch."
+    },
+    {
+      "key": "org:decagon.ai",
+      "name": "Decagon",
+      "domain": "decagon.ai",
+      "member_keys": [
+        "site:org:decagon.ai",
+        "devpost:org:decagon"
+      ],
+      "facts_key": "linkedin:org:decagon.ai",
+      "category": "ai",
+      "tags": [
+        "conversational-ai",
+        "customer-experience",
+        "bronze"
+      ],
+      "description": "Decagon is a conversational AI platform for concierge customer experiences, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share decagon.ai with matching LinkedIn facts."
+    },
+    {
+      "key": "org:deshaw.com",
+      "name": "D. E. Shaw Group",
+      "domain": "deshaw.com",
+      "member_keys": [
+        "devpost:org:deshawgroup",
+        "site:org:deshaw.com"
+      ],
+      "facts_key": "linkedin:org:deshaw.com",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "investment",
+        "bronze"
+      ],
+      "description": "The D. E. Shaw group is a quantitative investment firm, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share deshaw.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:drinknixie.com",
+      "name": "Nixie",
+      "domain": "drinknixie.com",
+      "member_keys": [
+        "site:org:drinknixie.com"
+      ],
+      "facts_key": "",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "partner"
+      ],
+      "description": "Nixie is a beverage brand and a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for drinknixie.com; no company_facts found."
+    },
+    {
+      "key": "org:elastic.co",
+      "name": "Elastic",
+      "domain": "elastic.co",
+      "member_keys": [
+        "devpost:org:elastic",
+        "site:org:elastic.co"
+      ],
+      "facts_key": "",
+      "category": "data",
+      "tags": [
+        "search",
+        "data",
+        "silver"
+      ],
+      "description": "Elastic is the company behind Elasticsearch, offering search and data platform tools; a Silver sponsor with Agent Builder prizes.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share elastic.co; no company_facts record found."
+    },
+    {
+      "key": "org:engramme.com",
+      "name": "Engramme AI",
+      "domain": "engramme.com",
+      "member_keys": [
+        "site:org:engramme.com",
+        "devpost:org:engrammeai"
+      ],
+      "facts_key": "linkedin:org:engramme.com",
+      "category": "ai",
+      "tags": [
+        "memory",
+        "ai",
+        "research"
+      ],
+      "description": "Engramme is building the API for human memory, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share engramme.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:factory.ai",
+      "name": "Factory",
+      "domain": "factory.ai",
+      "member_keys": [
+        "site:org:factory.ai",
+        "devpost:org:factoryai"
+      ],
+      "facts_key": "",
+      "category": "ai",
+      "tags": [
+        "coding-agent",
+        "ai",
+        "silver"
+      ],
+      "description": "Factory (Factory AI) is an AI coding agent platform, a Silver sponsor.",
+      "match_method": "agent",
+      "match_reason": "devpost:org:factoryai on factory.com and site:org:factory.ai are the same company 'Factory AI', confirmed by text naming it as a Cal Hacks sponsor AI agent platform."
+    },
+    {
+      "key": "org:fetch.ai",
+      "name": "Fetch.ai",
+      "domain": "fetch.ai",
+      "member_keys": [
+        "site:org:fetch.ai",
+        "devpost:org:fetchai"
+      ],
+      "facts_key": "",
+      "category": "ai",
+      "tags": [
+        "agents",
+        "blockchain",
+        "golden-bear"
+      ],
+      "description": "Fetch.ai builds autonomous agent technology, a Golden Bear (top) sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share fetch.ai; no company_facts record found."
+    },
+    {
+      "key": "org:figma.com",
+      "name": "Figma",
+      "domain": "figma.com",
+      "member_keys": [
+        "devpost:org:figma",
+        "site:org:figma.com"
+      ],
+      "facts_key": "",
+      "category": "design",
+      "tags": [
+        "design",
+        "collaboration",
+        "bronze"
+      ],
+      "description": "Figma is a collaborative design platform, a Bronze sponsor with a Figma Agent prize category.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share figma.com; the only facts-like record (linkedin:org:figma.bot) is under a different domain not clearly naming Figma proper as the organization, so left unlinked."
+    },
+    {
+      "key": "org:finchnode.org",
+      "name": "FinchNode",
+      "domain": "finchnode.org",
+      "member_keys": [
+        "site:org:finchnode.org"
+      ],
+      "facts_key": "",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "description": "FinchNode is a sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for finchnode.org; no company_facts found."
+    },
+    {
+      "key": "org:greptile.com",
+      "name": "Greptile",
+      "domain": "greptile.com",
+      "member_keys": [
+        "devpost:org:greptile",
+        "site:org:greptile.com"
+      ],
+      "facts_key": "linkedin:org:greptile.com",
+      "category": "developer_tools",
+      "tags": [
+        "code-review",
+        "ai",
+        "agents"
+      ],
+      "description": "Greptile builds AI agents that review pull requests with full codebase context, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share greptile.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:harmlessharvest.com",
+      "name": "Harmless Harvest",
+      "domain": "harmlessharvest.com",
+      "member_keys": [
+        "site:org:harmlessharvest.com"
+      ],
+      "facts_key": "linkedin:org:harmlessharvest.com",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "coconut-water",
+        "partner"
+      ],
+      "description": "Harmless Harvest is a food & beverage company known for coconut water, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for harmlessharvest.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:hyphenate.ai",
+      "name": "Hyphenate",
+      "domain": "hyphenate.ai",
+      "member_keys": [
+        "site:org:hyphenate.ai",
+        "devpost:org:hyphenate"
+      ],
+      "facts_key": "crunchbase:org:hyphenate.ai",
+      "category": "fintech",
+      "tags": [
+        "finance",
+        "automation",
+        "cfo"
+      ],
+      "description": "Hyphenate is an autonomous finance platform for the office of the CFO, an Anchor sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share hyphenate.ai with matching Crunchbase facts."
+    },
+    {
+      "key": "org:illumio.com",
+      "name": "Illumio",
+      "domain": "illumio.com",
+      "member_keys": [
+        "devpost:org:illumio",
+        "site:org:illumio.com"
+      ],
+      "facts_key": "linkedin:org:illumio.com",
+      "category": "security",
+      "tags": [
+        "cybersecurity",
+        "breach-containment",
+        "partner"
+      ],
+      "description": "Illumio is a leader in ransomware and breach containment security, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share illumio.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:illy.com",
+      "name": "illy",
+      "domain": "illy.com",
+      "member_keys": [
+        "site:org:illy.com"
+      ],
+      "facts_key": "",
+      "category": "food_drink",
+      "tags": [
+        "coffee",
+        "partner"
+      ],
+      "description": "illy is a coffee brand and a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for illy.com; no company_facts found."
+    },
+    {
+      "key": "org:janestreet.com",
+      "name": "Jane Street",
+      "domain": "janestreet.com",
+      "member_keys": [
+        "devpost:org:janestreet",
+        "site:org:janestreet.com"
+      ],
+      "facts_key": "linkedin:org:janestreet.com",
+      "category": "fintech",
+      "tags": [
+        "trading",
+        "quant",
+        "bronze"
+      ],
+      "description": "Jane Street is a quantitative trading firm, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share janestreet.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:jukeboxprint.com",
+      "name": "Jukebox",
+      "domain": "jukeboxprint.com",
+      "member_keys": [
+        "site:org:jukeboxprint.com",
+        "devpost:org:jukebox"
+      ],
+      "facts_key": "linkedin:org:jukeboxprint.com",
+      "category": "other",
+      "tags": [
+        "print",
+        "merchandise",
+        "partner"
+      ],
+      "description": "Jukebox helps brands and teams bring ideas to life through premium custom print, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share jukeboxprint.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:listenlabs.com",
+      "name": "Listen Labs",
+      "domain": "listenlabs.com",
+      "member_keys": [
+        "site:org:listenlabs.ai",
+        "devpost:org:listenlabs"
+      ],
+      "facts_key": "linkedin:org:listenlabs.com",
+      "category": "ai",
+      "tags": [
+        "market-research",
+        "ai",
+        "bronze"
+      ],
+      "description": "Listen Labs is an autonomous AI market researcher, a Bronze sponsor.",
+      "match_method": "agent",
+      "match_reason": "devpost:org:listenlabs on listenlabs.com and site:org:listenlabs.ai are the same company 'Listen Labs'."
+    },
+    {
+      "key": "org:llamaventures.vc",
+      "name": "Llama Ventures",
+      "domain": "llamaventures.vc",
+      "member_keys": [
+        "site:org:llamaventures.vc"
+      ],
+      "facts_key": "",
+      "category": "venture",
+      "tags": [
+        "venture-capital",
+        "sponsor"
+      ],
+      "description": "Llama Ventures is a venture capital firm and sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for llamaventures.vc; no company_facts found."
+    },
+    {
+      "key": "org:mana.space",
+      "name": "Mana",
+      "domain": "mana.space",
+      "member_keys": [
+        "site:org:mana.space"
+      ],
+      "facts_key": "",
+      "category": "other",
+      "tags": [
+        "sponsor"
+      ],
+      "description": "Mana is a sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for mana.space; no company_facts found."
+    },
+    {
+      "key": "org:meta.com",
+      "name": "Meta",
+      "domain": "meta.com",
+      "member_keys": [
+        "site:org:meta.com",
+        "devpost:org:meta"
+      ],
+      "facts_key": "linkedin:org:metacareers.com",
+      "category": "ai",
+      "tags": [
+        "social",
+        "ai",
+        "silver"
+      ],
+      "description": "Meta builds technologies that help people connect, find communities, and grow businesses, a Silver sponsor with a Round 2 Hackathon prize.",
+      "match_method": "agent",
+      "match_reason": "The LinkedIn facts record on metacareers.com is named 'Meta' and describes the same company, a known careers-subdomain for Meta."
+    },
+    {
+      "key": "org:microsoft.com",
+      "name": "Microsoft",
+      "domain": "microsoft.com",
+      "member_keys": [
+        "site:org:microsoft.com",
+        "devpost:org:microsoft"
+      ],
+      "facts_key": "linkedin:org:microsoft.com",
+      "category": "cloud",
+      "tags": [
+        "cloud",
+        "software",
+        "golden-bear"
+      ],
+      "description": "Microsoft empowers every person and organization to achieve more through technology, a Golden Bear sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share microsoft.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:mlh.com",
+      "name": "MLH",
+      "domain": "mlh.com",
+      "member_keys": [
+        "devpost:org:mlh"
+      ],
+      "facts_key": "linkedin:org:mlh.io",
+      "category": "education",
+      "tags": [
+        "hackathons",
+        "community",
+        "partner"
+      ],
+      "description": "Major League Hacking (MLH) is a global hackathon community empowering developers, a Partner of the event.",
+      "match_method": "agent",
+      "match_reason": "The LinkedIn facts record on mlh.io is named 'Major League Hacking' matching the MLH devpost organization, differing only by domain suffix (.io vs .com)."
+    },
+    {
+      "key": "org:moonpay.com",
+      "name": "MoonPay",
+      "domain": "moonpay.com",
+      "member_keys": [
+        "devpost:org:moonpay",
+        "site:org:moonpay.com"
+      ],
+      "facts_key": "linkedin:org:moonpay.com",
+      "category": "crypto",
+      "tags": [
+        "crypto",
+        "payments",
+        "bronze"
+      ],
+      "description": "MoonPay simplifies buying, selling, and trading crypto using everyday payment methods, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share moonpay.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:moss.dev",
+      "name": "Moss",
+      "domain": "moss.dev",
+      "member_keys": [
+        "devpost:org:moss",
+        "site:org:usemoss.dev"
+      ],
+      "facts_key": "",
+      "category": "other",
+      "tags": [
+        "sponsor",
+        "bronze"
+      ],
+      "description": "Moss is a Bronze sponsor of the event, offering an Airpod Max/pro prize.",
+      "match_method": "agent",
+      "match_reason": "site:org:usemoss.dev and devpost:org:moss/site:org:moss.dev are the same 'Moss' company across domains."
+    },
+    {
+      "key": "org:nooks.ai",
+      "name": "Nooks",
+      "domain": "nooks.ai",
+      "member_keys": [
+        "site:org:nooks.ai"
+      ],
+      "facts_key": "",
+      "category": "ai",
+      "tags": [
+        "sales",
+        "ai",
+        "sponsor"
+      ],
+      "description": "Nooks is a sponsor of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for nooks.ai; no company_facts found."
+    },
+    {
+      "key": "org:notability.com",
+      "name": "Notability",
+      "domain": "notability.com",
+      "member_keys": [
+        "devpost:org:notability",
+        "site:org:notability.com"
+      ],
+      "facts_key": "linkedin:org:notability.com",
+      "category": "education",
+      "tags": [
+        "notes",
+        "productivity",
+        "bronze"
+      ],
+      "description": "Notability builds tools to help people capture notes and learn better, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share notability.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:redbull.com",
+      "name": "Red Bull",
+      "domain": "redbull.com",
+      "member_keys": [
+        "site:org:redbull.com"
+      ],
+      "facts_key": "",
+      "category": "food_drink",
+      "tags": [
+        "beverage",
+        "energy-drink",
+        "partner"
+      ],
+      "description": "Red Bull is an energy drink brand and a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for redbull.com; no company_facts found."
+    },
+    {
+      "key": "org:runpod.io",
+      "name": "Runpod",
+      "domain": "runpod.io",
+      "member_keys": [
+        "devpost:org:runpod",
+        "site:org:runpod.io"
+      ],
+      "facts_key": "linkedin:org:runpod.io",
+      "category": "cloud",
+      "tags": [
+        "gpu",
+        "ai",
+        "cloud"
+      ],
+      "description": "Runpod is the AI Developer Cloud for building, training, and scaling AI applications, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share runpod.io with matching LinkedIn facts."
+    },
+    {
+      "key": "org:rysesupps.com",
+      "name": "RYSE",
+      "domain": "rysesupps.com",
+      "member_keys": [
+        "site:org:rysesupps.com"
+      ],
+      "facts_key": "",
+      "category": "other",
+      "tags": [
+        "partner"
+      ],
+      "description": "RYSE is a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for rysesupps.com; no company_facts found."
+    },
+    {
+      "key": "org:savvywealth.com",
+      "name": "Savvy",
+      "domain": "savvywealth.com",
+      "member_keys": [
+        "site:org:savvywealth.com",
+        "devpost:org:savvy"
+      ],
+      "facts_key": "",
+      "category": "fintech",
+      "tags": [
+        "wealth",
+        "finance",
+        "bronze"
+      ],
+      "description": "Savvy (Savvy Wealth) is a wealth management fintech company, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share savvywealth.com; no company_facts record found."
+    },
+    {
+      "key": "org:scale.com",
+      "name": "Scale AI",
+      "domain": "scale.com",
+      "member_keys": [
+        "devpost:org:scaleai",
+        "site:org:scale.com"
+      ],
+      "facts_key": "linkedin:org:scale.com",
+      "category": "ai",
+      "tags": [
+        "data",
+        "ai",
+        "bronze"
+      ],
+      "description": "Scale AI develops reliable AI systems and provides data infrastructure for AI applications, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share scale.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:seeedstudio.com",
+      "name": "Seeed Studio",
+      "domain": "seeedstudio.com",
+      "member_keys": [
+        "site:org:seeedstudio.com"
+      ],
+      "facts_key": "linkedin:org:seeedstudio.com",
+      "category": "hardware",
+      "tags": [
+        "hardware",
+        "manufacturing",
+        "partner"
+      ],
+      "description": "Seeed Studio provides open hardware technology and agile manufacturing services, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Only site candidate for seeedstudio.com with matching LinkedIn facts."
+    },
+    {
+      "key": "org:spacetimedb.com",
+      "name": "SpacetimeDB",
+      "domain": "spacetimedb.com",
+      "member_keys": [
+        "devpost:org:spacetimedb",
+        "site:org:spacetimedb.com"
+      ],
+      "facts_key": "crunchbase:org:clockworklabs.io",
+      "category": "developer_tools",
+      "tags": [
+        "database",
+        "backend",
+        "gaming"
+      ],
+      "description": "SpacetimeDB is a backend system for real-time apps and games, developed by Clockwork Labs; an Anchor sponsor.",
+      "match_method": "agent",
+      "match_reason": "The Crunchbase facts text explicitly states 'Clockwork Labs is developing SpacetimeDB', naming the organization behind this domain."
+    },
+    {
+      "key": "org:supercell.com",
+      "name": "Supercell",
+      "domain": "supercell.com",
+      "member_keys": [
+        "devpost:org:supercell",
+        "site:org:supercell.com"
+      ],
+      "facts_key": "linkedin:org:supercell.com",
+      "category": "gaming",
+      "tags": [
+        "mobile-games",
+        "gaming",
+        "golden-bear"
+      ],
+      "description": "Supercell is a Finnish mobile games company known for Clash of Clans and Clash Royale, a Golden Bear sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share supercell.com; LinkedIn facts chosen as the more complete record over Crunchbase."
+    },
+    {
+      "key": "org:thehouse.fund",
+      "name": "The House Fund",
+      "domain": "thehouse.fund",
+      "member_keys": [
+        "devpost:org:thehousefund",
+        "site:org:thehouse.fund"
+      ],
+      "facts_key": "linkedin:org:thehouse.fund",
+      "category": "venture",
+      "tags": [
+        "venture-capital",
+        "berkeley",
+        "partner"
+      ],
+      "description": "The House Fund is a pre-seed and early stage venture capital fund focused on Berkeley startups, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share thehouse.fund with matching LinkedIn facts."
+    },
+    {
+      "key": "org:visa.com",
+      "name": "Visa",
+      "domain": "visa.com",
+      "member_keys": [
+        "devpost:org:visa",
+        "site:org:visa.com"
+      ],
+      "facts_key": "linkedin:org:visa.com",
+      "category": "fintech",
+      "tags": [
+        "payments",
+        "finance",
+        "golden-bear"
+      ],
+      "description": "Visa is a world leader in digital payments facilitating transactions globally, a Golden Bear sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share visa.com; LinkedIn facts chosen as the more complete record over Crunchbase."
+    },
+    {
+      "key": "org:wajo.ai",
+      "name": "Wajo AI",
+      "domain": "wajo.ai",
+      "member_keys": [
+        "site:org:wajo.ai",
+        "devpost:org:wajoai"
+      ],
+      "facts_key": "linkedin:org:wajo.ai",
+      "category": "ai",
+      "tags": [
+        "agents",
+        "consumer",
+        "partner"
+      ],
+      "description": "Wajo builds proactive, self-learning action agents that complete real-world tasks, a Partner of the event.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share wajo.ai with matching LinkedIn facts."
+    },
+    {
+      "key": "org:ycombinator.com",
+      "name": "Y Combinator",
+      "domain": "ycombinator.com",
+      "member_keys": [
+        "devpost:org:ycombinator",
+        "site:org:ycombinator.com"
+      ],
+      "facts_key": "",
+      "category": "venture",
+      "tags": [
+        "accelerator",
+        "startups",
+        "bronze"
+      ],
+      "description": "Y Combinator is a startup accelerator, a Bronze sponsor.",
+      "match_method": "exact_domain",
+      "match_reason": "Devpost and site candidates share ycombinator.com; no company_facts record found."
+    }
+  ],
+  "prize_links": [
+    {
+      "prize_key": "devpost:prize:1stplacebestaifirstdisruptor",
+      "organization_key": "org:creao.ai",
+      "reason": "Exact org_key match creaoai → Creao AI candidates."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestonepersoncompany",
+      "organization_key": "org:creao.ai",
+      "reason": "Exact org_key match creaoai."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestteamempowerment",
+      "organization_key": "org:creao.ai",
+      "reason": "Exact org_key match creaoai."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestuseofapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestuseofbitdeeraimodelstudio",
+      "organization_key": "org:bitdeer.ai",
+      "reason": "Prize names Bitdeer AI Model Studio; candidate site:org:bitdeer.ai shares org_key bitdeerai."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestuseoffetchai",
+      "organization_key": "org:fetch.ai",
+      "reason": "Exact org_key match fetchai."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebestuseoftheelasticagentbuilderonaserverlessinstance",
+      "organization_key": "org:elastic.co",
+      "reason": "Exact org_key match elastic."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacebuiltfortherealworld",
+      "organization_key": "org:microsoft.com",
+      "reason": "Exact org_key match microsoft."
+    },
+    {
+      "prize_key": "devpost:prize:1stplacethehyphenatedenterpriseautonomoussystemsforfinance",
+      "organization_key": "org:hyphenate.ai",
+      "reason": "Exact org_key match hyphenate."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacebestuseofapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacebestuseofbitdeeraimodelstudio",
+      "organization_key": "org:bitdeer.ai",
+      "reason": "Prize names Bitdeer AI Model Studio, matching bitdeer.ai candidate."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacebestuseoffetchai",
+      "organization_key": "org:fetch.ai",
+      "reason": "Exact org_key match fetchai."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacebestuseoftheelasticagentbuilderonaserverlessinstance",
+      "organization_key": "org:elastic.co",
+      "reason": "Exact org_key match elastic."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacemicrosoftcustomerimpactaward",
+      "organization_key": "org:microsoft.com",
+      "reason": "Exact org_key match microsoft."
+    },
+    {
+      "prize_key": "devpost:prize:2ndplacethehyphenatedenterpriseautonomoussystemsforfinance",
+      "organization_key": "org:hyphenate.ai",
+      "reason": "Exact org_key match hyphenate."
+    },
+    {
+      "prize_key": "devpost:prize:3rdplacebestuseofapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:3rdplacebestuseoffetchai",
+      "organization_key": "org:fetch.ai",
+      "reason": "Exact org_key match fetchai."
+    },
+    {
+      "prize_key": "devpost:prize:3rdplacethehyphenatedenterpriseautonomoussystemsforfinance",
+      "organization_key": "org:hyphenate.ai",
+      "reason": "Exact org_key match hyphenate."
+    },
+    {
+      "prize_key": "devpost:prize:4thplacebestuseofapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:5thplacebestuseofapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:bestactorsponsoredbyapify",
+      "organization_key": "org:apify.com",
+      "reason": "Exact org_key match apify."
+    },
+    {
+      "prize_key": "devpost:prize:bestdesign",
+      "organization_key": "org:figma.com",
+      "reason": "Exact org_key match figma."
+    },
+    {
+      "prize_key": "devpost:prize:bestdomainnamefromgodaddyregistry",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh (MLH-bundled prize)."
+    },
+    {
+      "prize_key": "devpost:prize:bestfinancialaiagent",
+      "organization_key": "org:crscreditapi.com",
+      "reason": "Prize is a CRS prize; candidates devpost:org:crscredit and company_facts share domain crscreditapi.com."
+    },
+    {
+      "prize_key": "devpost:prize:bestidentityfraudinnovation",
+      "organization_key": "org:crscreditapi.com",
+      "reason": "CRS prize text mentions CRS team/forward-deployed engineer role, matching CRS Credit API org."
+    },
+    {
+      "prize_key": "devpost:prize:bestoverallcrshack",
+      "organization_key": "org:crscreditapi.com",
+      "reason": "CRS-branded prize matches CRS Credit API org."
+    },
+    {
+      "prize_key": "devpost:prize:bestsecurityhack",
+      "organization_key": "org:armadin.com",
+      "reason": "Exact org_key match armadin."
+    },
+    {
+      "prize_key": "devpost:prize:bestusecaseoffigma",
+      "organization_key": "org:figma.com",
+      "reason": "Exact org_key match figma."
+    },
+    {
+      "prize_key": "devpost:prize:bestusecaseoffigmaagent",
+      "organization_key": "org:figma.com",
+      "reason": "Exact org_key match figma."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofcartesia",
+      "organization_key": "org:cartesia.ai",
+      "reason": "Exact org_key match cartesia."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofconvex",
+      "organization_key": "org:convex.dev",
+      "reason": "Exact org_key match convex."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofgeminiapi",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofmoss",
+      "organization_key": "org:moss.dev",
+      "reason": "Exact org_key match moss."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofnessie",
+      "organization_key": "org:capitalone.com",
+      "reason": "Exact org_key match capitalone."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofnotability",
+      "organization_key": "org:notability.com",
+      "reason": "Exact org_key match notability."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofreimaginingshoppingsponsoredbyvisa",
+      "organization_key": "org:visa.com",
+      "reason": "Exact org_key match visa."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofsnowflakeapi",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofsolana",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofthefactorydroidsdk",
+      "organization_key": "org:factory.ai",
+      "reason": "Exact org_key match factory."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseoftigerdata",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofvultr",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:bestuseofx402bycoinbase",
+      "organization_key": "org:coinbase.com",
+      "reason": "Exact org_key match coinbase."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksbestbeginnerhack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself, no sponsor org."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksbesthardwarehack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksbestpeoplefirstsocialimpacthack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksbestplanetfirstsocialimpacthack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksbestsolohack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksfirstoverall",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhackshackerschoice",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksmostcreativeproject",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksmosttechnicallyadvancedhack",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhackssecondoverall",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:calhacksthirdoverall",
+      "organization_key": "",
+      "reason": "Cal Hacks prize offered by the event itself."
+    },
+    {
+      "prize_key": "devpost:prize:commitfellowshipprizecategory",
+      "organization_key": "org:mlh.com",
+      "reason": "Exact org_key match mlh."
+    },
+    {
+      "prize_key": "devpost:prize:makeitlegendarywithspacexsi",
+      "organization_key": "",
+      "reason": "No organization in this run's list matches SpaceXSI; org:cursor.com (SpaceXAI) has a different domain and name with no corroborating text."
+    },
+    {
+      "prize_key": "devpost:prize:metafacebookbringingpeopleclosertogetherwithai",
+      "organization_key": "org:meta.com",
+      "reason": "Exact org_key match meta."
+    },
+    {
+      "prize_key": "devpost:prize:mostcreative",
+      "organization_key": "org:figma.com",
+      "reason": "Exact org_key match figma."
+    },
+    {
+      "prize_key": "devpost:prize:mostcreativeusecaseoffigmaagent",
+      "organization_key": "org:figma.com",
+      "reason": "Exact org_key match figma."
+    },
+    {
+      "prize_key": "devpost:prize:mostunexpecteduseofcrs",
+      "organization_key": "org:crscreditapi.com",
+      "reason": "CRS-branded prize referencing the CRS team, matches CRS Credit API org."
+    }
+  ],
+  "person_links": [
+    {
+      "person_key": "site:person:enoreyes",
+      "organization_key": "org:factory.ai",
+      "reason": "Eno Reyes is FOUNDER & CTO of Factory AI, matching organization_text 'Factory AI' to org:factory.ai."
+    },
+    {
+      "person_key": "site:person:ryanpetersen",
+      "organization_key": "",
+      "reason": "Ryan Petersen's employer Flexport is not an organization of this run."
+    },
+    {
+      "person_key": "site:person:sergeylevine",
+      "organization_key": "",
+      "reason": "Sergey Levine's employer Physical Intelligence is not an organization of this run."
+    }
+  ],
+  "schedule_links": [
+    {
+      "slot_key": "devpost_dates:slot:submissions20261023t1800000700",
+      "zone_key": "",
+      "organization_key": "",
+      "reason": "No location text or exact zone join, and no zone name matches 'Submissions'; no organization clearly runs this deadline item."
+    },
+    {
+      "slot_key": "devpost_dates:slot:winnersannounced20261025t1600000700",
+      "zone_key": "",
+      "organization_key": "",
+      "reason": "No location text or exact zone join, and no zone name clearly fits 'Winners Announced'; no organization clearly runs it."
+    }
+  ],
+  "gaps": [
+    {
+      "key": "org:a16z.com",
+      "reason": "No company_facts record was found for a16z despite targeted search."
+    },
+    {
+      "key": "org:bitdeer.ai",
+      "reason": "No company_facts record was found for Bitdeer."
+    },
+    {
+      "key": "org:cartesia.ai",
+      "reason": "No company_facts record was found for Cartesia."
+    },
+    {
+      "key": "org:context.dev",
+      "reason": "No company_facts record was found for Context."
+    },
+    {
+      "key": "org:council.health",
+      "reason": "No company_facts record was found for Council Health."
+    },
+    {
+      "key": "org:drinknixie.com",
+      "reason": "No company_facts record was found for Nixie."
+    },
+    {
+      "key": "org:elastic.co",
+      "reason": "No company_facts record was found for Elastic despite being a sponsor on this run."
+    },
+    {
+      "key": "org:fetch.ai",
+      "reason": "No company_facts record was found for Fetch.ai."
+    },
+    {
+      "key": "org:figma.com",
+      "reason": "No company_facts record clearly about Figma proper was found; the only candidate (figma.bot) names a different-looking entity and was not linked."
+    },
+    {
+      "key": "org:finchnode.org",
+      "reason": "No company_facts record was found for FinchNode."
+    },
+    {
+      "key": "org:illy.com",
+      "reason": "No company_facts record was found for illy."
+    },
+    {
+      "key": "org:llamaventures.vc",
+      "reason": "No company_facts record was found for Llama Ventures."
+    },
+    {
+      "key": "org:mana.space",
+      "reason": "No company_facts record was found for Mana."
+    },
+    {
+      "key": "org:nooks.ai",
+      "reason": "No company_facts record was found for Nooks."
+    },
+    {
+      "key": "org:redbull.com",
+      "reason": "No company_facts record was found for Red Bull."
+    },
+    {
+      "key": "org:rysesupps.com",
+      "reason": "No company_facts record was found for RYSE."
+    },
+    {
+      "key": "org:savvywealth.com",
+      "reason": "No company_facts record was found for Savvy despite targeted search."
+    },
+    {
+      "key": "org:ycombinator.com",
+      "reason": "No company_facts record was found for Y Combinator."
+    },
+    {
+      "key": "org:cursor.com",
+      "reason": "The only organization candidate on cursor.com is named 'SpaceXAI', an unresolved name/domain mismatch that needs human review before linking to any facts or sponsor identity."
+    },
+    {
+      "key": "devpost_dates:slot:submissions20261023t1800000700",
+      "reason": "Schedule item has no venue/zone information and no organization is recorded as running it."
+    },
+    {
+      "key": "devpost_dates:slot:winnersannounced20261025t1600000700",
+      "reason": "Schedule item has no venue/zone information; likely held at the main stage but this is not stated in the record, so left unassigned."
+    },
+    {
+      "key": "devpost:prize:makeitlegendarywithspacexsi",
+      "reason": "Prize names sponsor 'SpaceXSI' but no organization of this run matches that name or domain; org:cursor.com (SpaceXAI) is a different entity with no linking evidence."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "bandit-organizer",
+  "name": "BandIt organizer",
+  "description": "Organizes the scraped public records of one BandIt import run: who is who, categories, tags, descriptions and links. Started by the bandit-organize workflow.",
+  "labels": ["bandit"],
+  "access_control": { "access_mode": "public" },
+  "configuration": {
+    "tools": [{ "tool_ids": ["bandit.records", "bandit.candidates"] }],
+    "enable_elastic_capabilities": false
+  }
+}

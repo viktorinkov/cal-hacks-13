@@ -1,0 +1,45 @@
+/* Deliberately plain: a designer will replace this. */
+body { font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #fafafa; color: #111; }
+main { max-width: 860px; margin: 0 auto; padding: 16px; }
+h2 { margin-top: 8px; }
+section { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+label { display: block; margin: 8px 0; }
+label input:not([type=checkbox]), select, textarea { display: block; width: 100%; max-width: 420px; padding: 6px; font: inherit; box-sizing: border-box; }
+label.check { display: flex; gap: 8px; align-items: center; }
+button { font: inherit; padding: 6px 12px; margin: 4px 4px 4px 0; cursor: pointer; }
+button.link { background: none; border: none; color: #0645ad; text-decoration: underline; padding: 0 4px; }
+button.sim { background: #fff3cd; border: 1px dashed #c69500; }
+table { border-collapse: collapse; width: 100%; }
+td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+.muted { color: #666; }
+.top { text-align: right; font-size: 13px; }
+.big { font-size: 20px; }
+.error { color: #b00020; white-space: pre-wrap; margin: 0; padding: 0 16px; }
+.card.grey { opacity: .55; }
+.chip { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 12px; font-size: 14px; background: #ddd; }
+.chip.green { background: #c8f7c5; } .chip.yellow { background: #fff2a8; } .chip.red { background: #ffc4c4; }
+.chip.blue { background: #c6dcff; } .chip.white { background: #fff; border: 1px solid #999; } .chip.pink { background: #ffd0ec; }
+.level.calm { color: #18794e; } .level.busy { color: #a35200; } .level.very-busy { color: #b00020; font-weight: bold; }
+.pass { color: #18794e; } .fail { color: #b00020; font-weight: bold; } .info { color: #555; }
+ul.cards { list-style: none; padding: 0; }
+ul.cards li { padding: 8px 0; border-bottom: 1px solid #eee; }
+.handle { margin-right: 10px; }
+.face { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; }
+.photos, .merch { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+figure { margin: 0; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
+figure img, figure canvas { width: 100%; display: block; }
+figcaption { padding: 8px; font-size: 14px; }
+svg.spacetime { width: 100%; height: auto; background: #fff; }
+svg.spacetime text { font-size: 13px; fill: #333; }
+svg.spacetime .tick { fill: #888; font-size: 12px; }
+svg.spacetime .grid { stroke: #eee; }
+svg.spacetime .stay { fill: #4c8dff; opacity: .8; }
+svg.spacetime .met { fill: #ff5c8a; stroke: #fff; stroke-width: 2; }
+nav a, nav button { margin-right: 12px; }
+nav .on { font-weight: bold; text-decoration: none; color: #111; }
+.alert { background: #ffe1e1; border-color: #f99; }
+code { background: #eee; padding: 1px 4px; border-radius: 3px; }
+.graph { height: 70vh; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+.legend span { margin-right: 14px; font-size: 14px; color: #555; white-space: nowrap; }
+.legend i { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle; }
+.legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
