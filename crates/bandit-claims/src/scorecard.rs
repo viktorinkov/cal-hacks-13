@@ -32,16 +32,17 @@ impl Kind {
 
     fn note(self) -> &'static str {
         match self {
-            Kind::Genuine | Kind::SameBillTwice => "right wrist sprain after slipping near the stage; wrapped, cold pack, first aid",
-            Kind::CircleElsewhere => "says they fell and hurt a wrist; no swelling, ice pack given",
-            Kind::InjuryAtHome => "right ankle pain and swelling; splinted, referred to urgent care",
-            Kind::InjuredStaff => "stage crew member hurt a wrist moving a road case; wrapped, first aid",
+            Kind::Genuine | Kind::SameBillTwice => {
+                "on scene: right wrist pain after slipping on a spilled drink; walking her to the medical station"
+            }
+            Kind::CircleElsewhere => "on scene: says they fell and hurt a wrist; no swelling, giving an ice pack",
+            Kind::InjuryAtHome => "on scene: right ankle pain and swelling; splinting it, referring him to urgent care",
+            Kind::InjuredStaff => "on scene: stage crew member hurt a wrist moving a road case; wrapping it",
         }
     }
 }
 
 const FAKES: [Kind; 4] = [Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::SameBillTwice, Kind::InjuredStaff];
-const STATIONS: [u8; 3] = [MAIN_STAGE, SPONSOR_HALL, HACKER_HALL];
 /// Bands that stand around and light the circle.
 const CROWD: [u8; 9] = [1, 2, 4, 5, 9, 3, 6, 7, 8];
 /// The module's occurrence window (5 min) plus slack for when the incident opens.
@@ -60,12 +61,12 @@ struct Planted {
 }
 
 pub fn run(app: &App, rounds: u32) -> Result<()> {
-    setup::run(app)?;
+    let bridge = setup::run(app)?;
     if !app.worker_active() {
         println!("\nnote: {}", app.worker_hint());
     }
-    let bridge = Bridge::open(app)?;
-    let crowd: Vec<(u8, Pose)> = CROWD.iter().map(|b| (*b, bridge.pose(*b).unwrap_or(Pose::at(MAIN_STAGE)))).collect();
+    let main = app.station(MAIN_STAGE)?;
+    let crowd: Vec<(u8, Pose)> = CROWD.iter().map(|b| (*b, bridge.pose(*b).unwrap_or(Pose::at(main)))).collect();
     bridge.place(&crowd);
     let mut all: Vec<Planted> = Vec::new();
     let mut witness_turn = 0usize;
@@ -82,8 +83,8 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
         });
         app.quiet.set(false);
         original.context("the first genuine claim never got past reading its record")?;
-        let source = (first.band, first.name.clone(), first.record.as_ref().map(|r| (r.sha256.clone(), r.size_bytes, r.pages)));
-        planted.push(plant(app, &bridge, Kind::SameBillTwice, Some(source), &mut witness_turn)?);
+        let dup = plant(app, &bridge, Kind::SameBillTwice, Some(first), &mut witness_turn)?;
+        planted.push(dup);
 
         println!("  the flow runs:");
         finish_flow(app, &mut planted)?;
@@ -148,25 +149,24 @@ fn person(app: &App, bridge: &Bridge, kind: Kind, station: u8) -> Result<(u8, St
 
 /// Plants one claim: a person (new, or the source's for the same bill twice)
 /// falls in a zone with room, the medic treats and resolves, a record is filed.
-fn plant(
-    app: &App,
-    bridge: &Bridge,
-    kind: Kind,
-    source: Option<(u8, String, Option<(String, u64, u32)>)>,
-    turn: &mut usize,
-) -> Result<Planted> {
+fn plant(app: &App, bridge: &Bridge, kind: Kind, source: Option<&Planted>, turn: &mut usize) -> Result<Planted> {
     let station = pick_station(app)?;
-    let witness_station = if kind == Kind::CircleElsewhere { *STATIONS.iter().find(|s| **s != station).unwrap() } else { station };
+    let witness_station = match kind {
+        Kind::CircleElsewhere if app.station(SPONSOR_ROW)? != station => app.station(SPONSOR_ROW)?,
+        Kind::CircleElsewhere => app.station(MAIN_STAGE)?,
+        _ => station,
+    };
     let n = if kind == Kind::CircleElsewhere { 3 } else { 2 + *turn % 2 };
     let witnesses: Vec<u8> = (0..n).map(|i| CROWD[(*turn + i) % CROWD.len()]).collect();
     *turn += n;
     let (band, name) = match &source {
-        Some((band, name, _)) => (*band, name.clone()),
+        Some(p) => (p.band, p.name.clone()),
         None => person(app, bridge, kind, station)?,
     };
     app.quiet.set(true);
     let planted = (|| {
         let incident = flow::fall(app, bridge, band, station, &witnesses, witness_station)?;
+        sleep_ms(flow::RESPONSE_SECS * 1000);
         flow::treat(app, incident.id, kind.note())?;
         let claim = flow::resolve(app, incident.id, "treated on site", "medic")?.context("no claim opened")?;
         let suffix = format!("SC{band:02}-{}", claim.id);
@@ -174,8 +174,8 @@ fn plant(
             Kind::Genuine => Some(flow::attach_record(app, claim.id, "first-aid-wrist", Some(&suffix), Some(&name))?),
             Kind::InjuryAtHome => Some(flow::attach_record(app, claim.id, "urgent-care-ankle-home", Some(&suffix), Some(&name))?),
             Kind::SameBillTwice => {
-                let (sha, size, pages) = source.as_ref().and_then(|s| s.2.clone()).context("the original claim has no record")?;
-                flow::file_record(app, claim.id, &sha, size, pages)?;
+                let r = source.and_then(|p| p.record.as_ref()).context("the original claim has no record")?;
+                flow::file_record(app, claim.id, &r.sha256, r.size_bytes, r.pages)?;
                 None
             }
             _ => None,
@@ -210,8 +210,8 @@ fn pick_station(app: &App) -> Result<u8> {
         let db = app.db()?;
         let t = now_micros() + 15_000_000;
         let mut best: Option<(usize, u8)> = None;
-        for s in STATIONS {
-            let Some(zone) = app.zone_by_station(s) else { continue };
+        for zone in app.stationed_zones()? {
+            let s = zone.station_id;
             let times: Vec<i64> = db
                 .db
                 .incident()

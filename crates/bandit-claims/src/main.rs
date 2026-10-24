@@ -12,7 +12,7 @@ mod setup;
 mod show;
 
 use anyhow::Result;
-use app::{App, MAIN_STAGE, parse_money, parse_status};
+use app::{App, parse_money, parse_status};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -35,9 +35,16 @@ enum Cmd {
         /// Comma-separated band ids, for example 2,4,9
         #[arg(long, value_delimiter = ',')]
         witnesses: Vec<u8>,
-        #[arg(long, default_value_t = MAIN_STAGE)]
-        station: u8,
-        /// Where the circle forms (default: the fall's station)
+        /// The zone the band falls in
+        #[arg(long, default_value = app::MAIN_STAGE)]
+        zone: String,
+        /// The zone where the circle forms (default: the fall's zone)
+        #[arg(long)]
+        witness_zone: Option<String>,
+        /// A raw station id instead of --zone
+        #[arg(long)]
+        station: Option<u8>,
+        /// A raw station id instead of --witness-zone
         #[arg(long)]
         witness_station: Option<u8>,
     },
@@ -161,12 +168,21 @@ fn main() {
 fn run(cli: Cli) -> Result<()> {
     let app = App::load()?;
     match cli.cmd {
-        Cmd::Setup => setup::run(&app),
+        Cmd::Setup => setup::run(&app).map(drop),
         Cmd::Status => setup::status(&app),
-        Cmd::Fall { band, witnesses, station, witness_station } => {
+        Cmd::Fall { band, witnesses, zone, witness_zone, station, witness_station } => {
+            let station = match station {
+                Some(s) => s,
+                None => app.station(&zone)?,
+            };
+            let witness_station = match (witness_station, witness_zone) {
+                (Some(s), _) => s,
+                (None, Some(z)) => app.station(&z)?,
+                (None, None) => station,
+            };
             let bridge = bridge::Bridge::open(&app)?;
             sleep_for_preroll();
-            let incident = flow::fall(&app, &bridge, band, station, &witnesses, witness_station.unwrap_or(station))?;
+            let incident = flow::fall(&app, &bridge, band, station, &witnesses, witness_station)?;
             drop(bridge);
             flow::print_incident(&app, incident.id)
         }

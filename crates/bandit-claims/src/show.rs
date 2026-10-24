@@ -165,10 +165,10 @@ pub fn show(app: &App, id: u64) -> Result<()> {
     for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
         println!("learned  {}", rule_line(app, &r));
     }
-    if c.decided_by == "rule" {
-        if let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id) {
-            println!("settled under {}", rule_line(app, &r));
-        }
+    if c.decided_by == "rule"
+        && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
+    {
+        println!("settled under {}", rule_line(app, &r));
     }
 
     ledger(app, id, true)?;
@@ -327,10 +327,10 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
     for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
         println!("  learned  {}", rule_line(app, &r));
     }
-    if c.decided_by == "rule" {
-        if let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id) {
-            println!("  under    {}", rule_line(app, &r));
-        }
+    if c.decided_by == "rule"
+        && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
+    {
+        println!("  under    {}", rule_line(app, &r));
     }
     if !c.payout_reference.is_empty() {
         println!("  paid     {} via {}", money(c.payout_cents), c.payout_reference);

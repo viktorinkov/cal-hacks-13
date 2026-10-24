@@ -10,8 +10,9 @@ use std::collections::HashMap;
 
 pub const POLICY: &str = "GL-2026-04417";
 
-/// Creates every actor and the demo world. Safe to run again: every step is an upsert.
-pub fn run(app: &App) -> Result<()> {
+/// Creates every actor and the demo world. Safe to run again: every step is an
+/// upsert. Returns the running bridge, so a demo keeps the bands online.
+pub fn run(app: &App) -> Result<Bridge> {
     let db = app.db()?;
     println!("server     {}  database {}", app.uri, app.database);
     println!("owner      {}", short_id(db.identity()));
@@ -35,19 +36,23 @@ pub fn run(app: &App) -> Result<()> {
         println!("{name:<10} {}  {role} ({label})", short_id(ids[name]));
     }
 
-    let ops = app.actor("ops")?;
-    let mut bundle = venue_bundle()?;
-    bundle.bundle_hash = bandit_common::sha256_hex(format!("{bundle:?}").as_bytes());
-    call!(ops, import_event_then(bundle))?;
+    if let Some(v) = db.db.venue().iter().next() {
+        println!("venue      {} already imported; keeping it", v.name);
+    } else {
+        let ops = app.actor("ops")?;
+        let mut bundle = venue_bundle()?;
+        bundle.bundle_hash = bandit_common::sha256_hex(format!("{bundle:?}").as_bytes());
+        call!(ops, import_event_then(bundle))?;
+        until(5.0, || (db.db.zone().count() >= 5).then_some(())).context("the venue import left no zones")?;
+        println!("venue      Cal Hacks 13.0 imported, live demos running on Main stage");
+    }
+    let zones = app.stationed_zones()?;
+    let list: Vec<String> = zones.iter().map(|z| format!("{} {}", z.name, z.station_id)).collect();
+    println!("zones      {}", list.join(", "));
+    let main = app.zone_by_name(MAIN_STAGE)?;
+    app.station(MAIN_STAGE)?;
     call!(db, start_safety_watch_then())?;
     call!(db, start_job_reaper_then())?;
-    let zones = until(5.0, || {
-        let z: Vec<Zone> = db.db.zone().iter().collect();
-        (z.len() >= 3).then_some(z)
-    })
-    .context("the venue import left no zones")?;
-    let main = app.zone_by_name("Main stage")?;
-    println!("venue      Cal Hacks 13.0: {} zones, {} booths, live demos running on Main stage", zones.len(), db.db.booth().count());
     println!("watch      safety watch (500 ms) and job reaper (10 s) started");
 
     let dana = app.actor("dana")?;
@@ -95,23 +100,22 @@ pub fn run(app: &App) -> Result<()> {
         call!(db, reset_bridge_then())?;
         call!(bridge_conn, register_bridge_then())?;
     }
-    for (station, colour) in [(MAIN_STAGE, 1), (SPONSOR_HALL, 2), (HACKER_HALL, 3)] {
-        call!(bridge_conn, ingest_station_then(station, colour, -48))?;
+    for z in &zones {
+        call!(bridge_conn, ingest_station_then(z.station_id, z.exit_colour, -48))?;
     }
     let _ = bridge_conn.disconnect();
     let bridge = Bridge::open(app)?;
-    let missing: Vec<(u8, Pose)> = (1..=9u8).filter(|b| bridge.pose(*b).is_none()).map(|b| (b, Pose::at(MAIN_STAGE))).collect();
+    let missing: Vec<(u8, Pose)> = (1..=9u8).filter(|b| bridge.pose(*b).is_none()).map(|b| (b, Pose::at(main.station_id))).collect();
     bridge.place(&missing);
     sleep_ms(800);
-    println!("bridge     {}  registered; bands 1-9 online", short_id(ids["bridge"]));
+    println!("bridge     {}  registered; bands 1-9 online (new ones at Main stage)", short_id(ids["bridge"]));
 
     for (name, display, band) in ATTENDEES {
         ensure_attendee(app, &bridge, name, display, *band)?;
         println!("{name:<10} {}  attendee {display}, band {band}", short_id(ids[name]));
     }
-    drop(bridge);
     println!("tokens     {}", app.tokens().dir().display());
-    Ok(())
+    Ok(bridge)
 }
 
 /// Claims the band (NFC tap, then a press on the band within a few seconds) and sets the profile.
@@ -143,9 +147,9 @@ fn this_month(tz: i32) -> Result<(Timestamp, Timestamp)> {
     Ok((at(y, m), at(ny, nm)))
 }
 
-/// The venue bundle: three zones anchored by stations 101-103, two booths and
-/// one schedule slot running now on Main stage. Times are rounded so a second
-/// import within the hour changes nothing.
+/// The venue bundle, imported only when the database has no venue yet: the
+/// five CalHacks zones with the pipeline's stations, two booths and one
+/// schedule slot running now on Main stage.
 fn venue_bundle() -> Result<EventBundle> {
     let tz = hyphenate_core::config::Config::default().tz_offset_minutes;
     let ts = Timestamp::from_micros_since_unix_epoch;
@@ -202,25 +206,17 @@ fn venue_bundle() -> Result<EventBundle> {
             fetched_at: ts(midnight),
         },
         zones: vec![
-            zone(
-                "zone-main-stage",
-                "Main stage",
-                "stage",
-                MAIN_STAGE,
-                0.0,
-                900.0,
-                1200,
-                1,
-                "The stage and the standing pit in front of it",
-            ),
-            zone("zone-sponsor-hall", "Sponsor hall", "hall", SPONSOR_HALL, 60.0, 1500.0, 900, 2, "Sponsor booths along both walls"),
-            zone("zone-hacker-hall", "Hacker hall", "hall", HACKER_HALL, 120.0, 2000.0, 1500, 3, "Tables, power and the hardware lab"),
+            zone("zone-entrance", "Entrance", "entrance", 101, 0.0, 400.0, 500, 1, "Check-in and the main doors"),
+            zone("zone-hacking-floor", "Hacking floor", "hall", 102, 40.0, 2000.0, 1500, 2, "Tables, power and the hardware lab"),
+            zone("zone-sponsor-row", "Sponsor row", "hall", 103, 80.0, 1200.0, 800, 3, "Sponsor booths along both walls"),
+            zone("zone-main-stage", "Main stage", "stage", 104, 120.0, 900.0, 1200, 4, "The stage and the standing pit in front of it"),
+            zone("zone-food", "Food and drinks", "food", 105, 160.0, 600.0, 400, 5, "Food trucks and the drinks bar"),
         ],
         organizations: Vec::new(),
         people: Vec::new(),
         booths: vec![
             booth("booth-medical", "zone-main-stage", "M1", "Event medical station", "medical", "First aid, staffed all night"),
-            booth("booth-hardware-lab", "zone-hacker-hall", "H4", "Hardware lab", "lab", "Soldering irons, 3D printers and parts"),
+            booth("booth-hardware-lab", "zone-hacking-floor", "H4", "Hardware lab", "lab", "Soldering irons, 3D printers and parts"),
         ],
         schedule: vec![ScheduleSlotIn {
             source_key: "slot-live-demos".into(),
