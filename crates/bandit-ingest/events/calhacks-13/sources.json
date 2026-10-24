@@ -2,7 +2,8 @@
   "pages": [
     {"source": "site", "kind": "event_site", "url": "https://www.calhacks.io/"},
     {"source": "devpost", "kind": "devpost", "url": "https://cal-hacks-13-0.devpost.com/"},
-    {"source": "devpost_dates", "kind": "devpost_dates", "url": "https://cal-hacks-13-0.devpost.com/details/dates"}
+    {"source": "devpost_dates", "kind": "devpost_dates", "url": "https://cal-hacks-13-0.devpost.com/details/dates"},
+    {"source": "venue_map", "kind": "venue_map", "url": "https://hive.hackberkeley.org/venue-map"}
   ],
   "datasets": [
     {

@@ -392,6 +392,7 @@ pub fn run(cfg: &Config) -> Result<()> {
             "linkedin_company" => linkedin(&snap),
             "crunchbase_company" => crunchbase(&snap),
             "google_maps" => google_maps(&snap),
+            "venue_map" => Ok(Vec::new()),
             other => bail!("no parser for kind {other}"),
         }
         .with_context(|| format!("parsing {}", path.display()))?;
