@@ -5,3 +5,6 @@
 target/
 var/
 .dev/
+pipeline/data/
+__pycache__/
+*.pyc
