@@ -1,0 +1,12 @@
+#!/bin/sh
+# Run bandit-indexer and bandit-api against the local social dev database and the `bandit-dev-*` Elastic indices.
+# First run: each prints its identity; grant the roles with scripts/stdb call ... grant_role.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export SPACETIMEDB_URL=http://127.0.0.1:3091 SPACETIMEDB_DATABASE=bandit-social-dev
+export ELASTIC_INDEX_PREFIX=bandit-dev BANDIT_API_ADDR=127.0.0.1:8091
+TARGET="${CARGO_TARGET_DIR:-$ROOT/target}"
+cd "$ROOT" && cargo build -q -p bandit-indexer -p bandit-api
+"$TARGET/debug/bandit-indexer" > "$ROOT/.dev/indexer.log" 2>&1 &
+"$TARGET/debug/bandit-api" > "$ROOT/.dev/api.log" 2>&1 &
+sleep 3
+grep "connected as" "$ROOT/.dev/indexer.log" "$ROOT/.dev/api.log"

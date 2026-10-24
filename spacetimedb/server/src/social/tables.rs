@@ -1,4 +1,4 @@
-use spacetimedb::{Identity, ScheduleAt, SpacetimeType, Timestamp};
+use spacetimedb::{Identity, ScheduleAt, Timestamp};
 
 /// One person using the attendee app, keyed by the identity of their app connection.
 #[spacetimedb::table(accessor = attendee)]
@@ -192,29 +192,36 @@ pub struct PeopleLink {
     pub updated_at: Timestamp,
 }
 
-/// One person the summary job picked as someone the attendee hung out with.
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub struct StoryPerson {
-    pub attendee: Identity,
-    pub line: String,
+/// An event photo, placed in a zone at the moment it was taken.
+#[spacetimedb::table(accessor = photo)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Photo {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    /// Where the image is served from.
+    pub url: String,
+    pub taken_at: Timestamp,
+    #[index(btree)]
+    pub zone_id: u64,
+    pub caption: String,
+    pub added_by: Identity,
+    pub created_at: Timestamp,
 }
 
-/// The attendee's story of the night, written by the summary_story Claude job or by its template fallback.
-#[spacetimedb::table(accessor = summary_story)]
+/// A findable attendee whose band was in the photo's zone when it was taken. They confirm or remove it.
+#[spacetimedb::table(accessor = photo_tag)]
 #[derive(Clone, Debug, PartialEq)]
-pub struct SummaryStory {
+pub struct PhotoTag {
     #[primary_key]
-    pub attendee: Identity,
-    /// pending or ready.
-    pub status: String,
-    pub title: String,
-    pub body: String,
-    pub highlights: Vec<String>,
-    pub people: Vec<StoryPerson>,
-    /// claude or template.
-    pub source: String,
+    #[auto_inc]
+    pub id: u64,
     #[index(btree)]
-    pub job_id: u64,
+    pub photo_id: u64,
+    #[index(btree)]
+    pub attendee: Identity,
+    /// suggested, confirmed or removed.
+    pub status: String,
     pub updated_at: Timestamp,
 }
 

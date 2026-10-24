@@ -21,11 +21,12 @@ pub const STATE_IDLE: u8 = 0;
 pub const STATE_IDENT: u8 = 8;
 pub const IDENT_TENTHS: u8 = 80;
 
-pub const STORY_PENDING: &str = "pending";
-pub const STORY_READY: &str = "ready";
-pub const STORY_CLAUDE: &str = "claude";
-pub const STORY_TEMPLATE: &str = "template";
-pub const SUMMARY_STORY_JOB: &str = "summary_story";
+
+pub const TAG_SUGGESTED: &str = "suggested";
+pub const TAG_CONFIRMED: &str = "confirmed";
+pub const TAG_REMOVED: &str = "removed";
+/// At most this many people are suggested for one photo (starting value, calibrate).
+pub const PHOTO_TAG_CAP: usize = 8;
 
 pub const LINK_MET: &str = "met";
 pub const LINK_VISITED: &str = "visited";
