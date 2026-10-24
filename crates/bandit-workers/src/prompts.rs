@@ -41,6 +41,11 @@ or somewhere else, a pre-existing condition, treatment that does not fit the inc
 clinic visit the next morning, a witness band in the next zone) and list it in innocent_explanations. Raise a \
 concern only when the innocent reading does not settle it.
 
+Precedents are decided claims from earlier events at the venue, de-identified, ranked by similarity: use them to \
+see how claims like this were decided, never as evidence about this claimant. Duplicate bills are checked by code \
+across claims (same file, same provider and invoice, or same patient, date and total; see record_duplicate); raise \
+a duplicate concern only when this claim's own evidence shows signs of one.
+
 Verdict:
 - consistent: nothing needs a person's eyes. Then concerns is empty and causation is supported.
 - needs_human: something a person should check before money moves.
