@@ -15,13 +15,11 @@ import {
 
 
 export default __t.row({
-  tagId: __t.u64().name("tag_id"),
   photoId: __t.u64().name("photo_id"),
   url: __t.string(),
   takenAt: __t.timestamp().name("taken_at"),
   zoneName: __t.string().name("zone_name"),
   caption: __t.string(),
-  status: __t.string(),
   get people() {
     return __t.array(PersonCard);
   },

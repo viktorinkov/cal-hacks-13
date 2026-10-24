@@ -56,7 +56,6 @@ import RequestMedicalCardReducer from "../request_medical_card_reducer";
 import RequestRecoveryLetterReducer from "../request_recovery_letter_reducer";
 import ResetBridgeReducer from "../reset_bridge_reducer";
 import ResolveIncidentReducer from "../resolve_incident_reducer";
-import RespondPhotoTagReducer from "../respond_photo_tag_reducer";
 import RetryClaimPayoutReducer from "../retry_claim_payout_reducer";
 import RevokeRoleReducer from "../revoke_role_reducer";
 import SendCommandReducer from "../send_command_reducer";
@@ -136,7 +135,6 @@ export type RequestMedicalCardParams = __Infer<typeof RequestMedicalCardReducer>
 export type RequestRecoveryLetterParams = __Infer<typeof RequestRecoveryLetterReducer>;
 export type ResetBridgeParams = __Infer<typeof ResetBridgeReducer>;
 export type ResolveIncidentParams = __Infer<typeof ResolveIncidentReducer>;
-export type RespondPhotoTagParams = __Infer<typeof RespondPhotoTagReducer>;
 export type RetryClaimPayoutParams = __Infer<typeof RetryClaimPayoutReducer>;
 export type RevokeRoleParams = __Infer<typeof RevokeRoleReducer>;
 export type SendCommandParams = __Infer<typeof SendCommandReducer>;

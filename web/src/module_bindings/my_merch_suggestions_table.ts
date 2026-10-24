@@ -25,5 +25,4 @@ export default __t.row({
   photoH: __t.u32().name("photo_h"),
   photoId: __t.u64().name("photo_id"),
   photoUrl: __t.string().name("photo_url"),
-  minutes: __t.f32(),
 });

@@ -244,7 +244,6 @@ pub mod request_medical_card_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
-pub mod respond_photo_tag_reducer;
 pub mod retry_claim_payout_reducer;
 pub mod revoke_role_reducer;
 pub mod schedule_slot_in_type;
@@ -559,7 +558,6 @@ pub use request_medical_card_reducer::request_medical_card;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
-pub use respond_photo_tag_reducer::respond_photo_tag;
 pub use retry_claim_payout_reducer::retry_claim_payout;
 pub use revoke_role_reducer::revoke_role;
 pub use schedule_slot_in_type::ScheduleSlotIn;
@@ -858,10 +856,6 @@ pub enum Reducer {
         incident_id: u64,
         resolution: String,
     },
-    RespondPhotoTag {
-        tag_id: u64,
-        confirm: bool,
-    },
     RetryClaimPayout {
         claim_id: u64,
     },
@@ -1063,7 +1057,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
-            Reducer::RespondPhotoTag { .. } => "respond_photo_tag",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
@@ -1484,12 +1477,6 @@ impl __sdk::Reducer for Reducer {
                 incident_id: incident_id.clone(),
                 resolution: resolution.clone(),
             }),
-            Reducer::RespondPhotoTag { tag_id, confirm } => {
-                __sats::bsatn::to_vec(&respond_photo_tag_reducer::RespondPhotoTagArgs {
-                    tag_id: tag_id.clone(),
-                    confirm: confirm.clone(),
-                })
-            }
             Reducer::RetryClaimPayout { claim_id } => {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),

@@ -9,8 +9,8 @@ import type { MerchSuggestion, MyPhoto } from './module_bindings/types';
 
 export type Recap = {
   display_name: string;
-  suggested_people: { node_id: number; name: string; photo_url: string; handles: Record<string, string>; minutes: number; score: number | null }[];
-  suggested_booths: { booth_id: number; name: string; zone_name: string; minutes: number; score: number | null }[];
+  suggested_people: { node_id: number; name: string; photo_url: string; handles: Record<string, string> }[];
+  suggested_booths: { booth_id: number; name: string; zone_name: string }[];
   suggestions_ranked: boolean;
 };
 
@@ -125,8 +125,7 @@ function people() {
     const handles = Object.entries(p.handles).map(([platform, handle]) => ({ platform, handle }));
     return h('li', {},
       p.photo_url && h('img', { class: 'face', src: p.photo_url }),
-      h('b', {}, p.name), ` · ${Math.max(1, Math.round(p.minutes))} min together`,
-      p.score !== null && h('span', { class: 'score' }, `match ${p.score.toFixed(2)}`),
+      h('b', {}, p.name),
       h('div', {}, handles.length ? handleLinks(handles) : h('span', { class: 'muted' }, 'no socials shared')));
   }));
 }
@@ -135,8 +134,7 @@ function booths() {
   if (!data) return h('p', { class: 'muted' }, 'Ranking…');
   if (!data.suggested_booths.length) return h('p', { class: 'muted' }, 'No booth visits.');
   return h('ul', { class: 'cards' }, data.suggested_booths.map(b => h('li', {},
-    h('b', {}, b.name), ` · ${b.zone_name} · ${Math.max(1, Math.round(b.minutes))} min`,
-    b.score !== null && h('span', { class: 'score' }, `match ${b.score.toFixed(2)}`))));
+    h('b', {}, b.name), ` · ${b.zone_name}`)));
 }
 
 function caption(p: MyPhoto, event: string) {
@@ -174,11 +172,7 @@ function photos(conn: DbConnection, event: string) {
     h('figcaption', {},
       h('b', {}, p.caption || p.zoneName), ` · ${p.zoneName} · ${time(p.takenAt)}`,
       h('div', {}, who(p)),
-      p.status === 'suggested'
-        ? [h('p', { class: 'muted' }, 'Your band was here when this was taken. Is this you?'),
-          h('button', { onclick: () => act(() => conn.reducers.respondPhotoTag({ tagId: p.tagId, confirm: true })) }, "That's me"),
-          h('button', { class: 'link', onclick: () => act(() => conn.reducers.respondPhotoTag({ tagId: p.tagId, confirm: false })) }, 'Not me')]
-        : h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
+      h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
 }
 
 /** The template image with the photo cover-cropped into its green photo box, scaled by CSS. */
@@ -232,14 +226,13 @@ function merch(conn: DbConnection) {
   };
   return [
     balance(conn),
-    !picks.length && h('p', { class: 'muted' }, 'Merch appears once you confirm a photo of you above ("That\'s me").'),
+    !picks.length && h('p', { class: 'muted' }, 'Merch appears once a photographer takes a photo of you.'),
     h('div', { class: 'merch' }, picks.map(t => {
       const key = `${t.templateId}:${t.photoId}`;
       if (!mockups.has(key)) mockups.set(key, mockup(t));
       return h('figure', {}, mockups.get(key)!,
         h('figcaption', {},
           h('b', {}, t.title), ` · ${money(t.priceCents)}`,
-          t.minutes > 0 && h('div', { class: 'muted' }, `You spent ${Math.max(1, Math.round(t.minutes))} min at the sponsor booths`),
           h('form', { onsubmit: (e: Event) => buy(e, t) },
             t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `size-${t.templateId}` },
               ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),

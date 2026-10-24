@@ -9,13 +9,11 @@ use super::person_card_type::PersonCard;
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct MyPhoto {
-    pub tag_id: u64,
     pub photo_id: u64,
     pub url: String,
     pub taken_at: __sdk::Timestamp,
     pub zone_name: String,
     pub caption: String,
-    pub status: String,
     pub people: Vec<PersonCard>,
 }
 
@@ -27,13 +25,11 @@ impl __sdk::InModule for MyPhoto {
 ///
 /// Provides typed access to columns for query building.
 pub struct MyPhotoCols {
-    pub tag_id: __sdk::__query_builder::Col<MyPhoto, u64>,
     pub photo_id: __sdk::__query_builder::Col<MyPhoto, u64>,
     pub url: __sdk::__query_builder::Col<MyPhoto, String>,
     pub taken_at: __sdk::__query_builder::Col<MyPhoto, __sdk::Timestamp>,
     pub zone_name: __sdk::__query_builder::Col<MyPhoto, String>,
     pub caption: __sdk::__query_builder::Col<MyPhoto, String>,
-    pub status: __sdk::__query_builder::Col<MyPhoto, String>,
     pub people: __sdk::__query_builder::Col<MyPhoto, Vec<PersonCard>>,
 }
 
@@ -41,13 +37,11 @@ impl __sdk::__query_builder::HasCols for MyPhoto {
     type Cols = MyPhotoCols;
     fn cols(table_name: &'static str) -> Self::Cols {
         MyPhotoCols {
-            tag_id: __sdk::__query_builder::Col::new(table_name, "tag_id"),
             photo_id: __sdk::__query_builder::Col::new(table_name, "photo_id"),
             url: __sdk::__query_builder::Col::new(table_name, "url"),
             taken_at: __sdk::__query_builder::Col::new(table_name, "taken_at"),
             zone_name: __sdk::__query_builder::Col::new(table_name, "zone_name"),
             caption: __sdk::__query_builder::Col::new(table_name, "caption"),
-            status: __sdk::__query_builder::Col::new(table_name, "status"),
             people: __sdk::__query_builder::Col::new(table_name, "people"),
         }
     }

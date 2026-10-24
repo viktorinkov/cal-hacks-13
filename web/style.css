@@ -24,7 +24,6 @@ td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #eee; vert
 ul.cards { list-style: none; padding: 0; }
 ul.cards li { padding: 8px 0; border-bottom: 1px solid #eee; }
 .handle { margin-right: 10px; }
-.score { white-space: nowrap; margin-left: 8px; font-size: 12px; color: #555; background: #eef; padding: 1px 6px; border-radius: 8px; }
 .face { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 8px; }
 .photos, .merch { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 figure { margin: 0; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
