@@ -46,14 +46,14 @@ def architecture(y0):
     legend(1900, 34)
 
     # browsers across the top
-    ops_l = "Ops dashboard\nmap, incidents, claims queue; the organizer's host portal: attendees, alerts, Event ended"
+    ops_l = "Ops dashboard\nmap, incidents, claims queue; its host portal layout: attendees, alerts, Event ended"
     app_l = "Attendee app at /t/{token}\nSpacetimeAuth sign-in; turns into the recap live when the event ends"
     top_h = max(measure(ops_l, 320), measure(app_l, 420))
     Y0 = 190 + top_h + 80 + 70  # top of the SpacetimeDB, services and Elastic zones
     ops = S.box(880, 230, 320, ops_l, "web", h=top_h)
     app = S.box(1230, 230, 420, app_l, "web", h=top_h)
     auth = S.box(1980, 230, 330, "SpacetimeAuth\nmagic-link sign-in for attendees and staff", "ext", h=top_h)
-    kib = S.box(2420, 230, 350, "Kibana\nimport runs, organizer decisions, dashboards", "ext", h=top_h)
+    kib = S.box(2420, 230, 350, "Kibana\nimport runs, bandit-organizer decisions, three dashboards", "ext", h=top_h)
 
     # SpacetimeDB
     S.text(880, Y0 + 50, "Live, exact state. Every write is a reducer call: one transaction, all or nothing. "
@@ -74,7 +74,7 @@ def architecture(y0):
     y += insurance.h + 30
     jobs, roles = row(880, y, 280, 20, [
         ("Jobs\nslow and outside work, done by bandit-workers", None),
-        ("Roles and views\nSpacetimeAuth gives each person one identity; reducers check roles; views return only the caller's rows", None)])
+        ("Roles and views\nSpacetimeAuth gives each person one identity; only the module owner grants roles; views return only the caller's rows", None)])
     stdb_bottom = L(jobs.bottom) + 30
 
     # venue floor and laptop
@@ -95,7 +95,7 @@ def architecture(y0):
     api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; POST /api/blobs, GET /recap/order, demo routes; holds the Elastic key", "rust")
     indexer = S.box(1640, L(api.bottom) + 50, 300, "bandit-indexer\none-way copy of booths and interests into "
                                                     "Elastic", "rust")
-    bd_label = "Bright Data Web MCP\nscrapes event pages, company pages and the floor plan"
+    bd_label = "Bright Data Web MCP\nscrapes event pages, company pages, the venue on Google Maps and the floor plan"
     bd_h = measure(bd_label, 250)
     ingest = S.box(1640, L(indexer.bottom) + 50, 300, "bandit-ingest\nbefore the event: fetch, organize, "
                                                        "import", "rust", h=bd_h + 76)
@@ -160,12 +160,12 @@ def pipeline(y0):
           "Runs once before the event from any event's public pages (Cal Hacks 13.0 is the first run), so no live "
           "step waits on a scrape. Bright Data does every fetch, Rust does the deterministic stages, Elastic "
           "organizes, and SpacetimeDB loads the checked bundle in one transaction.")
-    L1, L2, L3, L4 = (170, 440), (460, 850), (870, 1250), (1270, 1500)
+    L1, L2, L3, L4 = (170, 440), (460, 850), (870, 1300), (1320, 1550)
 
     seed = S.box(300, 0, 260, "Event seed\nstart URLs: the event site, its sponsor list on Devpost, the "
                               "schedule, the floor plan page", "rust", cy=650)
     bd = S.box(620, 230, 360, "Bright Data Web MCP\nextract with a schema per page, search_engine, LinkedIn and "
-                              "Crunchbase company tools, browser screenshots", "ext")
+                              "Crunchbase company tools, the venue on Google Maps, browser screenshots", "ext")
     fetch = S.box(670, 0, 260, "fetch\none raw snapshot per call, kept as versioned files", "rust", cy=650)
     mp = S.box(1030, 510, 270, "map\nbooth centres from pixels to metres; each booth gets its nearest "
                                "station's zone", "rust")
@@ -175,18 +175,19 @@ def pipeline(y0):
     elabels = [
         (1320, 300, "Raw indices\nbandit-raw-pages, bandit-raw-orgs, bandit-raw-plan"),
         (1690, 320, "Workflow bandit-organize\nES|QL LOOKUP JOIN: exact matches by domain, booth number and stage"),
-        (2080, 320, "Agent bandit-organizer\nAgent Builder decides the fuzzy matches, with a reason for every merge"),
+        (2080, 320, "Agent bandit-organizer\nAgent Builder decides the fuzzy matches, a reason for every merge in bandit-organizer-decisions"),
         (2470, 290, "bandit-bundles\none organized bundle per run, plus the gaps list")]
     eh = max(measure(t, w) for _, w, t in elabels)
     e1, e2, e3, e4 = [S.box(x, 930, w, t, "ext", h=eh) for x, w, t in elabels]
     gapfill = S.box(2080, 230, 320, "Bright Data extract\ngap fill for the agent: at most 10 calls per run, saved as "
                                     "snapshots", "ext", dashed=True)
     kib = S.box(1690, L(e1.y) + eh + 50, 1070, "Kibana: the Workflows run view shows every step and every merge "
-                                                "with the agent's reason; dashboards for the scrape pipeline and "
-                                                "for sponsors and prizes", "ext")
+                                                "with the agent's reason; dashboards over bandit-pipeline-events: "
+                                                "BandIt · Cal Hacks 13.0 · scrape pipeline, and "
+                                                "BandIt · Cal Hacks 13.0 · sponsors and prizes", "ext")
     validate = S.box(2470, 0, 290, "validate\nthe same rules as import_event; saved as the last good bundle",
                      "rust", cy=650)
-    imp = S.box(2830, 1330, 300, "import_event\none transaction: the whole event or nothing; upsert by "
+    imp = S.box(2830, 1380, 300, "import_event\none transaction: the whole event or nothing; upsert by "
                                  "source_key", "stdb")
     tables = S.box(3200, 0, 300, "Live tables\nvenue, hall, organization, booth, schedule_slot, person "
                                  "(unclaimed profiles)", "stdb", cy=L(imp.cy))
@@ -323,7 +324,7 @@ def insurance(y0):
             "witnesses) through the same reducers a medic uses.\nStraight-through rate per round, rising as rules "
             "are learned.\nDollars wrongly paid on decoys: target $0.\nAuto-settle precision and recall; bill-review "
             "savings; incident to payout time; human touches per claim.\nShown in the Claims queue and the Kibana "
-            "Claims evidence dashboard.", kind="good")
+            "dashboard BandIt claims evidence.", kind="good")
     return S.end_frame()
 
 
@@ -374,7 +375,7 @@ def social(y0):
                                            "or more, met or not", "stdb")
 
     # 3. after the event
-    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nend_event in the host portal writes event_state; reopen_event undoes it", "web")
+    c1 = S.box(1940, 260, 420, "Ops taps Event ended\nend_event in the host portal writes event_state; reopen_event undoes it", "web")
     c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to event_state; /t/{token} "
                                              "reopens it later on any device", "web")
     c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_shared_visits, my_visits, my_photos: the "
