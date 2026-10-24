@@ -5,11 +5,11 @@ BandIt is the only band you need for a public event.
 
 When you join an event you are given the BandIt band. You create an account using our web app by tapping the band itself (NFC). You connect with your social media accounts, medical history, and insurance.
 
-Each band uses bluetooth to locate itself amongst other bands. Combined with the venue cameras, this 2-step system allows a detail spacial-time map of the whole event with all the people.
+Each band uses radio to locate itself amongst other bands. Combined with the venue cameras, this 2-step system allows a detail spacial-time map of the whole event with all the people.
 
 ## Accidents
 
-Each year there are over preventable 44,500 deaths and 15,6M injuries in public venues. 34% of those accidents occurred due to falls. 
+Each year there are over preventable 44,500 deaths and 15,6M injuries in public venues. The leading cause of accidnets is due to falls. 
 
 The biggest risk when somebody fall is getting crowd crush. With the bands and the cameras, we track high risk areas of crowd crushes. When somebody falls, the bands of all the people around them start vibrating and flashing red. 
 
