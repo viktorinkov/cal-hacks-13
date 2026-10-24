@@ -87,7 +87,7 @@ pub fn start_crowd(ctx: &ReducerContext, size: u8) -> Result<(), String> {
             photo_url: format!("https://i.pravatar.cc/300?img={}", i % 70 + 1),
             findable: true,
             person_id: 0,
-            organization_id: if orgs.is_empty() { 0 } else { orgs[(i * 5) % orgs.len()] },
+            organization_id: if orgs.is_empty() { 0 } else { orgs[i % orgs.len()] },
             simulated: true,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,

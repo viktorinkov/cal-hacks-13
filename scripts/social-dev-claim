@@ -7,7 +7,7 @@ DB="-s local3091 bandit-social-dev"
 staff() { "$ROOT/scripts/stdb" call $DB "$@" 2>&1 | grep -v UNSTABLE; }
 attendee() { "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" call $DB "$@" 2>&1 | grep -v UNSTABLE; }
 "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" server add --url http://127.0.0.1:3091 local3091 --no-fingerprint >/dev/null 2>&1
-"$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" login show 2>/dev/null | grep -q identity \
+grep -q spacetimedb_token "$ROOT/.dev/stdb-config/attendee.toml" 2>/dev/null \
   || "$SPACETIME" --config-path "$ROOT/.dev/stdb-config/attendee.toml" login --server-issued-login local3091 >/dev/null
 beacon() { echo "{\"id\":3,\"rssi\":-50,\"flags\":$1,\"neigh\":0,\"zone\":102,\"bat\":255,\"state\":0,\"seq\":$2,\"find\":0}"; }
 staff register_bridge

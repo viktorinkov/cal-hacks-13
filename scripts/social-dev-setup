@@ -6,7 +6,7 @@ S="$ROOT/scripts/stdb"
 TARGET="${CARGO_TARGET_DIR:-$ROOT/target}"
 (cd "$ROOT/spacetimedb/server" && CARGO_TARGET_DIR="$TARGET" cargo build --target wasm32-unknown-unknown --release)
 "$S" server add --url http://127.0.0.1:3091 local3091 --no-fingerprint 2>/dev/null || true
-"$S" login show 2>/dev/null | grep -q identity || "$S" login --server-issued-login local3091
+grep -q spacetimedb_token "$ROOT/.dev/stdb-config/cli.toml" 2>/dev/null || "$S" login --server-issued-login local3091
 "$S" publish --bin-path "$TARGET/wasm32-unknown-unknown/release/band1t.wasm" -s local3091 -y --delete-data bandit-social-dev
 BUNDLE="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))[0]))' "$ROOT/scripts/social-dev/bundle.json")"
 "$S" call -s local3091 bandit-social-dev import_event "$BUNDLE"
