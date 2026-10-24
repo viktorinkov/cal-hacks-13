@@ -37,7 +37,7 @@ pub fn end_event(ctx: &ReducerContext) -> Result<(), String> {
     set_ended(ctx, true)
 }
 
-/// Back to the live event, for running the demo again.
+/// Back to the live event, for running it again.
 #[spacetimedb::reducer]
 pub fn reopen_event(ctx: &ReducerContext) -> Result<(), String> {
     set_ended(ctx, false)

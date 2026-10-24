@@ -43,8 +43,8 @@ function render() {
 
 async function main() {
   const cfg = await config();
-  if (cfg.demo) people = await actors();
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.demo) {
+  if (cfg.simulate) people = await actors();
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.simulate) {
     return mount('app', h('h2', {}, 'Photographer'), h('button', { onclick: signIn }, 'Sign in with email'));
   }
   conn = await connect(['SELECT * FROM zone', 'SELECT * FROM my_roles'], render);

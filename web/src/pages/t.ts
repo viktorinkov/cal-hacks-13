@@ -37,7 +37,7 @@ const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
 const bandId = Number(token.replace('BANDIT-', ''));
 
 let conn: DbConnection;
-let demo = false;
+let simulate = false;
 /** Where this page is in the claim: before the tap, refused, or after a refusal message. */
 let claimError = '';
 let claimAsked = false;
@@ -87,10 +87,10 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
     h('h2', {}, `Band ${bandId} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
-    demo && bandId >= 94 && h('button', { class: 'demo', onclick: () => act(async () => {
+    simulate && bandId >= 94 && h('button', { class: 'sim', onclick: () => act(async () => {
       const res = await fetch(`/api/dev/press/${bandId}`, { method: 'POST' });
       if (!res.ok) throw new Error((await res.json()).error);
-    }) }, 'Demo: press the band for me'),
+    }) }, 'Press the band for me'),
   ];
 }
 
@@ -182,9 +182,9 @@ function bandCard() {
     h('p', {}, zone ? `Near ${zone.name}` : 'No zone yet', band.bat !== 255 ? ` · battery ${band.bat}%` : ''),
     band.state === 3 && claim && h('p', {}, `Claim: ${claim.status.tag}`),
     settings && h('p', { class: 'muted' }, `Band density limits: busy at ${settings.yellow}, very busy at ${settings.red} people close by.`),
-    demo && bandId >= 94 && h('p', { class: 'demo' }, 'Demo: walk your band to ',
+    simulate && bandId >= 94 && h('p', { class: 'sim' }, 'Walk your band to ',
       [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId).map(z =>
-        h('button', { class: 'demo', disabled: z.stationId === band.zone || undefined, onclick: () => act(async () => {
+        h('button', { class: 'sim', disabled: z.stationId === band.zone || undefined, onclick: () => act(async () => {
           const res = await fetch(`/api/dev/move/${bandId}/${z.stationId}`, { method: 'POST' });
           if (!res.ok) throw new Error((await res.json()).error);
         }) }, z.name))));
@@ -278,7 +278,7 @@ function render() {
 async function main() {
   if (location.pathname === '/callback') return finishSignIn();
   const cfg = await config();
-  demo = cfg.demo;
+  simulate = cfg.simulate;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   if (cfg.auth_client_id && !idToken() && !(await playedToken())) {
     return mount('app', h('h2', {}, `Band ${bandId}`), h('p', {}, 'Sign in with your email to make this band yours.'),

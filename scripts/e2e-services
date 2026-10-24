@@ -4,7 +4,7 @@
 set -e
 . "$(dirname "$0")/e2e-env"
 cd "$ROOT"
-export BANDIT_DEMO="${BANDIT_DEMO:-1}"
+export BANDIT_SIMULATE="${BANDIT_SIMULATE:-1}"
 (cd web && bun install --silent && bun run --silent build >/dev/null)
 cargo build -q -p bandit-api -p bandit-indexer -p bandit-workers
 mkdir -p "$DATA/logs"

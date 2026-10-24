@@ -4,7 +4,7 @@
 #[macro_use]
 mod app;
 mod decide;
-mod demo;
+mod story;
 mod flow;
 mod scorecard;
 mod setup;
@@ -148,7 +148,7 @@ enum Cmd {
         timeout: u64,
     },
     /// The scripted story, end to end
-    Demo {
+    Story {
         #[arg(long)]
         no_pause: bool,
     },
@@ -213,7 +213,7 @@ fn run(cli: Cli) -> Result<()> {
             }
         }
         Cmd::Wait { claim, status, timeout } => show::wait(&app, claim, parse_status(&status)?, timeout).map(|_| ()),
-        Cmd::Demo { no_pause } => demo::run(&app, !no_pause),
+        Cmd::Story { no_pause } => story::run(&app, !no_pause),
         Cmd::Scorecard { rounds } => scorecard::run(&app, rounds),
     }
 }

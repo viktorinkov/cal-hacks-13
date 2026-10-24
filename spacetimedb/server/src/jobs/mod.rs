@@ -220,7 +220,7 @@ fn retry_or_bury(ctx: &ReducerContext, job: Job, error: String) {
     }
 }
 
-/// Starts the lease reaper. Idempotent; the demo setup calls it once.
+/// Starts the lease reaper. Idempotent; `bandit-claims setup` calls it once.
 #[spacetimedb::reducer]
 pub fn start_job_reaper(ctx: &ReducerContext) -> Result<(), String> {
     require_role(ctx, &["ops"])?;

@@ -14,10 +14,10 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
 
 pub const FIRST_SIM_BAND: u8 = 10;
-/// Bands 90 to 99 belong to the insurance demo's simulated bands.
+/// Bands 90 to 99 are the claims story's and the testers' simulated bands.
 pub const LAST_SIM_BAND: u8 = 89;
-const FIRST_DEMO_BAND: u8 = 90;
-const LAST_DEMO_BAND: u8 = 99;
+const FIRST_TESTER_BAND: u8 = 90;
+const LAST_TESTER_BAND: u8 = 99;
 const CROWD_TICK_SECONDS: u64 = 5;
 /// Each tick two people spend together counts this many seconds, so links appear within a minute.
 const TOGETHER_SECONDS_PER_TICK: u32 = 30;
@@ -34,7 +34,7 @@ const LAST_NAMES: &[&str] = &[
     "Chen", "Patel", "Garcia", "Kim", "Nguyen", "Okafor", "Silva", "Novak", "Haddad", "Rossi", "Tanaka", "Moreno",
     "Fischer", "Adeyemi", "Larsen", "Kaur", "Dubois", "Ivanova", "Mensah", "Park",
 ];
-/// Public Instagram accounts of well-known people, used as the fake attendees' socials for the demo.
+/// Public Instagram accounts of well-known people, used as the fake attendees' socials.
 const INSTAGRAM: &[&str] = &[
     "viktorinkovski", "zuck", "mosseri", "cristiano", "leomessi", "selenagomez", "therock", "arianagrande",
     "taylorswift", "zendaya", "kevinhart4real", "badgalriri", "beyonce", "kimkardashian", "kyliejenner",
@@ -197,15 +197,15 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         }
     }
 
-    // Claimed demo bands (90 to 99, reported through report_sim_band) stay and mix with the crowd
+    // Claimed simulated bands (90 to 99, reported through report_sim_band) stay and mix with the crowd
     // at whatever station they report, so a recap can be tried without hardware.
-    let demo: Vec<(u8, u8)> = (FIRST_DEMO_BAND..=LAST_DEMO_BAND)
+    let testers: Vec<(u8, u8)> = (FIRST_TESTER_BAND..=LAST_TESTER_BAND)
         .filter(|id| ctx.db.band_owner().band_id().find(id).is_some())
         .filter_map(|id| ctx.db.band().id().find(id))
         .filter(|b| b.online && b.zone != 0)
         .map(|b| (b.id, b.zone))
         .collect();
-    for &(band_id, station) in &demo {
+    for &(band_id, station) in &testers {
         let open = ctx.db.zone_visit().band_id().filter(band_id).find(|v| v.left.is_none()).map(|v| v.zone);
         if open != Some(station) {
             enter(ctx, band_id, station, ctx.timestamp);
@@ -214,8 +214,8 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
             together(ctx, band_id, m.band_id);
         }
     }
-    for (i, &(a, station)) in demo.iter().enumerate() {
-        for &(b, _) in demo[i + 1..].iter().filter(|(_, s)| *s == station) {
+    for (i, &(a, station)) in testers.iter().enumerate() {
+        for &(b, _) in testers[i + 1..].iter().filter(|(_, s)| *s == station) {
             together(ctx, a, b);
         }
     }

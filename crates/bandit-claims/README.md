@@ -2,7 +2,7 @@
 
 Drives and shows BandIt's incident-to-claim flow from the terminal. It plays every person and device: simulated bands (ids 90 to 99, never real hardware), the medic, the approvers, the insurer and the vision stub. `bandit-workers` runs the Claude, Elastic and Nessie jobs alongside it.
 
-## Run the demo on a local database
+## Run the story on a local database
 
 ```bash
 var/stdb publish -s insurance-local -p spacetimedb/server bandit-insurance -c -y
@@ -17,12 +17,12 @@ SPACETIMEDB_URL=http://127.0.0.1:3088 SPACETIMEDB_DATABASE=bandit-insurance ELAS
 ```
 
 ```bash
-cargo run -p bandit-claims -- demo
+cargo run -p bandit-claims -- story
 ```
 
-`var/stdb` wraps the `spacetime` CLI with this clone's own config, so a local login never touches `~/.config/spacetime`. `setup` creates one identity per actor (tokens in `var/identities`), grants roles as the module owner, imports the venue if none is loaded, claims the demo bands for the attendees, and seeds the policy, covers, authority matrix and camera. It is safe to run twice.
+`var/stdb` wraps the `spacetime` CLI with this clone's own config, so a local login never touches `~/.config/spacetime`. `setup` creates one identity per actor (tokens in `var/identities`), grants roles as the module owner, imports the venue if none is loaded, claims the simulated bands for the attendees, and seeds the policy, covers, authority matrix and camera. It is safe to run twice.
 
-## The demo
+## The story
 
 1. Jordan falls on Main stage with three witnesses. The urgent-care bill is cut from $1,308.00 to $895.00 by the fee schedule (one unrelated line excluded), so the claim goes to Dana Ruiz. A stale approval fails closed; her real approval pays Jordan through Nessie and teaches rule v1.
 2. Maya falls the same way with a first-aid record for $180.00 and settles automatically under rule v1.

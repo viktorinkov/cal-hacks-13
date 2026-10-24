@@ -17,7 +17,7 @@ const REOPEN_GRACE_MICROS: i64 = 10_000_000;
 
 pub const STAFF_ROLES: &[&str] = &["ops", "medic", "floor_manager", "risk_manager", "adjuster"];
 
-/// Band ids the claims demo simulates. No real band carries them (the fleet is
+/// Band ids the claims story simulates. No real band carries them (the fleet is
 /// 1 to 9, social's simulated crowd starts at 10), so a rehearsal on the live
 /// database never touches real hardware or the real bridge.
 pub const SIM_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
@@ -365,7 +365,7 @@ pub fn report_sim_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state:
     Ok(())
 }
 
-/// Starts the 500 ms band watch. Idempotent; the demo setup calls it once.
+/// Starts the 500 ms band watch. Idempotent; `bandit-claims setup` calls it once.
 #[spacetimedb::reducer]
 pub fn start_safety_watch(ctx: &ReducerContext) -> Result<(), String> {
     require_role(ctx, &["ops"])?;

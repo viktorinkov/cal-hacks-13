@@ -1,7 +1,7 @@
 //! Vision evidence interface (TBD -- LEO). Leo owns the cameras and models;
 //! this file fixes only what insurance reads: cameras mapped to zones, a
 //! per-incident assessment, and property events. A stub client (the
-//! `bandit-claims vision` command) plays the vision service for the demo.
+//! `bandit-claims vision` command) plays the vision service for the claims story.
 
 use crate::roles::*;
 use crate::safety::{self, Incident, IncidentKind, incident};

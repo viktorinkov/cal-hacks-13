@@ -11,7 +11,7 @@ export type Config = {
   kibana_url: string;
   dashboards: { title: string; url: string }[];
   auth_client_id: string;
-  demo: boolean;
+  simulate: boolean;
 };
 
 export type Actor = { name: string; label: string; token: string };
@@ -104,15 +104,15 @@ export async function finishSignIn(): Promise<void> {
   location.replace(saved.back || '/');
 }
 
-// --- Demo identities ------------------------------------------------------------------------
+// --- Test identities ------------------------------------------------------------------------
 
-/** With BANDIT_DEMO=1, the people `bandit-claims setup` created, so one browser can play each. */
+/** With BANDIT_SIMULATE=1, the people `bandit-claims setup` created, so one browser can play each. */
 export async function actors(): Promise<Actor[]> {
   const res = await fetch('/api/actors');
   return res.ok ? res.json() : [];
 }
 
-/** The token of the person this browser plays (`?as=name`), when the demo switcher is on. */
+/** The token of the person this browser plays (`?as=name`), when the switcher is on. */
 export async function playedToken(): Promise<string | undefined> {
   const as = new URLSearchParams(location.search).get('as');
   if (!as) return undefined;

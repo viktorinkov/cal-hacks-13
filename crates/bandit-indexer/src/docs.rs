@@ -259,7 +259,7 @@ mod tests {
             booth_number: format!("B{id}"),
             name: name.into(),
             kind: "sponsor".into(),
-            description: format!("{name} demos."),
+            description: format!("{name} showcases."),
             tags: tags.iter().map(|t| t.to_string()).collect(),
             plan_x_m: 0.0,
             plan_y_m: 0.0,
@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(d["tags"], json!(["search", "ai", "vectors"]));
         assert_eq!(
             d["description"],
-            "Elastic booth demos.\nElastic makes things.\nsearch, ai, vectors\nVector search 101"
+            "Elastic booth showcases.\nElastic makes things.\nsearch, ai, vectors\nVector search 101"
         );
     }
 
@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(d["organization"], "Elastic");
         assert_eq!(
             d["interests"],
-            "Stage\nDrone show: Drone show demos. (drones)\nExpo\nElastic booth: Elastic booth demos. (search, ai)\nRobot arms: Robot arms demos. (robotics)"
+            "Stage\nDrone show: Drone show showcases. (drones)\nExpo\nElastic booth: Elastic booth showcases. (search, ai)\nRobot arms: Robot arms showcases. (robotics)"
         );
         assert!(d.get("display_name").is_none());
         assert_eq!(doc(&docs, Index::People, &hex(who(2)))["interests"], "");

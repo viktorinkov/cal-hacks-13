@@ -1,14 +1,14 @@
-# Synthetic medical records (demo fixtures)
+# Synthetic medical records (test fixtures)
 
-Fictional US clinical paperwork for the BandIt insurance demo. When an attendee is hurt at the event, the venue's medical-payments coverage pays treatment costs. Claude reads each PDF into a structured record (`expected/<name>.json`), and code then checks the record and computes the covered amount.
+Fictional US clinical paperwork for the BandIt insurance flow. When an attendee is hurt at the event, the venue's medical-payments coverage pays treatment costs. Claude reads each PDF into a structured record (`expected/<name>.json`), and code then checks the record and computes the covered amount.
 
-Every patient, clinician, clinic, home address, phone number and ID in these files is invented. Every page has the footer `SYNTHETIC RECORD - DEMO DATA - NOT A REAL PATIENT`.
+Every patient, clinician, clinic, home address, phone number and ID in these files is invented. Every page has the footer `SYNTHETIC RECORD - TEST DATA - NOT A REAL PATIENT`.
 
 The event, venue and zone names come from placeholders. The claims agent compares each record with the real incident, so these names must match the event. The defaults are `Cal Hacks 13.0`, `Cal Hacks 13.0 venue` and `Main stage`. The urgent care clinic (Wrenfield Urgent Care) is fictional.
 
 ## Records
 
-| Template | Pages | Patient | Invoice (default) | Billed | Role in the demo |
+| Template | Pages | Patient | Invoice (default) | Billed | Role in the story |
 |---|---|---|---|---|---|
 | `first-aid-wrist` | 1 | Maya Chen | `FA-1024-0007` | $180.00 | Small claim that settles automatically. The event's own medical station treats a right wrist sprain on the incident night: she slipped on a spilled drink near `{{ZONE_NAME}}` at `{{EVENT_NAME}}`. |
 | `urgent-care-wrist` | 2 | Jordan Alvarez | `UC-2025-1188` | $1,308.00 | Larger claim that goes to the risk manager. Urgent care visit the day after the event. The patient has a left wrist sprain: he fell at `{{EVENT_NAME}}` when the crowd surged near `{{ZONE_NAME}}`. Covered amount is $895.00 after the fee schedule: six lines are cut to the schedule cap and the unrelated Tdap shot (90715) is excluded and flagged for a person. |
@@ -27,7 +27,7 @@ render.sh               fills the placeholders and prints to PDF with headless C
 
 ## Rendering
 
-The demo runs on judging day, so the dates are filled in when you render. Give the date of the event night as the incident date:
+The event runs on judging day, so the dates are filled in when you render. Give the date of the event night as the incident date:
 
 ```sh
 ./render.sh <template-name> <incident-date YYYY-MM-DD> <out.pdf> [invoice-suffix]

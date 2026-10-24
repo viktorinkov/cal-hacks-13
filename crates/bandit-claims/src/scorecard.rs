@@ -3,7 +3,7 @@
 //! genuine, refuse what is planted) and scores what the automation paid.
 //! Only the simulated bands 90-99 exist, so each planted claim reuses a band
 //! and gives its owner a new display name (patients must differ, or the
-//! module's duplicate check would fire); setup restores the demo names.
+//! module's duplicate check would fire); setup restores the story names.
 
 use crate::app::*;
 use crate::sim::{Pose, SIM_BANDS, Sim};
@@ -46,7 +46,7 @@ impl Kind {
 }
 
 const FAKES: [Kind; 4] = [Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::SameBillTwice, Kind::InjuredStaff];
-/// Bands that fall, in turn: the spare simulated bands first, then the demo attendees'.
+/// Bands that fall, in turn: the spare simulated bands first, then the story attendees'.
 const SUBJECTS: [u8; 10] = [94, 95, 96, 97, 98, 99, 90, 91, 92, 93];
 /// The module's occurrence window (5 min) plus slack for when the incident opens.
 const WINDOW: i64 = 330_000_000;

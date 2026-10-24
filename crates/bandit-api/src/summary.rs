@@ -473,8 +473,8 @@ mod tests {
             booth_number: String::new(),
             name: name.into(),
             kind: "sponsor".into(),
-            description: format!("{name} demos."),
-            tags: vec!["demo".into()],
+            description: format!("{name} showcases."),
+            tags: vec!["showcase".into()],
             plan_x_m: 0.0,
             plan_y_m: 0.0,
             placement: String::new(),
@@ -729,7 +729,7 @@ mod tests {
     fn visited_text_reads_like_interests() {
         assert_eq!(
             visited_text(&rows(), who(1)),
-            "Expo\nElastic booth: Elastic booth demos. (demo)\nRobot arms: Robot arms demos. (demo)\nStage\nDrone show: Drone show demos. (demo)"
+            "Expo\nElastic booth: Elastic booth showcases. (showcase)\nRobot arms: Robot arms showcases. (showcase)\nStage\nDrone show: Drone show showcases. (showcase)"
         );
         assert_eq!(visited_text(&rows(), who(42)), "");
     }

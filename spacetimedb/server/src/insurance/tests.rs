@@ -1,4 +1,4 @@
-//! The demo paths end to end inside an in-memory module: band flags, the
+//! The claim paths end to end inside an in-memory module: band flags, the
 //! safety watch, the medic, the record reader, Elastic and the claims agent
 //! (played here by the test, through the same reducers the workers call),
 //! and the named approver.

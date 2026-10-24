@@ -121,9 +121,9 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let data = tempfile::tempdir().unwrap();
         let store = TokenStore::new(data.path());
-        store.save("demo-cli", "secret").unwrap();
+        store.save("test-cli", "secret").unwrap();
         let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode(&store.dir().join("demo-cli")), 0o600);
+        assert_eq!(mode(&store.dir().join("test-cli")), 0o600);
         assert_eq!(mode(store.dir()), 0o700);
     }
 

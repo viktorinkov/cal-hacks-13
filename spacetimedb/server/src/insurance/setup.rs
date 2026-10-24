@@ -1,5 +1,5 @@
 //! Setup reducers: the policy, its covers, the authority matrix and the
-//! verification settings. The demo seeds them once from `bandit-claims setup`.
+//! verification settings. The claims story seeds them once from `bandit-claims setup`.
 
 use super::*;
 use crate::roles::*;

@@ -102,17 +102,17 @@ async fn main() -> Result<()> {
         database: database.clone(),
         kibana_url: config.kibana_url.clone().unwrap_or_default(),
         auth_client_id: std::env::var("SPACETIMEAUTH_CLIENT_ID").unwrap_or_default(),
-        demo: std::env::var("BANDIT_DEMO").is_ok_and(|v| v == "1"),
+        simulate: std::env::var("BANDIT_SIMULATE").is_ok_and(|v| v == "1"),
         http: reqwest::Client::new(),
-        demo_bands: Default::default(),
+        sim_bands: Default::default(),
     };
     let pages = web::routes(&web);
-    let demo = web.demo;
+    let simulate = web.simulate;
     let state = Arc::new(App { conn, es, web, blobs: config.blob_store(), tokens });
-    if demo {
-        // Demo bands a tester pressed before a restart keep reporting.
-        let known: Vec<(u8, u8)> = state.conn.db.band().iter().filter(|b| web::DEMO_BANDS.contains(&b.id)).map(|b| (b.id, b.zone)).collect();
-        state.web.demo_bands.lock().unwrap().extend(known);
+    if simulate {
+        // Simulated bands a tester pressed before a restart keep reporting.
+        let known: Vec<(u8, u8)> = state.conn.db.band().iter().filter(|b| web::TAP_SIM_BANDS.contains(&b.id)).map(|b| (b.id, b.zone)).collect();
+        state.web.sim_bands.lock().unwrap().extend(known);
         tokio::spawn(web::heartbeat(state.clone()));
     }
     let app = Router::new()

@@ -269,7 +269,7 @@ fn signed(b: i128) -> String {
     }
 }
 
-/// A few lines per claim, for the demo's end states.
+/// A few lines per claim, for the story's end states.
 pub fn summary(app: &App, id: u64) -> Result<()> {
     let db = app.db()?;
     let c = app.claim(id)?;

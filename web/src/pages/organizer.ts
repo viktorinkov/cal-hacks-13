@@ -39,7 +39,7 @@ const QUERIES = [
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
-const DEMO_RECORDS: [string, string][] = [
+const SAMPLE_RECORDS: [string, string][] = [
   ['first-aid-wrist', 'Event first aid, wrist sprain (Maya Chen, $180)'],
   ['urgent-care-wrist', 'Urgent care, wrist sprain (Jordan Alvarez, $1,308)'],
   ['urgent-care-ankle-home', 'Urgent care, ankle hurt at home (Sam Patel, $565)'],
@@ -65,7 +65,7 @@ function header() {
   return [
     h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} host portal`),
     h('p', {},
-      cfg.demo && h('label', { class: 'check' }, 'Play as',
+      cfg.simulate && h('label', { class: 'check' }, 'Play as',
         h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
           h('option', { value: '' }, 'choose a person'),
           people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
@@ -188,9 +188,9 @@ function claimList() {
 
 async function fileRecord(claimId: bigint, form: HTMLFormElement) {
   const input = form.querySelector('input[type=file]') as HTMLInputElement;
-  const demo = field(form, 'demo');
-  if (!input.files?.[0] && demo) {
-    const res = await fetch(`/api/dev/record/${claimId}/${demo}`, { method: 'POST' });
+  const sample = field(form, 'sample');
+  if (!input.files?.[0] && sample) {
+    const res = await fetch(`/api/dev/record/${claimId}/${sample}`, { method: 'POST' });
     if (!res.ok) throw new Error((await res.json()).error);
     return;
   }
@@ -249,7 +249,7 @@ function claimDetail(id: bigint) {
     c.status.tag === 'AwaitingRecord' && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', accept: 'application/pdf' })),
-      cfg.demo && h('label', {}, 'or a demo record, dated for this incident', h('select', { name: 'demo' }, h('option', { value: '' }, '—'), DEMO_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      cfg.simulate && h('label', {}, 'or a sample record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
     c.status.tag === 'Routed' && h('div', {}, h('h4', {}, `Your decision (${c.routedToName}, ${c.routedToRole})`), decide(c)),
     h('h4', {}, 'Checks'),
@@ -322,8 +322,8 @@ function render() {
 
 async function main() {
   cfg = await config();
-  if (cfg.demo) people = await actors();
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.demo) {
+  if (cfg.simulate) people = await actors();
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.simulate) {
     return mount('app', h('h2', {}, 'Host portal'), h('button', { onclick: signIn }, 'Sign in with email'));
   }
   conn = await connect(QUERIES, render);

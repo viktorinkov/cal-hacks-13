@@ -10,9 +10,9 @@ use std::collections::HashMap;
 
 pub const POLICY: &str = "GL-2026-04417";
 
-/// Creates every actor and the demo world. Safe to run again: every step is an
+/// Creates every actor and the test world. Safe to run again: every step is an
 /// upsert. Never touches the hardware bridge or real bands: only the
-/// simulated bands 90-99. Returns the running simulator, so a demo keeps the
+/// simulated bands 90-99. Returns the running simulator, so a story run keeps the
 /// bands online.
 pub fn run(app: &App) -> Result<Sim> {
     let db = app.db()?;
@@ -37,7 +37,7 @@ pub fn run(app: &App) -> Result<Sim> {
         bundle.bundle_hash = bandit_common::sha256_hex(format!("{bundle:?}").as_bytes());
         call!(ops, import_event_then(bundle))?;
         until(5.0, || (db.db.zone().count() >= 5).then_some(())).context("the venue import left no zones")?;
-        println!("venue      Cal Hacks 13.0 imported, live demos running on Main stage");
+        println!("venue      Cal Hacks 13.0 imported, live showcases running on Main stage");
     }
     let zones = app.stationed_zones()?;
     let list: Vec<String> = zones.iter().map(|z| format!("{} {}", z.name, z.station_id)).collect();
@@ -193,7 +193,7 @@ fn venue_bundle() -> Result<EventBundle> {
             timezone: "America/Los_Angeles".into(),
             starts_at: Some(ts(midnight - 12 * hour)),
             ends_at: Some(ts(midnight + 60 * hour)),
-            description: "Hackathon venue for the BandIt demo".into(),
+            description: "Hackathon venue for BandIt".into(),
             facts: Vec::new(),
             source_url: String::new(),
             fetched_at: ts(midnight),
@@ -212,10 +212,10 @@ fn venue_bundle() -> Result<EventBundle> {
             booth("booth-hardware-lab", "zone-hacking-floor", "H4", "Hardware lab", "lab", "Soldering irons, 3D printers and parts"),
         ],
         schedule: vec![ScheduleSlotIn {
-            source_key: "slot-live-demos".into(),
-            title: "Live hardware demos".into(),
+            source_key: "slot-live-showcases".into(),
+            title: "Live hardware showcase".into(),
             kind: "show".into(),
-            description: "Teams demo their hardware on the main stage".into(),
+            description: "Teams show their hardware on the main stage".into(),
             location_text: "Main stage".into(),
             zone_key: "zone-main-stage".into(),
             booth_key: String::new(),
