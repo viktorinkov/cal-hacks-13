@@ -52,9 +52,9 @@ Non-responsibilities:
 | `record_insurer_payment` | in | `risk_manager`, `adjuster` | claim id, amount received in cents, insurer reference | reducer |
 | `retry_claim_payout` | in | `risk_manager`, `adjuster` | claim id; queues the `claim_payout` job again for a `settling` claim whose payout job is dead | reducer |
 | `request_recovery_letter` | in | `risk_manager`, `adjuster` | claim id, counterparty name and contact | reducer; enqueues `recovery_letter` |
-| `retire_settlement_rule` | in | `risk_manager`, `organizer` | rule id | reducer; new version with ceiling 0 |
-| `load_fallback_rule` | in | `organizer` | none; loads the seed's fallback rule v1 | reducer; refused while an active rule of that shape exists |
-| `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule` | in | `organizer`, `risk_manager` (setup) | policies, cover limits and deductibles, role ceilings, fee schedule caps | reducers, loaded from the seed |
+| `retire_settlement_rule` | in | `risk_manager` | rule id | reducer; new version with ceiling 0 |
+| `load_fallback_rule` | in | `ops` | none; loads the seed's fallback rule v1 | reducer; refused while an active rule of that shape exists |
+| `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule` | in | `risk_manager` (setup) | policies, cover limits and deductibles, role ceilings, fee schedule caps | reducers, loaded from the seed |
 | `attach_claim_letters` | in | role `worker` | job id, claim ids, letter kind, `blob_ref` id, suggested tolerance | reducer; rejects a stale lease |
 | Payments-Nessie.md: `record_claim_payout` | in | role `worker` | job id, the Nessie customer, account and deposit ids | reducer; posts J3, settles the claim and adds the wallet's `payout` entry; rejects a stale lease |
 | Jobs `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | out | `bandit-workers` | payloads named below; results through the reducers above | `job` table, `claim_job` and `complete_job` |
@@ -62,7 +62,7 @@ Non-responsibilities:
 | Claims queue, ledger, rules and scorecard | out | Ops dashboard (roles above) | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `ledger_entry`, `settlement_rule`, `authority_limit`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | SpacetimeDB subscription |
 | Vision.md (TBD -- LEO): `vision_assessment`, `camera`, `property_event` rows | in | `bandit-vision` | per-incident judgment (confirmed, confidence, description, frame blob refs, `model_call` id), the camera's zone, property events | tables read by `open_claim` |
 | Letters | out | Ops dashboard | the notice, summary and recovery letters as blobs | `bandit-api` blob download for a staff `api_session`; letter blobs carry access class `staff` |
-| Elastic.md: Kibana dashboard Claims evidence | out | the team, in Kibana | tonight's de-identified claim copies beside the 30 past claims | read only on `bandit-claims` |
+| Elastic.md: Kibana dashboard "BandIt claims evidence" | out | the team, in Kibana | counts and charts over the de-identified claim copies: claims tonight, evidence failing validation, payouts, outcomes by zone and incident kind, and the validation errors | read only on `bandit-claims` |
 | Elastic.md: job `claim_verify` and `submit_claim_checks` | both | `bandit-workers` (role `worker`) | a de-identified claim document out to `bandit-claims`; similar past claim ids and scores back | `job` table; HTTPS to Elastic ([Elastic](Elastic.md)); reducer that rejects a stale lease |
 
 ## Design
@@ -201,7 +201,7 @@ Code refuses the claim at this point, at claim open, when any of these holds. Th
 | Check | `refusal_reason` |
 |---|---|
 | Corroboration is `disputed` | the failed corroboration check: `witness_zone`, `staff_note_time`; Vision.md (TBD -- LEO): `vision_confirmed`, `vision_zone`, `vision_time` |
-| The injured person holds a venue staff role (`owner`, `organizer`, `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`); the `adjuster` works for the insurer and is not venue staff | `claimant_not_staff`: medical payments excludes the venue's own employees; report it under workers' compensation |
+| The injured person holds a venue staff role (`ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`); the `adjuster` works for the insurer and is not venue staff | `claimant_not_staff`: medical payments excludes the venue's own employees; report it under workers' compensation |
 | No active cover for the incident kind | `no_cover` |
 | `payout_cents` = 0 | `zero_payout` |
 
@@ -289,7 +289,7 @@ Contradictions never overwrite. A refusal contradicts a rule when the refused cl
 
 A `property` claim is never `corroborated`, so a rule for it could never fire; its approval writes no rule.
 
-The fallback rule. The seed folder holds one fallback rule v1 for (`fall`, `medical_payments`, any zone) under the event policy, ceiling 100000 ($1,000), approver name "rehearsal risk manager", `origin` `fallback`. It is not loaded with the seed. Only if the judge's live approval fails does the organizer load it with `load_fallback_rule`, so step 6 of the demo still settles under a rule v1. The reducer refuses while an active rule of that shape exists.
+The fallback rule. The seed folder holds one fallback rule v1 for (`fall`, `medical_payments`, any zone) under the event policy, ceiling 100000 ($1,000), approver name "rehearsal risk manager", `origin` `fallback`. It is not loaded with the seed. Only if the judge's live approval fails does a staff member with `ops` load it with `load_fallback_rule`, so step 6 of the demo still settles under a rule v1. The reducer refuses while an active rule of that shape exists.
 
 ### Approval, fail closed
 
@@ -392,7 +392,7 @@ Every claim gets a precedent search, and its results are only ever checks. When 
 
 `submit_claim_checks` (role `worker`, rejects a stale lease) writes the validation result as a check, and one `claim_precedent` row per result: the past claim's id and its score. A copy the pipeline marks invalid flags the claim: the check fails, and the claim routes to a person with the pipeline's errors listed. It is never refused for it. The Claims queue lists the precedents under the claim's checks as "similar past claim P-014, score 0.82". They are not pack facts, are not hashed, and never change an amount or the route.
 
-**Dashboard: Claims evidence.** One Kibana dashboard over `bandit-claims`, saved with the project setup: claims tonight by outcome, payout by zone, incident kind by outcome, and the 30 past claims beside tonight's. The team opens it in the demo next to the Claims queue. It reads only the de-identified copies and decides nothing ([Elastic](Elastic.md)).
+**Dashboard: "BandIt claims evidence".** One Kibana dashboard over `bandit-claims` (id `bandit-claims`), put in by its own install script from a saved file. A note says what the index holds and how it is checked. Three counts: claims tonight, evidence failing validation, and the amount paid to claimants in USD across all events. Four charts: claims by outcome, payout by zone in USD, claims by incident kind and outcome, and the validation errors `bandit-claims-validate` caught on the way in. The team opens it in the demo next to the Claims queue. It reads only the de-identified copies and decides nothing ([Elastic](Elastic.md)).
 
 ### The live-learning demo
 
@@ -402,7 +402,7 @@ Already on the screen when the insurance step starts:
 - A broken-speaker claim ($2,400, property, payout 240000, recoverable 190000 after the $500 deductible) waits for `risk_manager` with its recovery letter drafted as a query. A floor manager who opens it can see it but cannot approve it.
 - No settlement rule exists under the event policy.
 - The teammate who will fall wears a full band claimed from a phone that holds no staff role, so the staff check passes.
-- While the medic treats the fall, the judge who joined in step 1 opens the Ops dashboard on their own phone (same host, same identity as their attendee app). The organizer picks the judge from the host portal's attendee list and grants `risk_manager`; it is revoked after the demo.
+- While the medic treats the fall, the judge who joined in step 1 opens the Ops dashboard on their own phone (same host, same identity as their attendee app). The module owner picks the judge from the host portal's attendee list and grants `risk_manager`; it is revoked after the demo.
 
 The question this diagram answers: what happens, in which component, from the fall to the second claim settling under the rule the judge's approval created.
 
@@ -469,7 +469,7 @@ Step by step (illustrative numbers):
 6. The payoff. The `bandit-claims` tool (Simulator.md) plants a second, similar fall on a demo band, with its own medic visit and bill (billed $675, paid $440). It passes the same code checks and the same causation review, matches rule v1 and settles in seconds: "Settled under rule v1, approved by <the judge's display name> 2 minutes ago". Its claimant is simulated and has no wallet, so the payout opens a Nessie account for it, and J3 posts when the deposit lands.
 7. The refusal. The `bandit-claims` tool (Simulator.md) plants a fake claim for Lee, a simulated attendee: a fall flag in zone 102 whose witness bands all sit in zone 105. The `witness_zone` check fails, so corroboration is `disputed`, and code refuses the claim at claim open with reason `witness_zone`, before Claude's review and before any money moves. The screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
 
-The one fallback: if the judge's approval cannot be made live (the phone cannot connect, or the step runs out of time), the organizer loads the fallback rule v1 with `load_fallback_rule`, and steps 6 and 7 run unchanged.
+The one fallback: if the judge's approval cannot be made live (the phone cannot connect, or the step runs out of time), a staff member with `ops` loads the fallback rule v1 with `load_fallback_rule`, and steps 6 and 7 run unchanged.
 
 ### Edge cases
 
@@ -572,9 +572,9 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | `record_claim_payout` | `worker` | Payments-Nessie.md: stores a new claimant's account and adds the wallet's `payout` entry; J3, `settled`; rejects a stale lease |
 | `request_recovery_letter` | `risk_manager`, `adjuster` | enqueues `recovery_letter` |
 | `attach_claim_letters` | `worker` | stores blob ids and the suggested tolerance on each claim it names; rejects a stale lease |
-| `retire_settlement_rule` | `risk_manager`, `organizer` | new version with ceiling 0 |
-| `load_fallback_rule` | `organizer` | the seed's fallback rule v1, only while no active rule of its shape exists |
-| `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule` | `organizer`, `risk_manager` | setup rows |
+| `retire_settlement_rule` | `risk_manager` | new version with ceiling 0 |
+| `load_fallback_rule` | `ops` | the seed's fallback rule v1, only while no active rule of its shape exists |
+| `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule` | `risk_manager` | setup rows |
 | Elastic.md: `submit_claim_checks` | `worker` | `claim_precedent` rows; rejects a stale lease |
 
 ## Failure modes and fallbacks
@@ -582,7 +582,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | Failure | Effect | Design answer |
 |---|---|---|
 | The medic resolves with no cost note and no bill | No claim | The medic attaches the bill from the incident card, which opens the claim |
-| The judge's live approval cannot be made | No rule v1 for step 6 | The organizer loads the fallback rule v1 with `load_fallback_rule`; steps 6 and 7 run unchanged |
+| The judge's live approval cannot be made | No rule v1 for step 6 | A staff member with `ops` loads the fallback rule v1 with `load_fallback_rule`; steps 6 and 7 run unchanged |
 | A floor manager tries to approve a claim routed to `risk_manager` | Would exceed authority | `approve_claim` rejects on role; the role check is the authority matrix |
 | Pack rebuilt or coverage rule edited while the approver looks | The amount or SHA on screen is out of date | `approve_claim` fails `stale` and changes nothing; the grid reloads |
 | Model suggests a tolerance above the approver's ceiling | The rule would overreach | Code clamps it to `authority_limit.ceiling_cents` |
@@ -623,7 +623,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - Remove the Hyphenate.md lines in Payments-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
 - Remove the `via = claim` row from the access log table in Medical-ID.md.
 - Remove the Hyphenate use cases from Anthropic-Agent.md, and the Hyphenate.md parts of Simulator.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the demo claims and the seeded staff grant).
-- Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the Claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
+- Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
 - Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, the Hyphenate.md rows in Flows.md (the risk manager, step 0c, step 9, its diagram index row, its failure row and its decision row), the prize row in Architecture.md, the Hyphenate.md rows in Attendee-App.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the two Hyphenate.md rows in Decisions.md, and the Hyphenate row and node in README.md.
 - Drop the roles `floor_manager`, `risk_manager` and `adjuster` from SpacetimeDB.md and Ops-Dashboard.md; nothing else uses them.
 
@@ -658,6 +658,6 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | A failed Nessie payout leaves the claim `settling` until a risk manager or adjuster retries it with `retry_claim_payout`; there is no manual payout | every payout to an attendee goes through Nessie, so the wallet and the ledger always agree |
 | The second source is the medic note plus at least 2 witnesses; Vision.md replaces it with the camera assessment when the zone has the camera | it works with bands alone, which is what the demo runs on |
 | Raw bridge logs are not evidence | they stay on the laptop; the snapshot rows are frozen in the same transaction as the incident |
-| Elastic.md: one Kibana dashboard, Claims evidence, shows tonight's claims beside the 30 past claims | the finance judges see the precedents as one picture, and it reads only the de-identified copies |
+| Elastic.md: one Kibana dashboard, "BandIt claims evidence", shows the claim copies: claims tonight, payouts by zone, outcomes by incident kind, and the validation errors caught on the way in | the finance judges see the claims and Elastic's checks on them as one picture, and it reads only the de-identified copies |
 | Bills are attached from the Ops dashboard incident card, not the attendee app | medics already work incidents on the dashboard on their phones, and the card knows the incident and its injured people |
 | Elastic.md: Elastic precedents are checks only; they are not hashed and never change an amount or a route | a similar past claim is context for a person, not evidence, and a claim must decide the same with or without Elastic |

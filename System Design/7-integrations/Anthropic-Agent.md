@@ -211,7 +211,7 @@ flowchart TD
 - **Minimum inputs.** Consent filters run before prompt building, in the process, on rows. The prompt never contains social handles, bank links or medical data that the output does not need.
 - **Validate, retry once, then fall back.** A response that fails code validation is retried once with the errors; a second failure uses the kind's template fallback and the job still completes, so the attendee always gets something.
 - **Refusals are outcomes.** A `refusal` is recorded with its category and routed to the template fallback; the same content is never resent.
-- **Everything recorded.** Every attempt is a `model_call` row readable by the roles `organizer` and `worker`, with hashes rather than copies for sensitive requests. The team reads it with the owner's SpacetimeDB tools; there is no Ops dashboard panel for it.
+- **Everything recorded.** Every attempt is a `model_call` row readable by the owner and the `worker` role, with hashes rather than copies for sensitive requests. The team reads it with the owner's SpacetimeDB tools; there is no Ops dashboard panel for it.
 
 ## Failure modes and fallbacks
 

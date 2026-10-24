@@ -7,7 +7,7 @@ BandIt must show, live at Cal Hacks 13.0, that one wristband can keep a crowd sa
 1. A crowd that gets too dense sees it on their own wrists and is guided to a clear exit, before anyone at a laptop reacts.
 2. A person in trouble (SOS or a fall) is found fast: the bands around them light up, staff see the incident with its witnesses, and a medic is sent.
 3. Every screen (staff dashboard, medic phone, attendee phone, the bands themselves) agrees on the state of the venue at every moment.
-4. When the organizer ends the event, every attendee's page turns into their recap, which gives them their night back: where they went, who they met, their photos, and things to buy or claim.
+4. When a staff member with `ops` ends the event, every attendee's page turns into their recap, which gives them their night back: where they went, who they met, their photos, and things to buy or claim.
 5. Each sponsor integration is real, visible in the demo, and removable without breaking the core.
 
 ## Functional requirements
@@ -32,7 +32,7 @@ Core requirements are what the safety demo needs. Rows that start with a file na
 | F14 | Elastic.md: organize the scraped records into one checked bundle, and order each attendee's recap suggestions by meaning | [Elastic](../7-integrations/Elastic.md) |
 | F15 | Vision.md (TBD -- LEO): count people from a camera and confirm falls from frames | [Vision](../4-devices/Vision.md) |
 | F16 | Simulator.md: run a simulated crowd inside the module and ten demo bands that report into the same tables as real ones | [Simulator](../3-services/Simulator.md) |
-| F17 | When the organizer presses "Event ended", turn every open attendee page into the recap page live, and reopen it from the tap link for the band's signed-in owner on any device | [Attendee-App](../5-apps/Attendee-App.md) |
+| F17 | When a staff member with `ops` presses "Event ended", turn every open attendee page into the recap page live, and reopen it from the tap link for the band's signed-in owner on any device | [Attendee-App](../5-apps/Attendee-App.md) |
 
 ## Non-functional requirements
 

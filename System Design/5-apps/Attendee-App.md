@@ -11,7 +11,7 @@ Responsibilities:
 - Claim the band by press, then run the onboarding steps.
 - Hold the profile and the `findable` consent switch.
 - Mirror the band's state, the zone's busy level and evacuation alerts on screen during the event.
-- Turn every open page into the recap page, live, when the organizer ends the event, and open it again later for the signed-in owner of the tapped band, on any device.
+- Turn every open page into the recap page, live, when a staff member with `ops` ends the event, and open it again later for the signed-in owner of the tapped band, on any device.
 - Host staff views at the tag URL for callers with staff roles.
 - Medical-ID.md: the medic view, whose content that file owns.
 
@@ -60,7 +60,7 @@ The landing route works out who tapped which band. Band rows are private, and `m
 
 1. Sign in. With no SpacetimeAuth session in this browser, the app shows the sign-in screen: the attendee types an email and opens the magic link (see Identity). The tap token stays in the URL, so the route continues after the sign-in.
 2. Connect to SpacetimeDB with the ID token and subscribe to `my_roles`, `my_attendee`, `my_band` and `event_state`.
-3. Staff roles are checked first. Medical-ID.md: role `medic` gets the medic view for this band's wearer. Roles are granted at setup by the organizer with `grant_role` from the [Ops dashboard](Ops-Dashboard.md).
+3. Staff roles are checked first. Medical-ID.md: role `medic` gets the medic view for this band's wearer. Roles are granted at setup by the module owner with `grant_role` from the [Ops dashboard](Ops-Dashboard.md).
 4. `my_band` already holds a band with this token: the caller owns it. Home at `/me`, which is the recap page once `event_state.ended` is set.
 5. Otherwise call `claim_band` with the token:
    - accepted: the band blinks white; show the claim screen ("Press the button on your band").
@@ -231,11 +231,11 @@ flowchart LR
 
 ### After the event
 
-There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the organizer: when the organizer presses "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so it switches from "Now" to "Your event" live, with no reload. `reopen_event` clears it and switches the pages back, for running the demo again.
+There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the host, a staff member with `ops`: when they press "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so it switches from "Now" to "Your event" live, with no reload. `reopen_event` clears it and switches the pages back, for running the demo again.
 
 Later, the attendee reopens their tap link `/t/BANDIT-0n` (or `/me`) on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, `release_band` is refused, so every band keeps its owner for the recap.
 
-The sequence below answers one question: how the organizer's press turns every open page into the recap, and how the attendee opens it again later.
+The sequence below answers one question: how the "Event ended" press by a staff member with `ops` turns every open page into the recap, and how the attendee opens it again later.
 
 ```mermaid
 sequenceDiagram

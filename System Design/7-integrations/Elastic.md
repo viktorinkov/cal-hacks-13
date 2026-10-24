@@ -7,11 +7,12 @@ Elastic Serverless does two jobs for BandIt, and nobody chats with it. Before th
 Responsibilities:
 
 - Hold the raw scraped records of one import run in three raw indices: `bandit-raw-pages`, `bandit-raw-orgs`, `bandit-raw-plan`.
+- Keep two logs of each import run for Kibana: `bandit-organizer-decisions`, one document per decision the organizer made, and `bandit-pipeline-events`, one document per step of the run.
 - Run the organizer. The Workflow `bandit-organize` makes the exact joins with fixed ES|QL `LOOKUP JOIN` steps, then calls the Agent Builder agent `bandit-organizer` with a JSON schema for the fuzzy remainder. The result is one structured bundle in `bandit-bundles`: organisations deduplicated, each organisation's facts merged across its site, LinkedIn and Crunchbase records, booths linked to organisations and people, categories and tags, schedule slots matched to stages and zones, and gaps flagged. The agent may fill a gap with at most 10 Bright Data MCP calls per run.
 - Keep a one-way copy of booths and of findable attendees' memories and interests in three indices: `bandit-booths`, `bandit-memories`, `bandit-people`.
 - Order the recap's suggestions. `GET /recap/order` in `bandit-api` takes the candidates SpacetimeDB lists for the caller (people from `my_encounters`, booths from `my_visits`) and returns them in order of meaning. The recap's shared visits (`my_shared_visits`) stay in time order and are not sent. `bandit-api` holds every Elastic credential; browsers never talk to Elastic.
 - Hyphenate.md: hold the index `bandit-claims` and its ingest pipeline `bandit-claims-validate`, and rank each de-identified claim copy by meaning against 30 seeded past claims.
-- Give the team its Kibana views: the Workflows execution view of `bandit-organize`, the organizer's tool calls in Agent Builder, and three dashboards: Import run, Event story and Interest map. Hyphenate.md: the Claims evidence dashboard.
+- Give the team its Kibana views: the Workflows execution view of `bandit-organize`, the organizer's tool calls in Agent Builder, and the two dashboards `bandit-ingest` installs for each event: "BandIt · Cal Hacks 13.0 · scrape pipeline" and "BandIt · Cal Hacks 13.0 · sponsors and prizes" for the demo instance. Hyphenate.md: the "BandIt claims evidence" dashboard.
 
 Non-responsibilities:
 
@@ -27,11 +28,13 @@ Non-responsibilities:
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| Elastic Bulk API, raw indices | in | `bandit-ingest`, organize stage ([BrightData](BrightData.md)) | JSON records from Bright Data `extract` and the company dataset tools, map-stage booth geometry, and the core station and zone rows; one document per record, tagged with the run id | HTTPS, ingest API key (write on `bandit-raw-*`, read on `bandit-bundles`) |
+| Elastic Bulk API, raw indices | in | `bandit-ingest`, organize stage ([BrightData](BrightData.md)) | JSON records from Bright Data `extract`, the company dataset tools and the Google Maps dataset, map-stage booth geometry, and the core station and zone rows; one document per record, tagged with the run id | HTTPS, ingest API key (write on `bandit-raw-*`, read on `bandit-bundles`) |
 | Workflows API | in | `bandit-ingest`, organize stage | start one execution of `bandit-organize` with the run id; poll its status every 5 s | HTTPS to Kibana, ingest API key |
 | Agent tools | internal | `bandit-organizer` | fixed ES\|QL queries and one index search tool over the raw indices; one MCP tool for gap filling | Elastic-internal |
 | Bright Data Web MCP, gap fill | out | `bandit-organizer`, through an Agent Builder MCP tool | `extract` with the null rule on an organisation or event page URL that the raw records name but no snapshot covers; one JSON record back with `source_url` and `fetched_at`; at most 10 calls per run (starting value) | HTTPS JSON-RPC to the remote MCP server, with a Bright Data zone token of its own that has its own spending limit ([BrightData](BrightData.md)) |
 | `bandit-bundles` | out | `bandit-ingest` | one bundle document per run: the organized sections, a match reason per merge, a gaps list, the gap-fill records, the agent's tool-call count | HTTPS `_search` by run id, ingest API key |
+| Elastic Bulk API, run logs | in | `bandit-ingest`, organize stage | one `bandit-organizer-decisions` document per decision in the bundle it read back, and one `bandit-pipeline-events` document per step of the run, with its time and counts | HTTPS, ingest API key, which also writes these two indices |
+| Kibana Dashboards API | in | `bandit-ingest`, at the end of each full run; Hyphenate.md: the claims dashboard's install script | the two event dashboards, created or replaced with that run's id in every query; Hyphenate.md: the "BandIt claims evidence" dashboard from its saved file | HTTPS to Kibana, Kibana API key |
 | SpacetimeDB subscription | in | `bandit-indexer` (role `indexer`) | rows of `venue`, `zone`, `station`, `booth`, `schedule_slot`; from BrightData.md: `organization`, `hall`; from Social.md: the views `social_attendees`, `social_visits`, `social_encounters`, which return findable attendees only | SpacetimeDB Rust client SDK over WebSocket; initial sync, then every committed change |
 | `heartbeat` reducer | out | `bandit-indexer` | service `indexer`, version, documents written, bulk failures, lag seconds, every 5 s | SpacetimeDB reducer call |
 | Elastic Bulk API, copy indices | out | `bandit-indexer` | index and delete operations keyed by document id | HTTPS, indexer API key (write on the three copy indices, use of the inference endpoint) |
@@ -41,7 +44,7 @@ Non-responsibilities:
 | Elasticsearch search | out | `bandit-api` | for `GET /recap/order`: a get of the caller's `bandit-people` document, then one semantic query on `bandit-people` and one on `bandit-booths` | HTTPS, one service API key (read on the three copy indices, use of the inference endpoint) |
 | Hyphenate.md: `bandit-claims`, through the pipeline `bandit-claims-validate` | in | `bandit-workers`, job `claim_verify`; `bandit-ingest` seed mode for the 30 past claims | one de-identified claim document per pack version; the seeded past claims | HTTPS; the worker uses the claims API key (write on `bandit-claims`, use of the inference endpoint), the seed uses the ingest API key, which also writes `bandit-claims` |
 | Hyphenate.md: precedent search | out | `bandit-workers` | one semantic query on `bandit-claims` per claim copy; the top 3 seeded past claims as ids and scores, which the worker writes to SpacetimeDB through Hyphenate.md's `submit_claim_checks` | HTTPS, the claims API key (read on `bandit-claims`) |
-| Kibana | in | the team, signed in to the Elastic Cloud project | the Workflows execution view, Agent Builder, and the Import run, Event story and Interest map dashboards; Hyphenate.md: the Claims evidence dashboard; read only on every BandIt index | HTTPS in a browser; Elastic Cloud logins, never attendees |
+| Kibana | in | the team, signed in to the Elastic Cloud project | the Workflows execution view, Agent Builder, and the scrape pipeline and sponsors and prizes dashboards; Hyphenate.md: the claims evidence dashboard; read only on every BandIt index | HTTPS in a browser; Elastic Cloud logins, never attendees |
 
 ## Design
 
@@ -71,7 +74,7 @@ Presence is zone-level only ([SpacetimeDB](../2-data/SpacetimeDB.md)), so a memo
 - It does not serve lists or search. There is no typed query anywhere in BandIt. "My visits", "my encounters", "my photos" and "the booth with number B12" are SpacetimeDB views in the apps. The one attendee route, `GET /recap/order`, only orders ids that SpacetimeDB already listed for the caller.
 - It does not decide who may see what. The indexer reads only the Social views, which return findable attendees only, and `bandit-api` takes every candidate from SpacetimeDB rows (`api_session`, `social_encounters`, `social_visits`). No Elastic query, model or key decides access.
 - It does not hold or discover graph links. The bands measure who met whom and who stood at which booth, and SpacetimeDB stores those links ([Social](../6-features/Social.md)). Kibana Graph is not used: it is unavailable on Elastic Cloud Serverless, and it discovers links from terms that occur together in documents, while here the links are already measured.
-- It does not hold live state or history. Live counts, zone state, incidents and `zone_sample` stay in the module. The Kibana dashboards read only the organizer's working data and the findable copy; none of them shows a live count, a zone's density or a person.
+- It does not hold live state or history. Live counts, zone state, incidents and `zone_sample` stay in the module. The Kibana dashboards read only the import run's records and logs (Hyphenate.md: and the de-identified claim copies); none of them shows a live count, a zone's density or anything about an attendee.
 - It does not write to SpacetimeDB. The bundle is loaded by `bandit-ingest` through `import_event`; the recap order becomes an action only through a reducer the app calls. Hyphenate.md: precedent ids and scores reach SpacetimeDB only because `bandit-workers` writes them through `submit_claim_checks`.
 - It does not talk to anyone. The one agent runs once per import over the raw indices of that run.
 - It does not fetch or crawl. Elastic's Open Crawler is not used, and there are no scheduled re-scrapes: one run per import. Bright Data cannot deliver to Elasticsearch directly, so `bandit-ingest` bulk-indexes the records itself.
@@ -112,13 +115,20 @@ flowchart TB
 
 | Index | One document per | Fields |
 |---|---|---|
-| `bandit-raw-pages` | record from an event or exhibitor page (the JSON that Bright Data `extract` produced) | `run_id`, `source_key`, `source_url`, `fetched_at`, `fetched_by` (`ingest`, `organizer`), `snapshot_sha256`, `record_kind` (`organization_candidate`, `person_candidate`, `schedule_item`, `booth_mention`, `venue_fact`), `name` (text with a keyword sub-field), `aliases` (keyword: website domain, normalised name, booth number as printed), `domain`, `booth_number_norm`, `location_norm`, `org_key` (keyword: the join keys the `LOOKUP JOIN` steps use), `text` (semantic_text: the record's description), `tier_text`, `role_text`, `location_text`, `start_text`, `end_text`, `links` and `raw` (not indexed) |
-| `bandit-raw-orgs` (lookup mode) | company-facts record from a dataset tool | `run_id`, `source_key`, `source_url`, `fetched_at`, `dataset` (`linkedin_company`, `crunchbase_company`), `name` (text with a keyword sub-field), `aliases`, `domain` (keyword: the join key), `website`, `text` (semantic_text: the dataset's description), `industry`, `headquarters`, `size_range`, `founded_year`, `funding_summary`, `social_pages` (not indexed) |
+| `bandit-raw-pages` | record from an event or exhibitor page (the JSON that Bright Data `extract` produced) | `run_id`, `source_key`, `source_url`, `fetched_at`, `fetched_by` (`ingest`, `bandit-organizer`), `snapshot_sha256`, `record_kind` (`organization_candidate`, `prize`, `person_candidate`, `schedule_item`, `booth_mention`, `venue_fact`; a `prize` carries its cash amount in USD and the sponsor named beside it), `name` (text with a keyword sub-field), `aliases` (keyword: website domain, normalised name, booth number as printed), `domain`, `booth_number_norm`, `location_norm`, `org_key` (keyword: the join keys the `LOOKUP JOIN` steps use), `text` (semantic_text: the record's description), `tier_text`, `role_text`, `location_text`, `start_text`, `end_text`, `links` and `raw` (not indexed) |
+| `bandit-raw-orgs` (lookup mode) | company-facts record from a dataset tool; also the one Google Maps venue record (`record_kind` `venue_place`), which the organizer leaves alone: `bandit-ingest` reads it straight into the bundle's event section ([BrightData](BrightData.md)) | `run_id`, `source_key`, `source_url`, `fetched_at`, `dataset` (`linkedin_company`, `crunchbase_company`, `google_maps`), `name` (text with a keyword sub-field), `aliases`, `domain` (keyword: the join key), `website`, `text` (semantic_text: the dataset's description), `industry`, `headquarters`, `size_range`, `founded_year`, `funding_summary`, `social_pages` (not indexed) |
 | `bandit-raw-plan` (lookup mode) | booth geometry item from the map stage, or a reference row | `run_id`, `record_kind` (`booth_geometry`, `station`, `zone`, `hall`), `source_key`, `hall_name`, `booth_number_text`, `booth_number_norm`, `location_norm`, `aliases`, `plan_x_m`, `plan_y_m`, `placement_confidence`, `nearest_station_id`, `nearest_station_distance_m`, and for reference rows the zone or station name, id and plan position copied from SpacetimeDB |
 
 **The workflow.** `bandit-organize` is an Elastic Workflow that `bandit-ingest` starts once per import run through the Workflows API, passing the run id. Workflows are generally available on Elastic Cloud Serverless; the feature is switched on in the project settings and needs a role with workflow privileges. Its first steps are fixed ES|QL queries with `LOOKUP JOIN`, parameterised only by the run id, that write the exact joins to a per-run join index, `bandit-joins`. They join an organisation candidate to its company facts on `domain`, a booth mention to its geometry on `booth_number_norm`, a schedule item to a stage booth or zone on `location_norm`, and a person candidate to an organisation on the `org_key` printed on the same page. Nothing a model says can change these rows. Then come the `ai.agent` steps, one per bundle section, in dependency order (organisations, booths, people, then schedule and gaps). Each step has that section's JSON `schema` and gets only the records the joins left unmatched plus the join results, so the answer is structured and a malformed one fails inside Elastic. A final index step writes the sections, the match reasons, the gap-fill records and the gaps list as one document to `bandit-bundles`, keyed by the run id.
 
 `bandit-ingest` polls the execution every 5 s, reads the document, saves every gap-fill record as a snapshot and indexes it into the raw indices of the run, and validates the bundle in Rust against the rules `import_event` enforces: every `source_key` exists in the raw indices of that run, every organisation reference resolves, booth numbers are unique per hall, zone and stage names exist, every category is on the fixed list, and the gap-fill count is within the cap. A valid bundle is saved as the last good bundle and loaded. If the run fails or the bundle fails validation, `bandit-ingest` loads the last good bundle it saved, and the failed run stays in Kibana for review. Elastic shapes the bundle, Rust decides whether it is loadable, and `import_event` checks once more inside the transaction.
+
+**Run logs.** Two more indices record each run for the Kibana dashboards. `bandit-ingest` writes both; the agent's tools never read them. Before writing a run's documents it deletes that run's old ones, so a rerun of the same run id replaces them.
+
+| Index | One document per | Fields |
+|---|---|---|
+| `bandit-organizer-decisions` | decision in the bundle `bandit-ingest` read back: one per organisation, prize link, person link, schedule link and gap | `run_id`, `decision_kind` (`organization`, `prize_link`, `person_link`, `schedule_link`, `gap`), `key` (the record or organisation decided on), `organization_key`, `name`, `category`, `tags`, `match_method` (`exact_domain` or `agent`, on organisations), `reason` (text: the agent's sentence), `at` |
+| `bandit-pipeline-events` | step of one run: indexing the records, each workflow step, reading the bundle back, writing the decisions, saving the bundle | `run_id`, `stage`, `at`, `duration_ms`, `counts` (an object of counts for that step), `note` |
 
 **What the agent decides.** The instructions, in prose (the exact wording lives in the agent configuration):
 
@@ -145,7 +155,7 @@ The fixed category list (starting value, calibrate against the real exhibitor li
 | `bandit.schedule_items` | ES\|QL, fixed | `bandit-raw-pages` | `run_id` | schedule items with location, start and end text | the schedule section |
 | `bandit.people_for_org` | ES\|QL, fixed | `bandit-raw-pages` | `run_id`, `org_key` | person candidates listed under that organisation | people linking |
 | `bandit.record_by_key` | built-in document lookup | any raw index | document id | the document | expand a key the agent already holds |
-| `bandit.fetch_gap` | MCP tool: Bright Data Web MCP `extract` | the web, through Bright Data ([BrightData](BrightData.md)) | `url`, the record schema for that kind, the null rule | one JSON record with `source_url`, `fetched_at` and `fetched_by` `organizer` | the only web call; at most 10 per run (starting value) |
+| `bandit.fetch_gap` | MCP tool: Bright Data Web MCP `extract` | the web, through Bright Data ([BrightData](BrightData.md)) | `url`, the record schema for that kind, the null rule | one JSON record with `source_url`, `fetched_at` and `fetched_by` `bandit-organizer` | the only web call; at most 10 per run (starting value) |
 
 Every ES|QL tool has a `LIMIT`, the index search tool has a row limit, and the agent runs one section at a time, because the most common Agent Builder failure is a tool response or an answer larger than the model's context.
 
@@ -190,7 +200,7 @@ flowchart LR
   class ES,KIB ext
 ```
 
-**bandit-indexer.** A Rust process with the `indexer` service role, on the Fly.io VM next to `bandit-api`. It is an ordinary SpacetimeDB client: one connection to the `band1t` database, subscriptions to the copied tables and views, and reactions to row callbacks. On first start it prints its identity so the organizer can grant the `indexer` role with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)). It calls `heartbeat` every 5 s, so the Ops dashboard can show whether the copy is fresh.
+**bandit-indexer.** A Rust process with the `indexer` service role, on the Fly.io VM next to `bandit-api`. It is an ordinary SpacetimeDB client: one connection to the `band1t` database, subscriptions to the copied tables and views, and reactions to row callbacks. On first start it prints its identity so the owner can grant the `indexer` role with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)). It calls `heartbeat` every 5 s, so the Ops dashboard can show whether the copy is fresh.
 
 - **Sync.** A new subscription first delivers all current rows, then each committed change. The indexer treats both the same way: a row arrived, rebuild the documents that depend on it. There is no backfill mode and no "indexed" flag in SpacetimeDB, so the module knows nothing about Elastic.
 - **Joins happen in the indexer.** A booth document needs its zone name, station id, organisation facts and schedule slots; a memory document needs the booth text and zone centroid; a `bandit-people` document needs the texts of the attendee's top booths. The builders read the related rows from the SDK cache, and a change to a parent row rebuilds every dependent document. Copying text in at index time avoids joins at query time.
@@ -200,7 +210,7 @@ flowchart LR
 
 | Table (owner) | Copied to | Filter |
 |---|---|---|
-| `venue`, `zone`, `station` (SpacetimeDB.md) | folded into every document (names, centroids, the origin for the Kibana map) | none; venue layout is public |
+| `venue`, `zone`, `station` (SpacetimeDB.md) | folded into every document (names, centroids, the plan origin for coordinates) | none; venue layout is public |
 | `booth`, `schedule_slot` (SpacetimeDB.md) | `bandit-booths` | none; venue content |
 | `organization`, `hall` (BrightData.md) | folded into `bandit-booths`: a booth document carries its organisation's facts and its hall name; there is no organisation index | none; facts about companies, not people |
 | `social_visits` view (Social.md) | `bandit-memories`; folded into `bandit-people` | the view returns visits of findable attendees only; indexed when it opens, updated when it closes; a closed visit rebuilds that attendee's `bandit-people` document |
@@ -214,7 +224,7 @@ flowchart LR
 
 The consent switch `findable` is defined in [SpacetimeDB](../2-data/SpacetimeDB.md) and given meaning by [Social](../6-features/Social.md); the Social views apply it, so the indexer never reads `consent`. When an attendee turns `findable` off, they drop out of the views; the indexer deletes their documents from `bandit-memories` and `bandit-people` by query on `attendee_id`, and the encounter documents of everyone they met that name them.
 
-**Positions for the Kibana map.** There are no positions for people. The only positions in Elastic are the zone centroid (`zone.plan_x_m`, `zone.plan_y_m`), used on memories, and the booth point (`booth.plan_x_m`, `booth.plan_y_m`), used on booths; a booth with `placement_source` `none` has no `location`. Plan metres become latitude and longitude with one Rust function in the indexer, so the Kibana map uses real coordinates. The function reads the plan origin (`venue.origin_lat`, `venue.origin_lon`) and the plan's rotation from true north (`venue.plan_rotation_deg`), rotates the plan offset into north and east metres, and adds them to the origin with local metres-per-degree factors (about 111 km per degree of latitude, about 88 km per degree of longitude at this latitude), which is exact enough for a site a few hundred metres wide. Starting value for the origin in the demo instance: the Palace of Fine Arts, 3601 Lyon Street, San Francisco, roughly 37.8029 north, 122.4486 west; the real origin corner is recorded on site at setup. SpacetimeDB keeps plan metres, which is what the Ops dashboard draws.
+**Positions.** There are no positions for people. The only positions in Elastic are the zone centroid (`zone.plan_x_m`, `zone.plan_y_m`), used on memories, and the booth point (`booth.plan_x_m`, `booth.plan_y_m`), used on booths; a booth with `placement_source` `none` has no `location`. Plan metres become latitude and longitude with one Rust function in the indexer, so every document carries real coordinates. The function reads the plan origin (`venue.origin_lat`, `venue.origin_lon`) and the plan's rotation from true north (`venue.plan_rotation_deg`), rotates the plan offset into north and east metres, and adds them to the origin with local metres-per-degree factors (about 111 km per degree of latitude, about 88 km per degree of longitude at this latitude), which is exact enough for a site a few hundred metres wide. Starting value for the origin in the demo instance: the Palace of Fine Arts, 3601 Lyon Street, San Francisco, roughly 37.8029 north, 122.4486 west; the real origin corner is recorded on site at setup. SpacetimeDB keeps plan metres, which is what the Ops dashboard draws.
 
 **Index conventions.**
 
@@ -347,36 +357,33 @@ The worker passes the result to Hyphenate.md's `submit_claim_checks`. An invalid
 
 ### Part four: Kibana, what the team shows
 
-Kibana is Elastic's web app: the screens, opened in a browser, where a team looks inside an Elastic project. In Kibana you configure features such as Workflows and Agent Builder, watch each workflow run step by step, and build charts, maps and dashboards over any index. For BandIt it is the most visual way to show the Elastic side: how messy scraped records became one checked bundle, how the night looked once it was over, and what the crowd was into. Hyphenate.md: and how tonight's claims compare with the 30 past claims. Kibana reads only what Elastic already holds. The live event is shown on the [Ops-Dashboard](../5-apps/Ops-Dashboard.md) from SpacetimeDB subscriptions, so no Kibana view repeats a live count, a zone's density or an incident. Only the team opens Kibana, signed in to the Elastic Cloud project.
+Kibana is Elastic's web app: the screens, opened in a browser, where a team looks inside an Elastic project. In Kibana you configure features such as Workflows and Agent Builder, watch each workflow run step by step, and build charts, maps and dashboards over any index. For BandIt it is the most visual way to show the Elastic side: how messy scraped records became one checked bundle, and what the scrape found about the event's sponsors and prizes. Hyphenate.md: and what tonight's claims look like, what was paid and which evidence failed validation. Kibana reads only what Elastic already holds. The live event is shown on the [Ops-Dashboard](../5-apps/Ops-Dashboard.md) from SpacetimeDB subscriptions, so no Kibana view repeats a live count, a zone's density or an incident. Only the team opens Kibana, signed in to the Elastic Cloud project.
 
 The diagram answers: which Kibana view reads which data, and where does that data come from?
 
 ```mermaid
 flowchart LR
   subgraph Sources["Data Elastic holds"]
-    RUN["One import run: raw indices, bandit-joins, bandit-bundles"]
-    COPY["Copy: bandit-booths, bandit-memories, bandit-people"]
+    RUN["One import run: raw indices, bandit-organizer-decisions, bandit-pipeline-events"]
     CLM["Hyphenate.md: bandit-claims"]
   end
   subgraph Kibana["Kibana, opened by the team"]
     WFV["Workflows: executions of bandit-organize, step by step"]
     ABV["Agent Builder: the organizer's tool calls and reasons"]
-    D1["Dashboard: Import run"]
-    D3["Dashboard: Event story (after the event)"]
-    D4["Dashboard: Interest map"]
-    D5["Hyphenate.md dashboard: Claims evidence"]
+    D1["Dashboard: BandIt · Cal Hacks 13.0 · scrape pipeline"]
+    D2["Dashboard: BandIt · Cal Hacks 13.0 · sponsors and prizes"]
+    D5["Hyphenate.md dashboard: BandIt claims evidence"]
   end
   RUN --> WFV
   RUN --> ABV
   RUN --> D1
-  COPY --> D3
-  COPY --> D4
+  RUN --> D2
   CLM --> D5
   STDB["band1t module: live state"] -->|"subscriptions"| OPS["Ops dashboard: the live screen"]
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
-  class RUN,COPY,CLM,WFV,ABV,D1,D3,D4,D5 ext
+  class RUN,CLM,WFV,ABV,D1,D2,D5 ext
   class STDB stdb
   class OPS web
 ```
@@ -385,19 +392,18 @@ flowchart LR
 |---|---|---|---|
 | Workflows, executions of `bandit-organize` | the workflow's own run record | each step of one import run in order: the `LOOKUP JOIN` steps with their match counts, each `ai.agent` section, the final index step, the time each took and any error | in the demo, to show how the event got loaded |
 | Agent Builder, the organizer | the agent's runs | the tools the agent called, the candidates each search returned, the gap fetches it made, and the reason behind every merge | in the demo, next to the workflow; when a reviewer checks a merge |
-| Dashboard: Import run | raw indices, `bandit-joins`, `bandit-bundles` for the latest run | records per source and kind; how each record was matched (exact join, alias join, agent, unmatched) as one stacked bar per kind; a table of merges with their reasons; the gaps list; gap-fill calls used against the cap; booths with and without a plan position | before the load stage, to review the bundle; in the demo, to show the validation |
-| Dashboard: Event story | `bandit-booths`, `bandit-memories` | a Kibana Maps layer of booths sized by total visit minutes; visit minutes per booth category per hour; the top booths by time spent. Totals only, never a person | after the event, in the closing demo |
-| Dashboard: Interest map | `bandit-memories`, `bandit-people` | anonymous totals: visit minutes per booth category, people per `top_category`, and the top booths for each `top_category`. A Vega panel draws a network of booths, sized by visit minutes and linked when the same people spent the most time at both, read with ES\|QL from `top_booth_ids` | in the demo, next to the people graph on the ops screen |
-| Hyphenate.md: Dashboard: Claims evidence | `bandit-claims` | claims tonight by outcome, payout by zone, incident kind by outcome, and the 30 past claims beside tonight's | in the demo, next to the Claims queue on the Ops dashboard |
+| Dashboard: "BandIt · Cal Hacks 13.0 · scrape pipeline" (id `bandit-pipeline-calhacks-13`) | the three raw indices, `bandit-organizer-decisions` and `bandit-pipeline-events`, for the run it was installed with | a note naming the run and who did each part; four counts: raw records from Bright Data, organisations after merging, matches only the agent could make, gaps flagged for review; records by source and kind; how each organisation was matched (exact domain or agent); a table of the organizer's decisions with their reasons; the time each pipeline step took; the gaps list | before the load stage, to review the bundle; in the demo, to show how the event got loaded |
+| Dashboard: "BandIt · Cal Hacks 13.0 · sponsors and prizes" (id `bandit-event-calhacks-13`) | `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-organizer-decisions`, for the same run | four counts: prize cash in USD, prizes, sponsors and partners, company profiles from LinkedIn and Crunchbase; prize cash by sponsor; sponsors by the category the agent gave them; sponsors by tier; a tag cloud of what the sponsors work on; a table of the companies with domain, source, industry, headquarters, size and founding year | in the demo, to show what the scrape found about the event |
+| Hyphenate.md: Dashboard: "BandIt claims evidence" (id `bandit-claims`) | `bandit-claims` | a note on what the index holds and how it is checked; three counts: claims tonight, evidence failing validation, paid to claimants in USD across all events; claims by outcome; payout by zone in USD; claims by incident kind and outcome; the validation errors caught on the way in | in the demo, next to the Claims queue on the Ops dashboard |
 
-Every dashboard is saved with the project setup, so it shows the saved import run even when no new run happens. The Event story and the Interest map count only the findable copy, so a visit of an attendee who is not findable is never counted. Vega is generally available on Serverless, so its panel is the network view there; Kibana Graph is not, and is not used.
+Every chart and count is an ES|QL query. `bandit-ingest` installs the two event dashboards through the Kibana Dashboards API at the end of each full run, one pair per event (the ids end in the event's slug, `calhacks-13` for the demo), with that run's id fixed in every query, and can install them again for any saved run. So they keep showing the saved import run even when no new run happens. Hyphenate.md: the claims evidence dashboard goes in through the same API from a saved file, by its own install script. No dashboard reads the copy indices. Kibana Graph is not used: it is unavailable on Serverless.
 
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
 | A `bandit-organize` run fails (managed LLM quota, agent error) or its bundle fails the Rust validation | No new bundle | `bandit-ingest` loads the last good bundle it saved; the failed run stays in Kibana and in `bandit-bundles` for review |
-| The agent merges two different organisations | Wrong facts on a booth | A merge needs a domain match or a ladder candidate, never a name alone; every merge carries a reason, and the team reads them on the Import run dashboard before the load stage |
+| The agent merges two different organisations | Wrong facts on a booth | A merge needs a domain match or a ladder candidate, never a name alone; every merge carries a reason, and the team reads them in the scrape pipeline dashboard's decisions table before the load stage |
 | The gap-fill tool runs away (too many calls, or a person's page) | Credits spent, scope rule broken | Three holds: the instruction caps it at 10 per run, the Bright Data zone token has its own spending limit, and the Rust validation drops any gap-fill record of kind person and rejects a bundle over the cap |
 | Elastic Serverless unreachable | `GET /recap/order` fails | `bandit-api` returns an unavailable error, and the recap page shows both lists by minutes. Hyphenate.md: the `claim_verify` job fails after its attempts, and the claim carries no precedent checks and decides the same way. Nothing live reads Elastic |
 | Hyphenate.md: `bandit-claims-validate` marks a claim copy invalid | The claim is flagged | `submit_claim_checks` stores the pipeline's errors as a failed check, and the claim routes to a person; it is never refused for it |
@@ -411,7 +417,7 @@ Every dashboard is saved with the project setup, so it shows the saved import ru
 - [BrightData](BrightData.md): the `bandit-ingest` pipeline that writes the raw indices, starts the workflow, validates the bundle and calls `import_event`; a Bright Data zone token of its own for the gap-fill tool; the `organization` and `hall` rows and booth points that the copy carries.
 - [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone`, `station`, `booth`, `schedule_slot`, `api_session`, `service_heartbeat`; reducers `heartbeat`, `grant_role`; the `indexer` and `api` service roles.
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` and `bandit-ingest` process shells, the Fly.io VM, and secret handling for the Elastic keys; Hyphenate.md: the `bandit-workers` shell for the `claim_verify` job and the Elastic claims key.
-- [Social](../6-features/Social.md): the views `social_attendees`, `social_visits` and `social_encounters`, and the consent meaning behind them. Social.md: without it `bandit-memories` and `bandit-people` stay empty, there is no recap list to order, and only the booth copy and the Kibana map work.
+- [Social](../6-features/Social.md): the views `social_attendees`, `social_visits` and `social_encounters`, and the consent meaning behind them. Social.md: without it `bandit-memories` and `bandit-people` stay empty, there is no recap list to order, and only the booth copy works.
 - An Elastic Cloud Serverless project with Agent Builder, Workflows and the Elastic Inference Service, and Kibana for the team.
 
 **Used by**
@@ -430,7 +436,7 @@ Every dashboard is saved with the project setup, so it shows the saved import ru
 - Remove the "Elastic.md" rows from [SpacetimeDB](../2-data/SpacetimeDB.md) (the `bandit-indexer` interfaces row, the `indexer` role row, the subscriptions row and the registry row) and turn its "Copied" markers into "Not copied".
 - Remove the Elastic.md organize stage row, interface rows, diagram nodes, sequence steps, failure row and dependency bullets from [BrightData](BrightData.md). `bandit-ingest` then has no scraped bundle to load, and booths and their organisations are entered by hand on the Ops dashboard with `upsert_booth`.
 - Remove the recap order rows from [Attendee-App](../5-apps/Attendee-App.md) and the Elastic bullets from [Social](../6-features/Social.md); the recap then lists its people and booths by minutes. Remove the indexer heartbeat rows from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the Elastic.md bullet from [Anthropic-Agent](Anthropic-Agent.md), and the Elastic row and node in [README](../README.md).
-- In [Hyphenate](Hyphenate.md), remove its "Elastic.md:" part (similar past claims, the `claim_verify` job, the `claim_precedent` table, `submit_claim_checks`, the 30 past claims seed, the Claims evidence dashboard and the Elastic.md rows in its tables), and the claim precedent rows in [Architecture](../1-overview/Architecture.md), [SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md) and [Decisions](../1-overview/Decisions.md). Claims then decide exactly the same, with no precedent checks.
+- In [Hyphenate](Hyphenate.md), remove its "Elastic.md:" part (similar past claims, the `claim_verify` job, the `claim_precedent` table, `submit_claim_checks`, the 30 past claims seed, the claims evidence dashboard and the Elastic.md rows in its tables), and the claim precedent rows in [Architecture](../1-overview/Architecture.md), [SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md) and [Decisions](../1-overview/Decisions.md). Claims then decide exactly the same, with no precedent checks.
 - The `indexer` role can be dropped from the seed, and the Social views lose their `indexer` and `api` readers; `booth.plan_x_m`, `booth.plan_y_m`, `zone.plan_x_m`, `zone.plan_y_m` and the `venue` origin fields stay, because the Ops dashboard map uses them.
 - Delete the Elastic Serverless project; no data is lost, because Elastic only held a copy and working data.
 
@@ -443,13 +449,13 @@ Every dashboard is saved with the project setup, so it shows the saved import ru
 | A failed run loads the last good bundle; there is no second organizer | The demo never waits on a live organize run, and the bundle always went through the same joins and the same agent |
 | Agent Builder uses the Elastic Managed LLM; Claude is not wired into Elastic | It works the moment the project exists, needs no second key, and keeps every Claude call in `claude-client` and `model_call`. Elastic agents organize and validate; judgments go to Claude |
 | Every text field uses `.jina-embeddings-v5-text-small`, named on the field | Scores from different models cannot be mixed, and the Serverless default can change |
-| Plan metres become latitude and longitude in one Rust function in the indexer | The Kibana map needs real coordinates, and SpacetimeDB keeps plan metres |
+| Plan metres become latitude and longitude in one Rust function in the indexer | The copy's documents carry real coordinates, and SpacetimeDB keeps plan metres |
 | `bandit-indexer` runs on the Fly.io VM next to `bandit-api` | One always-on host for the cloud services |
 | The joins of exhibitor records to booth geometry happen once, in the `LOOKUP JOIN` steps | One owner per step; the map stage in `bandit-ingest` only produces geometry |
 | The people graph's links live in SpacetimeDB; Elastic draws nothing on the graph, and nothing about the graph flows back | Links are exact, private facts that change live |
 | Hyphenate.md: a de-identified copy of each claim goes to `bandit-claims`; precedents come back only as past-claim ids and scores, written by `bandit-workers` through `submit_claim_checks`, and never change an amount | Ranking similar past claims by meaning is what Elastic does best; money, routes and live state stay in SpacetimeDB |
 | Hyphenate.md: `bandit-claims-validate` is the index's final pipeline; it never rejects a document, it marks it valid or invalid, and an invalid copy flags the claim and routes it to a person | Elastic checks data and never decides money; a person looks at anything it flags |
-| Kibana Graph is not used; the network picture in Kibana is the Vega panel on the Interest map | Graph is unavailable on Elastic Cloud Serverless, and it discovers links from co-occurring terms, while the links are already rows in SpacetimeDB |
+| Kibana Graph is not used, and no Kibana view draws a network | Graph is unavailable on Elastic Cloud Serverless, and it discovers links from co-occurring terms, while the links are already rows in SpacetimeDB, drawn live on the ops screen's event graph ([Social](../6-features/Social.md)) |
 | SpacetimeDB decides who and what is on the recap list; Elastic only orders it, through `GET /recap/order` | The list is exact and private and comes from what the bands measured; meaning is the one thing only Elastic's embeddings add, and a stranger can never appear |
 | There is no typed query; the caller's own `interests` text is the only query | The recap shows suggestions, not search results |
 | Candidates with no document, and both lists when Elastic is down, go by minutes | The recap always opens with the full exact list |

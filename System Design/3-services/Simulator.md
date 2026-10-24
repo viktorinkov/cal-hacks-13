@@ -94,7 +94,7 @@ flowchart TB
 
 Two drivers report them, both as the `simulator` identity:
 
-- **The `bandit-claims` command-line tool**, on the demo laptop. Its `setup` command creates the demo identities and their role grants; its `sim` identity holds `simulator`. While it runs, it reports every demo band once a second, so none goes stale (5 s), and at once when a band changes station, state or flags. A demo band's `neigh` is the number of other demo bands at its station, unless a scenario sets it. A press is the press flag held for 400 ms, as a person presses a real band after the tap.
+- **The `bandit-claims` command-line tool**, on the demo laptop. Its `setup` command connects as the module owner, the only identity that may grant, and creates the demo identities and their role grants; its `sim` identity holds `simulator`. While it runs, it reports every demo band once a second, so none goes stale (5 s), and at once when a band changes station, state or flags. A demo band's `neigh` is the number of other demo bands at its station, unless a scenario sets it. A press is the press flag held for 400 ms, as a person presses a real band after the tap.
 - **`bandit-api`'s demo routes**, only while demo mode is on. `POST /api/dev/press/{band}` presses one of the bands 94 to 99, so a tester claims it from the tap link with no hardware. `POST /api/dev/move/{band}/{station}` moves it to another station's zone. `bandit-api` keeps reporting each band pressed this way every 2 s, so it stays live, keeps its zone and mixes with the crowd. Once `event_state.ended` is set, those reports stop. Bands 90 to 93 belong to the claims demo, and only the tool drives them.
 
 ### Demo bands obey the server

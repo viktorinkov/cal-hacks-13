@@ -107,18 +107,18 @@ Every process is a SpacetimeDB client with its own identity, so every reducer ca
 sequenceDiagram
   participant P as Rust service
   participant M as band1t module
-  participant O as Organizer (Ops dashboard)
+  participant O as Owner (Ops dashboard staff panel)
   P->>M: first connect, no saved token
   M-->>P: new identity and token
   P->>P: save token to its credentials file, log its identity
   O->>M: grant_role(identity, service role)
-  M->>M: staff_role row written
+  M->>M: caller is the owner, staff_role row written
   P->>M: privileged reducer call
   M->>M: check staff_role for caller, then act
 ```
 
-- The module's init reducer seeds the publishing identity as `owner`, and the owner grants `organizer` once at setup. Only `organizer` (and `owner`) can call `grant_role` and `revoke_role`.
-- People do not keep a saved token: they sign in with SpacetimeAuth, and the organizer grants their roles the same way, from the short identity code on their screen ([SpacetimeDB](../2-data/SpacetimeDB.md)).
+- The module's init reducer records the publishing identity as `owner`. Only the owner can call `grant_role` and `revoke_role`; the module refuses every other caller.
+- People do not keep a saved token: they sign in with SpacetimeAuth, and the owner grants their roles the same way, from the short identity code on their screen ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 - Each service keeps its token in a credentials file, never in the repo. The three services on the Fly Machine keep theirs on the Fly volume, so a redeploy keeps their identities; the laptop processes keep theirs in a local file. A restart therefore keeps the identity, and the role survives it.
 - Service roles are narrow: the bridge can report bands and acknowledge commands but cannot touch claims; workers can submit job results but cannot force band states.
 
@@ -227,7 +227,7 @@ Simulator.md: in the live demo, the crowd (up to 80 bands inside the module) and
 | Failure | Effect | Design answer |
 |---|---|---|
 | The Fly Machine restarts or is redeployed | The three cloud services drop for a few seconds | They restart with the identities saved on the volume and reconnect; leased jobs return through `job_reaper`. |
-| A service gets a new identity because its credentials file is lost | Its reducer calls are refused | The organizer grants the role to the new identity from the dashboard; the refusal is logged loudly. |
+| A service gets a new identity because its credentials file is lost | Its reducer calls are refused | The owner grants the role to the new identity from the dashboard; the refusal is logged loudly. |
 | `bandit-workers` crashes mid-job | Jobs stay leased | `job_reaper` returns them after the lease; an external call checks its recorded request id before it runs again. |
 | `bandit-api` is down | New phones cannot load the app; no uploads and no recap order | Phones that already loaded the app keep live safety and the recap views, which talk to SpacetimeDB directly. |
 | A secret is missing for one feature | That feature's handlers fail | Only those job kinds go `dead`; other features run, and the job monitor shows which kind is failing. |

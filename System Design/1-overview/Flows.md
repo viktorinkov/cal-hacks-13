@@ -20,10 +20,11 @@ The flows run over the connections in [Architecture](Architecture.md) and add no
 |---|---|---|
 | Attendee | a judge, on their own phone | a band, the attendee app |
 | Wearers | nine people, the judge among them; the three full bands go to the people in the fall and SOS script, the six lite bands to everyone else | the bands |
-| Organizer | a team member with the `organizer` role | the host portal on the Ops dashboard |
+| Owner | the team member signed in with the identity that published the module, the only one who grants roles | the staff panel on the Ops dashboard |
+| Host | a team member with the `ops` role | the host portal on the Ops dashboard |
 | Ops | a team member at the demo laptop | the Ops dashboard, shown on the big screen |
 | Medic | a team member with the `medic` role, without a band | the medic view of the attendee app |
-| Hyphenate.md: Risk manager | the same judge, on their own phone, with `risk_manager` granted live by the organizer, who picks the judge from the host attendee list | the Claims queue on the Ops dashboard |
+| Hyphenate.md: Risk manager | the same judge, on their own phone, with `risk_manager` granted live by the owner, who picks the judge from the host attendee list | the Claims queue on the Ops dashboard |
 
 ## Design
 
@@ -33,7 +34,7 @@ The venue and the event's real exhibitors are loaded before anyone arrives, so n
 
 | Step | What happens | Owned by |
 |---|---|---|
-| 0. Seed | `bandit-ingest` in seed mode loads the venue, zones, exits, stations, bands and role grants through the setup reducers; each Rust service's identity gets its role, and the organizer grants each staff member's role from the short identity code on their screen | [SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md) |
+| 0. Seed | `bandit-ingest` in seed mode loads the venue, zones, exits, stations, bands and role grants through the setup reducers; each Rust service's identity gets its role, and the owner grants each staff member's role from the short identity code on their screen | [SpacetimeDB](../2-data/SpacetimeDB.md), [Rust-Backend](../3-services/Rust-Backend.md) |
 | BrightData.md: 0a. Import | `bandit-ingest` fetches the event's public pages from the start URLs in its seed (for the demo, the Cal Hacks 13.0 pages) through the Bright Data Web MCP and loads one bundle of organisations, booths, the floor plan and the schedule with `import_event`, in one transaction; ops drags any misplaced booth on the Ops dashboard map | [BrightData](../7-integrations/BrightData.md) |
 | Elastic.md: 0b. Organize | between the fetch and the load, the Workflow `bandit-organize` turns the raw records into the checked bundle that 0a loads | [Elastic](../7-integrations/Elastic.md) |
 | Hyphenate.md: 0c. Accuracy run | the `bandit-claims` command-line tool (Simulator.md) plants three rounds of claims, genuine and fake, under the accuracy-run policy; the claims agent settles, routes or refuses each one, and the Claims queue shows the scorecard. Its learned rules expire before doors open, so the demo starts with no rule | [Hyphenate](../7-integrations/Hyphenate.md), [Simulator](../3-services/Simulator.md) |
@@ -51,7 +52,7 @@ Each row is the happy path. The doc in the last column owns the detail.
 | 4. Fall and medic | A wearer on a full band falls; the same strobe and blue circle appear. Ops assigns the medic with one tap on their entry zone; the other bands in the zone turn to a side exit's colour and the full bands vibrate, so people move sideways while the medic walks toward the blue ring. The medic adds a treatment note and resolves; the strobe stops | `ack_incident`, `assign_medic`, medic-approach directives and `buzz` from `venue_tick`, `add_incident_note`, `resolve_incident` and its `clear` command | [Safety](../6-features/Safety.md), [Ops-Dashboard](../5-apps/Ops-Dashboard.md) |
 | Medical-ID.md: 4a. Medical card | Before resolving, the medic taps the person's band and their medical card appears | The `medic` role plus the open incident unlocks the card; the read is logged | [Medical-ID](../6-features/Medical-ID.md) |
 | Social.md: 5. The people graph grows | On the big screen the event's people graph grows live: a link appears the moment someone has stayed at a booth for 2 minutes or two people have been together for 3 minutes | The social step of `memory_tick` writes `people_link` in the same transaction as the visit or encounter; the anonymous `event_graph` view pushes it to the screen. Simulator.md: the simulated attendees fill the graph out | [Social](../6-features/Social.md), [Ops-Dashboard](../5-apps/Ops-Dashboard.md) |
-| 6. Event ended | The organizer presses "Event ended" in the host portal. Every judge's open page turns into their recap page, live, starting with their space-time view. Later a judge reopens their tap link on any device, signed in, and sees it again | `end_event` sets `event_state.ended`; every attendee page subscribes to `event_state` and switches to the recap; `release_band` is refused from then on | [Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Attendee-App](../5-apps/Attendee-App.md), [SpacetimeDB](../2-data/SpacetimeDB.md) |
+| 6. Event ended | The host, a staff member with `ops`, presses "Event ended" in the host portal. Every judge's open page turns into their recap page, live, starting with their space-time view. Later a judge reopens their tap link on any device, signed in, and sees it again | `end_event` sets `event_state.ended`; every attendee page subscribes to `event_state` and switches to the recap; `release_band` is refused from then on | [Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Attendee-App](../5-apps/Attendee-App.md), [SpacetimeDB](../2-data/SpacetimeDB.md) |
 | Social.md: 6a. The night back | Below the space-time view the recap page shows the booths they visited, the people they hung out with and those people's socials when they allow it, their photos with tap to share, and their graph | The social step of `memory_tick` wrote the visits and, with the encounter rule (TBD -- LEO), the encounters; the recap reads views keyed on the caller | [Social](../6-features/Social.md) |
 | Elastic.md: 7. Ordered by meaning | On the recap, the people and booths closest to what the judge was into come first; there is no search box | `GET /recap/order` in `bandit-api` takes the caller's candidates from SpacetimeDB views and orders them with semantic queries on `bandit-people` and `bandit-booths` | [Elastic](../7-integrations/Elastic.md) |
 | Merch.md: 8. Merch | At the bottom of the recap page the attendee sees their own photo on a t-shirt, mug or poster, some of them from a sponsor booth they spent time at, picks one and buys it with one tap | `my_merch_suggestions` ranks the hand-made templates by the caller's booth minutes, each with one of their confirmed photos; the app places the photo in the template's photo area; `buy_merch` checks the wallet, writes the order and holds its amount. Payments-Nessie.md: a `merch_purchase` job records the purchase on the Nessie sandbox, and the wallet shows the new balance | [Merch](../6-features/Merch.md) |
@@ -59,7 +60,7 @@ Each row is the happy path. The doc in the last column owns the detail.
 
 Simulator.md: a crowd of up to 80 simulated bands, each with a simulated owner who is `findable`, moves between the zones inside the module for the whole demo, so the people graph and the recaps look like a real event, and the demo bands (90 to 99) show on the map next to the real ones.
 
-Elastic.md: Kibana, Elastic's web interface, closes the after-event steps. The team opens the `bandit-organize` Workflows run that loaded the event's real exhibitors, one merge with the agent's reason, and the Event story and Interest map dashboards, while the Ops dashboard stays on the live venue.
+Elastic.md: Kibana, Elastic's web interface, closes the after-event steps. The team opens the `bandit-organize` Workflows run that loaded the event's real exhibitors, one merge with the agent's reason, and the scrape pipeline and sponsors and prizes dashboards, while the Ops dashboard stays on the live venue.
 
 ### Sequence diagrams in other files
 
@@ -72,7 +73,7 @@ Each row names a diagram that already exists and the section it sits in.
 | BrightData.md: 1a. Profile claim | [BrightData](../7-integrations/BrightData.md), "The profile claim, for band owners" | how a band owner claims a scraped profile with one tap |
 | 3. SOS and 4. Fall and medic | [Safety](../6-features/Safety.md), "SOS and fall" | from the flag on the band and the light circle to the medic standing next to the person |
 | Medical-ID.md: 4a. Medical card | [Medical-ID](../6-features/Medical-ID.md), "The medic tap flow" | from the medic's phone touching the band to the card on screen |
-| 6. Event ended | [Attendee-App](../5-apps/Attendee-App.md), "After the event" | how the organizer's press turns every open page into the recap, and how the attendee opens it again later |
+| 6. Event ended | [Attendee-App](../5-apps/Attendee-App.md), "After the event" | how the "Event ended" press by a staff member with `ops` turns every open page into the recap, and how the attendee opens it again later |
 | Elastic.md: 7. Ordered by meaning | [Elastic](../7-integrations/Elastic.md), "Part three: ordering the recap's suggestions" | who talks to whom when the recap page opens, and where the list comes from |
 | Merch.md: 8. Merch | [Merch](../6-features/Merch.md), "From photo to order" | from a suggested photo on a template to a paid order |
 | Hyphenate.md: 9. The claims | [Hyphenate](../7-integrations/Hyphenate.md), "The live-learning demo" | from the fall to the second claim settling under the rule the judge's approval created |
@@ -90,7 +91,7 @@ Each step's failures belong to the doc that owns it. These are the ones that wou
 | After the event the judge's device is not signed in | No recap on that device | They open their tap link, sign in with the same email and get the same identity ([Attendee-App](../5-apps/Attendee-App.md)). |
 | Simulator.md: the radio misbehaves in front of the judges | The real bands stop moving the map | The `bandit-claims` tool replays a recorded rehearsal log on the demo ids 91 to 99, as its own run and never during the claims demo ([Simulator](../3-services/Simulator.md)). |
 | Elastic.md: Kibana is slow at the close | Nothing to show on the Elastic side | The dashboards are saved with the project and show the saved import run ([Elastic](../7-integrations/Elastic.md)). |
-| Hyphenate.md: the judge's approval cannot be made live | The first claim has no approver and no rule is learned | The organizer loads the fallback rule v1, and the second claim and the refusal run unchanged ([Hyphenate](../7-integrations/Hyphenate.md)). |
+| Hyphenate.md: the judge's approval cannot be made live | The first claim has no approver and no rule is learned | A staff member with `ops` loads the fallback rule v1, and the second claim and the refusal run unchanged ([Hyphenate](../7-integrations/Hyphenate.md)). |
 
 ## Dependencies
 
@@ -109,9 +110,9 @@ Each step's failures belong to the doc that owns it. These are the ones that wou
 | The flows show happy paths only | each step has one path the team rehearses; failures stay in the owning docs, except the few above that would stop the demo |
 | The medic is assigned by ops with one tap on the entry zone | medics do not wear bands, so ops always names the zone they come from |
 | Guidance always pairs the route colour with vibration on the full bands | the ring cannot point, so colour plus vibration is how a band moves its wearer along the dispersion route |
-| The night comes back when the organizer presses "Event ended": every open page turns into the recap live, and the tap link reopens it later for the signed-in owner | one press by the host ends the night for everyone, with no email; the band's own URL is the way back |
+| The night comes back when a staff member with `ops` presses "Event ended": every open page turns into the recap live, and the tap link reopens it later for the signed-in owner | one press by the host ends the night for everyone, with no email; the band's own URL is the way back |
 | Simulator.md: the simulated crowd runs for the whole demo | it lives in the module and sends no band reports, so it costs the dashboard nothing, and its findable owners give the people graph and the recaps a real event's size |
 | Social.md: the people graph is shown growing on the big screen during the event | a link is written in the same transaction as its visit or encounter, so the audience watches the graph grow as people move |
 | BrightData.md: the import runs before the demo, never during it | no step depends on a live scrape |
-| Hyphenate.md: the claim starts with no rule, a judge approves it live, and a second claim settles under the rule that approval created | the judges watch the system learn from them; the scorecard, the insurer's payment with its reconciliation difference and the refusal after reserve come from the accuracy run, so nobody types an adjuster's entries in front of the judges. If the approval cannot be made live, the organizer loads the fallback rule v1 |
+| Hyphenate.md: the claim starts with no rule, a judge approves it live, and a second claim settles under the rule that approval created | the judges watch the system learn from them; the scorecard, the insurer's payment with its reconciliation difference and the refusal after reserve come from the accuracy run, so nobody types an adjuster's entries in front of the judges. If the approval cannot be made live, a staff member with `ops` loads the fallback rule v1 |
 | Elastic.md: Kibana is opened only after the after-event steps | the live screen is the Ops dashboard; Kibana shows only what Elastic holds |

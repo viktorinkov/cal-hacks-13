@@ -38,7 +38,7 @@ Non-responsibilities:
 | View `my_medical_card` | out | the attendee | own `medical_card` and `medical_document` status | subscription |
 | View `medic_medical_card` | out | role `medic` | the card for which a granted log row exists for the caller and the incident is not resolved | subscription |
 | `medical_card` read by `open_claim` | out | `band1t` module (Hyphenate.md) | card status, emergency contact present, conditions text, logged with `via = claim` | module-internal |
-| Access log | out | Ops dashboard (role `ops`, `organizer`) | `medical_access_log` rows | subscription |
+| Access log | out | Ops dashboard (role `ops`) | `medical_access_log` rows | subscription |
 
 ## Design
 

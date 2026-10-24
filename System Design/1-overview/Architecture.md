@@ -57,7 +57,7 @@ Who uses BandIt, and which outside services it relies on.
 ```mermaid
 flowchart LR
   Attendee["Attendee"]
-  Staff["Staff: organizer, ops, medics, approvers"]
+  Staff["Staff: ops, medics, approvers"]
   BandIt["BandIt: bands, gateway, SpacetimeDB module, Rust services, web apps"]
   Auth["SpacetimeAuth"]
   Elastic["Elastic Serverless"]
@@ -191,7 +191,7 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Data | Source of truth | Written by | Copies |
 |---|---|---|---|
 | Venue layout: zones, exits, stations, booths, schedule | `band1t` module | the setup reducers from the seed (`bandit-ingest` seed mode), ops; BrightData.md: `import_event` | none; Elastic.md: `bandit-booths` |
-| Bands, attendees, consent, staff roles | `band1t` module | attendee app, ops, the organizer | none |
+| Bands, attendees, consent, staff roles | `band1t` module | attendee app, ops, the owner (role grants) | none |
 | Live band reports, zone state, directives, commands | `band1t` module | `bandit-bridge`, `venue_tick`; Simulator.md: `report_sim_band` from the `bandit-claims` tool and `bandit-api` | none |
 | Incidents, snapshots, witnesses, notes | `band1t` module | `ingest_band_reports`, ops, medics | none |
 | Presence history | `band1t` module (`presence_sample`) | `memory_tick` | none; Social.md: derives `visit` from it and writes `social_encounter` by the encounter rule (TBD -- LEO); Elastic.md copies both, for findable attendees only, to `bandit-memories` |
@@ -227,7 +227,7 @@ Elastic.md: BandIt uses a second database because it has a second, different pro
 | Ordering by meaning | `semantic_text` fields on `.jina-embeddings-v5-text-small`: `GET /recap/order` puts the people an attendee met and the booths they visited in order of how close they are to what the attendee was into ([Elastic](../7-integrations/Elastic.md)) | two people who visited different booths can still care about the same things; SpacetimeDB filters by exact values and has no relevance ranking or vectors |
 | An agent that resolves messy records | the Agent Builder agent `bandit-organizer` on the Elastic Managed LLM, run by the Workflow `bandit-organize` with a JSON schema per section, searching candidates and giving a reason per merge | one company spelled three ways becomes one organisation before anything reaches the live database |
 | Bulk joins where raw data lands | ES\|QL `LOOKUP JOIN` steps match booth numbers, domains and stage names across thousands of raw records | the messy raw records never enter the live database; only the checked bundle does |
-| Analysis you can see | Kibana, Elastic's web interface: the Workflows execution view, Agent Builder, and the Import run, Event story and Interest map dashboards; Hyphenate.md: the Claims evidence dashboard | the team shows how the data was organized and what the crowd was into, without touching the live screens |
+| Analysis you can see | Kibana, Elastic's web interface: the Workflows execution view, Agent Builder, and the dashboards "BandIt · Cal Hacks 13.0 · scrape pipeline" and "BandIt · Cal Hacks 13.0 · sponsors and prizes"; Hyphenate.md: the "BandIt claims evidence" dashboard | the team shows how the data was organized and what the scrape found about the event, without touching the live screens |
 
 The diagram shows where the two meet and which way data flows at each meeting point.
 
@@ -332,7 +332,7 @@ flowchart TB
 | Gateway id | 200 | firmware | radio |
 | NFC token | `BANDIT-01` to `BANDIT-09` in the URL `https://<host>/t/BANDIT-0n`, where `<host>` is `bandit-api`'s public host | written to each sticker | attendee app landing, medic view |
 | Attendee id | SpacetimeDB identity derived from the SpacetimeAuth ID token (issuer and subject), the same on every device | SpacetimeDB | every per-person table and view |
-| Service identity | one SpacetimeDB identity per Rust process, with a `staff_role` row | the organizer at setup | role checks in reducers |
+| Service identity | one SpacetimeDB identity per Rust process, with a `staff_role` row | the owner at setup | role checks in reducers |
 | Row ids | auto-increment ids assigned by the module | SpacetimeDB | every other table, Elastic document ids, job payloads |
 
 ### Demo flows
@@ -341,14 +341,14 @@ The demo runs as a fixed sequence of steps from joining to the insurance claim, 
 
 ### Access model in one paragraph
 
-Every person signs in with the SpacetimeAuth magic link, and every privileged reducer checks the caller's `staff_role`. People roles are `owner` (the publishing identity), `organizer` (the event host), `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager` and `adjuster`. Each Rust service has its own identity with a service role (`bridge`, `simulator`, `vision`, `ingest`, `indexer`, `worker`, `api`). Tables with personal data are private. Clients read them only through views keyed on who is asking, so rules such as "a medic sees a card only during an open incident" are enforced by the database, not by the app ([SpacetimeDB](../2-data/SpacetimeDB.md)).
+Every person signs in with the SpacetimeAuth magic link, and every privileged reducer checks the caller's `staff_role`. People roles are `owner` (the publishing identity, the only one that grants roles), `ops` (also the event host), `medic`, `photographer`, `floor_manager`, `risk_manager` and `adjuster`. Each Rust service has its own identity with a service role (`bridge`, `simulator`, `vision`, `ingest`, `indexer`, `worker`, `api`). Tables with personal data are private. Clients read them only through views keyed on who is asking, so rules such as "a medic sees a card only during an open incident" are enforced by the database, not by the app ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 
 ### Prize tracks and where they live
 
 | Track | What BandIt shows | Main docs |
 |---|---|---|
 | SpacetimeDB | the whole live world in one module on Maincloud: reducers as transactions (an SOS incident, its snapshot, its light circle and its escalation in one commit), subscriptions pushing every change to six kinds of clients, scheduled reducers computing zone state and history, identity from the SpacetimeAuth sign-in and per-caller views enforcing access, typed bindings for Rust and TypeScript | [SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md), [Gateway-Bridge](../3-services/Gateway-Bridge.md) |
-| Elastic.md: best use of Elastic Agent Builder on Serverless | an Agent Builder agent (`bandit-organizer`) run by a Workflow with a schema per section, which resolves messy scraped records into one checked bundle before it loads into SpacetimeDB; each attendee's recap suggestions ordered by meaning; Hyphenate.md: similar past claims ranked for each claim; Kibana views of every import run and dashboards of where people spent time and what the crowd was into | [Elastic](../7-integrations/Elastic.md) |
+| Elastic.md: best use of Elastic Agent Builder on Serverless | an Agent Builder agent (`bandit-organizer`) run by a Workflow with a schema per section, which resolves messy scraped records into one checked bundle before it loads into SpacetimeDB; each attendee's recap suggestions ordered by meaning; Hyphenate.md: similar past claims ranked for each claim; Kibana dashboards of every import run and of the event's sponsors and prizes. Where people spent time and what they were into shows in each attendee's recap, ordered by meaning | [Elastic](../7-integrations/Elastic.md) |
 | Hyphenate.md: autonomous systems for finance | a claims agent that learns live: a band's fall becomes a claim; Claude reads the urgent-care bill and code pays it against a fee schedule; Claude explains causation; a judge approves the first claim as risk manager, which teaches a rule, and the next similar claim settles in seconds under it; fakes are refused by code with every check listed. Behind it: evidence packs, coverage in code, an authority matrix, fail-closed approvals, a ledger, the notice of loss in ACORD 3 layout and a scorecard from planted claims | [Hyphenate](../7-integrations/Hyphenate.md) |
 | Payments-Nessie.md: Capital One, best use of Nessie | a $200 Nessie sandbox wallet per attendee, merch bought from it with one tap after the event, and claim payouts into it | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | Merch.md: Visa, reimagining shopping | merch made from your own photo at the booths you loved, bought from your recap after the event | [Merch](../6-features/Merch.md) |

@@ -33,7 +33,7 @@ Every interface is a reducer call in or a subscription out, over the SpacetimeDB
 | In | `bandit-ingest` | venue layout, booths, schedule, bands, calibration from the seed | `upsert_venue`, `upsert_zone`, `upsert_zone_link`, `upsert_exit`, `upsert_station`, `upsert_booth`, `upsert_schedule_slot`, `register_band`, `set_calibration`; Merch.md: `load_merch_templates`, after the import; BrightData.md: `import_event` (one event bundle per transaction) | Rust SDK |
 | In | SpacetimeAuth | the ID token of every person's sign-in (attendees and staff, magic-link email only); SpacetimeDB derives the identity from its issuer and subject | every connection of the two web apps | OpenID Connect, checked by SpacetimeDB |
 | In | Ops dashboard | modes, exits, forced states, calibration, incident handling, role grants, the end of the event, API session token | the Ops and Incident reducers below, `end_event`, `reopen_event`, `open_api_session` | TypeScript SDK |
-| Out | Ops dashboard | everything staff may see; the host portal for `organizer` | public tables plus the `staff_*`, `host_attendees` and `my_roles` views | subscription |
+| Out | Ops dashboard | everything staff may see; the host portal for `ops` | public tables plus the `staff_*`, `host_attendees` and `my_roles` views | subscription |
 | In | Attendee app | claim, release, profile, consent, API session token | `claim_band`, `release_band`, `update_profile`, `set_consent`, `open_api_session`; BrightData.md: `claim_person` | TypeScript SDK |
 | Out | Attendee app | own band, reports, presence and incidents; venue map and the end of the event; busy zones; evacuation banner with exit name and colour | `my_*` views, `venue`, `event_state`, `zone`, `exit`, `booth`, `schedule_slot`, `zone_state`, `venue_mode` | subscription |
 | In | `bandit-workers` | lease and finish jobs, heartbeat | `claim_job`, `extend_job_lease`, `complete_job`, `fail_job`, `heartbeat` | Rust SDK |
@@ -135,7 +135,8 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | `name` | text | display name |
 | `starts_at`, `ends_at` | timestamp | the planned event window |
 | `pit_zone_id` | zone id, optional | the demo pit zone, so the dashboard opens on it |
-| `origin_lat`, `origin_lon`, `plan_rotation_deg` | numbers | where the floor plan's origin sits on the earth and how the plan is rotated from true north; recorded on site at setup and written in the seed. BrightData.md: `import_event` loads them from the seed with the event section. Elastic.md: the indexer's function that turns plan metres into latitude and longitude for the Kibana map reads them |
+| `origin_lat`, `origin_lon`, `plan_rotation_deg` | numbers | where the floor plan's origin sits on the earth and how the plan is rotated from true north; recorded on site at setup and written in the seed. BrightData.md: `import_event` loads them from the seed with the event section. Elastic.md: the indexer's function that turns plan metres into latitude and longitude for the copy's documents reads them |
+| BrightData.md: `venue_name`, `address`, `latitude`, `longitude`, `description`, `facts`, `source_url`, `fetched_at` | text, text, numbers, text, list of label and value, text, timestamp | the venue's place from its Google Maps record (`latitude` and `longitude` are the place's pin, not the plan origin), and the event's facts from the event pages plus the place's rating, phone number and opening hours; written by `import_event` |
 | `notes` | text | free text for ops |
 
 `event_state`: a single row, id 0, that says whether the event has ended. Written by `end_event` and `reopen_event` (role `ops`). Public. Not copied.
@@ -143,7 +144,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | always 0, primary key | singleton |
-| `ended` | bool | set by `end_event` when the organizer presses "Event ended"; every open attendee page turns into the recap page, and `release_band` is refused while it is set. `reopen_event` clears it |
+| `ended` | bool | set by `end_event` when a staff member with `ops` presses "Event ended"; every open attendee page turns into the recap page, and `release_band` is refused while it is set. `reopen_event` clears it |
 | `ended_at` | timestamp, optional | when the event ended; empty while it is live |
 | `ended_by` | identity | who last ended or reopened it |
 
@@ -242,7 +243,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | Field | Type | Meaning |
 |---|---|---|
 | `attendee_id` | identity, primary key | the person |
-| `display_name` | text | shown to staff only inside an open incident, through `staff_incidents`, and to the organizer in the host portal's attendee list, through `host_attendees`. Social.md: also shown to their encounter counterparts (in `my_encounters` and `my_graph`) and their shared-visit counterparts (in `my_shared_visits`) while they are `findable` |
+| `display_name` | text | shown to staff only inside an open incident, through `staff_incidents`, and to `ops` in the host portal's attendee list, through `host_attendees`. Social.md: also shown to their encounter counterparts (in `my_encounters` and `my_graph`) and their shared-visit counterparts (in `my_shared_visits`) while they are `findable` |
 | BrightData.md: `person_id`, `organization_id`, `photo_url` | id, id, text; empty until a profile is claimed | the claimed profile, its organisation and its headshot, copied by `claim_person` |
 | `created_at`, `updated_at` | timestamp | audit |
 
@@ -270,7 +271,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | `claim_candidate` | identity, optional | who started a claim that waits for the press |
 | `claim_pending_until` | timestamp, optional | end of the 8 s claim window |
 
-`staff_role`: one role grant to one identity. Written by `grant_role` and `revoke_role` (role `organizer`); `init` seeds the publisher as `owner`. Private; read through `my_roles` (own rows) and `staff_roles` (organizer and ops). Not copied.
+`staff_role`: one role grant to one identity. Written by `grant_role` and `revoke_role`, which only the module owner may call. The owner is not a grant: `init` records the publishing identity in `owner`, a private one-row table. Private; read through `my_roles` (own rows) and `staff_roles` (ops). Not copied.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -321,7 +322,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | `sos_count`, `circle_count` | number | live bands in the zone with an SOS or fall flag, and bands showing state 4 |
 | `updated_at` | timestamp | tick time |
 
-`venue_mode`: one row per venue. Written by `set_venue_mode` (role `ops`, `organizer`); `venue_tick` refreshes `tick_at`. Public. Not copied.
+`venue_mode`: one row per venue. Written by `set_venue_mode` (role `ops`); `venue_tick` refreshes `tick_at`. Public. Not copied.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -330,7 +331,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | `tick_at` | timestamp | heartbeat of `venue_tick`; clients use it as the server clock to judge stale rows and a dead tick |
 | `set_by`, `set_at`, `note` | identity, timestamp, text | audit and the reason ops typed |
 
-`fleet_config`: one row of live band calibration. Written by `set_fleet_config` (role `ops`, `organizer`); `init` seeds defaults from `bandit-protocol`. Public. Not copied.
+`fleet_config`: one row of live band calibration. Written by `set_fleet_config` (role `ops`); `init` seeds defaults from `bandit-protocol`. Public. Not copied.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -343,7 +344,7 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 
 #### Control group
 
-`band_directive`: sticky desired state per target. Written by `venue_tick` (exit colours, evacuation, medic approach), `claim_band` (IDENT), `force_band_state` and `clear_all` (manual). Private; read through `staff_directives` (ops, organizer, bridge, simulator). Not copied. The bridge turns rows into `state`, `exit` and `override` commands ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). Rules:
+`band_directive`: sticky desired state per target. Written by `venue_tick` (exit colours, evacuation, medic approach), `claim_band` (IDENT), `force_band_state` and `clear_all` (manual). Private; read through `staff_directives` (ops, bridge, simulator). Not copied. The bridge turns rows into `state`, `exit` and `override` commands ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). Rules:
 
 - One row per target. A band id means that band. A station id means the station marker, for which only `exit_colour` and a forced mode (0 breathe, 1 chase, 9 off) mean anything. Target 0 means all bands, and a band row overrides it field by field.
 - `exit_colour` is never written on target 0, because an `exit` broadcast recolours every station marker. `venue_tick` writes exit colours per band, from each band's zone.
@@ -702,7 +703,7 @@ Feature reducers, views and timers are defined in their own doc and follow the s
 |---|---|---|
 | [Medical-ID](../6-features/Medical-ID.md) | `submit_medical_document` (role `api`), `apply_medical_extract` (role `worker`), `confirm_medical_card`, `save_medical_card`, `request_medical_card` (role `medic`), `medic_open_incident` (role `medic`) | views `my_medical_card`, `medic_medical_card` |
 | [Payments-Nessie](../7-integrations/Payments-Nessie.md) | `record_wallet` (role `worker`); the `wallet_open` call in `update_profile`; the job kind `wallet_open` | views `my_wallet` (the spendable balance), `my_wallet_entries` |
-| [Hyphenate](../7-integrations/Hyphenate.md) | `open_claim`, `add_injured_party` (roles `medic` and `ops`), `submit_medical_record` (roles `medic`, `ops`, `floor_manager`, `risk_manager`, from the incident card after the bill's `POST /api/blobs` upload), `apply_medical_record` (role `worker`), `enter_claim_lines`, `submit_claim_review` (role `worker`), `approve_claim`, `refuse_claim`, `record_insurer_payment`, `retry_claim_payout`, `request_recovery_letter`, `attach_claim_letters`, `retire_settlement_rule`, `load_fallback_rule` (role `organizer`), `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule`; the job kinds `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter`; Payments-Nessie.md: `record_claim_payout` (role `worker`) and the job kind `claim_payout`; Elastic.md: `submit_claim_checks` (role `worker`) and the job kind `claim_verify`; Simulator.md: `plant_medic_visit` (role `simulator`, defined in [Simulator](../3-services/Simulator.md)) | defined there |
+| [Hyphenate](../7-integrations/Hyphenate.md) | `open_claim`, `add_injured_party` (roles `medic` and `ops`), `submit_medical_record` (roles `medic`, `ops`, `floor_manager`, `risk_manager`, from the incident card after the bill's `POST /api/blobs` upload), `apply_medical_record` (role `worker`), `enter_claim_lines`, `submit_claim_review` (role `worker`), `approve_claim`, `refuse_claim`, `record_insurer_payment`, `retry_claim_payout`, `request_recovery_letter`, `attach_claim_letters`, `retire_settlement_rule`, `load_fallback_rule` (role `ops`), `upsert_insurance_policy`, `upsert_coverage_rule`, `set_authority_limit`, `upsert_fee_schedule`; the job kinds `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter`; Payments-Nessie.md: `record_claim_payout` (role `worker`) and the job kind `claim_payout`; Elastic.md: `submit_claim_checks` (role `worker`) and the job kind `claim_verify`; Simulator.md: `plant_medic_visit` (role `simulator`, defined in [Simulator](../3-services/Simulator.md)) | defined there |
 | [Social](../6-features/Social.md) | `set_social_handle`, `remove_social_handle`, `register_photo` (role `photographer`), `hide_photo`, `respond_photo_tag`, `create_share_link`, `revoke_share_link`; Simulator.md: `start_crowd` and `stop_crowd` (roles `ops` and `simulator`) and the timer `crowd_tick`, defined in [Simulator](../3-services/Simulator.md); plus the social step in `memory_tick`, which writes `visit`, `social_encounter` (both owners `findable` and 3 minutes together in one zone, starting value; the encounter rule is Leo's to replace (TBD -- LEO)), `shared_visit` (two `findable` attendees' visits to one zone overlapping for at least 300 s, `SHARED_VISIT_MIN_SECONDS`, starting value; not a link), and `people_link`, the only writer of `people_link` (kinds `met` with minutes, written with the encounter, `visited` with minutes, `works_at`, `exhibits`; only `findable` attendees get links) | views `my_visits`, `my_encounters`, `my_shared_visits` (per caller: zone, booths, start, overlap minutes, the other person's card), `my_photos`, `my_share_links`, `my_graph` (per caller: own neighbourhood), `event_graph` (anonymous: node ids only, no names, zones or times); `social_attendees`, `social_visits`, `social_encounters` (roles `indexer` and `api`: findable attendees only); `social_shared_visits` (roles `indexer`, `worker` and `api`) |
 | [Merch](../6-features/Merch.md) | `load_merch_templates` (roles `ingest` and `ops`, after the import), `buy_merch` (one tap, paid from the wallet), `settle_merch_order` (role `worker`); the job kind `merch_purchase` | views `my_merch_suggestions` (per caller: the top 3 templates, each with the caller's best confirmed photo, ranked by minutes at the template's booths), `my_merch_orders` |
 | [BrightData](../7-integrations/BrightData.md) | `import_event` (roles `ingest` and `ops`: one event bundle of halls, organisations, people, booths and schedule in one transaction; it refines existing station zones matched by name and never creates or deletes a zone, so core stays independent); `claim_person` (the signed-in attendee; refused unless the caller owns a band) | view `claimed_people` (anonymous: claimed person ids only) |
@@ -718,15 +719,15 @@ Every reducer runs as one transaction. "Caller" is the role the reducer requires
 
 | Reducer | Caller | What it does | Writes |
 |---|---|---|---|
-| `upsert_venue` | `ingest`, `ops`, `organizer` | creates or updates the venue row, and its `venue_mode` row if missing | `venue`, `venue_mode` |
+| `upsert_venue` | `ingest`, `ops` | creates or updates the venue row, and its `venue_mode` row if missing | `venue`, `venue_mode` |
 | `upsert_zone` | same | creates or updates a zone by name, and its `zone_state` row with `risk` `normal`, so no zone is ever without state | `zone`, `zone_state` |
 | `upsert_zone_link` | same | creates or updates the link between two zones | `zone_link` |
 | `upsert_exit` | same | creates or updates an exit; rejects a colour index outside 1 to 6 | `exit` |
 | `upsert_station` | same | creates or updates a station by radio id and points it at its zone and exit | `station` |
 | `upsert_booth` | same | creates or updates one booth by hand; a position placed by a person is `manual` and a re-import never overrides it | `booth` |
 | `upsert_schedule_slot` | same | creates or updates a timed item | `schedule_slot` |
-| `register_band` | `ingest`, `ops`, `organizer` | creates or updates a band by radio id with its NFC token and flags; never clears an owner, so re-running the seed never unclaims a band | `band` |
-| `set_calibration` | `ops`, `organizer` | inserts or replaces a calibration point by label | `calibration_point` |
+| `register_band` | `ingest`, `ops` | creates or updates a band by radio id with its NFC token and flags; never clears an owner, so re-running the seed never unclaims a band | `band` |
+| `set_calibration` | `ops` | inserts or replaces a calibration point by label | `calibration_point` |
 
 #### Devices
 
@@ -799,38 +800,38 @@ Why these cadences: 500 ms is twice the bridge batch, so every tick sees fresh r
 
 #### End of the event
 
-The organizer ends the event from the host portal ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). There is no email: the recap opens live on every open attendee page, and the tap link opens it again later for the band's signed-in owner ([Attendee-App](../5-apps/Attendee-App.md)).
+A staff member with `ops` ends the event from the host portal ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). There is no email: the recap opens live on every open attendee page, and the tap link opens it again later for the band's signed-in owner ([Attendee-App](../5-apps/Attendee-App.md)).
 
 | Reducer | Caller | What it does | Writes |
 |---|---|---|---|
-| `end_event` | `ops`, `organizer` | sets `event_state.ended`, `ended_at` to now and `ended_by` to the caller; calling it again only moves the time. Every open attendee page, subscribed to `event_state`, turns into the recap page; from then on `release_band` is refused, so every band keeps its owner for the recap | `event_state` |
-| `reopen_event` | `ops`, `organizer` | clears `event_state.ended` and `ended_at`, back to the live event, for running the demo again; open pages leave the recap | `event_state` |
+| `end_event` | `ops` | sets `event_state.ended`, `ended_at` to now and `ended_by` to the caller; calling it again only moves the time. Every open attendee page, subscribed to `event_state`, turns into the recap page; from then on `release_band` is refused, so every band keeps its owner for the recap | `event_state` |
+| `reopen_event` | `ops` | clears `event_state.ended` and `ended_at`, back to the live event, for running the demo again; open pages leave the recap | `event_state` |
 
 #### Ops
 
 | Reducer | Caller | What it does | Writes |
 |---|---|---|---|
-| `set_venue_mode` | `ops`, `organizer` | sets `venue_mode.mode`; with a zone list, sets `zone.evacuating` on those zones and leaves `mode` `normal`. `venue_tick` turns it into directives and an `evacuation` incident | `venue_mode`, `zone` |
-| `set_exit_status` | `ops`, `organizer` | marks an exit `open` or `blocked`; `venue_tick` reassigns on its next pass | `exit` |
-| `set_zone_exit` | `ops`, `organizer` | pins or clears a zone's exit assignment | `zone` |
-| `set_zone_risk` | `ops`, `organizer` | pins or clears a zone's risk level; `venue_tick` marks `density_source` `manual` | `zone` |
-| `release_band` | `ops`, `organizer`, and the attendee who owns the band | clears `band.owner`, `claimed_at` and any pending claim, so the band can be claimed again by press; works after a confirm tap in the app or on the dashboard, until `event_state.ended` is set; the old `attendee` row stays | `band` |
-| `force_band_state` | `ops`, `organizer` | upserts a `band_directive` for a target (0 for all) with a forced state and a hold, reason `manual` or `plan_b`; rejects state 9 for a band | `band_directive` |
-| `send_band_command` | `ops`, `organizer` | writes a one-shot `buzz` or `clear` for a target | `band_command` |
-| `clear_all` | `ops`, `organizer` | deletes every `band_directive`, clears `zone.evacuating` and `zone.forced_*`, sets `venue_mode.mode` `normal`, and writes one `clear` for target 0. That `clear` also releases every SOS and fall latch and every light circle, so this is the demo's reset button, not a routine control | `band_directive`, `zone`, `venue_mode`, `band_command` |
-| `set_fleet_config` | `ops`, `organizer` | updates calibration values and bumps `version` | `fleet_config` |
-| `open_incident` | `ops`, `organizer` | opens a `crowd_risk`, `evacuation` or `property` incident by hand, with a snapshot and a timer. `sos` and `fall` come only from band reports, Medical-ID.md's `medic_open_incident` and Vision.md's `report_ground_alert` (TBD -- LEO) | `incident`, `incident_snapshot`, `escalation_timer` |
-| `grant_role` | `organizer` | grants a role to an identity with a label; the organizer enters the short identity code shown on the staff member's screen | `staff_role` |
-| `revoke_role` | `organizer` | removes a grant | `staff_role` |
+| `set_venue_mode` | `ops` | sets `venue_mode.mode`; with a zone list, sets `zone.evacuating` on those zones and leaves `mode` `normal`. `venue_tick` turns it into directives and an `evacuation` incident | `venue_mode`, `zone` |
+| `set_exit_status` | `ops` | marks an exit `open` or `blocked`; `venue_tick` reassigns on its next pass | `exit` |
+| `set_zone_exit` | `ops` | pins or clears a zone's exit assignment | `zone` |
+| `set_zone_risk` | `ops` | pins or clears a zone's risk level; `venue_tick` marks `density_source` `manual` | `zone` |
+| `release_band` | `ops`, and the attendee who owns the band | clears `band.owner`, `claimed_at` and any pending claim, so the band can be claimed again by press; works after a confirm tap in the app or on the dashboard, until `event_state.ended` is set; the old `attendee` row stays | `band` |
+| `force_band_state` | `ops` | upserts a `band_directive` for a target (0 for all) with a forced state and a hold, reason `manual` or `plan_b`; rejects state 9 for a band | `band_directive` |
+| `send_band_command` | `ops` | writes a one-shot `buzz` or `clear` for a target | `band_command` |
+| `clear_all` | `ops` | deletes every `band_directive`, clears `zone.evacuating` and `zone.forced_*`, sets `venue_mode.mode` `normal`, and writes one `clear` for target 0. That `clear` also releases every SOS and fall latch and every light circle, so this is the demo's reset button, not a routine control | `band_directive`, `zone`, `venue_mode`, `band_command` |
+| `set_fleet_config` | `ops` | updates calibration values and bumps `version` | `fleet_config` |
+| `open_incident` | `ops` | opens a `crowd_risk`, `evacuation` or `property` incident by hand, with a snapshot and a timer. `sos` and `fall` come only from band reports, Medical-ID.md's `medic_open_incident` and Vision.md's `report_ground_alert` (TBD -- LEO) | `incident`, `incident_snapshot`, `escalation_timer` |
+| `grant_role` | `owner` only | grants a role to an identity with a label; refuses a role name that is not lowercase `snake_case`, and a grant the identity already holds changes nothing; the owner enters the short identity code shown on the staff member's screen | `staff_role` |
+| `revoke_role` | `owner` only | removes a grant | `staff_role` |
 
 #### Incidents
 
 | Reducer | Caller | What it does | Writes |
 |---|---|---|---|
-| `ack_incident` | `ops`, `medic`, `floor_manager`, `organizer` | `open` to `acknowledged`; deletes the incident's timer | `incident`, `escalation_timer` |
-| `assign_medic` | `ops`, `organizer` | sets `assigned_medic` and `medic_entry_zone_id` (both picked by ops), status `responding`; acknowledges if still `open`; deletes the timer. `venue_tick` then writes the medic-approach directives | `incident`, `escalation_timer` |
+| `ack_incident` | `ops`, `medic`, `floor_manager` | `open` to `acknowledged`; deletes the incident's timer | `incident`, `escalation_timer` |
+| `assign_medic` | `ops` | sets `assigned_medic` and `medic_entry_zone_id` (both picked by ops), status `responding`; acknowledges if still `open`; deletes the timer. `venue_tick` then writes the medic-approach directives | `incident`, `escalation_timer` |
 | `add_incident_note` | staff roles | appends a note or a cost | `incident_note` |
-| `resolve_incident` | `ops`, `medic`, `organizer` | status `resolved` with a resolution text; deletes any timer and the `band_directive` rows with this `incident_id`; for `sos` and `fall` with a subject band, writes a `clear` for that band so its latch releases. Hyphenate.md: ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note | `incident`, `escalation_timer`, `band_directive`, `band_command` |
+| `resolve_incident` | `ops`, `medic` | status `resolved` with a resolution text; deletes any timer and the `band_directive` rows with this `incident_id`; for `sos` and `fall` with a subject band, writes a `clear` for that band so its latch releases. Hyphenate.md: ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note | `incident`, `escalation_timer`, `band_directive`, `band_command` |
 
 #### Jobs
 
@@ -851,19 +852,18 @@ The organizer ends the event from the host portal ([Ops-Dashboard](../5-apps/Ops
 
 #### Lifecycle
 
-`init` runs once, when the module is first published: it records the publishing identity as `owner` in `staff_role`, inserts the three interval timer rows, and inserts the `fleet_config` singleton with defaults from `bandit-protocol`. Liveness comes from `band_report.heard_at` and `service_heartbeat.last_at`, so client connect and disconnect hooks are not used.
+`init` runs once, when the module is first published: it records the publishing identity in the `owner` table, inserts the three interval timer rows, and inserts the `fleet_config` singleton with defaults from `bandit-protocol`. Liveness comes from `band_report.heard_at` and `service_heartbeat.last_at`, so client connect and disconnect hooks are not used.
 
 ### Roles and access control
 
-Roles are rows in `staff_role`. People: `owner`, `organizer`, `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`, `adjuster`. Services: `bridge`, `simulator`, `vision`, `ingest`, `indexer`, `worker`, `api`. One identity may hold several roles. `owner` is the identity that published the module: it passes every role check and grants `organizer` once at setup. `organizer` is the event host: everything `ops` can, plus grant and revoke every role and the host portal. Every person signs in with SpacetimeAuth, and the organizer grants each staff role at setup by entering the short identity code shown on the staff member's screen ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)).
+Roles are rows in `staff_role`, except `owner`. People: `owner`, `ops`, `medic`, `photographer`, `floor_manager`, `risk_manager`, `adjuster`. Services: `bridge`, `simulator`, `vision`, `ingest`, `indexer`, `worker`, `api`. One identity may hold several roles. `owner` is the identity that published the module, kept in the one-row `owner` table: it passes every role check, and it alone may call `grant_role` and `revoke_role`. There is no separate host role: the event host is a staff member with `ops`, which also opens the host portal. Every person signs in with SpacetimeAuth, and the owner grants each staff role at setup by entering the short identity code shown on the staff member's screen ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)).
 
 | Role | May call | May read (beyond public tables) |
 |---|---|---|
-| `owner` | everything; in practice only the one `organizer` grant at setup | everything the staff views return |
-| `organizer` | everything `ops` may, plus `grant_role` and `revoke_role`; Hyphenate.md: its setup reducers | all `staff_*` views and `host_attendees` |
-| `ops` | setup, ops and incident reducers, `end_event`, `reopen_event`; BrightData.md: `import_event`; Simulator.md: `start_crowd`, `stop_crowd` | all `staff_*` views |
+| `owner` | everything; it alone may call `grant_role` and `revoke_role` | everything the staff views return |
+| `ops` | setup, ops and incident reducers, `end_event`, `reopen_event`; BrightData.md: `import_event`; Simulator.md: `start_crowd`, `stop_crowd`; Hyphenate.md: `load_fallback_rule` | all `staff_*` views and `host_attendees` |
 | `medic` | `ack_incident`, `add_incident_note`, `resolve_incident` | `staff_incidents`, `staff_incident_bands`, `staff_snapshots`, `staff_incident_notes`, `staff_band_reports`. Medical-ID.md: the medical card view |
-| `floor_manager`, `risk_manager` | `ack_incident`, `add_incident_note` | the same incident views and `staff_band_reports` |
+| `floor_manager`, `risk_manager` | `ack_incident`, `add_incident_note`; Hyphenate.md: `risk_manager` also calls its setup reducers | the same incident views and `staff_band_reports` |
 | Hyphenate.md, Social.md: `adjuster`, `photographer` | feature reducers only | feature views only; incident views for `adjuster` as Hyphenate.md defines |
 | `bridge`, `simulator` | `bridge`: `ingest_band_reports`, `ack_band_command`, `heartbeat`. Simulator.md: `simulator`: `report_sim_band`, `start_crowd`, `stop_crowd`, `ack_band_command`, `heartbeat`; Hyphenate.md: `plant_medic_visit` | `staff_directives`, `staff_commands`, `staff_bands`, `staff_band_reports`, `staff_sim_reports` |
 | `worker` | job reducers, feature apply reducers, `register_blob`, `heartbeat` | `worker_jobs` and the feature tables each job kind needs |
@@ -873,7 +873,7 @@ Roles are rows in `staff_role`. People: `owner`, `organizer`, `ops`, `medic`, `p
 | Vision.md (TBD -- LEO): `vision` | the Vision reducers; the job reducers for `photo_features`; `heartbeat`, `record_model_call` | `zone`, `camera`, and `incident` through `vision_incidents`; `worker_jobs(photo_features)` |
 | attendee (no role row) | attendee reducers, `release_band` for their own band, and feature reducers for attendees | `my_*` views |
 
-How the check works: the reducer reads the caller's identity from the reducer context and looks up `staff_role` through a b-tree index on `identity`. A missing or wrong role returns an error, which rolls back the transaction and reaches the caller's SDK as a failed call. Each Rust service prints its identity on first start, and the organizer grants its service role.
+How the check works: the reducer reads the caller's identity from the reducer context and looks up `staff_role` through a b-tree index on `identity`. A missing or wrong role returns an error, which rolls back the transaction and reaches the caller's SDK as a failed call. Each Rust service prints its identity on first start, and the owner grants its service role.
 
 ### Views
 
@@ -890,16 +890,16 @@ SpacetimeDB 2.x views are server-side, read-only functions. They may read privat
 | `my_jobs` | any | `job` rows the caller requested, without `payload` |
 | `my_blobs` | any | `blob_ref` rows the caller owns |
 | `my_roles` | any | the caller's `staff_role` rows, so the app knows whether to show the medic or photographer routes and the dashboard knows whether to show the host portal |
-| `staff_roles` | `organizer`, `ops` | all `staff_role` rows, for the roles panel |
-| `host_attendees` | `organizer` | one row per attendee: `display_name`, the band they own, and that band's status from `band_report` (alive or stale), for the host portal's attendee list |
+| `staff_roles` | `ops` | all `staff_role` rows, for the roles panel |
+| `host_attendees` | `ops` | one row per attendee: `display_name`, the band they own, and that band's status from `band_report` (alive or stale), for the host portal's attendee list |
 | `staff_bands` | people roles, `bridge`, `simulator` | `band` rows with `owner` and `claim_candidate` replaced by a `claimed` flag |
 | `staff_band_reports` | people roles, `bridge`, `simulator` | `band_report` rows for real bands |
-| `staff_sim_reports` | `ops`, `organizer`, `simulator` | `band_report` rows for simulated bands |
-| `staff_incidents`, `staff_snapshots`, `staff_incident_bands`, `staff_incident_notes` | `organizer`, `ops`, `medic`, `floor_manager`, `risk_manager`, `adjuster` | the incident tables; `staff_incidents` adds the subject's `display_name` while the incident is not resolved, so staff never need a view on `attendee` |
-| `staff_directives`, `staff_commands` | `organizer`, `ops`, `bridge`, `simulator` | `band_directive` and `band_command` |
+| `staff_sim_reports` | `ops`, `simulator` | `band_report` rows for simulated bands |
+| `staff_incidents`, `staff_snapshots`, `staff_incident_bands`, `staff_incident_notes` | `ops`, `medic`, `floor_manager`, `risk_manager`, `adjuster` | the incident tables; `staff_incidents` adds the subject's `display_name` while the incident is not resolved, so staff never need a view on `attendee` |
+| `staff_directives`, `staff_commands` | `ops`, `bridge`, `simulator` | `band_directive` and `band_command` |
 | `staff_blobs` | people roles, `api` | `blob_ref` rows with `access` `staff` or `shared` |
 | `worker_jobs` | `worker` | `job` rows `queued` or `leased`, with `kind` as the view argument, so each worker subscribes to the kinds it runs |
-| `staff_jobs` | `organizer`, `ops` | every `job` row as job id, kind, status, attempts, lease expiry (`lease_until`) and last error; never the payload, which can hold personal data. It feeds the Ops job monitor |
+| `staff_jobs` | `ops` | every `job` row as job id, kind, status, attempts, lease expiry (`lease_until`) and last error; never the payload, which can hold personal data. It feeds the Ops job monitor |
 | `api_sessions` | `api` | all unexpired `api_session` rows |
 
 Feature docs add their own views the same way: look up the caller's role or ownership by index, then return the rows.
@@ -910,7 +910,7 @@ Feature docs add their own views the same way: look up the caller's role or owne
 |---|---|---|
 | `bandit-bridge` | `staff_directives`, `staff_commands`, `fleet_config`, `staff_bands`, `station`, `venue_mode` | directives and commands to send; valid targets and colours; mode for its status line |
 | Simulator.md: the `bandit-claims` command-line tool | `zone`, `zone_link`, `exit`, `station`, `zone_state`, `venue_mode`, `fleet_config`, `staff_directives`, `staff_commands`, `staff_bands` | place the demo bands in zones and obey GUIDE and evacuation like real bands |
-| Ops dashboard | all public tables, `my_roles`, `staff_roles`, `staff_bands`, `staff_band_reports`, `staff_sim_reports`, `staff_incidents`, `staff_snapshots`, `staff_incident_bands`, `staff_incident_notes`, `staff_directives`, `staff_commands`, `staff_blobs`, `staff_jobs`, and `host_attendees` for `organizer`; Social.md: `event_graph` | map, incidents, fleet, job monitor, service health, controls, the host portal, the event graph on the big screen ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)) |
+| Ops dashboard | all public tables, `my_roles`, `staff_roles`, `staff_bands`, `staff_band_reports`, `staff_sim_reports`, `staff_incidents`, `staff_snapshots`, `staff_incident_bands`, `staff_incident_notes`, `staff_directives`, `staff_commands`, `staff_blobs`, `staff_jobs`, and `host_attendees`; Social.md: `event_graph` | map, incidents, fleet, job monitor, service health, controls, the host portal, the event graph on the big screen ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)) |
 | Attendee app | `venue`, `event_state`, `zone`, `exit`, `booth`, `schedule_slot`, `zone_state`, `venue_mode`, `my_attendee`, `my_consent`, `my_band`, `my_band_report`, `my_presence`, `my_incident`, `my_jobs`, `my_roles`; Social.md: its `my_*` views and `my_graph` | claim flow, profile, busy map, evacuation banner, the switch to the recap page, own history; the medic route adds the incident views when `my_roles` says `medic` ([Attendee-App](../5-apps/Attendee-App.md)) |
 | `bandit-workers` | `worker_jobs` per kind, plus the feature tables each kind reads | claim and run jobs |
 | `bandit-api` | `api_sessions`, `staff_blobs`; Social.md: `share_link`; Elastic.md: `social_encounters`, `social_visits`; Simulator.md: `event_state` | authenticate HTTP callers, serve blobs by access class; Social.md: the share page; Elastic.md: the recap candidates for `GET /recap/order`; Simulator.md: stop the demo bands' heartbeat once the event ends |
@@ -924,7 +924,7 @@ A new subscription first delivers every current row, then each change as it comm
 | Group | Rows appear | Rows change | Rows leave | Size at demo scale |
 |---|---|---|---|---|
 | Venue | seed load before doors open | rarely, by ops | never during the event | tens of rows |
-| Identity | an attendee taps a band; the organizer grants roles; Simulator.md: `start_crowd` adds the crowd | profile edits, consent toggles, `release_band` | never | tens of rows; Simulator.md: plus up to 80 simulated attendees |
+| Identity | an attendee taps a band; the owner grants roles; Simulator.md: `start_crowd` adds the crowd | profile edits, consent toggles, `release_band` | never | tens of rows; Simulator.md: plus up to 80 simulated attendees |
 | Live | first report, first tick, `init` | every batch and tick, in place | never; a lost band keeps its last report with an old `heard_at` | one row per band and zone; Simulator.md: about 100 band rows with the crowd and the demo bands |
 | Control | tick, ops, claim, features | in place; `version` increments | directives when cleared or expired; commands on ack or after 30 s | handfuls |
 | Incidents | band flag, tick, ops | status changes | never; resolved incidents stay as evidence (Hyphenate.md reads them) | tens of rows |
@@ -936,7 +936,7 @@ A new subscription first delivers every current row, then each change as it comm
 
 The module is published once to SpacetimeDB Maincloud under the database name `band1t`. Every client reads the database address from one configuration value ([Rust-Backend](../3-services/Rust-Backend.md)). `bandit-api`, `bandit-workers` and `bandit-indexer` connect from the Fly.io VM; `bandit-bridge` and the Ops dashboard connect from the demo laptop over a team phone's hotspot (Simulator.md: so does the `bandit-claims` command-line tool); the attendee app connects from each phone, served by `bandit-api` on its public HTTPS host ([Architecture](../1-overview/Architecture.md)).
 
-Seed loading: `bandit-ingest` has a seed mode that reads a folder of seed files (venue, zones, links, exits, stations, booths, schedule, bands, calibration points, role grants) and calls the setup reducers in that order, then `grant_role` for each identity listed. Feature docs add their own seed files (Merch.md: the templates in `assets/merch/templates.json` through `load_merch_templates`, after the import; Hyphenate.md: the event and accuracy-run policies, covers, authority limits and fee schedule through its setup reducers, while its fallback rule file waits for `load_fallback_rule`; Elastic.md and Hyphenate.md: the 30 past claims, written to `bandit-claims` in Elastic rather than to the module). BrightData.md: the `import_event` bundle is one more input to the same process. Every setup reducer upserts by name or id, so the seed is idempotent: re-running it after a fresh publish restores the venue in one pass. `init` seeds the publisher as `owner`, so the owner never needs a grant; the owner grants `organizer` once, and the organizer grants every other role.
+Seed loading: `bandit-ingest` has a seed mode that reads a folder of seed files (venue, zones, links, exits, stations, booths, schedule, bands, calibration points, role grants) and calls the setup reducers in that order. The seed's role grants go through `grant_role` called as the owner, the only identity that may grant. Feature docs add their own seed files (Merch.md: the templates in `assets/merch/templates.json` through `load_merch_templates`, after the import; Hyphenate.md: the event and accuracy-run policies, covers, authority limits and fee schedule through its setup reducers, while its fallback rule file waits for `load_fallback_rule`; Elastic.md and Hyphenate.md: the 30 past claims, written to `bandit-claims` in Elastic rather than to the module). BrightData.md: the `import_event` bundle is one more input to the same process. Every setup reducer upserts by name or id, so the seed is idempotent: re-running it after a fresh publish restores the venue in one pass. `init` records the publisher as `owner`, so the owner never needs a grant, and the owner grants every role.
 
 ### Schema change rules
 
@@ -988,7 +988,7 @@ SpacetimeDB publishes additive changes without clearing data and refuses column 
 | Access to private rows goes through views, not row-level security | views are a stable SpacetimeDB 2.x feature and can see the caller's identity |
 | The module runs no procedures | every external call (Claude, Nessie, Elastic, Bright Data) stays in a Rust service with its own secrets, away from the safety path |
 | Simulator.md: the simulator reports only the demo bands 90 to 99, through `report_sim_band`; a replay maps real bands 1 to 9 onto 91 to 99 | a replay never fights the bridge over a live band |
-| Only ops (and the organizer) call `assign_medic` | ops picks the medic's entry zone with one tap ([Safety](../6-features/Safety.md)) |
+| Only ops calls `assign_medic` | ops picks the medic's entry zone with one tap ([Safety](../6-features/Safety.md)) |
 | `release_band` works until the event ends, for the attendee who owns the band (in the app) and for ops (on the dashboard), after a confirm tap | the owner can hand the band on, and ops can fix a band claimed by mistake; the tap stops an accidental release; after `end_event` every band keeps its owner for the recap |
 | `band_command` carries only `buzz` and `clear` | there is no paying at the venue, so the firmware's `pay` and `paid` are not used |
 | A full band gets one double `buzz` (pattern 2) when it first joins an incident's light circle | the bands around a fallen person vibrate as well as pulse blue; pattern 2 keeps it distinct from the long guidance buzz |
@@ -997,7 +997,7 @@ SpacetimeDB publishes additive changes without clearing data and refuses column 
 | A press that no prompt is waiting for does nothing | the press is consent, so it counts only when the app has just asked for it: a band claim |
 | `venue_tick` sends one long `buzz` (pattern 3) to a full band when its guidance starts or its exit colour changes | the vibration tells the wearer to move now and look at the ring; the colour says which way ([Safety](../6-features/Safety.md)) |
 | One sign-in for every person: the SpacetimeAuth magic link, with no other providers; the identity comes from the ID token's issuer and subject | the same person is the same identity on every device, so the recap opens anywhere, and BandIt keeps no password and no email address |
-| `end_event` (role `ops`, so also `organizer`) sets `event_state.ended`; the recap opens live from that row, and `release_band` is refused after it; `reopen_event` (same role) clears it to run the demo again | one press by the host ends the night for everyone, with no email, and every band keeps its owner for the recap |
-| `organizer` is the event host role; `owner` is only the publishing identity | the host's powers are a grant like any other, and the publisher's key is used once |
+| `end_event` (role `ops`) sets `event_state.ended`; the recap opens live from that row, and `release_band` is refused after it; `reopen_event` (same role) clears it to run the demo again | one press by the host ends the night for everyone, with no email, and every band keeps its owner for the recap |
+| There is no host role: the event host is a staff member with `ops`, and only `owner`, the publishing identity, grants and revokes roles | one role runs both the venue and the host portal, and every grant comes from one identity, so no staff screen can widen its own access |
 | Screens read the escalation countdown from `incident.escalates_at`; `escalation_timer` keeps no view | schedule tables stay private to the scheduler, and the countdown arrives with the incident row the screen already has |
 | The Ops job monitor reads `staff_jobs`, which never returns a job's payload | payloads can hold personal data, and the monitor needs only kind, status, attempts, lease and error |

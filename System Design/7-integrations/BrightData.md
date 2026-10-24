@@ -1,12 +1,12 @@
 # Bright Data
 
-`bandit-ingest` is a Rust command-line tool the team runs before the event. It works for any event: it starts from the list of start URLs in the event's seed and fetches the event's public pages and its organisations' pages through the Bright Data Web MCP, saves every fetch as a versioned snapshot kept with the project, has Elastic organize the records into one event bundle (organisations, booths with positions, halls, schedule, unclaimed people profiles), and loads the bundle into SpacetimeDB in one transaction with the `import_event` reducer. Everything downstream (the Ops dashboard map, visits, the profile claim, the Elastic copy) sees ordinary SpacetimeDB rows and never knows a scrape happened. Bright Data owns every step that touches the web, Elastic every step after the raw records land, and SpacetimeDB everything live or exact. The snapshots mean that no demo or rerun depends on a live scrape. Cal Hacks 13.0 is the demo instance.
+`bandit-ingest` is a Rust command-line tool the team runs before the event. It works for any event: it starts from the list of start URLs in the event's seed and fetches the event's public pages, its organisations' pages and its venue's Google Maps place through the Bright Data Web MCP, saves every fetch as a versioned snapshot kept with the project, has Elastic organize the records into one event bundle (organisations, booths with positions, halls, schedule, unclaimed people profiles), and loads the bundle into SpacetimeDB in one transaction with the `import_event` reducer. Everything downstream (the Ops dashboard map, visits, the profile claim, the Elastic copy) sees ordinary SpacetimeDB rows and never knows a scrape happened. Bright Data owns every step that touches the web, Elastic every step after the raw records land, and SpacetimeDB everything live or exact. The snapshots mean that no demo or rerun depends on a live scrape. Cal Hacks 13.0 is the demo instance.
 
 ## Role in the system
 
 Responsibilities:
 
-- Fetch any event's public pages through the Bright Data Web MCP, starting from the start URLs in the event's seed: the event's site, its exhibitor or sponsor list, its schedule and its floor plan image; then each organisation's own site and its company facts. Keep a dated snapshot of every fetch.
+- Fetch any event's public pages through the Bright Data Web MCP, starting from the start URLs in the event's seed: the event's site, its exhibitor or sponsor list, its schedule and its floor plan image; then each organisation's own site and its company facts, and the venue's Google Maps place record. Keep a dated snapshot of every fetch.
 - Build the booth geometry: Claude's `floorplan_check` reads booth numbers and their positions from the floor plan image, the hall's real width from the seed turns pixels into plan metres, and each booth gets the nearest station's zone.
 - Build unclaimed `person` profiles from event pages only (speakers, judges, sponsor representatives, exhibitor contacts, artists), and let an attendee who has claimed their band claim their profile at onboarding with one tap.
 - Validate the organized bundle in Rust, keep the last good bundle, and load it with `import_event`, keyed by stable source keys so reruns are idempotent. Every scraped row carries `source_url` and `fetched_at`.
@@ -28,10 +28,10 @@ Elastic.md: the organize stage turns the records into the bundle. Without Elasti
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| Bright Data Web MCP | out | `bandit-ingest`, fetch stage | `search_engine` to find an organisation's official site; `extract` with a record schema and the null rule for event and exhibitor pages; `web_data_linkedin_company_profile` and `web_data_crunchbase_company` for company facts; `scrape_as_markdown` to find the floor plan image link; `scraping_browser_navigate` and `scraping_browser_screenshot` to capture the floor plan and logo images | HTTPS JSON-RPC tool calls to the remote MCP server, Pro mode on, with the account token |
+| Bright Data Web MCP | out | `bandit-ingest`, fetch stage | `search_engine` to find an organisation's official site; `extract` with a record schema and the null rule for event and exhibitor pages; `web_data_linkedin_company_profile` and `web_data_crunchbase_company` for company facts; `run_scraper`, `get_scraper_progress` and `get_scraper_results` on the Google Maps dataset `gd_m8ebnr0q2qlklc02fz` for the venue's place record; `scrape_as_markdown` to find the floor plan image link; `scraping_browser_navigate` and `scraping_browser_screenshot` to capture the floor plan and logo images | HTTPS JSON-RPC tool calls to the remote MCP server, Pro mode on, with the account token |
 | Elastic.md: Bright Data Web MCP, gap fill | out | the organizer agent in Elastic, through an Agent Builder MCP tool | `extract` on an organisation or event page the raw records name but no snapshot covers; one JSON record back; at most 10 calls per run (starting value) | the same MCP server with a zone token of its own that has its own spending limit ([Elastic](Elastic.md)) |
 | Claude API | out | `bandit-ingest`, map stage, through `claude-client` | `floorplan_check`: the floor plan image and the booth numbers the exhibitor records list; back come the hall's edges and each visible booth's centre in pixels, or null | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Agent](Anthropic-Agent.md)) |
-| Seed files | in | `bandit-ingest`, map and load stages | for the event: the list of start URLs, each with its page kind; per hall: name, real width in metres, offset in the venue plan frame; for the venue: plan origin and rotation, recorded on site at setup | hand-written files next to the core seed ([SpacetimeDB](../2-data/SpacetimeDB.md)) |
+| Seed files | in | `bandit-ingest`, fetch, map and load stages | for the event: the list of start URLs, each with its page kind, and the venue's Google Maps place URL; per hall: name, real width in metres, offset in the venue plan frame; for the venue: plan origin and rotation, recorded on site at setup | hand-written files next to the core seed ([SpacetimeDB](../2-data/SpacetimeDB.md)) |
 | Snapshot and bundle files | out and in | `bandit-ingest`; the team by review | raw snapshots with their fetch metadata, parsed records, and the last good bundle | versioned files kept with the project |
 | Elastic.md: raw indices and the organizer | out and in | `bandit-ingest`, organize stage | parsed JSON records, map-stage geometry and the core station and zone rows out to `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; one `bandit-organize` workflow execution per run; back comes the bundle document from `bandit-bundles` | HTTPS Bulk API and Workflows API with the Elastic ingest key ([Elastic](Elastic.md)) |
 | `import_event` reducer | out | `bandit-ingest`, load stage (role `ingest`) | the whole bundle; back come row counts per section | SpacetimeDB Rust client SDK, one reducer call, one transaction |
@@ -43,30 +43,32 @@ Elastic.md: the organize stage turns the records into the bundle. Without Elasti
 
 ### Scope rule
 
-The scrape covers the event and organisations, never people. The only person records are unclaimed profiles built from pages the event itself publishes (a speaker page, a judge list, a sponsor's named representative, an exhibitor's listed contact, an artist on the line-up), and they hold only what that page says: name, role, organisation, the photo it shows and the page it came from. Handles come from the attendee: their Instagram, Facebook and Threads handles, typed at onboarding ([Social](../6-features/Social.md)), with or without a claimed profile. So every fact about a person in the system is one the event published or the person entered.
+The scrape covers the event, its venue and its organisations, never people. The only person records are unclaimed profiles built from pages the event itself publishes (a speaker page, a judge list, a sponsor's named representative, an exhibitor's listed contact, an artist on the line-up), and they hold only what that page says: name, role, organisation, the photo it shows and the page it came from. Handles come from the attendee: their Instagram, Facebook and Threads handles, typed at onboarding ([Social](../6-features/Social.md)), with or without a claimed profile. Every dataset row, from the company datasets and from Google Maps, loses its fields about people (reviews, employees, founders, contacts and the like) before the snapshot is saved. So every fact about a person in the system is one the event published or the person entered.
 
 ### Sources
 
-The import is the same for every event. The event's seed lists its start URLs, each with its page kind: the event's own site, its exhibitor or sponsor list, its schedule page and the page that shows its floor plan image. The page kind picks the record schema. Each source below is a named entry in the ingest configuration with the Web MCP tool that fetches it, the record schema, and the features that need it; only the start URLs change from one event to the next. Core safety needs none of them, which is why the whole file is optional.
+The import is the same for every event. The event's seed lists its start URLs, each with its page kind: the event's own site, its exhibitor or sponsor list, its schedule page and the page that shows its floor plan image, plus the venue's Google Maps place URL. The page kind picks the record schema. Each source below is a named entry in the ingest configuration with the Web MCP tool that fetches it, the record schema, and the features that need it; only the start URLs change from one event to the next. Core safety needs none of them, which is why the whole file is optional.
 
-The demo instance is Cal Hacks 13.0, at the Palace of Fine Arts. Its start URLs are the event's own site, its Devpost page (the sponsor list with tiers) and its schedule page.
+The demo instance is Cal Hacks 13.0, at the Palace of Fine Arts. Its start URLs are the event's own site, its Devpost page (the sponsor list with tiers, the prizes, and the venue line with its maps.google.com link) and its schedule page, and its venue place is the Palace of Fine Arts on Google Maps.
 
 | Source | Pages | Gives | Web MCP tools | Needed by |
 |---|---|---|---|---|
-| `event_pages` | the start URLs: the event's own site (sponsors, speakers, judges, venue, dates), its exhibitor or sponsor list (with tiers when it gives them) and its schedule page | `organization` candidates with tier; `person` candidates; `schedule_slot` records; event and venue facts | `extract` with a schema per page kind | booths and schedule for [Social](../6-features/Social.md), [Elastic](Elastic.md) and the attendee app; people for the profile claim |
+| `event_pages` | the start URLs: the event's own site (sponsors, speakers, judges, venue, dates), its exhibitor or sponsor list (with tiers when it gives them) and its schedule page | `organization` candidates with tier; prizes with their cash amount and sponsor; `person` candidates; `schedule_slot` records; event and venue facts, among them the venue's name and address from the venue line's maps.google.com link | `extract` with a schema per page kind | booths and schedule for [Social](../6-features/Social.md), [Elastic](Elastic.md) and the attendee app; people for the profile claim |
 | `exhibitor_pages` | each organisation's public home and about pages, found from the sponsor list or with `search_engine` | description, tags, logo, company social pages, booth number when the page states it | `search_engine`, `extract`; the browser tools for the logo image | booth descriptions for [Elastic](Elastic.md) |
 | `org_facts` | the organisation's LinkedIn company page and Crunchbase company page | industry, headquarters, size range, founding year, short description, funding summary | `web_data_linkedin_company_profile`, `web_data_crunchbase_company` (company pages only) | richer booth documents in [Elastic](Elastic.md) |
-| `floor_plan` | the floor plan image on the start URL of kind map | booth numbers and their positions | `scrape_as_markdown` finds the image link; `scraping_browser_navigate` and `scraping_browser_screenshot` capture the image | booth positions for the Ops map, [Social](../6-features/Social.md) visits and the Kibana map ([Elastic](Elastic.md)) |
+| `google_maps` | the venue's Google Maps place page, listed in the seed | one `venue_place` record: the venue's name, address, latitude and longitude, description, website, rating, phone number and opening hours | `run_scraper` with the Google Maps dataset `gd_m8ebnr0q2qlklc02fz`, collected by the place's URL; `get_scraper_progress` and `get_scraper_results` | the event section of the bundle, which is not built without it |
+| `floor_plan` | the floor plan image on the start URL of kind map | booth numbers and their positions | `scrape_as_markdown` finds the image link; `scraping_browser_navigate` and `scraping_browser_screenshot` capture the image | booth positions for the Ops map, [Social](../6-features/Social.md) visits and the booth copy ([Elastic](Elastic.md)) |
 
 ### The Bright Data Web MCP
 
-Every fetch goes through the Bright Data Web MCP server. `bandit-ingest` speaks the MCP protocol directly (JSON-RPC tool calls over HTTPS with the account token), so no agent runtime is involved. Pro mode is switched on, because `extract`, the company dataset tools and the browser tools are Pro tools; the credits cover them. Each tool has one job:
+Every fetch goes through the Bright Data Web MCP server. `bandit-ingest` speaks the MCP protocol directly (JSON-RPC tool calls over HTTPS with the account token), so no agent runtime is involved. Pro mode is switched on, because `extract`, the company dataset tools, the scraper tools and the browser tools are Pro tools; the credits cover them. Each tool has one job:
 
 | Tool | Used for | Behaviour the design relies on |
 |---|---|---|
 | `extract` | every event and exhibitor page: a URL becomes JSON against a schema given in the call | always told to return null for a field it cannot find rather than guess; its output is validated against the schema before use |
 | `search_engine` | finding an organisation's official site from its name on the sponsor list | one query per organisation that has no website on the event pages |
 | `web_data_linkedin_company_profile`, `web_data_crunchbase_company` | company facts, collected by company page URL | structured JSON back; a call can take a minute or more, because Bright Data collects the page before answering |
+| `run_scraper`, `get_scraper_progress`, `get_scraper_results` | the venue's Google Maps place: the Web Scraper API dataset `gd_m8ebnr0q2qlklc02fz`, collected by the place's Google Maps URL | `run_scraper` starts a collection and returns a snapshot id; the fetch stage polls `get_scraper_progress` until the rows are ready and reads them with `get_scraper_results` |
 | `scrape_as_markdown` | reading the event's map page to find the floor plan image link | a link hunt needs no schema |
 | `scraping_browser_navigate`, `scraping_browser_screenshot` | capturing an image: the floor plan and each organisation's logo | the only tools that return an image; used for nothing else |
 
@@ -96,7 +98,7 @@ The diagram answers: how do public pages become one bundle that lands in Spaceti
 
 ```mermaid
 flowchart TB
-  SRC["Public pages: event site, exhibitor sites, company pages, floor plan"] -->|"HTTPS"| BD["Bright Data Web MCP: extract, search_engine, company dataset tools, browser tools"]
+  SRC["Public pages: event site, exhibitor sites, company pages, the venue on Google Maps, floor plan"] -->|"HTTPS"| BD["Bright Data Web MCP: extract, search_engine, company dataset tools, the Google Maps dataset, browser tools"]
   BD -->|"JSON records, images"| F["fetch stage"]
   F -->|"bodies and metadata"| SNAP["Raw snapshots (versioned files)"]
   SNAP -->|"JSON records"| P["parse stage"]
@@ -159,12 +161,14 @@ The bundle has one section per table, loaded in dependency order inside the one 
 
 | Section | Target table | What `bandit-ingest` supplies | Owner of the table |
 |---|---|---|---|
-| event | `venue` | name, `starts_at` and `ends_at` from the event pages; `origin_lat`, `origin_lon` and `plan_rotation_deg` from the seed | [SpacetimeDB](../2-data/SpacetimeDB.md) |
+| event | `venue` | name, `starts_at`, `ends_at` and the event facts from the event pages; from the Google Maps record: the venue's name, address, latitude and longitude (the place's pin, not the plan origin), description and source URL, with its rating, phone number and opening hours added to the facts; `origin_lat`, `origin_lon` and `plan_rotation_deg` from the seed | [SpacetimeDB](../2-data/SpacetimeDB.md) |
 | halls | `hall` | see below | this file |
 | organizations | `organization` | see below | this file |
 | booths | `booth` | `source_key`, name, kind (`sponsor`, `stage`, `food`, `help_desk`, `other`), booth number, `organization_id`, `hall_id`, `zone_id`, `plan_x_m`, `plan_y_m`, `placement_source` (`plan`, `manual`, `none`), description and tags (from the organisation when the booth has none), `source_url`, `fetched_at` | [SpacetimeDB](../2-data/SpacetimeDB.md) |
 | schedule | `schedule_slot` | title, start, end, location text, `booth_id` when the location maps to a booth, speakers' `person` ids | [SpacetimeDB](../2-data/SpacetimeDB.md) |
 | people | `person` | see below | this file |
+
+The event section needs the Google Maps record: a run without one builds no bundle, and the last good bundle stays loaded.
 
 `import_event` is callable by the `ingest` role, and by `ops` for a hand-made bundle. It validates every reference inside the bundle before touching a row (zones exist, organisation keys resolve, booth numbers are unique per hall), then upserts section by section and returns counts. One bad record aborts the whole call, so there is never a half-loaded event. A hackathon bundle is a few hundred rows, well inside one reducer call.
 
@@ -313,7 +317,7 @@ sequenceDiagram
 **If you delete this file**
 
 - `bandit-ingest` keeps only its seed mode, which loads the hand-written seed files through the setup reducers ([SpacetimeDB](../2-data/SpacetimeDB.md)). Remove its scraping stages and the BrightData.md parts of its rows in [Rust-Backend](../3-services/Rust-Backend.md) and [Architecture](../1-overview/Architecture.md) (interfaces, data ownership and failure tables).
-- Remove `import_event`, `claim_person`, `claimed_people`, `hall`, `organization`, `person` and `person_claim` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field rows on `booth` and `attendee`, the BrightData.md note on the `venue` origin fields, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
+- Remove `import_event`, `claim_person`, `claimed_people`, `hall`, `organization`, `person` and `person_claim` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field rows on `booth`, `attendee` and `venue`, the BrightData.md note on the `venue` origin fields, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
 - Remove the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Is this you?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
 - Remove the `floorplan_check` row from [Anthropic-Agent](Anthropic-Agent.md).
 - [Merch](../6-features/Merch.md) loads only its plain templates, because sponsor names have no organisations to match.
@@ -335,5 +339,5 @@ sequenceDiagram
 | Every page becomes JSON through `extract`; there are no hand-written page parsers | Extraction happens once, at fetch time, with the null rule and a schema |
 | The bundle never changes zones or exits | The core seed owns them, so the safety demo is the same with or without this file |
 | The import works for any event: its input is the list of start URLs in the event's seed, and Cal Hacks 13.0 is the demo instance | The product must work at any venue; only the seed changes from one event to the next |
-| The hall's width and offset and the venue's plan origin and rotation are typed in the seed | They are measured on site at setup; no map or geocoding source is scraped |
+| The hall's width and offset and the venue's plan origin and rotation are typed in the seed; the venue's name, address and map pin come from its Google Maps record | The plan frame is measured on site at setup; the place's public facts are fetched like any other source |
 | Booth numbers are joined to geometry once, in the organizer's `LOOKUP JOIN` step | One owner per step; the map stage only produces geometry |

@@ -1,6 +1,6 @@
 # BandIt system design
 
-BandIt is the only band you need at a public event. A wristband senses crowd density, raises SOS and fall alerts, and lights and buzzes the bands around someone who needs help. Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims: when the organizer ends the event, every attendee's page becomes their recap. This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
+BandIt is the only band you need at a public event. A wristband senses crowd density, raises SOS and fall alerts, and lights and buzzes the bands around someone who needs help. Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims: when a staff member with `ops` ends the event, every attendee's page becomes their recap. This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
 
 ## Folder map
 
@@ -41,7 +41,7 @@ Core components are what the safety demo needs. Optional components are features
 | [Gateway-Bridge.md](3-services/Gateway-Bridge.md) | `bandit-bridge`, `bandit-protocol` | core | serial to SpacetimeDB, batching, directive reconciliation, command delivery, press to confirm, raw logs | Hardware, SpacetimeDB |
 | [Hardware.md](4-devices/Hardware.md) | Bands, gateway, station markers | core | the fleet, radio, packet, on-band logic, state precedence, gateway wire protocol, NFC, power, limits | none |
 | [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, medic approach, evacuation, override | SpacetimeDB, Hardware, Gateway-Bridge |
-| [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for the organizer, the big-screen graph | SpacetimeDB, Safety |
+| [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for `ops`, the big-screen graph | SpacetimeDB, Safety |
 | [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, profile and consent, live view, medic view, the recap page | SpacetimeDB |
 | [Simulator.md](3-services/Simulator.md) | The in-module crowd and the demo bands, driven by `bandit-claims` | optional | a simulated crowd with simulated owners inside the module, demo bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
 | [Vision.md](4-devices/Vision.md) | Vision service (TBD -- LEO) | optional | camera counts, person-down alerts, incident assessments, photo features | SpacetimeDB; uses Anthropic-Agent when present |

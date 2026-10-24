@@ -225,7 +225,7 @@ Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `b
 
 ### The recap's social part
 
-After the event these views are the social part of the recap page ([Attendee-App](../5-apps/Attendee-App.md)). When the organizer runs `end_event`, the recap appears live on every open page; later the attendee reopens it from their tap link `/t/{token}`, signed in with SpacetimeAuth, on any device. During the event the same views show in the app. The social part is not one table: it is a set of views keyed on the caller's identity, so every attendee sees only their own rows and the module, not the app, enforces that.
+After the event these views are the social part of the recap page ([Attendee-App](../5-apps/Attendee-App.md)). When a staff member with `ops` runs `end_event`, the recap appears live on every open page; later the attendee reopens it from their tap link `/t/{token}`, signed in with SpacetimeAuth, on any device. During the event the same views show in the app. The social part is not one table: it is a set of views keyed on the caller's identity, so every attendee sees only their own rows and the module, not the app, enforces that.
 
 | View | Rows |
 |---|---|
@@ -301,7 +301,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 
 - Remove the social step bullet from `memory_tick` in [SpacetimeDB](../2-data/SpacetimeDB.md), the Social.md rows in its registry tables, the Social.md note on `display_name`, and the tables `visit`, `social_encounter`, `shared_visit`, `people_link`, `social_handle`, `photo`, `photo_tag`, `share_link`, and the views `my_shared_visits`, `my_graph`, `event_graph`, `social_attendees`, `social_visits`, `social_encounters` and `social_shared_visits`.
 - Remove the Social.md row from the endpoint registry in [Rust-Backend](../3-services/Rust-Backend.md) (photo upload, share page) and the Social.md `photo` purpose of `POST /api/blobs`, the socials onboarding step, the graph screen, the photographer route and the recap's social part from [Attendee-App](../5-apps/Attendee-App.md), the `photographer` role row and the big-screen graph from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the crowd (`start_crowd`, `stop_crowd`, `crowd_tick` and its simulated attendees) from [Simulator](../3-services/Simulator.md), demo steps 5 and 6a in [Flows](../1-overview/Flows.md), the memories row in the data ownership table of [Architecture](../1-overview/Architecture.md), and the Social.md row from the README components table.
-- Remove the `bandit-memories` and `bandit-people` indices, `GET /recap/order` and the "Interest map" dashboard from [Elastic](../7-integrations/Elastic.md), and the photo tagging consumer and `photo_features` job from [Vision](../4-devices/Vision.md).
+- Remove the `bandit-memories` and `bandit-people` indices and `GET /recap/order` from [Elastic](../7-integrations/Elastic.md), and the photo tagging consumer and `photo_features` job from [Vision](../4-devices/Vision.md).
 - The profile claim stays with [BrightData](../7-integrations/BrightData.md); a claimed `person` row then has no handles attached.
 - Delete [Merch](Merch.md) too: every suggestion starts from a visit and a confirmed photo defined here.
 - `presence_sample` stays: it is core and feeds incidents.

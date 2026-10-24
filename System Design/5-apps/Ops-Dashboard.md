@@ -1,6 +1,6 @@
 # Ops dashboard
 
-The ops dashboard is the staff web app. On the demo laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. On staff phones it is the same app trimmed by role, so a medic sees incidents first, an approver sees claims and the organizer sees the host portal. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
+The ops dashboard is the staff web app. On the demo laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. On staff phones it is the same app trimmed by role, so a medic sees incidents first, an approver sees claims and ops sees the host portal. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
 
 ## Role in the system
 
@@ -12,8 +12,8 @@ Responsibilities:
 - Host the calibration UI: live `thresh` and `rssi` through `fleet_config`, and the three calibration steps recorded into `calibration_point`.
 - Show where each booth stands and let ops fix it.
 - Monitor the work queue (`job`, through `staff_jobs`) and the Rust services (`service_heartbeat`).
-- Give the organizer the host portal: the attendee list with band status, live zones and alerts, the claims waiting for approval, and the "Event ended" button (`end_event`), which becomes "Reopen the event" (`reopen_event`) once the event has ended.
-- Let the organizer grant and revoke roles.
+- Give ops the host portal: the attendee list with band status, live zones and alerts, the claims waiting for approval, and the "Event ended" button (`end_event`), which becomes "Reopen the event" (`reopen_event`) once the event has ended.
+- Let the module owner grant and revoke roles.
 
 Not responsible for:
 
@@ -30,7 +30,7 @@ Not responsible for:
 | Static bundle | in | `bandit-api` to browser | the app, from the same public HTTPS host as the attendee app | HTTPS |
 | SpacetimeAuth sign-in | both | dashboard and SpacetimeAuth | the magic-link email sign-in for every staff member; an ID token back | HTTPS, OpenID Connect |
 | SpacetimeDB connection | both | dashboard and `band1t` module | the ID token, subscriptions, reducer calls; the caller's `staff_role` rows decide which panels render and which reducers accept it | TypeScript client SDK over WebSocket |
-| Subscriptions | in | module to dashboard | venue tables, live tables, control tables, incident tables, `calibration_point`, `staff_jobs`, `service_heartbeat`, `staff_role`, `band`, and `host_attendees` for the organizer; see Subscriptions below | SDK subscription |
+| Subscriptions | in | module to dashboard | venue tables, live tables, control tables, incident tables, `calibration_point`, `staff_jobs`, `service_heartbeat`, `staff_role`, `band`, and `host_attendees` for ops; see Subscriptions below | SDK subscription |
 | Control reducers | out | dashboard to module | `force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_venue_mode`, `set_exit_status`, `set_fleet_config` (calibration values and `density_override`), `set_calibration` | SDK reducer call |
 | Incident reducers | out | dashboard to module | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | SDK reducer call |
 | Fleet, booth and staff reducers | out | dashboard to module | `register_band` (add, rename), `release_band` (unclaim), `upsert_booth` (place or add a booth), `grant_role`, `revoke_role`; `end_event` and `reopen_event` (the host portal's "Event ended" and "Reopen the event" buttons) | SDK reducer call |
@@ -51,27 +51,27 @@ One app, one bundle; the caller's `staff_role` rows decide what renders. Reducer
 
 | Role | Device | Panels |
 |---|---|---|
-| `organizer` | laptop | the host portal (below), plus everything `ops` sees and the staff panel (grant and revoke roles, service identities) |
-| `ops` | laptop, phone | venue map, fleet, incidents, controls, calibration, jobs, service health; Social.md: the event graph on the big screen |
+| `owner` | laptop | everything `ops` sees, plus the staff panel (grant and revoke roles, service identities) |
+| `ops` | laptop, phone | the host portal (below), venue map, fleet, incidents, controls, calibration, jobs, service health; Social.md: the event graph on the big screen |
 | `medic` | phone | incidents (assigned to me first, then open), venue map, fleet read-only. Medical-ID.md: the hint "tap the band for the medical card", which opens the medic view in the attendee app |
 | `floor_manager`, `risk_manager`, `adjuster` | phone, laptop | incidents read-only; Hyphenate.md: the claims queue filtered to their authority, with the approval grid; in the demo a judge holds `risk_manager` on their own phone |
 | `photographer` | none here | Social.md: the `/photo` route in the attendee app |
 
-Staff onboarding happens at setup, before the demo. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and the dashboard then shows their identity as a short code on an otherwise empty screen; a Rust service prints its identity on first start. The organizer enters each code in the staff panel and calls `grant_role`. Nobody types codes in front of judges. Hyphenate.md: the one grant made during the demo is `risk_manager` for the judge who approves the first claim. The judge opens the dashboard on the phone they joined with, signed in, so it is the same identity and display name as their attendee app; the organizer picks the judge from the host portal's attendee list, and revokes the grant after the demo.
+Staff onboarding happens at setup, before the demo. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and the dashboard then shows their identity as a short code on an otherwise empty screen; a Rust service prints its identity on first start. The owner, the team member signed in with the identity that published the module, enters each code in the staff panel and calls `grant_role`; no other role may grant. Nobody types codes in front of judges. Hyphenate.md: the one grant made during the demo is `risk_manager` for the judge who approves the first claim. The judge opens the dashboard on the phone they joined with, signed in, so it is the same identity and display name as their attendee app; the owner picks the judge from the host portal's attendee list, and revokes the grant after the demo.
 
 ### Host portal
 
-The host portal is the dashboard's layout for the `organizer` role: one screen to run the event as its host.
+The host portal is the dashboard's layout for the `ops` role: one screen to run the event as its host.
 
 | Part | Shows | Reads | Controls (reducer) |
 |---|---|---|---|
-| Attendee list | every attendee by display name, with their band and its status (alive or stale) | `host_attendees` | per attendee: grant a role (`grant_role`) |
+| Attendee list | every attendee by display name, with their band and its status (alive or stale) | `host_attendees` | per attendee, for the owner only: grant a role (`grant_role`) |
 | Live zones | the Venue map | the Venue map's tables | the Venue map's controls |
 | Alerts | open incidents and the evacuation state | `staff_incidents`, `venue_mode` | the Incidents panel's actions |
 | Hyphenate.md: Claims queue | the claims waiting for approval | the Claims queue's tables | `approve_claim`, `refuse_claim`, as the authority matrix allows |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
-When the organizer presses "Event ended", `end_event` sets `event_state.ended`. Every open attendee page turns into the recap page live, and from then on bands cannot be released ([Attendee-App](Attendee-App.md)). "Reopen the event" runs `reopen_event`, which clears it, for running the demo again.
+When a staff member with `ops` presses "Event ended", `end_event` sets `event_state.ended`. Every open attendee page turns into the recap page live, and from then on bands cannot be released ([Attendee-App](Attendee-App.md)). "Reopen the event" runs `reopen_event`, which clears it, for running the demo again.
 
 ### Panels
 
@@ -84,8 +84,8 @@ When the organizer presses "Event ended", `end_event` sets `event_state.ended`. 
 | Calibration | live thresholds, live `neigh` histogram, the three calibration steps and the resulting mapping | `fleet_config`, `band_report`, `calibration_point` | `set_fleet_config`, `set_calibration` |
 | Job monitor | queue depth per kind, each job's status, attempts, lease expiry and last error | `staff_jobs` | none |
 | Service health | one card per Rust service: last heartbeat, version, counters | `service_heartbeat` | none |
-| Staff panel (organizer) | identities and roles | `staff_role` | `grant_role`, `revoke_role` |
-| Hyphenate.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, who may approve, the approval grid, and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Simulator.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`, `staff_incidents`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule`, `load_fallback_rule` (organizer) |
+| Staff panel (owner) | identities and roles | `staff_role` | `grant_role`, `revoke_role` |
+| Hyphenate.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, who may approve, the approval grid, and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Simulator.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`, `staff_incidents`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule`, `load_fallback_rule` (ops) |
 | Hyphenate.md: Incident card controls | Attach bill and Add injured person on an incident row, for `medic` and `ops` | `injured_party`, `medical_record`, `incident_snapshot` (bands present) | the bill upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record`; `add_injured_party` |
 | Hyphenate.md: Report property damage button | one button on the Incidents panel; ops picks the zone | `zone` | `open_incident` with kind `property` and the zone |
 | Medical-ID.md: Medical access log | every card access: medic, band, incident, time, granted or refused | `medical_access_log` | none |
@@ -326,8 +326,8 @@ Private tables arrive through the staff views that [SpacetimeDB](../2-data/Space
 | `incident` (with `escalates_at`), `incident_snapshot`, `incident_band`, `incident_note` | incidents panel and countdown | yes | yes |
 | `display_name` carried on `staff_incidents` | the wearer's name on an open incident | yes | medics |
 | `staff_role` | own role, medic picker, staff panel | yes | own rows |
-| `host_attendees` | the host portal's attendee list | organizer | no |
-| `event_state` | the host portal's Event ended part | organizer | no |
+| `host_attendees` | the host portal's attendee list | yes | no |
+| `event_state` | the host portal's Event ended part | yes | no |
 | `staff_jobs` | job monitor | yes | no |
 | `service_heartbeat` | service health | yes | yes |
 | Hyphenate.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | claims queue, ledger, rules, scorecard, incident card controls | yes | approvers, medics |
@@ -379,8 +379,8 @@ Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Sim
 | Zones are rectangles in plan metres | the demo zones are taped squares and booth areas; a rectangle draws them, and a dropped booth lands in exactly one zone |
 | Booths are fixed by dragging them on the venue map, through `upsert_booth` | one place to see and fix the booth layout, and a hand fix survives a re-import |
 | `release_band` works until the event ends, after a confirm tap; the band's owner can also release it from the attendee app | ops can fix a band claimed by mistake mid-event; the confirm tap stops an accidental release |
-| Staff roles are granted at setup, before the demo | nobody types identity codes in front of judges |
-| Hyphenate.md: a judge approves the first claim as `risk_manager` on their own phone, granted live with one tap on the judge's name in the host portal's attendee list | the rule that settles the next claim is stamped with the judge's own display name; a tap is not typing a code |
+| Staff roles are granted by the owner at setup, before the demo | nobody types identity codes in front of judges |
+| Hyphenate.md: a judge approves the first claim as `risk_manager` on their own phone, granted live by the owner with one tap on the judge's name in the host portal's attendee list | the rule that settles the next claim is stamped with the judge's own display name; a tap is not typing a code |
 | Hyphenate.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Hyphenate.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
 | Ops picks the medic's entry zone with one tap; medics wear no bands | the entry zone drives the medic approach, and a tap is faster than any default |
@@ -389,5 +389,5 @@ Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Sim
 | Social.md: the event graph is anonymous on the big screen, and its links come only from `event_graph` | a public screen shows no names; SpacetimeDB pushes the measured links live |
 | The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the attendee's wallet and the claims queue |
 | The job monitor reads the `staff_jobs` view, and the incident countdown reads `incident.escalates_at`; the dashboard subscribes to neither `job` nor `escalation_timer` | both are private, the job payload can hold personal data, and the countdown arrives with the incident row the panel already has |
-| The host portal is the dashboard's layout for `organizer`, and its "Event ended" button runs `end_event` ("Reopen the event" runs `reopen_event`) | the host chooses the moment the night ends, with one press, and every attendee page turns into the recap at once |
-| Staff sign in with the same SpacetimeAuth magic link as attendees | one sign-in to build, and the identity code the organizer grants is the same on every device |
+| The host portal is the dashboard's layout for `ops`, and its "Event ended" button runs `end_event` ("Reopen the event" runs `reopen_event`) | the host chooses the moment the night ends, with one press, and every attendee page turns into the recap at once |
+| Staff sign in with the same SpacetimeAuth magic link as attendees | one sign-in to build, and the identity code the owner grants is the same on every device |
