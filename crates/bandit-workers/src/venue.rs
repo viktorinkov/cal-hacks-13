@@ -322,7 +322,8 @@ fn find_prompt(event: &str, results: &str) -> String {
 Give the event's official site (`event_site`), the venue's name (`venue_name`) and its street address (`address`) as the results show them, \
 and up to {PAGES} `pages` to read next, best first, each with a short reason. Pick the pages most likely to show the venue's interior as an \
 interactive 3D map or 3D model, or to link to one: the event's own venue map or attendee guide, an embedded 3D map, the venue's own site, \
-a 3D tour of the venue. Include the event site itself when it may link to a venue map.\n\n<search_results>\n{results}\n</search_results>"
+a 3D tour of the venue. Include the event site itself when it may link to a venue map. Prefer pages about this edition of the event; \
+skip pages about other years or editions.\n\n<search_results>\n{results}\n</search_results>"
     )
 }
 
@@ -335,6 +336,7 @@ short reason: a page that draws a 3D map of the venue in the browser (often the 
 model file, or a 3D scan tour of the inside. Leave `maps` empty rather than listing a flat image, a street map or a photo gallery.\n\
 List in `floor_plans` images or PDFs of the venue's floor plans or venue maps. List in `sources` the pages that matter, each with a short label \
 such as \"Event site\", \"Venue map\" or \"Venue floor plan\".\n\
+Use only pages and files about this edition of the event or the venue itself, not other years or editions.\n\
 When `maps` is empty, list in `next_pages` up to 4 addresses from these links worth reading next to find a 3D map; otherwise leave it empty.\n"
     );
     for p in pages {
@@ -557,7 +559,9 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
         ctx.sink.register_shared(&layout, "venue_layout", "application/json").await?;
         let sm = &c.summary;
         let size = |i: usize| sm["size"][i].as_f64().unwrap_or(0.0) as f32;
-        step("Saved the model", format!("{} meshes, {} triangles, {} named parts, through {}", sm["meshes"], sm["triangles"], sm["places"], s(sm, "method"))).await?;
+        let parts = u32_of(&sm["places"]);
+        let parts = if parts > 0 { format!(", {parts} named parts") } else { String::new() };
+        step("Saved the model", format!("{} meshes, {} triangles{parts}, through {}", sm["meshes"], sm["triangles"], s(sm, "method"))).await?;
         result = VenueSetupResult {
             map_url: url,
             method: s(sm, "method"),
