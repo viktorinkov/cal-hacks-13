@@ -8,7 +8,7 @@ use super::logic::*;
 use super::tables::*;
 use super::tick::ensure_tick;
 use crate::roles::require_role;
-use crate::tables::{encounter, pair_key, zone_visit, Encounter, ZoneVisit};
+use crate::tables::{band, encounter, pair_key, zone_visit, Encounter, ZoneVisit};
 use crate::venue::{organization, zone};
 use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
@@ -16,6 +16,8 @@ use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
 pub const FIRST_SIM_BAND: u8 = 10;
 /// Bands 90 to 99 belong to the insurance demo's simulated bands.
 pub const LAST_SIM_BAND: u8 = 89;
+const FIRST_DEMO_BAND: u8 = 90;
+const LAST_DEMO_BAND: u8 = 99;
 const CROWD_TICK_SECONDS: u64 = 5;
 /// Each tick two people spend together counts this many seconds, so links appear within a minute.
 const TOGETHER_SECONDS_PER_TICK: u32 = 30;
@@ -117,6 +119,31 @@ pub fn start_crowd(ctx: &ReducerContext, size: u8) -> Result<(), String> {
     Ok(())
 }
 
+/// Two simulated bands spent this tick close together, as band1t's radio encounter would record it.
+fn together(ctx: &ReducerContext, a: u8, b: u8) {
+    let key = pair_key(a, b);
+    match ctx.db.encounter().key().find(key) {
+        Some(e) => {
+            ctx.db.encounter().key().update(Encounter {
+                last_seen: ctx.timestamp,
+                seconds_close: e.seconds_close + TOGETHER_SECONDS_PER_TICK,
+                ..e
+            });
+        }
+        None => {
+            ctx.db.encounter().insert(Encounter {
+                key,
+                band_a: a.min(b),
+                band_b: a.max(b),
+                first_seen: ctx.timestamp,
+                last_seen: ctx.timestamp,
+                seconds_close: 0,
+                best_rssi: -50,
+            });
+        }
+    }
+}
+
 /// Freeze the crowd where it is; its memories and links stay.
 #[spacetimedb::reducer]
 pub fn stop_crowd(ctx: &ReducerContext) -> Result<(), String> {
@@ -164,33 +191,32 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     // Friends in the same zone stay close; strangers in the same zone sometimes talk.
     for (i, a) in members.iter().enumerate() {
         for b in &members[i + 1..] {
-            if a.station != b.station {
-                continue;
+            if a.station == b.station && (a.group_id == b.group_id || ctx.rng().gen_bool(STRANGER_CHANCE)) {
+                together(ctx, a.band_id, b.band_id);
             }
-            if a.group_id != b.group_id && !ctx.rng().gen_bool(STRANGER_CHANCE) {
-                continue;
-            }
-            let key = pair_key(a.band_id, b.band_id);
-            match ctx.db.encounter().key().find(key) {
-                Some(e) => {
-                    ctx.db.encounter().key().update(Encounter {
-                        last_seen: ctx.timestamp,
-                        seconds_close: e.seconds_close + TOGETHER_SECONDS_PER_TICK,
-                        ..e
-                    });
-                }
-                None => {
-                    ctx.db.encounter().insert(Encounter {
-                        key,
-                        band_a: a.band_id,
-                        band_b: b.band_id,
-                        first_seen: ctx.timestamp,
-                        last_seen: ctx.timestamp,
-                        seconds_close: 0,
-                        best_rssi: -50,
-                    });
-                }
-            }
+        }
+    }
+
+    // Claimed demo bands (90 to 99, reported through report_sim_band) stay and mix with the crowd
+    // at whatever station they report, so a recap can be tried without hardware.
+    let demo: Vec<(u8, u8)> = (FIRST_DEMO_BAND..=LAST_DEMO_BAND)
+        .filter(|id| ctx.db.band_owner().band_id().find(id).is_some())
+        .filter_map(|id| ctx.db.band().id().find(id))
+        .filter(|b| b.online && b.zone != 0)
+        .map(|b| (b.id, b.zone))
+        .collect();
+    for &(band_id, station) in &demo {
+        let open = ctx.db.zone_visit().band_id().filter(band_id).find(|v| v.left.is_none()).map(|v| v.zone);
+        if open != Some(station) {
+            enter(ctx, band_id, station, ctx.timestamp);
+        }
+        for m in members.iter().filter(|m| m.station == station) {
+            together(ctx, band_id, m.band_id);
+        }
+    }
+    for (i, &(a, station)) in demo.iter().enumerate() {
+        for &(b, _) in demo[i + 1..].iter().filter(|(_, s)| *s == station) {
+            together(ctx, a, b);
         }
     }
     Ok(())
