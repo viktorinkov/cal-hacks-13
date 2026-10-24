@@ -51,7 +51,7 @@ Explicit non-responsibilities:
 
 All nine bands run the same firmware; the only per-band differences are the compile-time band id and the full-band flag. A full band whose IMU or motor fails behaves as a lite band. Band ids 1 to 9 map to `band.band_id` and NFC tokens `BANDIT-01` to `BANDIT-09` ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 
-Who wears which band: the three full bands go to the three people in the fall and SOS demo script, so fall detection is always on the wrist that falls. The six lite bands go to everyone else.
+Who wears which band: the three full bands go to the three people in the fall and SOS script, so fall detection is always on the wrist that falls. The six lite bands go to everyone else.
 
 ### Band block diagram
 
@@ -128,7 +128,7 @@ flowchart LR
 
 - Bands transmit at 8 dBm (a quarter of full power); the gateway and stations transmit at full power. Band power is kept moderate so the RSSI threshold, not raw range, decides nearness, while the gateway still hears every band across the room. The firmware comments warn against lowering band power further.
 - Bands listen to everything: other bands (density and the light circle), stations (zone) and the gateway (commands). Stations listen only for commands. The gateway listens to everything and transmits only commands.
-- A packet is 14 bytes in a frame type whose payload limit is 250 bytes. Air time at the demo scale (about 115 packets a second across the fleet) is a few percent of the channel.
+- A packet is 14 bytes in a frame type whose payload limit is 250 bytes. Air time at event scale (about 115 packets a second across the fleet) is a few percent of the channel.
 
 ### Packet fields
 
@@ -314,7 +314,7 @@ A station is a SuperMini with a ring on USB power, placed at an exit or a zone c
 
 ### The NFC token
 
-Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band; BrightData.md: claiming a profile) requires a button press on the band within a server-timed window. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md); Medical-ID.md: the medic flow and the staff-only access rule.
+Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md); Medical-ID.md: the medic flow and the staff-only access rule.
 
 ### Power budget and runtime
 
@@ -327,7 +327,7 @@ Design values from the hardware handoff.
 | Coin motor | about 80 mA | only while buzzing (full bands) |
 | IMU | a few mA | always (full bands) |
 
-Call it about 150 mA average: a 500 mAh cell gives roughly 3 hours per charge, and charges at 380 mA from empty in about 1.5 to 2 hours. A band on the bench drains at the same rate, because there is no sleep. The cell's protection circuit cuts power at about 2.5 V. Because most bands have no battery divider, the dashboard shows battery as unknown and runtime is managed by charging before the demo. Stations and the gateway run from USB. The ring at full white would draw about 0.7 A, which is why brightness is capped in firmware.
+Call it about 150 mA average: a 500 mAh cell gives roughly 3 hours per charge, and charges at 380 mA from empty in about 1.5 to 2 hours. A band on the bench drains at the same rate, because there is no sleep. The cell's protection circuit cuts power at about 2.5 V. Because most bands have no battery divider, the dashboard shows battery as unknown and runtime is managed by charging before doors open. Stations and the gateway run from USB. The ring at full white would draw about 0.7 A, which is why brightness is capped in firmware.
 
 ### Physical form
 
@@ -356,14 +356,14 @@ The buzz carries no direction; the colour does. The two patterns differ from the
 | No acknowledgement from bands | commands are fire and forget, repeated three times | the bridge reconciles against the state the band reports rather than trusting delivery |
 | The gateway does not buffer | it has no storage and prints as it hears | the bridge reads continuously; a paused reader loses packets |
 | Zone, not position | a band knows only its loudest station | everything downstream is zone-level |
-| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
-| No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the demo |
+| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the crowd and simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
+| No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the event |
 
 ### Calibration as a system process
 
 Calibration turns the venue's radio environment into thresholds the bands use and a mapping the server uses. It is a process over the whole system, not a firmware setting.
 
-What is measured, in the demo spot with bands on wrists:
+What is measured, in the pit with bands on wrists:
 
 1. Spread out, about 2 m apart: the typical RSSI between neighbours ("far") and the resulting `neigh`, which should be 0 to 1.
 2. In the 1.5 m taped square, about 4 people per square metre: `neigh` should put bands in YELLOW.
@@ -375,13 +375,13 @@ Inter-band RSSI, the number that best guides the `rssi` thresholds, is visible i
 
 ### Overhead camera (TBD -- LEO)
 
-Vision.md: the hardware side of the camera is one phone on a light stand looking straight down on the demo pit. It serves JPEG snapshots over the team phone's hotspot to `bandit-vision` on the laptop, which counts people, spots a person on the ground and judges incidents ([Vision](Vision.md)). The taped demo squares define the camera's region of interest. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
+Vision.md: the hardware side of the camera is one phone on a light stand looking straight down on the pit. It serves JPEG snapshots over the team phone's hotspot to `bandit-vision` on the laptop, which counts people, spots a person on the ground and judges incidents ([Vision](Vision.md)). The taped squares define the camera's region of interest. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
 
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
-| A band's battery is flat | the band is silent; the server sees it stale after 5 s | bands are charged before the demo; a flat band shows grey and is left out of density |
+| A band's battery is flat | the band is silent; the server sees it stale after 5 s | bands are charged before doors open; a flat band shows grey and is left out of density |
 | A command is lost on air | the band keeps its old state | three repeats per command; the bridge re-sends while the reported state disagrees |
 | A band reboots | it forgets calibration, exit colour, override and any forced state, and blinks white for 1.5 s | the bridge sees the `seq` reset and re-sends `fleet_config` and the band's directives |
 | The gateway is unplugged | no lines on serial; every band goes stale on the dashboard | bands never depend on the gateway for safety colours, SOS or the light circle; the bridge reopens the port and resyncs ([Gateway-Bridge](../3-services/Gateway-Bridge.md)) |
@@ -400,13 +400,13 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): the wire protocol and the state precedence.
 - [Safety](../6-features/Safety.md): local density, SOS, fall and light-circle behaviour, zone reports, forced states, exit colours and the two buzz cues.
 - [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md): the NFC token and the IDENT blink for claiming.
-- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the demo bands.
+- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the simulated bands.
 - [Social](../6-features/Social.md): zone-level presence.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the fleet panel, state legend, calibration controls and manual override.
 
 **If you delete this file**
 
-- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s demo bands become the only band reports, through `report_sim_band`.
+- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s simulated bands become the only band reports, through `report_sim_band`.
 - Remove the Band, Station marker and Gateway rows from the component table in [Architecture](../1-overview/Architecture.md) and the device nodes from its diagrams.
 - Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md), and the press-to-confirm step from the band claim.
 - In [Safety](../6-features/Safety.md), remove the band-based density estimate, the light circle and both buzz cues; the camera estimate (TBD -- LEO) would stand alone.
@@ -417,9 +417,9 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 |---|---|
 | The firmware's state ladder stays as it is, with PAY and PAID above the light circle and forced states | there is no paying at the venue, so BandIt never sends `pay` or `paid` and those states never compete with an emergency; no firmware change is needed |
 | Forcing OFF is not used; the OFF sentinel stays as the firmware has it | bands on the bench are handled by hand, so no firmware change is needed |
-| One gateway on channel 1, with the firmware's 2 s neighbour window | one gateway hears the whole demo room, and the 2 s window absorbs the packet loss from venue Wi-Fi on channel 1 |
-| The three full bands go to the three people in the fall and SOS demo script; the six lite bands go to everyone else | fall detection must be on the wrist that falls in the script, and those wearers also feel the guidance buzz |
+| One gateway on channel 1, with the firmware's 2 s neighbour window | one gateway hears the whole room, and the 2 s window absorbs the packet loss from venue Wi-Fi on channel 1 |
+| The three full bands go to the three people in the fall and SOS script; the six lite bands go to everyone else | fall detection must be on the wrist that falls in the script, and those wearers also feel the guidance buzz |
 | Two buzz cues: pattern 2 (double) for full bands joining an incident's light circle, pattern 3 (long) with each new route colour | the short buzz already means "press registered", and the double buzz is free because BandIt sends no `pay`; each cue then feels different on the wrist |
 | Battery is managed by charging, not telemetry | most bands have no divider and report `bat` 255 |
 | The NFC tags hold the one public host of `bandit-api` and are locked read-only | judges use their own phones on one host; a static tag is enough because every consent needs a band press |
-| The docs describe the firmware as it is, with no proposed extensions | the team is not changing the hardware for the demo |
+| The docs describe the firmware as it is, with no proposed extensions | the team is not changing the hardware for the event |

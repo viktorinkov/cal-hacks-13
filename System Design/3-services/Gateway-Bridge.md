@@ -1,6 +1,6 @@
 # Gateway-Bridge
 
-`bandit-bridge` is the Rust process on the demo laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `band1t` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the simulator and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
+`bandit-bridge` is the Rust process on the venue laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `band1t` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the simulator and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
 
 ## Role in the system
 
@@ -19,7 +19,7 @@ Explicit non-responsibilities:
 
 - It decides nothing about safety: no incident logic, no exit assignment, no density. Those live in the module ([Safety](../6-features/Safety.md)). The bridge is a courier with a memory.
 - It holds no truth. Everything it knows is in `band_report`, `service_heartbeat` or its raw log, and a restart loses nothing the system needs.
-- It never speaks for simulated bands (Simulator.md: the crowd, ids 10 to 89, and the demo bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
+- It never speaks for bands no radio carries (Simulator.md: the crowd bands, ids 10 to 89, and the simulated bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
 - It does not synchronise clocks. It timestamps lines with the laptop clock on receipt and sends ages, not timestamps.
 - It runs no feature flow. It relays the claim blink down and the press flag up, and the module decides.
 
@@ -254,7 +254,7 @@ A rejected command is logged and counted in the heartbeat; it is never silently 
 
 The bridge writes every line it reads and every line it writes to a `.jsonl` file on the laptop: one JSON object per line, the gateway's object unchanged plus the laptop receive time in milliseconds since the epoch, the direction (in or out), and, for outgoing lines, the command text. Unparseable gateway lines are logged as raw text with the same timestamp. A new file starts with each run and whenever the serial port is reopened. The logs stay on the laptop; they are not uploaded.
 
-The log serves three purposes: replay through [Simulator](Simulator.md), a post-mortem of a demo run (what each band reported, what was commanded, when), and calibration capture. For calibration, the bridge tags each logged report with the `fleet_config` version in force when it was received. The capture itself is driven from the Ops dashboard: ops marks the start and end of each formation and the known density, the module stores it as `calibration_point` rows via `set_calibration` ([Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Safety](../6-features/Safety.md)), and the dashboard computes the mean `neigh` over the window from its `band_report` subscription. The log is the exact record if the numbers are later questioned.
+The log serves three purposes: replay through [Simulator](Simulator.md), a post-mortem of a run at the event or a rehearsal (what each band reported, what was commanded, when), and calibration capture. For calibration, the bridge tags each logged report with the `fleet_config` version in force when it was received. The capture itself is driven from the Ops dashboard: ops marks the start and end of each formation and the known density, the module stores it as `calibration_point` rows via `set_calibration` ([Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Safety](../6-features/Safety.md)), and the dashboard computes the mean `neigh` over the window from its `band_report` subscription. The log is the exact record if the numbers are later questioned.
 
 ### When the serial cable or the server goes away
 
@@ -269,7 +269,7 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 |---|---|---|
 | The bridge process crashes | no reports and no commands; bands continue locally | restart it by hand; it holds no state that matters and resyncs the whole fleet in its first batch; the Ops dashboard shows the missing heartbeat |
 | A command triple is lost on air | the band keeps its old state | the reconciler re-sends while the reported state disagrees, and re-sends unverifiable settings every 30 s |
-| A band reboots mid-demo | it forgets thresholds and directives | the `seq` reset triggers a per-band resync |
+| A band reboots during the event | it forgets thresholds and directives | the `seq` reset triggers a per-band resync |
 | The dashboard or module writes a bad directive (for example exit on target 0) | could recolour every station and show wrong exits | `bandit-protocol` validation rejects it, and the heartbeat counts the rejection |
 | A `buzz` arrives after an outage | a stale cue on someone's wrist | one-shots carry a useful life; late ones are acknowledged as `expired` and never sent |
 | `clear` misuse ends someone's SOS | an SOS vanishes | `clear` is only ever sent for an explicit `band_command`; forced states are released by expiry |
@@ -291,7 +291,7 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 
 **If you delete this file**
 
-- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s demo bands report, through `report_sim_band`.
+- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s simulated bands report, through `report_sim_band`.
 - Move the `bandit-protocol` crate description to [Simulator](Simulator.md), which still needs it.
 - Remove the `bridge` role and the bridge rows from the service tables in [Rust-Backend](Rust-Backend.md) and [Architecture](../1-overview/Architecture.md), and the `bandit-bridge` row from the service health panel in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
 - In [Safety](../6-features/Safety.md), note that `band_directive` and `band_command` rows have no consumer for real bands.
@@ -306,4 +306,4 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 | The serial port is a configured path, not auto-detected | a band charging on the same laptop has the same USB ids as the gateway |
 | One reboot rule: a `seq` that goes backwards is a reboot unless the last value was above 64000 | one rule covers a quick reboot and a band that comes back after a long silence |
 | A guidance `buzz` goes out after its target's pending `state` and `exit` commands | the wearer who feels it must see the new colour when they look down |
-| There is one gateway, id 200, on one serial port | one gateway hears the whole demo room, so there is one fleet map and one command queue |
+| There is one gateway, id 200, on one serial port | one gateway hears the whole room, so there is one fleet map and one command queue |
