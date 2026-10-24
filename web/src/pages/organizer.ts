@@ -5,8 +5,8 @@
 // decides the claims afterwards.
 
 import {
-  act, actors, config, connect, date, field, h, idToken, money, mount, risk, signIn,
-  signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
+  act, actors, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
+  signOut, signedInEmail, testAs, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
 import { graphTab } from '../graph';
 import type { DbConnection } from '../module_bindings';
@@ -107,7 +107,6 @@ function bandStatus(bandId: number): string {
 
 function header() {
   const roleList = [...(isOwner() ? ['owner'] : []), ...[...conn.db.myRoles.iter()].map(r => `${r.role} (${r.label})`)];
-  const as = new URLSearchParams(location.search).get('as') ?? '';
   const state = conn.db.eventState.id.find(0);
   const ended = state?.ended ?? false;
   return [
@@ -115,10 +114,7 @@ function header() {
     h('p', {},
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', {},
-      cfg.simulate && h('label', { class: 'check' }, 'Test as',
-        h('select', { onchange: (e: Event) => { const v = (e.target as HTMLSelectElement).value; location.search = v ? `?as=${v}` : ''; } },
-          h('option', { value: '' }, 'myself'),
-          people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
+      cfg.simulate && testAs(people),
       h('span', { class: 'muted' }, ` Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`)),
     can('ops') && h('p', {},
       ended
@@ -252,17 +248,7 @@ function incidentDesk() {
 /** The medical card a medic opened by tapping the band, while the incident is open. */
 function medicCard(incidentId: bigint) {
   const m = [...conn.db.medicMedicalCards.iter()].find(c => c.incidentId === incidentId);
-  if (!m) return null;
-  const c = m.card;
-  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`), h('p', {}, 'No medical card on file.'));
-  const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
-  return h('section', { class: 'alert' },
-    h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
-    c.bloodType && h('p', {}, h('b', {}, 'Blood type: '), c.bloodType),
-    list('Allergies', c.allergies), list('Conditions', c.conditions), list('Medications', c.medications),
-    c.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), c.emergencyContact),
-    c.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${c.insurer} ${c.plan}, member ${c.memberId}, group ${c.groupNumber}${c.insurerPhone ? `, ${c.insurerPhone}` : ''}`),
-    c.notes && h('p', {}, c.notes));
+  return m ? medicalCard(m) : null;
 }
 
 // --- Simulate ------------------------------------------------------------------------------

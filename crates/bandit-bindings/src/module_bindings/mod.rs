@@ -158,6 +158,7 @@ pub mod link_type;
 pub mod load_merch_templates_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
+pub mod medic_open_incident_reducer;
 pub mod medical_access_log_table;
 pub mod medical_access_log_type;
 pub mod medical_card_table;
@@ -472,6 +473,7 @@ pub use link_type::Link;
 pub use load_merch_templates_reducer::load_merch_templates;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
+pub use medic_open_incident_reducer::medic_open_incident;
 pub use medical_access_log_table::*;
 pub use medical_access_log_type::MedicalAccessLog;
 pub use medical_card_table::*;
@@ -762,6 +764,9 @@ pub enum Reducer {
     LoadMerchTemplates {
         templates: Vec<MerchTemplateIn>,
     },
+    MedicOpenIncident {
+        band_id: u8,
+    },
     OpenApiSession {
         token_hash: String,
     },
@@ -1036,6 +1041,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::IngestStation { .. } => "ingest_station",
             Reducer::JobReaper { .. } => "job_reaper",
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
+            Reducer::MedicOpenIncident { .. } => "medic_open_incident",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
             Reducer::OpenIncident { .. } => "open_incident",
@@ -1300,6 +1306,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::LoadMerchTemplates { templates } => {
                 __sats::bsatn::to_vec(&load_merch_templates_reducer::LoadMerchTemplatesArgs {
                     templates: templates.clone(),
+                })
+            }
+            Reducer::MedicOpenIncident { band_id } => {
+                __sats::bsatn::to_vec(&medic_open_incident_reducer::MedicOpenIncidentArgs {
+                    band_id: band_id.clone(),
                 })
             }
             Reducer::OpenApiSession { token_hash } => {

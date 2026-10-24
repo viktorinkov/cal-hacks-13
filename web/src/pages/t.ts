@@ -2,10 +2,12 @@
 // band by pressing it, name, socials, the medical history and insurance PDFs, the Capital One wallet,
 // then a thank-you.
 // When the host ends the event, the same page turns into the recap.
+// Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
+// for first aid, which the module hands out only while the band has an open SOS or fall incident.
 
 import {
-  act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, signIn, signOut,
-  signedInEmail, PLATFORMS,
+  act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
+  signIn, signOut, signedInEmail, testAs, time, type Actor, PLATFORMS,
 } from '../lib';
 import { recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -30,6 +32,9 @@ const QUERIES = [
   'SELECT * FROM person',
   'SELECT * FROM claimed_people',
   'SELECT * FROM band',
+  'SELECT * FROM my_roles',
+  'SELECT * FROM open_incidents',
+  'SELECT * FROM medic_medical_cards',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
@@ -39,6 +44,7 @@ type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 
 
 let conn: DbConnection;
 let simulate = false;
+let people: Actor[] = [];
 let claimError = '';
 let claimAsked = false;
 let step: Step = 'name';
@@ -279,12 +285,62 @@ function setup() {
   }
 }
 
+// --- Medic view -------------------------------------------------------------------------------
+
+function isMedic(): boolean {
+  return [...conn.db.myRoles.iter()].some(r => r.role === 'medic');
+}
+
+/** `asking` until the module answers the tap, then `granted` or the reason it refused. */
+let tap = 'asking';
+
+/** The medic's tap: the module checks the role and the open incident, and logs the granted read. */
+async function tapAsMedic() {
+  tap = 'asking';
+  try {
+    await conn.reducers.requestMedicalCard({ bandId });
+    tap = 'granted';
+  } catch (e: any) {
+    tap = String(e?.message ?? e);
+  }
+  render();
+}
+
+function medicView() {
+  const m = [...conn.db.medicMedicalCards.iter()].filter(c => c.bandId === bandId).pop();
+  const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && i.kind.tag !== 'Property');
+  const title = h('h2', {}, `Medic view: band ${bandId}`);
+  const again = h('button', { class: 'link', onclick: tapAsMedic }, 'Tap again');
+  if (m && incident) {
+    return [
+      title,
+      h('p', {}, `${incident.kind.tag} incident ${incident.id}, ${incident.status.tag.toLowerCase()}, opened ${time(incident.openedAt)} by ${incident.openedBy}.`),
+      incident.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: incident.id })) }, 'Take it'),
+      medicalCard(m),
+      h('p', {}, h('a', { href: `/organizer${location.search}#claims` }, 'Notes, cost and resolve on the incident desk')),
+    ];
+  }
+  if (tap === 'asking' || (tap === 'granted' && incident)) return [title, h('p', { class: 'muted' }, 'Opening the medical card…')];
+  if (tap === 'granted') return [title, h('p', {}, 'The incident is resolved, so the medical card is closed.'), again];
+  if (tap.includes('no open SOS or fall')) {
+    return [
+      title,
+      h('p', {}, `Band ${bandId} has no open SOS or fall, so its medical card stays closed.`),
+      h('button', { onclick: () => act(() => conn.reducers.medicOpenIncident({ bandId })).then(ok => { if (ok) return tapAsMedic(); }) }, 'Open an SOS and show the card'),
+    ];
+  }
+  if (tap.includes('nobody wears')) return [title, h('p', {}, `Nobody wears band ${bandId}.`), again];
+  return [title, h('p', { class: 'error' }, tap), again];
+}
+
 function render() {
   if (!conn) return;
   const mb = conn.db.myBand.iter().next().value;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
-  const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'));
+  const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
+    simulate && people.length > 0 && testAs(people));
+  if (isMedic()) return mount('app', top, medicView());
   if (mb && mb.bandId === bandId && mb.status === 'claimed') {
     if (ended) {
       return mount('app', top, recap(conn, render));
@@ -309,7 +365,10 @@ async function main() {
       h('button', { onclick: signIn }, 'Sign in with email'),
       simulate && h('button', { class: 'sim', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
+  if (simulate) people = await actors();
   conn = await connect(QUERIES, render);
+  // A medic's tap opens the medical card; it never claims the band.
+  if (isMedic()) return tapAsMedic();
   const mb = conn.db.myBand.iter().next().value;
   if (!mb || (mb.bandId === bandId && mb.status !== 'claimed')) await tryClaim();
   // Someone who reloads mid-setup picks up at the first step they have not finished.

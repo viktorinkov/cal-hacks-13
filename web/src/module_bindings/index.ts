@@ -63,6 +63,7 @@ import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
+import MedicOpenIncidentReducer from "./medic_open_incident_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
 import OpenIncidentReducer from "./open_incident_reducer";
@@ -879,6 +880,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
+  __reducerSchema("medic_open_incident", MedicOpenIncidentReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
   __reducerSchema("open_incident", OpenIncidentReducer),
