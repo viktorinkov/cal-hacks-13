@@ -141,7 +141,7 @@ pub fn ingest_heard(ctx: &ReducerContext, id: u8, heard: Vec<HeardEntry>) -> Res
     Ok(())
 }
 
-fn record_encounter(ctx: &ReducerContext, a: u16, b: u16, rssi: i8) {
+fn record_encounter(ctx: &ReducerContext, a: u32, b: u32, rssi: i8) {
     let key = pair_key(a, b);
     let now = ctx.timestamp;
     match ctx.db.encounter().key().find(key) {
@@ -171,7 +171,7 @@ fn record_encounter(ctx: &ReducerContext, a: u16, b: u16, rssi: i8) {
 }
 
 /// A band starts a stay in a station's zone, at a booth when its spot is known.
-pub(crate) fn open_stay(ctx: &ReducerContext, band_id: u16, zone: u8, booth_id: u64) {
+pub(crate) fn open_stay(ctx: &ReducerContext, band_id: u32, zone: u8, booth_id: u64) {
     ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone, entered: ctx.timestamp, left: None, booth_id, open: true });
 }
 
@@ -179,7 +179,7 @@ pub(crate) fn close_stay(ctx: &ReducerContext, v: ZoneVisit) {
     ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), open: false, ..v });
 }
 
-fn change_zone(ctx: &ReducerContext, band_id: u16, zone: u8) {
+fn change_zone(ctx: &ReducerContext, band_id: u32, zone: u8) {
     let now = micros(ctx.timestamp);
     let visits: Vec<ZoneVisit> = ctx.db.zone_visit().band_id().filter(band_id).collect();
     if let Some(open) = visits.iter().find(|v| v.open) {
@@ -204,7 +204,7 @@ fn change_zone(ctx: &ReducerContext, band_id: u16, zone: u8) {
     }
 }
 
-pub(crate) fn leave_zone(ctx: &ReducerContext, band_id: u16) {
+pub(crate) fn leave_zone(ctx: &ReducerContext, band_id: u32) {
     for v in ctx.db.zone_visit().band_id().filter(band_id).filter(|v| v.open).collect::<Vec<_>>() {
         close_stay(ctx, v);
     }

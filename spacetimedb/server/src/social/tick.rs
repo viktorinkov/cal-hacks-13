@@ -84,7 +84,7 @@ fn update_visits(ctx: &ReducerContext) {
 }
 
 /// Who wears a band and since when: the owner of a radio or test band, the attendee of a crowd band.
-pub fn wearer(ctx: &ReducerContext, band_id: u16) -> Option<(Identity, Timestamp)> {
+pub fn wearer(ctx: &ReducerContext, band_id: u32) -> Option<(Identity, Timestamp)> {
     match radio_id(band_id) {
         Some(id) => ctx.db.band_owner().band_id().find(id).map(|o| (o.owner, o.claimed_at)),
         None => ctx.db.crowd_member().band_id().find(band_id).map(|m| (m.identity, m.joined_at)),
@@ -195,7 +195,7 @@ fn update_encounters(ctx: &ReducerContext) {
         if !findable(owner.owner) {
             continue;
         }
-        for enc in ctx.db.encounter().band_a().filter(u16::from(owner.band_id)).collect::<Vec<_>>() {
+        for enc in ctx.db.encounter().band_a().filter(u32::from(owner.band_id)).collect::<Vec<_>>() {
             let Some((other, _)) = wearer(ctx, enc.band_b) else {
                 continue;
             };

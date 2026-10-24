@@ -51,7 +51,7 @@ export type Attendee = __Infer<typeof Attendee>;
 export const AttendeeOut = __t.object("AttendeeOut", {
   nodeId: __t.u64(),
   displayName: __t.string(),
-  bandId: __t.u16(),
+  bandId: __t.u32(),
   findable: __t.bool(),
   crowd: __t.bool(),
   organization: __t.string(),
@@ -74,7 +74,7 @@ export const AuthorityLimitRow = __t.object("AuthorityLimitRow", {
 export type AuthorityLimitRow = __Infer<typeof AuthorityLimitRow>;
 
 export const Band = __t.object("Band", {
-  id: __t.u16(),
+  id: __t.u32(),
   state: __t.u8(),
   flags: __t.u8(),
   neigh: __t.u8(),
@@ -395,14 +395,14 @@ export const CrowdGroup = __t.object("CrowdGroup", {
 export type CrowdGroup = __Infer<typeof CrowdGroup>;
 
 export const CrowdMember = __t.object("CrowdMember", {
-  bandId: __t.u16(),
+  bandId: __t.u32(),
   identity: __t.identity(),
   joinedAt: __t.timestamp(),
   groupId: __t.u16(),
   dxM: __t.f32(),
   dyM: __t.f32(),
   interests: __t.array(__t.string()),
-  chat: __t.u16(),
+  chat: __t.u32(),
 });
 export type CrowdMember = __Infer<typeof CrowdMember>;
 
@@ -413,9 +413,9 @@ export const CrowdTimer = __t.object("CrowdTimer", {
 export type CrowdTimer = __Infer<typeof CrowdTimer>;
 
 export const Encounter = __t.object("Encounter", {
-  key: __t.u32(),
-  bandA: __t.u16(),
-  bandB: __t.u16(),
+  key: __t.u64(),
+  bandA: __t.u32(),
+  bandB: __t.u32(),
   firstSeen: __t.timestamp(),
   lastSeen: __t.timestamp(),
   secondsClose: __t.u32(),
@@ -1277,7 +1277,7 @@ export type SharedVisit = __Infer<typeof SharedVisit>;
 
 export const SocialEncounter = __t.object("SocialEncounter", {
   id: __t.u64(),
-  bandPair: __t.u32(),
+  bandPair: __t.u64(),
   attendeeA: __t.identity(),
   attendeeB: __t.identity(),
   zoneId: __t.u64(),
@@ -1393,7 +1393,7 @@ export const Visit = __t.object("Visit", {
   zoneVisitId: __t.u64(),
   attendee: __t.identity(),
   zoneId: __t.u64(),
-  bandId: __t.u16(),
+  bandId: __t.u32(),
   startedAt: __t.timestamp(),
   endedAt: __t.option(__t.timestamp()),
   minutes: __t.f32(),
@@ -1447,7 +1447,7 @@ export type ZoneIn = __Infer<typeof ZoneIn>;
 
 export const ZoneVisit = __t.object("ZoneVisit", {
   id: __t.u64(),
-  bandId: __t.u16(),
+  bandId: __t.u32(),
   zone: __t.u8(),
   entered: __t.timestamp(),
   left: __t.option(__t.timestamp()),

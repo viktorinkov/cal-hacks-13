@@ -5,6 +5,7 @@
 import { Identity, Timestamp } from 'spacetimedb';
 import { DbConnection } from './module_bindings';
 import type { MedicCard } from './module_bindings/types';
+import { bandCode } from './band-code';
 
 export type Config = {
   spacetimedb_url: string;
@@ -219,10 +220,10 @@ export async function api<T>(path: string, session: string, init: RequestInit = 
 /** The medical card a medic opened by tapping the band, from the module's `medic_medical_cards`. */
 export function medicalCard(m: MedicCard): HTMLElement {
   const c = m.card;
-  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`), h('p', {}, 'No medical card on file.'));
+  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${bandCode(m.bandId)}`), h('p', {}, 'No medical card on file.'));
   const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
   return h('section', { class: 'alert' },
-    h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
+    h('h4', {}, `Medical card: ${m.name}, band ${bandCode(m.bandId)}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
     c.bloodType && h('p', {}, h('b', {}, 'Blood type: '), c.bloodType),
     list('Allergies', c.allergies), list('Conditions', c.conditions), list('Medications', c.medications),
     c.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), c.emergencyContact),

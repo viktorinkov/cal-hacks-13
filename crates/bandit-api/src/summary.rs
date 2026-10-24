@@ -548,7 +548,7 @@ mod tests {
     fn encounter(id: u64, a: u8, b: u8, seconds: u32) -> SocialEncounter {
         SocialEncounter {
             id,
-            band_pair: id as u32,
+            band_pair: id,
             attendee_a: who(a),
             attendee_b: who(b),
             zone_id: 1,

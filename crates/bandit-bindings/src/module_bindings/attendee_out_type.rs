@@ -11,7 +11,7 @@ use super::handle_out_type::HandleOut;
 pub struct AttendeeOut {
     pub node_id: u64,
     pub display_name: String,
-    pub band_id: u16,
+    pub band_id: u32,
     pub findable: bool,
     pub crowd: bool,
     pub organization: String,
@@ -29,7 +29,7 @@ impl __sdk::InModule for AttendeeOut {
 pub struct AttendeeOutCols {
     pub node_id: __sdk::__query_builder::Col<AttendeeOut, u64>,
     pub display_name: __sdk::__query_builder::Col<AttendeeOut, String>,
-    pub band_id: __sdk::__query_builder::Col<AttendeeOut, u16>,
+    pub band_id: __sdk::__query_builder::Col<AttendeeOut, u32>,
     pub findable: __sdk::__query_builder::Col<AttendeeOut, bool>,
     pub crowd: __sdk::__query_builder::Col<AttendeeOut, bool>,
     pub organization: __sdk::__query_builder::Col<AttendeeOut, String>,

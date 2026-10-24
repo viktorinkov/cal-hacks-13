@@ -172,7 +172,7 @@ impl<'ctx> __sdk::WithUpdate for EncounterTableHandle<'ctx> {
 /// but to directly chain method calls,
 /// like `ctx.db.encounter().key().find(...)`.
 pub struct EncounterKeyUnique<'ctx> {
-    imp: __sdk::UniqueConstraintHandle<Encounter, u32>,
+    imp: __sdk::UniqueConstraintHandle<Encounter, u64>,
     phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
 }
 
@@ -180,7 +180,7 @@ impl<'ctx> EncounterTableHandle<'ctx> {
     /// Get a handle on the `key` unique index on the table `encounter`.
     pub fn key(&self) -> EncounterKeyUnique<'ctx> {
         EncounterKeyUnique {
-            imp: self.imp.get_unique_constraint::<u32>("key"),
+            imp: self.imp.get_unique_constraint::<u64>("key"),
             phantom: std::marker::PhantomData,
         }
     }
@@ -189,7 +189,7 @@ impl<'ctx> EncounterTableHandle<'ctx> {
 impl<'ctx> EncounterKeyUnique<'ctx> {
     /// Find the subscribed row whose `key` column value is equal to `col_val`,
     /// if such a row is present in the client cache.
-    pub fn find(&self, col_val: &u32) -> Option<Encounter> {
+    pub fn find(&self, col_val: &u64) -> Option<Encounter> {
         self.imp.find(col_val)
     }
 }
@@ -197,7 +197,7 @@ impl<'ctx> EncounterKeyUnique<'ctx> {
 #[doc(hidden)]
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table = client_cache.get_or_make_table::<Encounter>("encounter");
-    _table.add_unique_constraint::<u32>("key", |row| &row.key);
+    _table.add_unique_constraint::<u64>("key", |row| &row.key);
 }
 
 #[doc(hidden)]

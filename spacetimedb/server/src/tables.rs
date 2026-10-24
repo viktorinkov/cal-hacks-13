@@ -11,15 +11,16 @@ pub const F_LOWBAT: u8 = 8;
 pub const F_MPU: u8 = 16;
 pub const F_MOTOR: u8 = 32;
 
-/// Radio and test bands carry ids 1 to 99, one byte like the radio.
+/// Radio and test bands carry ids 1 to 99, the one byte the radio sends.
 pub const BAND_ID_MAX: u8 = 99;
 /// The crowd's bands start here. No radio carries them: social's crowd tick moves them inside the module.
-pub const FIRST_CROWD_BAND: u16 = 100;
+pub const FIRST_CROWD_BAND: u32 = 100;
 
 #[spacetimedb::table(accessor = band, public)]
 pub struct Band {
+    /// The band's key. People never see it: they see its code (`band_code`).
     #[primary_key]
-    pub id: u16,
+    pub id: u32,
     pub state: u8,
     pub flags: u8,
     pub neigh: u8,
@@ -137,11 +138,11 @@ pub struct Gateway {
 #[spacetimedb::table(accessor = encounter, public)]
 pub struct Encounter {
     #[primary_key]
-    pub key: u32,
+    pub key: u64,
     #[index(btree)]
-    pub band_a: u16,
+    pub band_a: u32,
     #[index(btree)]
-    pub band_b: u16,
+    pub band_b: u32,
     pub first_seen: Timestamp,
     pub last_seen: Timestamp,
     pub seconds_close: u32,
@@ -155,7 +156,7 @@ pub struct ZoneVisit {
     #[auto_inc]
     pub id: u64,
     #[index(btree)]
-    pub band_id: u16,
+    pub band_id: u32,
     pub zone: u8,
     pub entered: Timestamp,
     pub left: Option<Timestamp>,
@@ -206,13 +207,13 @@ pub struct HeardEntry {
     pub rssi: i8,
 }
 
-pub fn pair_key(a: u16, b: u16) -> u32 {
+pub fn pair_key(a: u32, b: u32) -> u64 {
     let (lo, hi) = if a < b { (a, b) } else { (b, a) };
-    ((lo as u32) << 16) | hi as u32
+    ((lo as u64) << 32) | hi as u64
 }
 
 /// The one-byte id of a radio or test band, None for a crowd band.
-pub fn radio_id(id: u16) -> Option<u8> {
+pub fn radio_id(id: u32) -> Option<u8> {
     u8::try_from(id).ok().filter(|b| *b <= BAND_ID_MAX)
 }
 

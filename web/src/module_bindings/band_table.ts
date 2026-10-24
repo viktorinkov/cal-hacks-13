@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  id: __t.u16().primaryKey(),
+  id: __t.u32().primaryKey(),
   state: __t.u8(),
   flags: __t.u8(),
   neigh: __t.u8(),

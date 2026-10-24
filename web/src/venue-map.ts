@@ -5,6 +5,7 @@
 import { h } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { Band, PlanArea } from './module_bindings/types';
+import { bandCode } from './band-code';
 
 const FIRST_CROWD_BAND = 100;
 /** A dot takes this long per metre to glide to its new spot, within these bounds. */
@@ -117,7 +118,7 @@ function draw() {
     g.beginPath();
     g.arc(px(d.x), py(d.y), alarm ? 6 : crowd ? 2.2 : 4, 0, Math.PI * 2);
     g.fill();
-    if (!crowd) g.fillText(String(d.band.id), px(d.x) + 6, py(d.y) - 6);
+    if (!crowd) g.fillText(bandCode(d.band.id), px(d.x) + 6, py(d.y) - 6);
   }
 }
 

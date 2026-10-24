@@ -116,7 +116,7 @@ impl World {
     }
 
     fn set_band(&self, b: u8, f: impl FnOnce(&mut Band)) {
-        let mut row = self.t.db.band().id().find(u16::from(b)).unwrap();
+        let mut row = self.t.db.band().id().find(u32::from(b)).unwrap();
         f(&mut row);
         self.t.db.band().id().update(row);
     }

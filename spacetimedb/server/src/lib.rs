@@ -1,3 +1,4 @@
+pub mod band_code;
 pub mod commands;
 pub mod ingest;
 pub mod tuning;

@@ -239,7 +239,7 @@ async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Val
         return Err(error(StatusCode::BAD_REQUEST, "only the test bands 94 to 99 can be pressed from here; press a radio band's button"));
     }
     let token = tester_token(&app)?;
-    let station = app.conn.db.band().iter().find(|b| b.id == u16::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    let station = app.conn.db.band().iter().find(|b| b.id == u32::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
     app.web.test_bands.lock().unwrap().insert(band, station);
     for pressed in [false, true, false] {
         report_test_band(&app.web, &token, band, station, pressed)
@@ -308,7 +308,7 @@ async fn fall(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Valu
     if !app.web.test_mode || !(90..=99).contains(&band) {
         return Err(error(StatusCode::NOT_FOUND, "only test bands fall from here"));
     }
-    let station = app.conn.db.band().iter().find(|b| b.id == u16::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    let station = app.conn.db.band().iter().find(|b| b.id == u32::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
     let witnesses: Vec<u8> = [90u8, 92, 93, 91].into_iter().filter(|w| *w != band).take(2).collect();
     let (paused, gathered) = {
         let mut reporting = app.web.test_bands.lock().unwrap();
