@@ -1,8 +1,8 @@
 #!/bin/bash
-# Runs as root on the Vultr server (Debian): installs Chromium (for the medical record PDFs), Caddy, Rust
-# and Bun, checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, then (re)starts
+# Runs as root on the Debian VM: installs Chromium (for the medical record PDFs), Caddy, Rust and Bun,
+# checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, then (re)starts
 # bandit-api, bandit-indexer and bandit-workers under systemd behind Caddy on https://$BANDIT_HOST.
-# scripts/deploy-vultr copies /opt/bandit/.env and /var/lib/bandit/identities first, then runs this.
+# scripts/deploy-vm copies /opt/bandit/.env and /var/lib/bandit/identities first, then runs this.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 APP=/opt/bandit

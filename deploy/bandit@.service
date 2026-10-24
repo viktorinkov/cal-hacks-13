@@ -1,4 +1,4 @@
-# One BandIt service on the Vultr server: bandit@api, bandit@indexer or bandit@workers. They share
+# One BandIt service on the VM: bandit@api, bandit@indexer or bandit@workers. They share
 # /var/lib/bandit (identities, uploaded files, rendered records) and read their keys from /opt/bandit/.env.
 [Unit]
 Description=BandIt %i
