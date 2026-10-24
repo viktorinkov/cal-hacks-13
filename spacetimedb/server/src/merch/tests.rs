@@ -178,6 +178,11 @@ impl World {
         photo.id
     }
 
+    /// The host's "Event ended" button; merch is sold only after it.
+    fn end_event(&self) {
+        self.as_("ops", crate::web::end_event);
+    }
+
     fn balance(&self, name: &str) -> i64 {
         my_wallet(&self.view(name)).expect("wallet is open").balance_cents
     }
@@ -294,6 +299,9 @@ fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
     let photo = w.photo("Maya Chen", w.sponsor_row, "confirmed");
     let tee = w.template("tee_spacetimedb.png");
 
+    let err = w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err();
+    assert!(err.contains("once the event ends"), "{err}");
+    w.end_event();
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, String::new())).unwrap_err().contains("size"));
     assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err().contains("photo"));
     w.as_("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into()));
@@ -330,6 +338,7 @@ fn a_failed_purchase_frees_the_money_and_the_wallet_cannot_overspend() {
     let w = World::new();
     let photo = w.photo("Maya Chen", w.sponsor_row, "confirmed");
     let tee = w.template("tee.png");
+    w.end_event();
     w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya Chen".into(), true));
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "S".into())).unwrap_err().contains("opening"));
     let job = w.lease(crate::wallet::KIND_WALLET_OPEN);
