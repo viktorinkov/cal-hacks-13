@@ -162,3 +162,14 @@ pub fn open_api_session(ctx: &ReducerContext, token_hash: String) -> Result<(), 
     });
     Ok(())
 }
+
+/// Staff take a band back at the entrance, so the next person can claim it. The wearer keeps their
+/// profile and their memories of the event.
+#[spacetimedb::reducer]
+pub fn release_band(ctx: &ReducerContext, band_id: u8) -> Result<(), String> {
+    crate::roles::require_role(ctx, &["ops"])?;
+    if !ctx.db.band_owner().band_id().delete(band_id) {
+        return Err(format!("band {band_id} is not claimed"));
+    }
+    Ok(())
+}
