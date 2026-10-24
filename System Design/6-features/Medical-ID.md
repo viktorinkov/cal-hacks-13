@@ -1,57 +1,60 @@
 # Medical-ID
 
-Medical-ID is the "Wrist assured" medical card. In band setup an attendee may upload two PDFs: their medical history and their health insurance document. A worker sends each to Claude, which returns a structured record with page references; code validates each record and writes both into one `medical_card`, which the attendee confirms before setup ends. The attendee does not see the card again during the event. A medic sees a card only by tapping the band of someone with an open `sos` or `fall` incident, and every medic read is written to `medical_access_log`. The model reads the document; code decides who sees the card.
+Medical-ID is the "Wrist assured" medical card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker sends each to Claude, which returns the card fields with the page each item came from. Code checks the answer and writes it into the attendee's one `medical_card`, which the attendee checks once before setup ends. A medic sees a card only for a band with an open `sos` or `fall` incident, by tapping that band with their phone or from the incident desk in the Ops dashboard, and every granted read is written to `medical_access_log`. A medic who reaches someone before any flag opens the SOS from the tap. The model reads the document; code decides who sees the card.
 
 ## Role in the system
 
 Responsibilities:
 
-- Accept the two PDFs, the medical history and the health insurance document, through `bandit-api`, store each as an `owner_only` blob, and record a `medical_document` of its kind.
-- Extract a structured record from each with the `medical_extract` job, validate it in code, and write it into the attendee's one `medical_card`.
-- Offer a manual-entry form on the confirm-card screen in setup, for edits and for typing the card when extraction fails.
-- Enforce the medic access rule in a reducer and log every medic read.
-- Let a medic who tapped a band open an `sos` incident for it, which then grants access.
-- Serve the card to the medic view opened by tapping the band.
+- Take the two PDFs, the medical history and the health insurance card, after the attendee page stored each in the blob store as an `owner_only` file, and record a `medical_document` of its kind.
+- Read each document into the attendee's one `medical_card` with the `medical_extract` job, checked in code.
+- Let the attendee check the card once, in setup, and confirm it.
+- Apply the medic access rule in one reducer and log the granted reads.
+- Show the medic view when a medic taps a band, and let the medic open an SOS from it when none is open.
+- Serve the granted card to the medic view and the incident desk while the incident is open.
 
 Non-responsibilities:
 
-- Incident detection, acknowledgement, assignment and resolution: [Safety](Safety.md). This file only reads `incident` rows and, in one reducer, opens one.
-- The NFC sticker, its URL and read range: [Hardware](../4-devices/Hardware.md).
-- Routes and screens (the medical setup step, the confirm-card screen, the medic view): [Attendee-App](../5-apps/Attendee-App.md). This file defines what they call and what they may show.
-- The venue's insurance policy: [Hyphenate](../7-integrations/Hyphenate.md). The health insurance on the card is the attendee's own.
-- Prompt wording, the output schema, model and effort, PDF input, recording in `model_call`: [Anthropic-Agent](../7-integrations/Anthropic-Agent.md).
-- Using the card as claim evidence: [Hyphenate](../7-integrations/Hyphenate.md). This file defines the read it is allowed.
+- Incident detection, taking an incident, notes and resolution: [Safety](Safety.md). This file only reads `incident` rows.
+- The setup screens, their order and the tap's landing route: [Attendee-App](../5-apps/Attendee-App.md). This file defines what the upload, document and card steps and the medic view call and show.
+- The incident desk and its layout: [Ops-Dashboard](../5-apps/Ops-Dashboard.md). This file defines what the medical card part calls and shows.
+- The blob store and the upload route: [Rust-Backend](../3-services/Rust-Backend.md).
+- The venue's insurance policy and claims: [Insurance](Insurance.md). The health insurance on the card is the attendee's own, and Insurance never reads the card.
+- Calling Claude, `ask_twice`, recording in `model_call`: [Anthropic-Agent](../7-integrations/Anthropic-Agent.md).
 
 ## Interfaces
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| `POST /api/medical/document` | in | Attendee app, the medical setup step | one PDF (multipart), its kind (`medical_history` or `health_insurance`), the caller's `api_session` token | HTTPS to `bandit-api` |
-| `register_blob` (core) | out | `bandit-api` (role `api`) | content type, size, SHA-256, owner, access class `owner_only` | SpacetimeDB reducer ([SpacetimeDB](../2-data/SpacetimeDB.md)) |
-| `submit_medical_document` | in | `bandit-api` (role `api`) | attendee id, kind, `blob_ref` id, page count | reducer; writes `medical_document`, enqueues `medical_extract` |
-| Job `medical_extract` | out | `bandit-workers` | payload: document id, kind, blob id; result: validated record | `job` table |
-| Claude Messages API | out | `bandit-workers` through `claude-client` | the PDF as document input, the JSON schema for its kind; structured record back | HTTPS ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)) |
-| `apply_medical_extract` | in | role `worker` | job id, document id, validated record, `model_call` id | reducer; rejects a stale lease |
-| `confirm_medical_card` | in | the attendee (own identity), in setup | card id | reducer |
-| `save_medical_card` | in | the attendee (own identity), in setup | all card fields, typed or edited | reducer; manual entry or correction |
-| `request_medical_card` | in | role `medic` | the band's NFC token from the tap | reducer; applies the access rule, writes `medical_access_log` |
-| `medic_open_incident` | in | role `medic` | the band's NFC token | reducer; opens an `sos` incident assigned to the caller |
-| View `my_medical_card` | out | the attendee, on the confirm-card screen in setup | own `medical_card` and the status of each `medical_document` | subscription |
-| View `medic_medical_card` | out | role `medic` | the card for which a granted log row exists for the caller and the incident is not resolved | subscription |
-| `medical_card` read by `open_claim` | out | `band1t` module (Hyphenate.md) | card status, emergency contact present, conditions text, logged with `via = claim` | module-internal |
-| Access log | out | Ops dashboard (role `ops`) | `medical_access_log` rows | subscription |
+| `POST /api/blobs?purpose=history` and `purpose=insurance` | in | Attendee app, the document steps of setup | one PDF as the request body, the attendee's API session in `x-bandit-session`; back come the hash, the size, the page count and the URL | HTTPS to `bandit-api` ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| `register_blob` (core) | out | `bandit-api` (role `api`) | the SHA-256, owner = the attendee, access class `owner_only`, purpose `history` or `insurance`, content type, size | SpacetimeDB reducer ([SpacetimeDB](../2-data/SpacetimeDB.md)) |
+| `submit_medical_document` | in | the attendee (own identity) | kind (`history` or `insurance`), the file hash, the page count | reducer; writes `medical_document`, enqueues `medical_extract` |
+| Job `medical_extract` | out | `bandit-workers` | payload: document id, kind, file hash, page count | `job` table |
+| Claude Messages API | out | `bandit-workers` through `claude-client` | the PDF, the prompt naming the kind and the page count, one JSON schema; the answer back | HTTPS ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)) |
+| `apply_medical_extract` | in | role `worker` | job id, the checked card as JSON, the model call | reducer; refuses a job the caller does not hold |
+| `confirm_medical_card` | in | the attendee (own identity), in setup | nothing | reducer |
+| View `my_medical_documents` | out | the attendee, the card step of setup | own `medical_document` rows | subscription |
+| View `my_medical_card` | out | the attendee, the card step of setup | own `medical_card` | subscription |
+| `request_medical_card` | in | role `medic`, the medic view and the incident desk | the band id | reducer; applies the access rule, writes `medical_access_log` |
+| `medic_open_incident` | in | role `medic`, the medic view | the band id | reducer; opens an `sos` incident on that band, taken by the caller |
+| View `medic_medical_cards` | out | role `medic`, the medic view and the incident desk | one row per granted request whose incident is still open: incident id, band id, name, card | subscription |
+| View `board_medical_access` | out | the owner, role `ops` or `medic` | every `medical_access_log` row | subscription |
 
 ## Design
 
-### Upload and storage
+### Upload
 
-The medical step of setup offers two uploads, each optional: the attendee's medical history and their health insurance document. The app sends each PDF to `bandit-api` with its kind and its `api_session` token; `bandit-api` hashes the token, finds the session in its subscription and so knows the attendee ([SpacetimeDB](../2-data/SpacetimeDB.md), `api_session`). It checks the content type is PDF and the size is at most 10 MB, writes the file to the blob store, counts the pages, calls `register_blob` with access class `owner_only`, and calls `submit_medical_document`. That reducer writes a `medical_document` row of that kind in status `uploaded`, moves it to `extracting`, and enqueues `medical_extract` with the document id, the kind and the blob id. An attendee has one current document of each kind: a new upload of a kind supersedes the old row of that kind (`superseded_by`).
+Setup has two upload steps, each with "Skip": "Your medical history" and then "Your health insurance". The history step tells the attendee: "A medic sees the card only if you fall or press SOS, and only by tapping your band." On "Upload" the page opens an API session if it has none and sends the PDF to `POST /api/blobs?purpose=history` (or `purpose=insurance`) with the session token. `bandit-api` finds the attendee from the session, writes the file to the blob store, calls `register_blob` with the attendee as owner and access class `owner_only`, counts the pages, and returns the hash and the page count. An empty file is refused. There is no size cap.
 
-`owner_only` keeps the PDFs out of every other screen: `bandit-api` serves such a blob only to the owner's own session. Medics, ops and Hyphenate see the extracted card, never a document.
+The page then calls `submit_medical_document(kind, file_hash, page_count)` as the attendee. It refuses, in order: "kind is history or insurance", "claim your band first" (the caller wears no band), "upload the PDF first" (no `blob_ref` with that hash) and "upload the PDF as your own medical document" (the file came in under another purpose). Otherwise it writes a `medical_document` in status `reading` with the page count (at least 1) and enqueues `medical_extract`. A new upload is a new document; when it is read, its fields overwrite that kind's fields on the card.
+
+In test mode each upload step also has "Use a test record". It loads the synthetic `medical-history.pdf` or `insurance-card.pdf` from `bandit-api`'s `/samples` route and files it the same way.
+
+Only the attendee's own `my_medical_documents` shows the file hash. Medics and ops see the card, never the PDF.
 
 ### Extraction
 
-The sequence below answers one question: how do the uploaded PDFs become one confirmed card, and which step is code and which is the model.
+The sequence below answers one question: how does an uploaded PDF become fields on the card, and which step is code and which is the model.
 
 ```mermaid
 sequenceDiagram
@@ -61,185 +64,188 @@ sequenceDiagram
   participant M as band1t module
   participant W as bandit-workers
   participant C as Claude API
-  loop each uploaded PDF: medical history, health insurance
-    A->>API: POST /api/medical/document (PDF, kind, api_session token)
-    API->>S: write PDF
-    API->>M: register_blob (owner_only), submit_medical_document
-    M->>M: medical_document extracting, job medical_extract
-    W->>M: claim_job (medical_extract)
-    W->>S: read PDF by blob id
-    W->>C: Messages API: PDF document input, the kind's JSON schema
-    C-->>W: record with page references
-    W->>W: validate in code (enums, page refs, lengths), drop items without a page
-    W->>M: apply_medical_extract (record, model_call id), complete_job
-    M->>M: the kind's fields on the one medical_card, document extracted
-  end
-  M-->>A: subscription: card to review, once every uploaded PDF is read
-  A->>M: confirm_medical_card
-  M-->>A: subscription: card confirmed, setup goes on
+  A->>API: POST /api/blobs?purpose=history (PDF, x-bandit-session)
+  API->>S: write PDF
+  API->>M: register_blob (owner_only, owner = attendee)
+  API-->>A: hash, page count
+  A->>M: submit_medical_document (history, hash, pages)
+  M->>M: medical_document reading, job medical_extract
+  W->>M: claim_job (medical_extract)
+  W->>S: read PDF by hash
+  W->>C: PDF, prompt with the kind, one JSON schema, effort low
+  C-->>W: card fields, each item with its page
+  W->>W: check in code, items without a page go to dropped
+  W->>M: apply_medical_extract (card JSON, model call)
+  M->>M: history fields on the card, card extracted, document read
+  M-->>A: my_medical_card, my_medical_documents
 ```
 
-The worker claims the job, reads the blob, and sends the PDF as document input with the JSON schema for its kind; the schema is the contract. Claude reads each page as text and as an image, so a scanned PDF works the same way. Model `claude-opus-5-5`, effort set per [Anthropic-Agent](../7-integrations/Anthropic-Agent.md), the call recorded in `model_call`. The worker calls `extend_job_lease` while the model call runs, so a long PDF is not handed to another worker. For the medical history the schema asks for:
+The worker gets the PDF from the blob store by its hash and asks Claude with the default model in `claude-client`, effort low, the PDF, and one JSON schema for both kinds. The prompt says which kind it is and how many pages the document has. The system prompt says to copy only what is printed, to cite the page of every item, and to leave a field empty rather than guess. The schema asks for:
 
-| Field | Shape | Validation in code |
-|---|---|---|
-| `blood_type` | one of the eight ABO/Rh types or `unknown` | must be in the set; anything else becomes `unknown` |
-| `allergies` | list of {name, reaction, page} | at most 20 items; name at most 120 characters; `page` between 1 and the page count; an item without a valid page is dropped |
-| `conditions` | list of {name, page} | same |
-| `medications` | list of {name, dose, page} | same |
-| `emergency_contact` | {name, relation, phone, page} | phone reduced to digits and plus sign, 7 to 15 digits; page required |
-| `notes` | free text, list of pages | at most 1000 characters |
+| Field | Shape |
+|---|---|
+| `blood_type` | one of A+, A-, B+, B-, AB+, AB-, O+, O- or `unknown` |
+| `allergies` | list of {name, reaction, page} |
+| `conditions` | list of {name, page} |
+| `medications` | list of {name, dose, page} |
+| `emergency_contact` | {name, relation, phone, page}, or empty |
+| `insurance` | {insurer, plan, member_id, group_number, phone, page}, or empty |
+| `notes` | short text a medic should know |
 
-For the health insurance document the schema asks for:
+Code then checks the answer and turns it into card fields:
 
-| Field | Shape | Validation in code |
-|---|---|---|
-| `insurance` | {insurer, member_id, group_number, plan, page} | insurer and plan at most 120 characters; member id and group number letters, digits and dashes only, at most 40 characters, the group number may be empty; page required, or the item is dropped |
+- Blood type outside the list becomes `unknown`.
+- Each list keeps at most 20 items. Each item becomes one text line that ends with its page, such as "Penicillin: hives (p. 1)". An item whose page is not between 1 and the page count goes to `dropped` instead, as "allergies: Latex: rash (no page on the document)".
+- The emergency contact needs a page. It becomes one line, "Ana Minchev (mother), +18055550142", with the phone cut to digits and the plus sign.
+- The insurance needs a page, or its fields stay empty. Its phone becomes `insurer_phone`.
+- Notes are cut to 1000 characters.
 
-Every item carries the page it came from, so a medic can trust it and the owner can check it. Code never accepts a field without a page reference and counts what it dropped in `medical_document.dropped_items`. On success `apply_medical_extract` (role `worker`, rejects a stale lease) writes the fields of the document's kind onto the attendee's one `medical_card`, creating it when there is none and leaving the other kind's fields as they are. It sets `status = extracted`, `source = model` and `history_document_id` or `insurance_document_id`, and sets the document to `extracted` with its `model_call_id`.
+The check runs through `ask_twice` ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)): when it rejects the answer, the worker asks Claude once more with the first answer and the problems. A failed Claude call fails the attempt, and the job queue tries again up to its last attempt.
 
-### Confirmation and manual entry
+`apply_medical_extract` (role `worker`, the job must be leased by the caller) records the model call. It merges the fields of the document's kind into the attendee's card, creating the card when there is none. History sets `blood_type` (empty becomes `unknown`), `allergies`, `conditions`, `medications`, `emergency_contact` and `notes`. Insurance sets `insurer`, `plan`, `member_id`, `group_number` and `insurer_phone`. The other kind's fields stay as they are. The card goes back to `extracted`, because a new reading needs the wearer's look again, and the document becomes `read` with its `model_call_id` and `dropped`. An answer that is not readable card JSON sets the document to `failed` and finishes the job.
 
-The confirm-card screen in setup waits until every document the attendee uploaded is `extracted` or `failed`, then shows the card next to the page references. `confirm_medical_card` sets `status = confirmed` and `confirmed_at`. `save_medical_card` lets the owner edit any field, or type the whole card; it writes the card with `source = manual` (`model_edited` when it started from an extraction) and `status = confirmed`, since the owner typed it. When extraction of a document fails three times the document is `failed` and the screen opens the manual form for that document's fields.
+### The card step
 
-This screen is the only place the attendee sees the card. Once setup moves on, the attendee page is the thank-you screen, which does not show it ([Attendee-App](../5-apps/Attendee-App.md)).
+The card step comes after "Are you one of these?" in setup ([Attendee-App](../5-apps/Attendee-App.md)). It reads `my_medical_documents` and `my_medical_card`:
 
-Anthropic-Agent.md: without it, upload is hidden and the manual form is the whole feature; the access rule is unchanged.
+1. No document: the step is skipped and setup goes on to the wallet.
+2. A document is still `reading`, or there is no card yet: "Claude is reading your documents", "This takes a few seconds." and "Check later", which goes on to the wallet.
+3. Otherwise: "Your medical card", "Read by Claude from your PDFs; each item shows the page it came from." It shows the blood type, allergies, conditions, medications, emergency contact and insurance. When a document is `failed` it adds "One document could not be read." "Looks right" calls `confirm_medical_card`, which sets the card to `confirmed`, and setup goes on to the wallet.
 
-A card in `extracted` that was never confirmed is still shown to a medic, labelled "not yet confirmed by the wearer", because a card with a caveat beats no card in an emergency.
+This step is the only place the attendee sees the card. After setup the attendee page is the thank-you screen and, after the event, the recap; neither shows it.
 
-### Access rule
+### The medic opens the card
 
-The rule lives in one reducer, `request_medical_card`, and nowhere else. The medic always taps the band; the tap supplies the NFC token. The token is static in v0.1, so presenting it counts as the tap. The checks, in order:
+A medic opens a card in two places, and both call `request_medical_card(band_id)`, so one rule and one log cover both.
 
-1. The caller holds role `medic` in `staff_role`.
-2. The token resolves to a claimed `band` and its owner.
-3. There is an `incident` of kind `sos` or `fall` for that band with status `open`, `acknowledged` or `responding`.
-4. The reducer writes a `medical_access_log` row: card, attendee, reader identity and role, incident id, `via` (`tap`), `granted` true or false, `reason`, `read_at`.
+**The tap.** At the person, the medic taps the band's tag with their own phone, which opens `/t/BANDIT-nn` like any tap ([Attendee-App](../5-apps/Attendee-App.md)). When `my_roles` holds role `medic`, the page shows "Medic view: band N" instead of setup or the recap, never claims the band, and calls `request_medical_card` for that band at once. It subscribes to `my_roles`, `open_incidents` and `medic_medical_cards`.
 
-The view `medic_medical_card` returns the card only where a granted log row exists for the caller and the linked incident is not `resolved`. Since the only way to get a log row is this reducer, every read writes `medical_access_log`. When the incident resolves, the card leaves the medic's screen with no cleanup step. A denied request also leaves a log row with its reason, so ops can see attempts.
+- Granted: the incident line "<Kind> incident <id>, <status>, opened <time> by <who>.", "Take it" while the incident is still `open` (`assign_medic`, [Safety](Safety.md)), the card, and the link "Notes, cost and resolve on the incident desk" to the Ops dashboard's Claims tab.
+- No open `sos` or `fall` on the band: "Band N has no open SOS or fall, so its medical card stays closed." with "Open an SOS and show the card". It calls `medic_open_incident(band_id)` and then asks for the card again.
+- "Nobody wears band N." and, after the incident resolved, "The incident is resolved, so the medical card is closed.", each with "Tap again".
 
-The flowchart below answers one question: given a medic's tap on a band, when does the card show.
+`medic_open_incident(band_id)` is for a medic who reaches someone before any band flag. It requires role `medic` and a worn band ("nobody wears that band"), and refuses "this band already has an open SOS or fall incident". Otherwise it opens an `sos` incident on that band in the zone of the band's current station, through the same open as a band SOS, so the snapshot is frozen in the same transaction. The incident has `opened_by` `medic`, status `responding` and `assigned_medic` the caller, so it needs no "Take it" and no escalation timer. It shows on the incident desk like any other incident, where the medic adds notes and resolves it ([Safety](Safety.md)).
+
+**The incident desk.** In the Ops dashboard's Claims tab, each open incident with a band shows "Tap band N for the medical card", which calls `request_medical_card` with the incident's band ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). The granted card shows inside the incident.
+
+In both places the card reads "Medical card: <name>, band N", with " (not yet confirmed by the wearer)" until the wearer confirmed it. It lists the blood type, allergies, conditions, medications, emergency contact, insurance and notes, each item with its page. The card closes when the incident resolves.
+
+The flowchart below answers one question: what does a medic's tap on a band show.
 
 ```mermaid
 flowchart TD
-  Q["request_medical_card (token from the tap)"] -->|"caller role"| R{"role medic"}
-  R -->|"no"| D["denied, logged with reason"]
-  R -->|"yes"| B{"band claimed"}
-  B -->|"no"| D
-  B -->|"yes"| I{"open sos or fall incident for this band"}
-  I -->|"no"| O["medic view offers medic_open_incident, then requests again"]
-  I -->|"yes"| G["medical_access_log granted; medic_medical_card shows the card until resolved"]
-  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  T["medic's phone opens /t/BANDIT-nn"] --> Ro{"my_roles holds medic"}
+  Ro -->|"no"| A["band setup, thank-you or recap (Attendee-App)"]
+  Ro -->|"yes"| Q["request_medical_card (band_id)"]
+  Q -->|"granted"| V["Medic view: incident line, Take it while open, the card, link to the incident desk"]
+  Q -->|"no open SOS or fall"| O["Open an SOS and show the card"]
+  O --> MO["medic_open_incident: sos, responding, taken by the medic"]
+  MO --> Q
+  Q -->|"nobody wears that band"| N["Nobody wears band N, Tap again"]
   classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
-  class Q,R,B,I,G,D stdb
-  class O web
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  class T,Ro,A,V,O,N web
+  class Q,MO stdb
 ```
 
-### Opening an incident from a tap
+### Access rule
 
-A medic may reach a person before any band flag or dashboard action: the wearer is unwell but did not hold the button, or the band is a lite band with no fall sensor. `medic_open_incident` (role `medic`) takes the token, requires a claimed band with no open `sos` or `fall` incident, and opens an `sos` incident for that band with `status = responding`, `assigned_medic` set to the caller and `opened_by = medic`, freezing the snapshot the same way `ingest_band_reports` does ([Safety](Safety.md) owns the snapshot). No escalation timer is scheduled because a medic is already there. The next `request_medical_card` passes the rule. The band's light state is left alone; the medic is already standing there.
+The rule lives in one reducer, `request_medical_card(band_id)`, and nowhere else. The checks, in order:
 
-### The medic tap flow
+1. The caller holds role `medic`.
+2. Someone wears the band. Otherwise it refuses "nobody wears that band".
+3. The band has an incident of kind `sos` or `fall` that is not resolved.
+4. The reducer writes a `medical_access_log` row with the reader, the wearer, the band, the incident, `granted`, the reason and `read_at`. A granted reason reads "open sos incident 12" or "open fall incident 12". A denied request returns "no open SOS or fall incident for this band" as its error, and the error rolls the reducer back, so its row does not stay.
 
-The sequence below answers one question: what happens from the medic's phone touching the band to the card on screen.
+The view `medic_medical_cards` returns, for the calling medic, one row per incident with a granted log row whose incident is still open. The only way to get a granted row is this reducer, so every card a medic sees has a log row. When the incident resolves, the card leaves the medic's screen with no cleanup step. `board_medical_access` shows every granted read to the owner, `ops` and `medic`; a denied request leaves no row.
+
+The flowchart below answers one question: given a medic's request for a band, when does the card show.
 
 ```mermaid
-sequenceDiagram
-  participant P as Medic's phone
-  participant B as Band
-  participant A as Attendee app (medic view)
-  participant M as band1t module
-  P->>B: NFC tap
-  B-->>P: NDEF URL https://host/t/BANDIT-07
-  P->>A: opens /t/BANDIT-07
-  A->>M: subscribe my_roles
-  M-->>A: role medic: show the medic view
-  A->>M: request_medical_card (BANDIT-07)
-  alt open sos or fall incident
-    M->>M: medical_access_log granted
-    M-->>A: view medic_medical_card: the card
-  else no open incident
-    M->>M: medical_access_log denied, reason no_incident
-    M-->>A: reducer error no_incident
-    A->>M: medic_open_incident (BANDIT-07), then request_medical_card again
-    M-->>A: view medic_medical_card: the card
-  end
+flowchart TD
+  Q["request_medical_card (band_id)"] --> R{"caller holds role medic"}
+  R -->|"no"| E["refused, no log row"]
+  R -->|"yes"| B{"someone wears the band"}
+  B -->|"no"| E2["nobody wears that band, no log row"]
+  B -->|"yes"| I{"unresolved sos or fall incident on the band"}
+  I -->|"no"| D["denied: reason returned as the error, no log row"]
+  I -->|"yes"| G["log row granted; medic_medical_cards shows the card until the incident resolves"]
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  class Q,R,B,I,G,D,E,E2 stdb
 ```
-
-The medic view shows the card fields with their page references, the health insurance among them, the band id, the incident id and status, and nothing from the PDF itself. When the attendee has no card, it shows "no medical card on file" and the incident still stands.
-
-### Hyphenate reads the card
-
-[Hyphenate](../7-integrations/Hyphenate.md)'s `open_claim` reads the subject attendee's `medical_card` when it builds the evidence pack. Code reads only the card's status and whether an emergency contact is present; the conditions text goes to the `claim_draft` job as model-read material for the claim summary. It never reads the health insurance fields: a claim is paid under the venue's policy, and the attendee's own insurance plays no part in it. The read writes a `medical_access_log` row with `via = claim`, the claim id in `reason`, and the identity whose call opened the claim as the reader, so the owner's log shows it like any medic read. This is the one kind of row in the access log that belongs to another file.
 
 ### Tables
 
 | Table | One row is | Fields |
 |---|---|---|
-| `medical_document` | one uploaded PDF | `id`, `attendee_id`, `kind` (`medical_history`, `health_insurance`), `blob_id`, `page_count`, `status` (`uploaded`, `extracting`, `extracted`, `failed`), `job_id`, `model_call_id`, `dropped_items`, `superseded_by`, `uploaded_at` |
-| `medical_card` | one attendee's current card | `id`, `attendee_id` (unique), `status` (`extracted`, `confirmed`), `source` (`model`, `model_edited`, `manual`), `blood_type`, `allergies`, `conditions`, `medications` (each a list of items with page references, stored as text lists), `emergency_contact_name`, `emergency_contact_relation`, `emergency_contact_phone`, `emergency_contact_page`, `notes`, `insurer`, `insurance_member_id`, `insurance_group_number`, `insurance_plan`, `insurance_page`, `history_document_id`, `insurance_document_id`, `extracted_at`, `confirmed_at`, `updated_at` |
-| `medical_access_log` | one read or denied attempt | `id`, `card_id`, `attendee_id`, `reader_identity`, `reader_role`, `incident_id`, `via` (`tap`, `claim`), `granted`, `reason`, `read_at` |
+| `medical_document` | one uploaded PDF | `id`, `attendee`, `kind` (`history`, `insurance`), `file_hash`, `page_count`, `status` (`reading`, `read`, `failed`), `job_id`, `model_call_id`, `dropped` (the items Claude returned without a page on the document), `uploaded_at` |
+| `medical_card` | one attendee's card, keyed by `attendee` | `attendee`, `blood_type`, `allergies`, `conditions`, `medications` (each a list of text lines ending with their page), `emergency_contact` (one line), `insurer`, `plan`, `member_id`, `group_number`, `insurer_phone`, `notes`, `status` (`extracted`, `confirmed`), `updated_at` |
+| `medical_access_log` | one granted medic read | `id`, `reader`, `attendee`, `band_id`, `incident_id`, `granted`, `reason`, `read_at` |
 
 ### Reducers and views
 
-| Name | Kind | Role | Does |
+| Name | Kind | Who | Does |
 |---|---|---|---|
-| `submit_medical_document` | reducer | `api` | document row of its kind, `medical_extract` job |
-| `apply_medical_extract` | reducer | `worker` | writes the document kind's fields onto the card from a validated record; rejects a stale lease |
-| `confirm_medical_card` | reducer | owner | `extracted` to `confirmed` |
-| `save_medical_card` | reducer | owner | manual entry or edits; `confirmed` |
+| `submit_medical_document` | reducer | the attendee | document row of its kind in `reading`, `medical_extract` job |
+| `apply_medical_extract` | reducer | `worker` | merges the document kind's fields into the card; card `extracted`, document `read`, or `failed` on an unreadable answer |
+| `confirm_medical_card` | reducer | the attendee | card `confirmed`; refuses "no medical card yet" |
 | `request_medical_card` | reducer | `medic` | the access rule; writes the log |
-| `medic_open_incident` | reducer | `medic` | opens an `sos` incident assigned to the caller |
-| `my_medical_card` | view | owner | own card and the status of each document, for the confirm-card screen in setup |
-| `medic_medical_card` | view | `medic` | cards with a granted log row for the caller and an unresolved incident |
+| `medic_open_incident` | reducer | `medic` | opens an `sos` on a worn band with no open `sos` or `fall`: `opened_by` `medic`, status `responding`, `assigned_medic` the caller |
+| `my_medical_documents` | view | the attendee | own documents and their status |
+| `my_medical_card` | view | the attendee | own card |
+| `medic_medical_cards` | view | `medic` | the cards of the caller's granted requests while the incident is open, with the incident, band and name |
+| `board_medical_access` | view | the owner, `ops`, `medic` | every access log row |
 
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
-| Model invents a field | wrong data on a medic's screen | every item needs a page reference or it is dropped; the owner reviews before confirming |
-| Model refuses or returns invalid JSON | no record | after 3 failed attempts the document is `failed` and the confirm-card screen opens the manual form for its fields |
-| Attendee never confirms | card not checked by the wearer | medics see it labelled "not yet confirmed by the wearer" |
-| Medic taps a band with no open incident | denied | the medic view offers `medic_open_incident` for the tapped band |
-| Someone without role `medic` uses the static token | could expose the card | the role check comes first; the reducer denies and logs the attempt |
+| Model invents an item | wrong data on a medic's screen | every item needs a page on the document or it goes to `dropped`; the wearer checks the card before "Looks right" |
+| Claude call fails | no reading | the job queue tries again; after its last attempt the document stays `reading`, the card step shows "Check later", and setup goes on to the wallet |
+| Answer is not readable card JSON | no reading for that document | the document is `failed`; the card step shows what the other document gave and "One document could not be read." |
+| Attendee never confirms | card not checked by the wearer | the medic still sees it, labelled "not yet confirmed by the wearer", because a card with a caveat beats no card in an emergency |
+| Medic asks for a band with no open `sos` or `fall` incident | denied | the reason shows as the error; the error rolls the call back, so no log row stays. On the medic view it comes with "Open an SOS and show the card" |
+| A medic opens an SOS only to read a card | a read with no emergency behind it | the incident carries `opened_by` `medic` and the medic's identity, shows on every staff screen until resolved, and the read is in `medical_access_log` |
+| Someone without role `medic` calls `request_medical_card` | could expose the card | the role check comes first and refuses |
+| The wearer has no card | nothing to show | the request is still granted and logged; the medic view and the desk show "Medical card: <name>, band N" with "No medical card on file." and the incident goes on |
 
 ## Dependencies
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): `band`, `attendee`, `staff_role`, `incident`, `job`, `blob_ref` with access classes, `register_blob`, `api_session`, `extend_job_lease`, views keyed on the caller.
-- [Safety](Safety.md): `incident` kinds and statuses, `assigned_medic`, the snapshot function used by `medic_open_incident`.
-- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` shell that hosts `POST /api/medical/document`, the blob store, and the `bandit-workers` shell.
-- [Anthropic-Agent](../7-integrations/Anthropic-Agent.md) (optional): `claude-client`, the extraction prompt and schema, `model_call`. Without it, manual entry only.
-- [Hardware](../4-devices/Hardware.md): the NFC sticker and its URL.
-- [Attendee-App](../5-apps/Attendee-App.md): the medical setup step, the confirm-card screen, the medic view route opened from `/t/BANDIT-0n`.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): `band_owner`, `attendee`, `staff_role`, `owner`, `job`, `blob_ref` with access classes, `register_blob`, `api_session`, views keyed on the caller.
+- [Safety](Safety.md): `incident` kinds and whether it is resolved, `open_incidents`, `assign_medic`, and the incident open that `medic_open_incident` shares with a band SOS.
+- [Rust-Backend](../3-services/Rust-Backend.md): `POST /api/blobs` with the purposes `history` and `insurance`, the `/samples` route, the blob store, and the `bandit-workers` shell.
+- [Anthropic-Agent](../7-integrations/Anthropic-Agent.md): `claude-client`, `ask_twice`, `model_call`. Without it no document is read and there is no card.
+- [Attendee-App](../5-apps/Attendee-App.md): the document steps and the card step of setup, and the landing route that sends a medic's tap to the medic view.
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the incident desk in the Claims tab, where the medic view's link leads.
 
 **Used by**
 
-- [Hyphenate](../7-integrations/Hyphenate.md): reads `medical_card` as evidence and writes the `via = claim` log row.
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Medical access log (Medical-ID.md)" panel row.
-- [Flows](../1-overview/Flows.md): the medic step of the event.
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the medical card in the incident desk and the "Medical access log (Medical-ID.md)" panel row.
+- [Flows](../1-overview/Flows.md): the document steps and card check of setup, and the medic step of the event.
 
 **If you delete this file**
 
-- Drop `medical_document`, `medical_card`, `medical_access_log`, the two views, the reducers above, the job kind `medical_extract` and the endpoint `POST /api/medical/document`.
-- Remove the medical setup step, the confirm-card screen and the medic view's card panel in Attendee-App.md (the medic view keeps the incident panel).
-- Remove the `medical_card` row from the evidence sources table in Hyphenate.md.
-- Remove the Medical-ID use case from Anthropic-Agent.md and the "Medical access log (Medical-ID.md)" panel row from Ops-Dashboard.md.
-- Remove the Medical-ID.md rows from the endpoint and handler registries in Rust-Backend.md, the Medical-ID.md rows from the registry tables in SpacetimeDB.md and its `medic_open_incident` mention on `incident`, the Medical-ID.md rows and bullets in Safety.md, the medic step in Flows.md and the prize row in Architecture.md, the Medical-ID.md part of the NFC token row and the dependency bullets in Hardware.md, and the Medical-ID row and node in README.md.
-- `medic_open_incident` goes with it.
+- Drop `medical_document`, `medical_card`, `medical_access_log`, the reducers and views above, the job kind `medical_extract`, and the purposes `history` and `insurance` of `POST /api/blobs` and of `blob_ref` in SpacetimeDB.md.
+- Remove the Medical-ID.md rows in Attendee-App.md: the two document steps, the card step, the medic view line, node and decision, and the interface row. Setup goes from the socials to "Are you one of these?" and then the wallet, and a medic's tap is like anyone's.
+- Remove the `opened_by` value `medic` in SpacetimeDB.md and the Medical-ID.md line in Safety.md.
+- Remove the Medical-ID.md rows in Ops-Dashboard.md: the medical card in the incident desk and the "Medical access log (Medical-ID.md)" panel row.
+- Remove the Medical-ID use case from Anthropic-Agent.md.
+- Remove the Medical-ID.md rows from the route and handler registries and the `/samples` row in Rust-Backend.md, the Medical-ID.md rows from the registry tables in SpacetimeDB.md, the Medical-ID.md rows in Safety.md, the Medical-ID.md steps and the medic's Medical-ID.md line in Flows.md, the Medical-ID.md line in Hardware.md, the Medical-ID.md rows in Requirements.md and Architecture.md, and the Medical-ID row and node in README.md.
 
 ## Decisions
 
 | Decision | Why |
 |---|---|
-| The medic always taps the band to see the card; there is no card in the dashboard's incident panel | the tap proves the medic is standing at the person, and it is the moment judges watch |
-| `medic_open_incident` leaves the band's light state alone | the medic is already at the person, so a light circle adds nothing |
-| Setup takes two optional PDFs, the medical history and the health insurance document, read into one card | a medic gets one card with everything, including who insures the person, from one tap |
-| Each document is its own `medical_extract` job with its kind's schema | a missing or failed document never holds up the other, and each retry reads one PDF |
-| The attendee sees the card only on the confirm-card screen in setup | during the event the attendee page is the thank-you screen; the card is for medics |
-| The upload cap is 10 MB per document | enough for a scanned medical summary or insurance card of a few pages |
-| The static NFC token counts as a tap in v0.1 | the role check and the open-incident check guard the card; every attempt is logged |
+| The medic opens the card by tapping the band, or from the incident desk with "Tap band N for the medical card"; both call `request_medical_card` | at the person the band's own tag is the quickest way in, at the desk the button names the band, and one reducer keeps one rule and one log |
+| A medic who reaches someone before any flag opens the SOS from the tap with `medic_open_incident`, already taken by them | the card still opens only for an open incident, and the incident the medic opens is the one ops sees on the desk |
+| A medic's tap never claims the band | the medic is never mistaken for the wearer, and the wearer's band stays theirs |
+| The attendee page uploads the PDF and then calls `submit_medical_document` as the attendee | the reducer knows the caller, so no service has to vouch for who the attendee is |
+| Setup takes two optional PDFs, the medical history and the health insurance card, read into one card | a medic gets one card with everything, including who insures the person |
+| Each document is its own `medical_extract` job, with one schema for both kinds and the kind in the prompt | a missing or failed document never holds up the other, and each retry reads one PDF |
+| A new upload is a new document whose reading overwrites that kind's fields | the latest PDF wins, with no chain of old rows to follow |
+| The attendee sees the card only on the card step in setup | during the event the attendee page is the thank-you screen; the card is for medics |
+| There is no manual form | the PDF is the source; when it cannot be read the attendee goes on without a card |
 | An unconfirmed card is still shown to a medic, labelled | a card with a caveat beats no card in an emergency |
-| After 3 failed extraction attempts the app opens the manual form | one fallback keeps the card step from stopping the event flow |
+| Effort low for the reading | it copies printed fields; there is nothing to reason about |

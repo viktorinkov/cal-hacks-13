@@ -225,16 +225,16 @@ The event section needs the Google Maps record: a run without one builds no bund
 | `person_id` | id | the claimed profile; one attendee per profile |
 | `claimed_at` | timestamp | |
 
-The view `claimed_people` is anonymous and returns only the claimed `person_id` values, so the app can leave taken profiles out of "Is this you?" without learning who took them.
+The view `claimed_people` is anonymous and returns only the claimed `person_id` values, so the app can leave taken profiles out of "Are you one of these?" without learning who took them.
 
 ### The profile claim, for band owners
 
 A person listed by the event can claim their profile in the onboarding flow, after claiming the band. The proof is the band claim they already made: only an attendee who owns a band can claim a profile, and only the band claim's press makes someone a band owner. The claim needs no second press, no email and no `bandit-api` route.
 
-1. The attendee has claimed their band by press and typed a display name ([Attendee-App](../5-apps/Attendee-App.md)). The app lists the `person` rows whose `display_name` matches what they typed and that `claimed_people` does not list: "Is this you?" Attendees with no match never see the step.
-2. The attendee taps their profile. The signed-in app calls `claim_person` with the `person` id.
+1. The attendee has claimed their band by press and typed a display name; the step comes later in setup ([Attendee-App](../5-apps/Attendee-App.md)). The app lists the `person` rows whose `display_name` matches what they typed and that `claimed_people` does not list: "Are you one of these?" Attendees with no match never see the step, and "None of these" goes on.
+2. The attendee taps "This is me" on their profile. The signed-in app calls `claim_person` with the `person` id.
 3. `claim_person` (person id; the caller is the attendee) checks, in order: the caller owns a band (`band.owner`, [SpacetimeDB](../2-data/SpacetimeDB.md)), otherwise it refuses with "claim your band first"; the profile exists, otherwise "no such profile"; nobody else holds the profile, otherwise "this profile is already claimed"; the caller holds no other profile, otherwise "you already claimed a profile". A repeat call for the profile the caller already holds changes nothing.
-4. It writes the `person_claim` row and copies the profile onto the caller's `attendee` row: the `person_id`, the profile's `organization_id`, its `headshot_url` as `photo_url`, and its `display_name` only when the attendee has not typed one. The app sees the profile turn claimed through its subscription and continues with the socials step ([Social](../6-features/Social.md)).
+4. It writes the `person_claim` row and copies the profile onto the caller's `attendee` row: the `person_id`, the profile's `organization_id`, its `headshot_url` as `photo_url`, and its `display_name` only when the attendee has not typed one. The app sees the profile turn claimed through its subscription and continues with the next setup step ([Attendee-App](../5-apps/Attendee-App.md)).
 
 The claim adds one thing to the people graph. Social.md: the claimed profile's `organization_id` gives the attendee their `works_at` link in `people_link`, written in the same transaction; a claimed profile is the only source of that link for an attendee, because onboarding asks for no company. The attendee's handles come from the socials step whether or not a profile was claimed. The first claim wins.
 
@@ -244,12 +244,12 @@ The sequence answers: how does a band owner claim "this profile is me"?
 sequenceDiagram
   participant App as Attendee app, signed in
   participant Mod as band1t module
-  App->>App: "Is this you?" lists person rows matching the typed name, minus claimed_people
+  App->>App: "Are you one of these?" lists person rows matching the typed name, minus claimed_people
   App->>Mod: claim_person (person id)
   Mod->>Mod: caller owns a band, profile free, caller holds no other profile
   Mod->>Mod: write person_claim, copy the profile onto the attendee row
   Mod-->>App: profile now claimed (subscription)
-  App->>App: continue with the socials step
+  App->>App: continue with the next setup step
 ```
 
 ### One organisation, fetch to load
@@ -303,14 +303,14 @@ sequenceDiagram
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that hosts the blob endpoint.
 - [Elastic](Elastic.md): the raw indices and the `bandit-organize` workflow for the organize stage. Without it, no scraped bundle is loaded.
 - [Anthropic-Agent](Anthropic-Agent.md): `claude-client`, the `floorplan_check` use case, `model_call`. Anthropic-Agent.md: without it, booths load without positions and ops drags each one into place.
-- [Social](../6-features/Social.md): the onboarding socials step that follows the profile claim (optional; without it a claimed `person` simply has no handles).
+- [Social](../6-features/Social.md): the onboarding socials step, which comes before the profile claim (optional; without it a claimed `person` simply has no handles).
 - A Bright Data account with credits and a Web MCP token in Pro mode; Elastic.md: a second zone token with its own spending limit for the gap-fill tool.
 
 **Used by**
 
 - [Elastic](Elastic.md): its organizer runs on the raw records this pipeline writes, and its output is loaded by this pipeline (a hard dependency on this file); its indexer copies the loaded booths with their organisation facts and positions.
 - [Social](../6-features/Social.md): visits are "at booth B", the profile claim sits in its onboarding flow, and the people graph takes its `exhibits` links from `booth.organization_id` and its `works_at` links from claimed profiles.
-- [Attendee-App](../5-apps/Attendee-App.md): the schedule and the "Is this you?" step.
+- [Attendee-App](../5-apps/Attendee-App.md): the schedule and the "Are you one of these?" step.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the hall's floor plan image and the booth fix-up panel.
 - [Merch](../6-features/Merch.md): a sponsor template names organisations, and `load_merch_templates` finds their booths through the imported `organization` rows.
 
@@ -318,7 +318,7 @@ sequenceDiagram
 
 - `bandit-ingest` keeps only its seed mode, which loads the hand-written seed files through the setup reducers ([SpacetimeDB](../2-data/SpacetimeDB.md)). Remove its scraping stages and the BrightData.md parts of its rows in [Rust-Backend](../3-services/Rust-Backend.md) and [Architecture](../1-overview/Architecture.md) (interfaces, data ownership and failure tables).
 - Remove `import_event`, `claim_person`, `claimed_people`, `hall`, `organization`, `person` and `person_claim` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field rows on `booth`, `attendee` and `venue`, the BrightData.md note on the `venue` origin fields, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
-- Remove the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Is this you?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
+- Remove the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Are you one of these?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
 - Remove the `floorplan_check` row from [Anthropic-Agent](Anthropic-Agent.md).
 - [Merch](../6-features/Merch.md) loads only its plain templates, because sponsor names have no organisations to match.
 - [Elastic](Elastic.md) loses its organizer and keeps the copy of hand-entered booths. Booths, schedule slots and the venue row are entered by hand through `upsert_booth`, `upsert_schedule_slot` and the seed. Behaviour elsewhere is unchanged, because everything reads SpacetimeDB rows either way.

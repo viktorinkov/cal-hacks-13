@@ -9,17 +9,17 @@ Responsibilities of the physical layer:
 - Sense crowd density locally. A band counts the bands it hears strongly and drives IDLE, YELLOW and GUIDE on its own, with no server round trip, so the safety colours keep working if the laptop dies.
 - Raise and show emergencies locally: SOS (button hold), fall (full bands) and the blue light circle around a band in SOS.
 - Report. Every band beacons its id, flags, neighbour count, zone, battery, light state and a packet counter ten times a second. The gateway relays each beacon it hears to the laptop.
-- Know its zone: the station marker heard loudest.
-- Obey the server: forced light states, exit colour, one-shot commands (`buzz`, `clear`), live calibration and the override switch, all delivered as gateway commands.
+- (TBD -- LEO) Know its zone: the station marker heard loudest.
+- Obey the server: forced light states, exit colour, one-shot commands (`buzz`, `clear`), live calibration, the override switch and low visibility, all delivered as gateway commands.
 - Guide people out: the exit colour shows the route, and a buzz on full bands tells the wearer to move along it. Full bands in a light circle also buzz when they join the incident.
-- Carry the attendee's NFC token on the lid, which opens the attendee app and the medic view.
+- Carry the attendee's NFC token on the lid, which opens the attendee app.
 - Station markers anchor zones and glow their exit colour, so "follow the colour" means something in the room.
 
 Explicit non-responsibilities:
 
 - No positions. A band knows its zone, never x/y. See [Safety](../6-features/Safety.md) for how zone-level data becomes density and guidance.
 - No pairwise record. A band counts neighbours but does not report who they are.
-- No decisions about exits, incidents or evacuation. Those are made in the `band1t` module ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md)).
+- No decisions about exits, incidents or low visibility. Those are made in the `band1t` module ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md)).
 - No storage. Calibration pushed by command is lost when a band resets; the bridge re-sends it ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
 - No network, no encryption, no deep sleep, no over-the-air update in v0.1.
 - The gateway does not buffer, retry or interpret. It is a transparent radio-to-serial bridge.
@@ -33,10 +33,10 @@ Explicit non-responsibilities:
 | Gateway command | gateway to bands and stations | bands, stations | packet type 3: target, command, two arguments | ESP-NOW broadcast, each command repeated 3 times 40 ms apart, full power |
 | Gateway uplink | gateway to laptop | `bandit-bridge` | one JSON object per heard packet, plus boot, ack and error lines | USB serial, nominal 115200 baud |
 | Gateway downlink | laptop to gateway | `bandit-bridge` | text lines `cmd <target> <name> [arg] [arg2]` | USB serial |
-| NFC token | band to phone | Attendee app ([Attendee-App](../5-apps/Attendee-App.md)); Medical-ID.md: the medic view | URL `https://<host>/t/BANDIT-0n` | NFC NDEF on an NTAG215 sticker, 1 to 2 cm |
+| NFC token | band to phone | Attendee app ([Attendee-App](../5-apps/Attendee-App.md)) | URL `https://band1t.vip/t/BANDIT-0n` | NFC NDEF on an NTAG215 sticker, 1 to 2 cm |
 | Button | wearer to band | the band itself | short press (confirm), 3 s hold (SOS) | GPIO with pull-up |
 | Bench serial | band to and from laptop | hardware owner only, never the backend | status line once a second with the heard list and RSSIs; bench commands | USB-C serial |
-| Vision.md: overhead camera (TBD -- LEO) | phone to `bandit-vision` | [Vision](Vision.md) | JPEG snapshots | HTTP over the team phone's hotspot |
+| Vision.md: security camera (TBD -- LEO) | camera to the venue laptop | [Vision](Vision.md) | live video at 30 fps, read by Leo's security view | the laptop's camera input |
 
 ## Design
 
@@ -73,7 +73,7 @@ flowchart TB
         DRV["2N2222 motor driver"]
         MOT["Coin vibration motor"]
     end
-    PHONE["Attendee or medic phone"]
+    PHONE["Attendee phone"]
     USB -->|"5 V in, charger at 380 mA"| XIAO
     XIAO -->|"charge current"| BAT
     BAT -->|"BAT rail 3.7 to 4.2 V"| XIAO
@@ -189,13 +189,13 @@ stateDiagram-v2
 
 Both thresholds are live-tunable with the `thresh` command. The checks run in order, so a band that jumps from empty to a crowd passes through YELLOW and reaches GUIDE in the same 250 ms step.
 
-**Zone pick.** The band also keeps a table of up to 8 stations heard. Its zone is the station with the strongest RSSI among those heard in the last 3 s, or 0 if none. The zone is only reported; the band does nothing with it locally. [Safety](../6-features/Safety.md) turns zone reports into per-zone density.
+(TBD -- LEO) **Zone pick.** The band also keeps a table of up to 8 stations heard. Its zone is the station with the strongest RSSI among those heard in the last 3 s, or 0 if none. The zone is only reported; the band does nothing with it locally. [Safety](../6-features/Safety.md) turns zone reports into per-zone density.
 
 **Button.** A press released before 3 s is a short press: the band sets the press flag in its beacons for 1 s and gives a short buzz. The server treats a press flag that arrives while a claim window is open as consent (press to confirm, [Gateway-Bridge](../3-services/Gateway-Bridge.md)). Holding for 3 s toggles the SOS latch and plays the SOS buzz pattern; the hold fires once per press.
 
 **SOS latch.** SOS is a latched boolean, not a timed state. While latched, the band's beacons carry flag bit 0 and its state is 3 regardless of density. The latch releases on another 3 s hold or on a `clear` command. A fall sets a second latch (flag bit 1) that behaves like SOS; `clear` releases both.
 
-**Fall detection (full bands).** The IMU is sampled every 20 ms. A total acceleration above 2.8 g marks an impact. If, within 3.5 s of the impact, the magnitude stays within 0.2 g of 1 g for 1.5 s (the person is still), the fall latch is set and the SOS buzz pattern plays. Both numbers are starting values, calibrate at the venue. A convincing stage fall is a hard arm stop followed by lying still; jumping should not trigger it.
+**Fall detection (full bands).** The IMU is read every 20 ms. A total acceleration above 2.8 g marks an impact. If, within 3.5 s of the impact, the magnitude stays within 0.2 g of 1 g for 1.5 s (the person is still), the fall latch is set and the SOS buzz pattern plays. Both numbers are starting values, calibrate at the venue. A convincing stage fall is a hard arm stop followed by lying still; jumping should not trigger it.
 
 **Light circle.** When a band hears another band's beacon with the SOS or fall flag at RSSI at or above the circle threshold (-58 dBm, starting value, calibrate at the venue), it opens a 1.5 s NEAR_SOS window that every further such beacon refreshes. Distant bands do not react, so the circle has an edge. A NEAR_SOS band does not set the SOS flag itself, so the circle does not spread from band to band. The circle threshold is stricter than the neighbour threshold on purpose: the circle is the people within arm's reach, not the whole zone. The server also buzzes each full band the first time it is recorded in the circle (see Guidance and vibration below).
 
@@ -212,6 +212,7 @@ Both thresholds are live-tunable with the `thresh` command. The checks run in or
 | `thresh` | replaces the yellow and red neighbour counts |
 | `rssi` | replaces the neighbour and circle RSSI thresholds (sent as positive magnitudes) |
 | `override` | 1 stops the density state machine (the band shows IDLE unless forced or in an emergency), 0 restores it |
+| `lowvis` | 1 turns low visibility on: the band shows GUIDE in its exit colour, so it guides its wearer to its zone's exit, ranked like a forced state; 0 turns it off |
 
 ### Band state precedence
 
@@ -258,8 +259,9 @@ stateDiagram-v2
 
 Consequences the backend relies on:
 
-- SOS beats everything except IDENT, so a forced evacuation colour never hides a person calling for help. IDENT sits above SOS only because it is a short, deliberate "find this band" blink used at boot and for claiming.
-- The light circle beats a forced state. During a medic approach the bands around the person stay blue while the rest of the zone is forced to GUIDE ([Safety](../6-features/Safety.md)).
+- SOS beats everything except IDENT, so a forced GUIDE or low visibility never hides a person calling for help. IDENT sits above SOS only because it is a short, deliberate "find this band" blink used at boot and for claiming.
+- The light circle beats a forced state and low visibility, so the bands around a person stay blue.
+- (TBD -- LEO) During a medic approach the bands around the person stay blue while the rest of the zone is forced to GUIDE ([Safety](../6-features/Safety.md)).
 - A forced state beats the override flag and the density state, so manual override on the dashboard works whether the density logic is on or off.
 - PAY and PAID rank above the light circle and forced states, but BandIt never sends `pay` or `paid`, so they never show and the ladder needs no firmware change.
 - The state a band reports in `state` is the result of this ladder, not the density state. The bridge therefore judges a directive against the reported state only after allowing for the states that legitimately outrank it ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
@@ -300,6 +302,7 @@ Liveness rule for every consumer: a band is alive if heard within 2 s and is sho
 | `thresh` | yellow count, red count | band or 0 | live density thresholds | ignored |
 | `rssi` | neighbour magnitude, circle magnitude (positive dBm values) | band or 0 | live RSSI thresholds | ignored |
 | `override` | 0 or 1 | band or 0 | density state machine off or on | ignored |
+| `lowvis` | 0 or 1 | band or 0 | low visibility on or off: GUIDE in the band's exit colour while on | ignored |
 
 Two hazards follow from target 0 meaning every node, bands and stations alike:
 
@@ -314,7 +317,7 @@ A station is a SuperMini with a ring on USB power, placed at an exit or a zone c
 
 ### The NFC token
 
-Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md); Medical-ID.md: the medic flow and the staff-only access rule.
+Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://band1t.vip/t/BANDIT-0n`, on the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md). Medical-ID.md: a medic's phone that taps the same tag opens the medic view of that band ([Medical-ID](../6-features/Medical-ID.md)).
 
 ### Power budget and runtime
 
@@ -342,7 +345,8 @@ The vibration motor adds two cues, both sent with the existing `buzz` command. A
 | Cue | When the server sends it | Pattern | What the wearer sees on the ring |
 |---|---|---|---|
 | Someone next to you needs help | once to each full band, the first time it is recorded in the light circle of an `sos` or `fall` incident | 2, double | the blue NEAR_SOS pulse, which the band shows on its own |
-| Move along your route | to each band whose route colour the server has just set or changed, during crowd-risk guidance, evacuation and a medic approach | 3, long | GUIDE in the colour of the exit to walk to |
+| Move along your route | to each band whose route colour the server has just set or changed, during crowd-risk guidance and low visibility | 3, long | GUIDE in the colour of the exit to walk to |
+| (TBD -- LEO) Move aside for the medic | to each full band that a medic approach forces to GUIDE | 3, long | GUIDE in the colour of a side exit |
 
 The buzz carries no direction; the colour does. The two patterns differ from the short buzz the band gives on its own for a press, so each cue feels different on the wrist.
 
@@ -356,7 +360,7 @@ The buzz carries no direction; the colour does. The two patterns differ from the
 | No acknowledgement from bands | commands are fire and forget, repeated three times | the bridge reconciles against the state the band reports rather than trusting delivery |
 | The gateway does not buffer | it has no storage and prints as it hears | the bridge reads continuously; a paused reader loses packets |
 | Zone, not position | a band knows only its loudest station | everything downstream is zone-level |
-| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the crowd and simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
+| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Test-Bands.md: the crowd and test band ids 10 to 99 never go on air ([Test-Bands](../3-services/Test-Bands.md)) |
 | No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the event |
 
 ### Calibration as a system process
@@ -373,9 +377,9 @@ The live values: the `rssi` command sets the neighbour and circle RSSI threshold
 
 Inter-band RSSI, the number that best guides the `rssi` thresholds, is visible in v0.1 only on a band's bench serial status line, because beacons carry a count and not the individual RSSIs.
 
-### Overhead camera (TBD -- LEO)
+### Cameras (TBD -- LEO)
 
-Vision.md: the hardware side of the camera is one phone on a light stand looking straight down on the pit. It serves JPEG snapshots over the team phone's hotspot to `bandit-vision` on the laptop, which counts people, spots a person on the ground and judges incidents ([Vision](Vision.md)). The taped squares define the camera's region of interest. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
+Vision.md: the security camera hangs above head height in the security room, tilted down at the floor, and the venue laptop reads it directly at 30 fps. It needs nothing new from the bands: it finds the SOS red strobe at 4 Hz, and its calibration uses the IDENT white blink at 2.5 Hz ([Vision](Vision.md)). A camera over the pit for head counts and person-down alerts is Leo's to choose; the taped squares would define its area. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
 
 ## Failure modes and fallbacks
 
@@ -399,16 +403,16 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): the wire protocol and the state precedence.
 - [Safety](../6-features/Safety.md): local density, SOS, fall and light-circle behaviour, zone reports, forced states, exit colours and the two buzz cues.
-- [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md): the NFC token and the IDENT blink for claiming.
-- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the simulated bands.
-- [Social](../6-features/Social.md): zone-level presence.
+- [Attendee-App](../5-apps/Attendee-App.md): the NFC token and the IDENT blink for claiming.
+- [Test-Bands](../3-services/Test-Bands.md): imitates the band's states and flags for the test bands.
+- (TBD -- LEO) [Social](../6-features/Social.md): zone-level presence from the zone pick.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the fleet panel, state legend, calibration controls and manual override.
 
 **If you delete this file**
 
-- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s simulated bands become the only band reports, through `report_sim_band`.
+- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Test-Bands](../3-services/Test-Bands.md)'s test bands become the only band reports, through `report_sim_band`.
 - Remove the Band, Station marker and Gateway rows from the component table in [Architecture](../1-overview/Architecture.md) and the device nodes from its diagrams.
-- Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md), and the press-to-confirm step from the band claim.
+- Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md), and the press-to-confirm step from the band claim.
 - In [Safety](../6-features/Safety.md), remove the band-based density estimate, the light circle and both buzz cues; the camera estimate (TBD -- LEO) would stand alone.
 
 ## Decisions

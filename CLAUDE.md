@@ -11,4 +11,4 @@
 
 ## Writing
 
-- Never use the word "demo" anywhere in the project: not in docs, code, comments, file names, folder names, branch names or commit messages. This is a hackathon project, so say what the thing is instead, for example "scripted bands", "test attendees" or "the scripted claims run".
+- Never use the word "demo" anywhere in the project: not in docs, code, comments, file names, folder names, branch names or commit messages. This is a hackathon project, so say what the thing is instead, for example "test bands", "test attendees" or "the scripted claims run".

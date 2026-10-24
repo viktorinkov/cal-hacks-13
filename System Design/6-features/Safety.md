@@ -1,15 +1,16 @@
 # Safety
 
-Safety is the set of behaviours that keep a crowd from crushing anyone and get help to a person who falls or calls for it: zone density and risk, exit guidance by colour and vibration, SOS and fall handling with the light circle, incident lifecycle and escalation, medic approach, evacuation, and the manual overrides the team can fall back on. Crowd crushes are preceded by measurable density for minutes before anyone is hurt, and a person on the ground needs the people around them to notice and move before any responder arrives. So the first reaction happens on the band itself, with no server in the loop. The `band1t` module decides only what the bands cannot know alone: which exit, which zone is dangerous, who is coming to help.
+Safety is the set of behaviours that keep a crowd from crushing anyone and get help to a person who falls or calls for it: zone density and risk, exit guidance by colour and vibration, SOS and fall handling with the light circle, incident lifecycle and escalation, low visibility, and the manual overrides the team can fall back on. Crowd crushes are preceded by measurable density for minutes before anyone is hurt, and a person on the ground needs the people around them to notice and move before any responder arrives. So the first reaction happens on the band itself, with no server in the loop. The `band1t` module decides only what the bands cannot know alone: which exit, which zone is dangerous, who is coming to help.
 
 ## Role in the system
 
 Responsibilities:
 
 - Define how `venue_tick` turns band reports (and Vision.md's camera count (TBD -- LEO)) into a density and a risk level per zone, with hysteresis.
-- Define how each zone is assigned an exit, and how that becomes an exit colour and a vibration on the bands.
+- (TBD -- LEO) Define how each zone is assigned an exit along `zone_link` paths, and how that becomes an exit colour and a vibration on the bands.
 - Define when incidents open, are acknowledged, responded to and resolved, what the snapshot freezes, who counts as a witness, and when escalation fires.
-- Define the medic approach, evacuation mode, blocked exits, manual override and Plan B.
+- Define how a medic takes an incident, low visibility, manual override and Plan B.
+- (TBD -- LEO) Define the medic-approach guidance, blocked exits and rerouting.
 - State what keeps working when the laptop, the bridge or the database is out of reach.
 
 Non-responsibilities:
@@ -17,9 +18,9 @@ Non-responsibilities:
 - The band's own state machine, thresholds and radio are in [Hardware](../4-devices/Hardware.md). This file relies on them.
 - How directives and commands become gateway commands is in [Gateway-Bridge](../3-services/Gateway-Bridge.md).
 - Tables and reducers are defined in [SpacetimeDB](../2-data/SpacetimeDB.md); this file specifies the policy inside them.
-- The staff screens are [Ops-Dashboard](../5-apps/Ops-Dashboard.md); the medic's phone view is a route in [Attendee-App](../5-apps/Attendee-App.md).
+- The staff screens are [Ops-Dashboard](../5-apps/Ops-Dashboard.md); medics work in its incident desk.
 - Medical-ID.md: the medical card.
-- Hyphenate.md: claims and evidence.
+- Insurance.md: claims and evidence.
 - What the camera does internally is Vision (TBD -- LEO). This file states only what it reads from `camera_count`, `ground_alert` and `vision_assessment`.
 
 ## Interfaces
@@ -27,17 +28,18 @@ Non-responsibilities:
 | Direction | Counterpart | What flows | Tables or reducers | Transport |
 |---|---|---|---|---|
 | In | `bandit-bridge` | per band: `neigh`, `zone`, `state`, SOS, fall and press flags, every 250 ms | `band_report` through `ingest_band_reports` | reducer |
-| In | Simulator.md: the `bandit-claims` tool and `bandit-api` dev routes | the same fields for simulated bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
+| In | Test-Bands.md: the `bandit-claims` tool and `bandit-api` dev routes | the same fields for test bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Test-Bands](../3-services/Test-Bands.md)) | reducer |
 | In | Venue seed | zones with areas, zone graph with distances, exits with colours and status, stations | `zone`, `zone_link`, `exit`, `station` | seed load |
 | In | Ops (calibration screen) | measured points mapping `neigh` to people per square metre | `calibration_point` through `set_calibration` | TypeScript SDK |
-| In | Ops | mode, blocked exits, pinned exit, pinned risk, forced states, reset | `set_venue_mode`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
-| In | Ops, medics | incident handling | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | TypeScript SDK |
-| In | Medical-ID.md: medic | an `sos` incident opened by a medic already with the person, from the band's NFC token | `medic_open_incident` ([Medical-ID](Medical-ID.md)) | TypeScript SDK |
+| In | Ops | low visibility, blocked exits, pinned exit, pinned risk, forced states, reset | `set_low_vis`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
+| In | Ops, medics | incident handling; a medic takes an incident with `assign_medic` (role `medic`); `ack_incident`, `add_incident_note`, `open_incident` and `resolve_incident` take `ops` or `medic` | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | TypeScript SDK |
 | In | Vision.md (TBD -- LEO): `bandit-vision` | a people count for the pit every 3 s; a person-down alert within about a second; a Claude assessment of the event a few seconds later | `report_zone_count`, `report_ground_alert`, `submit_vision_assessment` ([Vision](../4-devices/Vision.md)) | reducer |
 | Out | everyone | density, source, risk and assigned exit per zone, twice a second | `zone_state` | subscription |
-| Out | `bandit-bridge` | exit colour per band; forced GUIDE for evacuation and medic approach; the guidance and light-circle buzzes; `clear` on resolve | `band_directive`, `band_command` | subscription, then gateway commands |
+| Out | `bandit-bridge` | exit colour per band; the guidance and light-circle buzzes; `clear` on resolve | `band_directive`, `band_command` | subscription, then gateway commands |
+| Out | `bandit-bridge` | low visibility on or off for every band | `fleet_config.low_vis` | subscription, then `cmd 0 lowvis 1` or `0` |
+| (TBD -- LEO) Out | `bandit-bridge` | forced GUIDE for the medic approach | `band_directive` | subscription, then gateway commands |
 | Out | staff | incidents, snapshots, witnesses, notes, escalation | `incident`, `incident_snapshot`, `incident_band`, `incident_note` | subscription through staff views |
-| Out | history | one row per zone per minute, read by the dashboard | `zone_sample` | written by `memory_tick` |
+| Out | history | one row per zone per minute, read by the dashboard | `zone_history` | written by `memory_tick` |
 
 ## Design
 
@@ -47,7 +49,7 @@ Non-responsibilities:
 |---|---|---|---|
 | Band (firmware) | its own density colour (IDLE, YELLOW, GUIDE), SOS strobe and buzz, fall detection, joining the light circle | under one beacon interval, about 100 ms | the laptop, the gateway and the database |
 | `band1t` module (`venue_tick`, `ingest_band_reports`) | density and risk per zone, exit colour per zone, incidents, witnesses, escalation, guidance directives and buzzes | about 0.75 s to the dashboard (one bridge batch plus one tick); about 1 s more back to the bands | the dashboard and every phone |
-| Staff (dashboard, medic phone) | acknowledge, assign, block an exit, evacuate, override | human | nothing the bands do depends on them |
+| Staff (Ops dashboard) | acknowledge, take an incident, block an exit, low visibility, override | human | nothing the bands do depends on them |
 
 The band's precedence order matters for everything below. From the firmware: IDENT, then SOS or fall, then PAID, PAY, CONNECT, then the light circle (NEAR_SOS), then any forced state, then the override flag, then the density state. So a forced GUIDE from the server never hides an SOS or a light circle, and the server relies on that without checking. BandIt never sets PAID, PAY or CONNECT.
 
@@ -89,7 +91,7 @@ stateDiagram-v2
   end note
 ```
 
-**Band colour before zone colour.** Each band decides its colour from its own neighbour count, so during the event the rings go red a second or two before the zone turns `high` on the dashboard. That is the right order: the crowd learns first, staff confirm second. `zone_state` and `zone_sample` record both estimates and the source.
+**Band colour before zone colour.** Each band decides its colour from its own neighbour count, so during the event the rings go red a second or two before the zone turns `high` on the dashboard. That is the right order: the crowd learns first, staff confirm second. `zone_state` and `zone_history` record both estimates and the source.
 
 ### The calibration table and the taped squares
 
@@ -105,7 +107,7 @@ The `neigh` column is filled in from the logs at the venue. The fleet thresholds
 
 The pit zone's `area_m2` is the standing area around its station marker, paced out when the room is measured and written in the seed. It sets only the `density_count` floor.
 
-### Exit assignment
+### Exit assignment (TBD -- LEO)
 
 Zones form a graph: `zone_link` rows carry a walking distance between neighbouring zones. Exits open from `exit` zones, each with a colour index 1 to 6. Every tick assigns each zone one exit.
 
@@ -149,16 +151,18 @@ Guidance happens in three situations, and the band shows GUIDE (red with the exi
 | Situation | Who is guided | Why the band shows GUIDE | Which colour |
 |---|---|---|---|
 | Crowd risk | bands in a dense zone | the band's own density logic (its `neigh` reached `red_at`) | the zone's assigned exit, already loaded |
-| Evacuation | every live band in scope | a forced GUIDE directive, reason `evacuation` | the zone's assigned exit |
-| Medic approach | bands in the incident zone, except the subject and the light circle | a forced GUIDE directive, reason `medic_approach` | the exit of a side zone, away from the medic (below) |
+| Low visibility | every band | the `lowvis 1` command, sent to every band while `fleet_config.low_vis` is on | its zone's exit colour |
+| (TBD -- LEO) Medic approach | bands in the incident zone, except the subject and the light circle | a forced GUIDE directive, reason `medic_approach` | the exit of a side zone, away from the medic (below) |
 
-**The guidance buzz.** `venue_tick` writes one `band_command` `buzz` with pattern 3 (long) for a full band when its guidance starts and whenever its guided exit colour changes. Guidance starts when the band's zone turns `high`, when the band comes into evacuation scope, or when it gets a medic-approach directive. One buzz per change keeps the motor meaningful: it fires when there is something new to do. The bridge sends it once like any one-shot command ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
+**The guidance buzz.** `venue_tick` writes one `band_command` `buzz` with pattern 3 (long) for a full band when its guidance starts and whenever its guided exit colour changes. Guidance starts when the band's zone turns `high` or when low visibility turns on. One buzz per change keeps the motor meaningful: it fires when there is something new to do. The bridge sends it once like any one-shot command ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
+
+(TBD -- LEO) A medic-approach directive also starts guidance, with the same long buzz.
 
 ### Crowd-risk incidents
 
 A zone that stays `high` for 10 consecutive ticks (5 s, starting value) with no open `crowd_risk` incident gets one, opened by `venue_tick` with a snapshot and an escalation timer like any other incident. The risk level already has hysteresis; the extra wait separates "the dashboard went red" from "staff must act", so a crowd that compresses for a moment does not page every medic.
 
-The incident closes itself when the zone has been `normal` for 60 consecutive ticks (30 s, starting value): `venue_tick` sets `resolved` with resolution `recovered`. When a medic has been assigned, the tick does not close it; a person resolves it. Ops can also open a `crowd_risk` incident by hand with `open_incident`.
+The incident closes itself when the zone has been `normal` for 60 consecutive ticks (30 s, starting value): `venue_tick` sets `resolved` with resolution `recovered`. When a medic has taken it, the tick does not close it; a person resolves it. Ops or a medic can also open a `crowd_risk` incident by hand with `open_incident`.
 
 ### SOS and fall
 
@@ -167,7 +171,7 @@ The incident closes itself when the zone has been `normal` for 60 consecutive ti
 **In the module, within one batch.** The next `ingest_band_reports` batch (250 ms) carries the flag. In the same transaction the reducer:
 
 1. opens an `incident` of kind `sos` or `fall` (fall wins when both flags are set), status `open`, `opened_by` `band`, `zone_id` the band's current zone (0 if unzoned, so an SOS always opens an incident), `subject` the band's owner;
-2. freezes an `incident_snapshot`: the zone's density, source and risk, the bands present, the bands showing state 4, the venue mode, the assigned exit and its status, the fleet config version, and (TBD -- LEO) the cameras covering the zone;
+2. freezes an `incident_snapshot`: the zone's density, source and risk, the bands present, the bands showing state 4, whether low visibility is on, the assigned exit and its status, the fleet config version, and (TBD -- LEO) the cameras covering the zone;
 3. adds the band as the `subject` row in `incident_band`;
 4. inserts an `escalation_timer` row 60 s later (starting value).
 
@@ -179,9 +183,11 @@ Later batches refresh `incident.last_signal_at` while the flag stays set, and ad
 
 **Vision.md (TBD -- LEO): corroboration and judgment.** A person-down alert from the camera's pose detector that lands in the zone of an open `sos` or `fall` incident within 3 s of the flag (starting value) sets `incident.camera_corroborated`, which the dashboard shows as a second source. A person-down alert with no band flag that lasts 5 s opens its own `fall` incident with `opened_by` `vision` and no band: the same snapshot, timer, escalation and medic approach, with no light circle and no `clear` on resolve. A few seconds after the flag, `bandit-vision` sends Claude frames from around the event and writes a `vision_assessment`, which sets `incident.vision_status` to `confirmed` or `not_confirmed`. None of this gates the band's reaction, the incident, the light circle or escalation; those have already happened.
 
-**Resolving.** `resolve_incident` sets `resolved`, deletes the directives tied to the incident, and writes a `clear` command for the subject band so the SOS latch releases without the wearer holding the button again. For 10 s after resolution (starting value) a still-set flag from that band does not reopen an incident, which gives the `clear` time to arrive. Hyphenate.md: `resolve_incident` ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note; the snapshot and witness rows are its evidence.
+**Resolving.** `resolve_incident` sets `resolved`, deletes the directives tied to the incident, and writes a `clear` command for the subject band so the SOS latch releases without the wearer holding the button again. For 10 s after resolution (starting value) a still-set flag from that band does not reopen an incident, which gives the `clear` time to arrive. Insurance.md: `resolve_incident` ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note; the snapshot and witness rows are its evidence.
 
-**Property incidents.** Staff open one from the Ops dashboard with `open_incident`, kind `property` and the zone. Hyphenate.md: the dashboard's Report property damage button makes this one tap. It gets the same snapshot and escalation timer as any incident and follows the same lifecycle. Vision.md (TBD -- LEO): `bandit-vision` assesses the scene and attaches frames and an assessment through `report_property_event`, and opens the incident itself with `opened_by` `vision` when the camera sees the damage first.
+Medical-ID.md: a medic who reaches someone before any flag opens the `sos` from a tap on the band with `medic_open_incident`: the same open and snapshot, `opened_by` `medic`, status `responding` and `assigned_medic` that medic, with no escalation timer ([Medical-ID](Medical-ID.md)).
+
+**Property incidents.** Staff open one from the Ops dashboard with `open_incident`, kind `property` and the zone. Insurance.md: the dashboard's Report property damage button makes this one tap. It gets the same snapshot and escalation timer as any incident and follows the same lifecycle. Vision.md (TBD -- LEO): `bandit-vision` assesses the scene and attaches frames and an assessment through `report_property_event`, and opens the incident itself with `opened_by` `vision` when the camera sees the damage first.
 
 This diagram answers: what happens, in order, from a fall to a medic standing next to the person.
 
@@ -193,7 +199,7 @@ sequenceDiagram
   participant BR as bandit-bridge
   participant M as band1t module
   participant D as Ops dashboard
-  participant MD as Medic (attendee app)
+  participant MD as Medic (Ops dashboard)
   B->>B: hold 3 s or impact then stillness: latch, strobe red, buzz
   B->>N: beacons with SOS or fall flag, ESP-NOW 10 Hz
   N->>N: heard at -58 dBm or stronger, pulse blue (state 4)
@@ -212,12 +218,11 @@ sequenceDiagram
     M->>M: escalate_incident, priority high, re-arm
     M-->>D: priority change
   end
-  D->>M: ack_incident, assign_medic with medic and entry zone
+  D->>M: ack_incident
   M-->>MD: incident, zone, witness band ids
-  M->>M: venue_tick: GUIDE directives and buzz for bands outside the circle
-  M-->>BR: band_directive and band_command rows
-  BR->>G: state 2, exit n, buzz 3
-  G->>N: commands, ESP-NOW x3
+  MD->>M: assign_medic, the Take it button
+  M->>M: status responding, assigned_medic is the medic
+  Note over M,N: TBD -- LEO: medic-approach guidance, GUIDE and buzz 3 for bands outside the circle
   MD->>M: resolve_incident
   M->>M: delete directives, write clear for subject
   M-->>BR: band_command clear
@@ -243,11 +248,13 @@ stateDiagram-v2
   end note
 ```
 
-### Medic dispatch and approach
+### A medic takes the incident
 
-There are no positions, so the medic flow is zone-level. Medics do not wear bands. Ops acknowledges the incident, then calls `assign_medic` with the medic and the zone the medic will enter from, picked with one tap on the map. The medic's phone shows the incident zone, the station colour that marks it, the subject band id and the witness band ids; the blue ring in the room is what they walk toward.
+There are no positions, so the medic flow is zone-level. Medics do not wear bands. A medic works in the incident desk of the [Ops dashboard](../5-apps/Ops-Dashboard.md). "Take it" calls `assign_medic(incident_id)`, role `medic`: it refuses a resolved incident, sets the status to `responding` and `assigned_medic` to the caller, and deletes the escalation timer. Ops does not assign medics. The desk shows the incident zone, the station colour that marks it, the subject band id and the witness band ids; the blue ring in the room is what the medic walks toward.
 
-On every tick while the incident is `responding`, `venue_tick` opens space around the person:
+### Medic approach (TBD -- LEO)
+
+The zone the medic enters from is `incident.medic_entry_zone_id`, which the medic who took the incident taps on the map. On every tick while the incident is `responding`, `venue_tick` opens space around the person:
 
 - it takes the incident zone's neighbours over `zone_link`, drops the neighbour that is the next hop on the shortest path from the entry zone (the way the medic is coming), and picks the least dense remaining neighbour; when no other neighbour remains, it uses the incident zone's own assigned exit;
 - every live band in the incident zone that is not the subject and not in the light circle gets a `band_directive` with `forced_state` GUIDE and `exit_colour` set to that neighbour's assigned exit colour, reason `medic_approach`, `incident_id` set, with no expiry (the bridge refreshes it), and a full band also gets the guidance buzz;
@@ -255,17 +262,11 @@ On every tick while the incident is `responding`, `venue_tick` opens space aroun
 
 People move sideways, away from the path the medic walks in on. When the incident resolves, `resolve_incident` deletes these directives; the bridge lets the forced states expire, and only the subject band gets an explicit `clear`.
 
-Medical-ID.md: a medic who reaches a person before any flag calls `medic_open_incident` with the band's NFC token. It opens an `sos` incident already `responding`, with the caller as `assigned_medic`, the incident zone as the entry zone, the same snapshot and no escalation timer; the approach directives apply from the next tick.
+### Low visibility and blocked exits
 
-### Evacuation mode and blocked exits
+In fire or smoke, ops presses "Low visibility: guide everyone to the exits" on the Ops dashboard and confirms "Fire or smoke? Every band starts guiding its wearer to the exit." `set_low_vis(true)`, role `ops`, stores `fleet_config.low_vis`, and the bridge sends `cmd 0 lowvis 1` to every band, and again to a band that reboots. Every band then guides its wearer to the exit colour of its zone, the colour of the station light at that exit, and full bands buzz once when guidance starts. "Turn it off" calls `set_low_vis(false)`; the bridge sends `lowvis 0` and the bands return to density colours. `clear_all` also turns low visibility off and sends `clear` to every band, which releases SOS latches too, so it is the reset button, not the way out of a drill.
 
-Ops calls `set_venue_mode` with `evacuate` for the whole venue, or for chosen zones (which sets `zone.evacuating`). On its next pass `venue_tick`:
-
-- opens one `evacuation` incident with a snapshot and a timer, so the event is recorded and escalates like any other;
-- writes a `band_directive` with `forced_state` GUIDE, the band's zone's `assigned_colour` and reason `evacuation`, with no expiry, for every live band in scope, keeps the colour in step with reassignments, and buzzes each full band when its guidance starts or its colour changes;
-- sets stations at open exits to chase (mode 1) and stations at blocked exits to off (mode 9), through directives addressed to each station, so the open doors are the moving lights and no light points at a closed door.
-
-`set_exit_status` marks an exit `blocked` or `open` at any time. The next tick skips a blocked exit, and the stability margin does not apply when the current exit is the one that was blocked, so the colour changes at once. Leaving evacuation with `set_venue_mode` `normal` deletes the evacuation directives; the bridge lets the forced GUIDE expire and the bands return to density colours within a second. `clear_all` also sends `clear` to every band, which releases SOS latches too, so it is the reset button, not the way out of a drill.
+(TBD -- LEO) Exits and routes. While low visibility is on, `venue_tick` keeps each band's exit colour in step with its zone's assigned exit and buzzes each full band when its colour changes. It sets stations at open exits to chase (mode 1) and stations at blocked exits to off (mode 9), through directives addressed to each station, so the open doors are the moving lights and no light points at a closed door. `set_exit_status` marks an exit `blocked` or `open` at any time. The next tick skips a blocked exit, and the stability margin does not apply when the current exit is the one that was blocked, so the colour changes at once.
 
 ### Manual override and Plan B
 
@@ -294,7 +295,9 @@ Two overrides exist, and the team tells the judges when one is used. The dashboa
 | 1.2 m square | all 9 inside the red tape, the judge in the middle | `neigh` reaches 5, red with the exit colour chasing; full bands buzz once when the zone turns `high` | after 4 ticks `high`; after 10 more a `crowd_risk` incident with snapshot and timer | pit zone red, incident card, the assigned exit's station named |
 | Step out | everyone walks toward the station glowing their colour | yellow, then green as `neigh` drops | `watch` after 10 ticks below 4.7, `normal` after 10 more below 3.7; incident `recovered` after 30 s of `normal` | zone back to green, incident resolved |
 | SOS | one wearer holds the button 3 s | red strobe; the bands around pulse blue, and full bands among them vibrate | `sos` incident, snapshot with the circle, timer | incident card with zone, subject id, witness ids, 60 s countdown |
-| Medic | ops acknowledges and assigns a teammate playing medic, tapping the entry zone; the medic walks in | bands outside the circle go GUIDE toward a side exit and full bands buzz; the circle stays blue | `responding`, medic-approach directives | the medic's phone shows the zone and the circle. Medical-ID.md: the medical card |
+| Medic | ops acknowledges; a teammate playing medic taps "Take it" in the incident desk and walks in | the circle stays blue | `responding`, `assigned_medic` set | the incident desk shows the zone and the circle |
+| (TBD -- LEO) Medic approach | the medic taps the entry zone | bands outside the circle go GUIDE toward a side exit and full bands buzz | medic-approach directives | the map shows the side exit |
+| Medical-ID.md: medical card | the medic taps "Tap band N for the medical card" | nothing changes | `request_medical_card` granted and logged | the card shows inside the incident |
 | Resolve | the medic resolves with one tap | `clear` arrives, strobe stops, blue fades in 1.5 s | `resolved`, directives deleted | card closes |
 
 If the manual override or Plan B is used at any step, the badge is visible and the presenter says so.
@@ -308,19 +311,20 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 | Exit colour flaps between two exits | the crowd stops trusting the colour | the 10 percent switch margin, on top of the risk hysteresis |
 | An SOS reopens right after resolve | duplicate incident | 10 s grace after resolution while the `clear` reaches the band |
 | A fall fires on a jump | false `fall` incident | ops resolves it with a note |
-| The medic approach guides people toward the medic | the crowd moves into the responder | the next-hop neighbour toward the entry zone is never chosen |
+| (TBD -- LEO) The medic approach guides people toward the medic | the crowd moves into the responder | the next-hop neighbour toward the entry zone is never chosen |
 
 ## Dependencies
 
 **Depends on**
 
 - [Hardware](../4-devices/Hardware.md): band states and precedence, flags, thresholds, the light-circle rule, the `buzz` patterns, station colours and modes.
-- [SpacetimeDB](../2-data/SpacetimeDB.md): every table and reducer named here, including `zone.forced_exit_id`, `zone.forced_risk`, `zone.evacuating`, `incident.assigned_medic`, `incident.medic_entry_zone_id`, `incident.opened_by`, `incident.priority`, `incident.camera_corroborated` and `incident.vision_status` (TBD -- LEO), `zone_state.candidate_risk` and `candidate_ticks`.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): every table and reducer named here, including `zone.forced_exit_id`, `zone.forced_risk`, `fleet_config.low_vis`, `incident.assigned_medic`, `incident.opened_by`, `incident.priority`, `incident.camera_corroborated` and `incident.vision_status` (TBD -- LEO), `zone_state.candidate_risk` and `candidate_ticks`.
+- (TBD -- LEO) [SpacetimeDB](../2-data/SpacetimeDB.md): `incident.medic_entry_zone_id` and `zone_link` for the medic approach and exit assignment.
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): directive reconciliation and refresh before the 25.5 s band-side limit, command delivery.
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Attendee-App](../5-apps/Attendee-App.md) (medic view), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Test-Bands](../3-services/Test-Bands.md) (scenarios that drive these behaviours), [Insurance](Insurance.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
 
 **If you delete this file**
 
@@ -332,11 +336,12 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 | Decision | Why |
 |---|---|
 | The pit zone's `area_m2` is the standing area around its station marker, paced out when the room is measured and written in the seed | it only sets the `density_count` floor; the taped squares are what the calibration measures |
-| Ops picks the medic's entry zone with one tap; medics do not wear bands | one input that is always there, with no band zone to look up |
-| Exit choice uses the seed's starting values (crowding penalty 0.25, switch margin 10 percent); the simulator's two-exit scenario is on the rehearsal checklist | the values are checked once against the simulated bands before anyone stands in the room |
+| A medic takes an incident with "Take it" (`assign_medic`, role `medic`); ops does not assign medics; medics do not wear bands | the medic knows whether they are free, and there is no band zone to look up |
+| (TBD -- LEO) The medic who took the incident taps the entry zone on the map | one input that is always there |
+| Low visibility is one venue-wide `lowvis` command, and each band guides to its zone's exit colour | one way to send everyone out; the bands keep guiding even when the laptop goes down after the command |
+| (TBD -- LEO) Exit choice uses the seed's starting values (crowding penalty 0.25, switch margin 10 percent); the two-exit scenario on the test bands is on the rehearsal checklist | the values are checked once against the test bands before anyone stands in the room |
 | A full band gets one long buzz (pattern 3) when its guidance starts or its exit colour changes | the vibration says "move now" and the colour says where; one buzz per change keeps it meaningful |
 | A full band gets one double buzz (pattern 2) when it first joins an incident's light circle | the bands around a fallen person vibrate and light up, as the project description asks; the double pattern differs from the long guidance buzz |
 | A witness is a state 4 band in the incident zone or a linked zone | the light circle is a few metres wide, so a band further away cannot be in it |
 | Plan B is run by hand from the dashboard; Vision.md adds the camera as the density source | the manual path works with no optional part built |
-| A medic-opened incident uses its own zone as the entry zone | the medic is already with the person |
 | An SOS from an unzoned band opens an incident in zone 0 | a person calling for help must never be dropped because a station was not heard |

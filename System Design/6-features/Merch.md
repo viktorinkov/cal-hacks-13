@@ -90,11 +90,11 @@ flowchart TD
 3. Then plain templates before sponsor templates, so an attendee who never stopped at a sponsor booth sees the plain tee, mug and poster first.
 4. Then the newest photo.
 
-The view returns the top 3. Each row holds what the app needs to draw it: the rank, the template's id, title, kind, price, image address, size and photo area, and the photo id and its `url` (`/blobs/<sha256>`). The minutes only rank; the recap does not show them. A typical first suggestion: the photo taken at the Elastic booth where the attendee spent 40 minutes, on `mug_elastic.png`. There is no job, no AI and no Claude. The view recomputes when a visit or a tag changes.
+The view returns the top 3. Each row holds what the app needs to draw it: the rank, the template's id, title, kind, price, image address, size and photo area, and the photo id and its `url` (`/blobs/<sha256>`). The minutes only rank; the recap does not show them. A typical first suggestion: the photo taken at the Elastic booth where the attendee spent 40 minutes, on `mug_elastic.png`. There is no job, no AI and no Claude. The view recomputes when a visit or a tag changes, so removing a tag takes that photo out at once.
 
 ### The preview
 
-The merch section is the bottom of the recap page, after the space-time view and the social part ([Attendee-App](../5-apps/Attendee-App.md)). For each suggestion the app draws the template image and places the photo over the green photo area, scaled to cover the area and centred, so whatever spills over the edges is cropped and no green shows. The app scales the photo area by the drawn size over `width` and `height`. The photo comes from its `url` in the blob store, through `GET /blobs/{hash}`. The server renders nothing; an order stores the template and the photo, which is all a printer would need.
+The merch section, "Make it merch", is the bottom of the recap page, after the space-time view and the social part ([Attendee-App](../5-apps/Attendee-App.md)). From top to bottom it holds the wallet balance from `my_wallet` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)), the suggestions, "Your orders" and the "Wallet activity" table. For each suggestion the app draws the template image and places the photo over the green photo area, scaled to cover the area and centred, so whatever spills over the edges is cropped and no green shows. The app scales the photo area by the drawn size over `width` and `height`. The photo comes from its `url` in the blob store, through `GET /blobs/{hash}`. The server renders nothing; an order stores the template and the photo, which is all a printer would need.
 
 ### From photo to order
 
@@ -119,7 +119,7 @@ sequenceDiagram
     M-->>AT: my_merch_orders shows paid, my_wallet the new balance
 ```
 
-1. **Suggest.** The recap page subscribes to `my_merch_suggestions` and shows the three previews, each with its price, next to the wallet balance from `my_wallet`, or the "Connect your Capital One wallet" button when the attendee has no wallet ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
+1. **Suggest.** The recap page subscribes to `my_merch_suggestions` and shows the three previews, each with its price, below the wallet balance from `my_wallet` at the top of the section. While `my_wallet` has no row, the top reads "Connect your Capital One wallet at band setup to buy merch." and every "Buy" button is disabled ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
 2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended (`event_state.ended` is set, otherwise "merch opens in your recap once the event ends"), that the size fits the kind, that the caller is tagged in the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price. It then writes a `merch_order` in status `paying`, with the template's price as `amount_cents`, and enqueues `merch_purchase`. From then on the order's amount is held: the spendable balance leaves it out, so a second tap cannot spend the same money.
 3. **Settle.** `bandit-workers` records the purchase on the attendee's Nessie account and calls `settle_merch_order` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)). The reducer rejects a stale lease, stores the merchant in `merch_shop` if it is not there yet, adds a `purchase` entry of minus the amount to `wallet_entry`, and sets the order `paid` with the Nessie purchase id.
 
@@ -159,7 +159,7 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 | Failure | Effect | Design answer |
 |---|---|---|
 | No photo qualifies: no tag yet | The merch section is empty | The section says merch appears once a photographer takes a photo of the attendee |
-| The attendee has no wallet, or it is still opening | `buy_merch` refuses with "your BandIt wallet is still opening" | The recap shows "Connect your Capital One wallet" in place of "Buy" until `my_wallet` has a row |
+| The attendee has no wallet, or it is still opening | `buy_merch` refuses with "your BandIt wallet is still opening" | No order and no Nessie call; the top of the merch section shows "Connect your Capital One wallet at band setup to buy merch." and "Buy" stays disabled until `my_wallet` has a row |
 | Balance too low | `buy_merch` refuses with "not enough money in your BandIt wallet" | No order and no Nessie call |
 | Nessie unreachable | The order stays `paying` | The job retries, and a retry reuses a purchase with the same memo, so it never buys twice; after 3 attempts the order is `failed`, the money is free again, and the attendee can buy again |
 | Two quick taps | Two orders | Each order holds its amount at once, so the wallet never spends more than it holds |
@@ -183,7 +183,7 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 **If you delete this file**
 
 - Remove the tables `merch_template`, `merch_order` and `merch_shop`, the reducers `load_merch_templates`, `buy_merch` and `settle_merch_order`, and the views `my_merch_suggestions` and `my_merch_orders` from [SpacetimeDB](../2-data/SpacetimeDB.md); `assets/merch/` from the app's static files; and the template load from the setup.
-- Remove the `merch_purchase` job and the Merch lines from [Payments-Nessie](../7-integrations/Payments-Nessie.md) and [Rust-Backend](../3-services/Rust-Backend.md); the wallet then holds only the opening and claim payouts. Remove the merch section of the recap page from [Attendee-App](../5-apps/Attendee-App.md).
+- Remove the `merch_purchase` job and the Merch lines from [Payments-Nessie](../7-integrations/Payments-Nessie.md) and [Rust-Backend](../3-services/Rust-Backend.md); the wallet then holds only the opening and claim payouts. Remove the merch section of the recap page from [Attendee-App](../5-apps/Attendee-App.md); the wallet balance and "Wallet activity" then show on their own at the end of the recap ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
 - Remove the Merch.md step 8 in [Flows](../1-overview/Flows.md), the prize row in [Architecture](../1-overview/Architecture.md), the Merch.md rows in [Requirements](../1-overview/Requirements.md) and [Decisions](../1-overview/Decisions.md), the Merch lines in [BrightData](../7-integrations/BrightData.md), and the Merch row and node in [README](../README.md).
 
 ## Decisions
