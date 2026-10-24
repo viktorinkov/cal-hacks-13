@@ -19,9 +19,11 @@ use serde_json::{Value, json};
 mod history;
 pub use history::history_claims;
 
-/// Index holding live and historical claim documents.
+/// Index prefix used when `ELASTIC_INDEX_PREFIX` is not set (Maincloud).
+pub const DEFAULT_PREFIX: &str = "bandit";
+/// Index holding live and historical claim documents, under the default prefix.
 pub const INDEX: &str = "bandit-claims";
-/// Ingest pipeline that validates every claim document without rejecting it.
+/// Ingest pipeline that validates every claim document without rejecting it, under the default prefix.
 pub const PIPELINE: &str = "bandit-claims-validate";
 /// Inference endpoint behind `narrative`: the project's default for
 /// `semantic_text`, pinned so a change of default cannot re-map the field.
@@ -165,17 +167,19 @@ pub fn narrative_for(p: &NarrativeParts) -> String {
     format!("{}.", parts.join("; "))
 }
 
-/// Client for the `bandit-claims` index. Debug output never shows the API key.
+/// Client for the `<prefix>-claims` index. Debug output never shows the API key.
 #[derive(Clone)]
 pub struct ClaimsIndex {
     http: Client,
     url: String,
     auth: HeaderValue,
+    index: String,
+    pipeline: String,
 }
 
 impl fmt::Debug for ClaimsIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClaimsIndex").field("url", &self.url).finish_non_exhaustive()
+        f.debug_struct("ClaimsIndex").field("url", &self.url).field("index", &self.index).finish_non_exhaustive()
     }
 }
 
@@ -185,7 +189,21 @@ impl ClaimsIndex {
             .context("ELASTICSEARCH_API_KEY is not a valid header value")?;
         auth.set_sensitive(true);
         let http = Client::builder().timeout(Duration::from_secs(120)).build()?;
-        Ok(Self { http, url: url.trim().trim_end_matches('/').to_string(), auth })
+        Ok(Self { http, url: url.trim().trim_end_matches('/').to_string(), auth, index: INDEX.into(), pipeline: PIPELINE.into() }
+            .with_prefix(DEFAULT_PREFIX))
+    }
+
+    /// Uses `<prefix>-claims` and `<prefix>-claims-validate`, so a local run
+    /// (`bandit-e2e`) never mixes its claims into the live index's precedents.
+    pub fn with_prefix(mut self, prefix: &str) -> Self {
+        let prefix = prefix.trim().trim_end_matches('-');
+        self.index = format!("{prefix}-claims");
+        self.pipeline = format!("{prefix}-claims-validate");
+        self
+    }
+
+    pub fn index(&self) -> &str {
+        &self.index
     }
 
     /// Reads `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` from the
@@ -194,26 +212,28 @@ impl ClaimsIndex {
         dotenvy::dotenv().ok();
         let url = std::env::var("ELASTICSEARCH_URL").context("ELASTICSEARCH_URL is not set")?;
         let key = std::env::var("ELASTICSEARCH_API_KEY").context("ELASTICSEARCH_API_KEY is not set")?;
-        Self::new(&url, &key)
+        let prefix = std::env::var("ELASTIC_INDEX_PREFIX").ok().filter(|p| !p.trim().is_empty());
+        Ok(Self::new(&url, &key)?.with_prefix(prefix.as_deref().unwrap_or(DEFAULT_PREFIX)))
     }
 
     /// Creates or updates the pipeline, and creates the index if it is missing
     /// (an existing index gets the current mapping, which only adds fields).
     pub async fn ensure_setup(&self) -> Result<()> {
-        self.call(Method::PUT, &format!("_ingest/pipeline/{PIPELINE}"), Some(pipeline_body())).await?;
-        let (status, _) = self.send(self.req(Method::HEAD, INDEX)).await?;
+        self.call(Method::PUT, &format!("_ingest/pipeline/{}", self.pipeline), Some(pipeline_body())).await?;
+        let (status, _) = self.send(self.req(Method::HEAD, &self.index)).await?;
         match status {
             StatusCode::OK => {
-                self.call(Method::PUT, &format!("{INDEX}/_mapping"), Some(mappings())).await?;
+                self.call(Method::PUT, &format!("{}/_mapping", self.index), Some(mappings())).await?;
             }
             StatusCode::NOT_FOUND => {
-                let body = json!({ "settings": { "index.default_pipeline": PIPELINE }, "mappings": mappings() });
-                let (status, v) = self.send(self.req(Method::PUT, INDEX).json(&body)).await?;
+                let body = json!({ "settings": { "index.default_pipeline": self.pipeline }, "mappings": mappings() });
+                let (status, v) = self.send(self.req(Method::PUT, &self.index).json(&body)).await?;
                 if !status.is_success() && v["error"]["type"] != "resource_already_exists_exception" {
-                    bail!("PUT {INDEX} returned {status}: {}", short(&v));
+                    bail!("PUT {} returned {status}: {}", self.index, short(&v));
                 }
+                self.seed_history().await?;
             }
-            other => bail!("HEAD {INDEX} returned {other}"),
+            other => bail!("HEAD {} returned {other}", self.index),
         }
         Ok(())
     }
@@ -222,9 +242,9 @@ impl ClaimsIndex {
     /// validation the pipeline stored on it.
     pub async fn index_claim(&self, doc: &ClaimDoc) -> Result<ValidationResult> {
         check_id(&doc.doc_id)?;
-        let path = format!("{INDEX}/_doc/{}?pipeline={PIPELINE}&refresh=wait_for", doc.doc_id);
+        let path = format!("{}/_doc/{}?pipeline={}&refresh=wait_for", self.index, doc.doc_id, self.pipeline);
         self.call(Method::PUT, &path, Some(serde_json::to_value(doc)?)).await?;
-        let got = self.call(Method::GET, &format!("{INDEX}/_doc/{}?_source_includes=validation", doc.doc_id), None).await?;
+        let got = self.call(Method::GET, &format!("{}/_doc/{}?_source_includes=validation", self.index, doc.doc_id), None).await?;
         serde_json::from_value(got["_source"]["validation"].clone()).context("stored document has no validation")
     }
 
@@ -246,7 +266,7 @@ impl ClaimsIndex {
             "collapse": { "field": "claim_id" },
             "_source": ["doc_id", "claim_id", "source", "incident_kind", "zone_name", "narrative", "outcome", "payout_cents"]
         });
-        let v = self.call(Method::POST, &format!("{INDEX}/_search"), Some(query)).await?;
+        let v = self.call(Method::POST, &format!("{}/_search", self.index), Some(query)).await?;
         hits(&v)
             .take(k)
             .map(|h| {
@@ -262,7 +282,7 @@ impl ClaimsIndex {
         if !OUTCOMES.contains(&outcome) {
             bail!("outcome {outcome:?} is not one of {OUTCOMES:?}");
         }
-        let path = format!("{INDEX}/_update/{}?refresh=wait_for", ClaimDoc::live_id(claim_id, pack_version));
+        let path = format!("{}/_update/{}?refresh=wait_for", self.index, ClaimDoc::live_id(claim_id, pack_version));
         let body = json!({ "doc": { "outcome": outcome, "payout_cents": payout_cents } });
         self.call(Method::POST, &path, Some(body)).await?;
         Ok(())
@@ -275,12 +295,12 @@ impl ClaimsIndex {
         let docs = history_claims();
         let mut body = String::new();
         for d in &docs {
-            body.push_str(&json!({ "index": { "_index": INDEX, "_id": d.doc_id } }).to_string());
+            body.push_str(&json!({ "index": { "_index": self.index, "_id": d.doc_id } }).to_string());
             body.push('\n');
             body.push_str(&serde_json::to_string(d)?);
             body.push('\n');
         }
-        let path = format!("_bulk?pipeline={PIPELINE}&refresh=wait_for");
+        let path = format!("_bulk?pipeline={}&refresh=wait_for", self.pipeline);
         let req = self.req(Method::POST, &path).header(CONTENT_TYPE, "application/x-ndjson").body(body);
         let (status, v) = self.send(req).await?;
         if !status.is_success() || v["errors"] == true {
@@ -295,7 +315,7 @@ impl ClaimsIndex {
                 { "term": { "validation.valid": false } }
             ]}}
         });
-        let v = self.call(Method::POST, &format!("{INDEX}/_search"), Some(query)).await?;
+        let v = self.call(Method::POST, &format!("{}/_search", self.index), Some(query)).await?;
         let invalid: Vec<String> = hits(&v).map(|h| h["_source"].to_string()).collect();
         if !invalid.is_empty() {
             bail!("seeded history failed validation: {}", invalid.join(", "));
@@ -306,7 +326,7 @@ impl ClaimsIndex {
     /// Deletes one document by id. Returns false when it did not exist.
     pub async fn delete_doc(&self, doc_id: &str) -> Result<bool> {
         check_id(doc_id)?;
-        let (status, v) = self.send(self.req(Method::DELETE, &format!("{INDEX}/_doc/{doc_id}?refresh=wait_for"))).await?;
+        let (status, v) = self.send(self.req(Method::DELETE, &format!("{}/_doc/{doc_id}?refresh=wait_for", self.index))).await?;
         match status {
             StatusCode::OK => Ok(true),
             StatusCode::NOT_FOUND => Ok(false),

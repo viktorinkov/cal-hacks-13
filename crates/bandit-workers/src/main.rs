@@ -56,11 +56,12 @@ fn runtime() -> Result<tokio::runtime::Runtime> {
 
 fn context(config: &Config, sink: Sink) -> Result<Ctx> {
     let client = ClaudeClient::from_env().context("setting up the Claude client")?;
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    let prefix = env("ELASTIC_INDEX_PREFIX").unwrap_or_else(|| claims_elastic::DEFAULT_PREFIX.into());
     let elastic = match (&config.elasticsearch_url, &config.elasticsearch_api_key) {
-        (Some(url), Some(key)) => Some(ClaimsIndex::new(url, key)?),
+        (Some(url), Some(key)) => Some(ClaimsIndex::new(url, key)?.with_prefix(&prefix)),
         _ => None,
     };
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
     let nessie = match (env("NESSIE_BASE_URL"), env("NESSIE_API_KEY")) {
         (Some(url), Some(key)) => Some(Nessie::new(&url, &key)?),
         _ => None,
