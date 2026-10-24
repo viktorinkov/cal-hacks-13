@@ -61,7 +61,7 @@ def architecture(y0):
                      "memory_tick) derive zone state and history inside the database.", fs=18, width=580)
     y = Y0 + 190
     venue, social = row(880, y, 280, 20, [
-        ("Venue\nvenue with ended_at, zones, organizations, booths, schedule, scraped profiles", None),
+        ("Venue\nevent_state, zones, organizations, booths, schedule, scraped profiles", None),
         ("Social\nvisits, people you hung out with, the people graph, photo tags", None)])
     y += venue.h + 30
     band1t, safety = row(880, y, 280, 20, [
@@ -83,7 +83,7 @@ def architecture(y0):
     stations = S.box(60, L(bands.bottom) + 80, 200, "Station markers 101 to 105\nzone anchors, exit colours",
                      "device")
     gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
-    sim = S.box(460, 0, 300, "bandit-sim\nup to 200 virtual bands (ids 1000 and up), each with a simulated owner", "rust",
+    sim = S.box(460, 0, 300, "bandit-sim\nsimulated bands: the crowd on ids 10 to 89, demo bands on 90 to 99, each with a simulated owner", "rust",
                 cy=L(venue.cy))
     bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band_reports every 250 ms, directives out",
                    "rust", cy=L(band1t.cy))
@@ -369,8 +369,8 @@ def social(y0):
     b8 = S.box(1480, L(b7.bottom) + 60, 320, "Photo features (TBD Leo)\npeople count and caption", "tbd")
 
     # 3. after the event
-    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nend_event in the host portal sets venue.ended_at", "web")
-    c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to venue; /t/{token} "
+    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nend_event in the host portal writes event_state; reopen_event undoes it", "web")
+    c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to event_state; /t/{token} "
                                              "reopens it later on any device", "web")
     c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_visits, my_photos: the exact lists of "
                                              "who and what", "stdb")
@@ -404,7 +404,7 @@ def social(y0):
     S.link(b5, "r", c3, "l", fa=0.5, fb=0.72, via=[(1870 + S.ox, b5.cy), (1870 + S.ox, c3.y + 0.72 * c3.h)])
     S.link(b7, "r", c3, "l", fa=0.5, fb=0.3, via=[(1850 + S.ox, b7.cy), (1850 + S.ox, c3.y + 0.3 * c3.h)],
            label="confirmed\ntags")
-    S.v(c1, c2, x=c1.cx, label="ended_at")
+    S.v(c1, c2, x=c1.cx, label="event_state")
     S.v(c2, c3, x=c2.cx)
     S.h(c3, c4)
     S.v(c3, c5, x=c3.cx)
