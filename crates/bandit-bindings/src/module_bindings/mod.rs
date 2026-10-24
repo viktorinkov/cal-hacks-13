@@ -148,11 +148,11 @@ pub mod my_encounter_type;
 pub mod my_encounters_table;
 pub mod my_graph_table;
 pub mod my_handles_table;
+pub mod my_photo_type;
+pub mod my_photos_table;
 pub mod my_roles_table;
 pub mod my_shared_visit_type;
 pub mod my_shared_visits_table;
-pub mod my_story_table;
-pub mod my_story_type;
 pub mod my_visit_type;
 pub mod my_visits_table;
 pub mod open_api_session_reducer;
@@ -175,6 +175,10 @@ pub mod person_claim_type;
 pub mod person_in_type;
 pub mod person_table;
 pub mod person_type;
+pub mod photo_table;
+pub mod photo_tag_table;
+pub mod photo_tag_type;
+pub mod photo_type;
 pub mod place_booth_reducer;
 pub mod precedent_in_type;
 pub mod property_event_table;
@@ -185,12 +189,14 @@ pub mod record_model_call_reducer;
 pub mod refuse_claim_reducer;
 pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
+pub mod register_photo_reducer;
 pub mod remove_social_handle_reducer;
 pub mod report_property_event_reducer;
 pub mod request_payment_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
+pub mod respond_photo_tag_reducer;
 pub mod retry_claim_payout_reducer;
 pub mod revoke_role_reducer;
 pub mod schedule_slot_in_type;
@@ -221,8 +227,9 @@ pub mod social_encounters_table;
 pub mod social_handle_table;
 pub mod social_handle_type;
 pub mod social_handles_table;
+pub mod social_photo_tags_table;
+pub mod social_photos_table;
 pub mod social_shared_visits_table;
-pub mod social_stories_table;
 pub mod social_tick_reducer;
 pub mod social_tick_timer_table;
 pub mod social_tick_timer_type;
@@ -237,8 +244,6 @@ pub mod station_table;
 pub mod station_type;
 pub mod stop_crowd_reducer;
 pub mod stop_find_reducer;
-pub mod story_person_out_type;
-pub mod story_person_type;
 pub mod submit_claim_checks_reducer;
 pub mod submit_claim_review_reducer;
 pub mod submit_medical_record_reducer;
@@ -246,8 +251,6 @@ pub mod submit_vision_assessment_reducer;
 pub mod summary_link_table;
 pub mod summary_link_type;
 pub mod summary_links_table;
-pub mod summary_story_table;
-pub mod summary_story_type;
 pub mod sweep_reducer;
 pub mod sweep_timer_table;
 pub mod sweep_timer_type;
@@ -412,11 +415,11 @@ pub use my_encounter_type::MyEncounter;
 pub use my_encounters_table::*;
 pub use my_graph_table::*;
 pub use my_handles_table::*;
+pub use my_photo_type::MyPhoto;
+pub use my_photos_table::*;
 pub use my_roles_table::*;
 pub use my_shared_visit_type::MySharedVisit;
 pub use my_shared_visits_table::*;
-pub use my_story_table::*;
-pub use my_story_type::MyStory;
 pub use my_visit_type::MyVisit;
 pub use my_visits_table::*;
 pub use open_api_session_reducer::open_api_session;
@@ -439,6 +442,10 @@ pub use person_claim_type::PersonClaim;
 pub use person_in_type::PersonIn;
 pub use person_table::*;
 pub use person_type::Person;
+pub use photo_table::*;
+pub use photo_tag_table::*;
+pub use photo_tag_type::PhotoTag;
+pub use photo_type::Photo;
 pub use place_booth_reducer::place_booth;
 pub use precedent_in_type::PrecedentIn;
 pub use property_event_table::*;
@@ -449,12 +456,14 @@ pub use record_model_call_reducer::record_model_call;
 pub use refuse_claim_reducer::refuse_claim;
 pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
+pub use register_photo_reducer::register_photo;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use report_property_event_reducer::report_property_event;
 pub use request_payment_reducer::request_payment;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
+pub use respond_photo_tag_reducer::respond_photo_tag;
 pub use retry_claim_payout_reducer::retry_claim_payout;
 pub use revoke_role_reducer::revoke_role;
 pub use schedule_slot_in_type::ScheduleSlotIn;
@@ -485,8 +494,9 @@ pub use social_encounters_table::*;
 pub use social_handle_table::*;
 pub use social_handle_type::SocialHandle;
 pub use social_handles_table::*;
+pub use social_photo_tags_table::*;
+pub use social_photos_table::*;
 pub use social_shared_visits_table::*;
-pub use social_stories_table::*;
 pub use social_tick_reducer::social_tick;
 pub use social_tick_timer_table::*;
 pub use social_tick_timer_type::SocialTickTimer;
@@ -501,8 +511,6 @@ pub use station_table::*;
 pub use station_type::Station;
 pub use stop_crowd_reducer::stop_crowd;
 pub use stop_find_reducer::stop_find;
-pub use story_person_out_type::StoryPersonOut;
-pub use story_person_type::StoryPerson;
 pub use submit_claim_checks_reducer::submit_claim_checks;
 pub use submit_claim_review_reducer::submit_claim_review;
 pub use submit_medical_record_reducer::submit_medical_record;
@@ -510,8 +518,6 @@ pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use summary_link_table::*;
 pub use summary_link_type::SummaryLink;
 pub use summary_links_table::*;
-pub use summary_story_table::*;
-pub use summary_story_type::SummaryStory;
 pub use sweep_reducer::sweep;
 pub use sweep_timer_table::*;
 pub use sweep_timer_type::SweepTimer;
@@ -699,6 +705,12 @@ pub enum Reducer {
         size_bytes: u64,
     },
     RegisterBridge,
+    RegisterPhoto {
+        url: String,
+        taken_at: __sdk::Timestamp,
+        zone_id: u64,
+        caption: String,
+    },
     RemoveSocialHandle {
         platform: String,
     },
@@ -724,6 +736,10 @@ pub enum Reducer {
     ResolveIncident {
         incident_id: u64,
         resolution: String,
+    },
+    RespondPhotoTag {
+        tag_id: u64,
+        confirm: bool,
     },
     RetryClaimPayout {
         claim_id: u64,
@@ -908,12 +924,14 @@ impl __sdk::Reducer for Reducer {
             Reducer::RefuseClaim { .. } => "refuse_claim",
             Reducer::RegisterBlob { .. } => "register_blob",
             Reducer::RegisterBridge => "register_bridge",
+            Reducer::RegisterPhoto { .. } => "register_photo",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::RequestPayment { .. } => "request_payment",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
+            Reducer::RespondPhotoTag { .. } => "respond_photo_tag",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
@@ -1224,6 +1242,17 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterBridge => {
                 __sats::bsatn::to_vec(&register_bridge_reducer::RegisterBridgeArgs {})
             }
+            Reducer::RegisterPhoto {
+                url,
+                taken_at,
+                zone_id,
+                caption,
+            } => __sats::bsatn::to_vec(&register_photo_reducer::RegisterPhotoArgs {
+                url: url.clone(),
+                taken_at: taken_at.clone(),
+                zone_id: zone_id.clone(),
+                caption: caption.clone(),
+            }),
             Reducer::RemoveSocialHandle { platform } => {
                 __sats::bsatn::to_vec(&remove_social_handle_reducer::RemoveSocialHandleArgs {
                     platform: platform.clone(),
@@ -1274,6 +1303,12 @@ impl __sdk::Reducer for Reducer {
                 incident_id: incident_id.clone(),
                 resolution: resolution.clone(),
             }),
+            Reducer::RespondPhotoTag { tag_id, confirm } => {
+                __sats::bsatn::to_vec(&respond_photo_tag_reducer::RespondPhotoTagArgs {
+                    tag_id: tag_id.clone(),
+                    confirm: confirm.clone(),
+                })
+            }
             Reducer::RetryClaimPayout { claim_id } => {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),
@@ -1573,9 +1608,9 @@ pub struct DbUpdate {
     my_encounters: __sdk::TableUpdate<MyEncounter>,
     my_graph: __sdk::TableUpdate<GraphLink>,
     my_handles: __sdk::TableUpdate<SocialHandle>,
+    my_photos: __sdk::TableUpdate<MyPhoto>,
     my_roles: __sdk::TableUpdate<StaffRole>,
     my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
-    my_story: __sdk::TableUpdate<MyStory>,
     my_visits: __sdk::TableUpdate<MyVisit>,
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
@@ -1584,6 +1619,8 @@ pub struct DbUpdate {
     people_link: __sdk::TableUpdate<PeopleLink>,
     person: __sdk::TableUpdate<Person>,
     person_claim: __sdk::TableUpdate<PersonClaim>,
+    photo: __sdk::TableUpdate<Photo>,
+    photo_tag: __sdk::TableUpdate<PhotoTag>,
     property_event: __sdk::TableUpdate<PropertyEvent>,
     schedule_slot: __sdk::TableUpdate<ScheduleSlot>,
     settings: __sdk::TableUpdate<Settings>,
@@ -1594,15 +1631,15 @@ pub struct DbUpdate {
     social_encounters: __sdk::TableUpdate<SocialEncounter>,
     social_handle: __sdk::TableUpdate<SocialHandle>,
     social_handles: __sdk::TableUpdate<SocialHandle>,
+    social_photo_tags: __sdk::TableUpdate<PhotoTag>,
+    social_photos: __sdk::TableUpdate<Photo>,
     social_shared_visits: __sdk::TableUpdate<SharedVisit>,
-    social_stories: __sdk::TableUpdate<SummaryStory>,
     social_tick_timer: __sdk::TableUpdate<SocialTickTimer>,
     social_visits: __sdk::TableUpdate<Visit>,
     staff_role: __sdk::TableUpdate<StaffRole>,
     station: __sdk::TableUpdate<Station>,
     summary_link: __sdk::TableUpdate<SummaryLink>,
     summary_links: __sdk::TableUpdate<SummaryLink>,
-    summary_story: __sdk::TableUpdate<SummaryStory>,
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     venue: __sdk::TableUpdate<Venue>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
@@ -1783,15 +1820,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_handles" => db_update
                     .my_handles
                     .append(my_handles_table::parse_table_update(table_update)?),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(my_photos_table::parse_table_update(table_update)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(my_roles_table::parse_table_update(table_update)?),
                 "my_shared_visits" => db_update
                     .my_shared_visits
                     .append(my_shared_visits_table::parse_table_update(table_update)?),
-                "my_story" => db_update
-                    .my_story
-                    .append(my_story_table::parse_table_update(table_update)?),
                 "my_visits" => db_update
                     .my_visits
                     .append(my_visits_table::parse_table_update(table_update)?),
@@ -1816,6 +1853,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "person_claim" => db_update
                     .person_claim
                     .append(person_claim_table::parse_table_update(table_update)?),
+                "photo" => db_update
+                    .photo
+                    .append(photo_table::parse_table_update(table_update)?),
+                "photo_tag" => db_update
+                    .photo_tag
+                    .append(photo_tag_table::parse_table_update(table_update)?),
                 "property_event" => db_update
                     .property_event
                     .append(property_event_table::parse_table_update(table_update)?),
@@ -1846,12 +1889,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "social_handles" => db_update
                     .social_handles
                     .append(social_handles_table::parse_table_update(table_update)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(social_photo_tags_table::parse_table_update(table_update)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(social_photos_table::parse_table_update(table_update)?),
                 "social_shared_visits" => db_update.social_shared_visits.append(
                     social_shared_visits_table::parse_table_update(table_update)?,
                 ),
-                "social_stories" => db_update
-                    .social_stories
-                    .append(social_stories_table::parse_table_update(table_update)?),
                 "social_tick_timer" => db_update
                     .social_tick_timer
                     .append(social_tick_timer_table::parse_table_update(table_update)?),
@@ -1870,9 +1916,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "summary_links" => db_update
                     .summary_links
                     .append(summary_links_table::parse_table_update(table_update)?),
-                "summary_story" => db_update
-                    .summary_story
-                    .append(summary_story_table::parse_table_update(table_update)?),
                 "sweep_timer" => db_update
                     .sweep_timer
                     .append(sweep_timer_table::parse_table_update(table_update)?),
@@ -2064,6 +2107,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.person_claim = cache
             .apply_diff_to_table::<PersonClaim>("person_claim", &self.person_claim)
             .with_updates_by_pk(|row| &row.attendee);
+        diff.photo = cache
+            .apply_diff_to_table::<Photo>("photo", &self.photo)
+            .with_updates_by_pk(|row| &row.id);
+        diff.photo_tag = cache
+            .apply_diff_to_table::<PhotoTag>("photo_tag", &self.photo_tag)
+            .with_updates_by_pk(|row| &row.id);
         diff.property_event = cache
             .apply_diff_to_table::<PropertyEvent>("property_event", &self.property_event)
             .with_updates_by_pk(|row| &row.id);
@@ -2097,9 +2146,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.summary_link = cache
             .apply_diff_to_table::<SummaryLink>("summary_link", &self.summary_link)
             .with_updates_by_pk(|row| &row.token_hash);
-        diff.summary_story = cache
-            .apply_diff_to_table::<SummaryStory>("summary_story", &self.summary_story)
-            .with_updates_by_pk(|row| &row.attendee);
         diff.sweep_timer = cache
             .apply_diff_to_table::<SweepTimer>("sweep_timer", &self.sweep_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
@@ -2142,10 +2188,10 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<MyEncounter>("my_encounters", &self.my_encounters);
         diff.my_graph = cache.apply_diff_to_table::<GraphLink>("my_graph", &self.my_graph);
         diff.my_handles = cache.apply_diff_to_table::<SocialHandle>("my_handles", &self.my_handles);
+        diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
         diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
         diff.my_shared_visits =
             cache.apply_diff_to_table::<MySharedVisit>("my_shared_visits", &self.my_shared_visits);
-        diff.my_story = cache.apply_diff_to_table::<MyStory>("my_story", &self.my_story);
         diff.my_visits = cache.apply_diff_to_table::<MyVisit>("my_visits", &self.my_visits);
         diff.open_incidents =
             cache.apply_diff_to_table::<Incident>("open_incidents", &self.open_incidents);
@@ -2155,10 +2201,12 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<SocialEncounter>("social_encounters", &self.social_encounters);
         diff.social_handles =
             cache.apply_diff_to_table::<SocialHandle>("social_handles", &self.social_handles);
+        diff.social_photo_tags =
+            cache.apply_diff_to_table::<PhotoTag>("social_photo_tags", &self.social_photo_tags);
+        diff.social_photos =
+            cache.apply_diff_to_table::<Photo>("social_photos", &self.social_photos);
         diff.social_shared_visits = cache
             .apply_diff_to_table::<SharedVisit>("social_shared_visits", &self.social_shared_visits);
-        diff.social_stories =
-            cache.apply_diff_to_table::<SummaryStory>("social_stories", &self.social_stories);
         diff.social_visits =
             cache.apply_diff_to_table::<Visit>("social_visits", &self.social_visits);
         diff.summary_links =
@@ -2336,14 +2384,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_handles" => db_update
                     .my_handles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_shared_visits" => db_update
                     .my_shared_visits
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "my_story" => db_update
-                    .my_story
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_visits" => db_update
                     .my_visits
@@ -2368,6 +2416,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "person_claim" => db_update
                     .person_claim
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "photo" => db_update
+                    .photo
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "photo_tag" => db_update
+                    .photo_tag
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
@@ -2399,11 +2453,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "social_handles" => db_update
                     .social_handles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "social_shared_visits" => db_update
                     .social_shared_visits
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "social_stories" => db_update
-                    .social_stories
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "social_tick_timer" => db_update
                     .social_tick_timer
@@ -2422,9 +2479,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "summary_links" => db_update
                     .summary_links
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "summary_story" => db_update
-                    .summary_story
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sweep_timer" => db_update
                     .sweep_timer
@@ -2625,14 +2679,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_handles" => db_update
                     .my_handles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_shared_visits" => db_update
                     .my_shared_visits
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "my_story" => db_update
-                    .my_story
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_visits" => db_update
                     .my_visits
@@ -2657,6 +2711,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "person_claim" => db_update
                     .person_claim
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "photo" => db_update
+                    .photo
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "photo_tag" => db_update
+                    .photo_tag
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
@@ -2688,11 +2748,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "social_handles" => db_update
                     .social_handles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "social_shared_visits" => db_update
                     .social_shared_visits
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "social_stories" => db_update
-                    .social_stories
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "social_tick_timer" => db_update
                     .social_tick_timer
@@ -2711,9 +2774,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "summary_links" => db_update
                     .summary_links
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "summary_story" => db_update
-                    .summary_story
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sweep_timer" => db_update
                     .sweep_timer
@@ -2806,9 +2866,9 @@ pub struct AppliedDiff<'r> {
     my_encounters: __sdk::TableAppliedDiff<'r, MyEncounter>,
     my_graph: __sdk::TableAppliedDiff<'r, GraphLink>,
     my_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
     my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
-    my_story: __sdk::TableAppliedDiff<'r, MyStory>,
     my_visits: __sdk::TableAppliedDiff<'r, MyVisit>,
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
@@ -2817,6 +2877,8 @@ pub struct AppliedDiff<'r> {
     people_link: __sdk::TableAppliedDiff<'r, PeopleLink>,
     person: __sdk::TableAppliedDiff<'r, Person>,
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
+    photo: __sdk::TableAppliedDiff<'r, Photo>,
+    photo_tag: __sdk::TableAppliedDiff<'r, PhotoTag>,
     property_event: __sdk::TableAppliedDiff<'r, PropertyEvent>,
     schedule_slot: __sdk::TableAppliedDiff<'r, ScheduleSlot>,
     settings: __sdk::TableAppliedDiff<'r, Settings>,
@@ -2827,15 +2889,15 @@ pub struct AppliedDiff<'r> {
     social_encounters: __sdk::TableAppliedDiff<'r, SocialEncounter>,
     social_handle: __sdk::TableAppliedDiff<'r, SocialHandle>,
     social_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    social_photo_tags: __sdk::TableAppliedDiff<'r, PhotoTag>,
+    social_photos: __sdk::TableAppliedDiff<'r, Photo>,
     social_shared_visits: __sdk::TableAppliedDiff<'r, SharedVisit>,
-    social_stories: __sdk::TableAppliedDiff<'r, SummaryStory>,
     social_tick_timer: __sdk::TableAppliedDiff<'r, SocialTickTimer>,
     social_visits: __sdk::TableAppliedDiff<'r, Visit>,
     staff_role: __sdk::TableAppliedDiff<'r, StaffRole>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     summary_link: __sdk::TableAppliedDiff<'r, SummaryLink>,
     summary_links: __sdk::TableAppliedDiff<'r, SummaryLink>,
-    summary_story: __sdk::TableAppliedDiff<'r, SummaryStory>,
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
@@ -3015,13 +3077,13 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<GraphLink>("my_graph", &self.my_graph, event);
         callbacks.invoke_table_row_callbacks::<SocialHandle>("my_handles", &self.my_handles, event);
+        callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
         callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
         callbacks.invoke_table_row_callbacks::<MySharedVisit>(
             "my_shared_visits",
             &self.my_shared_visits,
             event,
         );
-        callbacks.invoke_table_row_callbacks::<MyStory>("my_story", &self.my_story, event);
         callbacks.invoke_table_row_callbacks::<MyVisit>("my_visits", &self.my_visits, event);
         callbacks.invoke_table_row_callbacks::<Incident>(
             "open_incidents",
@@ -3042,6 +3104,8 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.person_claim,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Photo>("photo", &self.photo, event);
+        callbacks.invoke_table_row_callbacks::<PhotoTag>("photo_tag", &self.photo_tag, event);
         callbacks.invoke_table_row_callbacks::<PropertyEvent>(
             "property_event",
             &self.property_event,
@@ -3088,14 +3152,15 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.social_handles,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<PhotoTag>(
+            "social_photo_tags",
+            &self.social_photo_tags,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Photo>("social_photos", &self.social_photos, event);
         callbacks.invoke_table_row_callbacks::<SharedVisit>(
             "social_shared_visits",
             &self.social_shared_visits,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SummaryStory>(
-            "social_stories",
-            &self.social_stories,
             event,
         );
         callbacks.invoke_table_row_callbacks::<SocialTickTimer>(
@@ -3114,11 +3179,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<SummaryLink>(
             "summary_links",
             &self.summary_links,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SummaryStory>(
-            "summary_story",
-            &self.summary_story,
             event,
         );
         callbacks.invoke_table_row_callbacks::<SweepTimer>("sweep_timer", &self.sweep_timer, event);
@@ -3847,9 +3907,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_encounters_table::register_table(client_cache);
         my_graph_table::register_table(client_cache);
         my_handles_table::register_table(client_cache);
+        my_photos_table::register_table(client_cache);
         my_roles_table::register_table(client_cache);
         my_shared_visits_table::register_table(client_cache);
-        my_story_table::register_table(client_cache);
         my_visits_table::register_table(client_cache);
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
@@ -3858,6 +3918,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         people_link_table::register_table(client_cache);
         person_table::register_table(client_cache);
         person_claim_table::register_table(client_cache);
+        photo_table::register_table(client_cache);
+        photo_tag_table::register_table(client_cache);
         property_event_table::register_table(client_cache);
         schedule_slot_table::register_table(client_cache);
         settings_table::register_table(client_cache);
@@ -3868,15 +3930,15 @@ impl __sdk::SpacetimeModule for RemoteModule {
         social_encounters_table::register_table(client_cache);
         social_handle_table::register_table(client_cache);
         social_handles_table::register_table(client_cache);
+        social_photo_tags_table::register_table(client_cache);
+        social_photos_table::register_table(client_cache);
         social_shared_visits_table::register_table(client_cache);
-        social_stories_table::register_table(client_cache);
         social_tick_timer_table::register_table(client_cache);
         social_visits_table::register_table(client_cache);
         staff_role_table::register_table(client_cache);
         station_table::register_table(client_cache);
         summary_link_table::register_table(client_cache);
         summary_links_table::register_table(client_cache);
-        summary_story_table::register_table(client_cache);
         sweep_timer_table::register_table(client_cache);
         venue_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
@@ -3935,9 +3997,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_encounters",
         "my_graph",
         "my_handles",
+        "my_photos",
         "my_roles",
         "my_shared_visits",
-        "my_story",
         "my_visits",
         "open_incidents",
         "organization",
@@ -3946,6 +4008,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "people_link",
         "person",
         "person_claim",
+        "photo",
+        "photo_tag",
         "property_event",
         "schedule_slot",
         "settings",
@@ -3956,15 +4020,15 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "social_encounters",
         "social_handle",
         "social_handles",
+        "social_photo_tags",
+        "social_photos",
         "social_shared_visits",
-        "social_stories",
         "social_tick_timer",
         "social_visits",
         "staff_role",
         "station",
         "summary_link",
         "summary_links",
-        "summary_story",
         "sweep_timer",
         "venue",
         "vision_assessment",
