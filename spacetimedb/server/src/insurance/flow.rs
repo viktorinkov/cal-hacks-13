@@ -186,6 +186,9 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
             ..claim
         },
     );
+    if let Some(staff) = pack.checks.iter().find(|c| c.name == "claimant_not_staff" && c.result == hyphenate_core::CheckResult::Fail) {
+        return refuse(ctx, claim, format!("medical payments cover excludes staff: {}", staff.detail), "code");
+    }
     if pack.corroboration == hyphenate_core::Corroboration::Disputed {
         let failed = hyphenate_core::outcome::failed_check_names(&pack.checks);
         return refuse(ctx, claim, format!("evidence disputed: {}", failed.join(", ")), "code");
@@ -557,6 +560,16 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
         review_required: settings(ctx).review_required,
         rule,
     });
+    let occurrence = occurrence(ctx, claim.incident_id);
+    if occurrence.len() >= MASS_OCCURRENCE && !matches!(decision, Decision::Refuse { .. }) {
+        let reason = format!(
+            "{} people hurt in {} within 5 minutes: auto-settle is off and the adjuster handles every claim of the occurrence",
+            occurrence.len(),
+            claim.zone_name
+        );
+        route_to(ctx, claim, "adjuster", reason);
+        return Ok(());
+    }
     match decision {
         Decision::Refuse { reason } => refuse(ctx, claim, reason, "code").map(|_| ()),
         Decision::Route { reason } => {
@@ -568,6 +581,25 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
             settle(ctx, claim, "auto_settled")
         }
     }
+}
+
+/// With this many people hurt in one occurrence, every claim goes to the adjuster.
+const MASS_OCCURRENCE: usize = 3;
+
+/// Sends the claim to the named person on one rung of the authority matrix.
+fn route_to(ctx: &ReducerContext, claim: Claim, role: &str, reason: String) {
+    let limit = ctx.db.authority_limit().role().find(&role.to_string());
+    save(
+        ctx,
+        Claim {
+            status: ClaimStatus::Routed,
+            status_note: reason,
+            routed_to_role: role.into(),
+            routed_to: limit.as_ref().and_then(|l| l.assignee).unwrap_or(Identity::ZERO),
+            routed_to_name: limit.map(|l| l.assignee_name).unwrap_or_default(),
+            ..claim
+        },
+    );
 }
 
 /// Sends the claim to the lowest rung of the authority matrix whose ceiling
@@ -732,7 +764,24 @@ fn letter_data(ctx: &ReducerContext, claim: &Claim, counterparty_name: &str, cou
             .collect(),
         counterparty_name: counterparty_name.into(),
         counterparty_contact: counterparty_contact.into(),
+        related_claims: related_claims(ctx, claim),
     }
+}
+
+/// The other claims of a mass occurrence, for the one notice that lists everyone.
+fn related_claims(ctx: &ReducerContext, claim: &Claim) -> Vec<String> {
+    let occurrence = occurrence(ctx, claim.incident_id);
+    if occurrence.len() < MASS_OCCURRENCE {
+        return Vec::new();
+    }
+    occurrence
+        .iter()
+        .filter(|i| i.id != claim.incident_id)
+        .map(|i| match ctx.db.claim().incident_id().find(i.id) {
+            Some(c) => format!("claim {}: {}, {}, {}", c.id, c.claimant_name, c.incident_kind, c.status_note),
+            None => format!("incident {}: band {}, no claim yet", i.id, i.subject_band),
+        })
+        .collect()
 }
 
 /// The named approver checks the claim; the reducer fails closed when the

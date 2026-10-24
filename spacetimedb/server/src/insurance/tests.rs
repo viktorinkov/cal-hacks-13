@@ -445,3 +445,55 @@ fn a_dead_review_job_sends_the_claim_to_a_person() {
     assert_eq!(c.status, ClaimStatus::Routed);
     assert_eq!(c.status_note, "claims agent review unavailable");
 }
+
+#[test]
+fn injured_staff_are_excluded_from_medical_payments() {
+    let w = World::new();
+    w.t.db.staff_role().insert(StaffRole { id: 0, identity: id("Lee Park"), role: "medic".into(), label: "Lee Park".into(), granted_by: id("owner"), granted_at: w.t.clock.now() });
+    let claim = w.treat_and_resolve(w.fall(6, 101, &[(1, 101), (2, 101)]));
+    assert_eq!(claim.status, ClaimStatus::Refused);
+    assert!(claim.refusal_reason.starts_with("medical payments cover excludes staff: Lee Park holds the staff role medic"), "{}", claim.refusal_reason);
+}
+
+#[test]
+fn three_people_hurt_at_once_go_to_the_adjuster_on_one_notice() {
+    let w = World::new();
+    approve_larger_fall(&w);
+    w.advance(3600);
+    let a = w.fall(3, 101, &[(1, 101), (5, 101)]);
+    w.advance(30);
+    let b = w.fall(8, 101, &[(1, 101), (5, 101)]);
+    w.advance(30);
+    let c = w.fall(6, 101, &[(1, 101), (5, 101)]);
+    let first = w.treat_and_resolve(a);
+    w.treat_and_resolve(b);
+    w.treat_and_resolve(c);
+    w.file_record(first.id, FIRST_AID, 1);
+    w.verify(first.id);
+    w.review(first.id, "consistent", "supported", None);
+    let claim = w.claim(first.id);
+    assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Priya Nair"));
+    assert!(claim.status_note.starts_with("3 people hurt in Main stage"), "{}", claim.status_note);
+    w.as_("priya", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone(), None, false));
+    w.pay(claim.id);
+    let p: DraftPayload = serde_json::from_str(&w.open_job(KIND_DRAFT, claim.id).payload).unwrap();
+    assert_eq!(p.letter.related_claims.len(), 2, "{:?}", p.letter.related_claims);
+    assert!(hyphenate_core::letters::fnol_template(&p.letter).contains("Sam Patel"));
+}
+
+#[test]
+fn the_same_invoice_on_another_claim_goes_to_a_person() {
+    let w = World::new();
+    approve_larger_fall(&w);
+    w.advance(3600);
+    let first = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record_hash(first.id, FIRST_AID, 1, &"ab".repeat(32));
+    w.advance(3600);
+    let second = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record_hash(second.id, FIRST_AID, 1, &"cd".repeat(32));
+    let version = w.claim(second.id).pack_version;
+    let checks = w.as_("ops", |ctx| Ok(pack_checks(ctx, second.id, version)));
+    let dup = checks.iter().find(|c| c.name == "record_duplicate").unwrap();
+    assert_eq!(dup.result, hyphenate_core::CheckResult::Fail);
+    assert!(dup.detail.starts_with("invoice FA-1024-0007"), "{}", dup.detail);
+}

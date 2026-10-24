@@ -114,6 +114,10 @@ pub struct LetterData {
     /// For recovery letters: who is asked, and how to reach them.
     pub counterparty_name: String,
     pub counterparty_contact: String,
+    /// Other people hurt in the same occurrence, one line each, for example
+    /// `claim 14: Lee Park, fall, routed to the adjuster`.
+    #[serde(default)]
+    pub related_claims: Vec<String>,
 }
 
 /// A copy with `$` spelled `USD ` in every text field, so the only figures a
@@ -136,6 +140,7 @@ fn plain(d: &LetterData) -> LetterData {
     ]
     .into_iter()
     .chain(c.fact_lines.iter_mut())
+    .chain(c.related_claims.iter_mut())
     {
         *s = s.replace('$', "USD ");
     }
@@ -151,32 +156,54 @@ fn kind_text(kind: &str) -> &str {
     }
 }
 
-/// First notice of loss to the insurer: claim and policy, what happened where
-/// and when, the four amounts, the decision, the pack SHA and the fact lines.
+/// First notice of loss to the insurer, in the section order of the ACORD 3
+/// liability notice of occurrence: carrier, policy, insured, occurrence,
+/// injured or damaged, witnesses, other injured, remarks, then the facts.
 pub fn fnol_template(d: &LetterData) -> String {
     let d = &plain(d);
     let a = d.amounts;
+    let cover = if d.incident_kind == "property" { "property" } else { "medical payments" };
     let mut t = format!(
-        "First notice of loss: claim {}\n\n\
-         To: {} ({})\nPolicy: {}\nInsured: {}\nClaimant: {}\nIncident: {} in {} at {}\n\n\
-         Covered cost: {}\nPaid to the claimant: {}\nRecoverable under the policy: {}\nVenue share (deductible): {}\n\n\
-         Decision: {}\nEvidence pack SHA-256: {}\n\nFacts:\n",
+        "LIABILITY NOTICE OF OCCURRENCE / CLAIM (ACORD 3 layout)\nClaim {}\n\n\
+         CARRIER\nInsurer: {}\nNotice to: {}\n\n\
+         POLICY\nPolicy number: {}\nLine of business: general liability, {} cover\n\n\
+         INSURED\nName: {}\n\n\
+         OCCURRENCE\nDate and time: {}\nLocation: {}, {}\nDescription: {} recorded by BandIt wristbands and venue staff\n\n\
+         INJURED / PROPERTY DAMAGED\nClaimant: {}\nCovered cost: {}\nPaid to the claimant: {}\nRecoverable under the policy: {}\nVenue share (deductible): {}\n\n\
+         WITNESSES\n",
         d.claim_id,
         d.insurer_name,
         d.fnol_contact,
         d.policy_number,
+        cover,
         d.venue_name,
-        d.claimant_name,
-        kind_text(&d.incident_kind),
-        d.zone_name,
         d.incident_time,
+        d.zone_name,
+        d.venue_name,
+        kind_text(&d.incident_kind),
+        d.claimant_name,
         format_cents(a.cost_cents),
         format_cents(a.payout_cents),
         format_cents(a.recoverable_cents),
         format_cents(a.venue_cost_cents),
-        d.decision_text,
-        d.pack_sha256,
     );
+    let witnesses: Vec<&String> = d.fact_lines.iter().filter(|l| l.contains("] witness = ")).collect();
+    if witnesses.is_empty() {
+        t.push_str("None recorded\n");
+    }
+    for w in witnesses {
+        t.push_str(w);
+        t.push('\n');
+    }
+    t.push_str("\nOTHER INJURED IN THIS OCCURRENCE\n");
+    if d.related_claims.is_empty() {
+        t.push_str("None\n");
+    }
+    for r in &d.related_claims {
+        t.push_str(r);
+        t.push('\n');
+    }
+    t.push_str(&format!("\nREMARKS\nDecision: {}\nEvidence pack SHA-256: {}\n\nEVIDENCE FACTS\n", d.decision_text, d.pack_sha256));
     for line in &d.fact_lines {
         t.push_str(line);
         t.push('\n');
@@ -299,6 +326,7 @@ mod tests {
             ],
             counterparty_name: "Stagecraft Rentals".to_string(),
             counterparty_contact: "ops@stagecraft.example".to_string(),
+            related_claims: vec![],
         }
     }
 
@@ -345,7 +373,7 @@ mod tests {
     #[test]
     fn fnol_carries_amounts_sha_and_facts() {
         let t = fnol_template(&data());
-        for needed in ["claim 42", "Covered cost: $180.00", "Recoverable under the policy: $80.00", "Venue share (deductible): $100.00"] {
+        for needed in ["Claim 42", "ACORD 3", "OCCURRENCE", "WITNESSES", "Covered cost: $180.00", "Recoverable under the policy: $80.00", "Venue share (deductible): $100.00"] {
             assert!(t.contains(needed), "{needed}");
         }
         assert!(t.contains(&data().pack_sha256));

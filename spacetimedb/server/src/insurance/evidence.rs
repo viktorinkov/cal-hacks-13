@@ -5,6 +5,7 @@
 
 use super::*;
 use super::{micros, timestamp};
+use crate::roles::*;
 use crate::safety::*;
 use crate::tables::*;
 use crate::venue::*;
@@ -215,20 +216,64 @@ pub fn record_checks(ctx: &ReducerContext, claim: &Claim, input: &EvidenceInput)
         let lines = hyphenate_core::fee_schedule::cover_lines(&valid, &incident_date, window);
         checks.push(hyphenate_core::fee_schedule::lines_check(&lines));
     }
-    let others: Vec<u64> = ctx
-        .db
-        .medical_record()
-        .file_hash()
-        .filter(&rec.file_hash)
-        .filter(|r| r.claim_id != claim.id)
-        .map(|r| r.claim_id)
-        .collect();
-    checks.push(if others.is_empty() {
-        Check::pass("record_duplicate", "this file is not filed on any other claim")
-    } else {
-        Check::fail("record_duplicate", format!("the same file is filed on claim {}", others[0]))
-    });
+    checks.push(duplicate_check(ctx, claim, &rec));
     checks
+}
+
+/// The same bill filed on another claim: the same file, the same provider and
+/// invoice number, or the same patient, service date and total.
+fn duplicate_check(ctx: &ReducerContext, claim: &Claim, rec: &MedicalRecord) -> Check {
+    if let Some(other) = ctx.db.medical_record().file_hash().filter(&rec.file_hash).find(|r| r.claim_id != claim.id) {
+        return Check::fail("record_duplicate", format!("the same file is filed on claim {}", other.claim_id));
+    }
+    let norm = |s: &str| s.trim().to_lowercase();
+    for other in ctx.db.medical_record().iter().filter(|r| r.claim_id != claim.id && r.status == "extracted") {
+        if !rec.invoice_number.is_empty() && norm(&other.invoice_number) == norm(&rec.invoice_number) && norm(&other.provider_name) == norm(&rec.provider_name) {
+            return Check::fail("record_duplicate", format!("invoice {} from {} is already filed on claim {}", rec.invoice_number, rec.provider_name, other.claim_id));
+        }
+        if norm(&other.patient_name) == norm(&rec.patient_name) && other.date_of_service == rec.date_of_service && other.billed_cents == rec.billed_cents {
+            return Check::fail(
+                "record_duplicate",
+                format!("{} on {} for {} is already filed on claim {}", rec.patient_name, rec.date_of_service, hyphenate_core::money::format_cents(rec.billed_cents), other.claim_id),
+            );
+        }
+    }
+    Check::pass("record_duplicate", "no other claim has this file, invoice, or patient, date and total")
+}
+
+/// Medical-payments cover excludes the venue's own staff.
+fn claimant_check(ctx: &ReducerContext, claim: &Claim) -> Option<Check> {
+    if cover_of(claim) != CoverKind::MedicalPayments {
+        return None;
+    }
+    let claimant = claim.claimant?;
+    let role = ctx.db.staff_role().identity().filter(claimant).next().map(|r| r.role);
+    Some(match role {
+        Some(role) => Check::fail("claimant_not_staff", format!("{} holds the staff role {role}", claim.claimant_name)),
+        None => Check::pass("claimant_not_staff", format!("{} holds no staff role", claim.claimant_name)),
+    })
+}
+
+/// Injury incidents in the same zone within this many microseconds count as one occurrence.
+const OCCURRENCE_MICROS: i64 = 5 * 60 * 1_000_000;
+
+/// The injury incidents of the same occurrence as this one, itself included.
+pub fn occurrence(ctx: &ReducerContext, incident_id: u64) -> Vec<Incident> {
+    let Some(inc) = ctx.db.incident().id().find(incident_id) else {
+        return Vec::new();
+    };
+    if inc.kind == IncidentKind::Property || inc.zone_id == 0 {
+        return vec![inc];
+    }
+    let at = micros(inc.opened_at);
+    let mut all: Vec<Incident> = ctx
+        .db
+        .incident()
+        .iter()
+        .filter(|i| i.kind != IncidentKind::Property && i.zone_id == inc.zone_id && (micros(i.opened_at) - at).abs() <= OCCURRENCE_MICROS)
+        .collect();
+    all.sort_by_key(|i| i.id);
+    all
 }
 
 pub struct Pack {
@@ -249,6 +294,7 @@ pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
     let hash = hyphenate_core::pack::pack_sha256(&facts);
     let (corroboration, mut checks) = hyphenate_core::corroboration::corroborate(&input, &config(&s));
     checks.extend(record_checks(ctx, claim, &input));
+    checks.extend(claimant_check(ctx, claim));
     let version = claim.pack_version + 1;
     for f in &facts {
         ctx.db.evidence_fact().insert(EvidenceFact {
