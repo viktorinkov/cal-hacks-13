@@ -46,13 +46,13 @@ def architecture(y0):
     legend(1900, 34)
 
     # browsers across the top
-    ops_l = "Ops dashboard\nmap, incidents, claims queue; its host portal layout: attendees, alerts, Event ended"
-    app_l = "Attendee app at /t/{token}\nSpacetimeAuth sign-in; turns into the recap live when the event ends"
+    ops_l = "Host portal at /organizer\none page for all staff: Live, Attendees, Claims, Imports and Kibana, Simulate; Event ended"
+    app_l = "Attendee page at /t/{token}\nband setup, then a thank-you; turns into the recap live when the event ends"
     top_h = max(measure(ops_l, 320), measure(app_l, 420))
     Y0 = 190 + top_h + 80 + 70  # top of the SpacetimeDB, services and Elastic zones
     ops = S.box(880, 230, 320, ops_l, "web", h=top_h)
     app = S.box(1230, 230, 420, app_l, "web", h=top_h)
-    auth = S.box(1980, 230, 330, "SpacetimeAuth\nmagic-link sign-in for attendees and staff", "ext", h=top_h)
+    auth = S.box(1980, 230, 330, "SpacetimeAuth\nmagic-link sign-in for attendees, staff and the module owner", "ext", h=top_h)
     kib = S.box(2420, 230, 350, "Kibana\nimport runs, bandit-organizer decisions, three dashboards", "ext", h=top_h)
 
     # SpacetimeDB
@@ -62,7 +62,7 @@ def architecture(y0):
     y = Y0 + 190
     venue, social = row(880, y, 280, 20, [
         ("Venue\nevent_state, zones, organizations, booths, schedule, scraped profiles", None),
-        ("Social\nvisits, shared visits, people you hung out with, the people graph, photo tags; the simulated crowd on bands 10 to 89", None)])
+        ("Social\nvisits, people you spent time with, the people graph, people in photos; the simulated crowd on bands 10 to 89", None)])
     y += venue.h + 30
     band1t, safety = row(880, y, 280, 20, [
         ("Band and encounter model (TBD Leo)\nbands, stations, encounters, zone visits", "tbd"),
@@ -74,7 +74,7 @@ def architecture(y0):
     y += insurance.h + 30
     jobs, roles = row(880, y, 280, 20, [
         ("Jobs\nslow and outside work, done by bandit-workers", None),
-        ("Roles and views\nSpacetimeAuth gives each person one identity; only the module owner grants roles; views return only the caller's rows", None)])
+        ("Roles and views\nSpacetimeAuth gives each person one identity; staff roles are ops and medic; views return only the caller's rows", None)])
     stdb_bottom = L(jobs.bottom) + 30
 
     # venue floor and laptop
@@ -97,10 +97,10 @@ def architecture(y0):
                                                     "Elastic", "rust")
     bd_label = "Bright Data Web MCP\nscrapes event pages, company pages, the venue on Google Maps and the floor plan"
     bd_h = measure(bd_label, 250)
-    ingest = S.box(1640, L(indexer.bottom) + 50, 300, "bandit-ingest\nbefore the event: fetch, organize, "
+    ingest = S.box(1640, L(indexer.bottom) + 50, 300, "bandit-ingest\nruns once before the event: fetch, organize, "
                                                        "import", "rust", h=bd_h + 76)
     cl_label = "Claude API\nagents for the judgment calls: read bills, review causation, draft letters"
-    ns_label = "Nessie (Capital One)\nwallets at sign-up, claim payouts, merch purchases"
+    ns_label = "Nessie (Capital One)\nthe wallet connected at band setup, claim payouts, merch purchases"
     cl_h, ns_h = measure(cl_label, 250), measure(ns_label, 250)
     wy = L(ingest.bottom) + 50
     workers = S.box(1640, wy, 300, "bandit-workers\nruns the jobs: Claude calls, Nessie payments, claim "
@@ -123,7 +123,7 @@ def architecture(y0):
     S.zone(440, 200, 340, zb - 200, "Team laptop, online through a phone hotspot", "rust")
     S.zone(840, 190, 1950, top_h + 80, "Browsers", "web")
     stdb = S.zone(860, Y0, 620, zb - Y0, "SpacetimeDB Maincloud: the band1t module", "stdb")
-    S.zone(1620, Y0, 340, zb - Y0, "Rust services", "rust")
+    S.zone(1620, Y0, 340, zb - Y0, "Rust services on a Vultr server", "rust")
     ez = S.zone(2400, Y0, 390, zb - Y0, "Elastic Serverless", "ext")
 
     S.v(stations, bands, x=stations.cx, label="station\nbeacons")
@@ -134,8 +134,8 @@ def architecture(y0):
     S.h(camera, vision)
     S.h(vision, stdb, y=vision.cy, label="alerts")
     S.v(app, stdb, x=app.cx, label="subscriptions,\nreducer calls", both=True)
-    S.v(ops, stdb, x=ops.cx, label="end_event,\napprovals", both=True)
-    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="uploads, recap order")
+    S.v(ops, stdb, x=ops.cx, label="end_event,\nclaim decisions", both=True)
+    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="PDFs, recap order")
     S.h(app, auth, y=app.y + 0.3 * app.h, label="sign-in")
     S.v(kib, ez, x=kib.cx, label="reads")
     S.h(stdb, api, y=api.cy, label="reads rows")
@@ -193,7 +193,7 @@ def pipeline(y0):
                                  "(unclaimed profiles)", "stdb", cy=L(imp.cy))
     indexer = S.box(3200, 0, 300, "bandit-indexer\none-way copy of booths into bandit-booths for the recap "
                                   "order", "rust", cy=L(e1.cy))
-    ops = S.box(3560, 0, 240, "Ops dashboard\ndrag a misplaced booth (upsert_booth)", "web", cy=L(imp.cy))
+    ops = S.box(3560, 0, 240, "Host portal\nImports and Kibana tab: import runs and what was loaded", "web", cy=L(imp.cy))
 
     S.zone(40, L1[0], W - 80, L1[1] - L1[0], "Outside APIs: Bright Data and Claude", "ext")
     S.zone(40, L2[0], W - 80, L2[1] - L2[0], "bandit-ingest (Rust)", "rust")
@@ -217,7 +217,7 @@ def pipeline(y0):
     S.link(validate, "r", imp, "t", via=[(imp.cx, validate.cy)], label="last good bundle")
     S.h(imp, tables, label="rows")
     S.v(tables, indexer, x=tables.cx, label="subscribes")
-    S.h(tables, ops, label="flags")
+    S.h(tables, ops, label="rows")
     return S.end_frame()
 
 
@@ -228,7 +228,7 @@ def insurance(y0):
     title("3 · Insurance claim flow (Hyphenate track)",
           "An incident becomes a claim with no form. The venue's liability policy pays. Claude reads the bill and "
           "judges causation, but never sees or sets an amount: code prices every line and decides the route. "
-          "A judge's approval teaches a rule that settles the next similar claim by itself.")
+          "The organizer's approval teaches a rule that settles the next similar claim by itself.")
     lanes = {"L1": (170, 420), "L2": (440, 900), "L3": (920, 1160), "L4": (1180, 1420), "L5": (1440, 1720),
              "L6": (1740, 2000)}
     c = {k: (a + b) / 2 for k, (a, b) in lanes.items()}
@@ -236,7 +236,7 @@ def insurance(y0):
 
     fall = S.box(300, 0, 260, "Fall or SOS\nthe band flags it; bands close by pulse blue and become witnesses",
                  "device", cy=c["L1"] + 15)
-    medic = S.box(610, 0, 260, "Medic\nadds a treatment note, uploads the bill through POST /api/blobs, resolves", "web",
+    medic = S.box(610, 0, 260, "Medic (paramedic)\ntreats the fall, files the bill PDF in the host portal, resolves", "web",
                   cy=c["L1"] + 15)
     cam = S.box(1500, 0, 260, "Overhead camera (TBD Leo)\na second source for falls; sees property damage", "tbd",
                 cy=c["L1"] + 15)
@@ -259,10 +259,10 @@ def insurance(y0):
     rule = S.box(2540, 0, 380, "Rule matches?\nshape, ceiling, corroborated, follows, not mass", "stdb",
                  shape="diamond", h=220, fs=18, cy=top2)
     auto = S.box(3030, 0, 260, "Auto-settled\ncites the rule version and who approved it", "good", cy=top2)
-    route = S.box(2580, 0, 300, "Named approver\nthe lowest role whose ceiling covers the payout: floor manager $500, "
-                                "risk manager $5,000; 3 or more hurt: the adjuster", "web", cy=c["L5"] + 10)
+    route = S.box(2580, 0, 300, "The organizer decides\nevery claim no rule settles waits in the host portal's Claims tab, "
+                                "3 or more hurt included", "web", cy=c["L5"] + 10)
     approve = S.box(3030, 0, 280, "Approve, learn on\nfails closed as stale if the amount or pack changed; writes "
-                                  "rule v1 with the approver's name", "web", cy=c["L5"] + 10)
+                                  "rule v1 with the organizer's name", "web", cy=c["L5"] + 10)
     settle = S.box(3370, 0, 260, "Settling\nledger journals: J1 reserve, J2 approval, J3 paid", "stdb", cy=top2)
     payout = S.box(3370, 0, 280, "Payout\nclaim_payout deposits into the claimant's Nessie wallet; a property claim pays the "
                                  "repair vendor", "ext", cy=c["L6"] + 15)
@@ -272,7 +272,7 @@ def insurance(y0):
 
     names = {"L1": "Bands and staff on the floor", "L2": "SpacetimeDB: claim state; code decides every amount",
              "L3": "Claude agents, run as jobs by bandit-workers", "L4": "Elastic",
-             "L5": "People: named approvers, in the Claims queue", "L6": "Nessie"}
+             "L5": "The organizer, in the host portal's Claims tab", "L6": "Nessie"}
     kinds = {"L1": "device", "L2": "stdb", "L3": "ext", "L4": "ext", "L5": "web", "L6": "ext"}
     for k, (a, b) in lanes.items():
         S.zone(40, a, W - 80, b - a, names[k], kinds[k])
@@ -308,9 +308,9 @@ def insurance(y0):
 
     py = lanes["L6"][1] + 50
     S.panel(40, py, 1180, "Live learning, as the judges see it",
-            "1. A live fall becomes a claim. No rule exists yet, so it waits for a judge playing risk "
-            "manager on the Ops dashboard on their own phone.\n2. A late note makes the first tap fail as stale; the judge approves "
-            "again. The payout lands in the wallet and rule v1 is created with the judge's name on it.\n3. A "
+            "1. A live fall becomes a claim. No rule exists yet, so it waits for the organizer in the host "
+            "portal's Claims tab.\n2. A late note makes the first tap fail as stale; the organizer approves "
+            "again. The payout lands in the wallet and rule v1 is created with the organizer's name on it.\n3. A "
             "similar fall from the simulator settles in seconds under rule v1.\n4. A fake with witnesses in "
             "another zone is refused by code with every check listed.")
     S.panel(1260, py, 1260, "Edge cases, live or in the stress test",
@@ -318,12 +318,13 @@ def insurance(y0):
             "refused at claim open as witness_zone, zones side by side.\nAmount changed while approving: fails "
             "closed as stale.\nSame bill scanned again: marked duplicate, pays nothing, refused as zero_payout."
             "\nInjured person is venue staff: refused at claim open; workers' comp applies.\nThree or more hurt in "
-            "one incident: every claim goes to the adjuster.\nOnly code at claim open and the named approver refuse.", kind="bad")
+            "one incident: no claim settles by rule; the organizer decides each.\nOnly code at claim open and the "
+            "organizer refuse.", kind="bad")
     S.panel(2560, py, 1340, "Accuracy run and scorecard, before judging",
             "bandit-claims plants 3 rounds of 12 genuine claims and 6 decoys (sitting down, dropped phone, fake "
             "witnesses) through the same reducers a medic uses.\nStraight-through rate per round, rising as rules "
             "are learned.\nDollars wrongly paid on decoys: target $0.\nAuto-settle precision and recall; bill-review "
-            "savings; incident to payout time; human touches per claim.\nShown in the Claims queue and the Kibana "
+            "savings; incident to payout time; human touches per claim.\nShown in the Claims tab and the Kibana "
             "dashboard BandIt claims evidence.", kind="good")
     return S.end_frame()
 
@@ -341,14 +342,17 @@ def social(y0):
     # 1. at the door
     a = []
     y = 260
-    for lbl, k in [("Tap the band with your phone\nits NFC sticker opens /t/{token} in the attendee app", "web"),
+    for lbl, k in [("Tap the band with your phone\nits NFC sticker opens your band's page, /t/{token}", "web"),
                    ("Sign in with SpacetimeAuth\na magic link at the first tap; the same identity on every device", "ext"),
                    ("Press the band's button when it blinks white\nthe band is now yours", "web"),
-                   ("Your display name\nsaving it opens your wallet", "web"),
-                   ("Is this you?\none tap on your scraped speaker or exhibitor profile; claim_person links it to "
-                    "you as the band's owner", "web"),
-                   ("Your Meta socials\nInstagram, Facebook, Threads, typed by you", "web"),
-                   ("Nessie wallet\nwallet_open puts $200 in claimant_account when you save your name", "ext")]:
+                   ("Your name and Meta socials\nInstagram, Facebook, Threads, typed by you; findable on or off", "web"),
+                   ("Medical history and insurance card PDFs\nClaude reads them into your medical card", "ext"),
+                   ("Are you one of these?\none tap on your scraped speaker or exhibitor profile (claim_person)",
+                    "web"),
+                   ("Check your medical card\nwhat Claude read, confirmed once", "web"),
+                   ("Connect your Capital One wallet\na $200 Nessie account: claim payouts land here, merch is "
+                    "paid from it", "ext"),
+                   ("You're all set\na thank-you; the page shows nothing else until the event ends", "web")]:
         b = S.box(70, y, 500, lbl, k)
         a.append(b)
         y = L(b.bottom) + 46
@@ -365,35 +369,34 @@ def social(y0):
                "tbd", cy=L(b3.cy))
     b5 = S.box(720, L(max(b3.bottom, b4.bottom)) + 70, 710, "People graph: people_link\nmet, visited, works at, "
                                                            "exhibits; written in the same transaction as the visit "
-                                                           "or encounter, so the big screen grows live", "stdb")
+                                                           "or encounter", "stdb")
     b6 = S.box(1480, 260, 320, "Photographer's photo\nuploaded through POST /api/blobs; its zone is the photographer's band zone then",
                "web")
-    b7 = S.box(1480, L(b2.y), 320, "Suggested photo tags\nfindable people whose bands were in that zone; each "
-                                   "confirms or removes their tag", "stdb")
+    b7 = S.box(1480, L(b2.y), 320, "Who is in the photo\nfindable people whose bands were in that zone when it was "
+                                   "taken", "stdb")
     b8 = S.box(1480, L(b7.bottom) + 60, 320, "Photo features (TBD Leo)\npeople count and caption", "tbd")
-    b9 = S.box(720, L(b5.bottom) + 60, 400, "Shared visits: shared_visit\ntwo findable people in one zone for 5 minutes "
-                                           "or more, met or not", "stdb")
 
     # 3. after the event
-    c1 = S.box(1940, 260, 420, "Ops taps Event ended\nend_event in the host portal writes event_state; reopen_event undoes it", "web")
+    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nin the host portal: end_event writes event_state; reopen_event undoes it", "web")
     c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to event_state; /t/{token} "
                                              "reopens it later on any device", "web")
-    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_shared_visits, my_visits, my_photos: the "
-                                             "exact lists of who and what", "stdb")
+    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_visits, my_photos: the exact lists of who "
+                                             "and what", "stdb")
     c4 = S.box(2420, 0, 380, "Elastic orders the lists\nGET /recap/order on bandit-api, by meaning against your "
                              "interests (bandit-people, bandit-booths)", "ext", cy=L(c3.cy))
-    c5 = S.box(1940, L(max(c3.bottom, c4.bottom)) + 60, 860, "Your recap page\n1. your space-time view of the night\n"
-                                                             "2. your most visited booths\n3. the people you hung out "
-                                                             "with, and their socials when they allow it\n4. your photos "
-                                                             "with the people in each, and tap to share\n5. merch",
+    c5 = S.box(1940, L(max(c3.bottom, c4.bottom)) + 60, 860, "Your recap, on the same tap link\n1. where you were: zones over time\n"
+                                                             "2. the people you spent time with, and their Meta socials "
+                                                             "when they allow it\n3. the booths you spent time at\n"
+                                                             "4. your photos with the people you met in them, tap to "
+                                                             "share\n5. make it merch",
                "web")
-    c6 = S.box(1940, L(c5.bottom) + 60, 420, "Merch suggestions\nyour confirmed photo placed in a hand-made template "
+    c6 = S.box(1940, L(c5.bottom) + 60, 420, "Merch suggestions\na photo of you placed in a hand-made template "
                                              "(tee, mug, poster, sponsor booth items); top 3 by minutes at that booth",
                "stdb")
-    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch checks the wallet balance in the same transaction; merch_purchase records it on Nessie", "ext",
+    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch, with a size for tees, paid from the Capital One wallet through Nessie", "ext",
                cy=L(c6.cy))
 
-    zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom), L(b9.bottom)) + 40
+    zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom)) + 40
     S.zone(40, zt, 560, zb - zt, "1. At the door", "web")
     S.zone(690, zt, 1140, zb - zt, "2. During the event", "stdb")
     S.zone(1910, zt, 920, zb - zt, "3. After the event", "plain")
@@ -403,15 +406,13 @@ def social(y0):
     S.v(b2, b3, x=b3.cx)
     S.link(b2, "r", b4, "t", fa=0.75, via=[(b4.cx, b2.y + 0.75 * b2.h)])
     S.v(b3, b5, x=b3.cx, label="visited")
-    S.link(b3, "l", b9, "l", via=[(b3.x - 18, b3.cy), (b3.x - 18, b9.cy)])
-    S.link(b9, "r", c3, "l", fb=0.9, via=[(1890 + S.ox, b9.cy), (1890 + S.ox, c3.y + 0.9 * c3.h)])
     S.v(b4, b5, x=b4.cx, label="met")
     S.v(b6, b7, x=b6.cx)
     S.v(b8, b7, x=b8.cx, dashed=True, label="re-cap to\nthe count")
     S.h(b2, b7, y=b2.y + 0.3 * b2.h, label="who was in that zone")
     S.link(b5, "r", c3, "l", fa=0.5, fb=0.72, via=[(1870 + S.ox, b5.cy), (1870 + S.ox, c3.y + 0.72 * c3.h)])
     S.link(b7, "r", c3, "l", fa=0.5, fb=0.3, via=[(1850 + S.ox, b7.cy), (1850 + S.ox, c3.y + 0.3 * c3.h)],
-           label="confirmed\ntags")
+           label="people\nin photos")
     S.v(c1, c2, x=c1.cx, label="event_state")
     S.v(c2, c3, x=c2.cx)
     S.h(c3, c4)
@@ -419,8 +420,9 @@ def social(y0):
     S.link(c4, "b", c5, "t", fb=(c4.cx - c5.x) / c5.w, label="order")
     S.v(c5, c6, x=c6.cx)
     S.h(c6, c7, label="order")
-    S.link(a[-1], "b", c7, "b", via=[(a[-1].cx, S.oy + zb + 40), (c7.cx, S.oy + zb + 40)], dashed=True,
-           label="the same wallet")
+    wallet = a[-2]
+    S.link(wallet, "r", c7, "b", via=[(wallet.right + 60, wallet.cy), (wallet.right + 60, S.oy + zb + 40),
+                                      (c7.cx, S.oy + zb + 40)], dashed=True, label="the same wallet")
     return S.end_frame()
 
 
