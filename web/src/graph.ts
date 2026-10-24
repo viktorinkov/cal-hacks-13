@@ -1,6 +1,6 @@
 // The event graph for the big screen, in 3D: people, booths, companies and the event photos. Links come live
-// from the anonymous `event_graph` view; each photo and the people in it come from the staff view
-// `board_photos`, so a memory floats among the people it caught together. People stay anonymous here.
+// from the `event_graph` view, names from the attendee list, and each photo and the people in it from the
+// staff view `board_photos`, so a memory floats among the people it caught together.
 // Clusters colour by kind, by memories (communities over time together, booth visits and shared photos) or
 // by company. A new link or photo flashes as it arrives, and a click shows what a node links to.
 
@@ -66,6 +66,10 @@ let paused = false;
 /** Photo pictures and company names, by node, so a redraw or a selection can reach them. */
 const sprites = new Map<string, THREE.Sprite>();
 const names = new Map<string, THREE.Sprite>();
+/** Name tags shown on the people around the selected node. */
+let tags: THREE.Sprite[] = [];
+/** Each person's name by graph node, from the attendee list. */
+let people = new Map<string, string>();
 
 const end = (x: string | GNode) => (typeof x === 'string' ? x : x.id);
 const other = (l: GLink, id: string) => (end(l.source) === id ? end(l.target) : end(l.source));
@@ -73,6 +77,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const jitter = () => Math.random() * 10 - 5;
 
 function label(kind: string, id: bigint): string {
+  if (kind === 'person') return people.get(String(id)) || 'no name yet';
   if (kind === 'booth') return conn.db.booth.id.find(id)?.name ?? 'booth';
   if (kind === 'company') return conn.db.organization.id.find(id)?.name ?? 'company';
   return '';
@@ -86,6 +91,7 @@ function rebuild() {
   const born = nodes.size ? now : 0;
   const nextNodes = new Map<string, GNode>();
   const nextLinks = new Map<string, GLink>();
+  people = new Map([...conn.db.boardAttendees.iter()].map(a => [String(a.nodeId), a.displayName]));
   const node = (kind: Kind, id: bigint, nearKey?: string) => {
     const key = `${kind}:${id}`;
     let n = nextNodes.get(key) ?? nodes.get(key);
@@ -95,6 +101,8 @@ function rebuild() {
       n = { id: key, kind, label: label(kind, id), born };
       if (at?.x !== undefined) Object.assign(n, { x: at.x + jitter(), y: at.y! + jitter(), z: at.z! + jitter() });
     }
+    // A name can arrive after the person's first link.
+    if (kind === 'person') n.label = label(kind, id);
     nextNodes.set(key, n);
     return key;
   };
@@ -236,6 +244,7 @@ function restyle() {
     .linkWidth(l => (fresh(l as GLink, now) ? 1.2 : touches(l as GLink) ? 0.6 : 0))
     .linkDirectionalParticles(l => (touches(l as GLink) ? 3 : 0));
   for (const [id, s] of [...sprites, ...names]) s.material.opacity = !selected || near.has(id) ? 1 : 0.12;
+  tagPeople();
   drawLegend();
   drawCard();
 }
@@ -286,7 +295,7 @@ function grow(sprite: THREE.Sprite | undefined) {
 }
 
 /** A company's name, floating above its node. */
-function nameSprite(text: string): THREE.Sprite {
+function nameSprite(text: string, size = 8, lift = 18): THREE.Sprite {
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d')!;
   const font = '600 40px -apple-system, "Segoe UI", sans-serif';
@@ -300,9 +309,27 @@ function nameSprite(text: string): THREE.Sprite {
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-  s.scale.set(8 * c.width / c.height, 8, 1);
-  s.position.y = 18;
+  s.scale.set(size * c.width / c.height, size, 1);
+  s.position.y = lift;
   return s;
+}
+
+/** Puts a name tag on the selected node's people, at most 40 of them. */
+function tagPeople() {
+  for (const t of tags) {
+    t.parent?.remove(t);
+    t.material.map?.dispose();
+    t.material.dispose();
+  }
+  tags = [];
+  if (!selected) return;
+  for (const id of [...near].slice(0, 41)) {
+    const n = nodes.get(id) as (GNode & { __threeObj?: THREE.Object3D }) | undefined;
+    if (n?.kind !== 'person' || !n.__threeObj) continue;
+    const t = nameSprite(n.label, 4.5, 8);
+    n.__threeObj.add(t);
+    tags.push(t);
+  }
 }
 
 function nodeObject(n: GNode): THREE.Object3D | null {
@@ -321,12 +348,16 @@ function describe(n: GNode): string {
   const count = (kind: string) => mine.filter(l => l.kind === kind).length;
   if (n.kind === 'photo' && n.photo) {
     const p = n.photo;
-    return `<img src="${esc(p.url)}" alt=""><b>${esc(p.caption || 'Event photo')}</b><br>${esc(p.zoneName)}, ${esc(date(p.takenAt))}<br>${p.nodeIds.length} ${p.nodeIds.length === 1 ? 'person' : 'people'} in it`;
+    const who = p.nodeIds.map(id => people.get(String(id)) || 'no name yet');
+    return `<img src="${esc(p.url)}" alt=""><b>${esc(p.caption || 'Event photo')}</b><br>${esc(p.zoneName)}, ${esc(date(p.takenAt))}<br>In it: ${esc(who.join(', '))}`;
   }
   if (n.kind === 'person') {
     const company = mine.find(l => l.kind === 'works_at');
-    const at = company ? ` at ${esc(nodes.get(end(company.target))?.label ?? 'a company')}` : '';
-    return `<b>Someone${at}</b><br>met ${count('met')} people, visited ${count('visited')} booths, in ${count('in_photo')} photos`;
+    const at = company ? `, ${esc(nodes.get(end(company.target))?.label ?? 'a company')}` : '';
+    const met = mine.filter(l => l.kind === 'met').map(l => nodes.get(other(l, n.id))?.label ?? '');
+    const more = met.length > 6 ? ` and ${met.length - 6} more` : '';
+    return `<b>${esc(n.label)}</b>${at}<br>met ${count('met')} people, visited ${count('visited')} booths, in ${count('in_photo')} photos`
+      + (met.length ? `<br>Met ${esc(met.slice(0, 6).join(', '))}${more}` : '');
   }
   if (n.kind === 'booth') return `<b>${esc(n.label)}</b><br>booth, ${count('visited')} visitors`;
   return `<b>${esc(n.label)}</b><br>company, ${count('works_at')} people work here, ${count('exhibits')} booths`;
@@ -430,6 +461,7 @@ function setup(c: DbConnection) {
   conn.db.eventGraph.onUpdate(mark);
   conn.db.eventGraph.onDelete(mark);
   const photo = () => { dirty = true; photosChanged = true; };
+  conn.db.boardAttendees.onInsert(mark);
   conn.db.boardPhotos.onInsert(photo);
   conn.db.boardPhotos.onDelete(photo);
   setInterval(() => {
@@ -452,7 +484,7 @@ export function graphTab(c: DbConnection) {
   const count = (kind: Kind) => [...nodes.values()].filter(n => n.kind === kind).length;
   return h('section', {},
     h('h3', {}, 'Event graph'),
-    h('p', { class: 'muted' }, `Live from SpacetimeDB: ${count('person')} people, ${count('booth')} booths, ${count('company')} companies, ${count('photo')} photos, ${links.size} links. People are anonymous on this screen. Drag to turn, scroll to zoom, click anything to see what it links to.`),
+    h('p', { class: 'muted' }, `Live from SpacetimeDB: ${count('person')} people, ${count('booth')} booths, ${count('company')} companies, ${count('photo')} photos, ${links.size} links. Drag to turn, scroll to zoom, click anything to see what it links to.`),
     bar, box, legend);
 }
 

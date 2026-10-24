@@ -286,18 +286,16 @@ fn links_at(ctx: &ViewContext, kind: &str, id: u64) -> Vec<PeopleLink> {
 }
 
 /// Your own neighbourhood of the graph: you, the people you hung out with, the booths you visited,
-/// your company, and the other findable people at those booths and that company, who show as "someone".
+/// your company, and the other findable people at those booths and that company, all by name.
 #[spacetimedb::view(accessor = my_graph, public)]
 pub fn my_graph(ctx: &ViewContext) -> Vec<GraphLink> {
     let Some(me) = ctx.db.attendee().identity().find(ctx.sender()).filter(|a| a.findable) else {
         return Vec::new();
     };
     let mine = links_at(ctx, "person", me.node_id);
-    let mut named: Vec<u64> = vec![me.node_id];
     let mut links: Vec<PeopleLink> = Vec::new();
     for l in &mine {
         match l.kind.as_str() {
-            "met" => named.push(if l.from_id == me.node_id { l.to_id } else { l.from_id }),
             "visited" => links.extend(links_at(ctx, "booth", l.to_id)),
             "works_at" => links.extend(links_at(ctx, "company", l.to_id)),
             _ => {}
@@ -308,10 +306,7 @@ pub fn my_graph(ctx: &ViewContext) -> Vec<GraphLink> {
     links.dedup_by_key(|l| l.id);
     let label = |kind: &str, id: u64| -> String {
         match kind {
-            "person" if named.contains(&id) => {
-                ctx.db.attendee().node_id().find(id).map(|a| a.display_name).unwrap_or_default()
-            }
-            "person" => "someone".into(),
+            "person" => ctx.db.attendee().node_id().find(id).map(|a| a.display_name).unwrap_or_default(),
             "booth" => ctx.db.booth().id().find(id).map(|b| b.name).unwrap_or_default(),
             _ => ctx.db.organization().id().find(id).map(|o| o.name).unwrap_or_default(),
         }
@@ -362,27 +357,8 @@ pub struct MyPhoto {
     pub people: Vec<PersonCard>,
 }
 
-/// Whether `me` hung out with `other`: a met encounter between the two.
-fn met(ctx: &ViewContext, me: Identity, other: Identity) -> bool {
-    ctx.db.social_encounter().attendee_a().filter(me).any(|e| e.met && e.attendee_b == other)
-        || ctx.db.social_encounter().attendee_b().filter(me).any(|e| e.met && e.attendee_a == other)
-}
-
-/// Someone in your photo you did not hang out with: no name, no socials.
-fn someone() -> PersonCard {
-    PersonCard {
-        name: "someone".into(),
-        photo_url: String::new(),
-        person_id: 0,
-        title: String::new(),
-        organization: String::new(),
-        node_id: 0,
-        handles: Vec::new(),
-    }
-}
-
-/// Photos you are tagged in, with everyone else the bands put in them: by name and socials for the
-/// people you hung out with, as "someone" otherwise.
+/// Photos you are tagged in, with everyone else the bands put in them, by name and socials, so you can
+/// tag them all when you share it.
 #[spacetimedb::view(accessor = my_photos, public)]
 pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
     let me = ctx.sender();
@@ -398,10 +374,7 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
                 .photo_id()
                 .filter(p.id)
                 .filter(|o| o.attendee != me)
-                .filter_map(|o| {
-                    let card = person_card(ctx, o.attendee)?;
-                    Some(if met(ctx, me, o.attendee) { card } else { someone() })
-                })
+                .filter_map(|o| person_card(ctx, o.attendee))
                 .collect();
             Some(MyPhoto {
                 photo_id: p.id,
