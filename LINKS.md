@@ -10,7 +10,7 @@
 | Page settings (database, dashboards, sign-in client) | https://band1t.vip/config.json |
 | SpacetimeDB database | `bandit-calhacks13-sp82j` on Maincloud, https://maincloud.spacetimedb.com |
 | Kibana | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud |
-| Kibana: Import run | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-pipeline-calhacks-13 |
+| Kibana: Scrape pipeline | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-pipeline-calhacks-13 |
 | Kibana: Sponsors and prizes | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-event-calhacks-13 |
 | Kibana: Claims | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-claims |
 | System design board (Excalidraw) | https://excalidraw.com/#json=MkGRkUgvLvTxJ7IX9tnoP,pIpsDpCWIJw_rmvxFNvK1w |
