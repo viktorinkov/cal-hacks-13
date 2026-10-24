@@ -161,7 +161,7 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
     h('h2', {}, title),
     h('p', {}, why),
     h('form', { onsubmit: (e: Event) => act(() => upload(e)) },
-      h('label', {}, 'PDF', h('input', { type: 'file', accept: 'application/pdf' })),
+      h('label', {}, 'PDF', h('input', { type: 'file', name: kind, accept: 'application/pdf' })),
       h('button', {}, 'Upload')),
     simulate && h('button', { class: 'sim', onclick: () => act(async () => {
       await fileDocument(kind, await (await fetch(`/samples/${sample}`)).arrayBuffer());
