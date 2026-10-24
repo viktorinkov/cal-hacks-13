@@ -28,7 +28,7 @@ Pages, on http://127.0.0.1:8097:
 4. A fall: `. scripts/e2e-env && target/debug/bandit-claims fall --band 91 --witnesses 90,92` (Maya Chen at Main stage).
 5. `/organizer?as=medic`, Claims: take the incident, add a note with a cost, resolve it. The claim opens; file "Event first aid, wrist sprain" as the demo record. Claude reads it, Elastic validates it, Claude reviews it, and code routes it.
 6. `/organizer?as=sam`: open the claim, approve with "learn" checked. Rule v1 appears and $180 lands in Maya's wallet (`/t/BANDIT-91?as=maya`).
-7. A second fall settles by itself under rule v1: `bandit-claims fall --band 92 --witnesses 90,93`, then the medic steps again.
+7. The insurance story with every route (a claim learned, a similar one settling by itself under the rule, a fake refused, a mass occurrence going to the adjuster): `target/debug/bandit-claims demo --no-pause` after `. scripts/e2e-env`. Watch it in the portal's Claims tab. It borrows demo bands 94-98 as witnesses.
 8. `/organizer?as=ops`: "Event ended". Every open tap link switches to the recap: where you were and when, the people and booths you spent time with (ranked by Elastic), photos with who is in them and Share, merch with your photo, Buy through Nessie.
 
 `scripts/e2e-sql "<query>"` runs SQL as the database owner. Logs are in `.dev/e2e-<target>/logs`.
