@@ -292,10 +292,10 @@ pub async fn heartbeat(app: Arc<App>) {
 /// claim's incident date and time, and files it as the medic through `bandit-claims attach-record`.
 async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64, String)>) -> ApiResult<Json<Value>> {
     if !app.web.simulate {
-        return Err(error(StatusCode::NOT_FOUND, "sample records are off"));
+        return Err(error(StatusCode::NOT_FOUND, "test records are off"));
     }
     if !["first-aid-wrist", "urgent-care-wrist", "urgent-care-ankle-home"].contains(&template.as_str()) {
-        return Err(error(StatusCode::BAD_REQUEST, "unknown sample record"));
+        return Err(error(StatusCode::BAD_REQUEST, "unknown test record"));
     }
     let filed = claims_cli(&app, &["attach-record", "--claim", &claim.to_string(), "--template", &template, "--for-claimant"]).await?;
     Ok(Json(json!({ "filed": filed })))

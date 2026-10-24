@@ -164,7 +164,7 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
     simulate && h('button', { class: 'sim', onclick: () => act(async () => {
       await fileDocument(kind, await (await fetch(`/samples/${sample}`)).arrayBuffer());
       go(next);
-    }) }, 'Use the sample PDF'),
+    }) }, 'Use a test record'),
     h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
   ];
 }

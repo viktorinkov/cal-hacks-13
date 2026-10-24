@@ -410,7 +410,7 @@ function claimDetail(id: bigint) {
     c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
-      cfg.simulate && h('label', {}, 'or a sample record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      cfg.simulate && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
     c.status.tag === 'Routed' && (decides(c)
       ? h('div', {}, h('h4', {}, 'Your decision'), decide(c))
