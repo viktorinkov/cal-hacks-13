@@ -1,5 +1,7 @@
 //! The post-event summary behind an attendee's special link, assembled from the subscription cache.
 //! Other people appear only when they are findable, with their name, photo and socials.
+//! The suggestions are the people they hung out with and the booths where they spent time; Elastic
+//! orders them by how well they match the attendee's own interests (see `apply_ranking`).
 
 use bandit_bindings::{
     Attendee, Booth, Photo, PhotoTag, SharedVisit, SocialEncounter, SocialHandle, Visit, Zone,
@@ -39,6 +41,33 @@ pub struct Summary {
     pub shared_visits: Vec<SharedVisitOut>,
     /// Photos you are tagged in, in time order.
     pub photos: Vec<PhotoOut>,
+    /// The people you hung out with, best match for your interests first.
+    pub suggested_people: Vec<SuggestedPerson>,
+    /// The booths in the zones you visited, best match for your interests first.
+    pub suggested_booths: Vec<SuggestedBooth>,
+    /// False when Elastic could not rank the suggestions: they are then ordered by minutes.
+    pub suggestions_ranked: bool,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SuggestedPerson {
+    pub node_id: u64,
+    pub name: String,
+    pub photo_url: String,
+    /// Meta socials by platform: instagram, facebook, threads.
+    pub handles: BTreeMap<String, String>,
+    pub minutes: f32,
+    pub score: Option<f64>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SuggestedBooth {
+    pub booth_id: u64,
+    pub name: String,
+    pub zone_name: String,
+    /// Minutes spent in the booth's zone.
+    pub minutes: f32,
+    pub score: Option<f64>,
 }
 
 #[derive(Serialize, Debug)]
@@ -146,6 +175,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
     for v in &visits {
         *minutes.entry(v.zone_id).or_default() += v.minutes;
     }
+    let suggested_booths = suggested_booths(rows, &minutes, &zone_name);
     let mut top_zones: Vec<ZoneMinutes> = minutes
         .into_iter()
         .map(|(zone_id, m)| ZoneMinutes {
@@ -228,6 +258,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
         })
         .collect();
 
+    let suggested_people = suggested_people(&people);
     Some(Summary {
         node_id: me.node_id,
         display_name: me.display_name.clone(),
@@ -237,7 +268,132 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
         people,
         shared_visits,
         photos,
+        suggested_people,
+        suggested_booths,
+        suggestions_ranked: false,
     })
+}
+
+/// Everyone you hung out with, minutes added up per person, most minutes first.
+fn suggested_people(people: &[Companion]) -> Vec<SuggestedPerson> {
+    let mut by_node: BTreeMap<u64, SuggestedPerson> = BTreeMap::new();
+    for c in people {
+        let p = by_node
+            .entry(c.person.node_id)
+            .or_insert_with(|| SuggestedPerson {
+                node_id: c.person.node_id,
+                name: c.person.name.clone(),
+                photo_url: c.person.photo_url.clone(),
+                handles: c.person.handles.clone(),
+                minutes: 0.0,
+                score: None,
+            });
+        p.minutes = round(p.minutes + c.minutes);
+    }
+    let mut out: Vec<SuggestedPerson> = by_node.into_values().collect();
+    out.sort_by(|a, b| {
+        b.minutes
+            .total_cmp(&a.minutes)
+            .then(a.node_id.cmp(&b.node_id))
+    });
+    out
+}
+
+/// Every booth in a zone you visited, with the minutes you spent in that zone, most minutes first.
+fn suggested_booths(
+    rows: &Rows,
+    zone_minutes: &BTreeMap<u64, f32>,
+    zone_name: &dyn Fn(u64) -> String,
+) -> Vec<SuggestedBooth> {
+    let mut out: Vec<SuggestedBooth> = rows
+        .booths
+        .iter()
+        .filter_map(|b| {
+            Some(SuggestedBooth {
+                booth_id: b.id,
+                name: b.name.clone(),
+                zone_name: zone_name(b.zone_id),
+                minutes: round(*zone_minutes.get(&b.zone_id)?),
+                score: None,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.minutes
+            .total_cmp(&a.minutes)
+            .then(a.booth_id.cmp(&b.booth_id))
+    });
+    out
+}
+
+/// What the attendee spent time on, as the indexer writes a person's interests: each visited zone,
+/// most minutes first, then its booths. Ranks the suggestions of someone with no people document.
+pub fn visited_text(rows: &Rows, who: Identity) -> String {
+    let mut minutes: BTreeMap<u64, f32> = BTreeMap::new();
+    for v in rows.visits.iter().filter(|v| v.attendee == who) {
+        *minutes.entry(v.zone_id).or_default() += v.minutes;
+    }
+    let mut zones: Vec<(u64, f32)> = minutes.into_iter().collect();
+    zones.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    let mut lines = Vec::new();
+    for (zone_id, _) in zones {
+        if let Some(z) = rows.zones.iter().find(|z| z.id == zone_id) {
+            lines.push(if z.description.is_empty() {
+                z.name.clone()
+            } else {
+                format!("{}: {}", z.name, z.description)
+            });
+        }
+        let mut booths: Vec<&Booth> = rows
+            .booths
+            .iter()
+            .filter(|b| b.zone_id == zone_id)
+            .collect();
+        booths.sort_by_key(|b| b.id);
+        lines.extend(
+            booths
+                .iter()
+                .map(|b| format!("{}: {} ({})", b.name, b.description, b.tags.join(", "))),
+        );
+    }
+    lines.join("\n")
+}
+
+/// Puts the suggestions in Elastic's order with its scores. Candidates Elastic did not return
+/// (no interests indexed yet) follow without a score, still by minutes.
+pub fn apply_ranking(s: &mut Summary, people: &[(u64, f64)], booths: &[(u64, f64)]) {
+    order_by(
+        &mut s.suggested_people,
+        people,
+        |p| p.node_id,
+        |p, score| p.score = Some(score),
+    );
+    order_by(
+        &mut s.suggested_booths,
+        booths,
+        |b| b.booth_id,
+        |b, score| b.score = Some(score),
+    );
+    s.suggestions_ranked = true;
+}
+
+fn order_by<T>(
+    items: &mut [T],
+    scores: &[(u64, f64)],
+    id: impl Fn(&T) -> u64,
+    set_score: impl Fn(&mut T, f64),
+) {
+    for item in items.iter_mut() {
+        if let Some(&(_, score)) = scores.iter().find(|(i, _)| *i == id(item)) {
+            set_score(item, score);
+        }
+    }
+    items.sort_by_key(|item| {
+        scores
+            .iter()
+            .position(|(i, _)| *i == id(item))
+            .unwrap_or(scores.len())
+    });
 }
 
 /// A findable attendee with their socials; None for anyone else.
@@ -317,8 +473,8 @@ mod tests {
             booth_number: String::new(),
             name: name.into(),
             kind: "sponsor".into(),
-            description: String::new(),
-            tags: Vec::new(),
+            description: format!("{name} demos."),
+            tags: vec!["demo".into()],
             plan_x_m: 0.0,
             plan_y_m: 0.0,
             placement: String::new(),
@@ -395,7 +551,11 @@ mod tests {
     fn rows() -> Rows {
         Rows {
             zones: vec![zone(1, "Expo"), zone(2, "Stage")],
-            booths: vec![booth(11, 1, "Robot arms"), booth(10, 1, "Elastic booth")],
+            booths: vec![
+                booth(11, 1, "Robot arms"),
+                booth(10, 1, "Elastic booth"),
+                booth(12, 2, "Drone show"),
+            ],
             attendees: vec![
                 attendee(1, "Ada", true),
                 attendee(2, "Bo", true),
@@ -518,6 +678,60 @@ mod tests {
         assert_eq!(robots.caption, "Robots!");
         let names: Vec<&str> = robots.people.iter().map(|p| p.name.as_str()).collect();
         assert_eq!(names, vec!["Bo"]);
+    }
+
+    #[test]
+    fn suggestions_start_in_minutes_order() {
+        let s = summary(&rows(), who(1)).unwrap();
+        assert!(!s.suggestions_ranked);
+        let people: Vec<(u64, f32)> = s
+            .suggested_people
+            .iter()
+            .map(|p| (p.node_id, p.minutes))
+            .collect();
+        assert_eq!(people, vec![(4, 20.0), (2, 10.0)]);
+        assert_eq!(
+            s.suggested_people[1]
+                .handles
+                .get("threads")
+                .map(String::as_str),
+            Some("bo")
+        );
+        let booths: Vec<(u64, f32)> = s
+            .suggested_booths
+            .iter()
+            .map(|b| (b.booth_id, b.minutes))
+            .collect();
+        assert_eq!(booths, vec![(10, 22.3), (11, 22.3), (12, 20.0)]);
+        assert_eq!(s.suggested_booths[2].zone_name, "Stage");
+    }
+
+    #[test]
+    fn ranking_follows_elastic_then_minutes() {
+        let mut s = summary(&rows(), who(1)).unwrap();
+        apply_ranking(&mut s, &[(2, 0.9)], &[(12, 0.8), (10, 0.5)]);
+        assert!(s.suggestions_ranked);
+        let people: Vec<(u64, Option<f64>)> = s
+            .suggested_people
+            .iter()
+            .map(|p| (p.node_id, p.score))
+            .collect();
+        assert_eq!(people, vec![(2, Some(0.9)), (4, None)]);
+        let booths: Vec<(u64, Option<f64>)> = s
+            .suggested_booths
+            .iter()
+            .map(|b| (b.booth_id, b.score))
+            .collect();
+        assert_eq!(booths, vec![(12, Some(0.8)), (10, Some(0.5)), (11, None)]);
+    }
+
+    #[test]
+    fn visited_text_reads_like_interests() {
+        assert_eq!(
+            visited_text(&rows(), who(1)),
+            "Expo\nElastic booth: Elastic booth demos. (demo)\nRobot arms: Robot arms demos. (demo)\nStage\nDrone show: Drone show demos. (demo)"
+        );
+        assert_eq!(visited_text(&rows(), who(42)), "");
     }
 
     #[test]

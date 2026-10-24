@@ -9,12 +9,11 @@ mod docs;
 mod elastic;
 
 use anyhow::{Context, Result};
-use bandit_common::Config;
 use bandit_bindings::{
     BoothTableAccess, DbConnection, OrganizationTableAccess, ScheduleSlotTableAccess,
-    SocialAttendeesTableAccess, SocialEncountersTableAccess, SocialVisitsTableAccess,
-    ZoneTableAccess, connect,
+    SocialAttendeesTableAccess, SocialVisitsTableAccess, ZoneTableAccess, connect,
 };
+use bandit_common::Config;
 use docs::{Docs, Index, Snapshot};
 use elastic::{Elastic, Op};
 use serde_json::Value;
@@ -27,14 +26,13 @@ use std::time::Duration;
 const SERVICE: &str = "bandit-indexer";
 const FLUSH_EVERY: Duration = Duration::from_secs(1);
 const BULK_SIZE: usize = 100;
-const QUERIES: [&str; 7] = [
+const QUERIES: [&str; 6] = [
     "SELECT * FROM zone",
     "SELECT * FROM organization",
     "SELECT * FROM booth",
     "SELECT * FROM schedule_slot",
     "SELECT * FROM social_attendees",
     "SELECT * FROM social_visits",
-    "SELECT * FROM social_encounters",
 ];
 
 /// What Elastic holds as far as the indexer knows: the last document written per key,
@@ -46,8 +44,14 @@ async fn main() -> Result<()> {
     let config = Config::load()?;
     let prefix = std::env::var("ELASTIC_INDEX_PREFIX").unwrap_or_else(|_| "bandit".into());
     let es = Elastic::new(
-        config.elasticsearch_url.as_deref().context("set ELASTICSEARCH_URL")?,
-        config.elasticsearch_api_key.as_deref().context("set ELASTICSEARCH_API_KEY")?,
+        config
+            .elasticsearch_url
+            .as_deref()
+            .context("set ELASTICSEARCH_URL")?,
+        config
+            .elasticsearch_api_key
+            .as_deref()
+            .context("set ELASTICSEARCH_API_KEY")?,
         &prefix,
     )?;
     let mut sent = Sent::new();
@@ -58,9 +62,13 @@ async fn main() -> Result<()> {
         }
     }
 
-    let database = config.spacetimedb_database.clone().context("set SPACETIMEDB_DATABASE")?;
+    let database = config
+        .spacetimedb_database
+        .clone()
+        .context("set SPACETIMEDB_DATABASE")?;
     let tokens = config.token_store();
-    let (conn, identity, token) = connect(&config.spacetimedb_url, &database, tokens.load(SERVICE)?)?;
+    let (conn, identity, token) =
+        connect(&config.spacetimedb_url, &database, tokens.load(SERVICE)?)?;
     tokens.save(SERVICE, &token)?;
     eprintln!("{SERVICE} connected as {identity}; it needs the indexer role");
     let dirty = Arc::new(AtomicBool::new(true));
@@ -95,7 +103,6 @@ fn watch(conn: &DbConnection, dirty: &Arc<AtomicBool>) {
     venue_table(&conn.db.schedule_slot(), dirty);
     inserts_and_deletes(&conn.db.social_attendees(), dirty);
     inserts_and_deletes(&conn.db.social_visits(), dirty);
-    inserts_and_deletes(&conn.db.social_encounters(), dirty);
 }
 
 fn inserts_and_deletes<T: Table>(table: &T, dirty: &Arc<AtomicBool>) {
@@ -120,7 +127,6 @@ fn snapshot(conn: &DbConnection) -> Snapshot {
         slots: conn.db.schedule_slot().iter().collect(),
         attendees: conn.db.social_attendees().iter().collect(),
         visits: conn.db.social_visits().iter().collect(),
-        encounters: conn.db.social_encounters().iter().collect(),
     }
 }
 

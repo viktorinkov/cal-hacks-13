@@ -1,9 +1,9 @@
 //! The documents the indexer writes, built from rows of the subscription cache.
 //! Plain functions, rows in and JSON out, so every rule here is easy to test.
 
-use bandit_bindings::{Attendee, Booth, Organization, ScheduleSlot, SocialEncounter, Visit, Zone};
+use bandit_bindings::{Attendee, Booth, Organization, ScheduleSlot, Visit, Zone};
 use serde_json::{Value, json};
-use spacetimedb_sdk::{Identity, Timestamp};
+use spacetimedb_sdk::Identity;
 use std::collections::{BTreeMap, HashMap};
 
 /// A person's interests come from the booths in the zones where they spent the most minutes.
@@ -12,17 +12,15 @@ pub const TOP_ZONES: usize = 5;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Index {
     Booths,
-    Memories,
     People,
 }
 
 impl Index {
-    pub const ALL: [Index; 3] = [Index::Booths, Index::Memories, Index::People];
+    pub const ALL: [Index; 2] = [Index::Booths, Index::People];
 
     pub fn name(self) -> &'static str {
         match self {
             Index::Booths => "booths",
-            Index::Memories => "memories",
             Index::People => "people",
         }
     }
@@ -39,12 +37,10 @@ pub struct Snapshot {
     pub slots: Vec<ScheduleSlot>,
     pub attendees: Vec<Attendee>,
     pub visits: Vec<Visit>,
-    /// Met encounters only; the `social_encounters` view leaves the others out.
-    pub encounters: Vec<SocialEncounter>,
 }
 
-/// Builds every document. Only findable attendees appear: their visits, the encounters where both
-/// people are findable, and their people document. Anything not built here is deleted from Elastic.
+/// Builds every document: one per booth and one per findable attendee.
+/// Anything not built here is deleted from Elastic.
 pub fn build(s: &Snapshot) -> Docs {
     let venue = Venue::new(s);
     let findable: HashMap<Identity, &Attendee> = s
@@ -59,25 +55,6 @@ pub fn build(s: &Snapshot) -> Docs {
             (Index::Booths, b.id.to_string()),
             venue.booth_doc(b, &s.slots),
         );
-    }
-    for v in s
-        .visits
-        .iter()
-        .filter(|v| findable.contains_key(&v.attendee))
-    {
-        docs.insert(
-            (Index::Memories, format!("visit-{}", v.zone_visit_id)),
-            venue.visit_doc(v),
-        );
-    }
-    for e in &s.encounters {
-        let (Some(a), Some(b)) = (findable.get(&e.attendee_a), findable.get(&e.attendee_b)) else {
-            continue;
-        };
-        for (me, other) in [(a, b), (b, a)] {
-            let id = format!("encounter-{}-{}", e.id, hex(me.identity));
-            docs.insert((Index::Memories, id), venue.encounter_doc(e, me, other));
-        }
     }
     for a in findable.values() {
         docs.insert(
@@ -125,29 +102,16 @@ impl<'a> Venue<'a> {
             .unwrap_or_default()
     }
 
-    fn booth_names(&self, zone_id: u64) -> Vec<&str> {
-        self.booths_in(zone_id)
-            .iter()
-            .map(|b| b.name.as_str())
-            .collect()
-    }
-
-    /// The zone's own name and description, then one line per booth: `description (tag, tag)`.
-    /// The zone line keeps zones without booths (a lounge, a stage) searchable.
-    fn booth_text(&self, zone_id: u64) -> String {
-        let mut lines = vec![self.zone_line(zone_id)];
-        lines.extend(
-            self.booths_in(zone_id)
-                .iter()
-                .map(|b| format!("{} ({})", b.description, b.tags.join(", "))),
-        );
-        lines.join("\n")
-    }
-
     fn zone_line(&self, zone_id: u64) -> String {
         self.zones
             .get(&zone_id)
-            .map(|z| if z.description.is_empty() { z.name.clone() } else { format!("{}: {}", z.name, z.description) })
+            .map(|z| {
+                if z.description.is_empty() {
+                    z.name.clone()
+                } else {
+                    format!("{}: {}", z.name, z.description)
+                }
+            })
             .unwrap_or_default()
     }
 
@@ -183,39 +147,6 @@ impl<'a> Venue<'a> {
             "org_kind": org.map(|o| o.kind.as_str()).unwrap_or_default(),
             "sponsor_tier": org.map(|o| o.sponsor_tier.as_str()).unwrap_or_default(),
             "description": description.join("\n"),
-        })
-    }
-
-    fn visit_doc(&self, v: &Visit) -> Value {
-        json!({
-            "kind": "visit",
-            "row_id": v.zone_visit_id,
-            "attendee_id": hex(v.attendee),
-            "zone_id": v.zone_id,
-            "zone_name": self.zone_name(v.zone_id),
-            "booth_names": self.booth_names(v.zone_id),
-            "booth_text": self.booth_text(v.zone_id),
-            "started_at": time(v.started_at),
-            "ended_at": v.ended_at.map(time),
-            "minutes": round(v.minutes as f64),
-        })
-    }
-
-    /// The encounter as `me` remembers it: who the other person was, where and for how long.
-    fn encounter_doc(&self, e: &SocialEncounter, me: &Attendee, other: &Attendee) -> Value {
-        json!({
-            "kind": "encounter",
-            "row_id": e.id,
-            "attendee_id": hex(me.identity),
-            "other_attendee_id": hex(other.identity),
-            "other_name": other.display_name,
-            "zone_id": e.zone_id,
-            "zone_name": self.zone_name(e.zone_id),
-            "booth_names": self.booth_names(e.zone_id),
-            "booth_text": self.booth_text(e.zone_id),
-            "started_at": time(e.started_at),
-            "ended_at": time(e.last_seen_at),
-            "minutes": round(e.seconds_together as f64 / 60.0),
         })
     }
 
@@ -259,19 +190,10 @@ pub fn hex(id: Identity) -> String {
     id.to_hex().to_string()
 }
 
-/// RFC 3339, which Elastic maps as a date.
-fn time(t: Timestamp) -> String {
-    t.to_string()
-}
-
-/// Minutes to one decimal, so a growing visit is rewritten only when the number visibly changes.
-fn round(minutes: f64) -> f64 {
-    (minutes * 10.0).round() / 10.0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use spacetimedb_sdk::Timestamp;
 
     fn at(s: i64) -> Timestamp {
         Timestamp::from_micros_since_unix_epoch(s * 1_000_000)
@@ -395,22 +317,6 @@ mod tests {
         }
     }
 
-    fn encounter(id: u64, a: u8, b: u8, zone_id: u64) -> SocialEncounter {
-        SocialEncounter {
-            id,
-            band_pair: id as u16,
-            attendee_a: who(a),
-            attendee_b: who(b),
-            zone_id,
-            baseline_seconds: 0,
-            seconds_together: 300,
-            started_at: at(100),
-            last_seen_at: at(400),
-            met: true,
-            updated_at: at(400),
-        }
-    }
-
     fn snapshot() -> Snapshot {
         Snapshot {
             zones: vec![zone(1, "Expo"), zone(2, "Stage")],
@@ -434,7 +340,6 @@ mod tests {
                 visit(101, 1, 2, 30.0),
                 visit(102, 3, 1, 5.0),
             ],
-            encounters: vec![encounter(7, 1, 2, 1), encounter(8, 1, 3, 1)],
         }
     }
 
@@ -457,46 +362,10 @@ mod tests {
     }
 
     #[test]
-    fn visit_carries_the_booths_of_its_zone() {
-        let docs = build(&snapshot());
-        let d = doc(&docs, Index::Memories, "visit-100");
-        assert_eq!(d["kind"], "visit");
-        assert_eq!(d["attendee_id"], hex(who(1)));
-        assert_eq!(d["booth_names"], json!(["Elastic booth", "Robot arms"]));
-        assert_eq!(
-            d["booth_text"],
-            "Expo\nElastic booth demos. (search, ai)\nRobot arms demos. (robotics)"
-        );
-        assert_eq!(d["minutes"], 12.3);
-        assert_eq!(d["started_at"], "1970-01-01T00:01:00+00:00");
-    }
-
-    #[test]
-    fn encounter_makes_one_document_per_participant() {
-        let docs = build(&snapshot());
-        let ada = doc(
-            &docs,
-            Index::Memories,
-            &format!("encounter-7-{}", hex(who(1))),
-        );
-        assert_eq!(ada["other_attendee_id"], hex(who(2)));
-        assert_eq!(ada["other_name"], "Bo");
-        assert_eq!(ada["minutes"], 5.0);
-        let bo = doc(
-            &docs,
-            Index::Memories,
-            &format!("encounter-7-{}", hex(who(2))),
-        );
-        assert_eq!(bo["other_name"], "Ada");
-    }
-
-    #[test]
     fn people_who_are_not_findable_never_reach_elastic() {
         let docs = build(&snapshot());
         let cy = hex(who(3));
-        assert!(!docs.contains_key(&(Index::Memories, "visit-102".into())));
         assert!(!docs.contains_key(&(Index::People, cy.clone())));
-        assert!(!docs.keys().any(|(_, id)| id.starts_with("encounter-8-")));
         assert!(!docs.values().any(|d| d.to_string().contains(&cy)));
     }
 

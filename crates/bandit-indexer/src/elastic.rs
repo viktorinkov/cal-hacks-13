@@ -8,7 +8,7 @@ use std::time::Duration;
 
 /// Text embedding endpoint of every semantic_text field. Indices searched together must share one model.
 pub const INFERENCE_ID: &str = ".jina-embeddings-v5-text-small";
-/// Each logical index is an alias over one generation: `<prefix>-memories` -> `<prefix>-memories-001`.
+/// Each logical index is an alias over one generation: `<prefix>-people` -> `<prefix>-people-001`.
 const GENERATION: &str = "001";
 /// Writes with embeddings take a while; one bulk request may run this long.
 const TIMEOUT: Duration = Duration::from_secs(60);
@@ -158,7 +158,6 @@ async fn ok_json(response: reqwest::Response) -> Result<Value> {
 pub fn mapping(index: Index) -> Value {
     let keyword = json!({ "type": "keyword" });
     let long = json!({ "type": "long" });
-    let date = json!({ "type": "date" });
     let text = json!({ "type": "text", "fields": { "keyword": { "type": "keyword" } } });
     let semantic = json!({ "type": "semantic_text", "inference_id": INFERENCE_ID });
     match index {
@@ -175,20 +174,6 @@ pub fn mapping(index: Index) -> Value {
             "org_kind": keyword,
             "sponsor_tier": keyword,
             "description": semantic,
-        }}),
-        Index::Memories => json!({ "properties": {
-            "kind": keyword,
-            "row_id": long,
-            "attendee_id": keyword,
-            "other_attendee_id": keyword,
-            "other_name": keyword,
-            "zone_id": long,
-            "zone_name": keyword,
-            "booth_names": text,
-            "booth_text": semantic,
-            "started_at": date,
-            "ended_at": date,
-            "minutes": { "type": "double" },
         }}),
         Index::People => json!({ "properties": {
             "attendee_id": keyword,
