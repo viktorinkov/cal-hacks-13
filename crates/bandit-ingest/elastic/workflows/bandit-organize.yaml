@@ -1,6 +1,6 @@
 version: "1"
 name: bandit-organize
-description: Organizes the raw records of one BandIt import run. Exact ES|QL joins first, then the bandit-organizer agent for the fuzzy remainder, then one document per run in bandit-bundles.
+description: Organizes the raw records of one BandIt import run. Exact ES|QL joins first, then the bandit-organizer agent decides the fuzzy remainder, one decision per listed item, then one document per run in bandit-bundles.
 enabled: true
 tags: [bandit]
 triggers:
@@ -47,12 +47,36 @@ steps:
       query: >
         FROM bandit-raw-pages
         | WHERE run_id == ? AND record_kind == "schedule_item"
-        | EVAL slot_key = source_key
-        | KEEP run_id, location_norm, slot_key
+        | EVAL slot_key = source_key, slot_name = name, slot_location = location_text
+        | KEEP run_id, location_norm, slot_key, slot_name, slot_location
         | LOOKUP JOIN bandit-raw-plan ON run_id, location_norm
-        | RENAME source_key AS plan_key, record_kind AS plan_kind
-        | KEEP slot_key, location_norm, plan_key, plan_kind
+        | EVAL zone_key = CASE(record_kind == "zone", source_key)
+        | STATS zone_keys = VALUES(zone_key), slot_name = VALUES(slot_name), slot_location = VALUES(slot_location) BY slot_key
         | SORT slot_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: list_prizes
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "prize"
+        | KEEP source_key, name, org_key
+        | SORT source_key
+        | LIMIT 500
+      params:
+        - "{{ inputs.run_id }}"
+
+  - name: list_people
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit-raw-pages
+        | WHERE run_id == ? AND record_kind == "person_candidate"
+        | KEEP source_key, name, role_text, org_key
+        | SORT source_key
         | LIMIT 500
       params:
         - "{{ inputs.run_id }}"
@@ -67,23 +91,23 @@ steps:
         Run id: {{ inputs.run_id }}
         Section: organizations.
 
-        Exact joins from the workflow (ES|QL LOOKUP JOIN of organization candidates to company_facts ON run_id, domain). Columns, then one row per website domain:
-        {{ steps.join_orgs.output.columns | json }}
-        {{ steps.join_orgs.output.values | json }}
-
+        The workflow joined the organization candidates of this run to their company_facts records by website domain (ES|QL LOOKUP JOIN ON run_id, domain). One numbered row per domain:
+        {% for row in steps.join_orgs.output.values %}{{ forloop.index }}. domain {{ row[2] }}: member_keys {{ row[0] | json }}, facts_keys {{ row[1] | json }}
+        {% endfor %}
         Do this:
         1. Read bandit.records(run_id, "organization_candidate") and bandit.records(run_id, "company_facts").
-        2. Each domain row is one organization with match_method "exact_domain" and its member_keys; its facts_key is the best of its facts_keys ("" when null).
-        3. Merge rows that are the same organization under different domains only by the matching ladder; a merged organization has match_method "agent" and a reason that names the evidence.
-        4. For an organization without facts_keys, look for its company_facts records with bandit.candidates and use them only when they are clearly about the same organization (match_method "agent").
-        5. Give each organization its name, domain, category, tags and description.
-        Every organization candidate must be in exactly one organization's member_keys, and member_keys holds organization candidate keys only; a company_facts key goes in facts_key. Gaps in this section are about organizations only.
+        2. Return exactly one organizations entry per row, in row order, with that row's member_keys only.
+        3. A row is its own organization with match_method "exact_domain", unless the matching ladder shows it is the same organization as another row. Then its entry repeats that organization's key, name, domain, facts_key, category, tags and description, with match_method "agent" and a match_reason that names the evidence.
+        4. facts_key is the best of the organization's facts_keys. For an organization without facts_keys, look for its company_facts records with bandit.candidates and use one only when it is clearly about the same organization (match_method "agent").
+        member_keys holds organization candidate keys only; a company_facts key goes in facts_key. Gaps in this section are about organizations only.
       schema:
         type: object
         required: [organizations, gaps]
         properties:
           organizations:
             type: array
+            minItems: "${{ steps.join_orgs.output.values | size }}"
+            maxItems: "${{ steps.join_orgs.output.values | size }}"
             items:
               type: object
               required: [key, name, domain, member_keys, facts_key, category, tags, description, match_method, match_reason]
@@ -91,8 +115,8 @@ steps:
                 key: { type: string, description: "org: followed by the primary domain" }
                 name: { type: string }
                 domain: { type: string }
-                member_keys: { type: array, items: { type: string }, description: "organization_candidate source keys only" }
-                facts_key: { type: string, description: "source_key of its company_facts record, or empty" }
+                member_keys: { type: array, items: { type: string }, description: "this row's organization_candidate keys" }
+                facts_key: { type: string, description: "source_key of its best company_facts record, or empty" }
                 category: { type: string, enum: [ai, developer_tools, cloud, data, security, fintech, crypto, venture, design, hardware, gaming, food_drink, health, education, other] }
                 tags: { type: array, maxItems: 5, items: { type: string } }
                 description: { type: string, description: "one or two sentences" }
@@ -117,21 +141,25 @@ steps:
         Run id: {{ inputs.run_id }}
         Section: links.
 
-        Organizations decided for this run:
-        {{ steps.organize_orgs.output.structured_output.organizations | json }}
-
-        Exact key matches from the workflow (records that share a normalised org_key). Columns, then rows:
-        {{ steps.join_keys.output.columns | json }}
-        {{ steps.join_keys.output.values | json }}
-
-        Exact schedule joins from the workflow (ES|QL LOOKUP JOIN of schedule items to bandit-raw-plan ON run_id, location_norm; plan_key is null when nothing matched). Columns, then rows:
-        {{ steps.join_schedule.output.columns | json }}
-        {{ steps.join_schedule.output.values | json }}
-
+        Organizations of this run (an organization can span several lines):
+        {% for o in steps.organize_orgs.output.structured_output.organizations %}- {{ o.key }}: {{ o.name }}, member_keys {{ o.member_keys | json }}
+        {% endfor %}
+        Exact key matches from the workflow (records that share a normalised org_key):
+        {% for row in steps.join_keys.output.values %}- org_key {{ row[2] }}: organization candidates {{ row[0] | json }}, linked records {{ row[1] | json }}
+        {% endfor %}
+        Prizes, one numbered row each:
+        {% for row in steps.list_prizes.output.values %}{{ forloop.index }}. {{ row[0] }}: {{ row[1] }} (org_key {{ row[2] | json }})
+        {% endfor %}
+        People, one numbered row each:
+        {% for row in steps.list_people.output.values %}{{ forloop.index }}. {{ row[0] }}: {{ row[1] }}, {{ row[2] }} (org_key {{ row[3] | json }})
+        {% endfor %}
+        Schedule items with the exact zone join (ES|QL LOOKUP JOIN to bandit-raw-plan ON run_id, location_norm), one numbered row each:
+        {% for row in steps.join_schedule.output.values %}{{ forloop.index }}. {{ row[3] }}: {{ row[1] }} at {{ row[2] | json }}, exact zone {{ row[0] | json }}
+        {% endfor %}
         Do this:
-        1. prize_links: one per record from bandit.records(run_id, "prize"). Use the exact key match when there is one (the organization whose member_keys contain that candidate); otherwise judge the tag in brackets with bandit.candidates.
-        2. person_links: one per record from bandit.records(run_id, "person_candidate"), linked to the organization the person works for, or "" when that company is not one of the organizations above.
-        3. schedule_links: one per record from bandit.records(run_id, "schedule_item"). zone_key is the exact plan_key when plan_kind is "zone"; otherwise pick a zone from bandit.records(run_id, "zone") only when its name clearly fits, else "". organization_key is the organization that clearly runs the item, else "".
+        1. prize_links: exactly one per prize row, in row order. Use the exact key match when there is one (the organization whose member_keys contain that candidate); otherwise judge the prize name, often a sponsor tag in brackets, with bandit.candidates. A prize the event itself offers has organization_key "".
+        2. person_links: exactly one per person row, in row order: the organization the person works for (bandit.records(run_id, "person_candidate") has their fields), or "".
+        3. schedule_links: exactly one per schedule row, in row order. zone_key is the exact zone when there is one; otherwise a zone from bandit.records(run_id, "zone") only when its name clearly fits, else "". organization_key is the organization that clearly runs the item, else "".
         Gaps in this section are about prizes, people and schedule items only.
       schema:
         type: object
@@ -139,6 +167,8 @@ steps:
         properties:
           prize_links:
             type: array
+            minItems: "${{ steps.list_prizes.output.values | size }}"
+            maxItems: "${{ steps.list_prizes.output.values | size }}"
             items:
               type: object
               required: [prize_key, organization_key, reason]
@@ -148,6 +178,8 @@ steps:
                 reason: { type: string }
           person_links:
             type: array
+            minItems: "${{ steps.list_people.output.values | size }}"
+            maxItems: "${{ steps.list_people.output.values | size }}"
             items:
               type: object
               required: [person_key, organization_key, reason]
@@ -157,6 +189,8 @@ steps:
                 reason: { type: string }
           schedule_links:
             type: array
+            minItems: "${{ steps.join_schedule.output.values | size }}"
+            maxItems: "${{ steps.join_schedule.output.values | size }}"
             items:
               type: object
               required: [slot_key, zone_key, organization_key, reason]

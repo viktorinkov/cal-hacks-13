@@ -1,6 +1,7 @@
 mod brightdata;
 mod bundle;
 mod config;
+mod dashboards;
 mod elastic;
 mod fetch;
 mod load;
@@ -36,6 +37,10 @@ enum Command {
         #[arg(long)]
         run_id: String,
     },
+    Dashboards {
+        #[arg(long)]
+        run_id: String,
+    },
     Load {
         bundle: PathBuf,
     },
@@ -59,6 +64,7 @@ fn main() -> Result<()> {
         Command::ElasticSetup => organize::setup(&cfg),
         Command::Organize { run_id } => organize::run(&cfg, &run_id.unwrap_or_else(|| new_run_id(&cfg))).map(|_| ()),
         Command::Assemble { run_id } => bundle::assemble(&cfg, &run_id).map(|_| ()),
+        Command::Dashboards { run_id } => dashboards::setup(&cfg, &run_id),
         Command::Load { bundle } => load::run(&cfg, &bundle),
         Command::Verify { bundle } => load::verify(&cfg, &bundle),
         Command::Run => {
@@ -69,7 +75,8 @@ fn main() -> Result<()> {
             organize::run(&cfg, &run_id)?;
             let path = bundle::assemble(&cfg, &run_id)?;
             load::run(&cfg, &path)?;
-            load::verify(&cfg, &path)
+            load::verify(&cfg, &path)?;
+            dashboards::setup(&cfg, &run_id)
         }
     }
 }

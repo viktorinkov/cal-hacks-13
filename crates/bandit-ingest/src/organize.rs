@@ -250,25 +250,45 @@ fn read_bundle(cfg: &Config, run_id: &str, records: &[Record]) -> Result<Organiz
     let started = Instant::now();
     let hits = elastic::search(cfg, BUNDLES, &json!({ "query": { "term": { "run_id": run_id } }, "size": 1 }))?;
     let source = hits["hits"]["hits"][0]["_source"].clone();
-    let organized: Organized =
+    let mut organized: Organized =
         serde_json::from_value(source).with_context(|| format!("the {BUNDLES} document of run {run_id} does not have the organized shape"))?;
-    let unknown = unknown_keys(&organized, records);
+    organized.organizations = collapse(std::mem::take(&mut organized.organizations));
+    let problems = problems(&organized, records);
     let counts = json!({
         "organizations": organized.organizations.len(),
         "prize_links": organized.prize_links.len(),
         "person_links": organized.person_links.len(),
         "schedule_links": organized.schedule_links.len(),
         "gaps": organized.gaps.len(),
-        "unknown_keys": unknown.len(),
+        "problems": problems.len(),
     });
-    log_event(cfg, run_id, "read_bundle", ms(started), counts, &unknown.join(", "))?;
-    if !unknown.is_empty() {
-        bail!("the organizer returned keys that are not in run {run_id}: {}", unknown.join(", "));
+    log_event(cfg, run_id, "read_bundle", ms(started), counts, &problems.join("; "))?;
+    if !problems.is_empty() {
+        bail!("the organized document of run {run_id} breaks the contract: {}", problems.join("; "));
     }
     Ok(organized)
 }
 
-fn unknown_keys(o: &Organized, records: &[Record]) -> Vec<String> {
+fn collapse(rows: Vec<Organization>) -> Vec<Organization> {
+    let mut out: Vec<Organization> = Vec::new();
+    for row in rows {
+        let Some(org) = out.iter_mut().find(|o| o.key == row.key) else {
+            out.push(row);
+            continue;
+        };
+        org.member_keys.extend(row.member_keys);
+        if org.facts_key.is_empty() {
+            org.facts_key = row.facts_key;
+        }
+        if row.match_method == "agent" {
+            org.match_method = row.match_method;
+            org.match_reason = row.match_reason;
+        }
+    }
+    out
+}
+
+fn problems(o: &Organized, records: &[Record]) -> Vec<String> {
     let known: HashSet<&str> = records
         .iter()
         .map(|r| r.source_key.as_str())
@@ -283,7 +303,24 @@ fn unknown_keys(o: &Organized, records: &[Record]) -> Vec<String> {
         .chain(o.person_links.iter().flat_map(|l| [&l.person_key, &l.organization_key]))
         .chain(o.schedule_links.iter().flat_map(|l| [&l.slot_key, &l.zone_key, &l.organization_key]))
         .chain(o.gaps.iter().map(|g| &g.key));
-    used.filter(|k| !known.contains(k.as_str())).cloned().collect()
+    let mut out: Vec<String> = used.filter(|k| !known.contains(k.as_str())).map(|k| format!("unknown key {k}")).collect();
+    let decided: HashSet<&str> = o
+        .organizations
+        .iter()
+        .flat_map(|x| x.member_keys.iter())
+        .chain(o.prize_links.iter().map(|l| &l.prize_key))
+        .chain(o.person_links.iter().map(|l| &l.person_key))
+        .chain(o.schedule_links.iter().map(|l| &l.slot_key))
+        .map(String::as_str)
+        .collect();
+    let kinds = [records::ORGANIZATION_CANDIDATE, records::PRIZE, records::PERSON_CANDIDATE, records::SCHEDULE_ITEM];
+    out.extend(
+        records
+            .iter()
+            .filter(|r| kinds.contains(&r.record_kind.as_str()) && !decided.contains(r.source_key.as_str()))
+            .map(|r| format!("no decision for {}", r.source_key)),
+    );
+    out
 }
 
 fn write_decisions(cfg: &Config, o: &Organized, records: &[Record]) -> Result<()> {

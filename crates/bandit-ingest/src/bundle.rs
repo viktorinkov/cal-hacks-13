@@ -382,7 +382,7 @@ fn slot(r: &Record, link: Option<&Link>) -> Result<ScheduleSlotIn> {
     Ok(ScheduleSlotIn {
         source_key: r.source_key.clone(),
         title: r.name.clone(),
-        kind: text_field(r, "kind"),
+        kind: Some(text_field(r, "kind")).filter(|k| !k.is_empty()).unwrap_or_else(|| "other".into()),
         description: r.text.clone(),
         location_text: r.location_text.clone(),
         zone_key: link.map(|l| l.zone_key.clone()).unwrap_or_default(),
