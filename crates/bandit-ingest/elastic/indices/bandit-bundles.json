@@ -1,0 +1,102 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "properties": {
+      "run_id": {
+        "type": "keyword"
+      },
+      "organizer": {
+        "type": "keyword"
+      },
+      "model": {
+        "type": "keyword"
+      },
+      "organizations": {
+        "properties": {
+          "key": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          },
+          "domain": {
+            "type": "keyword"
+          },
+          "member_keys": {
+            "type": "keyword"
+          },
+          "facts_key": {
+            "type": "keyword"
+          },
+          "category": {
+            "type": "keyword"
+          },
+          "tags": {
+            "type": "keyword"
+          },
+          "description": {
+            "type": "text"
+          },
+          "match_method": {
+            "type": "keyword"
+          },
+          "match_reason": {
+            "type": "text"
+          }
+        }
+      },
+      "prize_links": {
+        "properties": {
+          "prize_key": {
+            "type": "keyword"
+          },
+          "organization_key": {
+            "type": "keyword"
+          },
+          "reason": {
+            "type": "text"
+          }
+        }
+      },
+      "person_links": {
+        "properties": {
+          "person_key": {
+            "type": "keyword"
+          },
+          "organization_key": {
+            "type": "keyword"
+          },
+          "reason": {
+            "type": "text"
+          }
+        }
+      },
+      "schedule_links": {
+        "properties": {
+          "slot_key": {
+            "type": "keyword"
+          },
+          "zone_key": {
+            "type": "keyword"
+          },
+          "organization_key": {
+            "type": "keyword"
+          },
+          "reason": {
+            "type": "text"
+          }
+        }
+      },
+      "gaps": {
+        "properties": {
+          "key": {
+            "type": "keyword"
+          },
+          "reason": {
+            "type": "text"
+          }
+        }
+      }
+    }
+  }
+}

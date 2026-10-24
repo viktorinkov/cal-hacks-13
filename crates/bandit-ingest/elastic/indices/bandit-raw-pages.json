@@ -1,0 +1,87 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "dynamic_templates": [
+      {
+        "fields_strings": {
+          "path_match": "fields.*",
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "keyword",
+            "ignore_above": 1024
+          }
+        }
+      }
+    ],
+    "properties": {
+      "run_id": {
+        "type": "keyword"
+      },
+      "index": {
+        "type": "keyword"
+      },
+      "record_kind": {
+        "type": "keyword"
+      },
+      "source_key": {
+        "type": "keyword"
+      },
+      "source_url": {
+        "type": "keyword"
+      },
+      "fetched_at": {
+        "type": "date"
+      },
+      "snapshot_sha256": {
+        "type": "keyword"
+      },
+      "name": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "aliases": {
+        "type": "keyword"
+      },
+      "domain": {
+        "type": "keyword"
+      },
+      "org_key": {
+        "type": "keyword"
+      },
+      "text": {
+        "type": "semantic_text",
+        "inference_id": ".jina-embeddings-v5-text-small"
+      },
+      "tier_text": {
+        "type": "keyword"
+      },
+      "role_text": {
+        "type": "keyword"
+      },
+      "location_text": {
+        "type": "keyword"
+      },
+      "location_norm": {
+        "type": "keyword"
+      },
+      "start_text": {
+        "type": "keyword"
+      },
+      "end_text": {
+        "type": "keyword"
+      },
+      "links": {
+        "type": "keyword",
+        "index": false
+      },
+      "fields": {
+        "type": "object",
+        "dynamic": true
+      }
+    }
+  }
+}

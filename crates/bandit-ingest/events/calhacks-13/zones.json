@@ -1,0 +1,10 @@
+{
+  "plan": "Palace of Fine Arts exhibition hall, metres from the north-west corner, x east, y south",
+  "zones": [
+    { "key": "zone:entrance", "name": "Entrance and concierge", "kind": "entrance", "station_id": 101, "plan_x_m": 8, "plan_y_m": 30, "area_sq_m": 300, "capacity": 200, "exit_colour": 1, "description": "Main doors and the concierge desk near the entrance" },
+    { "key": "zone:hacking-floor", "name": "Hacking floor", "kind": "floor", "station_id": 102, "plan_x_m": 55, "plan_y_m": 30, "area_sq_m": 2400, "capacity": 1500, "exit_colour": 0, "description": "Team tables in the middle of the hall" },
+    { "key": "zone:sponsor-row", "name": "Sponsor row", "kind": "sponsor", "station_id": 103, "plan_x_m": 95, "plan_y_m": 12, "area_sq_m": 600, "capacity": 400, "exit_colour": 0, "description": "Sponsor tables along the north wall" },
+    { "key": "zone:stage", "name": "Main stage", "kind": "stage", "station_id": 104, "plan_x_m": 110, "plan_y_m": 42, "area_sq_m": 500, "capacity": 600, "exit_colour": 2, "description": "Opening and closing ceremonies, talks" },
+    { "key": "zone:food", "name": "Food and drinks", "kind": "food", "station_id": 105, "plan_x_m": 35, "plan_y_m": 54, "area_sq_m": 400, "capacity": 300, "exit_colour": 0, "description": "Meals, snacks and partner drinks" }
+  ]
+}
