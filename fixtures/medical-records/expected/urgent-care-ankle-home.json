@@ -1,0 +1,65 @@
+{
+  "document_kind": "urgent_care_record",
+  "patient": {
+    "name": "Sam Patel",
+    "date_of_birth": "1997-11-21",
+    "page": 1
+  },
+  "provider": {
+    "name": "Wrenfield Urgent Care",
+    "address": "880 Tamsin Street, Suite 120, Port Alder, CA 94999",
+    "page": 1
+  },
+  "encounter": {
+    "date_of_service": "2026-10-25",
+    "time": "09:15",
+    "reason_for_visit": "Right ankle pain and swelling.",
+    "history": "Patient presents with right ankle pain and swelling. He states he twisted his right ankle (inversion injury) while playing pickup basketball at home on the evening of Friday, October 23, 2026, before attending Cal Hacks 13.0. He was able to walk afterward and did not seek care that night. The pain and swelling got worse while he was walking around the event on Saturday, October 24, 2026, and today he has difficulty bearing full weight. Denies any new fall, twist, or other injury since the initial injury. Rates pain 6/10, lateral ankle, worse with weight bearing. Took ibuprofen 400 mg last night with partial relief. Denies numbness or tingling. No prior right ankle injury.",
+    "page": 1
+  },
+  "diagnoses": [
+    {
+      "code": "S93.401A",
+      "description": "Sprain of unspecified ligament of right ankle, initial encounter",
+      "page": 1
+    },
+    {
+      "code": "Y93.67",
+      "description": "Activity, basketball",
+      "page": 1
+    },
+    {
+      "code": "Y92.009",
+      "description": "Unspecified place in unspecified non-institutional (private) residence as the place of occurrence",
+      "page": 1
+    }
+  ],
+  "services": [
+    {
+      "code": "99203",
+      "description": "New patient visit, low complexity",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 18500,
+      "page": 2
+    },
+    {
+      "code": "73610",
+      "description": "X-ray ankle, 3 views, right",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 16000,
+      "page": 2
+    },
+    {
+      "code": "29515",
+      "description": "Short leg splint application (calf to foot), right",
+      "date_of_service": "2026-10-25",
+      "units": 1,
+      "charge_cents": 22000,
+      "page": 2
+    }
+  ],
+  "invoice_number": "UC-2025-1201",
+  "total_billed_cents": 56500
+}
