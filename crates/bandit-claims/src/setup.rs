@@ -128,7 +128,25 @@ pub fn ensure_attendee(app: &App, sim: &Sim, name: &str, display: &str, band: u8
     }
     call!(conn, update_profile_then(display.to_string(), true))?;
     call!(conn, connect_wallet_then())?;
+    ensure_medical_card(app, &conn, me)?;
     Ok(me)
+}
+
+/// Files the sample medical history and insurance card for the attendee, as if they uploaded them at
+/// band setup; `bandit-workers` has Claude read them into the medical card a medic sees on a tap.
+fn ensure_medical_card(app: &App, conn: &DbConnection, me: Identity) -> Result<()> {
+    if app.db()?.db.medical_document().iter().any(|d| d.attendee == me) {
+        return Ok(());
+    }
+    let ops = app.actor("ops")?;
+    for (kind, file) in [("history", "medical-history.pdf"), ("insurance", "insurance-card.pdf")] {
+        let path = app.root.join("fixtures/attendee-documents/rendered").join(file);
+        let bytes = std::fs::read(&path).with_context(|| format!("reading {}", path.display()))?;
+        let blob = app.blobs().put(&bytes)?;
+        call!(ops, register_blob_then(blob.sha256.clone(), Some(me), "owner_only".into(), kind.into(), "application/pdf".into(), blob.size_bytes))?;
+        call!(conn, submit_medical_document_then(kind.into(), blob.sha256.clone(), crate::flow::count_pages(&bytes)))?;
+    }
+    Ok(())
 }
 
 /// Midnight on the first of this month to midnight on the first of the next, venue time.

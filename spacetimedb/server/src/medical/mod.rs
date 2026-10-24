@@ -256,7 +256,8 @@ pub struct MedicCard {
     pub incident_id: u64,
     pub band_id: u8,
     pub name: String,
-    pub card: MedicalCard,
+    /// None when the wearer never filed their documents.
+    pub card: Option<MedicalCard>,
 }
 
 /// The cards this medic tapped for, while the incident is still open.
@@ -268,10 +269,9 @@ pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {
         if !open || out.iter().any(|c| c.incident_id == log.incident_id) {
             continue;
         }
-        if let Some(card) = ctx.db.medical_card().attendee().find(log.attendee) {
-            let name = ctx.db.attendee().identity().find(log.attendee).map(|a| a.display_name).unwrap_or_default();
-            out.push(MedicCard { incident_id: log.incident_id, band_id: log.band_id, name, card });
-        }
+        let card = ctx.db.medical_card().attendee().find(log.attendee);
+        let name = ctx.db.attendee().identity().find(log.attendee).map(|a| a.display_name).unwrap_or_default();
+        out.push(MedicCard { incident_id: log.incident_id, band_id: log.band_id, name, card });
     }
     out
 }

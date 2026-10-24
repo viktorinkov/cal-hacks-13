@@ -709,7 +709,7 @@ export const MedicCard = __t.object("MedicCard", {
   bandId: __t.u8(),
   name: __t.string(),
   get card() {
-    return MedicalCard;
+    return __t.option(MedicalCard);
   },
 });
 export type MedicCard = __Infer<typeof MedicCard>;
