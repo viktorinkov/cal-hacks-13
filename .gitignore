@@ -1,0 +1,5 @@
+firmware/build/
+firmware/logs/
+firmware/bandit_common/bandit_version.h
+__pycache__/
+*.pyc
