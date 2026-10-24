@@ -1,4 +1,3 @@
-// BandIt station marker. Usage at the top of bandit_station.ino.
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
@@ -116,7 +115,7 @@ void render(uint32_t now) {
   ring.show();
 }
 
-}  // namespace
+}
 
 void setup() {
   serialBegin(1024, 256);

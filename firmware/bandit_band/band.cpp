@@ -1,4 +1,3 @@
-// BandIt band: density, zone, light circle, SOS, fall, pay, find your friend. Usage at the top of bandit_band.ino.
 #include <Arduino.h>
 #include <driver/gpio.h>
 #include <esp_sleep.h>
@@ -12,21 +11,18 @@
 
 namespace {
 
-// ------------------------------------------------------------------ pins (XIAO silkscreen: GPIO)
-// GPIO8 (D8) and GPIO9 (D9, BOOT) are strapping pins and are never touched.
-constexpr uint8_t PIN_VBAT  = 2;    // D0 / A0, ADC1, optional 2 x 200k divider
-constexpr uint8_t PIN_RING  = 3;    // D1, ring DIN through 330 R
-constexpr uint8_t PIN_BTN   = 4;    // D2, switch to GND, deep sleep wake source
-constexpr uint8_t PIN_SDA   = 6;    // D4
-constexpr uint8_t PIN_SCL   = 7;    // D5
-constexpr uint8_t PIN_MOTOR = 21;   // D6, 1k to the 2N2222 base
+constexpr uint8_t PIN_VBAT  = 2;
+constexpr uint8_t PIN_RING  = 3;
+constexpr uint8_t PIN_BTN   = 4;
+constexpr uint8_t PIN_SDA   = 6;
+constexpr uint8_t PIN_SCL   = 7;
+constexpr uint8_t PIN_MOTOR = 21;
 
-// ------------------------------------------------------------------ timing and tuning constants
-constexpr uint8_t  RING_BRIGHT      = 64;     // of 255. 12 LEDs at full white is ~0.7 A: never above ~80 on battery
-constexpr float    FAST_TAU_MS      = 500;    // per-peer RSSI smoothing for density, zone, light circle
-constexpr float    SLOW_TAU_MS      = 2000;   // per-peer RSSI smoothing for find your friend
+constexpr uint8_t  RING_BRIGHT      = 64;
+constexpr float    FAST_TAU_MS      = 500;
+constexpr float    SLOW_TAU_MS      = 2000;
 constexpr uint32_t DENSITY_MS       = 250;
-constexpr float    DENSITY_KEEP     = 0.7f;   // EMA every 250 ms: ~1 s time constant
+constexpr float    DENSITY_KEEP     = 0.7f;
 constexpr uint32_t PRESS_FLAG_MS    = 1000;
 constexpr uint32_t PAY_MS           = 8000;
 constexpr uint32_t PAID_MS          = 1500;
@@ -37,14 +33,14 @@ constexpr uint32_t DEBOUNCE_MS      = 25;
 constexpr uint32_t HOLD_SOS_MS      = 3000;
 constexpr uint32_t HOLD_SLEEP_MS    = 10000;
 constexpr uint32_t FIND_TIMEOUT_MS  = 5UL * 60 * 1000;
-constexpr uint32_t FIND_LOST_MS     = 3000;   // friend not heard this long: one dim LED, no Geiger
-constexpr uint32_t SOUGHT_MS        = 2000;   // a seeker's beacon keeps me "being looked for" this long
-constexpr float    FIND_FAR         = -85;    // fill meter: 1 LED at or below ...
-constexpr float    FIND_NEAR        = -50;    // ... 12 LEDs at or above
-constexpr float    GEIGER_SOLID     = -48;    // continuous buzz above this
+constexpr uint32_t FIND_LOST_MS     = 3000;
+constexpr uint32_t SOUGHT_MS        = 2000;
+constexpr float    FIND_FAR         = -85;
+constexpr float    FIND_NEAR        = -50;
+constexpr float    GEIGER_SOLID     = -48;
 constexpr uint32_t GEIGER_SLOW_MS   = 1500;
 constexpr uint32_t GEIGER_FAST_MS   = 150;
-constexpr float    FOUND_ME_RSSI    = -55;    // seeker this strong for FOUND_ME_DWELL_MS -> FOUND_ME
+constexpr float    FOUND_ME_RSSI    = -55;
 constexpr float    FOUND_ME_EXIT    = -60;
 constexpr uint32_t FOUND_ME_DWELL_MS = 1000;
 constexpr uint32_t RAISE_EVERY_MS   = 5000;
@@ -52,7 +48,6 @@ constexpr uint32_t GUIDE_PULSE_MS   = 2000;
 constexpr uint32_t PING_FLASH_MS    = 250;
 constexpr uint8_t  NO_FORCE         = 0xFF;
 
-// ------------------------------------------------------------------ peers (other bands and stations I hear)
 struct Peer {
   uint8_t  id = 0;
   int8_t   raw = 0;
@@ -87,7 +82,6 @@ Peer* peerFor(uint8_t id, bool create) {
   return stalest;
 }
 
-// ------------------------------------------------------------------ state
 bool        hasMpu = false;
 uint8_t     mpuWho = 0;
 FallDetector fall;
@@ -102,21 +96,20 @@ bool      overrideAuto = false, sos = false, fell = false;
 uint32_t  pressUntil = 0, payUntil = 0, paidUntil = 0, connectUntil = 0, identUntil = 0, nearSosUntil = 0;
 uint32_t  flashUntil = 0, flashColour = 0;
 
-uint8_t   findId = 0, findColour = 0;            // I am looking for findId
+uint8_t   findId = 0, findColour = 0;
 uint32_t  findUntil = 0, lastTick = 0;
-uint8_t   seekerId = 0, seekerColour = 0;        // seekerId is looking for me
+uint8_t   seekerId = 0, seekerColour = 0;
 uint32_t  soughtLast = 0, closeSince = 0, lastRaise = 0;
 bool      foundMe = false, raisePending = false;
 uint32_t  lastGuidePulse = 0;
-bool      sleepPending = false;              // 10 s hold reached: ring dark, sleep on release
+bool      sleepPending = false;
 
 uint16_t  seq = 0;
 CmdDedupe dedupe;
-uint32_t  beaconSlot = 0, nextBeacon = 0, nextHeard = 0, nextDensity = 0;   // beacons: 100 ms grid + 0..30 ms jitter
+uint32_t  beaconSlot = 0, nextBeacon = 0, nextHeard = 0, nextDensity = 0;
 
 inline bool before(uint32_t now, uint32_t until) { return (int32_t)(until - now) > 0; }
 
-// ------------------------------------------------------------------ state priority
 BandState currentState(uint32_t now) {
   if (before(now, identUntil)) return S_IDENT;
   if (sos || fell) return S_SOS;
@@ -139,7 +132,6 @@ uint8_t flags(uint32_t now) {
          (batPct != 255 && batPct < 15 ? F_LOWBAT : 0) | (hasMpu ? F_MPU : 0) | (cfg.hasMotor ? F_MOTOR : 0);
 }
 
-// ------------------------------------------------------------------ radio out
 void sendBeacon(uint32_t now, int stateOverride = -1) {
   Pkt p = {};
   p.magic = BANDIT_MAGIC;
@@ -156,7 +148,6 @@ void sendBeacon(uint32_t now, int stateOverride = -1) {
   radioSend(&p, sizeof(p));
 }
 
-// every band and station heard in the last 2 s, strongest first
 uint8_t collectHeard(HeardEntry* out, uint32_t now) {
   uint8_t n = 0;
   for (const auto& p : peers) {
@@ -178,7 +169,6 @@ void sendHeard(uint32_t now) {
   radioSend(&h, heardLen(h.n));
 }
 
-// ------------------------------------------------------------------ find your friend
 void startFind(uint8_t friendId, uint8_t colour, uint32_t now) {
   if (!friendId || friendId == cfg.id) return;
   findId = friendId;
@@ -257,8 +247,7 @@ void serviceFind(uint32_t now) {
   }
 }
 
-// ------------------------------------------------------------------ low visibility guidance
-const Peer* exitStation(uint32_t now) {   // the strongest station showing my exit colour
+const Peer* exitStation(uint32_t now) {
   const Peer* best = nullptr;
   for (const auto& p : peers)
     if (p.id >= ID_STATION_MIN && p.state == exitIdx && p.fresh(now, ZONE_WINDOW_MS) && (!best || p.fast > best->fast))
@@ -279,7 +268,6 @@ void serviceGuide(uint32_t now, BandState s) {
   }
 }
 
-// ------------------------------------------------------------------ density and zone
 void updateDensity(uint32_t now) {
   uint8_t n = 0;
   for (const auto& p : peers)
@@ -298,7 +286,6 @@ void updateDensity(uint32_t now) {
   zone = best ? best->id : 0;
 }
 
-// ------------------------------------------------------------------ deep sleep
 void goToSleep(uint8_t minutes) {
   const uint32_t now = millis();
   sos = fell = false;
@@ -307,13 +294,13 @@ void goToSleep(uint8_t minutes) {
   hapticsOff();
   ringOff();
   if (cfg.id)
-    for (int i = 0; i < 3; i++) {   // tell the dashboard this band went dark on purpose
+    for (int i = 0; i < 3; i++) {
       sendBeacon(now, S_OFF);
       delay(40);
     }
   emitf("{\"sleep\":%u}", minutes);
   delay(50);
-  pinMode(PIN_RING, OUTPUT);   // take the pin back from RMT and hold DIN low so the ring cannot latch noise
+  pinMode(PIN_RING, OUTPUT);
   digitalWrite(PIN_RING, LOW);
   gpio_hold_en((gpio_num_t)PIN_RING);
   gpio_hold_en((gpio_num_t)PIN_MOTOR);
@@ -327,15 +314,14 @@ void goToSleep(uint8_t minutes) {
   esp_deep_sleep_start();
 }
 
-// ------------------------------------------------------------------ button: short press, 3 s hold, 10 s hold
 void onShortPress(uint32_t now) {
-  pressUntil = now + PRESS_FLAG_MS;   // approve during PAY, ping during FIND
+  pressUntil = now + PRESS_FLAG_MS;
   hapticPlay(H_SHORT);
 }
 
 void onHold3(uint32_t now) {
   (void)now;
-  if (findId) {   // 3 s hold on the seeker ends find; the next 3 s hold raises SOS
+  if (findId) {
     stopFind("hold");
     hapticPlay(H_LONG);
   } else if (sos || fell) {
@@ -353,7 +339,7 @@ void serviceButton(uint32_t now) {
   const bool r = digitalRead(PIN_BTN) == LOW;
   if (r != raw) { raw = r; changedAt = now; }
   const bool settled = now - changedAt >= DEBOUNCE_MS;
-  if (settled && r != stable) {       // debounced edge
+  if (settled && r != stable) {
     stable = r;
     if (armed) {
       if (stable) { downAt = now; fired3 = false; sleepPending = false; }
@@ -361,13 +347,12 @@ void serviceButton(uint32_t now) {
       else if (!fired3) onShortPress(now);
     }
   }
-  if (settled && !stable) armed = true;   // a button held at boot or at wake does nothing until released once
+  if (settled && !stable) armed = true;
   if (!armed || !stable) return;
   if (!fired3 && now - downAt >= HOLD_SOS_MS) { fired3 = true; onHold3(now); }
-  if (!sleepPending && now - downAt >= HOLD_SLEEP_MS) { sleepPending = true; hapticsOff(); ringOff(); }   // dark: release to sleep
+  if (!sleepPending && now - downAt >= HOLD_SLEEP_MS) { sleepPending = true; hapticsOff(); ringOff(); }
 }
 
-// ------------------------------------------------------------------ battery
 uint8_t lipoPercent(uint32_t mv) {
   static const uint16_t MV[]  = {3300, 3500, 3600, 3700, 3750, 3800, 3900, 4000, 4100, 4200};
   static const uint8_t  PCT[] = {0, 5, 12, 25, 35, 45, 60, 75, 88, 100};
@@ -387,10 +372,9 @@ void serviceBattery(uint32_t now) {
   batPct = lipoPercent(mv / 16 * 2);
 }
 
-// ------------------------------------------------------------------ gateway commands
 void handleCmd(const Pkt& p, uint32_t now) {
   if (!cfg.id || (p.target != ID_ALL_BANDS && p.target != cfg.id)) return;
-  if (dedupe.seen(p.id, p.seq, now)) return;   // 3 repeats, act once
+  if (dedupe.seen(p.id, p.seq, now)) return;
   emitf("{\"event\":\"cmd\",\"cmd\":%u,\"arg\":%u,\"arg2\":%u}", p.cmd, p.arg, p.arg2);
   const uint32_t hold = p.arg2 * 100UL;
   switch (p.cmd) {
@@ -455,7 +439,6 @@ void handleCmd(const Pkt& p, uint32_t now) {
   }
 }
 
-// ------------------------------------------------------------------ radio in
 void onFrame(const RxFrame& f) {
   const uint8_t type = f.data[1];
   if (type == T_HEARD || f.len < sizeof(Pkt)) return;
@@ -475,8 +458,8 @@ void onFrame(const RxFrame& f) {
     e->target = p.target;
     e->arg = p.arg;
     e->state = p.state;
-    if ((p.flags & (F_SOS | F_FALL)) && e->fast >= cfg.circleRssi) nearSosUntil = f.t + NEAR_SOS_MS;   // light circle
-    if (cfg.id && p.target == cfg.id) {   // someone is looking for me
+    if ((p.flags & (F_SOS | F_FALL)) && e->fast >= cfg.circleRssi) nearSosUntil = f.t + NEAR_SOS_MS;
+    if (cfg.id && p.target == cfg.id) {
       if (seekerId != p.id) {
         seekerId = p.id;
         foundMe = false;
@@ -488,11 +471,10 @@ void onFrame(const RxFrame& f) {
       soughtLast = f.t;
     }
     const bool partner = (findId && p.id == findId) || (seekerId && p.id == seekerId);
-    if (partner && (p.flags & F_PRESS) && !(prevFlags & F_PRESS)) ping(p.id);   // two-way ping
+    if (partner && (p.flags & F_PRESS) && !(prevFlags & F_PRESS)) ping(p.id);
   }
 }
 
-// ------------------------------------------------------------------ serial: config and bench commands
 void printInfo() {
   char mac[18];
   macToStr(selfMac(), mac);
@@ -533,7 +515,6 @@ void handleSerial(char* line, uint32_t now) {
   else if (is("duty") && n1 && a >= 10 && a <= 100) { cfg.dutyPct = a; hapticsBegin(PIN_MOTOR, cfg.hasMotor, cfg.dutyPct); changed(); }
   else if (is("lowvis") && n1 && (a == 0 || a == 1)) { cfg.lowVis = a; changed(); }
   else if (is("vbat") && n1 && (a == 0 || a == 1)) { cfg.vbatDiv = a; batPct = 255; changed(); }
-  // bench commands
   else if (is("sos")) { sos = !sos; if (!sos) fell = false; if (sos) hapticPlay(H_SOS); ok(); }
   else if (is("clear")) { sos = fell = false; forcedState = NO_FORCE; nearSosUntil = 0; ok(); }
   else if (is("pay")) { payUntil = now + PAY_MS; hapticPlay(H_DOUBLE); ok(); }
@@ -590,9 +571,8 @@ const char* wakeReason() {
   }
 }
 
-}  // namespace
+}
 
-// ------------------------------------------------------------------ arduino
 void setup() {
   gpio_hold_dis((gpio_num_t)PIN_RING);
   gpio_hold_dis((gpio_num_t)PIN_MOTOR);
@@ -600,7 +580,7 @@ void setup() {
 #if SOC_GPIO_SUPPORT_HOLD_IO_IN_DSLP && !SOC_GPIO_SUPPORT_HOLD_SINGLE_IO_IN_DSLP
   gpio_deep_sleep_hold_dis();
 #endif
-  pinMode(PIN_MOTOR, OUTPUT);   // first: the bootloader leaves this pin (U0TXD) idling high, which runs the motor
+  pinMode(PIN_MOTOR, OUTPUT);
   digitalWrite(PIN_MOTOR, LOW);
   pinMode(PIN_BTN, INPUT_PULLUP);
   serialBegin(2048, 256);
@@ -618,7 +598,7 @@ void setup() {
   macToStr(selfMac(), mac);
   emitf("{\"boot\":\"band\",\"id\":%u,\"mac\":\"%s\",\"hasMpu\":%d,\"hasMotor\":%d,\"wake\":\"%s\",\"fw\":\"%s\"}", cfg.id,
         mac, hasMpu, cfg.hasMotor, wakeReason(), BANDIT_FW);
-  identUntil = millis() + 1500;   // white blink on boot so a reset is visible
+  identUntil = millis() + 1500;
 }
 
 void loop() {
@@ -627,8 +607,8 @@ void loop() {
   const uint32_t now = millis();
   if (cfg.id && (int32_t)(now - nextBeacon) >= 0) {
     sendBeacon(now);
-    beaconSlot += BAND_BEACON_MS;   // the jitter does not accumulate: exactly 10 Hz on average
-    if ((int32_t)(now - beaconSlot) >= (int32_t)BAND_BEACON_MS) beaconSlot = now;   // after a stall, restart the grid
+    beaconSlot += BAND_BEACON_MS;
+    if ((int32_t)(now - beaconSlot) >= (int32_t)BAND_BEACON_MS) beaconSlot = now;
     nextBeacon = beaconSlot + random(0, BAND_JITTER_MS + 1);
   }
   if (cfg.id && (int32_t)(now - nextHeard) >= 0) {
@@ -653,5 +633,5 @@ void loop() {
   render(now, s);
   if (char* l = lines.poll(Serial)) handleSerial(l, now);
   printStatus(now, s);
-  vTaskDelay(1);   // one tick so the idle task can halt the core between passes; all timing is millis() driven
+  vTaskDelay(1);
 }

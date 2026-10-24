@@ -1,15 +1,3 @@
-"""Live view of the BandIt fleet through the gateway's serial port, plus a command prompt.
-
-    python3 tools/gateway_monitor.py [port] [--label spread]
-
-port defaults to the connected board that answers "info" as the gateway. Every line from the gateway is logged
-unchanged to logs/bandit_<label>_<time>.jsonl (calibrate.py reads these). At the prompt:
-    cmd <target> <name> [arg] [arg2]     sent to the gateway, e.g. cmd 0 exit 2, cmd 3 pay, cmd 0 thresh 3 5
-    info                                 the gateway's identity line
-    label <name>                         writes {"label":"<name>","wall":<unix time>} into the log (marks a run)
-    quit
-Needs pyserial (pip install pyserial).
-"""
 import json
 import os
 import sys
@@ -19,7 +7,7 @@ import time
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import fleet  # noqa: E402
+import fleet
 
 STATE = ['IDLE', 'YELLOW', 'GUIDE', 'SOS', 'NEAR_SOS', 'PAY', 'PAID', 'CONNECT', 'IDENT', 'OFF', 'FIND', 'FOUND_ME']
 FLAGS = (('S', 1), ('F', 2), ('P', 4), ('L', 8), ('M', 16), ('V', 32))
@@ -59,7 +47,7 @@ def main():
         ser.reset_input_buffer()
         while True:
             buf += ser.read(4096)
-            if not synced:   # the port opened mid-line: drop the fragment before the first newline
+            if not synced:
                 if b'\n' not in buf:
                     continue
                 buf, synced = buf.split(b'\n', 1)[1], True

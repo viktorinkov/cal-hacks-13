@@ -1,24 +1,3 @@
-"""BandIt density calibration from labelled gateway logs.
-
-    python3 tools/calibrate.py logs/bandit_*.jsonl
-
-Record three runs at the venue with everyone wearing a band (same wrist, ring facing out), about 60 s each:
-    python3 tools/gateway_monitor.py --label spread     people 2 m apart
-    python3 tools/gateway_monitor.py --label sq15       everyone inside the 1.5 m taped square
-    python3 tools/gateway_monitor.py --label sq12       everyone inside the 1.2 m taped square
-or one log with "label spread" / "label sq15" / "label sq12" typed at the monitor prompt before each run.
-
-Each band sends a heard list once a second (gateway line type 4: every band it hears with the smoothed RSSI it
-uses itself), so the neighbour count can be recomputed here for any threshold. The script prints, per band and
-run, the RSSI of the bands it hears and the neighbour counts it reported, then suggests:
-    rssi    the neighbour threshold that best separates the runs: spread stays at 0..1 neighbours, the 1.5 m and
-            1.2 m squares differ by at least one count, and red does not need every band (red <= 6 with nine
-            bands); the light-circle threshold 4 dB stricter
-    thresh  yellow and red counts: yellow fires in the 1.5 m square, red fires in the 1.2 m square, and the
-            spread run never reaches yellow
-Push the result live:  cmd 0 rssi <n> <c>   and   cmd 0 thresh <yellow> <red>   (the bands save them)
-Options: --spread NAME --loose NAME --tight NAME choose other label names; --skip 5 drops the first 5 s of a run.
-"""
 import json
 import os
 import re
@@ -34,7 +13,6 @@ def pct(xs, p):
 
 
 def load(paths, skip_ms):
-    """-> {label: {'heard': [(band, [(id, rssi)])], 'neigh': {band: [counts]}}}"""
     runs = defaultdict(lambda: {'heard': [], 'neigh': defaultdict(list)})
     for path in paths:
         m = re.match(r'bandit_(.+?)_\d{8}_\d{6}\.jsonl$', os.path.basename(path))
@@ -66,18 +44,17 @@ def counts_at(run, thr):
 
 
 def suggest(spread, loose, tight):
-    """Pick the threshold with the widest gap between consecutive runs, then counts in the middle of each gap."""
     rows = []
     for thr in range(-40, -91, -1):
         cs, cl, ct = counts_at(spread, thr), counts_at(loose, thr), counts_at(tight, thr)
         if not (cs and cl and ct):
             continue
-        gap_y = pct(cl, 25) - pct(cs, 95)           # 1.5 m square vs spread
-        gap_r = pct(ct, 25) - pct(cl, 75)           # 1.2 m square vs 1.5 m square
+        gap_y = pct(cl, 25) - pct(cs, 95)
+        gap_r = pct(ct, 25) - pct(cl, 75)
         yellow = max(2, min(pct(cs, 95) + 2, pct(cl, 25)))
         red = max(yellow + 1, (pct(cl, 75) + 1 + pct(ct, 25) + 1) // 2)
         ok = pct(cs, 90) <= 1 and gap_y >= 1 and gap_r >= 1
-        score = (red <= 6, min(gap_y, gap_r), gap_y + gap_r)   # with 9 bands, red must not need everyone
+        score = (red <= 6, min(gap_y, gap_r), gap_y + gap_r)
         rows.append((thr, ok, score, yellow, red, pct(cs, 50), pct(cl, 50), pct(ct, 50)))
     good = [r for r in rows if r[1]]
     if good:
@@ -100,7 +77,7 @@ def main():
             paths.append(args[i])
             i += 1
     if not paths:
-        print(__doc__)
+        print('usage: calibrate.py <log.jsonl>... [--spread NAME] [--loose NAME] [--tight NAME] [--skip SECONDS]')
         sys.exit(1)
     runs = load(paths, int(float(opt['--skip']) * 1000))
     names = [opt['--spread'], opt['--loose'], opt['--tight']]

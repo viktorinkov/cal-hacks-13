@@ -1,15 +1,3 @@
-"""BandIt fleet table and serial helper for boards plugged into this laptop.
-
-    python3 tools/fleet.py table                 ask every connected ESP32-C3 for "info" and print the whiteboard
-                                                 table (id, MAC, hasMpu, hasMotor, fw). Every answer is appended
-                                                 to logs/fleet.jsonl, so bands flashed earlier stay in the table.
-    python3 tools/fleet.py send <port> <line>... send lines (e.g. "id 3" "save") and print the answers
-    python3 tools/fleet.py targets               ports that are bands or blank (used by build.sh all-bands)
-    python3 tools/fleet.py ports                 port and MAC of every connected ESP32-C3 (no serial traffic)
-
-Needs pyserial (pip install pyserial). The C3's USB serial number is its MAC, so ports are told apart without
-touching the boards; "table" and "send" open the port with default DTR/RTS, so nothing resets.
-"""
 import json
 import os
 import sys
@@ -29,12 +17,10 @@ def esp_ports():
 
 
 def open_port(port):
-    # Leave DTR/RTS alone. pyserial sets them one at a time, and DTR low with RTS high is the C3's reset request.
     return serial.Serial(port, 115200, timeout=0.05)
 
 
 def converse(port, lines, wait=1.2, want=None):
-    """Send lines, collect JSON answers for `wait` s (or until a line with key `want` arrives)."""
     out = []
     try:
         s = open_port(port)
@@ -115,7 +101,7 @@ def main():
         for d in converse(sys.argv[2], sys.argv[3:], wait=1.5):
             print(json.dumps(d))
     else:
-        print(__doc__)
+        print('usage: fleet.py table | ports | targets | send <port> <line>...')
         sys.exit(1)
 
 

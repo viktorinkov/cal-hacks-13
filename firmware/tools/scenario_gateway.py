@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""BandIt scenario gateway: the gateway's serial protocol, driven by a modelled fleet of nine bands and two stations.
-
-The dashboard can be built and rehearsed without hardware. Output lines are formatted exactly like
-firmware/bandit_gateway (same keys, same order, no spaces, '\n' endings) and it takes the same command syntax.
-
-    python3 tools/scenario_gateway.py              lines on stdout, commands on stdin
-    python3 tools/scenario_gateway.py --pty        opens a pseudo-terminal and prints its path on stderr; open that
-                                                   path from the dashboard exactly like /dev/cu.usbmodemXXXX
-    options:  --speed 2     run the model twice as fast (t, the gateway uptime, runs at the same rate)
-              --once        stop after one pass of the script instead of looping
-              --no-script   people stand spread out and only react to commands
-              --loss 0.03   fraction of band packets the gateway misses
-              --seed 7      repeatable run
-
-The script (about 165 s, then it loops):
-      0 s  spread out across the room, 2.6 m apart: rings green
-     20 s  walk toward the pit (a 1.5 m square): neighbour counts rise, yellow
-     35 s  packed into the 1.2 m square: red, guide state with the exit colour
-     55 s  step back out: green again
-     70 s  band 5 holds SOS; bands 4, 6 and 8 stand next to it and form the light circle (state 4)
-     86 s  band 5 holds again: SOS cleared
-     95 s  band 3 short press (flag 4), the "approve" a merchant page waits for
-    105 s  band 1 starts looking for band 8 (as after "cmd 1 find 8") and walks over; band 8 goes to found me
-    140 s  band 8 presses (ping); 148 s band 1 holds 3 s and the find ends
-Interactive: every command works on the model. "cmd N pay" opens the prompt and band N's wearer presses about 2.5 s
-later. "cmd N find M" makes band N walk over to band M. "cmd 0 state 2" forces states (Plan B), "cmd 0 thresh",
-"cmd 0 rssi" retune the neighbour counting live, "cmd N sleep" silences a band.
-"""
 import argparse
 import math
 import os
@@ -38,7 +10,6 @@ import threading
 import time
 import tty
 
-# ------------------------------------------------------------------ protocol, mirrored from bandit_common.h
 T_BAND, T_STATION, T_CMD, T_HEARD = 1, 2, 3, 4
 F_SOS, F_FALL, F_PRESS, F_LOWBAT, F_MPU, F_MOTOR = 1, 2, 4, 8, 16, 32
 (S_IDLE, S_YELLOW, S_GUIDE, S_SOS, S_NEAR_SOS, S_PAY, S_PAID, S_CONNECT, S_IDENT, S_OFF, S_FIND,
@@ -46,7 +17,6 @@ F_SOS, F_FALL, F_PRESS, F_LOWBAT, F_MPU, F_MOTOR = 1, 2, 4, 8, 16, 32
 S_COUNT = 12
 CMD_STATE, CMD_EXIT, CMD_CLEAR, CMD_BUZZ, CMD_PAY, CMD_PAID, CMD_THRESH, CMD_RSSI, CMD_OVERRIDE, CMD_FIND, \
     CMD_SLEEP, CMD_HAPTIC, CMD_LOWVIS = range(1, 14)
-# name, cmd, min args, max args, default first arg: the gateway's command table
 CMDS = {
     'state': (CMD_STATE, 1, 2, 0), 'exit': (CMD_EXIT, 1, 1, 0), 'clear': (CMD_CLEAR, 0, 0, 0),
     'buzz': (CMD_BUZZ, 0, 1, 1), 'pay': (CMD_PAY, 0, 0, 0), 'paid': (CMD_PAID, 0, 0, 0),
@@ -57,7 +27,6 @@ CMDS = {
 ID_ALL_BANDS, ID_BAND_MAX, ID_ALL_STATIONS = 0, 99, 100
 N_EXIT, N_PAIR = 6, 6
 
-# ------------------------------------------------------------------ firmware constants, mirrored from band.cpp
 BEACON_MS, JITTER_MS, HEARD_MS, STATION_MS = 100, 30, 1000, 200
 NEIGH_WINDOW_MS, ZONE_WINDOW_MS = 2000, 3000
 FAST_TAU, SLOW_TAU = 500.0, 2000.0
@@ -79,15 +48,12 @@ def git_fw():
         return 'scenario'
 
 
-# ------------------------------------------------------------------ radio model
 ROOM_W, ROOM_H = 12.0, 8.0
 PIT = (6.0, 4.0)
 GATEWAY_POS = (6.0, 8.6)
 
 
 def path_loss(d, ref=-47.0, slope=32.0):
-    """Mean RSSI in dBm at distance d (m). The default is wrist to wrist at 8 dBm through a crowd, where bodies
-    absorb most of the signal (-62 dBm at about 0.9 m); stations and the gateway use a gentler slope."""
     return ref - slope * math.log10(max(d, 0.2) / 0.3)
 
 
@@ -125,7 +91,7 @@ class Band:
     def __init__(self, bid, x, y, mpu, motor, divider):
         self.id, self.x, self.y = bid, x, y
         self.tx, self.ty, self.speed = x, y, 1.2
-        self.follow = None                     # walk toward this band (find)
+        self.follow = None
         self.hw = (F_MPU if mpu else 0) | (F_MOTOR if motor else 0)
         self.bat = random.randint(78, 96) if divider else 255
         self.peers = {}
@@ -145,7 +111,6 @@ class Band:
         self.next_heard = random.randrange(HEARD_MS)
         self.next_density = random.randrange(DENSITY_MS)
 
-    # -------- the band's own logic, as in band.cpp
     def state(self, now):
         if now < self.ident_until:
             return S_IDENT
@@ -292,7 +257,6 @@ class Band:
             self.asleep_until = now + arg * 60000 if arg else float('inf')
 
 
-# ------------------------------------------------------------------ the world
 class World:
     def __init__(self, args, out):
         self.args, self.out = args, out
@@ -315,7 +279,7 @@ class World:
         return [(PIT[0] + dx, PIT[1] + dy) for dy in (-2.6, 0, 2.6) for dx in (-2.6, 0, 2.6)]
 
     @staticmethod
-    def square_positions(step):   # 3 x 3 people, step metres apart, around the pit centre
+    def square_positions(step):
         return [(PIT[0] + dx * step + random.uniform(-0.08, 0.08), PIT[1] + dy * step + random.uniform(-0.08, 0.08))
                 for dy in (-1, 0, 1) for dx in (-1, 0, 1)]
 
@@ -324,10 +288,9 @@ class World:
             b = self.bands[i]
             b.tx, b.ty, b.speed, b.follow = x, y, speed, None
 
-    # -------- the scripted scenario
     def script(self):
         bands = self.bands
-        sq15, sq12 = self.square_positions(0.75), self.square_positions(0.4)   # 1.5 m and 1.2 m squares
+        sq15, sq12 = self.square_positions(0.75), self.square_positions(0.4)
         sos_scene = [(PIT[0] - 3.2, 1.2), (PIT[0], 1.0), (PIT[0] + 3.2, 1.2),
                      (PIT[0] - 0.55, PIT[1]), PIT, (PIT[0] + 0.55, PIT[1]),
                      (PIT[0] - 3.2, 6.8), (PIT[0], PIT[1] + 0.6), (PIT[0] + 3.2, 6.8)]
@@ -355,11 +318,10 @@ class World:
         b1.tx, b1.ty = 1.2, 1.2
         b8.tx, b8.ty, b8.speed = 10.8, 6.8, 1.5
 
-    # -------- radio
     def rssi(self, a, b, base_offset=0.0, slope=32.0):
         key = (min(a.id, b.id), max(a.id, b.id))
         s = self.shadow.get(key, 0.0)
-        s = max(-5.0, min(5.0, s + random.gauss(0, 0.15)))   # slow body shadowing per pair
+        s = max(-5.0, min(5.0, s + random.gauss(0, 0.15)))
         self.shadow[key] = s
         d = math.hypot(a.x - b.x, a.y - b.y)
         return int(round(path_loss(d, slope=slope) + base_offset + s + random.gauss(0, 3.0)))
@@ -395,7 +357,6 @@ class World:
             return True
         return False
 
-    # -------- one model step
     def step(self, now, dt):
         for b in self.bands.values():
             if b.follow is not None and b.find:
@@ -445,7 +406,6 @@ class World:
             if b.bat != 255 and random.random() < dt / 90000.0:
                 b.bat = max(0, b.bat - 1)
 
-    # -------- commands, parsed exactly like gateway.cpp
     def handle_line(self, line, now):
         if len(line) > 127:
             return
@@ -499,9 +459,7 @@ class World:
                 b.apply(cmd, arg, arg2, now, self)
 
 
-# ------------------------------------------------------------------ io
 class PtyOut:
-    """Writes whole lines to a pty master without ever blocking; lines are dropped whole when nobody reads."""
 
     def __init__(self):
         self.master, self.slave = os.openpty()

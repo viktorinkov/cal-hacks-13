@@ -3,7 +3,6 @@
 
 namespace {
 
-// on / off durations in ms, starting with on
 const uint16_t P_SHORT[]  = {120};
 const uint16_t P_DOUBLE[] = {100, 100, 100};
 const uint16_t P_LONG[]   = {600};
@@ -39,7 +38,7 @@ void drive(bool on) {
   if (attached) ledcWrite(pin, on ? duty : 0);
 }
 
-}  // namespace
+}
 
 void hapticsBegin(uint8_t p, bool en, uint8_t dutyPct) {
   pin = p;

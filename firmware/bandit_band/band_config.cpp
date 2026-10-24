@@ -20,7 +20,7 @@ void configDefaults(bool keepIdentity) {
 void configLoad() {
   configDefaults(false);
   Preferences p;
-  if (!p.begin(NS, true)) return;  // fails on a fresh board: the namespace does not exist yet
+  if (!p.begin(NS, true)) return;
   cfg.id = p.getUChar("id", cfg.id);
   cfg.hasMotor = p.getBool("motor", cfg.hasMotor);
   cfg.yellowAt = p.getUChar("yellow", cfg.yellowAt);

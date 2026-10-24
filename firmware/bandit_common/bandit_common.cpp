@@ -1,4 +1,3 @@
-// Shared radio, serial and colour helpers for the BandIt firmware. See bandit_common.h for the protocol.
 #include "bandit_common.h"
 #include <WiFi.h>
 #include <esp_now.h>
@@ -17,7 +16,6 @@ uint32_t dimColour(uint32_t c, uint8_t b) {
   return (r << 16) | (g << 8) | bl;
 }
 
-// ------------------------------------------------------------------ radio
 static const uint8_t BCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static QueueHandle_t rxQueue = nullptr;
 static volatile uint32_t rxDropped = 0;
@@ -65,7 +63,6 @@ void macToStr(const uint8_t* m, char out[18]) {
   snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
-// ------------------------------------------------------------------ serial
 void serialBegin(size_t txBuf, size_t rxBuf) {
 #if ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT
   Serial.setTxBufferSize(txBuf);

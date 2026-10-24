@@ -1,4 +1,3 @@
-// BandIt gateway: ESP-NOW <-> USB serial bridge. Usage and line formats are at the top of bandit_gateway.ino.
 #include <Arduino.h>
 #include <bandit_common.h>
 #include <string.h>
@@ -166,7 +165,7 @@ void handleLine(char* line) {
   emitf("{\"ack\":\"cmd\",\"target\":%ld,\"cmd\":%u,\"arg\":%ld,\"arg2\":%ld}", target, d->cmd, a[0], a[1]);
 }
 
-}  // namespace
+}
 
 void setup() {
   serialBegin(8192, 1024);
@@ -190,5 +189,5 @@ void loop() {
     droppedReported = d;
     lastDropReport = now;
   }
-  vTaskDelay(1);  // one tick so the idle task can halt the core; everything above is millis() driven
+  vTaskDelay(1);
 }

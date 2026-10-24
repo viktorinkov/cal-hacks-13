@@ -17,7 +17,7 @@ bool     valid = false;
 uint32_t lastFrame = 0;
 float    chasePhase = 0;
 
-float wave(uint32_t now, uint32_t period) {   // 0..1 sine
+float wave(uint32_t now, uint32_t period) {
   return 0.5f + 0.5f * sinf((now % period) * 6.2831853f / period);
 }
 
@@ -29,7 +29,7 @@ void push(const uint32_t* c) {
   valid = true;
 }
 
-}  // namespace
+}
 
 void ringBegin(uint8_t pin, uint8_t brightness) {
   strip.setPin(pin);
@@ -73,7 +73,7 @@ void ringRender(const RingView& v, uint32_t now) {
         break;
       }
       case S_SOS:
-        fill((now / 125) % 2 ? RED : 0);   // 4 Hz
+        fill((now / 125) % 2 ? RED : 0);
         break;
       case S_NEAR_SOS:
         fill(dimColour(BLUE, 60 + (uint8_t)(195 * wave(now, 1000))));
@@ -95,7 +95,7 @@ void ringRender(const RingView& v, uint32_t now) {
         else for (int i = 0; i < v.fill && i < LEDS; i++) c[i] = v.pairColour;
         break;
       case S_FOUND_ME:
-        fill((now / 100) % 2 ? v.pairColour : 0);   // 5 Hz strobe reads through haze
+        fill((now / 100) % 2 ? v.pairColour : 0);
         break;
       default:
         break;

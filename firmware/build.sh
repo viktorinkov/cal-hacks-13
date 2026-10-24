@@ -1,18 +1,4 @@
 #!/usr/bin/env bash
-# BandIt build and flash with arduino-cli (esp32 core 3.x, library Adafruit NeoPixel).
-#
-#   ./build.sh ports                        connected boards with their MAC, role, id and firmware version
-#   ./build.sh compile [band|gateway|station|all]
-#   ./build.sh band <port> [id]             compile, upload, then set and save the id over serial
-#   ./build.sh gateway <port>
-#   ./build.sh station <port> [101..105]
-#   ./build.sh all-bands                    the same band binary to every connected board that is not a
-#                                           gateway or station (ids and thresholds stay in NVS)
-#   ./build.sh monitor <port>
-#
-# The protocol header exists once, in bandit_common/, passed to the compiler with --library. Each build writes
-# bandit_common/bandit_version.h: the git hash, plus the build time when the tree has uncommitted changes.
-# If an upload fails: hold B, tap R, release B, run it again.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -92,5 +78,5 @@ case "$cmd" in
   monitor)
     arduino-cli monitor -p "${2:?usage: ./build.sh monitor <port>}" -c baudrate=115200 ;;
   *)
-    sed -n '2,15p' "$0"; exit 1 ;;
+    echo "usage: ./build.sh ports | compile [band|gateway|station|all] | band <port> [id] | gateway <port> | station <port> [id] | all-bands | monitor <port>"; exit 1 ;;
 esac

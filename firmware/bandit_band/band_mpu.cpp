@@ -22,7 +22,7 @@ bool readRegs(uint8_t reg, uint8_t* out, uint8_t n) {
   return true;
 }
 
-}  // namespace
+}
 
 bool mpuBegin(uint8_t sda, uint8_t scl, uint8_t* whoami) {
   if (!Wire.begin(sda, scl, 400000)) return false;
@@ -33,14 +33,14 @@ bool mpuBegin(uint8_t sda, uint8_t scl, uint8_t* whoami) {
     return false;
   }
   uint8_t who = 0;
-  readRegs(0x75, &who, 1);   // 0x68 on an MPU-6050; clones (MPU-6500) answer 0x70 with the same registers
+  readRegs(0x75, &who, 1);
   if (whoami) *whoami = who;
-  writeReg(0x6B, 0x80);      // reset
+  writeReg(0x6B, 0x80);
   delay(50);
-  writeReg(0x6B, 0x00);      // wake, internal oscillator
-  writeReg(0x6C, 0x07);      // gyro in standby: only the accelerometer is used (saves about 3 mA)
-  writeReg(0x1C, 0x10);      // accel +/- 8 g, 4096 LSB/g
-  writeReg(0x1A, 0x03);      // DLPF about 44 Hz
+  writeReg(0x6B, 0x00);
+  writeReg(0x6C, 0x07);
+  writeReg(0x1C, 0x10);
+  writeReg(0x1A, 0x03);
   return true;
 }
 
@@ -55,7 +55,7 @@ bool mpuReadG(float& g) {
 }
 
 bool FallDetector::service(uint32_t now, float impactG, float tolG, uint16_t stillMs, uint16_t windowMs) {
-  if (now - lastRead_ < 20) return false;   // 50 Hz
+  if (now - lastRead_ < 20) return false;
   lastRead_ = now;
   float a;
   if (!mpuReadG(a)) return false;
