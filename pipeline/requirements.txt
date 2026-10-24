@@ -3,3 +3,4 @@ requests
 Pillow
 pillow-heif
 opencv-python
+playwright
