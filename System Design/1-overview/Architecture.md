@@ -24,7 +24,7 @@ Every connection in the system. Names match the component docs.
 | Gateway | Band, station marker | commands (`state`, `exit`, `clear`, `buzz`, `thresh`, `rssi`, `override`) | ESP-NOW broadcast, each sent 3 times |
 | Gateway | `bandit-bridge` | one JSON line per packet heard; command lines back | USB serial, 115200 baud |
 | `bandit-bridge` | `band1t` module | `ingest_band_reports` every 250 ms; subscriptions to `band_directive`, `band_command`, `fleet_config` | SpacetimeDB Rust client SDK (WebSocket) |
-| Simulator.md: the `bandit-claims` command-line tool and `bandit-api`'s dev routes | `band1t` module | reports for the 10 simulated bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
+| Test-Bands.md: the `bandit-claims` command-line tool and `bandit-api`'s dev routes | `band1t` module | reports for the 10 test bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
 | Ops dashboard, Attendee app | `band1t` module | reducer calls; subscriptions to their slice | SpacetimeDB TypeScript client SDK (WebSocket) |
 | Ops dashboard, Attendee app | SpacetimeAuth | the magic-link email sign-in; an ID token that SpacetimeDB checks on connect | HTTPS, OpenID Connect |
 | Ops dashboard, Attendee app | `bandit-api` | the app files, uploads and downloads, and the feature endpoints listed in [Rust-Backend](../3-services/Rust-Backend.md) | HTTPS, same origin |
@@ -101,7 +101,7 @@ flowchart LR
   end
   subgraph Laptop["Venue laptop"]
     Bridge["bandit-bridge"]
-    Sim["bandit-claims (Simulator.md)"]
+    Sim["bandit-claims (Test-Bands.md)"]
   end
   STDB[("band1t module on SpacetimeDB")]
   subgraph Apps["Browsers"]
@@ -126,7 +126,7 @@ flowchart LR
   Bands <-->|"beacons up, commands down"| Gateway
   Gateway <-->|"USB serial lines"| Bridge
   Bridge <-->|"reports up, directives down"| STDB
-  Sim -->|"simulated band reports"| STDB
+  Sim -->|"test band reports"| STDB
   Ops <-->|"subscriptions, ops reducers"| STDB
   App <-->|"subscriptions, attendee reducers"| STDB
   Ops -->|"app files"| API
@@ -158,7 +158,7 @@ flowchart LR
   class Elastic,Claude,Nessie,Bright,Auth ext
 ```
 
-Vision.md (TBD -- LEO): the Vision service is left out of this picture. Leo's default is a Rust process, `bandit-vision`, on the venue laptop. It pulls snapshots from one overhead phone camera over the pit, runs person and pose detection locally for head counts and person-down alerts, asks Claude to assess an event only after a band or the detector flags it, and writes the results through the reducers in [Vision](../4-devices/Vision.md). Identity always comes from the bands, never from faces.
+Vision.md (TBD -- LEO): the cameras are left out of this picture. Leo's security view runs on the venue laptop beside the bridge. It records the gateway, finds a calling band's 4 Hz red flash on the security camera, and shows the security room where the person is, from local files and without the module. `bandit-vision`, which would send the module head counts, person-down alerts, incident assessments and photo features through the reducers in [Vision](../4-devices/Vision.md), is Leo's to build. Identity always comes from the bands, never from faces.
 
 ### The live loop in one picture
 
@@ -194,14 +194,14 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 |---|---|---|---|
 | Venue layout: zones, exits, stations, booths, schedule | `band1t` module | the setup reducers from the seed (`bandit-ingest` seed mode), ops; BrightData.md: `import_event` | none; Elastic.md: `bandit-booths` |
 | Bands, attendees, consent, staff roles | `band1t` module | attendee app, ops, the owner (role grants) | none |
-| Live band reports, zone state, directives, commands | `band1t` module | `bandit-bridge`, `venue_tick`; Simulator.md: `report_sim_band` from the `bandit-claims` tool and `bandit-api` | none |
+| Live band reports, zone state, directives, commands | `band1t` module | `bandit-bridge`, `venue_tick`; Test-Bands.md: `report_sim_band` from the `bandit-claims` tool and `bandit-api` | none |
 | Incidents, snapshots, witnesses, notes | `band1t` module | `ingest_band_reports`, ops, medics | none |
-| (TBD -- LEO) Presence history | `band1t` module (`presence_sample`) | `memory_tick` | none; Social.md: derives `visit` from it and writes `social_encounter` by the encounter rule (TBD -- LEO); Elastic.md copies both, for findable attendees only, to `bandit-memories` |
-| Zone history | `band1t` module (`zone_sample`) | `memory_tick` | none |
+| (TBD -- LEO) Presence history | `band1t` module (`band_presence`) | `memory_tick` | none; Social.md: derives `visit` from it and writes `social_encounter` by the encounter rule (TBD -- LEO); Elastic.md copies both, for findable attendees only, to `bandit-memories` |
+| Zone history | `band1t` module (`zone_history`) | `memory_tick` | none |
 | Social.md: the people graph | `band1t` module (`people_link`) | the social step of `memory_tick`; `exhibits` links from the import | none; Elastic.md: `bandit-people` holds each findable attendee's interests, never the links |
 | Medical-ID.md, Insurance.md: medical card (with the attendee's own health insurance), the venue's insurance policy | `band1t` module, private tables | attendee app, workers | never copied |
 | Payments-Nessie.md, Insurance.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Nessie ids | Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used only to rank similar past claims |
-| Files: photos, PDFs, letters | the blob store, a folder on the Fly volume | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
+| Files: photos, PDFs, letters | the blob store, a folder in `/var/lib/bandit` on the Vultr VM | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
 | Raw radio log | `.jsonl` files on the laptop | `bandit-bridge` | stay on the laptop; used for calibration and replay |
 | BrightData.md: raw fetch snapshots | versioned files kept with the project | `bandit-ingest` | loaded into the module through `import_event` |
 | Anthropic-Agent.md: model calls | `model_call` rows plus response blobs | `bandit-workers`, `bandit-ingest`; Vision.md (TBD -- LEO): `bandit-vision` | used for audit |
@@ -219,7 +219,7 @@ What only SpacetimeDB does here:
 | Push to every client on commit | the Ops map, the medic's incident desk, the attendee app and the bridge subscribe to queries and receive each change, with a local cache to render from | an SOS reaches the medic without polling, and the bridge reads its directives from the cache |
 | Timers inside the database | scheduled reducers: `venue_tick` turns band reports into zone state and exit colours; `memory_tick` turns presence into history | the derived safety state is computed where the data lives, on a fixed cadence |
 | Identity and access next to the data | claiming a band by pressing it binds the band to the signed-in identity, which SpacetimeDB derives from the SpacetimeAuth ID token; reducers check `staff_role`; views return only the caller's rows (`staff_incidents` for staff; the caller's own band and consent for attendees) | access is enforced once, in the database, for every client, so an app bug cannot widen it |
-| (TBD -- LEO) The space-time mapping | `presence_sample`, written by `memory_tick`: which band was in which zone, and when | it is the filter other questions start from (Social.md: visits and encounters; Elastic.md: the recap candidates it orders) |
+| (TBD -- LEO) The space-time mapping | `band_presence`, written by `memory_tick`: which band was in which zone, and when | it is the filter other questions start from (Social.md: visits and encounters; Elastic.md: the recap candidates it orders) |
 | One schema, typed clients, one hosted database | `spacetime generate` gives the Rust services and both TypeScript apps the same types; Maincloud hosts the module, so bands (through the bridge), phones, staff and services all reach the same database | six kinds of clients stay in step with one schema, and no server of ours sits on the live path |
 
 Elastic.md: BandIt uses a second database because it has a second, different problem. Elastic solves meaning: messy scraped text before the import, and the order of an attendee's recap by what they were into, plus the analysis of it in Kibana. SpacetimeDB decides who and what is on the list (exact, private, live); Elastic decides the order by meaning (and organizes the scraped data, and finds claim precedents). Neither database does the other's job, and they meet in exactly three places, plus a fourth for Insurance.md's claim precedents, shown in the diagram after this table. Live state never lives in Elastic. What only Elastic does here:
@@ -262,18 +262,18 @@ The line is drawn by the question: exact, live or transactional questions go to 
 |---|---|---|
 | Every write: claims, incidents, payments, consent, imports | SpacetimeDB reducers | one transactional write path, so every screen sees the same committed state |
 | Live state: band reports, zone state, directives, incidents | SpacetimeDB tables and subscriptions | pushed to every client the instant a transaction commits; nothing polls |
-| (TBD -- LEO) Who was in which zone, and when | SpacetimeDB (`presence_sample`) | derived by `memory_tick` from raw reports; the filter every other question starts from |
+| (TBD -- LEO) Who was in which zone, and when | SpacetimeDB (`band_presence`) | derived by `memory_tick` from raw reports; the filter every other question starts from |
 | Plain lists: my visits, the people I hung out with, my photos by zone and time, a booth by id or name | SpacetimeDB views | exact rows, already scoped to the caller by the view; no ranking needed |
 | People and the links between them: who owns which band, who hung out with whom, whose socials a person may see | SpacetimeDB tables and views | exact rows that reducers write and views read by key under consent; Elastic only ever orders a findable copy |
 | Consent and access: who may see a card, a tag, a memory | SpacetimeDB views and reducers | enforced by the database on every read; an app or index bug cannot widen it |
 | Elastic.md: organizing scraped data before the import | Elastic (raw indices, fixed `LOOKUP JOIN` steps, the organizer agent, `bandit-bundles`) | exact joins and fuzzy entity resolution across messy sources are search work; the result is still loaded by a reducer |
 | Elastic.md: "of the people I hung out with, who is most into the same things as me" | Elastic (`bandit-people`, `bandit-booths`) through `GET /recap/order` | ordering by meaning over candidates SpacetimeDB listed; there is no typed search |
 | Elastic.md, Insurance.md: "which past claims look like this one" | Elastic (`bandit-claims`) | ranking by meaning over a de-identified copy against 30 seeded past claims; the ids and scores come back as checks through a reducer and never change an amount |
-| Files: photos, PDFs, letters | the blob store on the Fly volume, with a `blob_ref` row | big bytes stay out of rows and subscriptions; the access class is still decided in the module |
+| Files: photos, PDFs, letters | the blob store in `/var/lib/bandit`, with a `blob_ref` row | big bytes stay out of rows and subscriptions; the access class is still decided in the module |
 
 ### Deployment
 
-Where each process runs, and how it reaches the database. There is one deployment. External services are left out of the picture: the Fly.io services and `bandit-ingest` call them over HTTPS.
+Where each process runs, and how it reaches the database. There is one deployment. External services are left out of the picture: the services on the VM and `bandit-ingest` call them over HTTPS.
 
 ```mermaid
 flowchart TB
@@ -285,13 +285,13 @@ flowchart TB
   end
   subgraph Laptop["Venue laptop, online through a team phone's hotspot"]
     Bridge["bandit-bridge"]
-    Sim["bandit-claims (Simulator.md)"]
+    Sim["bandit-claims (Test-Bands.md)"]
     Ingest["bandit-ingest, before the event"]
     OpsUI["Ops dashboard in a browser"]
   end
-  subgraph Fly["Fly.io Machine, always on"]
-    Svc["bandit-api, bandit-workers, bandit-indexer"]
-    Vol[("Fly volume: blobs")]
+  subgraph VM["Vultr VM, always on: band1t.vip"]
+    Svc["Caddy, then bandit-api, bandit-workers, bandit-indexer as systemd services"]
+    Vol[("/var/lib/bandit: identities, blobs, records")]
   end
   Maincloud[("SpacetimeDB Maincloud: band1t")]
 
@@ -318,10 +318,10 @@ flowchart TB
   class Phones,OpsUI web
 ```
 
-- The `band1t` database runs on SpacetimeDB Maincloud only. There is no standalone copy and no second host, so there is never a second source of truth.
-- `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Fly.io Machine. `bandit-api` serves both web apps as static files from its public HTTPS host, which is the host written into the NFC tags, so judges use their own phones. Blobs are files on a Fly volume attached to that Machine ([Rust-Backend](../3-services/Rust-Backend.md)).
+- The `band1t` module runs on SpacetimeDB Maincloud only, as the database `bandit-calhacks13-sp82j`. There is no standalone copy and no second host, so there is never a second source of truth.
+- `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Debian VM on Vultr, as systemd services that restart on failure. Caddy on the VM serves HTTPS for band1t.vip and passes each request to `bandit-api`. `bandit-api` serves both web apps as static files from band1t.vip, which is the host written into the NFC tags, so judges use their own phones. The three services share the data folder `/var/lib/bandit`: the service identities, the blob store and the rendered records ([Rust-Backend](../3-services/Rust-Backend.md)).
 - The venue laptop runs only what needs the room: `bandit-bridge` on the gateway's USB cable and the Ops dashboard in a browser. `bandit-ingest` runs on it once before the event.
-- Simulator.md: the `bandit-claims` command-line tool runs on the venue laptop.
+- Test-Bands.md: the `bandit-claims` command-line tool runs on the venue laptop.
 - Vision.md (TBD -- LEO): `bandit-vision` runs on the venue laptop.
 - The laptop gets internet from a team phone's hotspot, so venue Wi-Fi is not on the critical path.
 
@@ -329,10 +329,10 @@ flowchart TB
 
 | Identifier | Format | Assigned by | Used by |
 |---|---|---|---|
-| Band id | one byte, as on the radio: 1 to 9 for real bands; Simulator.md: 10 to 89 for the crowd bands, 90 to 99 for the simulated bands | firmware flag; Simulator.md: `start_crowd` and the simulated id range | radio, bridge, module, dashboard |
+| Band id | one byte, as on the radio: 1 to 9 for real bands; Test-Bands.md: 10 to 89 for the crowd bands, 90 to 99 for the test bands | firmware flag; Test-Bands.md: `start_crowd` and the test band id range | radio, bridge, module, dashboard |
 | Station id | 101 to 105; exit colour index defaults to id minus 100 | firmware flag | radio, zone selection, exit guidance |
 | Gateway id | 200 | firmware | radio |
-| NFC token | `BANDIT-01` to `BANDIT-09` in the URL `https://<host>/t/BANDIT-0n`, where `<host>` is `bandit-api`'s public host | written to each sticker | attendee app landing |
+| NFC token | `BANDIT-01` to `BANDIT-09` in the URL `https://band1t.vip/t/BANDIT-0n`, on `bandit-api`'s public host | written to each sticker | attendee app landing |
 | Attendee id | SpacetimeDB identity derived from the SpacetimeAuth ID token (issuer and subject), the same on every device | SpacetimeDB | every per-person table and view |
 | Service identity | one SpacetimeDB identity per Rust process, with a `staff_role` row | the owner at setup | role checks in reducers |
 | Row ids | auto-increment ids assigned by the module | SpacetimeDB | every other table, Elastic document ids, job payloads |
@@ -356,7 +356,7 @@ Social.md: one more people role, `photographer`, uploads booth photos.
 | Insurance.md: Hyphenate, autonomous systems for finance | a claims agent that learns from the organizer: a band's fall becomes a claim; Claude reads the urgent-care bill and code pays it against a fee schedule; Claude explains causation; the organizer approves the first claim after the event, which teaches a rule, and the next similar claim settles in seconds under it; fakes are refused by code with every check listed. Behind it: evidence packs, coverage in code, fail-closed approvals, a ledger, the notice of loss in ACORD 3 layout and a scorecard from planted claims | [Insurance](../6-features/Insurance.md) |
 | Payments-Nessie.md: Capital One, best use of Nessie | a $200 Nessie sandbox wallet per attendee, merch bought from it with one tap after the event, and claim payouts into it | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | Merch.md: Visa, reimagining shopping | merch made from your own photo at the booths you loved, bought from your recap after the event | [Merch](../6-features/Merch.md) |
-| Social impact and real-world tracks | preventive crowd-crush guidance with exit colours and vibration, the SOS light circle, low visibility; Medical-ID.md: medic access to the card from the incident desk | [Safety](../6-features/Safety.md), [Hardware](../4-devices/Hardware.md); Medical-ID.md |
+| Social impact and real-world tracks | preventive crowd-crush guidance with exit colours and vibration, the SOS light circle, low visibility; Medical-ID.md: medic access to the card from a tap on the band or from the incident desk | [Safety](../6-features/Safety.md), [Hardware](../4-devices/Hardware.md); Medical-ID.md |
 | (TBD -- LEO) Social impact, the medic approach | dispersion around a medic | [Safety](../6-features/Safety.md) |
 
 ## Failure modes and fallbacks
@@ -388,7 +388,7 @@ The failures that can happen during the event, and the one answer to each. The f
 | The `band1t` database runs on Maincloud only, and the venue laptop gets internet from a team phone's hotspot | one deployment means one source of truth, one set of identities and no switch-over during the event; venue Wi-Fi is off the critical path |
 | BrightData.md: the import works for any event, from the start URLs in its seed; Cal Hacks 13.0 is the first event it runs at | the product must work at any venue, and the judges are at Cal Hacks 13.0, so the booths, schedule and organisations on screen are ones they can check against the room |
 | Judges use their own phones; `bandit-api` serves both web apps from its public HTTPS host, which the NFC tags hold | one host in the tags, and the app files, uploads and API calls share one origin |
-| `bandit-api`, `bandit-workers` and `bandit-indexer` run on one Fly.io Machine; the laptop runs only the bridge, the `bandit-claims` tool, `bandit-ingest` and the Ops dashboard | the laptop holds what needs the gateway's cable or the team's hands; the services keep running when the laptop sleeps |
+| `bandit-api`, `bandit-workers` and `bandit-indexer` run on one Vultr VM; the laptop runs only the bridge, the `bandit-claims` tool, `bandit-ingest` and the Ops dashboard | the laptop holds what needs the gateway's cable or the team's hands; the services keep running when the laptop sleeps |
 | Social.md: people and the links between them live in SpacetimeDB tables; no graph database, separate Postgres or Kibana Graph | every link is an exact fact from a visit, an encounter row or the import, written in the same transaction as its visit or encounter, pushed live and filtered per caller by views; a graph of hundreds of nodes needs only one or two hops of indexed lookups; Kibana Graph is unavailable on Serverless and discovers implicit links, which the visit and encounter rows already record. Elastic.md: Elastic only orders the recap's suggestions |
 | Payments-Nessie.md: nobody pays at the venue; Nessie settles only the merch bought in the app after the event and the claim payouts | the band press stays for claiming a band, and the money moments judges see at the event are the merch checkout and the insurance payout |
 | Full bands vibrate through `buzz` alongside the route colour whenever the module guides people | the ring has no compass, so colour plus vibration is how a band points its wearer to its exit |

@@ -2,7 +2,7 @@
 
 Insurance is BandIt's incident-to-claim workflow, built for Hyphenate's "autonomous systems for finance" track. It turns a resolved safety incident into a hashed evidence pack, reads the urgent-care bill into service lines and prices each line against a fee schedule, asks Claude whether the injury follows from the incident, decides in code whether the venue's insurance covers it and for how much, and then takes one of three routes: settle it automatically under a rule the organizer approved earlier, wait for the organizer, or refuse it in code and show every check. Money moves on a double-entry ledger and lands in the attendee's Nessie wallet. One pattern runs through all of it: code checks the facts and computes every amount, the model reads and explains, the organizer decides every claim that no learned rule settles, and each approval becomes a rule that settles the next claim of that shape without anyone.
 
-In finance terms: the reserve is a general-ledger entry, the insurer receivable is order-to-cash, the bill review and the claimant payment are procure-to-pay, and the reconciliation closes the receivable when the insurer pays. Two staff roles take part. During the event the medic (role `medic`) is the paramedic: they take the incident, note the cost and resolve it, which opens the claim. After the event the organizer (role `ops`) decides every claim that no learned rule settled. Simulator.md: in the scripted claims run, judges see the system learn: the organizer's approval of the first claim creates a rule, and the next similar claim settles in seconds under it.
+In finance terms: the reserve is a general-ledger entry, the insurer receivable is order-to-cash, the bill review and the claimant payment are procure-to-pay, and the reconciliation closes the receivable when the insurer pays. Two staff roles take part. During the event the medic (role `medic`) is the paramedic: they take the incident, note the cost and resolve it, which opens the claim. After the event the organizer (role `ops`) decides every claim that no learned rule settled. Test-Bands.md: in the scripted claims run, judges see the system learn: the organizer's approval of the first claim creates a rule, and the next similar claim settles in seconds under it.
 
 ## Role in the system
 
@@ -21,7 +21,7 @@ Responsibilities:
 - Draft the first notice of loss in the layout of ACORD 3, the claim summary and recovery letters through `bandit-workers` jobs.
 - Own `claimant_account`, each attendee's one Nessie account, where claim payouts land.
 - Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](../7-integrations/Payments-Nessie.md); the wallet is the same `claimant_account`, which it opens when the attendee connects it in setup.
-- Simulator.md: score the accuracy run of planted claims on the Claims queue.
+- Test-Bands.md: score the accuracy run of planted claims on the Claims queue.
 - Elastic.md: send a de-identified copy of each claim to Elastic and record its similar past claims as checks.
 
 Non-responsibilities:
@@ -32,7 +32,7 @@ Non-responsibilities:
 - Raw bridge logs: they stay on the venue laptop and are never evidence. The pack reads the `incident_snapshot` frozen in the same transaction as the incident ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
 - Calling banks: [Payments-Nessie](../7-integrations/Payments-Nessie.md). Insurance enqueues the `claim_payout` job and records the result with `record_claim_payout`.
 - Prompts, model choice, recording and replay: [Anthropic-Agent](../7-integrations/Anthropic-Agent.md).
-- Planting claims: [Simulator](../3-services/Simulator.md). Insurance's decision code never reads which claims were planted or why.
+- Planting claims: [Test-Bands](../3-services/Test-Bands.md). Insurance's decision code never reads which claims were planted or why.
 - Screens: the Claims queue panel and the incident card controls are in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
 
 ## Interfaces
@@ -41,7 +41,7 @@ Non-responsibilities:
 |---|---|---|---|---|
 | Hook in `resolve_incident` | in | `band1t` module (Safety.md) | incident id; writes the subject's `injured_party` row for a `sos` or `fall`, then opens a claim for every injured party with a first-aid cost or a bill, or for a `property` incident with a cost note | same transaction, module-internal call to the `open_claim` logic |
 | `add_injured_party` | in | the assigned `medic`, `ops` | open incident id, a band picked from the snapshot's bands present, first-aid cost in cents | reducer; writes `injured_party` |
-| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Simulator.md: the `bandit-claims` tool for incidents on simulated bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Test-Bands.md: the `bandit-claims` tool for incidents on test bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | `submit_medical_record` | in | the incident card as the signed-in staff member (roles `medic`, `ops`) | incident id, injured party id, the file's SHA-256 (its registered `blob_ref`), page count; the caller is the uploader | reducer; writes `medical_record`, rejects an identical file, enqueues `claim_record_extract`, opens the claim when the incident is already resolved |
 | `apply_medical_record` | in | role `worker` | job id, bill id, validated header and lines, `model_call` id | reducer; rejects a stale lease; prices the lines and runs the duplicate check |
 | `enter_claim_lines` | in | `ops` | bill id, header and lines typed from the PDF | reducer; same pricing and duplicate check |
@@ -58,7 +58,7 @@ Non-responsibilities:
 | Payments-Nessie.md: `record_claim_payout` | in | role `worker` | job id, the Nessie customer, account and deposit ids | reducer; posts J3, settles the claim and adds the wallet's `payout` entry; rejects a stale lease |
 | Jobs `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | out | `bandit-workers` | payloads named below; results through the reducers above | `job` table, `claim_job` and `complete_job` |
 | Payments-Nessie.md: job `claim_payout` | out | `bandit-workers` | claim id, claimant, name, the wallet's customer and account ids (empty when the claimant has none), amount in cents, memo | `job` table |
-| Claims queue, ledger, rules and scorecard | out | Ops dashboard (roles above) | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `ledger_entry`, `settlement_rule`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | SpacetimeDB subscription |
+| Claims queue, ledger, rules and scorecard | out | Ops dashboard (roles above) | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `ledger_entry`, `settlement_rule`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | SpacetimeDB subscription |
 | Vision.md (TBD -- LEO): `vision_assessment`, `camera`, `property_event` rows | in | `bandit-vision` | per-incident judgment (confirmed, confidence, description, frame blob refs, `model_call` id), the camera's zone, property events | tables read by `open_claim` |
 | Letters | out | Ops dashboard | the notice, summary and recovery letters as blobs | `bandit-api` blob download for a staff `api_session`; letter blobs carry access class `staff` |
 | Elastic.md: Kibana dashboard "BandIt claims evidence" | out | the team, in Kibana | counts and charts over the de-identified claim copies: claims tonight, evidence failing validation, payouts, outcomes by zone and incident kind, and the validation errors | read only on `bandit-claims` |
@@ -87,7 +87,7 @@ A claim opens from an incident, never from a form: one claim per injured person 
 
 Claude reads the bill; code decides every amount. The urgent-care bill is a PDF. At the event it is a synthetic one.
 
-Upload. "Attach bill" on the incident card sends the PDF to `POST /api/blobs` with purpose `medical`. `bandit-api` takes a PDF of at most 10 MB, stores it in the blob store under its SHA-256, registers it with `register_blob` and access class `staff`, counts the pages and returns the hash and the page count. The card then calls `submit_medical_record` with them as the signed-in staff member. The reducer accepts `medic` and `ops` (Simulator.md: the `bandit-claims` tool files planted bills as its `medic` test identity), refuses a hash that is not a registered `blob_ref`, and writes a `medical_record` row in status `uploaded`. A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
+Upload. "Attach bill" on the incident card sends the PDF to `POST /api/blobs` with purpose `medical`. `bandit-api` takes a PDF of at most 10 MB, stores it in the blob store under its SHA-256, registers it with `register_blob` and access class `staff`, counts the pages and returns the hash and the page count. The card then calls `submit_medical_record` with them as the signed-in staff member. The reducer accepts `medic` and `ops` (Test-Bands.md: the `bandit-claims` tool files planted bills as its `medic` test identity), refuses a hash that is not a registered `blob_ref`, and writes a `medical_record` row in status `uploaded`. A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
 
 Extraction. The worker sends the PDF to Claude as a document block with a JSON schema ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). Claude returns the header (provider name, provider NPI, invoice number, patient name and service date as printed, billed total, the visit reason as printed) and one line per service (code as printed, description, units, billed amount, page). Claude never sees the fee schedule and returns no paid amounts. Code validates before `apply_medical_record` accepts the record: the lines sum to the billed total, every amount is a positive whole number of cents, every line cites a page within the page count, and the NPI passes its check digit. A bill that fails validation twice is `failed`, and its claim waits for the organizer, who types the lines from the PDF with `enter_claim_lines`. Typed lines go through the same pricing and the same duplicate check.
 
@@ -368,7 +368,7 @@ Anthropic-Agent.md: without it, `claim_draft` and `recovery_letter` fill a fixed
 
 When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount into the claimant's Nessie wallet, where it shows in the attendee's recap, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`. When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; a staff member with `ops` calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
 
-A claimant with no wallet gets one at payout time: the job carries an empty customer and account, the worker opens a Nessie customer and an account with 0, and `record_claim_payout` stores it as their `claimant_account` with the `payout` entry and no $200 opening. Simulator.md: the test attendees that the `bandit-claims` tool sets up connect their wallet right after `update_profile`, so their payouts land in a $200 wallet, like a judge's.
+A claimant with no wallet gets one at payout time: the job carries an empty customer and account, the worker opens a Nessie customer and an account with 0, and `record_claim_payout` stores it as their `claimant_account` with the `payout` entry and no $200 opening. Test-Bands.md: the test attendees that the `bandit-claims` tool sets up connect their wallet right after `update_profile`, so their payouts land in a $200 wallet, like a judge's.
 
 A `property` claim pays the venue's repair vendor, who has no Nessie account in BandIt, so J3 posts ledger-only at once, with reference `vendor`, and the claim moves to `settled`. The ledger and letters are the same either way; only the cash leg differs.
 
@@ -412,15 +412,15 @@ sequenceDiagram
   W->>M: record_claim_payout, J3, settled
 ```
 
-### Simulator.md: the scripted claims run
+### Test-Bands.md: the scripted claims run
 
-The `bandit-claims` tool's `story` command ([Simulator](../3-services/Simulator.md)) runs the whole claims flow on the simulated bands after the event, with the Claims tab on the big screen. It runs before the organizer decides the real claims from the event, so it starts with no rule. The tool plays every person and device: the simulated bands, the medic (role `medic`), the organizer (the `ops` identity labelled "Ops desk"), the vision stub and the insurer's payment. `bandit-workers` runs the Claude, Elastic and Nessie jobs beside it. Four simulated attendees wear bands 90 to 93: Jordan Alvarez (90), Maya Chen (91), a third attendee (92) and Lee Park (93). Bands 94 to 99 form the light circles.
+The `bandit-claims` tool's `story` command ([Test-Bands](../3-services/Test-Bands.md)) runs the whole claims flow on the test bands after the event, with the Claims tab on the big screen. It runs before the organizer decides the real claims from the event, so it starts with no rule. The tool plays every person and device: the test bands, the medic (role `medic`), the organizer (the `ops` identity labelled "Ops desk"), the vision stub and the insurer's payment. `bandit-workers` runs the Claude, Elastic and Nessie jobs beside it. Four test attendees wear bands 90 to 93: Jordan Alvarez (90), Maya Chen (91), a third attendee (92) and Lee Park (93). Bands 94 to 99 form the light circles.
 
 Already on the screen when it starts:
 
 - The Claims tab shows the accuracy-run scorecard and the stress-test results (below), run before doors open under the accuracy-run policy. The ledger shows their journals, including J1r refusals after reserve and one J4 where the insurer paid $10 less than the receivable.
 - No settlement rule exists under the event policy. The real claims from the event wait in "Waiting for your decision".
-- No simulated attendee holds a staff role, so the staff check passes.
+- No test attendee holds a staff role, so the staff check passes.
 
 The question this diagram answers: what happens, in which component, from Jordan's fall to Maya's claim settling under the rule the organizer's approval created.
 
@@ -465,7 +465,7 @@ Step by step (the story's own numbers):
 
 ### Edge cases
 
-Simulator.md: the scripted claims run shows three of them; the stress test and the accuracy run's fakes show the other two before doors open, and the Claims tab keeps their results.
+Test-Bands.md: the scripted claims run shows three of them; the stress test and the accuracy run's fakes show the other two before doors open, and the Claims tab keeps their results.
 
 | Case | What judges see | Guardrail |
 |---|---|---|
@@ -475,9 +475,9 @@ Simulator.md: the scripted claims run shows three of them; the stress test and t
 | The same bill is filed again | Stress test and accuracy run: the bill is marked `duplicate` and pays nothing, so the claim is refused as `zero_payout`; the checks name the earlier claim | the duplicate check across all claims, in code |
 | The injured person is venue staff | Stress test and accuracy run: refused as `claimant_not_staff`: medical payments excludes the venue's own employees, and workers' compensation applies | the staff check in code, on the injured person's `staff_role` rows |
 
-### Simulator.md: accuracy run and scorecard
+### Test-Bands.md: accuracy run and scorecard
 
-The `bandit-claims` command-line tool ([Simulator](../3-services/Simulator.md)) plants claims through the same reducers a real medic uses, and Insurance's decision code never reads which ones were planted. Before doors open its `scorecard` command runs three rounds under the accuracy-run policy. Each round plants 2 genuine falls and 4 fakes, one of each kind (starting values):
+The `bandit-claims` command-line tool ([Test-Bands](../3-services/Test-Bands.md)) plants claims through the same reducers a real medic uses, and Insurance's decision code never reads which ones were planted. Before doors open its `scorecard` command runs three rounds under the accuracy-run policy. Each round plants 2 genuine falls and 4 fakes, one of each kind (starting values):
 
 | Planted type | How it is planted | What should stop it |
 |---|---|---|
@@ -590,7 +590,7 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 - Payments-Nessie.md: the `claim_payout` work in `bandit-workers`, which fills this file's `claimant_account`, and the wallet's `wallet_entry`. Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
 - Anthropic-Agent.md: `claude-client`, `model_call`, the prompts for `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`. Without it, bill lines are typed with `enter_claim_lines`, every injury claim's causation is `none` and goes to a person, and letters are templates.
 - Vision.md (TBD -- LEO): `vision_assessment`, `camera` zones, frame blobs and `property_event`. Without it, the medic note and witnesses are the second source, and property incidents come only from the staff button.
-- Simulator.md: planted claims for the accuracy run and the stress test, and the scripted claims run. Without it, there is no scorecard and no scripted claims run: claims come only from real incidents, worked by the medic during the event and decided by the organizer after it.
+- Test-Bands.md: planted claims for the accuracy run and the stress test, and the scripted claims run. Without it, there is no scorecard and no scripted claims run: claims come only from real incidents, worked by the medic during the event and decided by the organizer after it.
 - Elastic.md: `bandit-claims`, `bandit-claims-validate` and the 30 seeded past claims. Without it, claims carry no precedent checks and decide exactly the same.
 
 **Used by**
@@ -598,7 +598,7 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Claims queue (Insurance.md)" panel row, the incident card controls and the Report property damage button.
 - [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): the accuracy run before doors open (step 0c), steps 9 to 9b and the finance track row.
 - [Payments-Nessie](../7-integrations/Payments-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes when the attendee connects the wallet.
-- [Simulator](../3-services/Simulator.md): `plant_medic_visit` feeds this file's claims.
+- [Test-Bands](../3-services/Test-Bands.md): `plant_medic_visit` feeds this file's claims.
 - [Elastic](../7-integrations/Elastic.md): `bandit-claims` holds this file's de-identified claim copies.
 
 **If you delete this file**
@@ -608,7 +608,7 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 - Remove the Insurance hook bullet from `resolve_incident` in Safety.md and SpacetimeDB.md, the Insurance.md rows in SpacetimeDB.md's registry and roles tables, and the policy, coverage and fee schedule files from the seed.
 - Remove the Insurance.md rows in Ops-Dashboard.md: the Claims queue with its scorecard, the incident card controls, the Report property damage button, their interface and subscription rows, "Waiting for your decision" and the decision on it. Staff can still open a `property` incident with the core Open incident control.
 - Remove the Insurance.md lines in Payments-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
-- Remove the Insurance use cases from Anthropic-Agent.md, and the Insurance.md parts of Simulator.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
+- Remove the Insurance use cases from Anthropic-Agent.md, and the Insurance.md parts of Test-Bands.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
 - Remove the Insurance.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
 - Remove the Insurance.md rows from the handler and endpoint registries in Rust-Backend.md, the Insurance.md rows in Flows.md (the organizer, step 0c, steps 9 to 9b, their diagram index rows and the decision row), the prize row in Architecture.md, the Insurance consumer rows in Vision.md, F12 in Requirements.md, the two Insurance.md rows in Decisions.md, and the Insurance row and node in README.md.
 
@@ -619,8 +619,8 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 | Every claim that no learned rule settles goes to the organizer: `routed_to_role` `ops`, no named person, shown as "Organizer"; there are no approver roles and no approval by amount | one person decides money after the event and anyone with `ops` can act for them; the stale check and the learned rule guard the money, not a ladder of roles |
 | The organizer decides after the event; the module does not wait for `event_state.ended`, so a routed claim can be decided as soon as it is routed | during the event the medic works the incident and nobody else touches claims; the scripted claims run decides its claims at once |
 | The approval records the deciding person's `ops` label as `approver_name`, or "Organizer" for the module owner | the rule and every settlement under it name who approved it |
-| Simulator.md: the scripted claims run starts with no rule: the organizer's approval of Jordan's claim teaches rule v1, and Maya's similar fall settles under it | the system learning in front of the judges is the point of the track; a rule approved the day before only shows the second half |
-| Simulator.md: the stale approval is shown in the scripted claims run, with an amount from a screen a minute old | fail closed is the guardrail finance reviewers ask about first, and it costs one extra step |
+| Test-Bands.md: the scripted claims run starts with no rule: the organizer's approval of Jordan's claim teaches rule v1, and Maya's similar fall settles under it | the system learning in front of the judges is the point of the track; a rule approved the day before only shows the second half |
+| Test-Bands.md: the stale approval is shown in the scripted claims run, with an amount from a screen a minute old | fail closed is the guardrail finance reviewers ask about first, and it costs one extra step |
 | The accuracy run and the stress test run before doors open, under a copy of the policy whose period ends before doors open | their learned rules expire before the event, so the scripted claims run really starts with no rule, and the scorecard is ready on screen |
 | Claude reads the bill into lines; code validates the lines and prices them against a seeded fee schedule | the model is good at reading a bill and must never decide a payable; a cap per service code is the standard way a policy pays a "reasonable" charge |
 | The fee schedule caps are starting values set in the seed | the venue's insurer sets the real schedule; the scripted claims run needs one that cuts lines to their caps and excludes another |

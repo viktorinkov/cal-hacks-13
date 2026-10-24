@@ -1,6 +1,6 @@
 # Attendee app
 
-The attendee app is the web app that opens when a phone taps a band's NFC sticker. During the event it does one thing for the attendee: band setup at the first tap (sign in, claim the band by pressing its button, a short onboarding), then a thank-you screen. After the event the same page is the attendee's recap. The tag URL has no staff views: staff work in the [Ops dashboard](Ops-Dashboard.md). It runs in the phone browser, signs the attendee in with SpacetimeAuth, reads everything from the `band1t` module through SpacetimeDB's TypeScript client SDK, and calls `bandit-api` only for file uploads and the order of the recap's suggestions.
+The attendee app is the web app that opens when a phone taps a band's NFC sticker. During the event it does one thing for the attendee: band setup at the first tap (sign in, claim the band by pressing its button, a short onboarding), then a thank-you screen. After the event the same page is the attendee's recap. Staff work in the [Ops dashboard](Ops-Dashboard.md). It runs in the phone browser, signs the attendee in with SpacetimeAuth, reads everything from the `band1t` module through SpacetimeDB's TypeScript client SDK, and calls `bandit-api` only for file uploads and the order of the recap's suggestions.
 
 ## Role in the system
 
@@ -24,7 +24,7 @@ Not responsible for:
 
 | Interface | Direction | Between | What flows | Transport |
 |---|---|---|---|---|
-| NFC tag URL | in | phone OS to app | `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api` ([Rust-Backend](../3-services/Rust-Backend.md)); the token is the path | NDEF URL read by the OS, opened in the browser |
+| NFC tag URL | in | phone OS to app | `https://band1t.vip/t/BANDIT-0n`, on the one public HTTPS host of `bandit-api` ([Rust-Backend](../3-services/Rust-Backend.md)); the token is the path | NDEF URL read by the OS, opened in the browser |
 | Static bundle | in | `bandit-api` to browser | the app itself, served from the same origin as the upload and recap order endpoints, so no cross-origin setup is needed | HTTPS |
 | SpacetimeAuth sign-in | both | app and SpacetimeAuth | the magic-link email sign-in; an OpenID Connect ID token back | HTTPS, OpenID Connect |
 | SpacetimeDB connection | both | app and `band1t` module | the ID token, subscriptions, reducer calls | TypeScript client SDK over WebSocket |
@@ -32,9 +32,9 @@ Not responsible for:
 | Public rows | in | module to app | `event_state` (its `ended` flag turns the page into the recap); `venue`, `zone` and `booth` for the names on the recap | SDK subscription |
 | Reducers | out | app to module | `claim_band`, `update_profile` (display name), `set_consent`, `open_api_session` (once per page load, see Identity) | SDK reducer call |
 | Blob upload | out | app to `bandit-api` | files for features that need them through `POST /api/blobs`, with the API session token; `bandit-api` stores the file under its SHA-256, calls `register_blob` and returns the hash and the URL `/blobs/<sha256>` | HTTPS, endpoint in [Rust-Backend](../3-services/Rust-Backend.md) |
-| Medical-ID.md | both | app, module and `bandit-api` | the two document steps of setup, "Your medical history" and "Your health insurance": each PDF goes to `POST /api/blobs?purpose=history` or `purpose=insurance` with the API session token, then the app calls `submit_medical_document` with the kind, the hash and the page count; in test mode "Use the sample PDF" loads the synthetic PDF from `/samples`; the card step after "Are you one of these?", from `my_medical_documents` and `my_medical_card`, with "Looks right" calling `confirm_medical_card` | HTTPS and SDK |
+| Medical-ID.md | both | app, module and `bandit-api` | the two document steps of setup, "Your medical history" and "Your health insurance": each PDF goes to `POST /api/blobs?purpose=history` or `purpose=insurance` with the API session token, then the app calls `submit_medical_document` with the kind, the hash and the page count; in test mode "Use a test record" loads the synthetic PDF from `/samples`; the card step after "Are you one of these?", from `my_medical_documents` and `my_medical_card`, with "Looks right" calling `confirm_medical_card`; the medic view on a medic's tap, from `my_roles`, `open_incidents` and `medic_medical_cards`, calling `request_medical_card`, `assign_medic` and `medic_open_incident` | HTTPS and SDK |
 | Payments-Nessie.md | both | app and module | the wallet step after the card step, "Connect your Capital One wallet" with "Connect" and "Skip": "Connect" calls `connect_wallet`, the step shows "Connecting your Capital One wallet" until `my_wallet` has a row, then "Your wallet is connected" with the balance ($200 to start) and "Continue"; on the recap, the balance line from `my_wallet` ("$X in your BandIt wallet · Capital One account" and the first 8 characters of the account id, or "Connect your Capital One wallet at band setup to buy merch." without a wallet) and the "Wallet activity" table from `my_wallet_entries`, among them each claim payout | SDK |
-| Social.md | both | app and module | the setup socials step: the attendee types their Instagram, Facebook and Threads handles, saved with `set_social_handle` into `social_handle`; the recap's space-time view from `my_visits` and `my_encounters`; the social part of the recap page through `my_visits`, `my_encounters`, `my_shared_visits`, `my_photos` (with `respond_photo_tag`), `my_share_links` and the recap's graph from `my_graph`; the photographer route (role `photographer`, read from `my_roles`) that uploads a photo through `POST /api/blobs` and calls `register_photo` with its URL | SDK and HTTPS |
+| Social.md | both | app and module | the setup socials step: the attendee types their Instagram, Facebook and Threads handles, saved with `set_social_handle` into `social_handle`; the recap's space-time view from `my_visits` and `my_encounters`; the social part of the recap page through `my_visits`, `my_encounters`, `my_shared_visits`, `my_photos`, `my_share_links` and the recap's graph from `my_graph`; the photographer route (role `photographer`, read from `my_roles`) that uploads a photo through `POST /api/blobs` and calls `register_photo` with its URL | SDK and HTTPS |
 | BrightData.md | both | app and module | the profile claim step in setup, "Are you one of these?", shown only when the name matches: the app lists the `person` rows (exhibitor, speaker or artist scraped from event pages) whose name matches the typed display name and that `claimed_people` does not list; the attendee taps "This is me" and the app calls `claim_person`, which works only for an attendee who already owns a band; "None of these" goes on | SDK |
 | Elastic.md | out | app to `bandit-api` | `GET /recap/order` when the recap page opens: the order of the recap's people and booths. The lists themselves come from the app's own subscriptions. Without Elastic.md, the app orders both lists by minutes together | HTTPS |
 | Merch.md | both | app and module | the merch section at the bottom of the recap page: suggestions from `my_merch_suggestions`, the preview that places the photo in the template's photo area, the one-tap "Buy" that calls `buy_merch` as the signed-in attendee, and `my_merch_orders` | SDK |
@@ -48,15 +48,18 @@ Not responsible for:
 | `/t/{token}` | anyone | The only URL written on the tags, and the attendee's only route. Decides the screen from the sign-in, the band and the caller: band setup, then the thank-you screen during the event; the recap page for the band's signed-in owner after the event, on any device. |
 | Social.md: `/photo` | role `photographer` | Upload a photo and call `register_photo`. Content in [Social](../6-features/Social.md). |
 
-`/t/{token}` shows the same thing to everyone who taps: setup, the thank-you screen or the recap, for the caller's own band. Staff tools live in the [Ops dashboard](Ops-Dashboard.md). Every tag holds the same host, the public `bandit-api` host, so judges use their own phones on any network.
+`/t/{token}` shows the same thing to every attendee who taps: setup, the thank-you screen or the recap, for the caller's own band. Staff tools live in the [Ops dashboard](Ops-Dashboard.md).
+
+Medical-ID.md: a medic who taps a band gets the medic view of that band instead, and the page never claims it ([Medical-ID](../6-features/Medical-ID.md)). Every tag holds the same host, the public `bandit-api` host, so judges use their own phones on any network.
 
 ### Landing route decision
 
 The landing route works out who tapped which band. Band rows are private, and `my_band` returns only bands the caller owns or is the claim candidate for, so the route learns a band's status by trying to claim it: `claim_band` accepts, which starts the press window, or rejects. Nothing is lost by trying, because a claim completes only with a press on that band.
 
 1. Sign in. With no SpacetimeAuth session in this browser, the app shows the sign-in screen: the attendee types an email and opens the magic link (see Identity). The tap token stays in the URL, so the route continues after the sign-in.
-   - Simulator.md: in test mode the sign-in screen also offers "Continue without an account". It marks this browser tab as a guest in session storage, and the app connects with a SpacetimeDB token kept in the browser instead of an ID token, so a tester claims a simulated band without an email.
+   - Test-Bands.md: in test mode the sign-in screen also offers "Continue without an account". It marks this browser tab as a guest in session storage, and the app connects with a SpacetimeDB token kept in the browser instead of an ID token, so a tester claims a test band without an email.
 2. Connect to SpacetimeDB with the ID token and subscribe to `my_attendee`, `my_band` and `event_state`.
+   - Medical-ID.md: when `my_roles` holds role `medic`, the page is the medic view of the tapped band, during and after the event, and the route stops here without calling `claim_band`.
 3. `my_band` already holds a band with this token: the caller owns it. Once `event_state.ended` is set, the page is the recap. Before that, the page resumes setup at the first step not yet finished (`resumeStep`, run on every load). The name step comes first while `my_attendee` has no display name. The optional steps that have a resume check follow, in setup order. When none is left, the page is the thank-you screen. So a later visit by someone who finished setup lands on the thank-you screen, and someone who left setup halfway picks up where they left off.
    - Medical-ID.md: setup resumes at "Your medical history" while no history document is on file, at "Your health insurance" while no insurance document is, and at the card check while the card is not confirmed.
    - Payments-Nessie.md: setup resumes at the wallet step while the attendee has no wallet.
@@ -79,6 +82,7 @@ flowchart TD
     Named -->|"yes"| Thanks["Thank-you screen"]
     Named -->|"no"| Onb["Onboarding steps, from the first one not finished"]
     Mine -->|"no"| Start["call claim_band(token)"]
+    Conn -.->|"Medical-ID.md: caller holds role medic"| Medic["Medical-ID.md: medic view of the tapped band"]
     Start -->|"accepted, band blinks white"| Claim["Claim screen: press your band"]
     Start -->|"rejected"| Taken["Taken page: the band is taken, nothing more"]
     Claim -->|"press confirmed"| Onb
@@ -86,7 +90,7 @@ flowchart TD
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
     classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
     classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
-    class Conn,Mine,Ended,Named,Start,Claim,Onb,Thanks,Recap,Taken web
+    class Conn,Mine,Ended,Named,Start,Claim,Onb,Thanks,Recap,Taken,Medic web
     class Tap device
     class Sess,SignIn ext
 ```
@@ -163,7 +167,7 @@ Setup asks for little: a display name, one consent switch and whatever the optio
 
 | Switch (`consent` kind) | What it allows | Who enforces it |
 |---|---|---|
-| `findable` | People you hung out with see you and your Meta handles in their recap, you appear in the people graph, and you can be suggested as a tag in photographer photos | [Social](../6-features/Social.md) |
+| `findable` | People you hung out with see you and your Meta handles in their recap, you appear in the people graph, and you can be tagged in photographer photos | [Social](../6-features/Social.md) |
 
 ### The thank-you screen
 
@@ -216,7 +220,7 @@ sequenceDiagram
 The recap page, top to bottom. How it looks is front end and not designed here.
 
 1. Social.md: the space-time view, "Where you were", drawn on the phone from `my_visits` (one bar per stay, zones down the side, time along the bottom) and `my_encounters` (a dot per person met).
-2. Social.md: the social part: the people you hung out with and the Meta handles of those who are `findable` (`my_encounters`), the booths you spent time at with their descriptions (`my_visits`), both by minutes together; the people you were in the same place with for a while, with the zone, its booths and the minutes, in time order (`my_shared_visits`); photos you are tagged in, with the people in each, a Share button that opens the phone's share sheet and the tag answer `respond_photo_tag` (`my_photos`); share links (`my_share_links`); and your graph (see The recap's graph below).
+2. Social.md: the social part: the people you hung out with and the Meta handles of those who are `findable` (`my_encounters`), the booths you spent time at with their descriptions (`my_visits`), both by minutes together; the people you were in the same place with for a while, with the zone, its booths and the minutes, in time order (`my_shared_visits`); photos you are tagged in, with the people in each, a Share button that opens the phone's share sheet (`my_photos`); share links (`my_share_links`); and your graph (see The recap's graph below).
 3. Merch.md: the merch suggestions and checkout: up to three templates from `my_merch_suggestions`, each with one of your own photos placed in its photo area, bought with one tap on "Buy" (`buy_merch`, paid from the wallet) and shown in `my_merch_orders`.
 
 Every call on the recap page runs as the signed-in attendee. Other sections, each separable:
@@ -238,7 +242,7 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 - Android opens an NDEF URL in the default browser from the system tag dispatch when the phone is unlocked.
 - The band claim starts from the OS opening the tag URL, so it works the same on both platforms with no in-page NFC reading.
 - The tag is an NTAG215 holding one NDEF URL on the `bandit-api` host, locked read-only once written ([Hardware](../4-devices/Hardware.md)).
-- Simulator.md: crowd bands have no tag and an empty `nfc_token`, and `start_crowd` gives each a simulated owner inside the module. The simulated bands 94 to 99 have a tap link (`/t/BANDIT-94` to `/t/BANDIT-99`) but no tag: a tester opens it and claims the band with a press from `bandit-api`'s dev routes instead of a real press ([Simulator](../3-services/Simulator.md)).
+- Test-Bands.md: crowd bands have no tag and an empty `nfc_token`, and `start_crowd` gives each a generated owner inside the module. The test bands 94 to 99 have a tap link (`/t/BANDIT-94` to `/t/BANDIT-99`) but no tag: a tester opens it and claims the band with a press from `bandit-api`'s dev routes instead of a real press ([Test-Bands](../3-services/Test-Bands.md)).
 
 ## Failure modes and fallbacks
 
@@ -262,7 +266,7 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 
 **Used by**
 
-- [Medical-ID](../6-features/Medical-ID.md): the two document steps and the card step in setup.
+- [Medical-ID](../6-features/Medical-ID.md): the two document steps and the card step in setup, and the medic view on a medic's tap.
 - [Payments-Nessie](../7-integrations/Payments-Nessie.md): the wallet step at the end of setup, its resume check, and the recap's wallet (the balance line and "Wallet activity").
 - [Social](../6-features/Social.md): the socials step, the photographer route, the recap's space-time view and its social part with its graph and share links.
 - [BrightData](../7-integrations/BrightData.md): the profile claim step, "Are you one of these?".
@@ -273,7 +277,7 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 **If you delete this file**
 
 - The event loses tap to join; bands would be registered to people by ops only (`register_band`) and `claim_band` would have no caller.
-- Medical-ID.md needs another host for its document and card steps; Social.md needs another host for the photographer route.
+- Medical-ID.md needs another host for its document steps, its card step and the medic view; Social.md needs another host for the photographer route.
 - Remove the Attendee app row from the component table in Architecture.md and the attendee row from SpacetimeDB.md's "subscriptions per client".
 - Remove the "attendee app" bullets in Social.md, BrightData.md, Elastic.md, Merch.md, Insurance.md, Payments-Nessie.md and Medical-ID.md.
 
@@ -293,7 +297,8 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 | Socials are typed by the attendee at onboarding | no verification flow to build, and nobody's profile is scraped |
 | BrightData.md: the profile claim is one tap, open only to an attendee who already owns a band | the band claim's press already proved who holds the band, so there is no second press and no email round trip |
 | Payments-Nessie.md: the wallet is the last setup step, "Connect your Capital One wallet" with "Connect" and "Skip"; setup finishes without it when it is skipped, and the recap has no connect button | the attendee chooses to connect it, every judge who taps has a funded wallet with nothing to type, and the wallet is asked for in one place |
-| The attendee page has no staff views; staff work in the Ops dashboard | the tag URL means the same for everyone who taps it, and the medic's tools sit next to the incident |
+| Staff work in the Ops dashboard; the attendee page shows each attendee only their own band | the tag URL means the same for every attendee who taps it |
+| Medical-ID.md: a medic's tap opens the medic view of that band and never claims it | at the person the band's own tag is the quickest way to the card; notes, cost and resolve stay on the incident desk |
 | Medical-ID.md: the card check comes just before the wallet, not right after the uploads | Claude reads the PDFs while the attendee answers the steps in between, so the card is usually ready when the check comes |
 | The app has no merchant route; BandIt takes no payments at the venue | the band press is kept for claiming a band; merch is paid in the app after the event |
 | Socials are Instagram, Facebook and Threads handles only, and onboarding has no company field | Meta is the sponsor track; `works_at` links come only from the import and a claimed profile |

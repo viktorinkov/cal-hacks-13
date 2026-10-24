@@ -1,6 +1,6 @@
 # Gateway-Bridge
 
-`bandit-bridge` is the Rust process on the venue laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `band1t` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the simulator and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
+`bandit-bridge` is the Rust process on the venue laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `band1t` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the `bandit-claims` tool and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
 
 ## Role in the system
 
@@ -19,7 +19,7 @@ Explicit non-responsibilities:
 
 - It decides nothing about safety: no incident logic, no exit assignment, no density. Those live in the module ([Safety](../6-features/Safety.md)). The bridge is a courier with a memory.
 - It holds no truth. Everything it knows is in `band_report`, `service_heartbeat` or its raw log, and a restart loses nothing the system needs.
-- It never speaks for bands no radio carries (Simulator.md: the crowd bands, ids 10 to 89, and the simulated bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
+- It never speaks for bands no radio carries (Test-Bands.md: the crowd bands, ids 10 to 89, and the test bands, ids 90 to 99); [Test-Bands](Test-Bands.md) handles those itself.
 - It does not synchronise clocks. It timestamps lines with the laptop clock on receipt and sends ages, not timestamps.
 - It runs no feature flow. It relays the claim blink down and the press flag up, and the module decides.
 
@@ -35,8 +35,8 @@ Explicit non-responsibilities:
 | `band_directive` | in, subscription through `staff_directives` | `band1t` module | desired sticky state per target: forced state and hold, exit colour, override flag | SDK |
 | `band_command` | in, subscription through `staff_commands` | `band1t` module | one-shot commands not yet acknowledged: target, name (`buzz`, `clear`), argument, created time | SDK |
 | `fleet_config` | in, subscription | `band1t` module | live calibration: yellow and red counts, neighbour and circle RSSI thresholds, `density_override`, `low_vis` | SDK |
-| Raw log | out | a JSON-lines file on the laptop; read by [Simulator](Simulator.md) replay and the calibration capture | one JSON object per line, every line in and out | `.jsonl` file, one per run, kept on the laptop |
-| Configuration | in | environment ([Rust-Backend](Rust-Backend.md)) | serial port path, the Maincloud host, database name `band1t`, identity token path, log folder | local |
+| Raw log | out | a JSON-lines file on the laptop; read by [Test-Bands](Test-Bands.md) replay and the calibration capture | one JSON object per line, every line in and out | `.jsonl` file, one per run, kept on the laptop |
+| Configuration | in | environment ([Rust-Backend](Rust-Backend.md)) | serial port path, the Maincloud host, database name `bandit-calhacks13-sp82j`, identity token path, log folder | local |
 
 The report the bridge sends for each band inside `ingest_band_reports`:
 
@@ -93,17 +93,17 @@ The crate is the single Rust mirror of the firmware's shared header. It compiles
 
 | Contents | Used by |
 |---|---|
-| The packet field list, the flag bits, the ten light states with their names and colours, the ten command numbers and names, the six exit colours and the id ranges (bands, stations, gateway, simulated) | bridge, simulator, module, and the dashboards through generated bindings |
-| The constants fixed by firmware: beacon rates, neighbour window 2 s, zone window 3 s, press flag 1 s, longest forced hold 25.5 s | bridge, simulator, module |
-| A parser for gateway lines that returns a report, a boot line, an `ack`, an `err` or an unparseable line, and never panics on garbage | bridge, simulator replay |
+| The packet field list, the flag bits, the ten light states with their names and colours, the ten command numbers and names, the six exit colours and the id ranges (bands, stations, gateway, test bands) | bridge, the `bandit-claims` tool, module, and the dashboards through generated bindings |
+| The constants fixed by firmware: beacon rates, neighbour window 2 s, zone window 3 s, press flag 1 s, longest forced hold 25.5 s | bridge, the `bandit-claims` tool, module |
+| A parser for gateway lines that returns a report, a boot line, an `ack`, an `err` or an unparseable line, and never panics on garbage | bridge, the `bandit-claims` tool's replay |
 | A formatter and validator for command lines (ranges, target rules, the never-broadcast rules below) | bridge |
-| The band's state-precedence function and its density state machine with hysteresis, written once from the firmware's order | simulator (to behave like a band), bridge (to judge whether a reported state is consistent with a directive) |
+| The band's state-precedence function and its density state machine with hysteresis, written once from the firmware's order | the `bandit-claims` tool (so a test band behaves like a band), bridge (to judge whether a reported state is consistent with a directive) |
 
 Why one crate: a one-byte disagreement between the firmware's enum and a Rust constant would silently miscolour the dashboard, so every Rust process reads the same table, and the header and the crate change together.
 
 ### Serial reader and line parser
 
-The reader opens the serial port path from its configuration at the nominal 115200 baud and reads with a short timeout, so it notices silence. Bytes are split on newline; carriage returns are dropped; a partial line left when the port closes is discarded. Every complete line goes to the log unchanged and to the parser. The parser classifies: a report (object with `id` and `type`), a boot line (object with `gateway`), an `ack`, an `err`, or unparseable. Type 3 lines (a command echo from another gateway) do not occur with one gateway; the parser counts and drops them. Parse errors are counted for the heartbeat; a burst of them usually means the wrong baud, a half-flashed gateway or a cable fault.
+The reader opens the serial port path from its configuration at the nominal 115200 baud and reads with a short timeout, so it notices silence. Vision.md: while Leo's recorder runs (`feed.py record --mirror`), that path is the recorder's mirror port, which carries the same lines and passes the bridge's commands back to the gateway ([Vision](../4-devices/Vision.md)). Bytes are split on newline; carriage returns are dropped; a partial line left when the port closes is discarded. Every complete line goes to the log unchanged and to the parser. The parser classifies: a report (object with `id` and `type`), a boot line (object with `gateway`), an `ack`, an `err`, or unparseable. Type 3 lines (a command echo from another gateway) do not occur with one gateway; the parser counts and drops them. Parse errors are counted for the heartbeat; a burst of them usually means the wrong baud, a half-flashed gateway or a cable fault.
 
 The reader also measures lines per second, the first number to look at when the fleet looks wrong: about 10 per live band plus 5 per station is healthy, and a sudden fall with the stations still present means bands, not the gateway, are the problem.
 
@@ -150,7 +150,7 @@ Latency from a button press to the module: up to 100 ms for the next beacon, ser
 
 ### Server intent: the three subscriptions
 
-The bridge subscribes to `staff_directives` (every `band_directive` row), `staff_commands` (the `band_command` rows not yet acknowledged) and `fleet_config`. Each subscription update wakes the reconciler. The bridge acts on directives for targets 0, 1 to 9 and 101 to 105 and ignores band targets 10 to 99, which belong to the simulator (Simulator.md). For stations the only meaningful directive fields are exit colour and a forced mode (0 breathe, 1 chase, 9 off).
+The bridge subscribes to `staff_directives` (every `band_directive` row), `staff_commands` (the `band_command` rows not yet acknowledged) and `fleet_config`. Each subscription update wakes the reconciler. The bridge acts on directives for targets 0, 1 to 9 and 101 to 105 and ignores band targets 10 to 99, which belong to the crowd and the test bands (Test-Bands.md). For stations the only meaningful directive fields are exit colour and a forced mode (0 breathe, 1 chase, 9 off).
 
 A directive addressed to a band overrides the all-bands directive (target 0) field by field, so a venue-wide forced GUIDE (target 0, from `force_band_state`) and a per-band exit colour (target 3, exit 2) combine into "band 3 shows GUIDE in magenta". Who writes which directive, and when, is in [Safety](../6-features/Safety.md) (manual and Plan B states, exit colours; (TBD -- LEO) the medic approach and exit assignment) and [Attendee-App](../5-apps/Attendee-App.md) (IDENT for claiming).
 
@@ -254,7 +254,7 @@ A rejected command is logged and counted in the heartbeat; it is never silently 
 
 The bridge writes every line it reads and every line it writes to a `.jsonl` file on the laptop: one JSON object per line, the gateway's object unchanged plus the laptop receive time in milliseconds since the epoch, the direction (in or out), and, for outgoing lines, the command text. Unparseable gateway lines are logged as raw text with the same timestamp. A new file starts with each run and whenever the serial port is reopened. The logs stay on the laptop; they are not uploaded.
 
-The log serves three purposes: replay through [Simulator](Simulator.md), a post-mortem of a run at the event or a rehearsal (what each band reported, what was commanded, when), and calibration capture. For calibration, the bridge tags each logged report with the `fleet_config` version in force when it was received. The capture itself is driven from the Ops dashboard: ops marks the start and end of each formation and the known density, the module stores it as `calibration_point` rows via `set_calibration` ([Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Safety](../6-features/Safety.md)), and the dashboard computes the mean `neigh` over the window from its `band_report` subscription. The log is the exact record if the numbers are later questioned.
+The log serves three purposes: replay through [Test-Bands](Test-Bands.md), a post-mortem of a run at the event or a rehearsal (what each band reported, what was commanded, when), and calibration capture. For calibration, the bridge tags each logged report with the `fleet_config` version in force when it was received. The capture itself is driven from the Ops dashboard: ops marks the start and end of each formation and the known density, the module stores it as `calibration_point` rows via `set_calibration` ([Ops-Dashboard](../5-apps/Ops-Dashboard.md), [Safety](../6-features/Safety.md)), and the dashboard computes the mean `neigh` over the window from its `band_report` subscription. The log is the exact record if the numbers are later questioned.
 
 ### When the serial cable or the server goes away
 
@@ -288,12 +288,12 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 - (TBD -- LEO) [Safety](../6-features/Safety.md): the medic-approach directives and their buzz reach a band the same way.
 - [Attendee-App](../5-apps/Attendee-App.md): the press-to-confirm round trip for the band claim.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): fleet liveness, loss and service health from `band_report` and `service_heartbeat`.
-- [Simulator](Simulator.md): replays the bridge's raw log and shares `bandit-protocol`.
+- [Test-Bands](Test-Bands.md): replays the bridge's raw log and shares `bandit-protocol`.
 
 **If you delete this file**
 
-- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s simulated bands report, through `report_sim_band`.
-- Move the `bandit-protocol` crate description to [Simulator](Simulator.md), which still needs it.
+- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Test-Bands](Test-Bands.md)'s test bands report, through `report_sim_band`.
+- Move the `bandit-protocol` crate description to [Test-Bands](Test-Bands.md), which still needs it.
 - Remove the `bridge` role and the bridge rows from the service tables in [Rust-Backend](Rust-Backend.md) and [Architecture](../1-overview/Architecture.md), and the `bandit-bridge` row from the service health panel in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
 - In [Safety](../6-features/Safety.md), note that `band_directive` and `band_command` rows have no consumer for real bands.
 

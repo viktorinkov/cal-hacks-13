@@ -24,15 +24,15 @@ Core requirements are what the safety features need. Rows that start with a file
 | F5 | Show staff a live map, the fleet, incidents and controls (acknowledge, a medic taking an incident, low visibility, override) | [Ops-Dashboard](../5-apps/Ops-Dashboard.md) |
 | F6 | Let staff force states, exit colours and prompts on bands, delivered within about a second | [Gateway-Bridge](../3-services/Gateway-Bridge.md) |
 | F7 | (TBD -- LEO) Record zone-level presence over time, the space-time mapping, so the night can be replayed and memories derived | [SpacetimeDB](../2-data/SpacetimeDB.md) |
-| F8 | Medical-ID.md: read the medical history and health insurance PDFs an attendee uploads in setup into one medical card, and give it to a medic who asks for it from the Ops dashboard's incident desk for the band of someone in an open `sos` or `fall` incident | [Medical-ID](../6-features/Medical-ID.md) |
+| F8 | Medical-ID.md: read the medical history and health insurance PDFs an attendee uploads in setup into one medical card, and give it to a medic who taps that person's band, or asks from the Ops dashboard's incident desk, while the band has an open `sos` or `fall` incident | [Medical-ID](../6-features/Medical-ID.md) |
 | F9 | Payments-Nessie.md: give each attendee a Nessie sandbox wallet when they connect it at the last setup step, let them buy merch from it with one tap after the event, pay settled claims into it, and show its balance as the exact sum of its movements | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | F10 | Social.md: turn presence into visits and encounters, grow a live people graph, tag photos, and show on the recap the people you hung out with and their Meta socials | [Social](../6-features/Social.md) |
 | F11 | Merch.md: put the attendee's own photo on a few hand-made templates, suggest them by the booths the attendee spent time at, and sell them from the recap page after the event | [Merch](../6-features/Merch.md) |
 | F12 | Insurance.md: turn an incident into an insurance claim on the venue's general liability policy and settle it like a claims team would: read the urgent-care bill and pay each line against a fee schedule in code, check the evidence, duplicates and coverage in code, have Claude judge causation without touching any amount, send every claim that no learned rule settles to the organizer, who decides it after the event, learn a settlement rule from each approval so the next similar claim settles by itself, keep a ledger, draft the notice of loss in ACORD 3 layout, and measure all of it on planted claims | [Insurance](../6-features/Insurance.md) |
 | F13 | BrightData.md: load any event's real organisations, booths, floor plan and schedule from its public pages, given as start URLs in the event's seed | [BrightData](../7-integrations/BrightData.md) |
 | F14 | Elastic.md: organize the scraped records into one checked bundle, and order each attendee's recap suggestions by meaning | [Elastic](../7-integrations/Elastic.md) |
-| F15 | Vision.md (TBD -- LEO): count people from a camera and confirm falls from frames | [Vision](../4-devices/Vision.md) |
-| F16 | Simulator.md: run a crowd of up to 80 crowd bands inside the module and ten simulated bands that report into the same tables as real ones | [Simulator](../3-services/Simulator.md) |
+| F15 | Vision.md (TBD -- LEO): show the security room where a band calling for help is, from its flash on a camera; count people from a camera and confirm falls from frames | [Vision](../4-devices/Vision.md) |
+| F16 | Test-Bands.md: run a crowd of up to 80 crowd bands inside the module and ten test bands that report into the same tables as real ones | [Test-Bands](../3-services/Test-Bands.md) |
 | F17 | When a staff member with `ops` presses "Event ended", turn every open attendee page into the recap page live, and reopen it from the tap link for the band's signed-in owner on any device | [Attendee-App](../5-apps/Attendee-App.md) |
 
 ## Non-functional requirements
@@ -50,7 +50,7 @@ Core requirements are what the safety features need. Rows that start with a file
 
 ## Scale
 
-BandIt is sized for the event, with headroom from the simulator.
+BandIt is sized for the event, with headroom.
 
 | Quantity | Value | Consequence |
 |---|---|---|
@@ -58,7 +58,7 @@ BandIt is sized for the event, with headroom from the simulator.
 | Station markers | 2 to 5 (ids 101 to 105), one per zone | zone-level presence only, never x/y |
 | Gateway | 1 (id 200) on USB to the venue laptop | one bridge process |
 | Beacons | 10 per second per band | about 90 serial lines per second from the real fleet |
-| Simulator.md: crowd and simulated bands | up to 80 crowd bands (ids 10 to 89) and 10 simulated bands (ids 90 to 99) | the crowd moves inside the module every 5 s and sends no reports; the simulated bands report once a second through `report_sim_band`, about 10 reducer calls per second |
+| Test-Bands.md: crowd and test bands | up to 80 crowd bands (ids 10 to 89) and 10 test bands (ids 90 to 99) | the crowd moves inside the module every 5 s and sends no reports; the test bands report once a second through `report_sim_band`, about 10 reducer calls per second |
 | Real band reports to the module | one batch every 250 ms | 4 reducer calls per second from the bridge |
 | Venue tick | every 500 ms | zone state and exits recomputed twice a second |
 | Clients | 1 Ops dashboard on the big screen, the Ops dashboard on a few medics' phones, tens of attendee phones | subscriptions carry only changes |

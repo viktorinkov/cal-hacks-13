@@ -24,9 +24,9 @@ This is the decision log for choices that cut across several files. Each compone
 |---|---|---|
 | The `band1t` database runs on SpacetimeDB Maincloud only; there is no standalone fallback | one deployment means one set of identities, one host and no switch-over during the event | [Architecture](Architecture.md), [SpacetimeDB](../2-data/SpacetimeDB.md) |
 | The venue laptop gets internet from a team phone's hotspot | venue Wi-Fi is the least reliable link at a hackathon, so it is off the critical path | [Architecture](Architecture.md) |
-| `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Fly.io VM; `bandit-api` also serves both web apps from the same HTTPS origin | judges use their own phones on one public host written into the NFC tags, and the services keep running when the laptop sleeps | [Rust-Backend](../3-services/Rust-Backend.md) |
-| Blobs are files on a Fly volume on that VM | one machine, no bucket to configure | [Rust-Backend](../3-services/Rust-Backend.md) |
-| The laptop runs only what needs it: `bandit-bridge` (USB to the gateway) and the Ops dashboard; Simulator.md: the `bandit-claims` command-line tool; Vision.md: `bandit-vision` (TBD -- LEO); BrightData.md: `bandit-ingest` before the event | the gateway cable and the camera are physically there | [Architecture](Architecture.md) |
+| `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Vultr VM as systemd services, behind Caddy; `bandit-api` also serves both web apps from the same HTTPS origin, band1t.vip | judges use their own phones on one public host written into the NFC tags, and the services keep running when the laptop sleeps | [Rust-Backend](../3-services/Rust-Backend.md) |
+| Blobs are files in `/var/lib/bandit` on that VM, next to the service identities | one machine, no bucket to configure | [Rust-Backend](../3-services/Rust-Backend.md) |
+| The laptop runs only what needs it: `bandit-bridge` (USB to the gateway) and the Ops dashboard; Test-Bands.md: the `bandit-claims` command-line tool; Vision.md: the recorder, the security view and `bandit-vision` (TBD -- LEO); BrightData.md: `bandit-ingest` before the event | the gateway cable and the camera are physically there | [Architecture](Architecture.md) |
 
 ## Identity and attendee data
 
@@ -39,7 +39,7 @@ This is the decision log for choices that cut across several files. Each compone
 | There is no host role: the event host is a staff member with `ops`, which runs `end_event`, `reopen_event` and the host portal; only `owner`, the identity that published the module, grants and revokes roles, with `grant_role` and `revoke_role` from the command line; the people staff roles are `ops` and `medic` | one role runs both the venue and the host portal, every grant comes from one identity, and no staff screen has a grant button | [SpacetimeDB](../2-data/SpacetimeDB.md), [Ops-Dashboard](../5-apps/Ops-Dashboard.md) |
 | Social.md: attendees type their own social handles at onboarding, Meta only (Instagram, Facebook, Threads) | no verification flow to build; Meta is the sponsor track; people's social profiles are never scraped | [Social](../6-features/Social.md) |
 | Social.md: there is no company field at onboarding; `works_at` comes from the import and a claimed profile | one less form field, and the company is already known for exhibitors and speakers | [Social](../6-features/Social.md) |
-| Simulator.md: each crowd band (10 to 89) has a simulated owner with a made-up name and an Instagram handle, created by `start_crowd` inside the module | the big-screen people graph shows a real-looking crowd, through the same social step as real bands | [Simulator](../3-services/Simulator.md) |
+| Test-Bands.md: each crowd band (10 to 89) has a generated owner with a made-up name and an Instagram handle, created by `start_crowd` inside the module | the big-screen people graph shows a real-looking crowd, through the same social step as real bands | [Test-Bands](../3-services/Test-Bands.md) |
 | BrightData.md: an attendee who already owns a band claims their scraped profile by picking it at onboarding; `claim_person` refuses anyone who owns no band | the band claim's press is the proof, so there is no second press and no email round trip | [BrightData](../7-integrations/BrightData.md) |
 
 ## Sponsors and external services

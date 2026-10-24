@@ -10,8 +10,8 @@ The folders follow the usual order of a system design: what the system must do, 
 |---|---|---|
 | 1-overview | [Requirements](1-overview/Requirements.md), [Architecture](1-overview/Architecture.md), [Flows](1-overview/Flows.md), [Decisions](1-overview/Decisions.md) | what BandIt must do, how the parts fit, the event step by step, and the choices that cut across files |
 | 2-data | [SpacetimeDB](2-data/SpacetimeDB.md) | the single source of truth: tables, reducers, views, subscriptions |
-| 3-services | [Rust-Backend](3-services/Rust-Backend.md), [Gateway-Bridge](3-services/Gateway-Bridge.md), [Simulator](3-services/Simulator.md) | the Rust processes and where they run |
-| 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, gateway, station markers and the camera (TBD -- LEO) |
+| 3-services | [Rust-Backend](3-services/Rust-Backend.md), [Gateway-Bridge](3-services/Gateway-Bridge.md), [Test-Bands](3-services/Test-Bands.md) | the Rust processes and where they run |
+| 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, gateway, station markers and the cameras (TBD -- LEO) |
 | 5-apps | [Ops-Dashboard](5-apps/Ops-Dashboard.md), [Attendee-App](5-apps/Attendee-App.md) | the two browser apps |
 | 6-features | [Safety](6-features/Safety.md), [Social](6-features/Social.md), [Medical-ID](6-features/Medical-ID.md), [Merch](6-features/Merch.md), [Insurance](6-features/Insurance.md) | what BandIt does for people |
 | 7-integrations | [Elastic](7-integrations/Elastic.md), [BrightData](7-integrations/BrightData.md), [Payments-Nessie](7-integrations/Payments-Nessie.md), [Anthropic-Agent](7-integrations/Anthropic-Agent.md) | the sponsor and outside services |
@@ -43,13 +43,13 @@ Core components are what the safety features need. Optional components are featu
 | [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, a medic taking an incident, low visibility, override, and the medic approach and dispersion routing (TBD -- LEO) | SpacetimeDB, Hardware, Gateway-Bridge |
 | [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for `ops`, the big-screen graph | SpacetimeDB, Safety |
 | [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, band setup and the thank-you screen, the recap page after the event | SpacetimeDB |
-| [Simulator.md](3-services/Simulator.md) | The in-module crowd and the simulated bands, driven by `bandit-claims` | optional | a crowd of crowd bands with simulated owners inside the module, simulated bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
-| [Vision.md](4-devices/Vision.md) | Vision service (TBD -- LEO) | optional | camera counts, person-down alerts, incident assessments, photo features | SpacetimeDB; uses Anthropic-Agent when present |
-| [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card in the incident desk | Attendee-App, Ops-Dashboard, Anthropic-Agent |
-| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
+| [Test-Bands.md](3-services/Test-Bands.md) | The in-module crowd and the test bands, driven by `bandit-claims` | optional | a crowd of crowd bands with generated owners inside the module, test bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
+| [Vision.md](4-devices/Vision.md) | Cameras (TBD -- LEO) | optional | the security view that finds a calling band's flash on camera, the 3D venue model, the radio and photo recorders; camera assessments and property events for incidents; planned head counts, person-down alerts and photo features | SpacetimeDB; uses Anthropic-Agent and Elastic when present |
+| [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card on a medic's tap and in the incident desk | Attendee-App, Ops-Dashboard, Anthropic-Agent |
+| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Test-Bands, Vision, Anthropic-Agent when present |
 | [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
 | [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Insurance when present |
-| [Insurance.md](6-features/Insurance.md) | Incident to claim | optional | the scripted claims run, evidence packs, bill review, coverage in code, the organizer's decisions, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
+| [Insurance.md](6-features/Insurance.md) | Incident to claim | optional | the scripted claims run, evidence packs, bill review, coverage in code, the organizer's decisions, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Test-Bands when present |
 | [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
 | [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
@@ -67,7 +67,7 @@ flowchart LR
   BD["BrightData"]
   Pay["Payments-Nessie"]
   Vision["Vision (TBD -- LEO)"]
-  Sim["Simulator"]
+  Sim["Test-Bands"]
 
   Merch --> Soc
   Merch --> Pay

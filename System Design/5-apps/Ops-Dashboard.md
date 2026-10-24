@@ -36,12 +36,12 @@ Not responsible for:
 | Incident reducers | out | dashboard to module | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | SDK reducer call |
 | Fleet and booth reducers | out | dashboard to module | `register_band` (add, rename), `release_band` ("Take the band back"), `upsert_booth` (place or add a booth); `end_event` and `reopen_event` (the host portal's "Event ended" and "Reopen the event" buttons) | SDK reducer call |
 | API session | out | dashboard to module, then to `bandit-api` | on page load the dashboard makes a random token, registers its hash with `open_api_session` and sends the token with each `bandit-api` request: BrightData.md: the floor-plan image; Vision.md (TBD -- LEO): the latest frame; Insurance.md: the bill upload through `POST /api/blobs` and the letter downloads | SDK reducer call, then HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| Insurance.md | both | dashboard, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, plus `planted_incident` (Simulator.md) for the scorecard and `claim_precedent` (Elastic.md); "Waiting for your decision" with `approve_claim` and `refuse_claim` for `ops`; on the incident card, Attach bill (`POST /api/blobs` with purpose `medical`) and Add injured person (`add_injured_party`); the Report property damage button, which calls `open_incident` with kind `property` and the zone | SDK and HTTPS |
-| Medical-ID.md | both | dashboard and module | in the incident desk, "Tap band N for the medical card" calls `request_medical_card` with the incident's band, and the granted card comes from `medic_medical_cards`; the medical access log from `board_medical_access` (which medic asked for which band's card, when, for which incident, granted or not) | SDK |
+| Insurance.md | both | dashboard, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, plus `planted_incident` (Test-Bands.md) for the scorecard and `claim_precedent` (Elastic.md); "Waiting for your decision" with `approve_claim` and `refuse_claim` for `ops`; on the incident card, Attach bill (`POST /api/blobs` with purpose `medical`) and Add injured person (`add_injured_party`); the Report property damage button, which calls `open_incident` with kind `property` and the zone | SDK and HTTPS |
+| Medical-ID.md | both | dashboard and module | in the incident desk, "Tap band N for the medical card" calls `request_medical_card` with the incident's band, and the granted card comes from `medic_medical_cards`; the medical access log from `board_medical_access` (which medic read which band's card, when, for which incident) | SDK |
 | Vision.md (TBD -- LEO) | both | module and dashboard | camera tile: `camera`, `camera_count`, `ground_alert`, `vision_assessment`; latest frame `blob_ref`; the `vision` heartbeat | SDK and HTTPS |
 | Social.md | in | module to dashboard | the event graph: the anonymous `event_graph` view (node ids and links only) | SDK |
-| Elastic.md | in | module to dashboard | the `indexer` heartbeat in service health. Zone history is read from `zone_sample` here, never from Elastic | SDK |
-| Simulator.md | both | module and `bandit-api` to dashboard | `band.simulated` for the legend and the counts; the `simulator` heartbeat; the Simulate tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| Elastic.md | in | module to dashboard | the `indexer` heartbeat in service health. Zone history is read from `zone_history` here, never from Elastic | SDK |
+| Test-Bands.md | both | module and `bandit-api` to dashboard | the band id (test bands are 90 to 99) for the legend and the counts; the `simulator` heartbeat; the test bands tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | BrightData.md | in | `bandit-api` and module to dashboard | each `hall` floor-plan image as a `blob_ref` with access class `staff`, booth `organization` names, the `ingest` heartbeat | HTTPS blob endpoint ([Rust-Backend](../3-services/Rust-Backend.md)) and SDK |
 
 ## Design
@@ -56,7 +56,7 @@ One app, one bundle, one page. There are two staff roles: the medic (`medic`) wo
 | `ops` | the organizer, on the venue laptop or a phone | the host portal (below), venue map, fleet, incidents, controls, calibration, jobs and service health |
 | owner | the team member signed in with the identity that published the module | passes every role check, on the page as in the module; grants roles from the command line |
 
-- Medical-ID.md: the medic also opens the medical card with "Tap band N for the medical card" (`request_medical_card`), and the granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the wearer confirms it.
+- Medical-ID.md: the medic also opens the medical card with "Tap band N for the medical card" (`request_medical_card`), or by tapping the band with their phone, whose medic view links back here with "Notes, cost and resolve on the incident desk"; and the granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the wearer confirms it.
 - Insurance.md: after the event the organizer decides every claim no learned rule settled, in "Waiting for your decision" on the Claims tab.
 - Social.md: the event graph on the big screen is for `ops`; the `photographer` role has no screen here and uses the `/photo` route in the attendee app.
 
@@ -65,7 +65,7 @@ The no-role screen. A signed-in person with no staff role sees no tabs. The page
 The tabs are the same on every device: Live (the zones, the alerts and the low-visibility button), Attendees (the host portal's attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs:
 
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
-- Simulator.md: the Simulate tab, shown in test mode only (see Simulate tab below).
+- Test-Bands.md: the test bands tab, shown in test mode only (see Test bands tab below).
 
 Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and sees the no-role screen with their identity code; a Rust service prints its identity on first start. The owner grants each role with `grant_role` from the SpacetimeDB command line, with a label such as the person's name, and the tabs appear as soon as the grant lands. Only the owner may call `grant_role`, `revoke_role` and `add_owner`; the page has no grant button. Nobody types codes in front of judges.
 
@@ -88,17 +88,17 @@ When a staff member with `ops` presses "Event ended", `end_event` sets `event_st
 | Panel | Shows | Reads | Controls (reducer) |
 |---|---|---|---|
 | Venue map | zone rectangles coloured by risk, stations with their exit colour, exits (blocked struck through), the assigned exit per zone, band count, density and its source badge per zone, booths as labelled dots | `venue`, `zone`, `zone_link`, `exit`, `station`, `booth`, `zone_state`, `fleet_config`, `band_report` | per zone: `set_zone_exit`, `set_zone_risk`; per exit: `set_exit_status`; per booth: `upsert_booth` |
-| Fleet table | one row per band: alive or grey, battery, state, zone, flags, simulated, last seq, claimed yes or no | `band`, `band_report`, `band_directive` | per band: `force_band_state`, `send_band_command` (buzz, clear), identify; `register_band` (add, rename), `release_band` (unclaim) |
+| Fleet table | one row per band: alive or grey, battery, state, zone, flags, test band or not, last seq, claimed yes or no | `band`, `band_report`, `band_directive` | per band: `force_band_state`, `send_band_command` (buzz, clear), identify; `register_band` (add, rename), `release_band` (unclaim) |
 | Incidents (the incident desk, "Open incidents") | open and recent incidents with zone, wearer, witnesses, countdown, status, snapshot, notes | `incident` (with `escalates_at` for the countdown), `incident_snapshot`, `incident_band`, `incident_note`; the wearer's display name comes with `staff_incidents` | `ack_incident`, `assign_medic` ("Take it"), `add_incident_note`, `resolve_incident`, `open_incident` |
 | Controls | fleet-wide actions, the low-visibility button and the override banner | `band_directive`, `fleet_config`, `zone_state` | `force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_low_vis`, `set_exit_status`, `set_fleet_config` (`density_override`) |
 | Calibration | live thresholds, live `neigh` histogram, the three calibration steps and the resulting mapping | `fleet_config`, `band_report`, `calibration_point` | `set_fleet_config`, `set_calibration` |
 | Job monitor | queue depth per kind, each job's status, attempts, lease expiry and last error | `staff_jobs` | none |
 | Service health | one card per Rust service: last heartbeat, version, counters | `service_heartbeat` | none |
-| Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, the decision form for `ops` ("Learn a rule from this approval, so similar claims settle on their own", ticked by default; "Rule ceiling in dollars (optional)"; "Approve $X"; Refuse with a reason), and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Simulator.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `staff_incidents`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (ops) |
+| Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, the decision form for `ops` ("Learn a rule from this approval, so similar claims settle on their own", ticked by default; "Rule ceiling in dollars (optional)"; "Approve $X"; Refuse with a reason), and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Test-Bands.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `staff_incidents`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (ops) |
 | Insurance.md: Incident card controls | Attach bill and Add injured person on an incident row, for `medic` and `ops` | `injured_party`, `medical_record`, `incident_snapshot` (bands present) | the bill upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record`; `add_injured_party` |
 | Insurance.md: Report property damage button | one button on the Incidents panel; ops picks the zone | `zone` | `open_incident` with kind `property` and the zone |
 | Medical-ID.md: Medical card | inside an incident in the incident desk: "Medical card: <name>, band N", with " (not yet confirmed by the wearer)" until confirmed; blood type, allergies, conditions, medications, emergency contact, insurance and notes, each item with its page | `medic_medical_cards` | "Tap band N for the medical card" (`request_medical_card`) |
-| Medical-ID.md: Medical access log | every request: medic, band, incident, time, granted or refused, reason | `board_medical_access` | none |
+| Medical-ID.md: Medical access log | every granted read: medic, band, incident, time, reason | `board_medical_access` | none |
 | Social.md: Event graph | the whole event as a live people graph for the big screen: anonymous people, booths and companies, links from `people_link`, clusters | `event_graph` | the cluster toggle |
 | Vision.md (TBD -- LEO): Camera tile | the pit camera's latest frame, the detector's head count beside the bands' own count, person-down alerts, and the Claude assessment on each incident | `camera`, `camera_count`, `ground_alert`, `vision_assessment`, `blob_ref` | none |
 
@@ -148,13 +148,13 @@ Booths are labelled dots at `booth.plan_x_m`, `booth.plan_y_m`. Ops drags a misp
 - BrightData.md: the hall's floor-plan image sits under the zones, scaled to plan metres by the hall's real width from the seed; booth dots carry their organisation's name; booths the import could not place are listed beside the map so ops drags each one in.
 - Elastic.md: without it, ops types every booth and its organisation into the "add booth" form.
 - Vision.md (TBD -- LEO): the pit zone shows two density numbers, the band estimate and the camera estimate, with the higher one driving the colour ([Safety](../6-features/Safety.md)).
-- Simulator.md: simulated bands are drawn lighter and each zone's count reads as real plus simulated.
+- Test-Bands.md: test bands are drawn lighter and each zone's count reads as real plus test.
 
 ### Fleet table
 
 | Column | Source | Rule |
 |---|---|---|
-| Band id | `band` | real bands 1 to 9; Simulator.md: simulated bands 90 to 99 (the crowd has no reports, so no row) |
+| Band id | `band` | real bands 1 to 9; Test-Bands.md: test bands 90 to 99 (the crowd has no reports, so no row) |
 | Alive | `band_report` age | green dot when heard in the last 2 s, grey row after 5 s |
 | State | `band_report.state` | chip in the ring's colour with the state name; a forced state shows a pin icon from `band_directive` |
 | Zone | `band_report.zone` | station id mapped to the zone name; blank when 0 |
@@ -162,7 +162,7 @@ Booths are labelled dots at `booth.plan_x_m`, `booth.plan_y_m`. Ops drags a misp
 | Flags | `band_report.flags` | SOS, fall, press, low battery, full band |
 | Neighbours | `band_report.neigh` | the band's own smoothed count |
 | Last seq | `band_report.seq` | a reset to a low number means a reboot |
-| Simulated | `band.simulated` | real bands are listed first; simulated bands are hidden by default so the nine real bands stay easy to find |
+| Test-Bands.md: Test band | band id 90 to 99 | real bands are listed first; test bands are hidden by default so the nine real bands stay easy to find |
 | Claimed | `band.owner` empty or not | no names here; names appear only on an incident and in the host portal |
 
 Row actions:
@@ -188,7 +188,7 @@ Each row shows: kind (`sos`, `fall`, `crowd_risk`, `property`), zone, the band i
 | Resolve | `resolve_incident` | one tap by the medic or ops; status `resolved`; directives for the incident lapse and the band is cleared |
 | Open incident | `open_incident` | ops opens an incident by hand on a zone (kind `crowd_risk` or `property`) when they see something the sensors did not |
 
-Vision.md (TBD -- LEO): an incident row also shows `camera_corroborated` (a person-down alert landed in the zone within 3 s of the flag), `vision_status` (`pending`, `confirmed`, `not_confirmed`) and, when it arrives, the `vision_assessment`: confidence, description, recommended action and the frames.
+Vision.md (TBD -- LEO): an incident row also shows `camera_corroborated` (a person-down alert landed in the zone within 3 s of the flag), `vision_status` (`none`, `confirmed`, `not_confirmed`) and, when it arrives, the `vision_assessment`: confidence, description, recommended action and the frames.
 
 The sequence below answers one question: what does the operator see and do for one SOS, from the wrist to resolved.
 
@@ -284,7 +284,7 @@ sequenceDiagram
 
 ### Event graph (Social.md)
 
-The event graph is a big-screen view for the event: the whole event as one live people graph, so judges watch it grow as people meet and visit booths. It reads the anonymous `event_graph` view, which holds node ids and links only, with no names, zones or times, and is computed once for every viewer ([Social](../6-features/Social.md)). Booths and companies are shared nodes, so two people who visited the same booth are pulled together without any link stored between them. A new link appears in the same transaction that records it, once a visit reaches 2 min or two people have been together for 3 min (starting values). Simulator.md: simulated bands have simulated owners with `findable` on, so the screen shows a crowd of up to 80 simulated attendees rather than nine people.
+The event graph is a big-screen view for the event: the whole event as one live people graph, so judges watch it grow as people meet and visit booths. It reads the anonymous `event_graph` view, which holds node ids and links only, with no names, zones or times, and is computed once for every viewer ([Social](../6-features/Social.md)). Booths and companies are shared nodes, so two people who visited the same booth are pulled together without any link stored between them. A new link appears in the same transaction that records it, once a visit reaches 2 min or two people have been together for 3 min (starting values). Test-Bands.md: crowd bands have generated owners with `findable` on, so the screen shows a crowd of up to 80 crowd attendees rather than nine people.
 
 The view is drawn with Sigma.js and graphology. The ForceAtlas2 layout and the Louvain clusters run in a web worker, so the laptop stays responsive.
 
@@ -324,19 +324,19 @@ Cards in the core: `bridge`, `workers`, `api`. Optional cards, each one line to 
 
 - Elastic.md: the `indexer` card (`backlog` is rows pending).
 - BrightData.md: the `ingest` card, present only while a load runs.
-- Simulator.md: the `simulator` card. Scenarios start from the `bandit-claims` command line or from the Simulate tab.
+- Test-Bands.md: the `simulator` card. Scenarios start from the `bandit-claims` command line or from the test bands tab.
 - Vision.md (TBD -- LEO): the `vision` card (`backlog` is frames waiting for the detector).
 
-### Simulate tab (Simulator.md)
+### Test bands tab (Test-Bands.md)
 
-Simulator.md: the Simulate tab is shown in test mode only. Under "Simulated bands" it lists every simulated band 90 to 99: the band with alive or stale, its wearer or "not claimed", and its zone. The line above the table reads "Bands 90 to 93 are the claims story's attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here."
+Test-Bands.md: the test bands tab is shown in test mode only. Its table lists every test band 90 to 99: the band with alive or stale, its wearer or "not claimed", and its zone. The line above the table reads "Bands 90 to 93 are the claims story's attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here."
 
 - "Walk to": every band gets one button per zone, and the button for the zone it is in is greyed. A press calls `POST /api/dev/move/{band}/{station}`, and the band reports from that zone's station.
 - "Press", on bands 94 to 99: `POST /api/dev/press/{band}` presses the band's button, so a tester who opened its tap link claims it.
 - "Fall here", on every claimed band: `POST /api/dev/fall/{band}` runs `bandit-claims fall` for that band, with two of bands 90 to 93 around it as the light circle. They stay in that zone afterwards. The fall incident opens in the incident desk.
 - "Speaker breaks in <zone>", one button per zone under "Property damage": `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that zone. Insurance.md: the property incident and its claim follow.
 
-After "Fall here" or a property button the dashboard switches to the Claims tab, where the new incident waits ([Simulator](../3-services/Simulator.md), [Rust-Backend](../3-services/Rust-Backend.md)).
+After "Fall here" or a property button the dashboard switches to the Claims tab, where the new incident waits ([Test-Bands](../3-services/Test-Bands.md), [Rust-Backend](../3-services/Rust-Backend.md)).
 
 ### Subscriptions
 
@@ -356,13 +356,13 @@ Private tables arrive through the staff views that [SpacetimeDB](../2-data/Space
 | `event_state` | the host portal's Event ended part | yes | no |
 | `staff_jobs` | job monitor | yes | no |
 | `service_heartbeat` | service health | yes | yes |
-| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, incident card controls | yes | yes |
+| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, incident card controls | yes | yes |
 | Medical-ID.md: `medic_medical_cards`, `board_medical_access` | the medical card in the incident desk, the medical access log | yes | medics |
 | Vision.md (TBD -- LEO): `camera`, `camera_count`, `ground_alert`, `vision_assessment` | camera tile | yes | no |
 | Social.md: `event_graph` | event graph | yes | no |
 | BrightData.md: `hall`, `organization` | floor-plan image and booth labels | yes | no |
 
-Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-services/Simulator.md)), so the laptop subscribes to every `band_report` and paints every update.
+Test-Bands.md: only the 10 test bands send reports ([Test-Bands](../3-services/Test-Bands.md)), so the laptop subscribes to every `band_report` and paints every update.
 
 ## Failure modes and fallbacks
 
@@ -387,15 +387,15 @@ Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-service
 **Used by**
 
 - [Attendee app](Attendee-App.md): unclaiming a band through `release_band`; the "Event ended" button that turns every attendee page into the recap.
-- [Medical-ID](../6-features/Medical-ID.md): the incident desk, where the medic asks for the card and sees it.
-- [Insurance](../6-features/Insurance.md), [Medical-ID](../6-features/Medical-ID.md), [Social](../6-features/Social.md), [Vision](../4-devices/Vision.md), [Elastic](../7-integrations/Elastic.md), [Simulator](../3-services/Simulator.md), [BrightData](../7-integrations/BrightData.md): host their optional panels, map layers, the event graph and service cards.
+- [Medical-ID](../6-features/Medical-ID.md): the incident desk, where the medic asks for the card and sees it, and where the medic view's link leads.
+- [Insurance](../6-features/Insurance.md), [Medical-ID](../6-features/Medical-ID.md), [Social](../6-features/Social.md), [Vision](../4-devices/Vision.md), [Elastic](../7-integrations/Elastic.md), [Test-Bands](../3-services/Test-Bands.md), [BrightData](../7-integrations/BrightData.md): host their optional panels, map layers, the event graph and service cards.
 - [Flows](../1-overview/Flows.md): the SOS, manual-override and Event ended steps.
 
 **If you delete this file**
 
 - Ops loses every control; forced states, low visibility and calibration would need another client calling the same reducers, and the manual-override fallback disappears from the event flow.
 - Remove the Ops dashboard row from the component table in Architecture.md and the ops subscriptions from SpacetimeDB.md's "subscriptions per client".
-- Remove the "ops dashboard" bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", incident card controls, property-damage button), Medical-ID.md (the medical card in the incident desk, medical access log), Social.md (event graph), Vision.md (camera tile), Elastic.md (indexer card, booths by hand), Simulator.md (legend and counts, the Simulate tab) and BrightData.md (floor plan and booth fixes).
+- Remove the "ops dashboard" bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", incident card controls, property-damage button), Medical-ID.md (the medical card in the incident desk, medical access log), Social.md (event graph), Vision.md (camera tile), Elastic.md (indexer card, booths by hand), Test-Bands.md (legend and counts, the test bands tab) and BrightData.md (floor plan and booth fixes).
 
 ## Decisions
 
@@ -414,9 +414,9 @@ Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-service
 | Insurance.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Insurance.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
 | A medic takes an incident with "Take it" (`assign_medic`); ops does not assign medics; medics wear no bands | the medic knows whether they are free, and the desk shows who took it |
-| Medical-ID.md: the medic asks for the medical card from the incident desk | the medic already works the incident there, and the card shows inside it |
-| The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 simulated bands report, next to the 9 real ones |
-| Simulator.md: the Simulate tab is shown in test mode only and calls the dev routes; scenarios also start from the `bandit-claims` command line | a tester runs a fall or a property claim from the laptop with one tap, and outside test mode the tab does not exist |
+| Medical-ID.md: the medic opens the medical card from the incident desk or by tapping the band; notes, cost and resolve stay on the desk | the medic already works the incident there, and the card shows inside it; at the person, the tag is quicker |
+| The laptop paints every `band_report` update without throttling | Test-Bands.md: only the 10 test bands report, next to the 9 real ones |
+| Test-Bands.md: the test bands tab is shown in test mode only and calls the dev routes; scenarios also start from the `bandit-claims` command line | a tester runs a fall or a property claim from the laptop with one tap, and outside test mode the tab does not exist |
 | Social.md: the event graph is anonymous on the big screen, and its links come only from `event_graph` | a public screen shows no names; SpacetimeDB pushes the measured links live |
 | The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the wallet on the attendee's recap and in the claims queue |
 | The job monitor reads the `staff_jobs` view, and the incident countdown reads `incident.escalates_at`; the dashboard subscribes to neither `job` nor `escalation_timer` | both are private, the job payload can hold personal data, and the countdown arrives with the incident row the panel already has |

@@ -33,10 +33,10 @@ Explicit non-responsibilities:
 | Gateway command | gateway to bands and stations | bands, stations | packet type 3: target, command, two arguments | ESP-NOW broadcast, each command repeated 3 times 40 ms apart, full power |
 | Gateway uplink | gateway to laptop | `bandit-bridge` | one JSON object per heard packet, plus boot, ack and error lines | USB serial, nominal 115200 baud |
 | Gateway downlink | laptop to gateway | `bandit-bridge` | text lines `cmd <target> <name> [arg] [arg2]` | USB serial |
-| NFC token | band to phone | Attendee app ([Attendee-App](../5-apps/Attendee-App.md)) | URL `https://<host>/t/BANDIT-0n` | NFC NDEF on an NTAG215 sticker, 1 to 2 cm |
+| NFC token | band to phone | Attendee app ([Attendee-App](../5-apps/Attendee-App.md)) | URL `https://band1t.vip/t/BANDIT-0n` | NFC NDEF on an NTAG215 sticker, 1 to 2 cm |
 | Button | wearer to band | the band itself | short press (confirm), 3 s hold (SOS) | GPIO with pull-up |
 | Bench serial | band to and from laptop | hardware owner only, never the backend | status line once a second with the heard list and RSSIs; bench commands | USB-C serial |
-| Vision.md: overhead camera (TBD -- LEO) | phone to `bandit-vision` | [Vision](Vision.md) | JPEG snapshots | HTTP over the team phone's hotspot |
+| Vision.md: security camera (TBD -- LEO) | camera to the venue laptop | [Vision](Vision.md) | live video at 30 fps, read by Leo's security view | the laptop's camera input |
 
 ## Design
 
@@ -195,7 +195,7 @@ Both thresholds are live-tunable with the `thresh` command. The checks run in or
 
 **SOS latch.** SOS is a latched boolean, not a timed state. While latched, the band's beacons carry flag bit 0 and its state is 3 regardless of density. The latch releases on another 3 s hold or on a `clear` command. A fall sets a second latch (flag bit 1) that behaves like SOS; `clear` releases both.
 
-**Fall detection (full bands).** The IMU is sampled every 20 ms. A total acceleration above 2.8 g marks an impact. If, within 3.5 s of the impact, the magnitude stays within 0.2 g of 1 g for 1.5 s (the person is still), the fall latch is set and the SOS buzz pattern plays. Both numbers are starting values, calibrate at the venue. A convincing stage fall is a hard arm stop followed by lying still; jumping should not trigger it.
+**Fall detection (full bands).** The IMU is read every 20 ms. A total acceleration above 2.8 g marks an impact. If, within 3.5 s of the impact, the magnitude stays within 0.2 g of 1 g for 1.5 s (the person is still), the fall latch is set and the SOS buzz pattern plays. Both numbers are starting values, calibrate at the venue. A convincing stage fall is a hard arm stop followed by lying still; jumping should not trigger it.
 
 **Light circle.** When a band hears another band's beacon with the SOS or fall flag at RSSI at or above the circle threshold (-58 dBm, starting value, calibrate at the venue), it opens a 1.5 s NEAR_SOS window that every further such beacon refreshes. Distant bands do not react, so the circle has an edge. A NEAR_SOS band does not set the SOS flag itself, so the circle does not spread from band to band. The circle threshold is stricter than the neighbour threshold on purpose: the circle is the people within arm's reach, not the whole zone. The server also buzzes each full band the first time it is recorded in the circle (see Guidance and vibration below).
 
@@ -317,7 +317,7 @@ A station is a SuperMini with a ring on USB power, placed at an exit or a zone c
 
 ### The NFC token
 
-Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md).
+Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://band1t.vip/t/BANDIT-0n`, on the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md). Medical-ID.md: a medic's phone that taps the same tag opens the medic view of that band ([Medical-ID](../6-features/Medical-ID.md)).
 
 ### Power budget and runtime
 
@@ -360,7 +360,7 @@ The buzz carries no direction; the colour does. The two patterns differ from the
 | No acknowledgement from bands | commands are fire and forget, repeated three times | the bridge reconciles against the state the band reports rather than trusting delivery |
 | The gateway does not buffer | it has no storage and prints as it hears | the bridge reads continuously; a paused reader loses packets |
 | Zone, not position | a band knows only its loudest station | everything downstream is zone-level |
-| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the crowd and simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
+| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Test-Bands.md: the crowd and test band ids 10 to 99 never go on air ([Test-Bands](../3-services/Test-Bands.md)) |
 | No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the event |
 
 ### Calibration as a system process
@@ -377,9 +377,9 @@ The live values: the `rssi` command sets the neighbour and circle RSSI threshold
 
 Inter-band RSSI, the number that best guides the `rssi` thresholds, is visible in v0.1 only on a band's bench serial status line, because beacons carry a count and not the individual RSSIs.
 
-### Overhead camera (TBD -- LEO)
+### Cameras (TBD -- LEO)
 
-Vision.md: the hardware side of the camera is one phone on a light stand looking straight down on the pit. It serves JPEG snapshots over the team phone's hotspot to `bandit-vision` on the laptop, which counts people, spots a person on the ground and judges incidents ([Vision](Vision.md)). The taped squares define the camera's region of interest. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
+Vision.md: the security camera hangs above head height in the security room, tilted down at the floor, and the venue laptop reads it directly at 30 fps. It needs nothing new from the bands: it finds the SOS red strobe at 4 Hz, and its calibration uses the IDENT white blink at 2.5 Hz ([Vision](Vision.md)). A camera over the pit for head counts and person-down alerts is Leo's to choose; the taped squares would define its area. If neighbour counting proves unstable, the camera count is the density source in Plan B ([Safety](../6-features/Safety.md)).
 
 ## Failure modes and fallbacks
 
@@ -404,13 +404,13 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): the wire protocol and the state precedence.
 - [Safety](../6-features/Safety.md): local density, SOS, fall and light-circle behaviour, zone reports, forced states, exit colours and the two buzz cues.
 - [Attendee-App](../5-apps/Attendee-App.md): the NFC token and the IDENT blink for claiming.
-- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the simulated bands.
+- [Test-Bands](../3-services/Test-Bands.md): imitates the band's states and flags for the test bands.
 - (TBD -- LEO) [Social](../6-features/Social.md): zone-level presence from the zone pick.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the fleet panel, state legend, calibration controls and manual override.
 
 **If you delete this file**
 
-- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s simulated bands become the only band reports, through `report_sim_band`.
+- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Test-Bands](../3-services/Test-Bands.md)'s test bands become the only band reports, through `report_sim_band`.
 - Remove the Band, Station marker and Gateway rows from the component table in [Architecture](../1-overview/Architecture.md) and the device nodes from its diagrams.
 - Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md), and the press-to-confirm step from the band claim.
 - In [Safety](../6-features/Safety.md), remove the band-based density estimate, the light circle and both buzz cues; the camera estimate (TBD -- LEO) would stand alone.
