@@ -4,6 +4,8 @@ One branch (`vik-e2e`) with the pipeline, insurance, social and merch work and t
 
 ## Start
 
+`scripts/demo` does it all in one command: it sets up the database the first time, starts the services and opens the host portal and band 94's tap link (Maincloud by default, `E2E_TARGET=local` for the private server). The pieces:
+
 ```sh
 scripts/e2e-server     # local only: a private SpacetimeDB on 127.0.0.1:3097 (leave it running)
 scripts/e2e-publish    # build the module and publish it
