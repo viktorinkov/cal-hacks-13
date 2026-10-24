@@ -398,7 +398,10 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
                 .photo_id()
                 .filter(p.id)
                 .filter(|o| o.attendee != me && o.status != "removed")
-                .filter_map(|o| if met(ctx, me, o.attendee) { person_card(ctx, o.attendee) } else { Some(someone()) })
+                .filter_map(|o| {
+                    let card = person_card(ctx, o.attendee)?;
+                    Some(if met(ctx, me, o.attendee) { card } else { someone() })
+                })
                 .collect();
             Some(MyPhoto {
                 tag_id: t.id,
