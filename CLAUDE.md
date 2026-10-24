@@ -1,5 +1,7 @@
 # Repository rules
 
+The rules in @AGENTS.md apply too.
+
 ## Git
 
 - Never add Claude as a co-author or add any attribution to commits or pull requests: no `Co-Authored-By` trailers, no "Generated with Claude Code" lines, no session links. This applies to every commit, merge commit and pull request in this repository.
