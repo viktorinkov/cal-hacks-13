@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from PIL import Image
 
-from elastic import DATA, Elastic
+from elastic import DATA, PREFIX, Elastic
 
 try:
     from pillow_heif import register_heif_opener
@@ -31,7 +31,7 @@ phone's clock is already exact, and its location is kept when the photo has one.
 movies are skipped. Camera: a sync shot is a photo of a phone showing a clock with seconds; pass its file name and
 the time shown. One corrects the offset, two (start and end) also the drift. Times without a zone use --tz
 (California is -07:00 until Nov 1). Records go to pipeline/data/photos_<session>_<time>.jsonl, and with --upload to
-the bandit-photos index; importing a photo again never creates a duplicate."""
+the bandit-raw-photos index; importing a photo again never creates a duplicate."""
 
 EXIF_IFD, GPS_IFD, MAKE, MODEL, DATETIME = 0x8769, 0x8825, 0x010F, 0x0110, 0x0132
 ORIGINAL, SUBSEC, OFFSET = 0x9003, 0x9291, 0x9011
@@ -174,7 +174,7 @@ def main():
     ap.add_argument('--session', default=datetime.now().strftime('photos-%m%d'))
     ap.add_argument('--upload', action='store_true')
     ap.add_argument('--watch', action='store_true')
-    ap.add_argument('--prefix', default='bandit')
+    ap.add_argument('--prefix', default=PREFIX)
     args = ap.parse_args()
     tz = parse_tz(args.tz)
     if args.folder == INBOX:

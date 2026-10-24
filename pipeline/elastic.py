@@ -5,6 +5,7 @@ import requests
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'pipeline', 'data')
+PREFIX = 'bandit-raw'
 
 MAPPINGS = {
     'radio': {
@@ -73,7 +74,7 @@ def load_env():
 
 
 class Elastic:
-    def __init__(self, prefix='bandit'):
+    def __init__(self, prefix=PREFIX):
         load_env()
         self.url = os.environ.get('ELASTICSEARCH_URL', '').rstrip('/')
         key = os.environ.get('ELASTICSEARCH_API_KEY', '')

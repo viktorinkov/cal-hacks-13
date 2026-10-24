@@ -11,7 +11,7 @@ import time
 import tty
 from datetime import datetime, timezone
 
-from elastic import DATA, Elastic
+from elastic import DATA, PREFIX, Elastic
 
 STATIONS = [101, 102, 103, 104, 105]
 USAGE = """record the gateway with wall-clock time, and load it into Elastic
@@ -230,7 +230,7 @@ def upload(args):
 
 def main():
     ap = argparse.ArgumentParser(description=USAGE, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--prefix', default='bandit')
+    ap.add_argument('--prefix', default=PREFIX)
     sub = ap.add_subparsers(dest='cmd', required=True)
     r = sub.add_parser('record')
     r.add_argument('--port', required=True)
