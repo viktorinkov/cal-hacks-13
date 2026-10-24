@@ -86,6 +86,9 @@ enum Cmd {
         /// Invoice suffix (default: the template's)
         #[arg(long)]
         invoice_suffix: Option<String>,
+        /// Make the record out to the claimant, with an invoice number of the claim's own
+        #[arg(long)]
+        for_claimant: bool,
     },
     /// One line per claim
     Claims,
@@ -190,8 +193,14 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::Treat { incident, note } => flow::treat(&app, incident, &note),
         Cmd::Resolve { incident, resolution } => flow::resolve(&app, incident, &resolution, "medic").map(|_| ()),
         Cmd::Property { zone, note, cost, camera } => flow::property(&app, &zone, &note, parse_money(&cost)?, camera).map(|_| ()),
-        Cmd::AttachRecord { claim, template, invoice_suffix } => {
-            flow::attach_record(&app, claim, &template, invoice_suffix.as_deref(), None).map(|_| ())
+        Cmd::AttachRecord { claim, template, invoice_suffix, for_claimant } => {
+            let (suffix, patient) = if for_claimant {
+                let c = app.claim(claim)?;
+                (Some(invoice_suffix.unwrap_or_else(|| format!("2410-{claim:04}"))), Some(c.claimant_name))
+            } else {
+                (invoice_suffix, None)
+            };
+            flow::attach_record(&app, claim, &template, suffix.as_deref(), patient.as_deref()).map(|_| ())
         }
         Cmd::Claims => show::claims(&app),
         Cmd::Show { claim } => show::show(&app, claim),
