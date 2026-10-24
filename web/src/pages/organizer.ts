@@ -5,8 +5,8 @@
 // decides the claims afterwards.
 
 import {
-  act, actors, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
-  signOut, signedInEmail, testAs, time, type Actor, type Config, EXIT_COLOURS,
+  act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
+  signOut, signedInEmail, time, type Config, EXIT_COLOURS,
 } from '../lib';
 import { graphTab } from '../graph';
 import type { DbConnection } from '../module_bindings';
@@ -53,7 +53,6 @@ const SAMPLE_RECORDS: [string, string][] = [
 
 let conn: DbConnection;
 let cfg: Config;
-let people: Actor[] = [];
 let tab = location.hash.slice(1);
 let openClaim: bigint | undefined;
 
@@ -113,9 +112,7 @@ function header() {
     h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} organizer portal`),
     h('p', {},
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
-    h('p', {},
-      cfg.simulate && testAs(people),
-      h('span', { class: 'muted' }, ` Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`)),
+    h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
     can('ops') && h('p', {},
       ended
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
@@ -481,9 +478,10 @@ function render() {
 
 async function main() {
   cfg = await config();
-  // Sign-in comes first wherever SpacetimeAuth is set up; testing as someone else is only offered after it.
+  // Wherever SpacetimeAuth is set up, sign-in comes first and staff always act as themselves; only a
+  // local server without sign-in still takes ?as= for testing.
   if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
-  if (cfg.simulate) people = await actors();
+  if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
   window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);
