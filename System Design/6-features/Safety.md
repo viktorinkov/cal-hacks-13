@@ -27,7 +27,7 @@ Non-responsibilities:
 | Direction | Counterpart | What flows | Tables or reducers | Transport |
 |---|---|---|---|---|
 | In | `bandit-bridge` | per band: `neigh`, `zone`, `state`, SOS, fall and press flags, every 250 ms | `band_report` through `ingest_band_reports` | reducer |
-| In | Simulator.md: the `bandit-claims` tool and `bandit-api` dev routes | the same fields for scripted bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
+| In | Simulator.md: the `bandit-claims` tool and `bandit-api` dev routes | the same fields for simulated bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
 | In | Venue seed | zones with areas, zone graph with distances, exits with colours and status, stations | `zone`, `zone_link`, `exit`, `station` | seed load |
 | In | Ops (calibration screen) | measured points mapping `neigh` to people per square metre | `calibration_point` through `set_calibration` | TypeScript SDK |
 | In | Ops | mode, blocked exits, pinned exit, pinned risk, forced states, reset | `set_venue_mode`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
@@ -320,7 +320,7 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Attendee-App](../5-apps/Attendee-App.md) (medic view, evacuation banner, busy map), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Attendee-App](../5-apps/Attendee-App.md) (medic view), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
 
 **If you delete this file**
 
@@ -333,7 +333,7 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 |---|---|
 | The pit zone's `area_m2` is the standing area around its station marker, paced out when the room is measured and written in the seed | it only sets the `density_count` floor; the taped squares are what the calibration measures |
 | Ops picks the medic's entry zone with one tap; medics do not wear bands | one input that is always there, with no band zone to look up |
-| Exit choice uses the seed's starting values (crowding penalty 0.25, switch margin 10 percent); the simulator's two-exit scenario is on the rehearsal checklist | the values are checked once against a simulated crowd before anyone stands in the room |
+| Exit choice uses the seed's starting values (crowding penalty 0.25, switch margin 10 percent); the simulator's two-exit scenario is on the rehearsal checklist | the values are checked once against the simulated bands before anyone stands in the room |
 | A full band gets one long buzz (pattern 3) when its guidance starts or its exit colour changes | the vibration says "move now" and the colour says where; one buzz per change keeps it meaningful |
 | A full band gets one double buzz (pattern 2) when it first joins an incident's light circle | the bands around a fallen person vibrate and light up, as the project description asks; the double pattern differs from the long guidance buzz |
 | A witness is a state 4 band in the incident zone or a linked zone | the light circle is a few metres wide, so a band further away cannot be in it |

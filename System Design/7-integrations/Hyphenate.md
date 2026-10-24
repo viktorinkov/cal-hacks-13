@@ -20,7 +20,7 @@ Responsibilities:
 - Post balanced `ledger_entry` journals for every money movement and keep the claim status honest about them.
 - Draft the first notice of loss in the layout of ACORD 3, the claim summary and recovery letters through `bandit-workers` jobs.
 - Own `claimant_account`, each attendee's one Nessie account, where claim payouts land.
-- Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](Payments-Nessie.md); the wallet is the same `claimant_account`, which it opens at sign-up.
+- Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](Payments-Nessie.md); the wallet is the same `claimant_account`, which it opens when the attendee connects it in setup.
 - Simulator.md: score the accuracy run of planted claims on the Claims queue.
 - Elastic.md: send a de-identified copy of each claim to Elastic and record its similar past claims as checks.
 
@@ -41,7 +41,7 @@ Non-responsibilities:
 |---|---|---|---|---|
 | Hook in `resolve_incident` | in | `band1t` module (Safety.md) | incident id; writes the subject's `injured_party` row for a `sos` or `fall`, then opens a claim for every injured party with a first-aid cost or a bill, or for a `property` incident with a cost note | same transaction, module-internal call to the `open_claim` logic |
 | `add_injured_party` | in | the assigned `medic`, `ops` | open incident id, a band picked from the snapshot's bands present, first-aid cost in cents | reducer; writes `injured_party` |
-| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Simulator.md: the `bandit-claims` tool for incidents on scripted bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Simulator.md: the `bandit-claims` tool for incidents on simulated bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | `submit_medical_record` | in | the incident card as the signed-in staff member (roles `medic`, `ops`, `floor_manager`, `risk_manager`) | incident id, injured party id, the file's SHA-256 (its registered `blob_ref`), page count; the caller is the uploader | reducer; writes `medical_record`, rejects an identical file, enqueues `claim_record_extract`, opens the claim when the incident is already resolved |
 | `apply_medical_record` | in | role `worker` | job id, bill id, validated header and lines, `model_call` id | reducer; rejects a stale lease; prices the lines and runs the duplicate check |
 | `enter_claim_lines` | in | `risk_manager`, `adjuster` | bill id, header and lines typed from the PDF | reducer; same pricing and duplicate check |
@@ -380,7 +380,7 @@ Anthropic-Agent.md: without it, `claim_draft` and `recovery_letter` fill a fixed
 
 ### Payout
 
-When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Payments-Nessie](Payments-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount into the claimant's Nessie wallet, where it appears in the attendee app, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`. When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; a risk manager or adjuster calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
+When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Payments-Nessie](Payments-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount into the claimant's Nessie wallet, where it shows in the attendee's recap, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`. When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; a risk manager or adjuster calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
 
 Simulator.md: a simulated claimant has no wallet. The worker opens a Nessie customer and an account with 0 for the payout, and `record_claim_payout` stores it as their wallet, so a simulated claim is paid the same way as a real one.
 
@@ -465,8 +465,8 @@ Step by step (illustrative numbers):
 
 3. Claude's review. The pack is `corroborated` (note at 22:26 within 30 min; witnesses in zone 102: 3 of 3). Claude's verdict is `follows`: the band's fall flag at 22:14 in zone 102, three witness bands in the same zone, the medic's wrist note 12 minutes later and a same-night urgent-care visit for a wrist injury after a fall. The explanation has no figures; the amount is already fixed.
 4. The first claim routes. No rule exists, and $625 is above the floor manager's $500, so the claim waits for `risk_manager`: the judge. While the judge reads the grid, the medic adds a late note (a sling at the first-aid point, $25) and ops taps Rebuild pack. The judge's first tap on Approve carries $625 and the v1 SHA, so it fails as stale and the grid reloads with $650 and the v2 SHA. This is the fail-closed edge case, live. The judge approves again with the suggested tolerance of $1,000.
-5. Money moves. J1 already reserved $625 and then $25; J2 books the $650 receivable (deductible 0); the Nessie deposit of $650 lands in the teammate's wallet in the attendee app, and J3 posts. The notice in ACORD 3 layout, drafted for pack v2, is ready to send. Rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling min($1,000, $5,000) = $1,000, stamped with the judge's display name.
-6. The payoff. The `bandit-claims` tool (Simulator.md) plants a second, similar fall on a scripted band, with its own medic visit and bill (billed $675, paid $440). It passes the same code checks and the same causation review, matches rule v1 and settles in seconds: "Settled under rule v1, approved by <the judge's display name> 2 minutes ago". Its claimant is simulated and has no wallet, so the payout opens a Nessie account for it, and J3 posts when the deposit lands.
+5. Money moves. J1 already reserved $625 and then $25; J2 books the $650 receivable (deductible 0); the Nessie deposit of $650 lands in the teammate's wallet, where their recap shows it, and J3 posts. The notice in ACORD 3 layout, drafted for pack v2, is ready to send. Rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling min($1,000, $5,000) = $1,000, stamped with the judge's display name.
+6. The payoff. The `bandit-claims` tool (Simulator.md) plants a second, similar fall on a simulated band, with its own medic visit and bill (billed $675, paid $440). It passes the same code checks and the same causation review, matches rule v1 and settles in seconds: "Settled under rule v1, approved by <the judge's display name> 2 minutes ago". Its claimant is simulated and has no wallet, so the payout opens a Nessie account for it, and J3 posts when the deposit lands.
 7. The refusal. The `bandit-claims` tool (Simulator.md) plants a fake claim for Lee, a simulated attendee: a fall flag in zone 102 whose witness bands all sit in zone 105. The `witness_zone` check fails, so corroboration is `disputed`, and code refuses the claim at claim open with reason `witness_zone`, before Claude's review and before any money moves. The screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
 
 The one fallback: if the judge's approval cannot be made live (the phone cannot connect, or the step runs out of time), a staff member with `ops` loads the fallback rule v1 with `load_fallback_rule`, and steps 6 and 7 run unchanged.
@@ -537,7 +537,7 @@ erDiagram
 
 | Table | One row is | Key fields |
 |---|---|---|
-| `claimant_account` | one attendee's Nessie account, the only one they have | `identity` (the attendee, primary key), `customer_id`, `account_id`, `created_at`; written by `record_claim_payout` for a claimant who has none; Payments-Nessie.md: written by `record_wallet` at sign-up, and used as the BandIt wallet |
+| `claimant_account` | one attendee's Nessie account, the only one they have | `identity` (the attendee, primary key), `customer_id`, `account_id`, `created_at`; written by `record_claim_payout` for a claimant who has none; Payments-Nessie.md: written by `record_wallet` when the attendee connects the wallet in setup, and used as the BandIt wallet |
 | `insurance_policy` | one policy | insurer name, policy number, `purpose` (`event`, `accuracy_run`), period start and end, FNOL contact, the venue's name and address for the notice, `aggregate_used_cents` per cover kind (updated by code at settlement) |
 | `coverage_rule` | one cover under a policy | see Coverage and amounts |
 | `fee_schedule` | one service code the policy pays | `code`, `description`, `cap_cents`, `cover_kind`, `active` |
@@ -610,7 +610,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Claims queue (Hyphenate.md)" panel row, the incident card controls and the Report property damage button.
 - [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): the accuracy run before doors open (step 0c), step 9 and the finance track row.
-- [Payments-Nessie](Payments-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes at sign-up.
+- [Payments-Nessie](Payments-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes when the attendee connects the wallet.
 - [Simulator](../3-services/Simulator.md): `plant_medic_visit` feeds this file's claims.
 - [Elastic](Elastic.md): `bandit-claims` holds this file's de-identified claim copies.
 
@@ -624,7 +624,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - Remove the `via = claim` row from the access log table in Medical-ID.md.
 - Remove the Hyphenate use cases from Anthropic-Agent.md, and the Hyphenate.md parts of Simulator.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
 - Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
-- Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, the Hyphenate.md rows in Flows.md (the risk manager, step 0c, step 9, its diagram index row, its failure row and its decision row), the prize row in Architecture.md, the Hyphenate.md rows in Attendee-App.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the two Hyphenate.md rows in Decisions.md, and the Hyphenate row and node in README.md.
+- Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, the Hyphenate.md rows in Flows.md (the risk manager, step 0c, step 9, its diagram index row, its failure row and its decision row), the prize row in Architecture.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the two Hyphenate.md rows in Decisions.md, and the Hyphenate row and node in README.md.
 - Drop the roles `floor_manager`, `risk_manager` and `adjuster` from SpacetimeDB.md and Ops-Dashboard.md; nothing else uses them.
 
 ## Decisions
@@ -648,8 +648,8 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | The first notice of loss follows the ACORD 3 sections; code fills every field it can and Claude writes only the free text | insurers read that layout, and every figure in it then comes from code |
 | A refusal writes a ceiling-0 rule version only when the rule would have settled that claim | a decoy refused for its own reason must not switch off a good rule during the accuracy run |
 | A learned rule matches only while its policy's period is open; it does not carry over to the next event | the rule is an approval under this policy's limits; a new policy starts with no rules |
-| Payments-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens at sign-up | one Nessie account per attendee, so a payout and a merch purchase show in one balance |
-| A claimant with no wallet, such as a simulated one, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
+| Payments-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens when the attendee connects it in setup | one Nessie account per attendee, so a payout and a merch purchase show in one balance |
+| A claimant with no wallet, such as a simulated one or an attendee who never connected one, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
 | Evidence windows: camera frames within 120 s of the band's flag time, the medic note within 30 min of resolution, the bill's service date within 3 days; all starting values, calibrate at the venue | wide enough for a real medic visit and an urgent-care trip, narrow enough that another event's paperwork cannot corroborate |
 | J1 is posted when a claim passes the code checks; a claim refused by them posts nothing | nothing was reserved, so nothing needs reversing; J1r then always means a refusal after the reserve |
 | `claim_draft` runs per incident when its claims are routed or auto-settled, and again for a rebuilt pack | the approver needs the summary and the suggested tolerance before deciding, and every figure must match the current pack |

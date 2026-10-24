@@ -142,7 +142,7 @@ Booths are labelled dots at `booth.plan_x_m`, `booth.plan_y_m`. Ops drags a misp
 
 | Column | Source | Rule |
 |---|---|---|
-| Band id | `band` | real bands 1 to 9; Simulator.md: scripted bands 90 to 99 (the crowd has no reports, so no row) |
+| Band id | `band` | real bands 1 to 9; Simulator.md: simulated bands 90 to 99 (the crowd has no reports, so no row) |
 | Alive | `band_report` age | green dot when heard in the last 2 s, grey row after 5 s |
 | State | `band_report.state` | chip in the ring's colour with the state name; a forced state shows a pin icon from `band_directive` |
 | Zone | `band_report.zone` | station id mapped to the zone name; blank when 0 |
@@ -336,7 +336,7 @@ Private tables arrive through the staff views that [SpacetimeDB](../2-data/Space
 | Social.md: `event_graph` | event graph | yes | no |
 | BrightData.md: `hall`, `organization` | floor-plan image and booth labels | yes | no |
 
-Simulator.md: only the 10 scripted bands send reports ([Simulator](../3-services/Simulator.md)), so the laptop subscribes to every `band_report` and paints every update.
+Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-services/Simulator.md)), so the laptop subscribes to every `band_report` and paints every update.
 
 ## Failure modes and fallbacks
 
@@ -384,10 +384,10 @@ Simulator.md: only the 10 scripted bands send reports ([Simulator](../3-services
 | Hyphenate.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Hyphenate.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
 | Ops picks the medic's entry zone with one tap; medics wear no bands | the entry zone drives the medic approach, and a tap is faster than any default |
-| The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 scripted bands report, next to the 9 real ones |
+| The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 simulated bands report, next to the 9 real ones |
 | Simulator.md: scenarios start from the `bandit-claims` command line; the dashboard has no simulator panel | the dashboard only shows what the simulator does |
 | Social.md: the event graph is anonymous on the big screen, and its links come only from `event_graph` | a public screen shows no names; SpacetimeDB pushes the measured links live |
-| The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the attendee's wallet and the claims queue |
+| The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the wallet section of the attendee's recap and in the claims queue |
 | The job monitor reads the `staff_jobs` view, and the incident countdown reads `incident.escalates_at`; the dashboard subscribes to neither `job` nor `escalation_timer` | both are private, the job payload can hold personal data, and the countdown arrives with the incident row the panel already has |
 | The host portal is the dashboard's layout for `ops`, and its "Event ended" button runs `end_event` ("Reopen the event" runs `reopen_event`) | the host chooses the moment the night ends, with one press, and every attendee page turns into the recap at once |
 | Staff sign in with the same SpacetimeAuth magic link as attendees | one sign-in to build, and the identity code the owner grants is the same on every device |

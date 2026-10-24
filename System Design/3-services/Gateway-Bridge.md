@@ -19,7 +19,7 @@ Explicit non-responsibilities:
 
 - It decides nothing about safety: no incident logic, no exit assignment, no density. Those live in the module ([Safety](../6-features/Safety.md)). The bridge is a courier with a memory.
 - It holds no truth. Everything it knows is in `band_report`, `service_heartbeat` or its raw log, and a restart loses nothing the system needs.
-- It never speaks for simulated bands (Simulator.md: the crowd, ids 10 to 89, and the scripted bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
+- It never speaks for bands no radio carries (Simulator.md: the crowd bands, ids 10 to 89, and the simulated bands, ids 90 to 99); [Simulator](Simulator.md) handles those itself.
 - It does not synchronise clocks. It timestamps lines with the laptop clock on receipt and sends ages, not timestamps.
 - It runs no feature flow. It relays the claim blink down and the press flag up, and the module decides.
 
@@ -291,7 +291,7 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 
 **If you delete this file**
 
-- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s scripted bands report, through `report_sim_band`.
+- Real bands can no longer report or receive directives; delete [Hardware](../4-devices/Hardware.md)'s software coupling too, and only [Simulator](Simulator.md)'s simulated bands report, through `report_sim_band`.
 - Move the `bandit-protocol` crate description to [Simulator](Simulator.md), which still needs it.
 - Remove the `bridge` role and the bridge rows from the service tables in [Rust-Backend](Rust-Backend.md) and [Architecture](../1-overview/Architecture.md), and the `bandit-bridge` row from the service health panel in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
 - In [Safety](../6-features/Safety.md), note that `band_directive` and `band_command` rows have no consumer for real bands.

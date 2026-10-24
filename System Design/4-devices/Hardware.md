@@ -314,7 +314,7 @@ A station is a SuperMini with a ring on USB power, placed at an exit or a zone c
 
 ### The NFC token
 
-Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band; BrightData.md: claiming a profile) requires a button press on the band within a server-timed window. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md); Medical-ID.md: the medic flow and the staff-only access rule.
+Each band carries an NTAG215 sticker (504 bytes, NDEF) with an anti-metal backing, placed on the lid over the electronics bay so it reads through the case. It holds one URL record, `https://<host>/t/BANDIT-0n`, where `<host>` is the one public HTTPS host of `bandit-api`, which serves the attendee app ([Rust-Backend](../3-services/Rust-Backend.md)), and the token matches `band.nfc_token`. A phone reads it at 1 to 2 cm, including through a hand; recent iPhones read it in the background with the screen on. The tags are written with that host and locked read-only. The tag is static and can be cloned, which is accepted for v0.1: the token only opens a page, and every action that needs the wearer's consent (claiming the band) requires a button press on the band within a server-timed window. BrightData.md: claiming a profile is open only to a band owner, so it rests on that press. Tap to join and claiming live in [Attendee-App](../5-apps/Attendee-App.md); Medical-ID.md: the medic flow and the staff-only access rule.
 
 ### Power budget and runtime
 
@@ -356,7 +356,7 @@ The buzz carries no direction; the colour does. The two patterns differ from the
 | No acknowledgement from bands | commands are fire and forget, repeated three times | the bridge reconciles against the state the band reports rather than trusting delivery |
 | The gateway does not buffer | it has no storage and prints as it hears | the bridge reads continuously; a paused reader loses packets |
 | Zone, not position | a band knows only its loudest station | everything downstream is zone-level |
-| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
+| Fleet size | one-byte ids, tables of 32 bands and 8 stations, 10 Hz beacons on one channel | ample for 9 bands and 5 stations; Simulator.md: the crowd and simulated ids 10 to 99 never go on air ([Simulator](../3-services/Simulator.md)) |
 | No encryption or authentication | ESP-NOW broadcast frames cannot be encrypted, and the packet has no signature | anyone on channel 1 with the packet layout can inject beacons or commands; accepted for the event |
 
 ### Calibration as a system process
@@ -400,13 +400,13 @@ Vision.md: the hardware side of the camera is one phone on a light stand looking
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): the wire protocol and the state precedence.
 - [Safety](../6-features/Safety.md): local density, SOS, fall and light-circle behaviour, zone reports, forced states, exit colours and the two buzz cues.
 - [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md): the NFC token and the IDENT blink for claiming.
-- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the scripted bands.
+- [Simulator](../3-services/Simulator.md): imitates the band's states and flags for the simulated bands.
 - [Social](../6-features/Social.md): zone-level presence.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the fleet panel, state legend, calibration controls and manual override.
 
 **If you delete this file**
 
-- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s scripted bands become the only band reports, through `report_sim_band`.
+- There is no physical layer. [Gateway-Bridge](../3-services/Gateway-Bridge.md) has nothing to read and goes too; [Simulator](../3-services/Simulator.md)'s simulated bands become the only band reports, through `report_sim_band`.
 - Remove the Band, Station marker and Gateway rows from the component table in [Architecture](../1-overview/Architecture.md) and the device nodes from its diagrams.
 - Remove the NFC tap entry point from [Attendee-App](../5-apps/Attendee-App.md) and [Medical-ID](../6-features/Medical-ID.md), and the press-to-confirm step from the band claim.
 - In [Safety](../6-features/Safety.md), remove the band-based density estimate, the light circle and both buzz cues; the camera estimate (TBD -- LEO) would stand alone.

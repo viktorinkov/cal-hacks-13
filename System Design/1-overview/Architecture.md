@@ -24,7 +24,7 @@ Every connection in the system. Names match the component docs.
 | Gateway | Band, station marker | commands (`state`, `exit`, `clear`, `buzz`, `thresh`, `rssi`, `override`) | ESP-NOW broadcast, each sent 3 times |
 | Gateway | `bandit-bridge` | one JSON line per packet heard; command lines back | USB serial, 115200 baud |
 | `bandit-bridge` | `band1t` module | `ingest_band_reports` every 250 ms; subscriptions to `band_directive`, `band_command`, `fleet_config` | SpacetimeDB Rust client SDK (WebSocket) |
-| Simulator.md: the `bandit-claims` command-line tool and `bandit-api`'s dev routes | `band1t` module | reports for the 10 scripted bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
+| Simulator.md: the `bandit-claims` command-line tool and `bandit-api`'s dev routes | `band1t` module | reports for the 10 simulated bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
 | Ops dashboard, Attendee app | `band1t` module | reducer calls; subscriptions to their slice | SpacetimeDB TypeScript client SDK (WebSocket) |
 | Ops dashboard, Attendee app | SpacetimeAuth | the magic-link email sign-in; an ID token that SpacetimeDB checks on connect | HTTPS, OpenID Connect |
 | Ops dashboard, Attendee app | `bandit-api` | the app files, uploads and downloads, and the feature endpoints listed in [Rust-Backend](../3-services/Rust-Backend.md) | HTTPS, same origin |
@@ -126,7 +126,7 @@ flowchart LR
   Bands <-->|"beacons up, commands down"| Gateway
   Gateway <-->|"USB serial lines"| Bridge
   Bridge <-->|"reports up, directives down"| STDB
-  Sim -->|"scripted band reports"| STDB
+  Sim -->|"simulated band reports"| STDB
   Ops <-->|"subscriptions, ops reducers"| STDB
   App <-->|"subscriptions, attendee reducers"| STDB
   Ops -->|"app files"| API
@@ -197,7 +197,7 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Presence history | `band1t` module (`presence_sample`) | `memory_tick` | none; Social.md: derives `visit` from it and writes `social_encounter` by the encounter rule (TBD -- LEO); Elastic.md copies both, for findable attendees only, to `bandit-memories` |
 | Zone history | `band1t` module (`zone_sample`) | `memory_tick` | none |
 | Social.md: the people graph | `band1t` module (`people_link`) | the social step of `memory_tick`; `exhibits` links from the import | none; Elastic.md: `bandit-people` holds each findable attendee's interests, never the links |
-| Medical-ID.md, Hyphenate.md: medical card, insurance policy | `band1t` module, private tables | attendee app, workers | never copied |
+| Medical-ID.md, Hyphenate.md: medical card (with the attendee's own health insurance), the venue's insurance policy | `band1t` module, private tables | attendee app, workers | never copied |
 | Payments-Nessie.md, Hyphenate.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Nessie ids | Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used only to rank similar past claims |
 | Files: photos, PDFs, letters | the blob store, a folder on the Fly volume | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
 | Raw radio log | `.jsonl` files on the laptop | `bandit-bridge` | stay on the laptop; used for calibration and replay |
@@ -327,7 +327,7 @@ flowchart TB
 
 | Identifier | Format | Assigned by | Used by |
 |---|---|---|---|
-| Band id | one byte, as on the radio: 1 to 9 for real bands; Simulator.md: 10 to 89 for the crowd, 90 to 99 for the scripted bands | firmware flag; Simulator.md: `start_crowd` and the scripted id range | radio, bridge, module, dashboard |
+| Band id | one byte, as on the radio: 1 to 9 for real bands; Simulator.md: 10 to 89 for the crowd bands, 90 to 99 for the simulated bands | firmware flag; Simulator.md: `start_crowd` and the simulated id range | radio, bridge, module, dashboard |
 | Station id | 101 to 105; exit colour index defaults to id minus 100 | firmware flag | radio, zone selection, exit guidance |
 | Gateway id | 200 | firmware | radio |
 | NFC token | `BANDIT-01` to `BANDIT-09` in the URL `https://<host>/t/BANDIT-0n`, where `<host>` is `bandit-api`'s public host | written to each sticker | attendee app landing, medic view |
