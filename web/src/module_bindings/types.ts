@@ -152,6 +152,16 @@ export const BoardMerchOrder = __t.object("BoardMerchOrder", {
 });
 export type BoardMerchOrder = __Infer<typeof BoardMerchOrder>;
 
+export const BoardPhoto = __t.object("BoardPhoto", {
+  id: __t.u64(),
+  url: __t.string(),
+  takenAt: __t.timestamp(),
+  zoneName: __t.string(),
+  caption: __t.string(),
+  nodeIds: __t.array(__t.u64()),
+});
+export type BoardPhoto = __Infer<typeof BoardPhoto>;
+
 export const Booth = __t.object("Booth", {
   id: __t.u64(),
   sourceKey: __t.string(),

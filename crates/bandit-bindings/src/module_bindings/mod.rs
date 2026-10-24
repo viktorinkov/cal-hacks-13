@@ -43,6 +43,8 @@ pub mod board_medical_access_table;
 pub mod board_merch_order_type;
 pub mod board_merch_orders_table;
 pub mod board_notes_table;
+pub mod board_photo_type;
+pub mod board_photos_table;
 pub mod board_policies_table;
 pub mod board_precedents_table;
 pub mod board_records_table;
@@ -363,6 +365,8 @@ pub use board_medical_access_table::*;
 pub use board_merch_order_type::BoardMerchOrder;
 pub use board_merch_orders_table::*;
 pub use board_notes_table::*;
+pub use board_photo_type::BoardPhoto;
+pub use board_photos_table::*;
 pub use board_policies_table::*;
 pub use board_precedents_table::*;
 pub use board_records_table::*;
@@ -1758,6 +1762,7 @@ pub struct DbUpdate {
     board_medical_access: __sdk::TableUpdate<MedicalAccessLog>,
     board_merch_orders: __sdk::TableUpdate<BoardMerchOrder>,
     board_notes: __sdk::TableUpdate<IncidentNote>,
+    board_photos: __sdk::TableUpdate<BoardPhoto>,
     board_policies: __sdk::TableUpdate<InsurancePolicy>,
     board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
     board_records: __sdk::TableUpdate<MedicalRecord>,
@@ -1927,6 +1932,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_notes" => db_update
                     .board_notes
                     .append(board_notes_table::parse_table_update(table_update)?),
+                "board_photos" => db_update
+                    .board_photos
+                    .append(board_photos_table::parse_table_update(table_update)?),
                 "board_policies" => db_update
                     .board_policies
                     .append(board_policies_table::parse_table_update(table_update)?),
@@ -2517,6 +2525,8 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<BoardMerchOrder>("board_merch_orders", &self.board_merch_orders);
         diff.board_notes =
             cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
+        diff.board_photos =
+            cache.apply_diff_to_table::<BoardPhoto>("board_photos", &self.board_photos);
         diff.board_policies = cache
             .apply_diff_to_table::<InsurancePolicy>("board_policies", &self.board_policies)
             .with_updates_by_pk(|row| &row.id);
@@ -2654,6 +2664,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_photos" => db_update
+                    .board_photos
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_policies" => db_update
                     .board_policies
@@ -3043,6 +3056,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_photos" => db_update
+                    .board_photos
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_policies" => db_update
                     .board_policies
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3397,6 +3413,7 @@ pub struct AppliedDiff<'r> {
     board_medical_access: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
     board_merch_orders: __sdk::TableAppliedDiff<'r, BoardMerchOrder>,
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
+    board_photos: __sdk::TableAppliedDiff<'r, BoardPhoto>,
     board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
     board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
     board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
@@ -3573,6 +3590,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<IncidentNote>(
             "board_notes",
             &self.board_notes,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<BoardPhoto>(
+            "board_photos",
+            &self.board_photos,
             event,
         );
         callbacks.invoke_table_row_callbacks::<InsurancePolicy>(
@@ -4588,6 +4610,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_medical_access_table::register_table(client_cache);
         board_merch_orders_table::register_table(client_cache);
         board_notes_table::register_table(client_cache);
+        board_photos_table::register_table(client_cache);
         board_policies_table::register_table(client_cache);
         board_precedents_table::register_table(client_cache);
         board_records_table::register_table(client_cache);
@@ -4715,6 +4738,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_medical_access",
         "board_merch_orders",
         "board_notes",
+        "board_photos",
         "board_policies",
         "board_precedents",
         "board_records",

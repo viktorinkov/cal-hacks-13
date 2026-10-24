@@ -40,7 +40,14 @@ nav .on { font-weight: bold; text-decoration: none; color: #111; }
 .alert { background: #ffe1e1; border-color: #f99; }
 code { background: #eee; padding: 1px 4px; border-radius: 3px; }
 .venue-map canvas { width: 100%; display: block; background: #fff; }
-.graph { height: 70vh; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+.graph { position: relative; height: 70vh; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #0b1020; }
+.graph:fullscreen { border-radius: 0; }
+.graph-card { position: absolute; top: 8px; left: 8px; z-index: 2; max-width: 240px; padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, .94); font-size: 13px; }
+.graph-card img, .graph-tip img { display: block; width: 100%; margin-bottom: 6px; border-radius: 4px; }
+.graph-tip { max-width: 220px; font-size: 13px; }
+.graph-bar button.on { font-weight: bold; }
+label.check.inline { display: inline-flex; margin: 0 8px; }
 .legend span { margin-right: 14px; font-size: 14px; color: #555; white-space: nowrap; }
 .legend i { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle; }
 .legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
+.legend i.photo { border-radius: 1px; outline: 1px solid #888; }
