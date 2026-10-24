@@ -11,81 +11,25 @@
       "model": {
         "type": "keyword"
       },
-      "organizations": {
-        "properties": {
-          "key": {
-            "type": "keyword"
-          },
-          "name": {
-            "type": "keyword"
-          },
-          "domain": {
-            "type": "keyword"
-          },
-          "member_keys": {
-            "type": "keyword"
-          },
-          "facts_key": {
-            "type": "keyword"
-          },
-          "category": {
-            "type": "keyword"
-          },
-          "tags": {
-            "type": "keyword"
-          },
-          "description": {
-            "type": "text"
-          },
-          "match_method": {
-            "type": "keyword"
-          },
-          "match_reason": {
-            "type": "text"
-          }
-        }
+      "org_rows": {
+        "type": "object",
+        "enabled": false
       },
-      "prize_links": {
-        "properties": {
-          "prize_key": {
-            "type": "keyword"
-          },
-          "organization_key": {
-            "type": "keyword"
-          },
-          "reason": {
-            "type": "text"
-          }
-        }
+      "org_decisions": {
+        "type": "object",
+        "enabled": false
       },
-      "person_links": {
-        "properties": {
-          "person_key": {
-            "type": "keyword"
-          },
-          "organization_key": {
-            "type": "keyword"
-          },
-          "reason": {
-            "type": "text"
-          }
-        }
+      "prize_decisions": {
+        "type": "object",
+        "enabled": false
       },
-      "schedule_links": {
-        "properties": {
-          "slot_key": {
-            "type": "keyword"
-          },
-          "zone_key": {
-            "type": "keyword"
-          },
-          "organization_key": {
-            "type": "keyword"
-          },
-          "reason": {
-            "type": "text"
-          }
-        }
+      "person_decisions": {
+        "type": "object",
+        "enabled": false
+      },
+      "schedule_decisions": {
+        "type": "object",
+        "enabled": false
       },
       "gaps": {
         "properties": {
