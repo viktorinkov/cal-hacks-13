@@ -63,7 +63,7 @@ def overview(y0):
 
     bands = S.box(60, 240, 340, "Bands and station markers\ncrowd colors, SOS and the light circle run on the band "
                                 "itself", "device")
-    bridge = S.box(60, 0, 340, "Gateway and bandit-bridge\non the venue laptop", "rust", cy=L(stdb.cy))
+    bridge = S.box(60, 0, 340, "Gateway and band1t-bridge\non the venue laptop", "rust", cy=L(stdb.cy))
 
     zy = L(stdb.bottom) + 110
     api = S.box(600, zy + 60, 400, "bandit-api and bandit-indexer\nserve the pages; copy rows one way into the "
@@ -144,7 +144,7 @@ def architecture(y0):
     gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
     cli = S.box(460, 0, 300, "bandit-claims (command-line tool)\ndrives test bands 90 to 99 through report_test_band and plants the claims", "rust",
                 cy=L(venue.cy))
-    bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band on each change and at most once a second per band, commands out",
+    bridge = S.box(460, 0, 300, "band1t-bridge\nserial lines in, ingest_band on each change and at most once a second per band, commands out",
                    "rust", cy=L(band1t.cy))
     camera = S.box(60, 0, 280, "Overhead phone camera\n(TBD Leo)", "tbd", cy=L(jobs.cy))
     vision = S.box(460, 0, 300, "bandit-vision (TBD Leo)\ncounts, person-down alerts, photo features", "tbd",
@@ -243,7 +243,7 @@ def spacetimedb(y0):
     S.box(x0 + 3 * 568, vy, 506, roles_l, "stdb", h=vh)
     mod_bottom = L(views.bottom) + 40
 
-    bridge = S.box(65, 0, 340, "Gateway and bandit-bridge\ncalls ingest_band at once on a change, otherwise at "
+    bridge = S.box(65, 0, 340, "Gateway and band1t-bridge\ncalls ingest_band at once on a change, otherwise at "
                                "most once a second per band", "rust", cy=L(ingest.cy))
     beacon = S.box(65, L(bridge.bottom) + 110, 340, "Band beacon\nten times a second over ESP-NOW", "device")
 
@@ -782,7 +782,7 @@ def hardware(y0):
                                   "to 105; anchor the zones and glow their exit colour", "device", cy=L(lite.cy))
     gateway = S.box(800, 0, 440, "Gateway x1\nXIAO ESP32-C3 on USB, id 200; one JSON line per packet; sends each "
                                  "command 3 times", "device", cy=L(full.cy))
-    bridge = S.box(1400, 0, 400, "bandit-bridge on the team laptop\nUSB serial at 115200 baud", "rust",
+    bridge = S.box(1400, 0, 400, "band1t-bridge on the team laptop\nUSB serial at 115200 baud", "rust",
                    cy=L(gateway.cy))
     cam = S.box(1400, 0, 400, "Overhead phone camera on a stand\n(TBD Leo)", "tbd", cy=L(lite.cy))
     bands = S.zone(60, L(lite.y) - 50, 500, L(full.bottom) - L(lite.y) + 70, "9 bands, one firmware", "device",
