@@ -1,6 +1,46 @@
 # BandIt system design
 
-BandIt is the only band you need at a public event. A wristband senses crowd density, raises SOS and fall alerts, and lights and buzzes the bands around someone who needs help. Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims: when a staff member with `ops` ends the event, every attendee's page becomes their recap. This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
+BandIt is the only band you need at a public event. The band senses crowd density, raises an SOS or a fall, and lights up the bands around someone who needs help. Meanwhile an exit marker at every exit glows that exit's colour.
+
+Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims. When an organizer (`ops`) ends the event, every attendee's tap page (/t/code) becomes their recap.
+
+This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
+
+## Terms
+
+One word for one thing in every doc. Code names stay as the code spells them, in backticks.
+
+| Term | Means | Not |
+| --- | --- | --- |
+| attendee | a person at the event who wears a band | wearer, guest, user, visitor |
+| organizer | the event staff who run the event in the organizer portal, with the `ops` role | host, ops, admin |
+| medic | staff who treat people at the event, with the `medic` role | paramedic, responder |
+| photographer | staff who take the event photos | |
+| band | the BandIt wristband | bracelet, wearable, device |
+| station marker | the device on a stand that beacons its station id, so each band picks its zone. Used for the hardware, the radio and zones | station, marker, beacon, anchor |
+| exit marker | a station marker in its job at the door: it glows that exit's colour and leads bands to the nearest exit | exit beacon, exit station |
+| station id | a station marker's id, above 100; a band's zone is the station id it hears loudest | |
+| zone | the area around one station marker | area, region, room |
+| gateway | the USB radio on the venue laptop that hears every band and station marker | receiver, hub |
+| `band1t-bridge` | the program that passes gateway lines to the module and commands back | bridge service |
+| the module | the `band1t` SpacetimeDB module on SpacetimeDB Maincloud | backend, server, database (alone) |
+| organizer portal (/organizer) | the organizer's web app | Ops dashboard, host portal, dashboard |
+| tap page (/t/code) | the page a band's NFC sticker opens | attendee app, band page, landing page |
+| recap | the tap page after the event ends | summary page |
+| light circle | the bands near a person in trouble, pulsing blue | witness ring, halo |
+| witness | a band in the light circle when an incident opens, kept as an `incident_band` row | |
+| incident | an SOS, a fall or damage the module records | alert, event (alone) |
+| security cameras | the venue's cameras, each covering one zone | security room camera, venue camera |
+| security view | the camera software on the venue laptop | vision service, camera app |
+| camera sighting | the security view's record of a flash on an incident | verdict, assessment |
+| medical card | the attendee's own health information | medical ID, medical profile |
+| hospital report | the hospital's report and itemised bill for a claim | medical record, clinic report |
+| claim | an insurance claim BandIt opens after an incident | case, request |
+| evidence pack | a claim's numbered facts, checks and fingerprint | evidence bundle |
+| The Evidence Engine | Elastic's part of a claim: past claims and event data | evidence agent |
+| The Decision Engine | the Anthropic Claude API plus the Rust code that decides a claim | claims agent |
+| wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
+| findable switch | the one consent switch at sign-up | privacy toggle, consent switch |
 
 ## Folder map
 
@@ -11,10 +51,10 @@ The folders follow the usual order of a system design: what the system must do, 
 | 1-overview | [Requirements](1-overview/Requirements.md), [Architecture](1-overview/Architecture.md), [Flows](1-overview/Flows.md), [Decisions](1-overview/Decisions.md) | what BandIt must do, how the parts fit, the event step by step, and the choices that cut across files |
 | 2-data | [SpacetimeDB](2-data/SpacetimeDB.md) | the single source of truth: tables, reducers, views, subscriptions |
 | 3-services | [Rust-Backend](3-services/Rust-Backend.md), [Gateway-Bridge](3-services/Gateway-Bridge.md), [Test-Bands](3-services/Test-Bands.md) | the Rust processes and where they run |
-| 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, gateway, station markers and the cameras (TBD -- LEO) |
-| 5-apps | [Ops-Dashboard](5-apps/Ops-Dashboard.md), [Attendee-App](5-apps/Attendee-App.md) | the two browser apps |
-| 6-features | [Safety](6-features/Safety.md), [Social](6-features/Social.md), [Medical-ID](6-features/Medical-ID.md), [Merch](6-features/Merch.md), [Insurance](6-features/Insurance.md) | what BandIt does for people |
-| 7-integrations | [Elastic](7-integrations/Elastic.md), [BrightData](7-integrations/BrightData.md), [Payments-Nessie](7-integrations/Payments-Nessie.md), [Anthropic-Agent](7-integrations/Anthropic-Agent.md) | the sponsor and outside services |
+| 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, the gateway, the station markers and the security cameras (TBD -- LEO) |
+| 5-apps | [Organizer-Portal](5-apps/Organizer-Portal.md), [Tap-Page](5-apps/Tap-Page.md) | the two browser apps: the organizer portal and the tap page |
+| 6-features | [Safety](6-features/Safety.md), [Social](6-features/Social.md), [Medical-Card](6-features/Medical-Card.md), [Merch](6-features/Merch.md), [Insurance](6-features/Insurance.md) | what BandIt does for people |
+| 7-integrations | [Elastic](7-integrations/Elastic.md), [Bright-Data](7-integrations/Bright-Data.md), [Capital-One-Nessie](7-integrations/Capital-One-Nessie.md), [Anthropic-Claude-API](7-integrations/Anthropic-Claude-API.md) | the sponsor and outside services |
 
 ## Reading order
 
@@ -38,23 +78,25 @@ Core components are what the safety features need. Optional components are featu
 | [Decisions.md](1-overview/Decisions.md) | Decision log | core | build, deployment, identity and sponsor decisions | none |
 | [SpacetimeDB.md](2-data/SpacetimeDB.md) | `band1t` module | core | tables, reducers, scheduled reducers, roles and views, subscriptions, deployment | none |
 | [Rust-Backend.md](3-services/Rust-Backend.md) | Cargo workspace and services | core | crates, processes and where they run, service identity, config and secrets, `bandit-api` and `bandit-workers` | SpacetimeDB |
-| [Gateway-Bridge.md](3-services/Gateway-Bridge.md) | `bandit-bridge`, `bandit-protocol` | core | serial to SpacetimeDB, batching, directive reconciliation, command delivery, press to confirm, raw logs | Hardware, SpacetimeDB |
+| [Gateway-Bridge.md](3-services/Gateway-Bridge.md) | `band1t-bridge` | core | serial to SpacetimeDB through the ingest reducers, command delivery one at a time with the gateway's ack, the gateway line protocol | Hardware, SpacetimeDB |
 | [Hardware.md](4-devices/Hardware.md) | Bands, gateway, station markers | core | the fleet, radio, packet, on-band logic, state precedence, gateway wire protocol, NFC, power, limits | none |
-| [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, a medic taking an incident, low visibility, override, and the medic approach and dispersion routing (TBD -- LEO) | SpacetimeDB, Hardware, Gateway-Bridge |
-| [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for `ops`, the big-screen graph | SpacetimeDB, Safety |
-| [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, band setup and the thank-you screen, the recap page after the event | SpacetimeDB |
-| [Test-Bands.md](3-services/Test-Bands.md) | The in-module crowd and the test bands, driven by `bandit-claims` | optional | a crowd of crowd bands with generated owners inside the module, test bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
-| [Vision.md](4-devices/Vision.md) | Cameras (TBD -- LEO) | optional | the security view that finds a calling band's flash on camera, the 3D venue model, the radio and photo recorders; camera assessments and property events for incidents; planned head counts, person-down alerts and photo features | SpacetimeDB; uses Anthropic-Agent and Elastic when present |
-| [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card on a medic's tap and in the incident desk | Attendee-App, Ops-Dashboard, Anthropic-Agent |
-| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Test-Bands, Vision, Anthropic-Agent when present |
-| [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
-| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Insurance when present |
-| [Insurance.md](6-features/Insurance.md) | Incident to claim | optional | the scripted claims run, evidence packs, bill review, coverage in code, the organizer's decisions, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Test-Bands when present |
-| [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
-| [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
-| [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
+| [Safety.md](6-features/Safety.md) | Safety behaviours | core | density on the bands and each zone's level, the exit markers, SOS, fall, light circle, incidents from open to resolve, a medic taking an incident, low visibility, calibration, the override and forced states, and exit routing and the medic approach (TBD -- LEO) | SpacetimeDB, Hardware, Gateway-Bridge |
+| [Organizer-Portal.md](5-apps/Organizer-Portal.md) | Organizer portal | core | the Live tab ("Alerts", venue map, zone table, low visibility), the incident desk, the attendee list and the "Event ended" button for `ops`, the big-screen graph | SpacetimeDB, Safety |
+| [Tap-Page.md](5-apps/Tap-Page.md) | Tap page | core | sign-in and tap to join, band codes, claim by press, band setup and the thank-you screen, the recap after the event | SpacetimeDB |
+| [Test-Bands.md](3-services/Test-Bands.md) | The in-module crowd and the test bands, driven by `bandit-claims` | optional | a crowd of 1,000 crowd bands from 100 with generated attendees inside the module, test bands 90 to 99 through `report_test_band`, scenarios | SpacetimeDB, Hardware; uses Social when present |
+| [Vision.md](4-devices/Vision.md) | Security cameras and the security view (TBD -- LEO) | optional | the security view that finds a calling band's flash on a security camera, the 3D venue model, the radio and photo recorders; camera sightings and property events for incidents; planned head counts, person-down alerts and photo features | SpacetimeDB; uses Anthropic-Claude-API and Elastic when present |
+| [Medical-Card.md](6-features/Medical-Card.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card on a medic's tap and in the incident desk | Tap-Page, Organizer-Portal, Anthropic-Claude-API |
+| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, the big screen's 3D event graph with the event photos, the Photos tab, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses Bright-Data, Test-Bands, Vision, Anthropic-Claude-API when present |
+| [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap, paid from the wallet | Social, Capital-One-Nessie; uses Bright-Data when present |
+| [Capital-One-Nessie.md](7-integrations/Capital-One-Nessie.md) | Wallet and payouts | optional | a $200 Capital One Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Tap-Page; uses Insurance when present |
+| [Insurance.md](6-features/Insurance.md) | Incident to claim | optional | the scripted claims run, evidence packs, bill review, coverage in code, the organizer's decisions, learned rules, ledger, the accuracy scorecard | Safety; uses Capital-One-Nessie, Anthropic-Claude-API, Elastic, Vision, Test-Bands when present |
+| [Elastic.md](7-integrations/Elastic.md) | `bandit-organize` and recap order | optional | the `bandit-organize` workflow in Elastic Workflows over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Elastic Kibana dashboards | uses Bright-Data and Social when present |
+| [Bright-Data.md](7-integrations/Bright-Data.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import; the 3D venue model exported through the Bright Data Browser API | Elastic; uses Anthropic-Claude-API and Social when present |
+| [Anthropic-Claude-API.md](7-integrations/Anthropic-Claude-API.md) | Anthropic Claude API use | optional | `claude-client`, every Anthropic Claude API use case, structured outputs, recording and replay, guardrails | Rust-Backend |
 
-How the optional features lean on each other. Every optional feature also builds on the core files; those arrows are left out to keep the picture readable. Solid arrows are hard needs. Dashed arrows mean "uses it when it is there, and works without it".
+How the optional features lean on each other. Every optional feature also builds on the core files; those arrows are left out to keep the picture readable.
+
+Solid arrows are hard needs. Dashed arrows mean "uses it when it is there, and works without it".
 
 ```mermaid
 flowchart LR
@@ -62,10 +104,10 @@ flowchart LR
   Hyp["Insurance"]
   Soc["Social"]
   Ela["Elastic"]
-  Med["Medical-ID"]
-  AI["Anthropic-Agent"]
-  BD["BrightData"]
-  Pay["Payments-Nessie"]
+  Med["Medical-Card"]
+  AI["Anthropic-Claude-API"]
+  BD["Bright-Data"]
+  Pay["Capital-One-Nessie"]
   Vision["Vision (TBD -- LEO)"]
   Sim["Test-Bands"]
 
@@ -116,11 +158,11 @@ Deleting a core file is not intended; the safety features need all of them.
 | Red | Rust processes and crates |
 | Indigo | the SpacetimeDB module |
 | Blue | browser apps and people |
-| Teal | outside services (Elastic, Claude, Nessie, Bright Data, SpacetimeAuth) |
-| Grey, dashed | vision, still (TBD -- LEO) |
+| Teal | outside services (Elastic, the Anthropic Claude API, Capital One Nessie, Bright Data, SpacetimeDB SpacetimeAuth) |
+| Grey, dashed | the security view, still (TBD -- LEO) |
 
-- **Excalidraw diagrams.** The whole system is also drawn in [bandit-system-design.excalidraw](../diagrams/bandit-system-design.excalidraw), on branch `vik-excalidraw-diagrams`. Open it at excalidraw.com or with the Excalidraw extension for VS Code. The generator that draws it is in `diagrams/generator`. The Mermaid diagrams in these files are the reference.
-- **(TBD -- LEO)** marks anything about cameras or computer vision, the space-time mapping (which zone a band is in over time), the medic-approach guidance and the dispersion routing. Leo owns those parts. The sections give Leo's starting defaults and the interface the rest of the system needs.
+- **Excalidraw diagrams.** The whole system is also drawn in [bandit-system-design.excalidraw](../diagrams/bandit-system-design.excalidraw), on branch `vik-excalidraw-diagrams`. Open it at excalidraw.com or with the Excalidraw extension for VS Code; the generator that draws it is in `diagrams/generator`. The Mermaid diagrams in these files are the reference.
+- **(TBD -- LEO)** marks Leo's parts: the security cameras and the security view, the zone pick on the band, exit routing and the medic approach. The sections give Leo's starting design, built on the names the code already has.
 - **Starting values.** Thresholds and timings that the firmware does not fix are labelled as starting values, to calibrate at the venue.
 - **Names.** Tables, reducers, roles and job kinds use exact `snake_case` names, defined once in the file that owns them ([SpacetimeDB](2-data/SpacetimeDB.md) for the core).
 - **Out of scope** is listed in [Requirements](1-overview/Requirements.md).

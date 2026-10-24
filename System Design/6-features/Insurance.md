@@ -1,47 +1,55 @@
 # Insurance
 
-Insurance is BandIt's incident-to-claim workflow, built for Hyphenate's "autonomous systems for finance" track. It turns a resolved safety incident into a hashed evidence pack, reads the urgent-care bill into service lines and prices each line against a fee schedule, asks Claude whether the injury follows from the incident, decides in code whether the venue's insurance covers it and for how much, and then takes one of three routes: settle it automatically under a rule the organizer approved earlier, wait for the organizer, or refuse it in code and show every check. Money moves on a double-entry ledger and lands in the attendee's Nessie wallet. One pattern runs through all of it: code checks the facts and computes every amount, the model reads and explains, the organizer decides every claim that no learned rule settles, and each approval becomes a rule that settles the next claim of that shape without anyone.
+Insurance is BandIt's incident-to-claim workflow, built for Hyphenate's "autonomous systems for finance" track. It turns a resolved safety incident into a hashed evidence pack, reads the urgent-care bill into service lines and prices each line against a fee schedule, asks the Anthropic Claude API whether the injury follows from the incident, decides in code whether the venue's insurance covers it and for how much, and then takes one of three routes: settle it automatically under a rule the organizer approved earlier, wait for the organizer, or refuse it in code and show every check. Money moves on a double-entry ledger and lands in the attendee's wallet, their Capital One Nessie account.
 
-In finance terms: the reserve is a general-ledger entry, the insurer receivable is order-to-cash, the bill review and the claimant payment are procure-to-pay, and the reconciliation closes the receivable when the insurer pays. Two staff roles take part. During the event the medic (role `medic`) is the paramedic: they take the incident, note the cost and resolve it, which opens the claim. After the event the organizer (role `ops`) decides every claim that no learned rule settled. Test-Bands.md: in the scripted claims run, judges see the system learn: the organizer's approval of the first claim creates a rule, and the next similar claim settles in seconds under it.
+The Decision Engine is the Anthropic Claude API plus the Rust code that decides a claim, and The Evidence Engine is Elastic's part of a claim: the similar past claims it finds.
+
+One pattern runs through all of it: code checks the facts and computes every amount, the model reads and explains, the organizer decides every claim that no learned rule settles, and each approval becomes a rule that settles the next claim of that shape without anyone.
+
+In finance terms: the reserve is a general-ledger entry, the insurer receivable is order-to-cash, the bill review and the claimant payment are procure-to-pay, and the reconciliation closes the receivable when the insurer pays.
+
+Two staff roles take part. During the event the medic (role `medic`) takes the incident, notes the cost and resolves it, which opens the claim. After the event the organizer (role `ops`) decides every claim that no learned rule settled.
+
+Test-Bands.md: in the scripted claims run, judges see the system learn: the organizer's approval of the first claim creates a rule, and the next similar claim settles in seconds under it.
 
 ## Role in the system
 
 Responsibilities:
 
-- Open one claim per injured person from a resolved `sos`, `fall` or `crowd_risk` incident that has a first-aid cost or an urgent-care bill, and one claim from a resolved `property` incident that carries a repair cost.
-- Bill review: read the urgent-care bill into service lines with Claude (`claim_record_extract`), price every line in code against the seeded `fee_schedule`, and catch duplicate bills across all claims.
+- Open a claim from the hook in `resolve_incident` when a `sos` or `fall` incident with at least one note, or a `property` incident with a note whose cost is above 0, is resolved; and one claim for each other injured person added to the incident with a cost or a bill.
+- Bill review: read the urgent-care bill into service lines with the Anthropic Claude API (`claim_record_extract`), price every line in code against the seeded `fee_schedule`, and catch duplicate bills across all claims.
 - Build and hash the evidence pack from rows the safety system and the bill review already wrote; never from new sensing.
 - Check corroboration in code: two independent sources agree on time and zone.
 - Refuse in code at claim open, and store and list every check: disputed evidence, a staff claimant, no cover, a zero payout. After that only the organizer can refuse a claim.
-- Ask Claude for a causation review (`claim_review`) that can flag a claim and route it to a person, but never refuses it and never changes an amount.
+- Ask the Anthropic Claude API for a causation review (`claim_review`) that can flag a claim and route it to a person, but never refuses it and never changes an amount.
 - Compute coverage and amounts in integer cents from `coverage_rule` and the priced bill lines.
 - Decide the outcome: auto-settle, route to the organizer, or refuse. Every claim of a mass occurrence goes to the organizer.
 - Learn: turn the organizer's approval into a versioned `settlement_rule` with the ceiling they approved.
 - Post balanced `ledger_entry` journals for every money movement and keep the claim status honest about them.
 - Draft the first notice of loss in the layout of ACORD 3, the claim summary and recovery letters through `bandit-workers` jobs.
-- Own `claimant_account`, each attendee's one Nessie account, where claim payouts land.
-- Payments-Nessie.md: pay the claimant into their sandbox wallet through [Payments-Nessie](../7-integrations/Payments-Nessie.md); the wallet is the same `claimant_account`, which it opens when the attendee connects it in setup.
+- Own `claimant_account`, each attendee's one Capital One Nessie account, their wallet, where claim payouts land.
+- Capital-One-Nessie.md: pay the claimant into their sandbox wallet through [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md); the wallet is the same `claimant_account`, which it opens when the attendee connects it in setup.
 - Test-Bands.md: score the accuracy run of planted claims on the Claims queue.
-- Elastic.md: send a de-identified copy of each claim to Elastic and record its similar past claims as checks.
+- Elastic.md: send a de-identified copy of each claim to Elastic, The Evidence Engine, and record its similar past claims as checks.
 
 Non-responsibilities:
 
 - Detecting incidents, freezing snapshots, recording witnesses: [Safety](Safety.md).
-- Medical-ID.md: the attendee's own medical card ([Medical-ID](Medical-ID.md)). Insurance never reads it; a claim rests on the bill, the incident and the venue's policy.
-- Camera frames, property-damage detection and the per-incident `vision_assessment`: [Vision](../4-devices/Vision.md) (TBD -- LEO). Insurance only reads those rows into evidence.
-- Raw bridge logs: they stay on the venue laptop and are never evidence. The pack reads the `incident_snapshot` frozen in the same transaction as the incident ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
-- Calling banks: [Payments-Nessie](../7-integrations/Payments-Nessie.md). Insurance enqueues the `claim_payout` job and records the result with `record_claim_payout`.
-- Prompts, model choice, recording and replay: [Anthropic-Agent](../7-integrations/Anthropic-Agent.md).
+- Medical-Card.md: the attendee's own medical card ([Medical-Card](Medical-Card.md)). Insurance never reads it; a claim rests on the bill, the incident and the venue's policy.
+- Security camera frames, property-damage detection and the per-incident `vision_assessment`: [Vision](../4-devices/Vision.md) (TBD -- LEO). Insurance only reads those rows into evidence.
+- Raw radio logs: they are never evidence. The pack reads the `incident_snapshot` written in the same transaction that opened the incident ([Safety](Safety.md)).
+- Calling banks: [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md). Insurance enqueues the `claim_payout` job and records the result with `record_claim_payout`.
+- Prompts, model choice, recording and replay: [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md).
 - Planting claims: [Test-Bands](../3-services/Test-Bands.md). Insurance's decision code never reads which claims were planted or why.
-- Screens: the Claims queue panel and the incident card controls are in [Ops-Dashboard](../5-apps/Ops-Dashboard.md).
+- Screens: the Claims queue panel and the incident card controls are in the [organizer portal](../5-apps/Organizer-Portal.md) (/organizer).
 
 ## Interfaces
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| Hook in `resolve_incident` | in | `band1t` module (Safety.md) | incident id; writes the subject's `injured_party` row for a `sos` or `fall`, then opens a claim for every injured party with a first-aid cost or a bill, or for a `property` incident with a cost note | same transaction, module-internal call to the `open_claim` logic |
+| Hook in `resolve_incident` | in | `band1t` module (Safety.md) | the resolved incident, after its one `clear` to the subject band; opens a claim when a `sos` or `fall` incident has at least one note, or a `property` incident has a note whose cost is above 0, and the incident has no claim yet | same transaction, module-internal call `on_incident_resolved` |
 | `add_injured_party` | in | the assigned `medic`, `ops` | open incident id, a band picked from the snapshot's bands present, first-aid cost in cents | reducer; writes `injured_party` |
-| `POST /api/blobs` with purpose `medical` | in | Ops dashboard incident card ("Attach bill"), for `medic` and `ops`; Test-Bands.md: the `bandit-claims` tool for incidents on test bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| `POST /api/blobs` with purpose `medical` | in | organizer portal, on a claim waiting for its record ("File the medical record"), for `medic` and `ops`; Test-Bands.md: the `bandit-claims` tool for incidents on test bands | the bill PDF (at most 10 MB); back come its SHA-256, its page count and the URL `/blobs/<sha256>` | HTTPS to `bandit-api`; stored under its SHA-256 and registered as a `staff` blob through the blob upload ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | `submit_medical_record` | in | the incident card as the signed-in staff member (roles `medic`, `ops`) | incident id, injured party id, the file's SHA-256 (its registered `blob_ref`), page count; the caller is the uploader | reducer; writes `medical_record`, rejects an identical file, enqueues `claim_record_extract`, opens the claim when the incident is already resolved |
 | `apply_medical_record` | in | role `worker` | job id, bill id, validated header and lines, `model_call` id | reducer; rejects a stale lease; prices the lines and runs the duplicate check |
 | `enter_claim_lines` | in | `ops` | bill id, header and lines typed from the PDF | reducer; same pricing and duplicate check |
@@ -55,20 +63,24 @@ Non-responsibilities:
 | `retire_settlement_rule` | in | `ops` | rule id | reducer; new version with ceiling 0 |
 | `upsert_insurance_policy`, `upsert_coverage_rule`, `upsert_fee_schedule` | in | `ops` (setup) | policies, cover limits and deductibles, fee schedule caps | reducers, loaded from the seed |
 | `attach_claim_letters` | in | role `worker` | job id, claim ids, letter kind, `blob_ref` id, suggested tolerance | reducer; rejects a stale lease |
-| Payments-Nessie.md: `record_claim_payout` | in | role `worker` | job id, the Nessie customer, account and deposit ids | reducer; posts J3, settles the claim and adds the wallet's `payout` entry; rejects a stale lease |
+| Capital-One-Nessie.md: `record_claim_payout` | in | role `worker` | job id, the Capital One Nessie customer, account and deposit ids | reducer; posts J3, settles the claim and adds the wallet's `payout` entry; rejects a stale lease |
 | Jobs `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | out | `bandit-workers` | payloads named below; results through the reducers above | `job` table, `claim_job` and `complete_job` |
-| Payments-Nessie.md: job `claim_payout` | out | `bandit-workers` | claim id, claimant, name, the wallet's customer and account ids (empty when the claimant has none), amount in cents, memo | `job` table |
-| Claims queue, ledger, rules and scorecard | out | Ops dashboard (roles above) | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `ledger_entry`, `settlement_rule`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | SpacetimeDB subscription |
-| Vision.md (TBD -- LEO): `vision_assessment`, `camera`, `property_event` rows | in | `bandit-vision` | per-incident judgment (confirmed, confidence, description, frame blob refs, `model_call` id), the camera's zone, property events | tables read by `open_claim` |
-| Letters | out | Ops dashboard | the notice, summary and recovery letters as blobs | `bandit-api` blob download for a staff `api_session`; letter blobs carry access class `staff` |
-| Elastic.md: Kibana dashboard "BandIt claims evidence" | out | the team, in Kibana | counts and charts over the de-identified claim copies: claims tonight, evidence failing validation, payouts, outcomes by zone and incident kind, and the validation errors | read only on `bandit-claims` |
+| Capital-One-Nessie.md: job `claim_payout` | out | `bandit-workers` | claim id, claimant, name, the wallet's customer and account ids (empty when the claimant has none), amount in cents, memo | `job` table |
+| Claims queue, ledger, rules and scorecard | out | organizer portal (roles above) | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `ledger_entry`, `settlement_rule`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | SpacetimeDB subscription |
+| Vision.md (TBD -- LEO): `vision_assessment`, `camera`, `property_event` rows | in | `bandit-vision` | per-incident judgment (confirmed, confidence, description, frame blob refs, `model_call` id), the security camera's zone, property events | tables read by `open_claim` |
+| Letters | out | organizer portal | the notice, summary and recovery letters as blobs | `bandit-api` blob download for a staff `api_session`; letter blobs carry access class `staff` |
+| Elastic.md: Elastic Kibana dashboard "BandIt claims evidence" | out | the team, in Elastic Kibana | counts and charts over the de-identified claim copies: claims tonight, evidence failing validation, payouts, outcomes by zone and incident kind, and the validation errors | read only on `bandit-claims` |
 | Elastic.md: job `claim_verify` and `submit_claim_checks` | both | `bandit-workers` (role `worker`) | a de-identified claim document out to `bandit-claims`; similar past claim ids and scores back | `job` table; HTTPS to Elastic ([Elastic](../7-integrations/Elastic.md)); reducer that rejects a stale lease |
 
 ## Design
 
 ### Which policy pays
 
-The venue's general liability policy, always. It has medical-payments cover (it pays reasonable treatment costs for a guest hurt on the premises, no fault needed, up to the medical expense limit) and property cover for the venue's own equipment, each with a per-claim limit, an aggregate limit for the event and a deductible. Medical payments excludes the venue's own employees, whose injuries belong to workers' compensation, so code refuses a staff injury. The attendee's medical card is evidence, not a policy. A vendor only ever receives a recovery letter worded as a question.
+The venue's general liability policy, always. It has medical-payments cover (it pays reasonable treatment costs for an attendee hurt on the premises, no fault needed, up to the medical expense limit) and property cover for the venue's own equipment, each with a per-claim limit, an aggregate limit for the event and a deductible.
+
+Medical payments excludes the venue's own employees, whose injuries belong to workers' compensation, so code refuses a staff injury.
+
+A claim pays from the venue's policy, and the medical card plays no part. A vendor only ever receives a recovery letter worded as a question.
 
 The seed holds two `insurance_policy` rows with the same covers: the event policy, and a copy for the accuracy run whose period ends before doors open (`purpose` is `event` or `accuracy_run`). A claim falls under the policy whose period contains the incident's open time. Rules match only inside their own policy's period, so whatever the accuracy run learns has expired when the event starts, and the scripted claims run begins with no rule.
 
@@ -76,20 +88,32 @@ The seed holds two `insurance_policy` rows with the same covers: the event polic
 
 A claim opens from an incident, never from a form: one claim per injured person per incident, and one claim per `property` incident.
 
-1. Injured people. For a `sos` or `fall` incident, the wearer of the subject band is the first `injured_party`, written by the hook in `resolve_incident`. Anyone else hurt in the same incident is added while it is open: the assigned medic or ops picks their band from the incident snapshot's bands present on the incident card and calls `add_injured_party` with the first-aid cost given on site. Ops does the same on a `crowd_risk` incident, which has no subject band.
-2. Costs. An injury claim needs a first-aid cost or an urgent-care bill. The subject's first-aid cost is the sum of `cost_cents` on the incident's notes; an added person's is the cost entered with them. The medic or ops attaches a bill to an injured person from the incident card, while the incident is open or within 30 days of resolution (starting value).
-3. Opening. `resolve_incident` ends with one separable Insurance hook that opens a claim for every injured party with a cost or a bill, in the same transaction, so a claim can never drift from the incident it came from. A bill attached after resolution opens the claim for its person if none exists.
-4. Property. A `property` incident resolved with a note carrying the repair or replacement cost opens one claim. Staff open the incident from the Report property damage button on the Ops dashboard, which calls `open_incident` with kind `property` ([Safety](Safety.md)). Vision.md (TBD -- LEO): `bandit-vision` attaches a `property_event` and a `vision_assessment` with frames to that incident, and they become evidence facts.
+1. Opening. `resolve_incident` marks the incident resolved, sends one `clear` to the subject band (not to a test band, 90 to 99), and ends with one separable Insurance hook in the same transaction, so a claim can never drift from the incident it came from ([Safety](Safety.md)). The hook opens a claim when a `sos` or `fall` incident has at least one note, or a `property` incident has a note whose cost is above 0, and the incident has no claim yet.
+
+   The hook needs an `insurance_policy` row: without one, a qualifying resolve fails and the incident stays open.
+2. Injured people. For a `sos` or `fall` incident, the claimant is the attendee who wears the subject band, the first `injured_party`. Anyone else hurt in the same incident is added while it is open: the assigned medic or an organizer (`ops`) picks their band from the snapshot's `bands_present` on the incident card and calls `add_injured_party` with the first-aid cost given on site, and the hook opens their claim too.
+3. Costs. The subject's first-aid cost is the sum of `cost_cents` on the incident's notes; an added person's is the cost entered with them. The medic or an organizer attaches a bill to an injured person from the incident card, while the incident is open or within 30 days of resolution (starting value). A bill attached after resolution opens the claim for its person if none exists.
+4. Property. Staff open a `property` incident with `open_incident` (roles `ops` and `medic`) from the command line, since no page opens one by hand ([Safety](Safety.md)). Test-Bands.md: in test mode the Bands tab's "Speaker breaks in <zone>" opens one through `bandit-claims property`.
+
+   Vision.md (TBD -- LEO): `bandit-vision` attaches a `property_event` and a `vision_assessment` with frames to that incident, or opens one itself with `report_property_event`, and they become evidence facts.
 
 `claim.injured_party_id` is unique, and `claim.incident_id` is unique among property claims.
 
 ### Bill review
 
-Claude reads the bill; code decides every amount. The urgent-care bill is a PDF. At the event it is a synthetic one.
+The Anthropic Claude API reads the bill; code decides every amount. The urgent-care bill is a PDF. At the event it is a synthetic one.
 
-Upload. "Attach bill" on the incident card sends the PDF to `POST /api/blobs` with purpose `medical`. `bandit-api` takes a PDF of at most 10 MB, stores it in the blob store under its SHA-256, registers it with `register_blob` and access class `staff`, counts the pages and returns the hash and the page count. The card then calls `submit_medical_record` with them as the signed-in staff member. The reducer accepts `medic` and `ops` (Test-Bands.md: the `bandit-claims` tool files planted bills as its `medic` test identity), refuses a hash that is not a registered `blob_ref`, and writes a `medical_record` row in status `uploaded`. A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
+Upload. "File the medical record" on a claim waiting for its record sends the PDF to `POST /api/blobs` with purpose `medical`. `bandit-api` takes a PDF of at most 10 MB, stores it in the blob store under its SHA-256, registers it with `register_blob` and access class `staff`, counts the pages and returns the hash and the page count. The form then calls `submit_medical_record` with them as the signed-in staff member.
 
-Extraction. The worker sends the PDF to Claude as a document block with a JSON schema ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). Claude returns the header (provider name, provider NPI, invoice number, patient name and service date as printed, billed total, the visit reason as printed) and one line per service (code as printed, description, units, billed amount, page). Claude never sees the fee schedule and returns no paid amounts. Code validates before `apply_medical_record` accepts the record: the lines sum to the billed total, every amount is a positive whole number of cents, every line cites a page within the page count, and the NPI passes its check digit. A bill that fails validation twice is `failed`, and its claim waits for the organizer, who types the lines from the PDF with `enter_claim_lines`. Typed lines go through the same pricing and the same duplicate check.
+The reducer accepts `medic` and `ops` (Test-Bands.md: the `bandit-claims` tool files planted bills as its `medic` test identity), refuses a hash that is not a registered `blob_ref`, and writes a `medical_record` row in status `uploaded`.
+
+A file whose SHA-256 equals any earlier bill on any claim is marked `duplicate` at once; otherwise the row moves to `extracting` and `claim_record_extract` is enqueued.
+
+Extraction. The worker sends the PDF to the Anthropic Claude API as a document block with a JSON schema ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). The Anthropic Claude API returns the header (provider name, provider NPI, invoice number, patient name and service date as printed, billed total, the visit reason as printed) and one line per service (code as printed, description, units, billed amount, page). The Anthropic Claude API never sees the fee schedule and returns no paid amounts.
+
+Code validates before `apply_medical_record` accepts the record: the lines sum to the billed total, every amount is a positive whole number of cents, every line cites a page within the page count, and the NPI passes its check digit.
+
+A bill that fails validation twice is `failed`, and its claim waits for the organizer, who types the lines from the PDF with `enter_claim_lines`. Typed lines go through the same pricing and the same duplicate check.
 
 Pricing. A pure function in the module prices every line against `fee_schedule`, the policy's list of reasonable charges by service code. The result is one `claim_line` row per line.
 
@@ -141,27 +165,31 @@ The pack is a set of `evidence_fact` rows plus one `evidence_pack` row that hash
 
 | Source | Rows read | Facts |
 |---|---|---|
-| `band_report` | the subject band's last report at incident open, as frozen in `incident_snapshot` (the live row is overwritten) | flags (SOS, fall), `neigh`, `zone`, `state`, report time |
-| `incident_snapshot` | the snapshot frozen in `ingest_band_reports` | zone density estimate and risk level, bands present |
-| `light_circle` | `incident_band` rows with role witness | witness band ids, their zone and state 4 times |
+| `band_report` | the subject band's values as `incident_snapshot` froze them when the incident opened (the live `band` row is overwritten) | `band_id`, `fall_flag`, `sos_flag`, `band_state`, `neigh`, `station_id`, observed at the band's last report |
+| `incident_snapshot` | the `incident` row, and its `incident_snapshot`, written in the same transaction that opened the incident | `incident_kind`, `opened_by`, `zone_id`; `bands_present` (the online bands that reported the incident's station id), `band_count`, `neigh_mean` (their mean `neigh`), `circle_bands` (the online bands in the light circle, anywhere in the venue) |
+| `light_circle` | `incident_band` rows with role witness, written by `watch_bands` | each witness band, its zone and the subject's signal as it heard it, observed at its first sighting |
 | `staff_note` | `incident_note` rows | author role, note time, text, `cost_cents` |
 | `claimant` | the `injured_party` row and `staff_role` | the injured band, how they were added (`band` or the medic's pick), the venue staff role they hold or none (reader `code`) |
 | `bill` | `medical_record` and `claim_line` rows | provider NPI, invoice number, service date, billed total, visit reason and each line's code and billed amount (reader `model`, validated by code); each line's cap, allowed amount and decision (reader `code`); `ref` is the bill's SHA-256 and the page |
-| Vision.md (TBD -- LEO): `vision_assessment` | the incident's `vision_assessment` row, written a few seconds after the flag | confirmed yes or no, confidence, description (reader `model`; `ref` is the `model_call` id); each frame's capture time and the camera's zone from its `camera` row (reader `code`; `ref` is the frame's blob SHA-256) |
+| Vision.md (TBD -- LEO): `vision_assessment` | the incident's `vision_assessment` row, written a few seconds after the flag | confirmed yes or no, confidence, description (reader `model`; `ref` is the `model_call` id); each frame's capture time and the security camera's zone from its `camera` row (reader `code`; `ref` is the frame's blob SHA-256) |
 | `policy` | `insurance_policy`, `coverage_rule` | policy number, purpose, cover kind, limit, deductible, aggregate remaining at open |
 
 Money uses only `code` facts and bill lines that passed code validation. A model judgment (the causation review, the vision assessment) never sets an amount.
 
-The `evidence_pack` row holds `claim_id`, `version`, `fact_count`, `sha256`, `built_at`, `corroboration` and `checks`, a short text list of every comparison made and its result. The module computes the SHA-256 over the facts of that version ordered by id, each serialised as its fields in a fixed order, so an auditor can recompute it from the rows. A pack is never edited: calling `open_claim` again for a `routed` claim (after a late note, for example) builds version n+1 and routes it again. Every approval records the SHA it was shown, which is what makes the stale check possible.
+The `evidence_pack` row holds `claim_id`, `version`, `fact_count`, `sha256`, `built_at`, `corroboration` and `checks`, a short text list of every comparison made and its result. The module computes the SHA-256 over the facts of that version ordered by id, each serialised as its fields in a fixed order, so an auditor can recompute it from the rows.
+
+A pack is never edited: calling `open_claim` again for a `routed` claim (after a late note, for example) builds version n+1 and routes it again. Every approval records the SHA it was shown, which is what makes the stale check possible.
 
 ### Corroboration rule (code)
 
-Two independent sources must agree on time and zone before a claim can settle without a person. The band is always the first source. The second is the medic's note plus the light-circle witnesses. Vision.md (TBD -- LEO): when the incident's zone has the camera and a `vision_assessment` exists, the assessment is the second source instead.
+Two independent sources must agree on time and zone before a claim can settle without a person. The band is always the first source. The second is the medic's note plus the light-circle witnesses.
+
+Vision.md (TBD -- LEO): when the incident's zone has a security camera and a `vision_assessment` exists, the assessment is the second source instead.
 
 | Second source | Agree on time | Agree on zone |
 |---|---|---|
 | Medic note plus light-circle witnesses | the first `incident_note` by the assigned medic is written while the incident is open or within 30 min of resolution (starting value, calibrate at the venue) | at least 2 witness bands (starting value) in `incident_band` whose zone at state 4 equals the subject band's zone |
-| Vision.md (TBD -- LEO): `vision_assessment` | `confirmed` is yes, and the frames' capture times lie within 120 s of the band's fall or SOS time (starting value, calibrate at the venue) | the camera's zone (its `camera` row) equals the band's zone |
+| Vision.md (TBD -- LEO): `vision_assessment` | `confirmed` is yes, and the frames' capture times lie within 120 s of the band's fall or SOS time (starting value, calibrate at the venue) | the security camera's zone (its `camera` row) equals the band's zone |
 
 The assessment's `confirmed` flag is a model judgment, so code uses it only as a yes or no gate; its confidence is recorded and shown to people, but no threshold on it ever decides money.
 
@@ -169,7 +197,7 @@ Outcomes, stored in `evidence_pack.corroboration`:
 
 - `corroborated`: both sources agree. Eligible for auto-settle.
 - `uncorroborated`: no second source exists. Routed to the organizer, who decides with their own eyes; never auto-settled. A `property` incident has no band, and an added injured party's only witness is the person who added them, so both are always `uncorroborated`.
-- `disputed`: a second source exists and disagrees on time or zone, or the assessment says not confirmed. Code refuses the claim with the failed check's name as `refusal_reason`: `witness_zone` when the light circle's witness bands sit in another zone, `staff_note_time` when the medic's note falls outside the window, and Vision.md (TBD -- LEO): `vision_confirmed`, `vision_zone` or `vision_time` when the camera disagrees. `checks` lists each comparison with both values, so the refusal shows everywhere it looked.
+- `disputed`: a second source exists and disagrees on time or zone, or the assessment says not confirmed. Code refuses the claim with the failed check's name as `refusal_reason`: `witness_zone` when the light circle's witness bands sit in another zone, `staff_note_time` when the medic's note falls outside the window, and Vision.md (TBD -- LEO): `vision_confirmed`, `vision_zone` or `vision_time` when the security camera disagrees. `checks` lists each comparison with both values, so the refusal shows everywhere it looked.
 
 The rule is deliberately dumb: equality on zone id and a window on time. A judge, the insurer or an auditor can re-run it by hand.
 
@@ -181,7 +209,7 @@ All amounts are integer cents, USD. A pure function in the module computes them 
 |---|---|---|
 | `policy_id` | which `insurance_policy` | each of the two policies |
 | `kind` | `medical_payments` or `property` | both rows seeded per policy |
-| `incident_kinds` | which incident kinds it applies to | medical: `sos`, `fall`, `crowd_risk`; property: `property` |
+| `incident_kinds` | which incident kinds it applies to | medical: `sos`, `fall`; property: `property` |
 | `per_claim_limit_cents` | most paid for one claim; for medical payments this is the medical expense limit for one person | medical 500000 ($5,000); property 1000000 ($10,000) |
 | `aggregate_limit_cents` | most paid under this cover for the event | medical 2500000 ($25,000); property 5000000 ($50,000) |
 | `deductible_cents` | the venue's share per claim | medical 0; property 50000 ($500) |
@@ -203,25 +231,29 @@ Code refuses the claim at this point, at claim open, when any of these holds. Th
 | No active cover for the incident kind | `no_cover` |
 | `payout_cents` = 0 | `zero_payout` |
 
-Nothing else refuses a claim on its own. Claude's causation review and Elastic.md's validation can only flag a claim, which routes it to the organizer. After claim open, only the organizer refuses, with `refuse_claim`.
+Nothing else refuses a claim on its own. The causation review by the Anthropic Claude API and Elastic.md's validation can only flag a claim, which routes it to the organizer. After claim open, only the organizer refuses, with `refuse_claim`.
 
 One more code check routes rather than refuses: a bill whose service date is before the incident or more than 3 days after it (starting value) sends the claim to the organizer, with both dates in `checks`.
 
 For a `property` claim the claimant is the venue's repair vendor, so `payout_cents` is what the venue pays the vendor and `recoverable_cents` is what it claims back.
 
-### Claude's causation review
+### Causation review by the Anthropic Claude API
 
-Code knows the band fell, the witnesses saw it and the bill is priced. It cannot read whether the injury on the bill follows from that fall. Claude can, so every injury claim that passes the code checks gets one `claim_review` job before its outcome is decided. Property claims skip it.
+Code knows the band fell, the witnesses saw it and the bill is priced. It cannot read whether the injury on the bill follows from that fall.
 
-The worker sends the pack's facts by id: the band's flag, time and zone, the witnesses, the medic's note text and time, the bill's service date, provider, visit reason and line descriptions, and the incident kind. It sends no amounts. Claude returns a verdict, `follows` or `doubt`, an explanation of a few sentences and the fact ids it relied on ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). Code accepts the answer only if every cited id exists in this pack version and the explanation contains no dollar figure. `submit_claim_review` stores it on the claim (`causation`, `causation_text`, `causation_fact_ids`, `causation_model_call_id`) and decides the outcome in the same transaction.
+The Anthropic Claude API can, so every injury claim that passes the code checks gets one `claim_review` job before its outcome is decided. Property claims skip it.
+
+The worker sends the pack's facts by id: the band's flag, time and zone, the witnesses, the medic's note text and time, the bill's service date, provider, visit reason and line descriptions, and the incident kind. It sends no amounts.
+
+The Anthropic Claude API returns a verdict, `follows` or `doubt`, an explanation of a few sentences and the fact ids it relied on ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). Code accepts the answer only if every cited id exists in this pack version and the explanation contains no dollar figure. `submit_claim_review` stores it on the claim (`causation`, `causation_text`, `causation_fact_ids`, `causation_model_call_id`) and decides the outcome in the same transaction.
 
 | Verdict | Effect |
 |---|---|
 | `follows` | the claim may auto-settle if a rule matches |
-| `doubt` | never auto-settles; routed to the organizer, with Claude's explanation and the cited lines at the top of the claim |
-| `none`: no usable answer (refusal, two failed validations, a dead job, or Anthropic-Agent.md deleted) | treated as `doubt` |
+| `doubt` | never auto-settles; routed to the organizer, with the explanation from the Anthropic Claude API and the cited lines at the top of the claim |
+| `none`: no usable answer (refusal, two failed validations, a dead job, or Anthropic-Claude-API.md deleted) | treated as `doubt` |
 
-Claude's judgment can hold a claim for a person but never refuses it and never changes an amount: its input has no amounts, its output has no amount field, and the coverage function never reads it.
+The judgment of the Anthropic Claude API can hold a claim for a person but never refuses it and never changes an amount: its input has no amounts, its output has no amount field, and the coverage function never reads it.
 
 ### Three outcomes and the learning loop
 
@@ -230,12 +262,12 @@ The question this diagram answers: which of the three routes a claim takes, and 
 ```mermaid
 flowchart TD
   R["resolve_incident or a late bill"] --> O["open_claim per injured party"]
-  O -->|"bill attached"| B["claim_record_extract (Claude), then price lines and duplicate check (code)"]
+  O -->|"bill attached"| B["claim_record_extract (Anthropic Claude API), then price lines and duplicate check (code)"]
   O -->|"no bill"| K
   B --> K["pack: evidence_fact rows, SHA-256"]
   K --> C{"code checks: corroboration, staff, cover, payout"}
   C -->|"fails"| X["Outcome 3: refused, checks listed"]
-  C -->|"pass, J1 reserve"| CR["claim_review (Claude): follows or doubt"]
+  C -->|"pass, J1 reserve"| CR["claim_review (Anthropic Claude API): follows or doubt"]
   CR --> S{"rule matches, corroborated, follows, not a mass occurrence, within ceiling"}
   S -->|"yes"| A["Outcome 1: auto-settled, cites the rule version and who approved it"]
   S -->|"no"| Q["Outcome 2: routed to the organizer: routed_to_role ops, shown as Organizer"]
@@ -252,11 +284,13 @@ flowchart TD
 
 J1 is posted when the claim passes the code checks, because from then on it will either settle or wait for a person; a claim refused by the code checks posts nothing.
 
-Outcome 1, auto-settle. Fires only when all of these hold: corroboration is `corroborated`; the causation verdict is `follows`; the claim is not part of a mass occurrence; an active `settlement_rule` of the claim's policy has the same shape (incident kind, cover kind, and zone when the rule names one); `payout_cents` is at or below the rule's `ceiling_cents`. The claim records `decided_by = rule`, the rule id and version and the person whose approval created it, so the dashboard can say "Settled under rule v1, approved by <their name> 2 minutes ago".
+Outcome 1, auto-settle. Fires only when all of these hold: corroboration is `corroborated`; the causation verdict is `follows`; the claim is not part of a mass occurrence; an active `settlement_rule` of the claim's policy has the same shape (incident kind, cover kind, and zone when the rule names one); `payout_cents` is at or below the rule's `ceiling_cents`. The claim records `decided_by = rule`, the rule id and version and the person whose approval created it, so the organizer portal can say "Settled under rule v1, approved by <their name> 2 minutes ago".
 
-Outcome 2, route. Everything else with a positive payout goes to the organizer, whatever its amount. The claim stores status `routed`, `routed_to_role` `ops`, no named person and `routed_to_name` "Organizer". It waits in "Waiting for your decision" on the host portal for anyone with `ops` ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)), and nothing moves until one of them acts. The organizer works that queue after the event. The module does not wait for `event_state.ended`: a routed claim can be decided as soon as it is routed.
+Outcome 2, route. Everything else with a positive payout goes to the organizer, whatever its amount. The claim stores status `routed`, `routed_to_role` `ops`, no named person and `routed_to_name` "Organizer".
 
-Outcome 3, refuse. Either code refuses at claim open (disputed evidence, a staff claimant, no cover, a zero payout), or the organizer refuses a routed claim. Claude and Elastic never refuse. The claim keeps its pack and `checks`, so the reason is always on screen.
+It waits in "Waiting for your decision" in the organizer portal for anyone with `ops` ([Organizer-Portal](../5-apps/Organizer-Portal.md)), and nothing moves until one of them acts. The organizer works that queue after the event. The module does not wait for `event_state.ended`: a routed claim can be decided as soon as it is routed.
+
+Outcome 3, refuse. Either code refuses at claim open (disputed evidence, a staff claimant, no cover, a zero payout), or the organizer refuses a routed claim. The Anthropic Claude API and Elastic never refuse. The claim keeps its pack and `checks`, so the reason is always on screen.
 
 ### Learned rules
 
@@ -271,15 +305,19 @@ A `settlement_rule` is created by an approval, never typed in. When `approve_cla
 | `approver`, `approver_name`, `approver_role`, `approval_id`, `created_at` | the decision that made it: the deciding person, their `ops` label and the role `ops` |
 | `version`, `status` | n+1 for the same shape; the earlier version becomes `superseded` |
 
-A rule settles nothing above its ceiling. A bigger claim of the same shape goes back to the organizer, and approving it with learn on writes the next version with the higher ceiling. A rule matches only while its policy's period is open, so the next event starts with no rules. Rule history is the full audit trail of policy.
+A rule settles nothing above its ceiling. A bigger claim of the same shape goes back to the organizer, and approving it with learn on writes the next version with the higher ceiling.
 
-Contradictions never overwrite. A refusal contradicts a rule when the refused claim matched the rule's shape, was `corroborated`, had causation `follows` and was within the ceiling, so the person is saying the rule was wrong. Code then writes a new version with `ceiling_cents` = 0, and the shape goes back to a person until someone approves it again; `retire_settlement_rule` does the same on purpose. A claim that reached a person for its own reason (a doubt, no corroboration, above the ceiling) leaves the rule alone when it is refused.
+A rule matches only while its policy's period is open, so the next event starts with no rules. Rule history is the full audit trail of policy.
+
+Contradictions never overwrite. A refusal contradicts a rule when the refused claim matched the rule's shape, was `corroborated`, had causation `follows` and was within the ceiling, so the person is saying the rule was wrong. Code then writes a new version with `ceiling_cents` = 0, and the shape goes back to a person until someone approves it again; `retire_settlement_rule` does the same on purpose.
+
+A claim that reached a person for its own reason (a doubt, no corroboration, above the ceiling) leaves the rule alone when it is refused.
 
 A `property` claim is never `corroborated`, so a rule for it could never fire; its approval writes no rule.
 
 ### Approval, fail closed
 
-The organizer opens the claim from "Waiting for your decision" and sees the bill lines with billed and paid side by side, cost, limit, deductible, payout, recoverable, venue cost, the pack SHA (first 8 characters), the checks, Claude's causation explanation with the facts it cited, and the summary and suggested tolerance from `claim_draft`. `approve_claim` carries the amount and the SHA that were on the screen. The reducer:
+The organizer opens the claim from "Waiting for your decision" and sees the bill lines with billed and paid side by side, cost, limit, deductible, payout, recoverable, venue cost, the pack SHA (first 8 characters), the checks, the causation explanation from the Anthropic Claude API with the facts it cited, and the summary and suggested tolerance from `claim_draft`. `approve_claim` carries the amount and the SHA that were on the screen. The reducer:
 
 1. checks that the claim is `routed` and that the caller holds its `routed_to_role` (`ops`) or is the module owner; anyone else gets "claim N is waiting for Organizer (ops)";
 2. recomputes `payout_cents` from the current `coverage_rule` rows and priced lines and compares it with the stored value and with the amount seen;
@@ -291,7 +329,11 @@ The organizer opens the claim from "Waiting for your decision" and sees the bill
 
 ### Mass occurrence
 
-When 3 or more people are hurt in one zone within 5 minutes (starting values), code treats them as one occurrence. It counts the people hurt in the `sos` and `fall` incidents of the claim's zone opened within 5 minutes of the claim's own incident, that incident included. Auto-settle is then off for every claim of the occurrence: each one that code does not refuse goes to the organizer, whatever its amount and whatever rule matches, with the reason "3 people hurt in <zone> within 5 minutes". The notice of each claim lists the others hurt in the same occurrence. The reason is the event's aggregate limit: one occurrence with many people hurt can use up the medical aggregate ($25,000), so the organizer decides those claims one by one with the whole occurrence in view, instead of a rule paying them one by one.
+When 3 or more people are hurt in one zone within 5 minutes (starting values), code treats them as one occurrence. It counts the people hurt in the `sos` and `fall` incidents of the claim's zone opened within 5 minutes of the claim's own incident, that incident included.
+
+Auto-settle is then off for every claim of the occurrence: each one that code does not refuse goes to the organizer, whatever its amount and whatever rule matches, with the reason "3 people hurt in <zone> within 5 minutes". The notice of each claim lists the others hurt in the same occurrence.
+
+The reason is the event's aggregate limit: one occurrence with many people hurt can use up the medical aggregate ($25,000), so the organizer decides those claims one by one with the whole occurrence in view, instead of a rule paying them one by one.
 
 ### Claim lifecycle
 
@@ -337,66 +379,88 @@ Fields per row: `claim_id`, `journal_id`, `account`, `debit_cents`, `credit_cent
 | J3 claimant payment | payout paid | `claims_reserve` | `cash` | `payout_cents` |
 | J4 reconciliation | `record_insurer_payment` | `cash` | `insurer_receivable` | the amount received; a difference from `recoverable_cents` posts one more line to `claims_expense`, so the receivable closes |
 
-This is what "money moving" means on the dashboard: each posting has a reason and traces to a claim and a pack SHA. The ledger panel sums by account and policy, and the totals are what a finance reviewer expects: an expense, a liability that falls when the claimant is paid, a receivable that falls when the insurer pays.
+This is what "money moving" means in the organizer portal: each posting has a reason and traces to a claim and a pack SHA. The ledger panel sums by account and policy, and the totals are what a finance reviewer expects: an expense, a liability that falls when the claimant is paid, a receivable that falls when the insurer pays.
 
 ### Letters and the notice in ACORD 3 layout
 
-Claude drafts, code checks, a person sends. Two job kinds:
+The Anthropic Claude API drafts, code checks, a person sends. Two job kinds:
 
 | Job | When enqueued | Input (payload) | Output |
 |---|---|---|---|
 | `claim_draft` | once per incident, when its claims are routed or auto-settled, and again for a rebuilt pack | incident id, claim ids and pack versions | the first notice of loss (FNOL) in the layout of ACORD 3, the standard general liability notice of occurrence; a one-paragraph summary per claim for the organizer's screen; a suggested rule tolerance in cents per claim |
 | `recovery_letter` | `request_recovery_letter` on a `property` claim | claim id, pack version, counterparty name and contact | one blob: a letter to the vendor or contractor |
 
-The notice follows the sections of ACORD 3. Code fills every field it can from rows; Claude writes only the free-text fields, from the pack facts:
+The notice follows the sections of ACORD 3. Code fills every field it can from rows; the Anthropic Claude API writes only the free-text fields, from the pack facts:
 
 | Section | What it holds | Filled by |
 |---|---|---|
 | Insurer and policy | insurer, policy number, period, the medical expense limit (the medical payments per-claim limit) and the property limit | code |
 | Insured | the venue's name and address, the FNOL contact | code, from the seed |
-| Occurrence | date, time, venue and zone name; a short description of what happened | code; the description by Claude |
-| Injured party, one block per person | name (`attendee.display_name`), what they were doing when hurt, the injury, where they were treated (the bill's provider) | name and provider by code; activity and injury by Claude |
+| Occurrence | date, time, venue and zone name; a short description of what happened | code; the description by the Anthropic Claude API |
+| Injured party, one block per person | name (`attendee.display_name`), what they were doing when hurt, the injury, where they were treated (the bill's provider) | name and provider by code; activity and injury by the Anthropic Claude API |
 | Witnesses | the witness bands and their zone, and the medic by role; attendees are never named | code |
-| Property damaged | the item, the estimate (`cost_cents`), where it can be seen | estimate by code; item and place by Claude |
+| Property damaged | the item, the estimate (`cost_cents`), where it can be seen | estimate by code; item and place by the Anthropic Claude API |
 | Remarks | claim ids, pack SHA, amounts paid so far | code |
 
-The worker builds the prompt from the pack facts only; [Anthropic-Agent](../7-integrations/Anthropic-Agent.md) owns the prompt, the model `claude-opus-5-5`, the structured output schema and the recording in `model_call`. Two guardrails live in code: every dollar figure in a letter must equal one of the amounts in the payload, otherwise the worker fails the job rather than attaching it; and the recovery letter is worded as a query ("our records show a speaker at Stage B was damaged at 23:40 while your crew was striking the stage; please tell us what you saw"), never as an accusation, which the worker enforces by rejecting output that assigns fault. The worker writes each letter to the blob store and calls `register_blob` with the `worker` role and access class `staff`, so only staff can download it through `bandit-api`. `attach_claim_letters` stores the `blob_ref` id on each claim it names (`fnol_blob_id`, `summary_blob_id`, `recovery_blob_id`) and rejects a stale lease. The organizer sends the notice to the insurer and marks it sent on the dashboard; BandIt never emails a letter.
+The worker builds the prompt from the pack facts only; [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md) owns the prompt, the model set in `claude-client`, the structured output schema and the recording in `model_call`. Two guardrails live in code: every dollar figure in a letter must equal one of the amounts in the payload, otherwise the worker fails the job rather than attaching it; and the recovery letter is worded as a query ("our records show a speaker at Stage B was damaged at 23:40 while your crew was striking the stage; please tell us what you saw"), never as an accusation, which the worker enforces by rejecting output that assigns fault.
 
-Anthropic-Agent.md: without it, `claim_draft` and `recovery_letter` fill a fixed template in the same layout from the same payload in code. Settlement never depends on letters.
+The worker writes each letter to the blob store and calls `register_blob` with the `worker` role and access class `staff`, so only staff can download it through `bandit-api`. `attach_claim_letters` stores the `blob_ref` id on each claim it names (`fnol_blob_id`, `summary_blob_id`, `recovery_blob_id`) and rejects a stale lease.
+
+The organizer sends the notice to the insurer and marks it sent in the organizer portal; BandIt never emails a letter.
+
+Anthropic-Claude-API.md: without it, `claim_draft` and `recovery_letter` fill a fixed template in the same layout from the same payload in code. Settlement never depends on letters.
 
 ### Payout
 
-When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount into the claimant's Nessie wallet, where it shows in the attendee's recap, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`. When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; a staff member with `ops` calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
+When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount through the Capital One Nessie API into the claimant's wallet, where it shows in the attendee's recap, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`.
 
-A claimant with no wallet gets one at payout time: the job carries an empty customer and account, the worker opens a Nessie customer and an account with 0, and `record_claim_payout` stores it as their `claimant_account` with the `payout` entry and no $200 opening. Test-Bands.md: the test attendees that the `bandit-claims` tool sets up connect their wallet right after `update_profile`, so their payouts land in a $200 wallet, like a judge's.
+When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; an organizer (`ops`) calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
 
-A `property` claim pays the venue's repair vendor, who has no Nessie account in BandIt, so J3 posts ledger-only at once, with reference `vendor`, and the claim moves to `settled`. The ledger and letters are the same either way; only the cash leg differs.
+A claimant with no wallet gets one at payout time: the job carries an empty customer and account, the worker opens a Capital One Nessie customer and an account with 0, and `record_claim_payout` stores it as their `claimant_account` with the `payout` entry and no $200 opening. Test-Bands.md: the test attendees that the `bandit-claims` tool sets up connect their wallet right after `update_profile`, so their payouts land in a $200 wallet, like a judge's.
 
-### Elastic.md: similar past claims
+A `property` claim pays the venue's repair vendor, who has no Capital One Nessie account in BandIt, so J3 posts ledger-only at once, with reference `vendor`, and the claim moves to `settled`. The ledger and letters are the same either way; only the cash leg differs.
 
-Every claim gets a precedent search, and its results are only ever checks. When a pack version is built, the module enqueues `claim_verify`. The worker builds a de-identified document in code: the claim id and pack version, the incident kind, cover kind, zone id and time, the amounts (cost, allowed, payout), the bill's service codes, the corroboration result and witness count, and a narrative built by code from a fixed template ("fall in zone 102 at 22:14, 3 witness bands in the same zone, medic note 12 min later, urgent-care bill with codes 99204, 73110, 29125, L3908, 99051"). It holds no names, no attendee or band ids and no medical free text: no note text, no visit reason, nothing from the medical card. The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which marks each document valid or invalid and never rejects it, then ranks it by meaning against the 30 seeded past claims and takes the top 3 (starting value) ([Elastic](../7-integrations/Elastic.md)).
+### Elastic.md: similar past claims from The Evidence Engine
 
-`submit_claim_checks` (role `worker`, rejects a stale lease) writes the validation result as a check, and one `claim_precedent` row per result: the past claim's id and its score. A copy the pipeline marks invalid flags the claim: the check fails, and the claim routes to the organizer with the pipeline's errors listed. It is never refused for it. The Claims queue lists the precedents under the claim's checks as "similar past claim P-014, score 0.82". They are not pack facts, are not hashed, and never change an amount or the route.
+Every claim gets a precedent search from The Evidence Engine, Elastic's part of a claim, and its results are only ever checks. When a pack version is built, the module enqueues `claim_verify`.
 
-**Dashboard: "BandIt claims evidence".** One Kibana dashboard over `bandit-claims` (id `bandit-claims`), put in by its own install script from a saved file. A note says what the index holds and how it is checked. Three counts: claims tonight, evidence failing validation, and the amount paid to claimants in USD across all events. Four charts: claims by outcome, payout by zone in USD, claims by incident kind and outcome, and the validation errors `bandit-claims-validate` caught on the way in. The team opens it at the event next to the Claims queue. It reads only the de-identified copies and decides nothing ([Elastic](../7-integrations/Elastic.md)).
+The worker builds a de-identified document in code: the claim id and pack version, the incident kind, cover kind, zone id and time, the amounts (cost, allowed, payout), the bill's service codes, the corroboration result and witness count, and a narrative built by code from a fixed template ("fall in zone 102 at 22:14, 3 witness bands in the same zone, medic note 12 min later, urgent-care bill with codes 99204, 73110, 29125, L3908, 99051"). It holds no names, no attendee or band ids and no medical free text: no note text, no visit reason, nothing from the medical card.
+
+The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which marks each document valid or invalid and never rejects it, then ranks it by meaning against the 30 seeded past claims and takes the top 3 (starting value) ([Elastic](../7-integrations/Elastic.md)).
+
+`submit_claim_checks` (role `worker`, rejects a stale lease) writes the validation result as a check, and one `claim_precedent` row per result: the past claim's id and its score.
+
+A copy the pipeline marks invalid flags the claim: the check fails, and the claim routes to the organizer with the pipeline's errors listed. It is never refused for it.
+
+The Claims queue lists the precedents under the claim's checks as "similar past claim P-014, score 0.82". They are not pack facts, are not hashed, and never change an amount or the route.
+
+**Elastic Kibana dashboard: "BandIt claims evidence".** One Elastic Kibana dashboard over `bandit-claims` (id `bandit-claims`), put in by its own install script from a saved file. A note says what the index holds and how it is checked.
+
+Three counts: claims tonight, evidence failing validation, and the amount paid to claimants in USD across all events. Four charts: claims by outcome, payout by zone in USD, claims by incident kind and outcome, and the validation errors `bandit-claims-validate` caught on the way in.
+
+The team opens it at the event next to the Claims queue, from the "Claims" link on the organizer portal's "Kibana" tab. It reads only the de-identified copies and decides nothing ([Elastic](../7-integrations/Elastic.md)).
 
 ### During and after the event
 
-The claims follow the two staff roles. During the event the medic works the incident: they take it, note the cost, resolve it and attach the urgent-care bill from the incident card, which opens the claim. Claude reads the bill, code prices it, Claude reviews it and code decides the route. With no learned rule yet, the claim waits for the organizer. After the event the organizer opens "Waiting for your decision" in the host portal and approves each claim there, with "Learn a rule from this approval" ticked, or refuses it with a reason. The fall in step 4 of the event flow ([Flows](../1-overview/Flows.md)) is decided this way.
+The claims follow the two staff roles. During the event the medic works the incident: they take it, note the cost, resolve it and attach the urgent-care bill from the incident card, which opens the claim.
+
+In The Decision Engine, the Anthropic Claude API reads the bill, code prices it, the Anthropic Claude API reviews it and code decides the route. With no learned rule yet, the claim waits for the organizer.
+
+After the event the organizer opens "Waiting for your decision" in the organizer portal and approves each claim there, with "Learn a rule from this approval" ticked, or refuses it with a reason. The fall in step 4 of the event flow ([Flows](../1-overview/Flows.md)) is decided this way.
 
 The question this diagram answers: who acts on a claim during the event, and who acts after it.
 
 ```mermaid
 sequenceDiagram
-  participant Med as Medic (Ops dashboard)
+  participant Med as Medic (organizer portal)
   participant M as band1t module
   participant W as bandit-workers
-  participant C as Claude
-  participant O as Organizer (host portal)
-  participant N as Nessie
+  participant C as Anthropic Claude API
+  participant O as Organizer (organizer portal)
+  participant N as Capital One Nessie API
   Note over Med,M: During the event
   Med->>M: assign_medic, add_incident_note with the cost, resolve_incident
-  Med->>M: Attach bill: POST /api/blobs, then submit_medical_record
+  Med->>M: File the medical record: POST /api/blobs, then submit_medical_record
   W->>C: claim_record_extract (PDF)
   C-->>W: service lines
   W->>M: apply_medical_record: lines priced, pack, J1
@@ -414,7 +478,11 @@ sequenceDiagram
 
 ### Test-Bands.md: the scripted claims run
 
-The `bandit-claims` tool's `story` command ([Test-Bands](../3-services/Test-Bands.md)) runs the whole claims flow on the test bands after the event, with the Claims tab on the big screen. It runs before the organizer decides the real claims from the event, so it starts with no rule. The tool plays every person and device: the test bands, the medic (role `medic`), the organizer (the `ops` identity labelled "Ops desk"), the vision stub and the insurer's payment. `bandit-workers` runs the Claude, Elastic and Nessie jobs beside it. Four test attendees wear bands 90 to 93: Jordan Alvarez (90), Maya Chen (91), a third attendee (92) and Lee Park (93). Bands 94 to 99 form the light circles.
+The `bandit-claims` tool's `story` command ([Test-Bands](../3-services/Test-Bands.md)) runs the whole claims flow on the test bands after the event, with the Claims tab on the big screen. It runs before the organizer decides the real claims from the event, so it starts with no rule.
+
+The tool plays every person and device: the test bands, the medic (role `medic`), the organizer (the `ops` identity labelled "Ops desk"), the vision stub and the insurer's payment. `bandit-workers` runs the Anthropic Claude API, Elastic and Capital One Nessie API jobs beside it.
+
+Four test attendees wear bands 90 to 93: Jordan Alvarez (90), Maya Chen (91), a third attendee (92) and Lee Park (93). Bands 94 to 99 form the light circles.
 
 Already on the screen when it starts:
 
@@ -429,10 +497,10 @@ sequenceDiagram
   participant T as bandit-claims tool
   participant M as band1t module
   participant W as bandit-workers
-  participant C as Claude
-  participant N as Nessie
+  participant C as Anthropic Claude API
+  participant N as Capital One Nessie API
   Note over T,M: 1. Jordan falls on Main stage
-  T->>M: report_sim_band: band 90 falls, 94 to 96 light the circle
+  T->>M: report_test_band: band 90 falls, 94 to 96 light the circle
   T->>M: as the medic: note, resolve_incident, file the bill
   W->>C: claim_record_extract, then claim_review
   C-->>W: lines, then follows
@@ -445,7 +513,7 @@ sequenceDiagram
   W->>N: claim_payout: deposit $895
   W->>M: record_claim_payout, J3, settled
   Note over T,M: 2. Maya falls the same way
-  T->>M: band 91 falls, first-aid record $180
+  T->>M: band 91 falls, hospital report $180
   M->>M: follows, rule v1 matches: settled in seconds
   Note over T,M: 3. to 6.
   M->>M: band 92: injury at home, routed to the organizer
@@ -456,11 +524,19 @@ sequenceDiagram
 
 Step by step (the story's own numbers):
 
-1. Jordan falls. Band 90 falls in the Main stage pit, and bands 94, 95 and 96 around him light the circle. The medic notes "left wrist pain and swelling after the crowd surged", resolves the incident and files the urgent-care bill. Claude reads it, and code pays $895 of the $1,308 billed against the fee schedule: six lines are cut to their caps and an unrelated tetanus shot (`90715`) is excluded. The pack is `corroborated` and Claude's review says `follows`. No rule exists yet, so the claim waits for the organizer. The organizer's first approval carries an amount from a screen a minute old, $100 more than the payout, so `approve_claim` fails closed as stale and nothing moves. This is the fail-closed edge case. The second approval carries $895 and the current SHA, with learn on: J2 books the receivable (deductible 0), the Nessie deposit of $895 lands in Jordan's wallet and J3 posts. Rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling $895, approved by "Ops desk".
-2. Maya falls the same way. A minute later band 91 slips near the stage, and bands 97 and 98 light the circle. Her first-aid record is $180. The pack is `corroborated`, Claude says `follows`, and rule v1 matches with $180 under its $895 ceiling, so the claim settles in seconds: "Settled under rule v1, approved by Ops desk". The payout lands in her wallet.
-3. The injury at home. Band 92 goes down on the Hacking floor, with bands 94 and 99 around it. The urgent-care record ($565) says the ankle was hurt playing basketball at home the evening before. Every code check passes; Claude's review says `doubt`, citing the history, and the claim waits for the organizer with the explanation on top.
-4. Lee's fake claim. Band 93 reports a fall at Main stage, but its light circle (bands 95, 96 and 97) forms on Sponsor row. The `witness_zone` check fails, so corroboration is `disputed`, and code refuses the claim at claim open, before Claude's review and before any money moves. The screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
-5. The broken speaker. The organizer opens a `property` incident at Main stage, the tool's vision stub confirms it from the overhead camera, and the organizer logs the $2,400 repair estimate and resolves it. The property claim (payout 240000, recoverable 190000 after the $500 deductible) waits for the organizer, who approves it. J3 posts ledger-only for the repair vendor, and `request_recovery_letter` has Claude draft a letter to the AV vendor, worded as a query.
+1. Jordan falls. Band 90 falls in the Main stage pit, and bands 94, 95 and 96 around him light the circle. The medic notes "left wrist pain and swelling after the crowd surged", resolves the incident and files the urgent-care bill.
+
+   The Anthropic Claude API reads it, and code pays $895 of the $1,308 billed against the fee schedule: six lines are cut to their caps and an unrelated tetanus shot (`90715`) is excluded. The pack is `corroborated` and the review by the Anthropic Claude API says `follows`. No rule exists yet, so the claim waits for the organizer.
+
+   The organizer's first approval carries an amount from a screen a minute old, $100 more than the payout, so `approve_claim` fails closed as stale and nothing moves. This is the fail-closed edge case.
+
+   The second approval carries $895 and the current SHA, with learn on: J2 books the receivable (deductible 0), the Capital One Nessie deposit of $895 lands in Jordan's wallet and J3 posts. Rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling $895, approved by "Ops desk".
+2. Maya falls the same way. A minute later band 91 slips near the stage, and bands 97 and 98 light the circle. Her hospital report, from first aid, is for $180.
+
+   The pack is `corroborated`, the Anthropic Claude API says `follows`, and rule v1 matches with $180 under its $895 ceiling, so the claim settles in seconds: "Settled under rule v1, approved by Ops desk". The payout lands in her wallet.
+3. The injury at home. Band 92 goes down on the Hacking floor, with bands 94 and 99 around it. The hospital report ($565) says the ankle was hurt playing basketball at home the evening before. Every code check passes; the review by the Anthropic Claude API says `doubt`, citing the history, and the claim waits for the organizer with the explanation on top.
+4. Lee's fake claim. Band 93 reports a fall at Main stage, but its light circle (bands 95, 96 and 97) forms on Sponsor row. The `witness_zone` check fails, so corroboration is `disputed`, and code refuses the claim at claim open, before the review by the Anthropic Claude API and before any money moves. The screen lists every check it made: the band's zone, each witness's zone, the note time and the result.
+5. The broken speaker. The organizer opens a `property` incident at Main stage, the tool's vision stub confirms it from the overhead security camera, and the organizer logs the $2,400 repair estimate and resolves it. The property claim (payout 240000, recoverable 190000 after the $500 deductible) waits for the organizer, who approves it. J3 posts ledger-only for the repair vendor, and `request_recovery_letter` has the Anthropic Claude API draft a letter to the AV vendor, worded as a query.
 6. The insurer pays. The organizer records Northwind Mutual's payment of claim 1's receivable ($895, reference `NWM-55120`) with `record_insurer_payment`; J4 closes it and the claim is `reconciled`.
 
 ### Edge cases
@@ -469,7 +545,7 @@ Test-Bands.md: the scripted claims run shows three of them; the stress test and 
 
 | Case | What judges see | Guardrail |
 |---|---|---|
-| The urgent-care record says the injury happened at home | Scripted claims run, step 3: Claude's review says `doubt`, citing the history; the claim waits for the organizer with the explanation on top | Claude can hold money for a person but never refuse or change it; no review, or a doubt, means no auto-settle |
+| The hospital report says the injury happened at home | Scripted claims run, step 3: the review by the Anthropic Claude API says `doubt`, citing the history; the claim waits for the organizer with the explanation on top | The Anthropic Claude API can hold money for a person but never refuse or change it; no review, or a doubt, means no auto-settle |
 | Witness bands sit in a different zone | Scripted claims run, step 4: Lee's fake claim is refused by code as `witness_zone`, with the band's zone and every witness's zone side by side | the corroboration rule in code: equality on zone id |
 | The amount on screen is out of date | Scripted claims run, step 1: the approval fails as stale, and nothing moves until an approval carries the current amount and SHA | `approve_claim` compares the amount and SHA seen with the current ones and fails closed |
 | The same bill is filed again | Stress test and accuracy run: the bill is marked `duplicate` and pays nothing, so the claim is refused as `zero_payout`; the checks name the earlier claim | the duplicate check across all claims, in code |
@@ -481,13 +557,17 @@ The `bandit-claims` command-line tool ([Test-Bands](../3-services/Test-Bands.md)
 
 | Planted type | How it is planted | What should stop it |
 |---|---|---|
-| Genuine | a fall, 2 or 3 witness bands in the same zone, a medic note, a first-aid record dated that night | nothing: paid, by a rule when one fits, otherwise by the organizer |
+| Genuine | a fall, 2 or 3 witness bands in the same zone, a medic note, a hospital report from first aid, dated that night | nothing: paid, by a rule when one fits, otherwise by the organizer |
 | Circle elsewhere | a fall whose 3 witness bands sit in another zone | code: `witness_zone` fails, refused at claim open |
-| Injury at home | a fall, witnesses, a medic note, and an urgent-care record that places the injury at home | Claude's causation review (`doubt`), then the organizer refuses it |
+| Injury at home | a fall, witnesses, a medic note, and a hospital report that places the injury at home | the causation review by the Anthropic Claude API (`doubt`), then the organizer refuses it |
 | Same bill twice | the first genuine claim's bill filed again on a new fall of the same person | code: the duplicate check, so the claim pays nothing and is refused as `zero_payout` |
 | Injured staff | a fall of a person who holds a staff role when the claim opens | code: refused as `claimant_not_staff` |
 
-After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one. Round 1 starts with no rules, so every genuine claim needs the organizer. The approvals create the rule for `fall`, and approving a bigger claim later raises the ceiling by a new version. Round 3 should need the organizer only for claims above the ceiling and for fakes. The tool plants each fall in a zone where no three injuries land within 5 minutes of each other, so the mass-occurrence rule never turns auto-settle off during the run.
+After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one.
+
+Round 1 starts with no rules, so every genuine claim needs the organizer. The approvals create the rule for `fall`, and approving a bigger claim later raises the ceiling by a new version. Round 3 should need the organizer only for claims above the ceiling and for fakes.
+
+The tool plants each fall in a zone where no three injuries land within 5 minutes of each other, so the mass-occurrence rule never turns auto-settle off during the run.
 
 The Claims queue shows one scorecard, computed in the browser from `planted_incident`, `incident`, `claim`, `approval`, `claim_line` and `ledger_entry` rows of the accuracy-run policy:
 
@@ -497,7 +577,7 @@ The Claims queue shows one scorecard, computed in the browser from `planted_inci
 | Dollars wrongly paid | total `payout_cents` paid on planted decoys, by a rule or by a person | $0 |
 | Auto-settle precision and recall | precision: genuine claims among all auto-settled claims; recall: auto-settled genuine claims among all genuine claims; with the weakest decoy type named, the one with the smallest share stopped by code checks alone | precision 1.0; recall reported as measured |
 | Bill-review savings | total billed minus total paid over the genuine claims' bills, in dollars and percent of billed | reported as measured |
-| Incident to payout | median time from `resolve_incident` to J3 over auto-settled claims; J3 posts when the Nessie deposit lands | seconds |
+| Incident to payout | median time from `resolve_incident` to J3 over auto-settled claims; J3 posts when the Capital One Nessie deposit lands | seconds |
 | Human touches per claim | `approval` rows divided by claims, per round | falls each round |
 
 After the run, the team records the insurer's payment for one accuracy-run claim with `record_insurer_payment`, $10 short, so the ledger shows J4 closing the receivable with its difference.
@@ -529,14 +609,14 @@ erDiagram
 
 | Table | One row is | Key fields |
 |---|---|---|
-| `claimant_account` | one attendee's Nessie account, the only one they have | `identity` (the attendee, primary key), `customer_id`, `account_id`, `created_at`; written by `record_claim_payout` for a claimant who has none; Payments-Nessie.md: written by `record_wallet` when the attendee connects the wallet in setup, and used as the BandIt wallet |
+| `claimant_account` | one attendee's Capital One Nessie account, their wallet, the only one they have | `identity` (the attendee, primary key), `customer_id`, `account_id`, `created_at`; written by `record_claim_payout` for a claimant who has none; Capital-One-Nessie.md: written by `record_wallet` when the attendee connects the wallet in setup, and used as the BandIt wallet |
 | `insurance_policy` | one policy | insurer name, policy number, `purpose` (`event`, `accuracy_run`), period start and end, FNOL contact, the venue's name and address for the notice, `aggregate_used_cents` per cover kind (updated by code at settlement) |
 | `coverage_rule` | one cover under a policy | see Coverage and amounts |
 | `fee_schedule` | one service code the policy pays | `code`, `description`, `cap_cents`, `cover_kind`, `active` |
 | `injured_party` | one person hurt in one incident | `incident_id`, `band_id`, `attendee_id`, `added_by` (`band` or the medic's identity), `first_aid_cents` (added parties), `added_at` |
 | `medical_record` | one uploaded bill | `incident_id`, `injured_party_id`, `claim_id`, `blob_id`, `file_sha256`, `page_count`, `status` (`uploaded`, `extracting`, `priced`, `duplicate`, `failed`), `provider_name`, `provider_npi`, `invoice_number`, `service_date`, `billed_total_cents`, `visit_reason`, `duplicate_of`, `duplicate_keys`, `source` (`model`, `typed`), `job_id`, `model_call_id`, `uploaded_by`, `uploaded_at` |
 | `claim_line` | one service line of a bill | `medical_record_id`, `claim_id`, `line_no`, `code`, `description`, `units`, `billed_cents`, `page`, `cap_cents` (empty when not listed), `allowed_cents`, `decision` (`paid`, `reduced`, `excluded`), `reason` |
-| `claim` | one claim for one injured person, or for one property incident | `incident_id`, `injured_party_id` (unique; empty for property), `attendee_id` (empty for property), `policy_id`, `cover_kind`, `status`, `decided_by` (`rule` or `approver`), `routed_to_role` (`ops` when routed), `routed_to_name` ("Organizer", then the name of whoever approved it), `causation` (`pending`, `follows`, `doubt`, `none`), `causation_text`, `causation_fact_ids`, `causation_model_call_id`, `settlement_rule_id` and version, `cost_cents`, `payout_cents`, `recoverable_cents`, `venue_cost_cents`, `pack_version`, `payout_reference` (the Nessie deposit id, or `vendor`), `fnol_blob_id`, `summary_blob_id`, `recovery_blob_id`, `fnol_sent_at`, `opened_at`, `decided_at`, `settled_at`, `reconciled_at`, `refusal_reason` |
+| `claim` | one claim for one injured person, or for one property incident | `incident_id`, `injured_party_id` (unique; empty for property), `attendee_id` (empty for property), `policy_id`, `cover_kind`, `status`, `decided_by` (`rule` or `approver`), `routed_to_role` (`ops` when routed), `routed_to_name` ("Organizer", then the name of whoever approved it), `causation` (`pending`, `follows`, `doubt`, `none`), `causation_text`, `causation_fact_ids`, `causation_model_call_id`, `settlement_rule_id` and version, `cost_cents`, `payout_cents`, `recoverable_cents`, `venue_cost_cents`, `pack_version`, `payout_reference` (the Capital One Nessie deposit id, or `vendor`), `fnol_blob_id`, `summary_blob_id`, `recovery_blob_id`, `fnol_sent_at`, `opened_at`, `decided_at`, `settled_at`, `reconciled_at`, `refusal_reason` |
 | `evidence_fact` | one fact in a pack | see Evidence pack |
 | `evidence_pack` | one hashed build of a claim's facts | `claim_id`, `version`, `fact_count`, `sha256`, `built_at`, `corroboration`, `checks` |
 | `settlement_rule` | one version of a learned rule | `policy_id`, shape fields, `requires_corroborated`, `ceiling_cents`, `approver`, `approver_name`, `approver_role`, `approval_id`, `version`, `status` (`active`, `superseded`), `created_at` |
@@ -560,7 +640,7 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 | `refuse_claim` | `ops` (the claim's `routed_to_role`) or the module owner | `approval` with `decision = refuse`, J1r, a ceiling-0 rule version when the refusal contradicts a rule, status `refused` |
 | `record_insurer_payment` | `ops` | J4, `reconciled` |
 | `retry_claim_payout` | `ops` | queues the `claim_payout` job again for a `settling` claim whose payout job is dead |
-| `record_claim_payout` | `worker` | Payments-Nessie.md: stores a new claimant's account and adds the wallet's `payout` entry; J3, `settled`; rejects a stale lease |
+| `record_claim_payout` | `worker` | Capital-One-Nessie.md: stores a new claimant's account and adds the wallet's `payout` entry; J3, `settled`; rejects a stale lease |
 | `request_recovery_letter` | `ops` | enqueues `recovery_letter` |
 | `attach_claim_letters` | `worker` | stores blob ids and the suggested tolerance on each claim it names; rejects a stale lease |
 | `retire_settlement_rule` | `ops` | new version with ceiling 0 |
@@ -572,12 +652,13 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 | Failure | Effect | Design answer |
 |---|---|---|
 | The medic resolves with no cost note and no bill | No claim | The medic attaches the bill from the incident card, which opens the claim |
-| A staff member without `ops`, such as the medic, tries to decide a claim | The wrong person would move money | `approve_claim` and `refuse_claim` refuse with "claim N is waiting for Organizer (ops)"; the host portal hides the buttons anyway |
+| A staff member without `ops`, such as the medic, tries to decide a claim | The wrong person would move money | `approve_claim` and `refuse_claim` refuse with "claim N is waiting for Organizer (ops)"; the organizer portal hides the buttons anyway |
 | Pack rebuilt or coverage rule edited while the organizer looks | The amount or SHA on screen is out of date | `approve_claim` fails `stale` and changes nothing; the screen reloads |
-| `claim_record_extract` fails validation twice, or Claude refuses | No priced lines | The bill is `failed`; the claim waits for the organizer, who types the lines with `enter_claim_lines` |
+| `claim_record_extract` fails validation twice, or the Anthropic Claude API refuses | No priced lines | The bill is `failed`; the claim waits for the organizer, who types the lines with `enter_claim_lines` |
 | `claim_review` gives no usable answer | No verdict | Treated as `doubt`: the claim goes to the organizer and never auto-settles |
-| A letter quotes a figure not in the payload, or Claude refuses | No usable letter | The worker fails the job and attaches the template letter; settlement is unaffected |
-| `claim_payout` dead after its attempts | Claimant unpaid | The claim stays `settling` with the job's error; a staff member with `ops` retries it with `retry_claim_payout` once Nessie answers again |
+| A letter quotes a figure not in the payload, or the Anthropic Claude API refuses | No usable letter | The worker fails the job and attaches the template letter; settlement is unaffected |
+| `claim_payout` dead after its attempts | Claimant unpaid | The claim stays `settling` with the job's error; an organizer (`ops`) retries it with `retry_claim_payout` once the Capital One Nessie API answers again |
+| No `insurance_policy` row when a qualifying incident is resolved | `resolve_incident` fails and the incident stays open | The seed loads the event policy before doors open |
 
 ## Dependencies
 
@@ -585,30 +666,30 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `job`, `blob_ref`, `register_blob`, `staff_role`, `attendee`, roles, the hook mechanism inside core reducers, the seed.
 - [Safety](Safety.md): `incident`, `incident_snapshot`, `incident_band`, `incident_note` with `cost_cents`, `resolve_incident`, `open_incident` for `property`.
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the Claims queue with "Waiting for your decision", the incident card controls (Attach bill, Add injured person) and the Report property damage button.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the Claims queue with "Waiting for your decision" the "File the medical record" form on a claim, and the incident card control Add injured person.
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` blob upload `POST /api/blobs` with purpose `medical`, and the `bandit-workers` handlers.
-- Payments-Nessie.md: the `claim_payout` work in `bandit-workers`, which fills this file's `claimant_account`, and the wallet's `wallet_entry`. Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
-- Anthropic-Agent.md: `claude-client`, `model_call`, the prompts for `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`. Without it, bill lines are typed with `enter_claim_lines`, every injury claim's causation is `none` and goes to a person, and letters are templates.
-- Vision.md (TBD -- LEO): `vision_assessment`, `camera` zones, frame blobs and `property_event`. Without it, the medic note and witnesses are the second source, and property incidents come only from the staff button.
+- Capital-One-Nessie.md: the `claim_payout` work in `bandit-workers`, which fills this file's `claimant_account`, and the wallet's `wallet_entry`. Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
+- Anthropic-Claude-API.md: `claude-client`, `model_call`, the prompts for `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`. Without it, bill lines are typed with `enter_claim_lines`, every injury claim's causation is `none` and goes to a person, and letters are templates.
+- Vision.md (TBD -- LEO): `vision_assessment`, `camera` zones, frame blobs and `property_event`. Without it, the medic note and witnesses are the second source, and property incidents come only from `open_incident`.
 - Test-Bands.md: planted claims for the accuracy run and the stress test, and the scripted claims run. Without it, there is no scorecard and no scripted claims run: claims come only from real incidents, worked by the medic during the event and decided by the organizer after it.
 - Elastic.md: `bandit-claims`, `bandit-claims-validate` and the 30 seeded past claims. Without it, claims carry no precedent checks and decide exactly the same.
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Claims queue (Insurance.md)" panel row, the incident card controls and the Report property damage button.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the "Claims queue (Insurance.md)" panel row and the incident card controls.
 - [Flows](../1-overview/Flows.md) and [Architecture](../1-overview/Architecture.md): the accuracy run before doors open (step 0c), steps 9 to 9b and the finance track row.
-- [Payments-Nessie](../7-integrations/Payments-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes when the attendee connects the wallet.
+- [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md): claim payouts are the money that comes into the wallet, and the wallet is this file's `claimant_account`, which it writes when the attendee connects the wallet.
 - [Test-Bands](../3-services/Test-Bands.md): `plant_medic_visit` feeds this file's claims.
 - [Elastic](../7-integrations/Elastic.md): `bandit-claims` holds this file's de-identified claim copies.
 
 **If you delete this file**
 
 - Drop the tables above (`insurance_policy`, `coverage_rule`, `fee_schedule`, `injured_party`, `medical_record`, `claim_line`, `claim`, `evidence_fact`, `evidence_pack`, `settlement_rule`, `approval`, `ledger_entry`, `claim_precedent`), the reducers above, the job kinds `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter`, `claim_verify` and `claim_payout`, and the bill upload's `medical` purpose of `POST /api/blobs`.
-- Do not drop `claimant_account`: move its definition into [Payments-Nessie](../7-integrations/Payments-Nessie.md), which keeps writing it for the wallet through `record_wallet`.
+- Do not drop `claimant_account`: move its definition into [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md), which keeps writing it for the wallet through `record_wallet`.
 - Remove the Insurance hook bullet from `resolve_incident` in Safety.md and SpacetimeDB.md, the Insurance.md rows in SpacetimeDB.md's registry and roles tables, and the policy, coverage and fee schedule files from the seed.
-- Remove the Insurance.md rows in Ops-Dashboard.md: the Claims queue with its scorecard, the incident card controls, the Report property damage button, their interface and subscription rows, "Waiting for your decision" and the decision on it. Staff can still open a `property` incident with the core Open incident control.
-- Remove the Insurance.md lines in Payments-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
-- Remove the Insurance use cases from Anthropic-Agent.md, and the Insurance.md parts of Test-Bands.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
+- Remove the Insurance.md rows in Organizer-Portal.md: the Claims queue with its scorecard, the incident card controls, their interface and subscription rows, "Waiting for your decision" and the decision on it, and the "Kibana" tab's "Claims" link. Staff can still open a `property` incident with `open_incident`.
+- Remove the Insurance.md lines in Capital-One-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
+- Remove the Insurance use cases from Anthropic-Claude-API.md, and the Insurance.md parts of Test-Bands.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
 - Remove the Insurance.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
 - Remove the Insurance.md rows from the handler and endpoint registries in Rust-Backend.md, the Insurance.md rows in Flows.md (the organizer, step 0c, steps 9 to 9b, their diagram index rows and the decision row), the prize row in Architecture.md, the Insurance consumer rows in Vision.md, F12 in Requirements.md, the two Insurance.md rows in Decisions.md, and the Insurance row and node in README.md.
 
@@ -622,28 +703,28 @@ Seed files: the two policies and their covers, and the fee schedule. Elastic.md:
 | Test-Bands.md: the scripted claims run starts with no rule: the organizer's approval of Jordan's claim teaches rule v1, and Maya's similar fall settles under it | the system learning in front of the judges is the point of the track; a rule approved the day before only shows the second half |
 | Test-Bands.md: the stale approval is shown in the scripted claims run, with an amount from a screen a minute old | fail closed is the guardrail finance reviewers ask about first, and it costs one extra step |
 | The accuracy run and the stress test run before doors open, under a copy of the policy whose period ends before doors open | their learned rules expire before the event, so the scripted claims run really starts with no rule, and the scorecard is ready on screen |
-| Claude reads the bill into lines; code validates the lines and prices them against a seeded fee schedule | the model is good at reading a bill and must never decide a payable; a cap per service code is the standard way a policy pays a "reasonable" charge |
+| The Anthropic Claude API reads the bill into lines; code validates the lines and prices them against a seeded fee schedule | the model is good at reading a bill and must never decide a payable; a cap per service code is the standard way a policy pays a "reasonable" charge |
 | The fee schedule caps are starting values set in the seed | the venue's insurer sets the real schedule; the scripted claims run needs one that cuts lines to their caps and excludes another |
 | A bill with no valid provider NPI pays nothing | it is not a medical provider's bill, and the NPI is also the provider key for the duplicate check |
 | Duplicates are matched on the identical file, provider and invoice number, and patient, service date and total, across all claims and policies | a re-scan changes the file hash but not the invoice, and a retyped invoice still has the same patient, date and total |
-| Claude's causation review can only send a claim to a person; no answer counts as a doubt | a judgment about why someone was hurt should be able to hold money for a person, and must never be able to move it or refuse it |
-| Only code at claim open and the organizer refuse a claim; Claude's review and Elastic.md's validation only flag and route | a model or a search never takes money from a person on its own; every refusal is a check anyone can re-run, or a person's name |
+| The causation review by the Anthropic Claude API can only send a claim to a person; no answer counts as a doubt | a judgment about why someone was hurt should be able to hold money for a person, and must never be able to move it or refuse it |
+| Only code at claim open and the organizer refuse a claim; the review by the Anthropic Claude API and Elastic.md's validation only flag and route | a model or a search never takes money from a person on its own; every refusal is a check anyone can re-run, or a person's name |
 | A staff injury is refused, not routed | medical payments excludes the venue's own employees; workers' compensation pays them, so the organizer could not pay it either |
 | Three or more people hurt in one zone within 5 minutes are one occurrence: auto-settle is off and the organizer decides every claim of it | one occurrence with many people hurt can use up the event's aggregate limit, so a person decides those claims with the whole occurrence in view |
 | An added injured party's claim is always `uncorroborated` | the only witness to their injury is the medic who added them, so a person decides |
-| The first notice of loss follows the ACORD 3 sections; code fills every field it can and Claude writes only the free text | insurers read that layout, and every figure in it then comes from code |
+| The first notice of loss follows the ACORD 3 sections; code fills every field it can and the Anthropic Claude API writes only the free text | insurers read that layout, and every figure in it then comes from code |
 | A refusal writes a ceiling-0 rule version only when the rule would have settled that claim | a decoy refused for its own reason must not switch off a good rule during the accuracy run |
 | A learned rule matches only while its policy's period is open; it does not carry over to the next event | the rule is an approval under this policy's limits; a new policy starts with no rules |
-| Payments-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens when the attendee connects it in setup | one Nessie account per attendee, so a payout and a merch purchase show in one balance |
-| A claimant with no wallet, an attendee who skipped the wallet step, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
-| Evidence windows: camera frames within 120 s of the band's flag time, the medic note within 30 min of resolution, the bill's service date within 3 days; all starting values, calibrate at the venue | wide enough for a real medic visit and an urgent-care trip, narrow enough that another event's paperwork cannot corroborate |
+| Capital-One-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens when the attendee connects it in setup | one Capital One Nessie account per attendee, so a payout and a merch purchase show in one balance |
+| A claimant with no wallet, an attendee who skipped the wallet step, is paid into a Capital One Nessie account opened at payout time | every payout to a person goes through the Capital One Nessie API, so the ledger and the timing are the same for every claimant |
+| Evidence windows: security camera frames within 120 s of the band's flag time, the medic note within 30 min of resolution, the bill's service date within 3 days; all starting values, calibrate at the venue | wide enough for a real medic visit and an urgent-care trip, narrow enough that another event's paperwork cannot corroborate |
 | J1 is posted when a claim passes the code checks; a claim refused by them posts nothing | nothing was reserved, so nothing needs reversing; J1r then always means a refusal after the reserve |
 | `claim_draft` runs per incident when its claims are routed or auto-settled, and again for a rebuilt pack | the organizer needs the summary and the suggested tolerance before deciding, and every figure must match the current pack |
 | A `property` claim is always routed to a person and its approval learns no rule | a property incident has no band, so it is never `corroborated`, and a rule for it could never fire |
-| A `property` payout to the repair vendor posts J3 ledger-only at once, with reference `vendor` | the vendor has no Nessie account in BandIt |
-| A failed Nessie payout leaves the claim `settling` until a staff member with `ops` retries it with `retry_claim_payout`; there is no manual payout | every payout to an attendee goes through Nessie, so the wallet and the ledger always agree |
-| The second source is the medic note plus at least 2 witnesses; Vision.md replaces it with the camera assessment when the zone has the camera | it works with bands alone, which is what the event runs on |
-| Raw bridge logs are not evidence | they stay on the laptop; the snapshot rows are frozen in the same transaction as the incident |
-| Elastic.md: one Kibana dashboard, "BandIt claims evidence", shows the claim copies: claims tonight, payouts by zone, outcomes by incident kind, and the validation errors caught on the way in | the finance judges see the claims and Elastic's checks on them as one picture, and it reads only the de-identified copies |
-| Bills are attached from the Ops dashboard incident card, not the attendee app | medics already work incidents on the dashboard on their phones, and the card knows the incident and its injured people |
+| A `property` payout to the repair vendor posts J3 ledger-only at once, with reference `vendor` | the vendor has no Capital One Nessie account in BandIt |
+| A failed Capital One Nessie payout leaves the claim `settling` until an organizer (`ops`) retries it with `retry_claim_payout`; there is no manual payout | every payout to an attendee goes through the Capital One Nessie API, so the wallet and the ledger always agree |
+| The second source is the medic note plus at least 2 witnesses; Vision.md replaces it with the security camera's assessment when the zone has a security camera | it works with bands alone, which is what the event runs on |
+| Raw radio logs are not evidence | the snapshot rows are written in the same transaction that opens the incident, so they cannot drift from it |
+| Elastic.md: one Elastic Kibana dashboard, "BandIt claims evidence", shows the claim copies: claims tonight, payouts by zone, outcomes by incident kind, and the validation errors caught on the way in | the finance judges see the claims and Elastic's checks on them as one picture, and it reads only the de-identified copies |
+| Bills are attached from the organizer portal incident card, not the tap page (/t/code) | medics already work incidents in the organizer portal on their phones, and the card knows the incident and its injured people |
 | Elastic.md: Elastic precedents are checks only; they are not hashed and never change an amount or a route | a similar past claim is context for a person, not evidence, and a claim must decide the same with or without Elastic |

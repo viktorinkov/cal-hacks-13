@@ -1,152 +1,180 @@
 # Test bands
 
-Nine real bands cannot show how an event behaves, so BandIt adds bands that no radio carries, in two places, and neither touches the radio. The crowd lives inside the `band1t` module: `start_crowd` adds up to 80 crowd bands (ids 10 to 89) with generated owners, and `crowd_tick` moves them between zones, so the people graph and the recaps look like a real event. The test bands (ids 90 to 99) report through `report_sim_band`, which only the `simulator` role may call. The `bandit-claims` command-line tool drives them for the safety scenarios, the planted claims and log replay, and `bandit-api`'s dev routes let a tester press, walk or drop one from a browser, among them from the Ops dashboard's test bands tab. The real bands move among them on the same dashboard.
+Nine real bands cannot show how an event behaves, so BandIt adds bands that no radio carries, in two places, and neither touches the radio. The crowd lives inside the `band1t` module: `start_crowd` adds up to 2,000 crowd bands, numbered from 100, each worn by a generated attendee, and `crowd_tick` moves them between the venue's zones and sponsor booths, so the venue map, the people graph and the recaps look like a real event. The event runs a crowd of 1,000.
+
+The test bands (ids 90 to 99) report through `report_test_band`, which only the `tester` role may call. The `bandit-claims` command-line tool drives them for falls with their light circle, a property incident and the insurance claims runs, and `bandit-api`'s dev routes let a tester press, walk or drop one from a browser, among them from the Bands tab of the organizer portal (/organizer). The real bands move among them in the same organizer portal.
 
 ## Role in the system
 
 Responsibilities:
 
-- Social.md: add up to 80 crowd bands (ids 10 to 89) with `start_crowd`, each with a generated owner, and move them in groups every 5 s with `crowd_tick`, so the big-screen people graph shows a real-looking crowd. `stop_crowd` freezes it.
-- Report the test bands (ids 90 to 99) through `report_sim_band`, under the `simulator` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press bands 94 to 99, move any test band 90 to 99, and start the tool's `fall` and `property` commands.
-- Obey `band_directive` and `band_command` rows for the test bands and for target 0, and acknowledge the one-shots addressed to their ids.
-- Run scenarios on the test bands: crush build-up, SOS, fall.
-- (TBD -- LEO) Run the two-exit low-visibility and the medic-approach scenarios.
+- Social.md: add up to 2,000 crowd bands, numbered from 100, with `start_crowd`, each worn by a generated attendee; the event runs 1,000. `crowd_tick` moves them every 2 s: hackers in teams between their table, the sponsor booths, food, the stage and the entrance, and booth staff at their booth. The crowd fills the venue map, the big-screen people graph and the recaps, and `stop_crowd` freezes it.
+- Report the test bands (ids 90 to 99) through `report_test_band`, under the `tester` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press bands 94 to 99, move any test band 90 to 99, and start the tool's `fall` and `property` commands.
+- Play the incident path on the test bands: a fall with its light circle (`fall`), the medic taking it and writing a note (`treat`), the resolve (`resolve`), and a property incident (`property`).
 - Insurance.md: plant insurance claims with the `bandit-claims` tool, each with a medic visit and a synthetic bill: three accuracy rounds of genuine claims and decoys, the stress-test run of the edge cases, and the six claims of the scripted claims run, in which the tool also plays the medic and the organizer.
-- Replay a bridge `.jsonl` log through `report_sim_band` at recorded or accelerated speed, with real bands 1 to 9 mapped onto test band ids 91 to 99.
-- Report the tool's health through `heartbeat` every 5 s.
 
 Explicit non-responsibilities:
 
 - The crowd and the test bands never open the serial port and never send radio commands; real bands are [Gateway-Bridge](Gateway-Bridge.md)'s alone.
-- Their drivers never write `band_directive` or any ops table; a test band is a device, not an operator. Insurance.md: the one exception is the medic visit of a planted incident on a test band, which the `bandit-claims` tool plays through `plant_medic_visit`.
-- They never report ids 1 to 9 (a replay maps them onto 91 to 99, see below).
+- Test bands do not obey commands. A `command` row addressed to 90 to 99 may be written (by `force_state` and the like), but nothing acts on it, and `resolve_incident` and `claim_band` skip the test bands. A test band shows only what its driver reports.
+- They never report ids below 90; `report_test_band` refuses them.
+- Social.md: the crowd is not part of the incident path. It counts in the Live tab's zone table, but `watch_bands` and the incident snapshot read only bands under 100, so a crowd band opens no incident and is never a witness, and no command reaches it.
 - They do not validate the radio: a test band reports what a band would report, which cannot tell whether the venue's RSSI thresholds are right. That is calibration ([Hardware](../4-devices/Hardware.md)).
-- They hold no truth. Stopping the `bandit-claims` tool makes the test bands go stale; the crowd stops only with `stop_crowd`.
+- They hold no truth. A test band goes offline 5 s after its driver stops reporting (`sweep`); the crowd stops only with `stop_crowd`.
 
 ## Interfaces
 
 | Interface | Direction | Counterpart | What flows | Transport |
 |---|---|---|---|---|
-| Social.md: `start_crowd` | in to the module, once after the venue import | the team as `ops`, or the `bandit-claims` tool as `simulator` | the crowd size, at most 80; refused until the venue has zones with stations | SpacetimeDB reducer call |
-| Social.md: `stop_crowd` | in to the module | the same callers | none; the crowd stops where it is | SpacetimeDB reducer call |
-| Social.md: `crowd_tick` | internal, every 5 s | the `band1t` scheduler | moves the groups, writes the crowd bands' `band_presence` rows and which crowd bands were close | schedule table `crowd_timer`; only the scheduler may call it |
-| `report_sim_band` | out, once a second per test band and at once on a change | `band1t` module | band id 90 to 99, station, state, `neigh`, and the SOS, fall and press flags | SpacetimeDB Rust client SDK, caller role `simulator` |
-| `bandit-claims` command line | in | the operator | `setup` (the test identities and their role grants), then a scenario file, `fall`, `property`, `scorecard` (the accuracy run), `story` (the scripted claims run) or a replay log | local process arguments |
-| `bandit-api` dev routes | in | a tester's browser, only while test mode (`BANDIT_SIMULATE=1`) is on | `POST /api/dev/press/{band}` presses one of the bands 94 to 99; `POST /api/dev/move/{band}/{station}` moves any test band 90 to 99 to that station's zone; `POST /api/dev/fall/{band}` runs `bandit-claims fall` for a test band 90 to 99; `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that station's zone. The Ops dashboard's test bands tab calls all four | HTTPS to `bandit-api` ([Rust-Backend](Rust-Backend.md)), which calls `report_sim_band` as the `simulator` identity |
-| Insurance.md: `plant_medic_visit` | out | `band1t` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `simulator` |
+| Social.md: `start_crowd` | in to the module, once after the venue import | the team as `ops`, or the `bandit-claims` tool as `tester` | the crowd size, at most 2,000 (1,000 at the event); a call replaces the whole crowd, and 0 removes it; refused until the venue import has made its zones | SpacetimeDB reducer call |
+| Social.md: `stop_crowd` | in to the module | the same callers | none; the crowd's bands go offline where they stand | SpacetimeDB reducer call |
+| Social.md: `crowd_tick` | internal, every 2 s | the `band1t` scheduler | moves the teams that are due, recounts every crowd band's neighbours, writes the `band` rows and the stays of the crowd bands that changed, and the close time of the pairs that are together | schedule table `crowd_timer`; only the scheduler may call it |
+| `report_test_band` | out: from the tool once a second per test band and at once on a change, from `bandit-api` every 2 s | `band1t` module | band id 90 to 99, station id, state, `neigh`, and the SOS, fall and press flags | SpacetimeDB Rust client SDK from the tool, an HTTP reducer call from `bandit-api`; caller role `tester` |
+| `bandit-claims` command line | in | the operator | `setup` and `status`; `fall`, `treat`, `resolve` and `property`; Insurance.md: `story` (the scripted claims run), `scorecard` (the accuracy run), `attach-record` and the claim commands | local process arguments |
+| `bandit-api` dev routes | in | a tester's browser, only while test mode (`BANDIT_TEST_MODE=1`) is on | `POST /api/dev/press/{band}` presses one of the bands 94 to 99; `POST /api/dev/move/{band}/{station}` moves any test band 90 to 99 to the zone of that station id; `POST /api/dev/fall/{band}` runs `bandit-claims fall` for a test band 90 to 99; `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for the zone of that station id; Insurance.md: `POST /api/dev/record/{claim}/{template}` runs `bandit-claims attach-record` | HTTPS to `bandit-api` ([Rust-Backend](Rust-Backend.md)), which calls `report_test_band` as the `tester` identity |
+| The tool's reads | in, subscription as the module owner | `band1t` module | each zone's station id by name, the test bands' last station ids, and the incident and witness rows a fall waits for | SDK |
+| Insurance.md: `plant_medic_visit` | out | `band1t` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `tester` |
 | Insurance.md: bill upload | out | `bandit-api`, then `band1t` module | a synthetic bill PDF from the tool's seed folder through `POST /api/blobs` with purpose `medical`, then `submit_medical_record` as the tool's `medic` test identity ([Insurance](../6-features/Insurance.md)) | HTTPS, then SDK |
-| `ack_band_command` | out | `band1t` module | command id and outcome for one-shots addressed to the test bands | SDK |
-| `heartbeat` | out, every 5 s | `band1t` module | service `simulator`, version, counters: test bands reporting, reports per second, active scenario and its clock, replay position | SDK |
-| `zone`, `zone_link`, `exit`, `station`, `zone_state` | in, subscription | `band1t` module | the venue graph (areas, walking distances, exits, the station colour at each) and zone state | SDK |
-| `fleet_config` | in, subscription | `band1t` module | the thresholds real bands use, so a test band's colour matches the `neigh` it reports, and `low_vis` | SDK |
-| `band_directive`, `band_command` | in, subscription through `staff_directives` and `staff_commands` | `band1t` module | rows for target 0 and the test bands 90 to 99 | SDK |
-| Scenario file | in | the operator | a list of timed steps (below) | local text file named on the command line |
-| Replay log | in | a bridge run | the bridge's raw `.jsonl` | local file named on the command line |
-
-A target-0 one-shot is applied by the `bandit-claims` tool and acknowledged by the bridge, so `ack_band_command` must be idempotent ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 
 ## Design
 
 ### Band ids
 
-Band ids are one byte, the same as on the radio. The ranges never overlap, so nothing downstream needs a rule about who may report which id.
+Band ids are 32 bits. Ids 1 to 99 fit in one byte, the same as on the radio: the real bands and the test bands, the only bands the incident path reads. The crowd's bands start at 100.
+
+The ranges never overlap, so nothing downstream needs a rule about who may report which id. People see every band, test and crowd bands too, by its code, never its id ([Tap-Page](../5-apps/Tap-Page.md)).
 
 | Ids | Bands | How they reach the module |
 |---|---|---|
-| 1 to 9 | the real bands | `bandit-bridge`, through `ingest_band_reports` |
-| 10 to 89 | the crowd | no reports: `crowd_tick` writes their presence inside the module |
-| 90 to 93 | the test bands of the four test attendees in the scripted claims run, Lee among them | the `bandit-claims` tool, through `report_sim_band` |
-| 94 to 99 | test bands a tester claims from the tap link | `bandit-api`'s dev routes or the `bandit-claims` tool, through `report_sim_band` |
+| 1 to 9 | the real bands | `band1t-bridge`, through `ingest_band` |
+| 90 to 93 | the test bands of the four test attendees of the scripted claims run: Jordan Alvarez, Maya Chen, Sam Patel and Lee Park | the `bandit-claims` tool, through `report_test_band` |
+| 94 to 99 | test bands a tester claims from the tap link | `bandit-api`'s dev routes or the `bandit-claims` tool, through `report_test_band` |
+| Social.md: from 100 (100 to 1,099 for the event's crowd of 1,000) | the crowd | no reports: `crowd_tick` writes their rows inside the module |
 
-`report_sim_band` refuses any id outside 90 to 99 (`SIM_BANDS` in the module), and only the `simulator` role may call it.
+`report_test_band` refuses any id outside 90 to 99 (`TEST_BANDS` in the module), and only the `tester` role may call it.
+
+Social.md: a crowd band never goes on air and no command reaches it, so a command target from 101 to 105 always means a station marker.
 
 ### Social.md: the crowd
 
-The crowd is part of the module, so it needs no process and no connection. The team starts it once after the venue import with `start_crowd` (roles `ops` and `simulator`), giving the crowd size.
+The crowd is part of the module, so it needs no process and no connection. The team starts it once after the venue import with `start_crowd` (roles `ops` and `tester`), giving the crowd size, at most 2,000; the event runs 1,000.
 
-- **Generated owners.** For each crowd band from 10 up, at most 80, `start_crowd` creates a crowd attendee and makes it the band's owner. The attendee has a made-up display name from fixed lists of first and last names, `findable` on, and one Instagram handle in `social_handle`, taken from a fixed list of well-known public accounts. It is keyed by a placeholder identity derived from the band id, which no client can sign in as. A band that already has an owner is skipped, so a second call adds nobody twice. The `attendee` field `simulated` marks a crowd attendee everywhere.
-- **Groups.** The crowd bands are put in groups of 3, and each group starts in one station zone.
-- **Movement.** `crowd_tick` runs every 5 s inside the module. When a group's time is up, the whole group moves to a random station zone and stays there for 3 to 8 minutes (starting values). Every tick, `crowd_tick` writes each crowd band's zone as its `band_presence`, the row `memory_tick` writes for a band it hears.
-- **Who is close.** Members of a group in the same zone are close on every tick. Two strangers in the same zone are close on 15 percent of ticks (starting value). Each close tick counts as 30 s together, so the 3 minutes of the encounter rule pass within a minute and the graph grows while people watch.
-- **Test bands mix in.** A claimed test band (90 to 99) that is live counts as close to every crowd band in the zone it reports, so a tester's recap shows people without any hardware.
-- **Stop.** `stop_crowd` stops the timer and closes the crowd's open zone stays. The visits, encounters and graph links it made stay.
+A call replaces the whole crowd: it first deletes every crowd attendee with their bands' rows, stays, handles, visits, encounters, shared visits, photo tags and graph links, so size 0 removes the crowd. Until the venue has zones with station markers, it refuses with "import the venue first".
 
-The social step of `memory_tick` then turns the crowd into visits, encounters, shared visits and graph links by the same rules as real attendees ([Social](../6-features/Social.md)). The crowd sends no band reports, so it has no `band_report` row: it is not on the band map, never counts in zone density, receives no directives and opens no incidents.
+- **Generated attendees.** Each crowd band, from 100 up, is worn by a crowd attendee that `start_crowd` creates. The attendee is keyed by a placeholder identity derived from the band id, which no client can sign in as.
+
+  It has a made-up display name from fixed lists of first and last names, a placeholder photo as `photo_url`, `findable` on, and an Instagram handle in `social_handle` made from the name; three in ten have the same handle on Threads too. Its `attendee` row has `crowd` set, which the attendee list shows. A `crowd_member` row ties the band to the attendee: its team, the attendee's small offset from the team's spot, 2 or 3 interests drawn from the booths' tags, and who they are talking to.
+- **Booth staff and teams.** One crowd attendee in ten staffs a sponsor booth, at most 2 per booth. Bright-Data.md: the biggest sponsors are staffed first, and a staff member's `organization_id` is the booth's organisation, so the graph links them to it with `works_at`.
+
+  Everyone else hacks in a team of 1 to 4 with a home table on the hacking floor. Each team, and each booth's staff member, is a `crowd_group` row: its home spot, where it stands now (zone, booth and spot in metres) and when it moves next.
+- **Movement.** `crowd_tick` runs every 2 s inside the module. When a team's time is up, the whole team moves on.
+
+  From its table it goes to a sponsor booth 45 percent of the time, for 2 to 5 minutes; booths that match its members' interests draw more (Bright-Data.md: and so do bigger sponsors). It goes to food 20 percent of the time (4 to 9 minutes), to the stage 15 percent (5 to 12 minutes), to another team's table 10 percent (3 to 6 minutes) and to the entrance 5 percent (1 to 3 minutes); otherwise it stays.
+
+  From a booth it tries another booth 35 percent of the time and otherwise goes back to its table, where it stays 6 to 15 minutes. Booth staff stay at their booth 15 to 40 minutes at a time, with a 4 to 8 minute food break 30 percent of the time.
+
+  At the start a third of the teams are away from their table, and the first moves are spread over the first 10 minutes, so the venue is busy at once. All of these are starting values.
+- **Spots and neighbours.** A team stands at a spot in metres on the venue plan, the same plan the organizer portal's venue map draws from `venue_plan` ([SpacetimeDB](../2-data/SpacetimeDB.md)): a booth's spot for the attendees who visit it, its staff spot for the booth's staff, or a random spot in a zone. Each member stands at the team's spot plus their own offset.
+
+  Every tick, `crowd_tick` counts each crowd band's neighbours, the bands within 1.5 m, real and test bands included. It turns that count into the band's state, IDLE, YELLOW or GUIDE (calm, busy or very busy on the map), against `settings.yellow` and `settings.red`, with the firmware's one-step hysteresis. It writes the `band` row (zone, booth, spot, `neigh`, state, online) only for the bands that changed, all in one transaction.
+- **Stays.** When a crowd band's zone or booth changes, `crowd_tick` closes its open stay in `zone_visit` and opens a new one with the new zone and booth. The crowd needs no space-time mapping, because the module places each crowd band itself.
+- **Who is close.** Teammates are always close. A stranger at the same zone and booth, within 3 m, sometimes starts talking: a chance of 0.4 percent per tick, 5 percent for booth staff. Each attendee talks to only a few strangers over the event: 2 to 10, four times as many for booth staff.
+
+  Two people talking stay close until either one moves on. The crowd's time together runs 6 times faster than the clock, so the 3 minutes of the encounter rule pass within 30 s and the graph grows while people watch.
+
+  `crowd_tick` keeps each pair's close time in `encounter`, crediting one fifteenth of the crowd per tick so each pair is written every 30 s, and `social_tick`'s encounter rule turns it into the `social_encounter` row and its `met` link.
+- **Test bands mix in.** A claimed test band (90 to 99) that is live is close to every crowd band within 3 m of its spot, in real time, and to the other claimed test bands in its zone, so a tester's recap shows people without any hardware.
+- **Pruning.** Every 60 s, `crowd_tick` deletes the crowd's stays that ended more than an hour ago, with their visits, so the tables stay small at 1,000 bands. The graph links they made stay.
+- **Stop.** `stop_crowd` stops the timer, sets the crowd's bands offline and closes their stays. The visits, encounters and graph links they made stay.
+
+`social_tick` turns the crowd's stays into visits and its close time into encounters and graph links, by the same rules as real attendees. Crowd attendees get no shared visits, because the crowd meets people only up close ([Social](../6-features/Social.md)).
+
+The crowd's `band` rows put it on the organizer portal's venue map and in each zone's row of the Live tab's zone table, its people, its average and its level ([Organizer-Portal](../5-apps/Organizer-Portal.md)). It stays out of the incident path: `watch_bands` and the incident snapshot read only bands under 100, so the crowd opens no incidents and is never a witness.
 
 What one crowd tick does.
 
 ```mermaid
 flowchart TB
-    SC["start_crowd: crowd bands from 10, generated owners, groups of 3"] --> CT["crowd_tick every 5 s"]
-    CT -->|"a group's time is up"| MV["the group moves to a random station zone, 3 to 8 min"]
-    MV --> PS["band_presence for each crowd band"]
-    CT -->|"same zone: group members always, strangers on 15 percent of ticks"| CL["close, 30 s together per tick"]
-    DM["claimed test bands 90 to 99 at their reported zone"] --> CL
-    PS --> SS["social step of memory_tick"]
+    SC["start_crowd: up to 2,000 crowd bands from 100, teams and booth staff"] --> CT["crowd_tick every 2 s"]
+    CT -->|"a team's time is up"| MV["the team moves: a booth, food, the stage, another table, the entrance, or home"]
+    MV -->|"zone or booth changed"| ST["zone_visit: old stay closed, new stay opened"]
+    CT -->|"bands that changed"| BR["band: zone, booth, spot, neigh, state"]
+    CT -->|"teammates always, strangers who talk"| CL["encounter: close time, 6 times faster"]
+    TB["claimed test bands 90 to 99: the crowd within 3 m"] --> CL
+    BR --> MAP["Organizer portal venue map and zone table"]
+    ST --> SS["social_tick every 1 s"]
     CL --> SS
-    SS --> OUT["visits, encounters, shared visits, graph links"]
+    SS --> OUT["visits, encounters, graph links"]
     classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
-    class SC,CT,MV,PS,CL,DM,SS,OUT stdb
+    classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+    class SC,CT,MV,ST,BR,CL,TB,SS,OUT stdb
+    class MAP web
 ```
 
 ### The test bands
 
-`report_sim_band` takes one test band's station, state, `neigh` and its SOS, fall and press flags, and applies it like one band record of a bridge batch ([SpacetimeDB](../2-data/SpacetimeDB.md)). It writes the band's `band_report` with source `simulator`. An SOS or fall flag opens an incident, state 4 adds a witness, and a press completes a pending band claim, exactly as for a real band. So the test bands go through the same incident, claim and memory paths as real bands, one reducer call per band. Every test band reports as a full band.
+`report_test_band(band_id, station_id, state, neigh, sos, fall, press)` builds the test band's `band` row the way `ingest_band` builds a radio band's ([SpacetimeDB](../2-data/SpacetimeDB.md)): the flags from the three booleans plus the IMU and motor bits, so every test band reports as a full band; `zone` the station id; `bat` 90; `rssi` -55; `seq` one more than before; online; and a spot a step apart from the other test bands around its zone's centre, five to a row, 1.5 m apart, so each one shows on the venue map.
 
-Two drivers report them, both as the `simulator` identity:
+It logs `SosRaised`, `Fall` and `Press` on rising edges with the detail "test band". When the station id changed or the band was offline, it closes the band's open stays and opens one in the new zone. From there the test bands go through the same paths as real bands: `watch_bands` opens an incident from an SOS or fall flag and adds a witness for each band in state 4, and `social_tick` completes a pending band claim from a `Press` event ([Safety](../6-features/Safety.md)).
 
-- **The `bandit-claims` command-line tool**, on the venue laptop. Its `setup` command connects as the module owner, the only identity that may grant, and creates the test identities and their role grants; its `sim` identity holds `simulator`. While it runs, it reports every test band once a second, so none goes stale (5 s), and at once when a band changes station, state or flags. A test band's `neigh` is the number of other test bands at its station, unless a scenario sets it. A press is the press flag held for 400 ms, as a person presses a real band after the tap.
-- **`bandit-api`'s dev routes**, only while test mode is on. `POST /api/dev/press/{band}` presses one of the bands 94 to 99, so a tester claims it from the tap link with no hardware. `POST /api/dev/move/{band}/{station}` moves any test band 90 to 99 to another station's zone. `bandit-api` keeps reporting each band pressed or moved this way every 2 s, so it stays live, keeps its zone and mixes with the crowd. Once `event_state.ended` is set, those reports stop. `POST /api/dev/fall/{band}` runs the tool's `fall` command for any test band 90 to 99, with two of the claims story's bands around it as the light circle, and `POST /api/dev/property/{station}` runs the tool's `property --camera` command for that station's zone: a venue camera sees a speaker knocked off its stand, and Insurance.md's property claim follows. The Ops dashboard's test bands tab calls all four routes ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Bands 90 to 93 belong to the scripted claims run: the dev routes never press them, and while the run plays, only the tool drives them.
+Test bands do not obey commands, so a forced state, an exit colour, low visibility or the override never shows on one. A test band also gets no `clear` when its incident is resolved: if it still reports the flag 10 s after the resolve, a new incident opens. The tool's `fall` calms its bands as soon as the witness rows land, so this does not happen in its runs.
 
-### Test bands obey the server
+Two drivers report them, both as the `tester` identity:
 
-While a scenario runs, the `bandit-claims` tool applies the directives for target 0 and for the test bands as a band would apply the matching commands: a forced state with its hold, an exit colour, the override flag, and the low-visibility flag, under which every test band shows GUIDE with its zone's exit colour. Because the tool reads the directive itself rather than a radio command, it follows the directive's own end time and needs no 25.5 s refresh. The behavioural part is what makes guidance visible: a test band whose shown state is GUIDE (from density or forced) moves toward the exit whose station glows its exit colour, found through `station` and `exit`, one zone per step along the shortest `zone_link` path, and on arrival stays at the exit zone with a low neighbour count. Test bands in IDLE or YELLOW keep the scenario's plan. This is how low visibility drains zones along the exit colours ([Safety](../6-features/Safety.md)).
+- **The `bandit-claims` command-line tool**, on the venue laptop.
+  - `setup` connects as the module owner, the only identity that may grant, and grants `worker`, `tester`, `vision`, `ops` and `medic` to its actors ("bandit-workers", "bandit-claims", "bandit-vision", "Ops desk" and the medic "Ari Ramos"). It imports the seed venue if none exists (five zones on station ids 101 to 105), calls `start_safety_watch` and `start_job_reaper`, and reports every test band online, each in its last zone and new ones at Main stage.
 
-(TBD -- LEO) The same rule is how a medic approach opens space around an incident.
+    Insurance.md: it also seeds the policy and its covers. Vision.md: it adds the camera "overhead pit" on Main stage.
 
-One-shots: `buzz`, either the light-circle alert or the guidance buzz that comes with a new route colour, changes nothing, because the band already moves by its GUIDE colour; `clear` releases the latches. Each one addressed to a test band is acknowledged with `ack_band_command` once applied.
+    It claims 90 to 93 for Jordan Alvarez, Maya Chen, Sam Patel and Lee Park, each with `claim_band` and a press. It is safe to run again. `status` shows the identities, their roles and the timers.
+  - While a command runs, it reports every test band in that command once a second, so none goes offline (5 s), and at once when a band changes station id, state or flags. A test band's `neigh` is the number of the command's other test bands with its station id.
 
-How low visibility moves the test bands.
+    A press is the press flag held for 400 ms, as a person presses a real band after the tap. When the command ends, its bands stop reporting and go offline 5 s later.
+  - `fall --band B --witnesses W1,W2` reports the bands calm in their zones for 1.2 s, then the subject in state 3 with the fall flag and the witnesses in state 4 for 2 s, so the 500 ms `watch_bands` sees both. It waits for the incident and the witness rows, calms the bands, and prints the incident, its snapshot and its witnesses. `--zone` picks the fall's zone (Main stage by default) and `--witness-zone` the zone where the circle forms, which may differ.
+  - `treat --incident N --note "..."` takes the incident as the medic (`assign_medic`) and adds the note (`add_incident_note`).
+  - `resolve --incident N` resolves it as the medic (`resolve_incident`, "treated on site"); Insurance.md: it prints the claim that opened, if any.
+  - `property --zone Z --note "..." --cost C` opens a `property` incident in that zone as `ops` (`open_incident`), adds a note with the cost and resolves it as `ops`. Vision.md: with `--camera` it first plays the camera's part: a synthetic frame in the blob store, `report_property_event` and a confirmed camera sighting through `submit_vision_assessment` ([Vision](../4-devices/Vision.md)).
+- **`bandit-api`'s dev routes**, only while test mode is on, with no sign-in check.
+  - `POST /api/dev/press/{band}`, for bands 94 to 99 only, reports no press, a press and no press, 300 ms apart, from the band's station id (104 if it has none), so a tester claims it from the tap link with no hardware.
+  - `POST /api/dev/move/{band}/{station}` reports any test band 90 to 99 at that station id.
+  - `bandit-api` then keeps reporting each band pressed or moved this way every 2 s, in state 0 with `neigh` 0, so it stays online, keeps its zone and mixes with the crowd. Once `event_state.ended` is set, those reports stop.
+  - `POST /api/dev/fall/{band}` runs the tool's `fall` for any test band 90 to 99 at its station id, with two of the bands 90, 92, 93 and 91 (never the band itself) as the light circle. The 2 s reports of those bands pause meanwhile, and the witnesses stay in that zone afterwards.
+  - `POST /api/dev/property/{station}` runs the tool's `property --camera` for the zone of that station id with a cost of $2,400.00: a security camera sees a speaker knocked off its stand, and Insurance.md's property claim follows.
+  - Insurance.md: `POST /api/dev/record/{claim}/{template}` runs the tool's `attach-record`, which files one of the three synthetic hospital reports for that claim; the Claims tab calls it.
+  - The organizer portal's Bands tab calls the press, move, fall and property routes ([Organizer-Portal](../5-apps/Organizer-Portal.md)). Bands 90 to 93 belong to the scripted claims run: the dev routes never press them, and while the run plays, only the tool drives them.
+
+How a test fall becomes an incident on the desk.
 
 ```mermaid
 sequenceDiagram
-    participant O as Ops dashboard
+    participant T as bandit-claims
     participant M as band1t module
-    participant S as bandit-claims tool
-    O->>M: set_low_vis on
-    M->>M: fleet_config.low_vis on
-    M-->>S: fleet_config row (subscription)
-    S->>S: every test band shows GUIDE and heads for the station with its zone's exit colour
-    loop every second, and on each change
-        S->>M: report_sim_band per test band (state 2, zones changing as bands move)
-        M->>M: zone_state recomputed
-        Note over M: TBD -- LEO: exit loads change and assignments may shift
-        M-->>O: zones drain along the exit colours
-    end
+    participant D as Organizer portal
+    T->>M: report_test_band: subject and witnesses calm in their zones (1.2 s)
+    T->>M: report_test_band: subject state 3 with the fall flag, witnesses state 4 (2 s)
+    M->>M: watch_bands (500 ms): fall incident, snapshot, subject row, witness rows
+    M-->>D: the incident on the desk and in the Alerts list
+    T->>M: report_test_band: everyone calm again
+    T->>M: treat as the medic: assign_medic, add_incident_note
+    T->>M: resolve as the medic: resolve_incident
+    M->>M: resolved, with no clear for a test band
 ```
 
-### Scenarios
+### Insurance.md: the claims runs
 
-A scenario is a small text file of timed steps that the `bandit-claims` tool plays on the test bands: at a given second, move bands to a zone, set the `neigh` the bands in a zone report, latch SOS or fall on a chosen band, or wait for a condition in the database (for example `fleet_config.low_vis` turning on, or a medic taking an incident) before continuing. The tool makes no ops calls in a scenario; where a scenario needs an operator action, the step waits for it, which keeps every operator action real. The operator starts a scenario by naming its file on the command line and stops it by stopping the tool.
+Three runs of the tool exercise Insurance.md's claims ([Insurance](../6-features/Insurance.md)).
 
-| Scenario | What the script does | What the system should show |
+| Run | What the tool does | What the system should show |
 |---|---|---|
-| Crush build-up | moves the test bands into one zone and ramps the `neigh` they report from the calibrated value for about one person per square metre to the value for six over 90 s, holds for 60 s, then releases | the zone turns `watch` then `high` in `zone_state`; the test bands go YELLOW then GUIDE; a `crowd_risk` incident opens; exit assignment moves bands away from the hot zone |
-| SOS | one test band latches SOS; the test bands in the same zone report NEAR_SOS (state 4) while it lasts | an `sos` incident with its snapshot; the circle members appear in `incident_band`; escalation fires if nobody acknowledges within 60 s |
-| Fall on a full band | a test band sets the fall flag after a short "impact" | a `fall` incident, otherwise identical to SOS |
-| (TBD -- LEO) Two-exit low visibility | waits for ops to turn low visibility on with `set_low_vis`, lets the test bands follow their exit colours toward two exits, then waits for ops to block one exit with `set_exit_status` | zones drain along the assigned colours and exit loads balance; after the block, every zone that used that exit changes colour at once and the blocked exit draws nobody |
-| (TBD -- LEO) Medic approach | runs the SOS scenario, then waits for a medic to take it with `assign_medic`; test bands outside the circle follow the GUIDE directive out of the zone, and the circle stays | space opens around the person while the blue ring remains |
-| Insurance.md: Accuracy run | the tool's `scorecard` command: three rounds (starting value), each planting 2 genuine falls and 4 fakes, one of each kind: a light circle in another zone, an injury at home, the same bill twice and an injured staff member. After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one. It plants each fall in a zone where no three injuries land within 5 minutes | the scorecard on the Ops dashboard's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling ([Insurance](../6-features/Insurance.md)) |
-| Insurance.md: Stress test | plants the edge cases not shown live: an injury the urgent-care record places at home, a bill re-filed as a new scan, a staff injury, and one more fake with witnesses in another zone | each claim next to its expected outcome: a doubt sent to the organizer, `zero_payout` for the duplicate bill, `claimant_not_staff`, `witness_zone` |
-| Insurance.md: Scripted claims run | the tool's `story` command, after the event and before the organizer decides the real claims: six claims on bands 90 to 93, with bands 94 to 99 as the light circles. The tool plays the medic (Ari Ramos) and the organizer (the `ops` identity labelled "Ops desk") | Jordan's claim waits for the organizer, a stale approval fails closed and the real approval creates rule v1; Maya's similar fall settles in seconds under v1; the injury at home waits for the organizer; Lee's claim is refused by code as `witness_zone`, with every check listed; the speaker is approved with a recovery letter; the insurer's payment reconciles claim 1 |
-
-(TBD -- LEO) The two-exit low-visibility run is on the rehearsal checklist, because it is the run that tests the exit choice's crowding penalty and switch margin ([Safety](../6-features/Safety.md)).
-
-Scenarios can be stacked: a crush with an SOS inside it is the event's full safety story.
+| Accuracy run | the tool's `scorecard` command: three rounds (starting value), each planting 2 genuine falls and 4 fakes, one of each kind: a light circle in another zone, an injury at home, the same bill twice and an injured staff member. After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one. It plants each fall in a zone where no three injuries land within 5 minutes | the scorecard on the organizer portal's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling |
+| Stress test | plants the edge cases not shown live: an injury the hospital report places at home, a bill re-filed as a new scan, a staff injury, and one more fake with witnesses in another zone | each claim next to its expected outcome: a doubt sent to the organizer, `zero_payout` for the duplicate bill, `claimant_not_staff`, `witness_zone` |
+| Scripted claims run | the tool's `story` command, after the event and before the organizer decides the real claims: six claims on bands 90 to 93, with bands 94 to 99 as the light circles. The tool plays the medic (Ari Ramos) and the organizer (the `ops` identity labelled "Ops desk") | Jordan's claim waits for the organizer, a stale approval fails closed and the real approval creates rule v1; Maya's similar fall settles in seconds under v1; the injury at home waits for the organizer; Lee's claim is refused by code as `witness_zone`, with every check listed; the speaker is approved with a recovery letter; the insurer's payment reconciles claim 1 |
 
 ### Insurance.md: planted claims
 
-A planted claim goes through the same path as a real one: a test band latches a fall or SOS, other test bands report state 4 as witnesses in a chosen zone, and then the `bandit-claims` tool plays the medic. It uploads the claim's synthetic bill PDF through `POST /api/blobs` with purpose `medical` and files it with `submit_medical_record` as its `medic` test identity, then calls `plant_medic_visit`. That reducer (role `simulator`) accepts only an open incident whose subject band is a test band. It runs the same logic as `assign_medic` (the `bandit-claims` tool as the medic), `add_incident_note` and `resolve_incident`, so the claim sees exactly what a real medic visit leaves. It also writes one `planted_incident` row. Insurance's decision code never reads that row; only the scorecard does.
+A planted claim goes through the same path as a real one: a test band latches a fall or SOS, other test bands report state 4 as witnesses in a chosen zone, and then the `bandit-claims` tool plays the medic. It uploads the claim's synthetic bill PDF through `POST /api/blobs` with purpose `medical` and files it with `submit_medical_record` as its `medic` test identity, then calls `plant_medic_visit`.
+
+That reducer (role `tester`) accepts only an open incident whose subject band is a test band. It runs the same logic as `assign_medic` (the `bandit-claims` tool as the medic), `add_incident_note` and `resolve_incident`, so the claim sees exactly what a real medic visit leaves. It also writes one `planted_incident` row; Insurance's decision code never reads that row; only the scorecard does.
 
 | `planted_incident` field | Meaning |
 |---|---|
@@ -165,68 +193,73 @@ A planted claim goes through the same path as a real one: a test band latches a 
 | `duplicate_bill` | a new fall whose bill is a re-scan of an earlier planted bill: the same provider and invoice number in a new file |
 | `staff` | a genuine-looking fall on a test band whose owner the tool has just granted the role `crew`, labelled as stage crew |
 
-The tool's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one. For a staff injury the tool grants the role `crew` to the test identity that wears the band, plants the fall, and revokes the grant after the round, so no person's identity is borrowed and no staff screen opens for it. The accuracy run and the stress test run before doors open, inside the period of Insurance.md's accuracy-run policy, so the rules they teach expire before the event starts. Each test attendee the tool sets up claims its band with a press, then saves its name with `update_profile`. Payments-Nessie.md: right after that it calls `connect_wallet`, so its Insurance.md payout lands in a $200 wallet, like a judge's ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
+The tool's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one.
 
-### Replay mode
+For a staff injury the tool grants the role `crew` to the test identity that wears the band, plants the fall, and revokes the grant after the round, so no person's identity is borrowed and no staff screen opens for it. The accuracy run and the stress test run before doors open, inside the period of Insurance.md's accuracy-run policy, so the rules they teach expire before the event starts.
 
-Replay reads a bridge `.jsonl` log and feeds its band reports through `report_sim_band` at their recorded receive times, at normal or accelerated speed. Replays use test band ids only: real bands 1 to 9 are mapped onto 91 to 99 (band 1 becomes 91), so a replay never collides with live bands. A replay is its own run of the `bandit-claims` tool, never beside a scenario and never during the scripted claims run, because the mapped ids include that run's bands. Station lines, command lines, `ack`, `err` and boot lines in the log are shown in the tool's output but never re-issued. `neigh` values in a replay reflect the thresholds in force when it was recorded, which the bridge tags on each logged line. Uses: rehearsing the dashboard without hardware, and a backup if the radio misbehaves in front of the judges.
+Each test attendee the tool sets up claims its band with a press, then saves its name with `update_profile`. Capital-One-Nessie.md: right after that it calls `connect_wallet`, so its Insurance.md payout lands in a $200 wallet, like a judge's ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)).
 
-### Real bands and test bands on the same dashboard
+### Real bands and test bands in the same organizer portal
 
-Real bands arrive through `ingest_band_reports` and test bands through `report_sim_band`; both live in `band_report` keyed by band id, so nothing downstream has two code paths. The band id is the only distinction: the Ops dashboard draws test bands lighter and shows per-zone counts as real plus test ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)); incidents raised by test bands are labelled by their band id; the venue tick treats both kinds the same when it computes density and guidance ([Safety](../6-features/Safety.md)). The crowd has no `band_report`, so it is not on the band map; it shows on the people graph and in the recaps. There is no radio between the populations, so a real band standing among test bands stays green unless real people surround it, and a test band never counts a real one. The safety choreography therefore puts the real people in the taped square and the test bands in the surrounding zones, so each population shows the behaviour it can.
+Real bands arrive through `ingest_band` and test bands through `report_test_band`; both live in `band` keyed by band id, so nothing downstream has two code paths. The band id is the only distinction.
+
+On the organizer portal's venue map both are blue dots with their codes: a real band stands at its zone's centre, because the radio gives only the zone, and the test bands stand a step apart around it ([Organizer-Portal](../5-apps/Organizer-Portal.md)). Incidents raised by test bands name the band by its code, like any band, and `watch_bands` treats both kinds the same ([Safety](../6-features/Safety.md)).
+
+Social.md: the crowd's rows sit in `band` too, written by `crowd_tick`, so the crowd is on the map as small dots in the colour of their state; `watch_bands` and the incident snapshot skip every band from 100.
+
+There is no radio between the populations, so a real band standing among test bands stays green unless real people surround it, and a test band never counts a real one. The safety choreography therefore puts the real people in the taped square and the test bands in the surrounding zones, so each population shows the behaviour it can.
 
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
-| The `bandit-claims` tool crashes | the test bands go stale after 5 s and leave the density after that | restart it; its bands and owners already exist, and the scenario starts again from the beginning |
-| SpacetimeDB connection lost (hotspot drop) | no test band reports | the tool pauses the scenario clock, keeps the latest state, and reports every test band at once after reconnect; the crowd keeps moving, because `crowd_tick` runs inside the module |
-| A scripted SOS runs while a real SOS is open | two incidents on the dashboard | the test incident is labelled by its band id (90 to 99), so staff go to the real one first |
+| The `bandit-claims` tool stops or crashes | its test bands go offline 5 s later | run the command again; `setup` is safe to repeat, and the bands and owners already exist |
+| SpacetimeDB connection lost (hotspot drop) | the running command fails with the module's error, or after 30 s without an answer | run it again once the hotspot is back; Social.md: the crowd keeps moving, because `crowd_tick` runs inside the module |
+| A test fall runs while a real incident is open | two incidents on the desk | the test incident names a test band, whose code the Bands tab lists, so staff go to the real one first |
 
 ## Dependencies
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): `report_sim_band`, `ack_band_command`, `heartbeat`, `band_presence`, `event_state`, the venue tables, `fleet_config`, the views `staff_directives` and `staff_commands`, and the `simulator` role.
-- [Gateway-Bridge](Gateway-Bridge.md): the `bandit-protocol` crate and the raw log format for replay.
-- [Hardware](../4-devices/Hardware.md): the behaviour being imitated (states, flags, windows).
-- [Safety](../6-features/Safety.md): what the directives mean, so test bands react the way the venue tick expects.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): `report_test_band`, `band`, `event_state`, the venue tables, `venue_plan`, `incident`, `incident_band`, `start_safety_watch` and the `tester` role.
+- [Hardware](../4-devices/Hardware.md): the behaviour being imitated (states and flags).
+- [Safety](../6-features/Safety.md): the incident path the test falls go through: `watch_bands`, `assign_medic`, `add_incident_note` and `resolve_incident`.
 - [Rust-Backend](Rust-Backend.md): `bandit-api`, which hosts the dev routes and the blob upload.
-- Social.md: `attendee`, the `findable` consent, `social_handle` and the social step of `memory_tick` for the crowd and its generated owners ([Social](../6-features/Social.md)).
+- Social.md: `attendee`, the findable switch (`findable`), `social_handle`, `zone_visit`, `encounter` and `social_tick` for the crowd and its generated attendees ([Social](../6-features/Social.md)).
+- Bright-Data.md: the imported booths' organisations and sponsor tiers, which choose the booths the crowd staffs and draw crowd attendees to them. Without it the crowd visits hand-entered booths, each with the same pull ([Bright-Data](../7-integrations/Bright-Data.md)).
 - Insurance.md: `POST /api/blobs` with purpose `medical`, `submit_medical_record`, the accuracy-run policy, and the claims queue the tool waits on between rounds ([Insurance](../6-features/Insurance.md)).
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the test band legend, the real-plus-test counts, the test bands tab and, through Social.md, the crowd on the event graph.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the test bands on the venue map, the Bands tab and, through Social.md, the crowd on the venue map, in the zone table, in the attendee list and on the event graph.
 - [Flows](../1-overview/Flows.md): the crowd that runs through the whole event flow, and the scripted claims run after the event.
-- [Safety](../6-features/Safety.md): scenario runs as the test bed for density, guidance and escalation.
-- (TBD -- LEO) [Safety](../6-features/Safety.md): the medic-approach scenario, and the two-exit run on the rehearsal checklist.
+- [Safety](../6-features/Safety.md): test falls for the incident desk and the safety choreography.
 - [Insurance](../6-features/Insurance.md): planted claims for the accuracy run and the stress test, and the scripted claims run.
 
 **If you delete this file**
 
-- Remove the Test-Bands.md rows, the legend and the test bands tab from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the Test-Bands.md rows and lines (the `bandit-claims` tool's band reports, `bandit-api`'s dev routes and what test mode turns on) from [Architecture](../1-overview/Architecture.md), [Rust-Backend](Rust-Backend.md) and the README, row F16 and the test bands scale row from [Requirements](../1-overview/Requirements.md), and the Test-Bands.md sentence and failure row, step 0c's planted claims and step 9a, the scripted claims run, in [Flows](../1-overview/Flows.md).
-- In [SpacetimeDB](../2-data/SpacetimeDB.md), the `simulator` role, `report_sim_band`, `start_crowd`, `stop_crowd`, `crowd_tick`, the crowd and test band id ranges (`SIM_BANDS`) and the `attendee` field `simulated` become unused and can be dropped; `ingest_band_reports` already takes only the `bridge` role. Remove the Test-Bands.md rows and notes from its interfaces, registry, roles, subscriptions and lifecycle tables.
-- Remove the Test-Bands.md lines in [Social](../6-features/Social.md) and [Attendee-App](../5-apps/Attendee-App.md), the two-exit run from the rehearsal checklist in [Safety](../6-features/Safety.md), and the Test-Bands.md parts of [Insurance](../6-features/Insurance.md): `plant_medic_visit`, `planted_incident`, the accuracy run and its scorecard, the stress test, the scripted claims run and the test claimants' payout. Claims then come only from real incidents, worked by the medic and decided by the organizer after the event.
-- Replay disappears; the bridge's raw log remains a post-mortem and calibration record only ([Gateway-Bridge](Gateway-Bridge.md)).
-- The dashboard shows the nine real bands only, and the event graph shows only real attendees.
+- Remove the Test-Bands.md rows and lines, the crowd's dots and the Bands tab from [Organizer-Portal](../5-apps/Organizer-Portal.md), the Test-Bands.md rows and lines (the `bandit-claims` tool's band reports, `bandit-api`'s dev routes and what test mode turns on) from [Architecture](../1-overview/Architecture.md), [Rust-Backend](Rust-Backend.md) and the README, row F16 and the test bands scale row from [Requirements](../1-overview/Requirements.md), and the Test-Bands.md sentence and failure row, step 0c's planted claims and step 9a, the scripted claims run, in [Flows](../1-overview/Flows.md).
+- In [SpacetimeDB](../2-data/SpacetimeDB.md), the `tester` role, `report_test_band`, `start_crowd`, `stop_crowd`, `crowd_tick`, `crowd_member`, `crowd_group`, the crowd and test band id ranges (`TEST_BANDS`) and the `attendee` column that marks a crowd attendee become unused and can be dropped; `ingest_band` already takes only `band1t-bridge`. Remove the Test-Bands.md rows and notes from its interfaces, registry, roles, views, subscriptions and lifecycle tables.
+- Remove the Test-Bands.md lines in [Social](../6-features/Social.md), [Tap-Page](../5-apps/Tap-Page.md) and [Safety](../6-features/Safety.md), and the Test-Bands.md parts of [Insurance](../6-features/Insurance.md): `plant_medic_visit`, `planted_incident`, the accuracy run and its scorecard, the stress test, the scripted claims run and the test claimants' payout. Claims then come only from real incidents, worked by the medic and decided by the organizer after the event.
+- The organizer portal shows the nine real bands only, and the venue map, the attendee list and the event graph show only real attendees.
 
 ## Decisions
 
 | Decision | Why |
 |---|---|
-| Social.md: the crowd runs inside the module, at most 80 bands (10 to 89), started once with `start_crowd` and moved by `crowd_tick` every 5 s | it needs no process and no connection, and it keeps moving when the laptop drops off the hotspot |
-| The crowd sends no band reports; `crowd_tick` writes its `band_presence` rows itself | the crowd is there for the people graph and the recaps, so it never touches the safety path |
-| Social.md: the crowd moves in groups of 3 that change zone every 3 to 8 minutes, and strangers in one zone are close on 15 percent of ticks (starting values) | friends meet each other and strangers only sometimes, so the graph looks like an event and not one big cluster |
-| The test bands are 90 to 99 and report through one reducer, `report_sim_band`, that only the `simulator` role may call | one byte of id like the radio, and the module needs no rule about when a test driver may report a real id |
+| Social.md: the crowd runs inside the module, at most 2,000 bands from 100 (1,000 at the event), started once with `start_crowd` and moved by `crowd_tick` every 2 s | it needs no process and no connection, and it keeps moving when the laptop drops off the hotspot |
+| Social.md: band ids are 32 bits; ids 1 to 99 are the one-byte radio and test bands, and the crowd starts at 100 | a crowd of 1,000 needs more ids than the radio's byte, and the incident path reads only bands below 100 |
+| Social.md: `crowd_tick` writes the crowd's `band` rows and stays itself, only for the bands that changed, and the incident path skips every band from 100 | the crowd fills the venue map, the zone table, the graph and the recaps, and it never opens an incident |
+| Social.md: the crowd moves in teams of 1 to 4 between their table, sponsor booths, food, the stage and the entrance, booth staff stay at their booth, and strangers talk only now and then (starting values) | friends meet each other and strangers only sometimes, so the graph looks like an event and not one big cluster |
+| Social.md: the crowd's time together runs 6 times faster than the clock | links appear within half a minute, so the graph grows while people watch |
+| Social.md: the crowd's stays that ended more than an hour ago are deleted, with their visits; the links stay | the tables stay small with 1,000 bands moving all night |
+| The test bands are 90 to 99 and report through one reducer, `report_test_band`, that only the `tester` role may call | one byte of id like the radio, and the module needs no rule about when a test driver may report a real id |
+| Test bands do not obey commands | they have no radio, so a test band shows only what its driver reports |
 | `bandit-api`'s dev routes press only bands 94 to 99 and move any test band 90 to 99, only in test mode; the fall and property routes start the tool | a tester can try the band claim without hardware and walk any test band, and the scripted claims run's bands 90 to 93 are never claimed by a tester |
-| Replays map real bands 1 to 9 onto 91 to 99 | a replay never fights the bridge over a live band |
-| Scenarios and replays start from the `bandit-claims` command line; the Ops dashboard's test bands tab starts only a walk, a fall or a broken speaker, through the dev routes | the dashboard needs no scenario controls, and a single fall or property claim is one tap for a tester |
-| A replay is a separate run from a scenario and never runs during the scripted claims run | the mapped replay ids include that run's bands |
-| Every test band reports as a full band | the fall scenario and the light-circle buzz work on any of them |
-| The bridge acknowledges target-0 one-shots; the tool acknowledges only one-shots addressed to the test bands | one acknowledger per command; with no bridge running, `memory_tick` deletes the unacknowledged row after 30 s |
-| Social.md: each crowd band gets a generated owner with `findable` on, a made-up name and the Instagram handle of a well-known public account | the big-screen people graph shows a real-looking crowd instead of at most nine people |
-| A generated owner is keyed by a placeholder identity derived from its band id | it needs no app connection, and no client can sign in as it |
+| Test runs start from the `bandit-claims` command line; the organizer portal's Bands tab starts only a press, a walk, a fall or a broken speaker, through the dev routes | the organizer portal needs no run controls, and a single fall or property claim is one tap for a tester |
+| Every test band reports as a full band | a fall works on any of them |
+| Social.md: each crowd band is worn by a generated attendee with `findable` on, a made-up name and an Instagram handle made from that name | the big-screen people graph shows a real-looking crowd instead of at most nine people, and no real person's account is named |
+| Social.md: a generated attendee is keyed by a placeholder identity derived from its band id | it needs no app connection, and no client can sign in as it |
 | Insurance.md: the `bandit-claims` tool plays the medic only for planted incidents on test bands, through `plant_medic_visit` | an accuracy run of 18 claims cannot wait for a person at every bedside, and the claim must see what a real medic visit leaves |
 | Insurance.md: planted ground truth lives in `planted_incident`, which only the scorecard reads | the claim decisions stay blind to which claims are planted, so the scorecard measures the real rules |
 | Insurance.md: a planted staff injury uses a test identity that the tool grants `crew` for the round | the staff check reads real `staff_role` rows, no person's identity has to be borrowed, and `crew` opens no staff screen |
