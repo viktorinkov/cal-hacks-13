@@ -9,7 +9,7 @@ mod flow;
 mod scorecard;
 mod setup;
 mod show;
-mod sim;
+mod test_bands;
 
 use anyhow::Result;
 use app::{App, parse_money, parse_status};
@@ -30,10 +30,10 @@ enum Cmd {
     Status,
     /// A band reports a fall and the bands around it show the light circle
     Fall {
-        /// A simulated band, 90-99
+        /// A test band, 90-99
         #[arg(long)]
         band: u8,
-        /// Comma-separated simulated band ids (90-99), for example 94,95,96
+        /// Comma-separated test band ids (90-99), for example 94,95,96
         #[arg(long, value_delimiter = ',')]
         witnesses: Vec<u8>,
         /// The zone the band falls in
@@ -184,10 +184,10 @@ fn run(cli: Cli) -> Result<()> {
                 (None, Some(z)) => app.station(&z)?,
                 (None, None) => station,
             };
-            let sim = sim::Sim::open(&app)?;
+            let test_bands = test_bands::TestBands::open(&app)?;
             sleep_for_preroll();
-            let incident = flow::fall(&app, &sim, band, station, &witnesses, witness_station)?;
-            drop(sim);
+            let incident = flow::fall(&app, &test_bands, band, station, &witnesses, witness_station)?;
+            drop(test_bands);
             flow::print_incident(&app, incident.id)
         }
         Cmd::Treat { incident, note } => flow::treat(&app, incident, &note),

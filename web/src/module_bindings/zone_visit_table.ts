@@ -12,8 +12,10 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u16().name("band_id"),
   zone: __t.u8(),
   entered: __t.timestamp(),
   left: __t.option(__t.timestamp()),
+  boothId: __t.u64().name("booth_id"),
+  open: __t.bool(),
 });

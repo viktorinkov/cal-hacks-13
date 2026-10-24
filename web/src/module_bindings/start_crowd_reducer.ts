@@ -11,5 +11,5 @@ import {
 } from "spacetimedb";
 
 export default {
-  size: __t.u8(),
+  size: __t.u16(),
 };

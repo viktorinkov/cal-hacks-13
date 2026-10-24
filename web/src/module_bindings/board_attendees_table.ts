@@ -17,9 +17,9 @@ import {
 export default __t.row({
   nodeId: __t.u64().name("node_id"),
   displayName: __t.string().name("display_name"),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u16().name("band_id"),
   findable: __t.bool(),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   organization: __t.string(),
   get handles() {
     return __t.array(HandleOut);

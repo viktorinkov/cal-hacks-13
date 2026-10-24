@@ -12,7 +12,7 @@ export type Config = {
   kibana_url: string;
   dashboards: { title: string; url: string }[];
   auth_client_id: string;
-  simulate: boolean;
+  test_mode: boolean;
 };
 
 export type Actor = { name: string; label: string; token: string };
@@ -107,7 +107,7 @@ export async function finishSignIn(): Promise<void> {
 
 // --- Test identities ------------------------------------------------------------------------
 
-/** With BANDIT_SIMULATE=1, the people `bandit-claims setup` created, so one browser can play each. */
+/** With BANDIT_TEST_MODE=1, the people `bandit-claims setup` created, so one browser can play each. */
 export async function actors(): Promise<Actor[]> {
   const res = await fetch('/api/actors');
   return res.ok ? res.json() : [];
@@ -173,17 +173,22 @@ export async function connect(queries: string[], onChange: () => void): Promise<
   }
 }
 
+/** Pages redraw at most this often, however many rows change: a crowd of a thousand bands changes many. */
+const REDRAW_GAP_MS = 500;
+
 /** Calls `onChange` (batched) after any row of any table changes. */
 function watch(conn: DbConnection, onChange: () => void) {
   let queued = false;
+  let last = 0;
   const kick = () => {
     if (queued) return;
     queued = true;
     // A timer, not an animation frame: frames stop in a background tab and the page would go stale.
     setTimeout(() => {
       queued = false;
+      last = Date.now();
       onChange();
-    }, 30);
+    }, Math.max(30, last + REDRAW_GAP_MS - Date.now()));
   };
   for (const table of Object.values(conn.db as Record<string, any>)) {
     if (table && typeof table.onInsert === 'function') {

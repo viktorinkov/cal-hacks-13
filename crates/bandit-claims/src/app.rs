@@ -18,7 +18,7 @@ pub const DEFAULT_DATABASE: &str = "bandit-insurance";
 /// Staff actors: token name, role, label.
 pub const STAFF: &[(&str, &str, &str)] = &[
     ("worker", "worker", "bandit-workers"),
-    ("sim", "simulator", "bandit-claims"),
+    ("tester", "tester", "bandit-claims"),
     ("vision", "vision", "bandit-vision"),
     ("ops", "ops", "Ops desk"),
     ("medic", "medic", "Ari Ramos"),

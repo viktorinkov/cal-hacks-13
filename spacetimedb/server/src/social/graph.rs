@@ -30,7 +30,8 @@ fn link(ctx: &ReducerContext, kind: &str, from: (&str, u64), to: (&str, u64), we
         updated_at: ctx.timestamp,
     };
     match ctx.db.people_link().key().find(&key) {
-        Some(old) if old.weight == weight => {}
+        // A visited link never shrinks: the crowd's old stays are pruned, the minutes they made stay.
+        Some(old) if old.weight == weight || (kind == LINK_VISITED && old.weight > weight) => {}
         Some(old) => {
             ctx.db.people_link().id().update(PeopleLink { id: old.id, ..row });
         }
@@ -49,14 +50,16 @@ pub fn link_met(ctx: &ReducerContext, a: Identity, b: Identity, minutes: f32) {
     link(ctx, LINK_MET, (PERSON, na), (PERSON, nb), minutes.floor(), "radio");
 }
 
-/// A person to every booth of a zone they stayed in, weighted by their minutes in that zone,
-/// plus each of those booths to the company exhibiting there.
-pub fn link_visited(ctx: &ReducerContext, who: Identity, zone_id: u64) {
+/// A person to the booth they stood at, or to every booth of the zone when only the zone of the stay is
+/// known, weighted by their minutes there, plus each of those booths to the company exhibiting there.
+pub fn link_visited(ctx: &ReducerContext, who: Identity, zone_id: u64, booth_id: u64) {
     let Some(node) = person_node(ctx, who) else {
         return;
     };
-    let minutes: f32 = ctx.db.visit().attendee().filter(who).filter(|v| v.zone_id == zone_id).map(|v| v.minutes).sum();
-    for b in booths_in_zone(ctx, zone_id) {
+    let visits: Vec<Visit> = ctx.db.visit().attendee().filter(who).filter(|v| v.zone_id == zone_id).collect();
+    let booths = if booth_id != 0 { ctx.db.booth().id().find(booth_id).into_iter().collect() } else { booths_in_zone(ctx, zone_id) };
+    for b in booths {
+        let minutes: f32 = visits.iter().filter(|v| v.booth_id == 0 || v.booth_id == b.id).map(|v| v.minutes).sum();
         link(ctx, LINK_VISITED, (PERSON, node), (BOOTH, b.id), minutes.floor(), "zone");
         if b.organization_id != 0 {
             link(ctx, LINK_EXHIBITS, (BOOTH, b.id), (COMPANY, b.organization_id), 1.0, "import");
@@ -89,11 +92,11 @@ pub fn relink(ctx: &ReducerContext, a: &Attendee) {
         return;
     }
     link_works_at(ctx, a);
-    let mut zones: Vec<u64> = ctx.db.visit().attendee().filter(a.identity).map(|v| v.zone_id).collect();
-    zones.sort_unstable();
-    zones.dedup();
-    for zone_id in zones {
-        link_visited(ctx, a.identity, zone_id);
+    let mut stays: Vec<(u64, u64)> = ctx.db.visit().attendee().filter(a.identity).map(|v| (v.zone_id, v.booth_id)).collect();
+    stays.sort_unstable();
+    stays.dedup();
+    for (zone_id, booth_id) in stays {
+        link_visited(ctx, a.identity, zone_id, booth_id);
     }
     let met: Vec<SocialEncounter> = ctx
         .db

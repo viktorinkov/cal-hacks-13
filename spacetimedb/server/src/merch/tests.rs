@@ -160,6 +160,8 @@ impl World {
             ended_at: None,
             minutes,
             updated_at: self.t.clock.now(),
+            booth_id: 0,
+            open: true,
         });
     }
 

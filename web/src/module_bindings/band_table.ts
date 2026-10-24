@@ -11,7 +11,7 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  id: __t.u8().primaryKey(),
+  id: __t.u16().primaryKey(),
   state: __t.u8(),
   flags: __t.u8(),
   neigh: __t.u8(),
@@ -28,4 +28,7 @@ export default __t.row({
   hasMotor: __t.bool().name("has_motor"),
   online: __t.bool(),
   lastSeen: __t.timestamp().name("last_seen"),
+  xM: __t.f32().name("x_m"),
+  yM: __t.f32().name("y_m"),
+  boothId: __t.u64().name("booth_id"),
 });

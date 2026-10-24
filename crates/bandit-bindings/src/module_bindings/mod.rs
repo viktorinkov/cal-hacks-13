@@ -90,6 +90,8 @@ pub mod confirm_medical_card_reducer;
 pub mod connect_wallet_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
+pub mod crowd_group_table;
+pub mod crowd_group_type;
 pub mod crowd_member_table;
 pub mod crowd_member_type;
 pub mod crowd_tick_reducer;
@@ -224,6 +226,7 @@ pub mod photo_tag_table;
 pub mod photo_tag_type;
 pub mod photo_type;
 pub mod place_booth_reducer;
+pub mod plan_area_type;
 pub mod precedent_in_type;
 pub mod property_event_table;
 pub mod property_event_type;
@@ -239,7 +242,7 @@ pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
-pub mod report_sim_band_reducer;
+pub mod report_test_band_reducer;
 pub mod request_medical_card_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
@@ -304,6 +307,7 @@ pub mod upsert_camera_reducer;
 pub mod upsert_coverage_rule_reducer;
 pub mod upsert_insurance_policy_reducer;
 pub mod venue_in_type;
+pub mod venue_plan_table;
 pub mod venue_table;
 pub mod venue_type;
 pub mod vision_assessment_table;
@@ -404,6 +408,8 @@ pub use confirm_medical_card_reducer::confirm_medical_card;
 pub use connect_wallet_reducer::connect_wallet;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
+pub use crowd_group_table::*;
+pub use crowd_group_type::CrowdGroup;
 pub use crowd_member_table::*;
 pub use crowd_member_type::CrowdMember;
 pub use crowd_tick_reducer::crowd_tick;
@@ -538,6 +544,7 @@ pub use photo_tag_table::*;
 pub use photo_tag_type::PhotoTag;
 pub use photo_type::Photo;
 pub use place_booth_reducer::place_booth;
+pub use plan_area_type::PlanArea;
 pub use precedent_in_type::PrecedentIn;
 pub use property_event_table::*;
 pub use property_event_type::PropertyEvent;
@@ -553,7 +560,7 @@ pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
-pub use report_sim_band_reducer::report_sim_band;
+pub use report_test_band_reducer::report_test_band;
 pub use request_medical_card_reducer::request_medical_card;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
@@ -618,6 +625,7 @@ pub use upsert_camera_reducer::upsert_camera;
 pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
 pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
 pub use venue_in_type::VenueIn;
+pub use venue_plan_table::*;
 pub use venue_table::*;
 pub use venue_type::Venue;
 pub use vision_assessment_table::*;
@@ -834,7 +842,7 @@ pub enum Reducer {
         confidence: f32,
         frame_hashes: Vec<String>,
     },
-    ReportSimBand {
+    ReportTestBand {
         band_id: u8,
         station_id: u8,
         state: u8,
@@ -916,7 +924,7 @@ pub enum Reducer {
         timer: SocialTickTimer,
     },
     StartCrowd {
-        size: u8,
+        size: u16,
     },
     StartFind {
         seeker: u8,
@@ -1052,7 +1060,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
-            Reducer::ReportSimBand { .. } => "report_sim_band",
+            Reducer::ReportTestBand { .. } => "report_test_band",
             Reducer::RequestMedicalCard { .. } => "request_medical_card",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
@@ -1434,7 +1442,7 @@ impl __sdk::Reducer for Reducer {
                 confidence: confidence.clone(),
                 frame_hashes: frame_hashes.clone(),
             }),
-            Reducer::ReportSimBand {
+            Reducer::ReportTestBand {
                 band_id,
                 station_id,
                 state,
@@ -1442,7 +1450,7 @@ impl __sdk::Reducer for Reducer {
                 sos,
                 fall,
                 press,
-            } => __sats::bsatn::to_vec(&report_sim_band_reducer::ReportSimBandArgs {
+            } => __sats::bsatn::to_vec(&report_test_band_reducer::ReportTestBandArgs {
                 band_id: band_id.clone(),
                 station_id: station_id.clone(),
                 state: state.clone(),
@@ -1768,6 +1776,7 @@ pub struct DbUpdate {
     claims_board: __sdk::TableUpdate<Claim>,
     command: __sdk::TableUpdate<Command>,
     coverage_rule: __sdk::TableUpdate<CoverageRuleRow>,
+    crowd_group: __sdk::TableUpdate<CrowdGroup>,
     crowd_member: __sdk::TableUpdate<CrowdMember>,
     crowd_timer: __sdk::TableUpdate<CrowdTimer>,
     encounter: __sdk::TableUpdate<Encounter>,
@@ -1844,6 +1853,7 @@ pub struct DbUpdate {
     station: __sdk::TableUpdate<Station>,
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     venue: __sdk::TableUpdate<Venue>,
+    venue_plan: __sdk::TableUpdate<PlanArea>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
     wallet_entry: __sdk::TableUpdate<WalletEntry>,
@@ -1978,6 +1988,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "coverage_rule" => db_update
                     .coverage_rule
                     .append(coverage_rule_table::parse_table_update(table_update)?),
+                "crowd_group" => db_update
+                    .crowd_group
+                    .append(crowd_group_table::parse_table_update(table_update)?),
                 "crowd_member" => db_update
                     .crowd_member
                     .append(crowd_member_table::parse_table_update(table_update)?),
@@ -2206,6 +2219,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(venue_table::parse_table_update(table_update)?),
+                "venue_plan" => db_update
+                    .venue_plan
+                    .append(venue_plan_table::parse_table_update(table_update)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(vision_assessment_table::parse_table_update(table_update)?),
@@ -2306,6 +2322,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.coverage_rule = cache
             .apply_diff_to_table::<CoverageRuleRow>("coverage_rule", &self.coverage_rule)
+            .with_updates_by_pk(|row| &row.id);
+        diff.crowd_group = cache
+            .apply_diff_to_table::<CrowdGroup>("crowd_group", &self.crowd_group)
             .with_updates_by_pk(|row| &row.id);
         diff.crowd_member = cache
             .apply_diff_to_table::<CrowdMember>("crowd_member", &self.crowd_member)
@@ -2563,6 +2582,7 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<SharedVisit>("social_shared_visits", &self.social_shared_visits);
         diff.social_visits =
             cache.apply_diff_to_table::<Visit>("social_visits", &self.social_visits);
+        diff.venue_plan = cache.apply_diff_to_table::<PlanArea>("venue_plan", &self.venue_plan);
         diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
@@ -2690,6 +2710,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "coverage_rule" => db_update
                     .coverage_rule
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crowd_group" => db_update
+                    .crowd_group
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "crowd_member" => db_update
                     .crowd_member
@@ -2918,6 +2941,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue" => db_update
                     .venue
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_plan" => db_update
+                    .venue_plan
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -3070,6 +3096,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "coverage_rule" => db_update
                     .coverage_rule
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crowd_group" => db_update
+                    .crowd_group
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "crowd_member" => db_update
                     .crowd_member
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3298,6 +3327,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_plan" => db_update
+                    .venue_plan
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3371,6 +3403,7 @@ pub struct AppliedDiff<'r> {
     claims_board: __sdk::TableAppliedDiff<'r, Claim>,
     command: __sdk::TableAppliedDiff<'r, Command>,
     coverage_rule: __sdk::TableAppliedDiff<'r, CoverageRuleRow>,
+    crowd_group: __sdk::TableAppliedDiff<'r, CrowdGroup>,
     crowd_member: __sdk::TableAppliedDiff<'r, CrowdMember>,
     crowd_timer: __sdk::TableAppliedDiff<'r, CrowdTimer>,
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
@@ -3447,6 +3480,7 @@ pub struct AppliedDiff<'r> {
     station: __sdk::TableAppliedDiff<'r, Station>,
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
+    venue_plan: __sdk::TableAppliedDiff<'r, PlanArea>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
     wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
@@ -3598,6 +3632,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.coverage_rule,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<CrowdGroup>("crowd_group", &self.crowd_group, event);
         callbacks.invoke_table_row_callbacks::<CrowdMember>(
             "crowd_member",
             &self.crowd_member,
@@ -3838,6 +3873,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
         callbacks.invoke_table_row_callbacks::<SweepTimer>("sweep_timer", &self.sweep_timer, event);
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
+        callbacks.invoke_table_row_callbacks::<PlanArea>("venue_plan", &self.venue_plan, event);
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
             "vision_assessment",
             &self.vision_assessment,
@@ -4552,6 +4588,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         claims_board_table::register_table(client_cache);
         command_table::register_table(client_cache);
         coverage_rule_table::register_table(client_cache);
+        crowd_group_table::register_table(client_cache);
         crowd_member_table::register_table(client_cache);
         crowd_timer_table::register_table(client_cache);
         encounter_table::register_table(client_cache);
@@ -4628,6 +4665,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         station_table::register_table(client_cache);
         sweep_timer_table::register_table(client_cache);
         venue_table::register_table(client_cache);
+        venue_plan_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
         wallet_entry_table::register_table(client_cache);
@@ -4671,6 +4709,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "claims_board",
         "command",
         "coverage_rule",
+        "crowd_group",
         "crowd_member",
         "crowd_timer",
         "encounter",
@@ -4746,6 +4785,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "station",
         "sweep_timer",
         "venue",
+        "venue_plan",
         "vision_assessment",
         "visit",
         "wallet_entry",

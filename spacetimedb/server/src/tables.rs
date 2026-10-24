@@ -11,12 +11,15 @@ pub const F_LOWBAT: u8 = 8;
 pub const F_MPU: u8 = 16;
 pub const F_MOTOR: u8 = 32;
 
+/// Radio and test bands carry ids 1 to 99, one byte like the radio.
 pub const BAND_ID_MAX: u8 = 99;
+/// The crowd's bands start here. No radio carries them: social's crowd tick moves them inside the module.
+pub const FIRST_CROWD_BAND: u16 = 100;
 
 #[spacetimedb::table(accessor = band, public)]
 pub struct Band {
     #[primary_key]
-    pub id: u8,
+    pub id: u16,
     pub state: u8,
     pub flags: u8,
     pub neigh: u8,
@@ -33,6 +36,11 @@ pub struct Band {
     pub has_motor: bool,
     pub online: bool,
     pub last_seen: Timestamp,
+    /// Where the band is on the venue plan, in metres: its booth spot for the crowd, its zone's centre for a radio band.
+    pub x_m: f32,
+    pub y_m: f32,
+    /// The booth it stands at, 0 when only the zone is known.
+    pub booth_id: u64,
 }
 
 #[spacetimedb::table(accessor = station, public)]
@@ -129,11 +137,11 @@ pub struct Gateway {
 #[spacetimedb::table(accessor = encounter, public)]
 pub struct Encounter {
     #[primary_key]
-    pub key: u16,
+    pub key: u32,
     #[index(btree)]
-    pub band_a: u8,
+    pub band_a: u16,
     #[index(btree)]
-    pub band_b: u8,
+    pub band_b: u16,
     pub first_seen: Timestamp,
     pub last_seen: Timestamp,
     pub seconds_close: u32,
@@ -147,10 +155,15 @@ pub struct ZoneVisit {
     #[auto_inc]
     pub id: u64,
     #[index(btree)]
-    pub band_id: u8,
+    pub band_id: u16,
     pub zone: u8,
     pub entered: Timestamp,
     pub left: Option<Timestamp>,
+    /// The booth of the stay, 0 when only the zone is known.
+    pub booth_id: u64,
+    /// True until `left` is set, so the social tick reads only the stays still running.
+    #[index(btree)]
+    pub open: bool,
 }
 
 #[spacetimedb::table(accessor = bridge)]
@@ -193,9 +206,14 @@ pub struct HeardEntry {
     pub rssi: i8,
 }
 
-pub fn pair_key(a: u8, b: u8) -> u16 {
+pub fn pair_key(a: u16, b: u16) -> u32 {
     let (lo, hi) = if a < b { (a, b) } else { (b, a) };
-    ((lo as u16) << 8) | hi as u16
+    ((lo as u32) << 16) | hi as u32
+}
+
+/// The one-byte id of a radio or test band, None for a crowd band.
+pub fn radio_id(id: u16) -> Option<u8> {
+    u8::try_from(id).ok().filter(|b| *b <= BAND_ID_MAX)
 }
 
 pub fn micros(t: Timestamp) -> i64 {

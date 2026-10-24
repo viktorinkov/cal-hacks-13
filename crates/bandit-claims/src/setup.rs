@@ -1,7 +1,7 @@
 //! `setup` and `status`: the actors, the venue, the bands, the policy and the camera.
 
 use crate::app::*;
-use crate::sim::{Pose, SIM_BANDS, Sim};
+use crate::test_bands::{Pose, TEST_BANDS, TestBands};
 use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
 use bandit_insurance::time::{civil_from_days, local_date, micros_at, parse_date};
@@ -12,9 +12,9 @@ pub const POLICY: &str = "GL-2026-04417";
 
 /// Creates every actor and the test world. Safe to run again: every step is an
 /// upsert. Never touches the hardware bridge or real bands: only the
-/// simulated bands 90-99. Returns the running simulator, so a story run keeps the
+/// test bands 90-99. Returns the running reporter, so a story run keeps the
 /// bands online.
-pub fn run(app: &App) -> Result<Sim> {
+pub fn run(app: &App) -> Result<TestBands> {
     let db = app.db()?;
     println!("server     {}  database {}", app.uri, app.database);
     println!("owner      {}", short_id(db.identity()));
@@ -82,24 +82,24 @@ pub fn run(app: &App) -> Result<Sim> {
     call!(vision, upsert_camera_then("overhead pit".into(), main.id, "overhead".into()))?;
     println!("camera     overhead pit on Main stage");
 
-    let sim = Sim::open(app)?;
-    let missing: Vec<(u8, Pose)> = SIM_BANDS.filter(|b| sim.pose(*b).is_none()).map(|b| (b, Pose::at(main.station_id))).collect();
-    sim.place(&missing);
+    let test_bands = TestBands::open(app)?;
+    let missing: Vec<(u8, Pose)> = TEST_BANDS.filter(|b| test_bands.pose(*b).is_none()).map(|b| (b, Pose::at(main.station_id))).collect();
+    test_bands.place(&missing);
     sleep_ms(800);
-    println!("bands      {}-{} simulated and online (new ones at Main stage)", SIM_BANDS.start(), SIM_BANDS.end());
+    println!("bands      {}-{} test bands online (new ones at Main stage)", TEST_BANDS.start(), TEST_BANDS.end());
 
     for (name, display, band) in ATTENDEES {
-        ensure_attendee(app, &sim, name, display, *band)?;
+        ensure_attendee(app, &test_bands, name, display, *band)?;
         println!("{name:<10} {}  attendee {display}, band {band}", short_id(ids[name]));
     }
     println!("tokens     {}", app.tokens().dir().display());
-    Ok(sim)
+    Ok(test_bands)
 }
 
-/// The identity behind a token. `sim` gets a short-lived connection, so the
-/// simulator pump stays the only `sim` connection in the process.
+/// The identity behind a token. `tester` gets a short-lived connection, so the
+/// band reporter stays the only `tester` connection in the process.
 fn identity_of(app: &App, name: &str, create: bool) -> Result<Identity> {
-    if name != "sim" {
+    if name != "tester" {
         return Ok(app.actor_with(name, create)?.identity());
     }
     let c = app.connect_as(name, create)?;
@@ -109,7 +109,7 @@ fn identity_of(app: &App, name: &str, create: bool) -> Result<Identity> {
 }
 
 /// Claims the band (NFC tap, then a press on the band within a few seconds) and sets the profile.
-pub fn ensure_attendee(app: &App, sim: &Sim, name: &str, display: &str, band: u8) -> Result<Identity> {
+pub fn ensure_attendee(app: &App, test_bands: &TestBands, name: &str, display: &str, band: u8) -> Result<Identity> {
     let conn = app.actor_with(name, true)?;
     let me = conn.identity();
     let db = app.db()?;
@@ -118,7 +118,7 @@ pub fn ensure_attendee(app: &App, sim: &Sim, name: &str, display: &str, band: u8
         Some(o) => bail!("band {band} already belongs to {}; republish the local database for a clean run", app.person(o.owner)),
         None => {
             call!(conn, claim_band_then(format!("BANDIT-{band:02}")))?;
-            sim.press(band);
+            test_bands.press(band);
             until(8.0, || db.db.band_owner().band_id().find(&band).filter(|o| o.owner == me))
                 .with_context(|| format!("band {band} was pressed but the claim did not complete"))?;
         }

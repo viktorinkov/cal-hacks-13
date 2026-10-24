@@ -1,6 +1,6 @@
 //! The plain web pages and what they need from bandit-api: the static files, the connection
 //! settings, file uploads into the blob store, the Elastic-ranked recap for a signed-in attendee,
-//! and, with `BANDIT_SIMULATE=1`, the test identities and a press on a simulated band.
+//! and, with `BANDIT_TEST_MODE=1`, the test identities and the test bands' buttons.
 
 use crate::{App, AppState, ranked_summary};
 use anyhow::{Context, Result};
@@ -32,8 +32,8 @@ const ACTORS: &[(&str, &str)] = &[
     ("lee", "Lee Park (attendee, band 93)"),
 ];
 
-/// Simulated bands a tester claims from the tap link. 90 to 93 belong to the claims story's attendees.
-pub const TAP_SIM_BANDS: std::ops::RangeInclusive<u8> = 94..=99;
+/// Test bands a tester claims from the tap link. 90 to 93 belong to the claims story's attendees.
+pub const TAP_TEST_BANDS: std::ops::RangeInclusive<u8> = 94..=99;
 
 pub struct Web {
     pub root: PathBuf,
@@ -42,10 +42,10 @@ pub struct Web {
     pub kibana_url: String,
     /// The SpacetimeAuth client the pages sign in with; empty until the project is set up.
     pub auth_client_id: String,
-    pub simulate: bool,
+    pub test_mode: bool,
     pub http: reqwest::Client,
-    /// The station each pressed simulated band reports from, kept alive by `heartbeat`.
-    pub sim_bands: std::sync::Mutex<std::collections::BTreeMap<u8, u8>>,
+    /// The station each pressed test band reports from, kept alive by `heartbeat`.
+    pub test_bands: std::sync::Mutex<std::collections::BTreeMap<u8, u8>>,
 }
 
 pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
@@ -66,10 +66,10 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route("/api/actors", get(actors))
         .route("/api/dev/press/{band}", post(press))
         .route("/api/dev/move/{band}/{station}", post(move_band))
-        .route("/api/dev/record/{claim}/{template}", post(sample_record))
+        .route("/api/dev/record/{claim}/{template}", post(test_record))
         .route("/api/dev/fall/{band}", post(fall))
         .route("/api/dev/property/{station}", post(property))
-        .nest_service("/samples", ServeDir::new(web.root.join("fixtures/attendee-documents/rendered")))
+        .nest_service("/test-records", ServeDir::new(web.root.join("fixtures/attendee-documents/rendered")))
 }
 
 fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>) {
@@ -97,7 +97,7 @@ async fn config(State(app): AppState) -> Json<Value> {
         "kibana_url": kibana,
         "dashboards": dashboards,
         "auth_client_id": w.auth_client_id,
-        "simulate": w.simulate,
+        "test_mode": w.test_mode,
     }))
 }
 
@@ -204,9 +204,9 @@ async fn blob(State(app): AppState, Path(hash): Path<String>) -> Response {
     }
 }
 
-/// Simulation only: the identities `bandit-claims setup` created, so one browser can play each person.
+/// Test mode only: the identities `bandit-claims setup` created, so one browser can play each person.
 async fn actors(State(app): AppState) -> ApiResult<Json<Value>> {
-    if !app.web.simulate {
+    if !app.web.test_mode {
         return Err(error(StatusCode::NOT_FOUND, "test identities are off"));
     }
     let mut out = Vec::new();
@@ -218,31 +218,31 @@ async fn actors(State(app): AppState) -> ApiResult<Json<Value>> {
     Ok(Json(json!(out)))
 }
 
-/// One report of a simulated band (ids 90 to 99) through `report_sim_band`, as the `sim` identity.
-async fn sim_report(web: &Web, token: &str, band: u8, station: u8, press: bool) -> Result<()> {
+/// One report of a test band (ids 90 to 99) through `report_test_band`, as the `tester` identity.
+async fn report_test_band(web: &Web, token: &str, band: u8, station: u8, press: bool) -> Result<()> {
     let body = json!([band, station, 0, 0, false, false, press]);
-    let url = format!("{}/v1/database/{}/call/report_sim_band", web.spacetimedb_url.trim_end_matches('/'), web.database);
+    let url = format!("{}/v1/database/{}/call/report_test_band", web.spacetimedb_url.trim_end_matches('/'), web.database);
     let res = web.http.post(url).bearer_auth(token).json(&body).send().await?;
     let status = res.status();
     if !status.is_success() {
-        anyhow::bail!("report_sim_band answered {status}: {}", res.text().await.unwrap_or_default());
+        anyhow::bail!("report_test_band answered {status}: {}", res.text().await.unwrap_or_default());
     }
     Ok(())
 }
 
-/// Simulation only: presses a simulated band's button, for testing the claim without hardware.
+/// Test mode only: presses a test band's button, for testing the claim without hardware.
 async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate {
-        return Err(error(StatusCode::NOT_FOUND, "simulated press is off"));
+    if !app.web.test_mode {
+        return Err(error(StatusCode::NOT_FOUND, "test band press is off"));
     }
-    if !TAP_SIM_BANDS.contains(&band) {
-        return Err(error(StatusCode::BAD_REQUEST, "only the simulated bands 94 to 99 can be pressed from here; press a real band's button"));
+    if !TAP_TEST_BANDS.contains(&band) {
+        return Err(error(StatusCode::BAD_REQUEST, "only the test bands 94 to 99 can be pressed from here; press a radio band's button"));
     }
-    let token = sim_token(&app)?;
-    let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
-    app.web.sim_bands.lock().unwrap().insert(band, station);
+    let token = tester_token(&app)?;
+    let station = app.conn.db.band().iter().find(|b| b.id == u16::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    app.web.test_bands.lock().unwrap().insert(band, station);
     for pressed in [false, true, false] {
-        sim_report(&app.web, &token, band, station, pressed)
+        report_test_band(&app.web, &token, band, station, pressed)
             .await
             .map_err(|e| error(StatusCode::BAD_GATEWAY, format!("{e:#}")))?;
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
@@ -250,48 +250,48 @@ async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Val
     Ok(Json(json!({ "pressed": band })))
 }
 
-fn sim_token(app: &App) -> ApiResult<String> {
+fn tester_token(app: &App) -> ApiResult<String> {
     app.tokens
-        .load("sim")
+        .load("tester")
         .ok()
         .flatten()
-        .context("no simulator identity; run scripts/e2e-setup")
+        .context("no tester identity; run scripts/e2e-setup")
         .map_err(|e| error(StatusCode::CONFLICT, format!("{e:#}")))
 }
 
-/// Simulation only: walks a simulated band (90 to 99) to another zone's station.
+/// Test mode only: walks a test band (90 to 99) to another zone's station.
 async fn move_band(State(app): AppState, Path((band, station)): Path<(u8, u8)>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate || !(90..=99).contains(&band) {
-        return Err(error(StatusCode::NOT_FOUND, "only simulated bands move from here"));
+    if !app.web.test_mode || !(90..=99).contains(&band) {
+        return Err(error(StatusCode::NOT_FOUND, "only test bands move from here"));
     }
-    let token = sim_token(&app)?;
-    app.web.sim_bands.lock().unwrap().insert(band, station);
-    sim_report(&app.web, &token, band, station, false).await.map_err(|e| error(StatusCode::BAD_GATEWAY, format!("{e:#}")))?;
+    let token = tester_token(&app)?;
+    app.web.test_bands.lock().unwrap().insert(band, station);
+    report_test_band(&app.web, &token, band, station, false).await.map_err(|e| error(StatusCode::BAD_GATEWAY, format!("{e:#}")))?;
     Ok(Json(json!({ "band": band, "station": station })))
 }
 
-/// Simulation only: reports every pressed simulated band every 2 s, as a worn band would, so it stays online,
-/// keeps its zone visit open and mixes with the simulated crowd. The bands go quiet once the event ends.
+/// Test mode only: reports every pressed test band every 2 s, as a worn band would, so it stays online,
+/// keeps its zone visit open and mixes with the crowd. The bands go quiet once the event ends.
 pub async fn heartbeat(app: Arc<App>) {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         if app.conn.db.event_state().iter().any(|e| e.ended) {
             continue;
         }
-        let Ok(token) = sim_token(&app) else { continue };
-        let bands: Vec<(u8, u8)> = app.web.sim_bands.lock().unwrap().iter().map(|(b, s)| (*b, *s)).collect();
+        let Ok(token) = tester_token(&app) else { continue };
+        let bands: Vec<(u8, u8)> = app.web.test_bands.lock().unwrap().iter().map(|(b, s)| (*b, *s)).collect();
         for (band, station) in bands {
-            if let Err(e) = sim_report(&app.web, &token, band, station, false).await {
-                eprintln!("simulated band {band} heartbeat: {e:#}");
+            if let Err(e) = report_test_band(&app.web, &token, band, station, false).await {
+                eprintln!("test band {band} heartbeat: {e:#}");
             }
         }
     }
 }
 
-/// Simulation only: renders one of the synthetic clinic records, made out to the claimant, for the
+/// Test mode only: renders one of the synthetic clinic records, made out to the claimant, for the
 /// claim's incident date and time, and files it as the medic through `bandit-claims attach-record`.
-async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64, String)>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate {
+async fn test_record(State(app): AppState, Path((claim, template)): Path<(u64, String)>) -> ApiResult<Json<Value>> {
+    if !app.web.test_mode {
         return Err(error(StatusCode::NOT_FOUND, "test records are off"));
     }
     if !["first-aid-wrist", "urgent-care-wrist", "urgent-care-ankle-home"].contains(&template.as_str()) {
@@ -301,29 +301,29 @@ async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64,
     Ok(Json(json!({ "filed": filed })))
 }
 
-/// Simulation only: the band falls where it is, with two of the claims story's attendees as the
+/// Test mode only: the band falls where it is, with two of the claims story's attendees as the
 /// bands around it, through `bandit-claims fall`. The heartbeats of the band and the witnesses pause
 /// meanwhile so the fall shows; the witnesses stay where they gathered round.
 async fn fall(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate || !(90..=99).contains(&band) {
-        return Err(error(StatusCode::NOT_FOUND, "only simulated bands fall from here"));
+    if !app.web.test_mode || !(90..=99).contains(&band) {
+        return Err(error(StatusCode::NOT_FOUND, "only test bands fall from here"));
     }
-    let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    let station = app.conn.db.band().iter().find(|b| b.id == u16::from(band) && b.zone != 0).map(|b| b.zone).unwrap_or(104);
     let witnesses: Vec<u8> = [90u8, 92, 93, 91].into_iter().filter(|w| *w != band).take(2).collect();
     let (paused, gathered) = {
-        let mut sims = app.web.sim_bands.lock().unwrap();
-        let paused = sims.remove(&band);
-        let gathered: Vec<u8> = witnesses.iter().copied().filter(|w| sims.remove(w).is_some()).collect();
+        let mut reporting = app.web.test_bands.lock().unwrap();
+        let paused = reporting.remove(&band);
+        let gathered: Vec<u8> = witnesses.iter().copied().filter(|w| reporting.remove(w).is_some()).collect();
         (paused, gathered)
     };
     let list: Vec<String> = witnesses.iter().map(u8::to_string).collect();
     let out = claims_cli(&app, &["fall", "--band", &band.to_string(), "--witnesses", &list.join(","), "--station", &station.to_string(), "--witness-station", &station.to_string()]).await;
-    let mut sims = app.web.sim_bands.lock().unwrap();
+    let mut reporting = app.web.test_bands.lock().unwrap();
     if let Some(s) = paused {
-        sims.insert(band, s);
+        reporting.insert(band, s);
     }
-    sims.extend(gathered.into_iter().map(|w| (w, station)));
-    drop(sims);
+    reporting.extend(gathered.into_iter().map(|w| (w, station)));
+    drop(reporting);
     Ok(Json(json!({ "fell": out? })))
 }
 
@@ -344,11 +344,11 @@ async fn claims_cli(app: &App, args: &[&str]) -> ApiResult<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Simulation only: a camera sees a speaker knocked off its stand in the zone, through
+/// Test mode only: a camera sees a speaker knocked off its stand in the zone, through
 /// `bandit-claims property --camera`, which plays the vision service.
 async fn property(State(app): AppState, Path(station): Path<u8>) -> ApiResult<Json<Value>> {
-    if !app.web.simulate {
-        return Err(error(StatusCode::NOT_FOUND, "simulation is off"));
+    if !app.web.test_mode {
+        return Err(error(StatusCode::NOT_FOUND, "test mode is off"));
     }
     let zone = app.conn.db.zone().iter().find(|z| z.station_id == station).map(|z| z.name).ok_or_else(|| error(StatusCode::BAD_REQUEST, "no zone has that station"))?;
     let out = claims_cli(&app, &["property", "--zone", &zone, "--note", "a speaker was knocked off its stand and cracked", "--cost", "2400.00", "--camera"]).await?;

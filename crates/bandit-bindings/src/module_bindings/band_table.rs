@@ -172,7 +172,7 @@ impl<'ctx> __sdk::WithUpdate for BandTableHandle<'ctx> {
 /// but to directly chain method calls,
 /// like `ctx.db.band().id().find(...)`.
 pub struct BandIdUnique<'ctx> {
-    imp: __sdk::UniqueConstraintHandle<Band, u8>,
+    imp: __sdk::UniqueConstraintHandle<Band, u16>,
     phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
 }
 
@@ -180,7 +180,7 @@ impl<'ctx> BandTableHandle<'ctx> {
     /// Get a handle on the `id` unique index on the table `band`.
     pub fn id(&self) -> BandIdUnique<'ctx> {
         BandIdUnique {
-            imp: self.imp.get_unique_constraint::<u8>("id"),
+            imp: self.imp.get_unique_constraint::<u16>("id"),
             phantom: std::marker::PhantomData,
         }
     }
@@ -189,7 +189,7 @@ impl<'ctx> BandTableHandle<'ctx> {
 impl<'ctx> BandIdUnique<'ctx> {
     /// Find the subscribed row whose `id` column value is equal to `col_val`,
     /// if such a row is present in the client cache.
-    pub fn find(&self, col_val: &u8) -> Option<Band> {
+    pub fn find(&self, col_val: &u16) -> Option<Band> {
         self.imp.find(col_val)
     }
 }
@@ -197,7 +197,7 @@ impl<'ctx> BandIdUnique<'ctx> {
 #[doc(hidden)]
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table = client_cache.get_or_make_table::<Band>("band");
-    _table.add_unique_constraint::<u8>("id", |row| &row.id);
+    _table.add_unique_constraint::<u16>("id", |row| &row.id);
 }
 
 #[doc(hidden)]

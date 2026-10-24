@@ -11,7 +11,7 @@ use super::graph::{link_met, link_visited};
 use super::logic::*;
 use super::onboarding::complete_claim;
 use super::tables::*;
-use crate::tables::{encounter, event, zone_visit, EventKind, ZoneVisit};
+use crate::tables::{band, encounter, event, radio_id, zone_visit, Encounter, EventKind, ZoneVisit};
 use crate::venue::{zone, zone_for_station};
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
 use std::collections::HashMap;
@@ -33,10 +33,8 @@ pub fn social_tick(ctx: &ReducerContext, _timer: SocialTickTimer) -> Result<(), 
     }
     read_presses(ctx);
     expire_claims(ctx);
-    let owners: Vec<BandOwner> = ctx.db.band_owner().iter().collect();
-    let findable: HashMap<Identity, bool> = ctx.db.attendee().iter().map(|a| (a.identity, a.findable)).collect();
-    update_visits(ctx, &owners, &findable);
-    update_encounters(ctx, &owners, &findable);
+    update_visits(ctx);
+    update_encounters(ctx);
     Ok(())
 }
 
@@ -64,44 +62,78 @@ fn zone_of_station(ctx: &ReducerContext, station: u8) -> u64 {
 }
 
 /// Every stay of an owned band that lasted long enough is a visit; findable visitors who overlap share it.
-fn update_visits(ctx: &ReducerContext, owners: &[BandOwner], findable: &HashMap<Identity, bool>) {
-    for owner in owners {
-        for zv in ctx.db.zone_visit().band_id().filter(owner.band_id).collect::<Vec<ZoneVisit>>() {
-            let zone_id = zone_of_station(ctx, zv.zone);
-            if zone_id == 0 {
-                continue;
-            }
-            let (start, end) = visit_window(zv.entered, zv.left, owner.claimed_at, ctx.timestamp);
-            let secs = (micros(end) - micros(start)) / 1_000_000;
-            if secs < VISIT_MIN_SECONDS {
-                continue;
-            }
-            let row = Visit {
-                zone_visit_id: zv.id,
-                attendee: owner.owner,
-                zone_id,
-                band_id: owner.band_id,
-                started_at: start,
-                ended_at: zv.left,
-                minutes: secs as f32 / 60.0,
-                updated_at: ctx.timestamp,
-            };
-            let visit = match ctx.db.visit().zone_visit_id().find(zv.id) {
-                None => ctx.db.visit().insert(row),
-                Some(old)
-                    if old.ended_at != row.ended_at
-                        || old.started_at != row.started_at
-                        || (row.ended_at.is_none() && stale(old.updated_at, ctx.timestamp)) =>
-                {
-                    ctx.db.visit().zone_visit_id().update(row)
-                }
-                Some(_) => continue,
-            };
-            if findable.get(&visit.attendee).copied().unwrap_or(false) {
-                link_visited(ctx, visit.attendee, visit.zone_id);
-                update_shared_visits(ctx, &visit, findable);
+/// Only the stays still running are read, plus the visits whose stay ended since the last tick.
+fn update_visits(ctx: &ReducerContext) {
+    let mut zones: HashMap<u8, u64> = HashMap::new();
+    for v in ctx.db.visit().open().filter(true).collect::<Vec<_>>() {
+        match ctx.db.zone_visit().id().find(v.zone_visit_id) {
+            Some(zv) if zv.open => {}
+            Some(zv) => write_visit(ctx, &zv, &mut zones),
+            None => {
+                ctx.db.visit().zone_visit_id().update(Visit { ended_at: Some(v.updated_at), open: false, ..v });
             }
         }
+    }
+    for zv in ctx.db.zone_visit().open().filter(true).collect::<Vec<_>>() {
+        // A running visit is rewritten at most every REFRESH_SECONDS.
+        if ctx.db.visit().zone_visit_id().find(zv.id).is_some_and(|v| v.open && !stale(v.updated_at, ctx.timestamp)) {
+            continue;
+        }
+        write_visit(ctx, &zv, &mut zones);
+    }
+}
+
+/// Who wears a band and since when: the owner of a radio or test band, the attendee of a crowd band.
+pub fn wearer(ctx: &ReducerContext, band_id: u16) -> Option<(Identity, Timestamp)> {
+    match radio_id(band_id) {
+        Some(id) => ctx.db.band_owner().band_id().find(id).map(|o| (o.owner, o.claimed_at)),
+        None => ctx.db.crowd_member().band_id().find(band_id).map(|m| (m.identity, m.joined_at)),
+    }
+}
+
+fn write_visit(ctx: &ReducerContext, zv: &ZoneVisit, zones: &mut HashMap<u8, u64>) {
+    let Some((who, since)) = wearer(ctx, zv.band_id) else {
+        return;
+    };
+    let zone_id = *zones.entry(zv.zone).or_insert_with(|| zone_of_station(ctx, zv.zone));
+    if zone_id == 0 {
+        return;
+    }
+    let (start, end) = visit_window(zv.entered, zv.left, since, ctx.timestamp);
+    let secs = (micros(end) - micros(start)) / 1_000_000;
+    if secs < VISIT_MIN_SECONDS {
+        return;
+    }
+    let row = Visit {
+        zone_visit_id: zv.id,
+        attendee: who,
+        zone_id,
+        band_id: zv.band_id,
+        started_at: start,
+        ended_at: zv.left,
+        minutes: secs as f32 / 60.0,
+        updated_at: ctx.timestamp,
+        booth_id: zv.booth_id,
+        open: zv.open,
+    };
+    let visit = match ctx.db.visit().zone_visit_id().find(zv.id) {
+        None => ctx.db.visit().insert(row),
+        Some(old)
+            if old.ended_at != row.ended_at
+                || old.started_at != row.started_at
+                || (row.open && stale(old.updated_at, ctx.timestamp)) =>
+        {
+            ctx.db.visit().zone_visit_id().update(row)
+        }
+        Some(_) => return,
+    };
+    let Some(a) = ctx.db.attendee().identity().find(visit.attendee).filter(|a| a.findable) else {
+        return;
+    };
+    link_visited(ctx, visit.attendee, visit.zone_id, visit.booth_id);
+    // Shared visits are between people who tapped their bands; the crowd only meets people up close.
+    if !a.simulated {
+        update_shared_visits(ctx, &visit);
     }
 }
 
@@ -113,13 +145,14 @@ fn stay(v: &Visit, now: Timestamp) -> (Timestamp, Timestamp) {
     (v.started_at, v.ended_at.unwrap_or(now))
 }
 
-fn update_shared_visits(ctx: &ReducerContext, v: &Visit, findable: &HashMap<Identity, bool>) {
+fn update_shared_visits(ctx: &ReducerContext, v: &Visit) {
     let others: Vec<Visit> = ctx
         .db
         .visit()
         .zone_id()
         .filter(v.zone_id)
-        .filter(|o| o.attendee != v.attendee && findable.get(&o.attendee).copied().unwrap_or(false))
+        .filter(|o| o.attendee != v.attendee)
+        .filter(|o| ctx.db.attendee().identity().find(o.attendee).is_some_and(|a| a.findable && !a.simulated))
         .collect();
     for other in others {
         let (secs, started_at) = overlap(stay(v, ctx.timestamp), stay(&other, ctx.timestamp));
@@ -153,81 +186,83 @@ fn update_shared_visits(ctx: &ReducerContext, v: &Visit, findable: &HashMap<Iden
     }
 }
 
-/// Pairs of owned bands that band1t saw close together become encounters once both owners are findable.
-/// Only time after that moment counts, so bands sitting together before they were handed out don't meet.
-fn update_encounters(ctx: &ReducerContext, owners: &[BandOwner], findable: &HashMap<Identity, bool>) {
-    let owner_of: HashMap<u8, Identity> = owners.iter().map(|o| (o.band_id, o.owner)).collect();
-    let is_findable = |who: &Identity| findable.get(who).copied().unwrap_or(false);
-    for owner in owners {
-        for enc in ctx.db.encounter().band_a().filter(owner.band_id).collect::<Vec<_>>() {
-            let Some(other) = owner_of.get(&enc.band_b).copied() else {
+/// Pairs of worn bands that band1t saw close together become encounters once both wearers are findable.
+/// Read here for the radio and test bands, whose ids are always the lower of a pair; the crowd's own pairs
+/// are synced by the crowd tick as it writes them.
+fn update_encounters(ctx: &ReducerContext) {
+    let findable = |who: Identity| ctx.db.attendee().identity().find(who).is_some_and(|a| a.findable);
+    for owner in ctx.db.band_owner().iter().collect::<Vec<_>>() {
+        if !findable(owner.owner) {
+            continue;
+        }
+        for enc in ctx.db.encounter().band_a().filter(u16::from(owner.band_id)).collect::<Vec<_>>() {
+            let Some((other, _)) = wearer(ctx, enc.band_b) else {
                 continue;
             };
-            if !is_findable(&owner.owner) || !is_findable(&other) {
-                continue;
-            }
-            let (attendee_a, attendee_b) = ordered(owner.owner, other);
-            match ctx.db.social_encounter().band_pair().find(enc.key) {
-                None => {
-                    let station = ctx
-                        .db
-                        .zone_visit()
-                        .band_id()
-                        .filter(owner.band_id)
-                        .find(|v| v.left.is_none())
-                        .map(|v| v.zone)
-                        .unwrap_or(0);
-                    ctx.db.social_encounter().insert(SocialEncounter {
-                        id: 0,
-                        band_pair: enc.key,
-                        attendee_a,
-                        attendee_b,
-                        zone_id: zone_of_station(ctx, station),
-                        baseline_seconds: enc.seconds_close,
-                        seconds_together: 0,
-                        started_at: ctx.timestamp,
-                        last_seen_at: enc.last_seen,
-                        met: false,
-                        updated_at: ctx.timestamp,
-                    });
-                }
-                Some(se) => {
-                    let together = enc.seconds_close.saturating_sub(se.baseline_seconds);
-                    let met = together >= ENCOUNTER_MIN_SECONDS;
-                    if together == se.seconds_together || (met == se.met && !stale(se.updated_at, ctx.timestamp)) {
-                        continue;
-                    }
-                    let se = ctx.db.social_encounter().id().update(SocialEncounter {
-                        seconds_together: together,
-                        last_seen_at: enc.last_seen,
-                        met,
-                        updated_at: ctx.timestamp,
-                        ..se
-                    });
-                    if se.met {
-                        link_met(ctx, se.attendee_a, se.attendee_b, together as f32 / 60.0);
-                    }
-                }
+            if findable(other) {
+                sync_encounter(ctx, &enc, owner.owner, other);
             }
         }
     }
 }
 
-/// Owned bands whose stay covered `at` in the zone, longest stay first. Used to suggest who is in a photo.
-pub fn bands_in_zone_at(ctx: &ReducerContext, zone_id: u64, at: Timestamp) -> Vec<BandOwner> {
+/// Writes the social encounter of two findable owners from their bands' band1t encounter. Only time after
+/// the first sync counts, so bands sitting together before they were handed out don't meet.
+pub fn sync_encounter(ctx: &ReducerContext, enc: &Encounter, a: Identity, b: Identity) {
+    let (attendee_a, attendee_b) = ordered(a, b);
+    match ctx.db.social_encounter().band_pair().find(enc.key) {
+        None => {
+            let station = ctx.db.zone_visit().band_id().filter(enc.band_a).find(|v| v.open).map(|v| v.zone).unwrap_or(0);
+            ctx.db.social_encounter().insert(SocialEncounter {
+                id: 0,
+                band_pair: enc.key,
+                attendee_a,
+                attendee_b,
+                zone_id: zone_of_station(ctx, station),
+                baseline_seconds: enc.seconds_close,
+                seconds_together: 0,
+                started_at: ctx.timestamp,
+                last_seen_at: enc.last_seen,
+                met: false,
+                updated_at: ctx.timestamp,
+            });
+        }
+        Some(se) => {
+            let together = enc.seconds_close.saturating_sub(se.baseline_seconds);
+            let met = together >= ENCOUNTER_MIN_SECONDS;
+            if together == se.seconds_together || (met == se.met && !stale(se.updated_at, ctx.timestamp)) {
+                return;
+            }
+            let se = ctx.db.social_encounter().id().update(SocialEncounter {
+                seconds_together: together,
+                last_seen_at: enc.last_seen,
+                met,
+                updated_at: ctx.timestamp,
+                ..se
+            });
+            if se.met {
+                link_met(ctx, se.attendee_a, se.attendee_b, together as f32 / 60.0);
+            }
+        }
+    }
+}
+
+/// The wearers of the bands whose stay covered `at` in the zone, longest stay first. Used to suggest who is
+/// in a photo.
+pub fn wearers_in_zone_at(ctx: &ReducerContext, zone_id: u64, at: Timestamp) -> Vec<Identity> {
     let Some(station) = ctx.db.zone().id().find(zone_id).map(|z| z.station_id) else {
         return Vec::new();
     };
     let t = micros(at);
-    let mut present: Vec<(i64, BandOwner)> = ctx
+    let mut present: Vec<(i64, Identity)> = ctx
         .db
-        .band_owner()
+        .band()
         .iter()
-        .filter_map(|o| {
-            let stay = ctx.db.zone_visit().band_id().filter(o.band_id).find(|v| {
+        .filter_map(|b| {
+            let stay = ctx.db.zone_visit().band_id().filter(b.id).find(|v| {
                 v.zone == station && micros(v.entered) <= t && v.left.is_none_or(|l| micros(l) >= t)
             })?;
-            Some((micros(stay.entered), o))
+            Some((micros(stay.entered), wearer(ctx, b.id)?.0))
         })
         .collect();
     present.sort_by_key(|(entered, _)| *entered);

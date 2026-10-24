@@ -6,7 +6,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct ReportSimBandArgs {
+pub(super) struct ReportTestBandArgs {
     pub band_id: u8,
     pub station_id: u8,
     pub state: u8,
@@ -16,9 +16,9 @@ pub(super) struct ReportSimBandArgs {
     pub press: bool,
 }
 
-impl From<ReportSimBandArgs> for super::Reducer {
-    fn from(args: ReportSimBandArgs) -> Self {
-        Self::ReportSimBand {
+impl From<ReportTestBandArgs> for super::Reducer {
+    fn from(args: ReportTestBandArgs) -> Self {
+        Self::ReportTestBand {
             band_id: args.band_id,
             station_id: args.station_id,
             state: args.state,
@@ -30,22 +30,22 @@ impl From<ReportSimBandArgs> for super::Reducer {
     }
 }
 
-impl __sdk::InModule for ReportSimBandArgs {
+impl __sdk::InModule for ReportTestBandArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `report_sim_band`.
+/// Extension trait for access to the reducer `report_test_band`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait report_sim_band {
-    /// Request that the remote module invoke the reducer `report_sim_band` to run as soon as possible.
+pub trait report_test_band {
+    /// Request that the remote module invoke the reducer `report_test_band` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`report_sim_band:report_sim_band_then`] to run a callback after the reducer completes.
-    fn report_sim_band(
+    /// /// Use [`report_test_band:report_test_band_then`] to run a callback after the reducer completes.
+    fn report_test_band(
         &self,
         band_id: u8,
         station_id: u8,
@@ -55,7 +55,7 @@ pub trait report_sim_band {
         fall: bool,
         press: bool,
     ) -> __sdk::Result<()> {
-        self.report_sim_band_then(
+        self.report_test_band_then(
             band_id,
             station_id,
             state,
@@ -67,13 +67,13 @@ pub trait report_sim_band {
         )
     }
 
-    /// Request that the remote module invoke the reducer `report_sim_band` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `report_test_band` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn report_sim_band_then(
+    fn report_test_band_then(
         &self,
         band_id: u8,
         station_id: u8,
@@ -89,8 +89,8 @@ pub trait report_sim_band {
     ) -> __sdk::Result<()>;
 }
 
-impl report_sim_band for super::RemoteReducers {
-    fn report_sim_band_then(
+impl report_test_band for super::RemoteReducers {
+    fn report_test_band_then(
         &self,
         band_id: u8,
         station_id: u8,
@@ -105,7 +105,7 @@ impl report_sim_band for super::RemoteReducers {
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            ReportSimBandArgs {
+            ReportTestBandArgs {
                 band_id,
                 station_id,
                 state,

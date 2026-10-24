@@ -1,8 +1,8 @@
-//! The people and devices on the floor: the simulated bands reporting a fall, the
+//! The people and devices on the floor: the test bands reporting a fall, the
 //! medic, the floor manager, the vision stub and the medical record.
 
 use crate::app::*;
-use crate::sim::{Pose, S_CIRCLE, S_FALLEN, Sim, check_bands};
+use crate::test_bands::{Pose, S_CIRCLE, S_FALLEN, TestBands, check_bands};
 use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
 use spacetimedb_sdk::{Table, Timestamp};
@@ -13,7 +13,7 @@ use std::process::Command;
 /// the subject reports a fall in `station` while the witnesses show the light
 /// circle in `witness_station`, held 2 s so the 500 ms watch sees both, then
 /// everything clears. Returns the incident the watch opened.
-pub fn fall(app: &App, sim: &Sim, band: u8, station: u8, witnesses: &[u8], witness_station: u8) -> Result<Incident> {
+pub fn fall(app: &App, test_bands: &TestBands, band: u8, station: u8, witnesses: &[u8], witness_station: u8) -> Result<Incident> {
     check_bands(&[band])?;
     check_bands(witnesses)?;
     let db = app.db()?;
@@ -26,11 +26,11 @@ pub fn fall(app: &App, sim: &Sim, band: u8, station: u8, witnesses: &[u8], witne
     let before = db.db.incident().iter().map(|i| i.id).max().unwrap_or(0);
     let mut calm = vec![(band, Pose::at(station))];
     calm.extend(witnesses.iter().map(|w| (*w, Pose::at(witness_station))));
-    sim.place(&calm);
+    test_bands.place(&calm);
     sleep_ms(1200);
     let mut moment = vec![(band, Pose { station, state: S_FALLEN, fall: true, press: false })];
     moment.extend(witnesses.iter().map(|w| (*w, Pose { state: S_CIRCLE, ..Pose::at(witness_station) })));
-    sim.place(&moment);
+    test_bands.place(&moment);
     sleep_ms(2000);
     let incident = until(5.0, || db.db.incident().iter().find(|i| i.id > before && i.subject_band == band))
         .with_context(|| format!("the safety watch opened no incident for band {band}; run setup (it starts the watch)"))?;
@@ -38,7 +38,7 @@ pub fn fall(app: &App, sim: &Sim, band: u8, station: u8, witnesses: &[u8], witne
         let n = db.db.incident_band().iter().filter(|r| r.incident_id == incident.id && r.role == "witness").count();
         (n >= witnesses.len()).then_some(())
     });
-    sim.place(&calm);
+    test_bands.place(&calm);
     sleep_ms(500);
     app.incident(incident.id)
 }

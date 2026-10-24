@@ -186,9 +186,10 @@ pub struct AttendeeOut {
     pub node_id: u64,
     pub display_name: String,
     /// 0 when the attendee wears no band.
-    pub band_id: u8,
+    pub band_id: u16,
     pub findable: bool,
-    pub simulated: bool,
+    /// One of the crowd's attendees.
+    pub crowd: bool,
     pub organization: String,
     pub handles: Vec<crate::social::views::HandleOut>,
     pub created_at: Timestamp,
@@ -206,9 +207,16 @@ pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
         .filter(0u64..)
         .map(|a| AttendeeOut {
             node_id: a.node_id,
-            band_id: ctx.db.band_owner().owner().find(a.identity).map(|o| o.band_id).unwrap_or(0),
+            band_id: ctx
+                .db
+                .band_owner()
+                .owner()
+                .find(a.identity)
+                .map(|o| o.band_id.into())
+                .or_else(|| ctx.db.crowd_member().identity().find(a.identity).map(|m| m.band_id))
+                .unwrap_or(0),
             findable: a.findable,
-            simulated: a.simulated,
+            crowd: a.simulated,
             organization: ctx.db.organization().id().find(a.organization_id).map(|o| o.name).unwrap_or_default(),
             handles: ctx
                 .db

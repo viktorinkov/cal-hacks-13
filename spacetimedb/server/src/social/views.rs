@@ -144,7 +144,11 @@ pub fn my_visits(ctx: &ViewContext) -> Vec<MyVisit> {
             zone_visit_id: v.zone_visit_id,
             zone_id: v.zone_id,
             zone_name: zone_name(ctx, v.zone_id),
-            booths: booth_names(ctx, v.zone_id),
+            booths: if v.booth_id != 0 {
+                ctx.db.booth().id().find(v.booth_id).map(|b| b.name).into_iter().collect()
+            } else {
+                booth_names(ctx, v.zone_id)
+            },
             started_at: v.started_at,
             ended_at: v.ended_at,
             minutes: v.minutes,

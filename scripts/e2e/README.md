@@ -13,7 +13,7 @@ scripts/e2e-setup      # load the event, merch templates, insurance actors, role
 scripts/e2e-services   # bandit-api with the pages, bandit-indexer, bandit-workers
 ```
 
-`E2E_TARGET=maincloud` points the scripts at the live database `bandit-calhacks13-sp82j` instead. On Maincloud, publish keeps the data and does not import the event (the pipeline loads the real CalHacks bundle). `BANDIT_SIMULATE=1` (the default in `e2e-services`) turns on the "play as" switcher, the buttons for bands 90 to 99 and the test medical records.
+`E2E_TARGET=maincloud` points the scripts at the live database `bandit-calhacks13-sp82j` instead. On Maincloud, publish keeps the data and does not import the event (the pipeline loads the real CalHacks bundle). `BANDIT_TEST_MODE=1` (the default in `e2e-services`) turns on the "play as" switcher, the buttons for bands 90 to 99 and the test medical records.
 
 Pages, on http://127.0.0.1:8097:
 
@@ -26,7 +26,7 @@ Pages, on http://127.0.0.1:8097:
 ## Happy path to test
 
 1. Open `/t/BANDIT-94` (no radio needed) and press "Press the band for me". Fill the name, keep findable on, add Instagram. Upload the medical history and the insurance card ("Use a test record" gives synthetic ones); Claude reads them into the medical card, which you confirm with "Looks right". Connect the Capital One wallet ($200 on Nessie). The page ends on a thank-you.
-2. Host portal, Bands tab (`/organizer?as=ops#bands`): walk the band between zones; the Live tab shows the people per zone change.
+2. Host portal, Bands tab (`/organizer?as=ops#bands`): walk the band between zones; the Live tab shows it on the venue map among the crowd of 1,000 and the people per zone change.
 3. `/photo?as=photographer`: add a photo in the zone the band is in.
 4. Bands tab: "Fall here" on your own band (94-99), so the claim you run by hand never collides with the story's attendees. The incident opens with two bands around you.
 5. `/organizer?as=medic`, Claims: take the incident, tap the band for your medical card, add a note with a cost, resolve it. The claim opens; file "Event first aid, wrist sprain" as the test record, which is made out to you with an invoice number of its own. Claude reads it, Elastic validates it, Claude reviews it, and code routes it.
