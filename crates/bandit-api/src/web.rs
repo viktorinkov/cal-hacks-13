@@ -40,6 +40,8 @@ pub struct Web {
     pub spacetimedb_url: String,
     pub database: String,
     pub kibana_url: String,
+    /// The SpacetimeAuth client the pages sign in with; empty until the project is set up.
+    pub auth_client_id: String,
     pub demo: bool,
     pub http: reqwest::Client,
 }
@@ -88,6 +90,7 @@ async fn config(State(app): AppState) -> Json<Value> {
         "database": w.database,
         "kibana_url": kibana,
         "dashboards": dashboards,
+        "auth_client_id": w.auth_client_id,
         "demo": w.demo,
     }))
 }

@@ -102,6 +102,7 @@ async fn main() -> Result<()> {
         spacetimedb_url: config.spacetimedb_url.clone(),
         database: database.clone(),
         kibana_url: config.kibana_url.clone().unwrap_or_default(),
+        auth_client_id: std::env::var("SPACETIMEAUTH_CLIENT_ID").unwrap_or_default(),
         demo: std::env::var("BANDIT_DEMO").is_ok_and(|v| v == "1"),
         http: reqwest::Client::new(),
     };

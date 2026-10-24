@@ -1,0 +1,65 @@
+{
+  "photo_area_color": "#00FF00",
+  "templates": {
+    "mug.png": {
+      "width": 1254,
+      "height": 1254,
+      "photo_area": {
+        "x": 328,
+        "y": 513,
+        "w": 502,
+        "h": 289
+      }
+    },
+    "mug_elastic.png": {
+      "width": 1254,
+      "height": 1254,
+      "photo_area": {
+        "x": 261,
+        "y": 479,
+        "w": 585,
+        "h": 383
+      }
+    },
+    "poster.png": {
+      "width": 1024,
+      "height": 1536,
+      "photo_area": {
+        "x": 48,
+        "y": 509,
+        "w": 928,
+        "h": 608
+      }
+    },
+    "poster_booth_crawl.png": {
+      "width": 1024,
+      "height": 1536,
+      "photo_area": {
+        "x": 93,
+        "y": 368,
+        "w": 838,
+        "h": 486
+      }
+    },
+    "tee.png": {
+      "width": 1254,
+      "height": 1254,
+      "photo_area": {
+        "x": 392,
+        "y": 420,
+        "w": 470,
+        "h": 276
+      }
+    },
+    "tee_spacetimedb.png": {
+      "width": 1254,
+      "height": 1254,
+      "photo_area": {
+        "x": 374,
+        "y": 454,
+        "w": 506,
+        "h": 300
+      }
+    }
+  }
+}
