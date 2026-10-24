@@ -38,6 +38,6 @@ systemctl daemon-reload
 systemctl enable -q bandit@api bandit@indexer bandit@workers
 systemctl restart bandit@api bandit@indexer bandit@workers
 
-printf '%s {\n\treverse_proxy 127.0.0.1:8080\n}\n' "$BANDIT_HOST" > /etc/caddy/Caddyfile
+printf '%s, www.%s {\n\treverse_proxy 127.0.0.1:8080\n}\n' "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
