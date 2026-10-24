@@ -36,6 +36,7 @@ const QUERIES = [
   'SELECT * FROM board_rules',
   'SELECT * FROM board_authority',
   'SELECT * FROM board_policies',
+  'SELECT * FROM medic_medical_cards',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -51,7 +52,7 @@ let people: Actor[] = [];
 let tab = location.hash.slice(1) || 'live';
 let openClaim: bigint | undefined;
 
-const tabs: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana']];
+const tabs: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana'], ['simulate', 'Simulate']];
 
 function zoneName(id: bigint) {
   return conn.db.zone.id.find(id)?.name ?? 'no zone';
@@ -77,7 +78,7 @@ function header() {
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
           h('button', { onclick: () => act(() => conn.reducers.reopenEvent({})) }, 'Reopen the event')]
         : h('button', { onclick: () => confirm('End the event? Every tap link switches to the recap.') && act(() => conn.reducers.endEvent({})) }, 'Event ended')),
-    h('nav', {}, tabs.map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
+    h('nav', {}, tabs.filter(([key]) => key !== 'simulate' || cfg.simulate).map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
   ];
 }
 
@@ -103,6 +104,9 @@ function live() {
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, band ${i.subjectBand}, ${i.status.tag}, opened ${time(i.openedAt)}`)))),
     h('section', {},
       h('h3', {}, 'Zones'),
+      h('p', {}, settings?.lowVis
+        ? [h('b', {}, 'Low visibility is on: every band guides its wearer to the exit colour of its zone. '), h('button', { onclick: () => act(() => conn.reducers.setLowVis({ on: false })) }, 'Turn it off')]
+        : h('button', { onclick: () => confirm('Fire or smoke? Every band starts guiding its wearer to the exit.') && act(() => conn.reducers.setLowVis({ on: true })) }, 'Low visibility: guide everyone to the exits')),
       h('p', { class: 'muted' }, `${inside.length} people in zones right now, ${bands.length} bands heard in the last 5 s. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
       h('table', {},
         h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Bands reporting'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
@@ -158,12 +162,56 @@ function incidentDesk() {
         h('p', {}, h('b', {}, `Incident ${i.id}: ${i.kind.tag}`), ` in ${zoneName(i.zoneId)}, band ${i.subjectBand}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
         h('ul', {}, mine.map(n => h('li', {}, `${time(n.createdAt)} ${n.authorRole}: ${n.text}${n.costCents !== undefined ? ` (${money(n.costCents)})` : ''}`))),
         i.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: i.id })) }, 'Take it'),
+        i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${i.subjectBand} for the medical card`),
+        medicCard(i.id),
         h('form', { onsubmit: note },
           h('input', { name: `text`, placeholder: 'Treatment note', required: true }),
           h('input', { name: `cost`, placeholder: 'Cost in dollars (optional)', inputmode: 'decimal' }),
           h('button', {}, 'Add note')),
         h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
     }));
+}
+
+/** The medical card a medic opened by tapping the band, while the incident is open. */
+function medicCard(incidentId: bigint) {
+  const m = [...conn.db.medicMedicalCards.iter()].find(c => c.incidentId === incidentId);
+  if (!m) return null;
+  const c = m.card;
+  const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
+  return h('section', { class: 'alert' },
+    h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
+    c.bloodType && h('p', {}, h('b', {}, 'Blood type: '), c.bloodType),
+    list('Allergies', c.allergies), list('Conditions', c.conditions), list('Medications', c.medications),
+    c.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), c.emergencyContact),
+    c.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${c.insurer} ${c.plan}, member ${c.memberId}, group ${c.groupNumber}${c.insurerPhone ? `, ${c.insurerPhone}` : ''}`),
+    c.notes && h('p', {}, c.notes));
+}
+
+// --- Simulate ------------------------------------------------------------------------------
+
+async function post(path: string) {
+  const res = await fetch(path, { method: 'POST' });
+  if (!res.ok) throw new Error((await res.json()).error);
+}
+
+/** The simulated bands 90 to 99: who wears them, where they are, and buttons to walk or drop them. */
+function simulateTab() {
+  const owners = new Map([...conn.db.boardAttendees.iter()].filter(a => a.bandId >= 90).map(a => [a.bandId, a.displayName]));
+  const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
+  const bands = [...conn.db.band.iter()].filter(b => b.id >= 90 && b.id <= 99 && owners.has(b.id)).sort((a, b) => a.id - b.id);
+  return h('section', {},
+    h('h3', {}, 'Simulated bands'),
+    h('p', { class: 'muted' }, 'Bands 90 to 93 are the claims story\'s attendees; 94 to 99 are the ones testers claim from a tap link. A fall uses two of the story attendees as the bands around it.'),
+    !bands.length && h('p', { class: 'muted' }, 'No simulated band is claimed yet. Open /t/BANDIT-94 and press it.'),
+    h('table', {}, bands.map(b => h('tr', {},
+      h('td', {}, h('b', {}, `Band ${b.id}`), ` ${owners.get(b.id)}`),
+      h('td', {}, zones.find(z => z.stationId === b.zone)?.name ?? 'no zone'),
+      h('td', {}, b.id >= 94 && zones.map(z => h('button', { class: 'sim', disabled: z.stationId === b.zone || undefined,
+        onclick: () => act(() => post(`/api/dev/move/${b.id}/${z.stationId}`)) }, z.name))),
+      h('td', {}, h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/fall/${b.id}`)).then(ok => { if (ok) { tab = 'claims'; location.hash = 'claims'; render(); } }) }, 'Fall here'))))),
+    h('h3', {}, 'Property damage'),
+    h('p', { class: 'muted' }, 'A venue camera sees a speaker knocked off its stand; the vision check confirms it and a property claim opens.'),
+    zones.map(z => h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(ok => { if (ok) { tab = 'claims'; location.hash = 'claims'; render(); } }) }, `Speaker breaks in ${z.name}`)));
 }
 
 function statusOf(c: Claim) {
@@ -316,7 +364,7 @@ function data() {
 
 function render() {
   if (!conn) return;
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'data' ? data() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'data' ? data() : tab === 'simulate' ? simulateTab() : live();
   mount('app', header(), body);
 }
 

@@ -128,10 +128,12 @@ export async function playedToken(): Promise<string | undefined> {
 export async function connect(queries: string[], onChange: () => void): Promise<DbConnection> {
   const cfg = await config();
   const played = await playedToken();
-  const storeKey = 'bandit-token';
-  const token = played ?? idToken() ?? localStorage.getItem(storeKey) ?? undefined;
-  return new Promise((resolve, reject) => {
-    const conn = DbConnection.builder()
+  // One kept identity per database, so a local test run never clashes with Maincloud.
+  const storeKey = `bandit-token:${cfg.database}`;
+  const stored = localStorage.getItem(storeKey) ?? localStorage.getItem('bandit-token') ?? undefined;
+  const token = played ?? idToken() ?? stored;
+  const open = (token: string | undefined) => new Promise<DbConnection>((resolve, reject) => {
+    DbConnection.builder()
       .withUri(cfg.spacetimedb_url)
       .withDatabaseName(cfg.database)
       .withToken(token)
@@ -140,6 +142,7 @@ export async function connect(queries: string[], onChange: () => void): Promise<
         c.subscriptionBuilder()
           .onApplied(() => {
             watch(c, onChange);
+            (window as any).bandit = c;
             resolve(c);
             setTimeout(onChange, 0);
           })
@@ -149,18 +152,28 @@ export async function connect(queries: string[], onChange: () => void): Promise<
       .onConnectError((_ctx, e) => reject(e))
       .build();
   });
+  try {
+    return await open(token);
+  } catch (e) {
+    // A kept identity from another server is refused; start a fresh one.
+    if (token !== stored || !stored) throw e;
+    localStorage.removeItem(storeKey);
+    localStorage.removeItem('bandit-token');
+    return open(undefined);
+  }
 }
 
-/** Calls `onChange` (at most once per frame) after any row of any table changes. */
+/** Calls `onChange` (batched) after any row of any table changes. */
 function watch(conn: DbConnection, onChange: () => void) {
   let queued = false;
   const kick = () => {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(() => {
+    // A timer, not an animation frame: frames stop in a background tab and the page would go stale.
+    setTimeout(() => {
       queued = false;
       onChange();
-    });
+    }, 30);
   };
   for (const table of Object.values(conn.db as Record<string, any>)) {
     if (table && typeof table.onInsert === 'function') {

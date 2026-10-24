@@ -127,6 +127,7 @@ pub fn ensure_attendee(app: &App, sim: &Sim, name: &str, display: &str, band: u8
         }
     }
     call!(conn, update_profile_then(display.to_string(), true))?;
+    call!(conn, connect_wallet_then())?;
     Ok(me)
 }
 

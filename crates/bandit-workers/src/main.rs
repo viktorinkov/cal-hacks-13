@@ -12,6 +12,7 @@
 mod extract;
 mod jobs;
 mod letters;
+mod medical;
 mod merch;
 mod model;
 mod nessie;
