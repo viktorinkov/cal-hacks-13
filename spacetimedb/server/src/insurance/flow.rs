@@ -709,6 +709,7 @@ pub fn record_claim_payout(ctx: &ReducerContext, job_id: u64, customer_id: Strin
         if ctx.db.claimant_account().identity().find(identity).is_none() {
             ctx.db.claimant_account().insert(ClaimantAccount { identity, customer_id, account_id, created_at: ctx.timestamp });
         }
+        crate::wallet::on_payout(ctx, identity, claim.id, claim.payout_cents, deposit_id.clone());
     }
     paid(ctx, claim, format!("Nessie deposit {deposit_id}"), "record_claim_payout")
 }

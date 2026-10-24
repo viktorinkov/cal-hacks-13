@@ -1,0 +1,19 @@
+#!/bin/sh
+# Loads the merch templates in assets/merch/templates.json into the module. Run after the event import
+# (scripts/e2e-setup), so each sponsor template finds its sponsor's booth.
+set -e
+. "$(dirname "$0")/e2e-env"
+cd "$ROOT"
+TEMPLATES="$(python3 - assets/merch/templates.json <<'PY'
+import json, sys
+doc = json.load(open(sys.argv[1]))
+print(json.dumps([
+    {"name": name, "title": t["title"], "kind": t["kind"], "width": t["width"], "height": t["height"],
+     "photo_x": t["photo_area"]["x"], "photo_y": t["photo_area"]["y"], "photo_w": t["photo_area"]["w"], "photo_h": t["photo_area"]["h"],
+     "sponsors": t["sponsors"]}
+    for name, t in doc["templates"].items()
+]))
+PY
+)"
+stdb call -s "$STDB_SERVER" "$SPACETIMEDB_DATABASE" load_merch_templates "$TEMPLATES" 2>&1 | grep -v UNSTABLE || true
+echo "merch templates loaded: $(echo "$TEMPLATES" | python3 -c 'import json,sys; print(", ".join(t["name"] for t in json.load(sys.stdin)))')"

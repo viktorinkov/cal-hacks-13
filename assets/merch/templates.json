@@ -1,17 +1,27 @@
 {
   "photo_area_color": "#00FF00",
   "templates": {
-    "mug.png": {
+    "tee_spacetimedb.png": {
+      "title": "SpacetimeDB tee",
+      "kind": "tee",
+      "sponsors": [
+        "SpacetimeDB"
+      ],
       "width": 1254,
       "height": 1254,
       "photo_area": {
-        "x": 328,
-        "y": 513,
-        "w": 502,
-        "h": 289
+        "x": 374,
+        "y": 454,
+        "w": 506,
+        "h": 300
       }
     },
     "mug_elastic.png": {
+      "title": "Elastic mug",
+      "kind": "mug",
+      "sponsors": [
+        "Elastic"
+      ],
       "width": 1254,
       "height": 1254,
       "photo_area": {
@@ -21,17 +31,17 @@
         "h": 383
       }
     },
-    "poster.png": {
-      "width": 1024,
-      "height": 1536,
-      "photo_area": {
-        "x": 48,
-        "y": 509,
-        "w": 928,
-        "h": 608
-      }
-    },
     "poster_booth_crawl.png": {
+      "title": "Booth crawl poster",
+      "kind": "poster",
+      "sponsors": [
+        "SpacetimeDB",
+        "Elastic",
+        "Bright Data",
+        "Capital One",
+        "Hyphenate",
+        "Anthropic"
+      ],
       "width": 1024,
       "height": 1536,
       "photo_area": {
@@ -42,6 +52,9 @@
       }
     },
     "tee.png": {
+      "title": "Cal Hacks 13.0 tee",
+      "kind": "tee",
+      "sponsors": [],
       "width": 1254,
       "height": 1254,
       "photo_area": {
@@ -51,14 +64,30 @@
         "h": 276
       }
     },
-    "tee_spacetimedb.png": {
+    "mug.png": {
+      "title": "Cal Hacks 13.0 mug",
+      "kind": "mug",
+      "sponsors": [],
       "width": 1254,
       "height": 1254,
       "photo_area": {
-        "x": 374,
-        "y": 454,
-        "w": 506,
-        "h": 300
+        "x": 328,
+        "y": 513,
+        "w": 502,
+        "h": 289
+      }
+    },
+    "poster.png": {
+      "title": "Cal Hacks 13.0 poster",
+      "kind": "poster",
+      "sponsors": [],
+      "width": 1024,
+      "height": 1536,
+      "photo_area": {
+        "x": 48,
+        "y": 509,
+        "w": 928,
+        "h": 608
       }
     }
   }

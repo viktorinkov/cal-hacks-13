@@ -303,7 +303,7 @@ pub struct ClaimReview {
     pub created_at: Timestamp,
 }
 
-/// The claimant's Nessie customer and account, created on their first payout.
+/// The attendee's Nessie customer and account: their BandIt wallet, opened when they save their name, or on a first payout.
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = claimant_account)]
 pub struct ClaimantAccount {

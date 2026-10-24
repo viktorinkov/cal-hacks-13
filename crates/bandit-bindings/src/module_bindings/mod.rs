@@ -30,11 +30,24 @@ pub mod band_table;
 pub mod band_type;
 pub mod blob_ref_table;
 pub mod blob_ref_type;
+pub mod board_approvals_table;
+pub mod board_authority_table;
+pub mod board_checks_table;
+pub mod board_facts_table;
+pub mod board_ledger_table;
+pub mod board_lines_table;
+pub mod board_notes_table;
+pub mod board_policies_table;
+pub mod board_precedents_table;
+pub mod board_records_table;
+pub mod board_reviews_table;
+pub mod board_rules_table;
 pub mod booth_in_type;
 pub mod booth_table;
 pub mod booth_type;
 pub mod bridge_table;
 pub mod bridge_type;
+pub mod buy_merch_reducer;
 pub mod camera_table;
 pub mod camera_type;
 pub mod check_in_type;
@@ -61,6 +74,7 @@ pub mod claimant_account_table;
 pub mod claimant_account_type;
 pub mod claimed_people_table;
 pub mod claimed_person_type;
+pub mod claims_board_table;
 pub mod clear_reducer;
 pub mod client_connected_reducer;
 pub mod client_disconnected_reducer;
@@ -135,8 +149,17 @@ pub mod ledger_entry_table;
 pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
+pub mod load_merch_templates_reducer;
 pub mod medical_record_table;
 pub mod medical_record_type;
+pub mod merch_order_table;
+pub mod merch_order_type;
+pub mod merch_shop_table;
+pub mod merch_shop_type;
+pub mod merch_suggestion_type;
+pub mod merch_template_in_type;
+pub mod merch_template_table;
+pub mod merch_template_type;
 pub mod model_call_in_type;
 pub mod model_call_table;
 pub mod model_call_type;
@@ -144,10 +167,14 @@ pub mod my_attendee_table;
 pub mod my_band_table;
 pub mod my_band_type;
 pub mod my_claim_queue_table;
+pub mod my_claim_type;
+pub mod my_claims_table;
 pub mod my_encounter_type;
 pub mod my_encounters_table;
 pub mod my_graph_table;
 pub mod my_handles_table;
+pub mod my_merch_orders_table;
+pub mod my_merch_suggestions_table;
 pub mod my_photo_type;
 pub mod my_photos_table;
 pub mod my_roles_table;
@@ -155,6 +182,9 @@ pub mod my_shared_visit_type;
 pub mod my_shared_visits_table;
 pub mod my_visit_type;
 pub mod my_visits_table;
+pub mod my_wallet_entries_table;
+pub mod my_wallet_table;
+pub mod my_wallet_type;
 pub mod open_api_session_reducer;
 pub mod open_claim_reducer;
 pub mod open_incident_reducer;
@@ -186,6 +216,7 @@ pub mod property_event_type;
 pub mod record_claim_payout_reducer;
 pub mod record_insurer_payment_reducer;
 pub mod record_model_call_reducer;
+pub mod record_wallet_reducer;
 pub mod refuse_claim_reducer;
 pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
@@ -216,6 +247,7 @@ pub mod set_thresholds_reducer;
 pub mod set_zone_station_reducer;
 pub mod settings_table;
 pub mod settings_type;
+pub mod settle_merch_order_reducer;
 pub mod settlement_rule_row_type;
 pub mod settlement_rule_table;
 pub mod shared_visit_table;
@@ -266,6 +298,8 @@ pub mod vision_assessment_table;
 pub mod vision_assessment_type;
 pub mod visit_table;
 pub mod visit_type;
+pub mod wallet_entry_table;
+pub mod wallet_entry_type;
 pub mod watch_bands_reducer;
 pub mod worker_jobs_table;
 pub mod zone_in_type;
@@ -298,11 +332,24 @@ pub use band_table::*;
 pub use band_type::Band;
 pub use blob_ref_table::*;
 pub use blob_ref_type::BlobRef;
+pub use board_approvals_table::*;
+pub use board_authority_table::*;
+pub use board_checks_table::*;
+pub use board_facts_table::*;
+pub use board_ledger_table::*;
+pub use board_lines_table::*;
+pub use board_notes_table::*;
+pub use board_policies_table::*;
+pub use board_precedents_table::*;
+pub use board_records_table::*;
+pub use board_reviews_table::*;
+pub use board_rules_table::*;
 pub use booth_in_type::BoothIn;
 pub use booth_table::*;
 pub use booth_type::Booth;
 pub use bridge_table::*;
 pub use bridge_type::Bridge;
+pub use buy_merch_reducer::buy_merch;
 pub use camera_table::*;
 pub use camera_type::Camera;
 pub use check_in_type::CheckIn;
@@ -329,6 +376,7 @@ pub use claimant_account_table::*;
 pub use claimant_account_type::ClaimantAccount;
 pub use claimed_people_table::*;
 pub use claimed_person_type::ClaimedPerson;
+pub use claims_board_table::*;
 pub use clear_reducer::clear;
 pub use client_connected_reducer::client_connected;
 pub use client_disconnected_reducer::client_disconnected;
@@ -403,8 +451,17 @@ pub use ledger_entry_table::*;
 pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
+pub use load_merch_templates_reducer::load_merch_templates;
 pub use medical_record_table::*;
 pub use medical_record_type::MedicalRecord;
+pub use merch_order_table::*;
+pub use merch_order_type::MerchOrder;
+pub use merch_shop_table::*;
+pub use merch_shop_type::MerchShop;
+pub use merch_suggestion_type::MerchSuggestion;
+pub use merch_template_in_type::MerchTemplateIn;
+pub use merch_template_table::*;
+pub use merch_template_type::MerchTemplate;
 pub use model_call_in_type::ModelCallIn;
 pub use model_call_table::*;
 pub use model_call_type::ModelCall;
@@ -412,10 +469,14 @@ pub use my_attendee_table::*;
 pub use my_band_table::*;
 pub use my_band_type::MyBand;
 pub use my_claim_queue_table::*;
+pub use my_claim_type::MyClaim;
+pub use my_claims_table::*;
 pub use my_encounter_type::MyEncounter;
 pub use my_encounters_table::*;
 pub use my_graph_table::*;
 pub use my_handles_table::*;
+pub use my_merch_orders_table::*;
+pub use my_merch_suggestions_table::*;
 pub use my_photo_type::MyPhoto;
 pub use my_photos_table::*;
 pub use my_roles_table::*;
@@ -423,6 +484,9 @@ pub use my_shared_visit_type::MySharedVisit;
 pub use my_shared_visits_table::*;
 pub use my_visit_type::MyVisit;
 pub use my_visits_table::*;
+pub use my_wallet_entries_table::*;
+pub use my_wallet_table::*;
+pub use my_wallet_type::MyWallet;
 pub use open_api_session_reducer::open_api_session;
 pub use open_claim_reducer::open_claim;
 pub use open_incident_reducer::open_incident;
@@ -454,6 +518,7 @@ pub use property_event_type::PropertyEvent;
 pub use record_claim_payout_reducer::record_claim_payout;
 pub use record_insurer_payment_reducer::record_insurer_payment;
 pub use record_model_call_reducer::record_model_call;
+pub use record_wallet_reducer::record_wallet;
 pub use refuse_claim_reducer::refuse_claim;
 pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
@@ -484,6 +549,7 @@ pub use set_thresholds_reducer::set_thresholds;
 pub use set_zone_station_reducer::set_zone_station;
 pub use settings_table::*;
 pub use settings_type::Settings;
+pub use settle_merch_order_reducer::settle_merch_order;
 pub use settlement_rule_row_type::SettlementRuleRow;
 pub use settlement_rule_table::*;
 pub use shared_visit_table::*;
@@ -534,6 +600,8 @@ pub use vision_assessment_table::*;
 pub use vision_assessment_type::VisionAssessment;
 pub use visit_table::*;
 pub use visit_type::Visit;
+pub use wallet_entry_table::*;
+pub use wallet_entry_type::WalletEntry;
 pub use watch_bands_reducer::watch_bands;
 pub use worker_jobs_table::*;
 pub use zone_in_type::ZoneIn;
@@ -581,6 +649,11 @@ pub enum Reducer {
         job_id: u64,
         recovery_hash: String,
         call: Option<ModelCallIn>,
+    },
+    BuyMerch {
+        template_id: u64,
+        photo_id: u64,
+        size: String,
     },
     ClaimBand {
         token: String,
@@ -661,6 +734,9 @@ pub enum Reducer {
     JobReaper {
         timer: JobReaperTimer,
     },
+    LoadMerchTemplates {
+        templates: Vec<MerchTemplateIn>,
+    },
     OpenApiSession {
         token_hash: String,
     },
@@ -692,6 +768,11 @@ pub enum Reducer {
     },
     RecordModelCall {
         call: ModelCallIn,
+    },
+    RecordWallet {
+        job_id: u64,
+        customer_id: String,
+        account_id: String,
     },
     RefuseClaim {
         claim_id: u64,
@@ -806,6 +887,11 @@ pub enum Reducer {
         zone_id: u64,
         station_id: u8,
     },
+    SettleMerchOrder {
+        job_id: u64,
+        merchant_id: String,
+        purchase_id: String,
+    },
     SleepBands {
         target: u8,
         minutes: u8,
@@ -902,6 +988,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AssignMedic { .. } => "assign_medic",
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
+            Reducer::BuyMerch { .. } => "buy_merch",
             Reducer::ClaimBand { .. } => "claim_band",
             Reducer::ClaimJob { .. } => "claim_job",
             Reducer::ClaimPerson { .. } => "claim_person",
@@ -925,6 +1012,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::IngestHeard { .. } => "ingest_heard",
             Reducer::IngestStation { .. } => "ingest_station",
             Reducer::JobReaper { .. } => "job_reaper",
+            Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
             Reducer::OpenIncident { .. } => "open_incident",
@@ -932,6 +1020,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RecordClaimPayout { .. } => "record_claim_payout",
             Reducer::RecordInsurerPayment { .. } => "record_insurer_payment",
             Reducer::RecordModelCall { .. } => "record_model_call",
+            Reducer::RecordWallet { .. } => "record_wallet",
             Reducer::RefuseClaim { .. } => "refuse_claim",
             Reducer::RegisterBlob { .. } => "register_blob",
             Reducer::RegisterBridge => "register_bridge",
@@ -956,6 +1045,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SetSocialHandle { .. } => "set_social_handle",
             Reducer::SetThresholds { .. } => "set_thresholds",
             Reducer::SetZoneStation { .. } => "set_zone_station",
+            Reducer::SettleMerchOrder { .. } => "settle_merch_order",
             Reducer::SleepBands { .. } => "sleep_bands",
             Reducer::SocialTick { .. } => "social_tick",
             Reducer::StartCrowd { .. } => "start_crowd",
@@ -1037,6 +1127,15 @@ impl __sdk::Reducer for Reducer {
                 job_id: job_id.clone(),
                 recovery_hash: recovery_hash.clone(),
                 call: call.clone(),
+            }),
+            Reducer::BuyMerch {
+                template_id,
+                photo_id,
+                size,
+            } => __sats::bsatn::to_vec(&buy_merch_reducer::BuyMerchArgs {
+                template_id: template_id.clone(),
+                photo_id: photo_id.clone(),
+                size: size.clone(),
             }),
             Reducer::ClaimBand { token } => {
                 __sats::bsatn::to_vec(&claim_band_reducer::ClaimBandArgs {
@@ -1170,6 +1269,11 @@ impl __sdk::Reducer for Reducer {
                     timer: timer.clone(),
                 })
             }
+            Reducer::LoadMerchTemplates { templates } => {
+                __sats::bsatn::to_vec(&load_merch_templates_reducer::LoadMerchTemplatesArgs {
+                    templates: templates.clone(),
+                })
+            }
             Reducer::OpenApiSession { token_hash } => {
                 __sats::bsatn::to_vec(&open_api_session_reducer::OpenApiSessionArgs {
                     token_hash: token_hash.clone(),
@@ -1227,6 +1331,15 @@ impl __sdk::Reducer for Reducer {
                     call: call.clone(),
                 })
             }
+            Reducer::RecordWallet {
+                job_id,
+                customer_id,
+                account_id,
+            } => __sats::bsatn::to_vec(&record_wallet_reducer::RecordWalletArgs {
+                job_id: job_id.clone(),
+                customer_id: customer_id.clone(),
+                account_id: account_id.clone(),
+            }),
             Reducer::RefuseClaim {
                 claim_id,
                 pack_hash_seen,
@@ -1426,6 +1539,15 @@ impl __sdk::Reducer for Reducer {
                 zone_id: zone_id.clone(),
                 station_id: station_id.clone(),
             }),
+            Reducer::SettleMerchOrder {
+                job_id,
+                merchant_id,
+                purchase_id,
+            } => __sats::bsatn::to_vec(&settle_merch_order_reducer::SettleMerchOrderArgs {
+                job_id: job_id.clone(),
+                merchant_id: merchant_id.clone(),
+                purchase_id: purchase_id.clone(),
+            }),
             Reducer::SleepBands { target, minutes } => {
                 __sats::bsatn::to_vec(&sleep_bands_reducer::SleepBandsArgs {
                     target: target.clone(),
@@ -1591,6 +1713,18 @@ pub struct DbUpdate {
     band_claim: __sdk::TableUpdate<BandClaim>,
     band_owner: __sdk::TableUpdate<BandOwner>,
     blob_ref: __sdk::TableUpdate<BlobRef>,
+    board_approvals: __sdk::TableUpdate<Approval>,
+    board_authority: __sdk::TableUpdate<AuthorityLimitRow>,
+    board_checks: __sdk::TableUpdate<ClaimCheck>,
+    board_facts: __sdk::TableUpdate<EvidenceFact>,
+    board_ledger: __sdk::TableUpdate<LedgerEntry>,
+    board_lines: __sdk::TableUpdate<ClaimLine>,
+    board_notes: __sdk::TableUpdate<IncidentNote>,
+    board_policies: __sdk::TableUpdate<InsurancePolicy>,
+    board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
+    board_records: __sdk::TableUpdate<MedicalRecord>,
+    board_reviews: __sdk::TableUpdate<ClaimReview>,
+    board_rules: __sdk::TableUpdate<SettlementRuleRow>,
     booth: __sdk::TableUpdate<Booth>,
     bridge: __sdk::TableUpdate<Bridge>,
     camera: __sdk::TableUpdate<Camera>,
@@ -1606,6 +1740,7 @@ pub struct DbUpdate {
     claim_reviews: __sdk::TableUpdate<ClaimReview>,
     claimant_account: __sdk::TableUpdate<ClaimantAccount>,
     claimed_people: __sdk::TableUpdate<ClaimedPerson>,
+    claims_board: __sdk::TableUpdate<Claim>,
     command: __sdk::TableUpdate<Command>,
     coverage_rule: __sdk::TableUpdate<CoverageRuleRow>,
     crowd_member: __sdk::TableUpdate<CrowdMember>,
@@ -1630,17 +1765,25 @@ pub struct DbUpdate {
     ledger_entry: __sdk::TableUpdate<LedgerEntry>,
     link: __sdk::TableUpdate<Link>,
     medical_record: __sdk::TableUpdate<MedicalRecord>,
+    merch_order: __sdk::TableUpdate<MerchOrder>,
+    merch_shop: __sdk::TableUpdate<MerchShop>,
+    merch_template: __sdk::TableUpdate<MerchTemplate>,
     model_call: __sdk::TableUpdate<ModelCall>,
     my_attendee: __sdk::TableUpdate<Attendee>,
     my_band: __sdk::TableUpdate<MyBand>,
     my_claim_queue: __sdk::TableUpdate<Claim>,
+    my_claims: __sdk::TableUpdate<MyClaim>,
     my_encounters: __sdk::TableUpdate<MyEncounter>,
     my_graph: __sdk::TableUpdate<GraphLink>,
     my_handles: __sdk::TableUpdate<SocialHandle>,
+    my_merch_orders: __sdk::TableUpdate<MerchOrder>,
+    my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
     my_roles: __sdk::TableUpdate<StaffRole>,
     my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
     my_visits: __sdk::TableUpdate<MyVisit>,
+    my_wallet: __sdk::TableUpdate<MyWallet>,
+    my_wallet_entries: __sdk::TableUpdate<WalletEntry>,
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
     owner: __sdk::TableUpdate<Owner>,
@@ -1673,6 +1816,7 @@ pub struct DbUpdate {
     venue: __sdk::TableUpdate<Venue>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
+    wallet_entry: __sdk::TableUpdate<WalletEntry>,
     worker_jobs: __sdk::TableUpdate<Job>,
     zone: __sdk::TableUpdate<Zone>,
     zone_visit: __sdk::TableUpdate<ZoneVisit>,
@@ -1711,6 +1855,42 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "blob_ref" => db_update
                     .blob_ref
                     .append(blob_ref_table::parse_table_update(table_update)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(board_approvals_table::parse_table_update(table_update)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(board_authority_table::parse_table_update(table_update)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(board_checks_table::parse_table_update(table_update)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(board_facts_table::parse_table_update(table_update)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(board_ledger_table::parse_table_update(table_update)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(board_lines_table::parse_table_update(table_update)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(board_notes_table::parse_table_update(table_update)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(board_policies_table::parse_table_update(table_update)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(board_precedents_table::parse_table_update(table_update)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(board_records_table::parse_table_update(table_update)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(board_reviews_table::parse_table_update(table_update)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(board_rules_table::parse_table_update(table_update)?),
                 "booth" => db_update
                     .booth
                     .append(booth_table::parse_table_update(table_update)?),
@@ -1756,6 +1936,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "claimed_people" => db_update
                     .claimed_people
                     .append(claimed_people_table::parse_table_update(table_update)?),
+                "claims_board" => db_update
+                    .claims_board
+                    .append(claims_board_table::parse_table_update(table_update)?),
                 "command" => db_update
                     .command
                     .append(command_table::parse_table_update(table_update)?),
@@ -1828,6 +2011,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "medical_record" => db_update
                     .medical_record
                     .append(medical_record_table::parse_table_update(table_update)?),
+                "merch_order" => db_update
+                    .merch_order
+                    .append(merch_order_table::parse_table_update(table_update)?),
+                "merch_shop" => db_update
+                    .merch_shop
+                    .append(merch_shop_table::parse_table_update(table_update)?),
+                "merch_template" => db_update
+                    .merch_template
+                    .append(merch_template_table::parse_table_update(table_update)?),
                 "model_call" => db_update
                     .model_call
                     .append(model_call_table::parse_table_update(table_update)?),
@@ -1840,6 +2032,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_claim_queue" => db_update
                     .my_claim_queue
                     .append(my_claim_queue_table::parse_table_update(table_update)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(my_claims_table::parse_table_update(table_update)?),
                 "my_encounters" => db_update
                     .my_encounters
                     .append(my_encounters_table::parse_table_update(table_update)?),
@@ -1849,6 +2044,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_handles" => db_update
                     .my_handles
                     .append(my_handles_table::parse_table_update(table_update)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(my_merch_orders_table::parse_table_update(table_update)?),
+                "my_merch_suggestions" => db_update.my_merch_suggestions.append(
+                    my_merch_suggestions_table::parse_table_update(table_update)?,
+                ),
                 "my_photos" => db_update
                     .my_photos
                     .append(my_photos_table::parse_table_update(table_update)?),
@@ -1861,6 +2062,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_visits" => db_update
                     .my_visits
                     .append(my_visits_table::parse_table_update(table_update)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(my_wallet_table::parse_table_update(table_update)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
+                    .append(my_wallet_entries_table::parse_table_update(table_update)?),
                 "open_incidents" => db_update
                     .open_incidents
                     .append(open_incidents_table::parse_table_update(table_update)?),
@@ -1957,6 +2164,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "visit" => db_update
                     .visit
                     .append(visit_table::parse_table_update(table_update)?),
+                "wallet_entry" => db_update
+                    .wallet_entry
+                    .append(wallet_entry_table::parse_table_update(table_update)?),
                 "worker_jobs" => db_update
                     .worker_jobs
                     .append(worker_jobs_table::parse_table_update(table_update)?),
@@ -2115,6 +2325,15 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.medical_record = cache
             .apply_diff_to_table::<MedicalRecord>("medical_record", &self.medical_record)
             .with_updates_by_pk(|row| &row.id);
+        diff.merch_order = cache
+            .apply_diff_to_table::<MerchOrder>("merch_order", &self.merch_order)
+            .with_updates_by_pk(|row| &row.id);
+        diff.merch_shop = cache
+            .apply_diff_to_table::<MerchShop>("merch_shop", &self.merch_shop)
+            .with_updates_by_pk(|row| &row.id);
+        diff.merch_template = cache
+            .apply_diff_to_table::<MerchTemplate>("merch_template", &self.merch_template)
+            .with_updates_by_pk(|row| &row.id);
         diff.model_call = cache
             .apply_diff_to_table::<ModelCall>("model_call", &self.model_call)
             .with_updates_by_pk(|row| &row.id);
@@ -2187,6 +2406,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.visit = cache
             .apply_diff_to_table::<Visit>("visit", &self.visit)
             .with_updates_by_pk(|row| &row.zone_visit_id);
+        diff.wallet_entry = cache
+            .apply_diff_to_table::<WalletEntry>("wallet_entry", &self.wallet_entry)
+            .with_updates_by_pk(|row| &row.id);
         diff.zone = cache
             .apply_diff_to_table::<Zone>("zone", &self.zone)
             .with_updates_by_pk(|row| &row.id);
@@ -2195,6 +2417,32 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.api_sessions =
             cache.apply_diff_to_table::<ApiSession>("api_sessions", &self.api_sessions);
+        diff.board_approvals =
+            cache.apply_diff_to_table::<Approval>("board_approvals", &self.board_approvals);
+        diff.board_authority = cache
+            .apply_diff_to_table::<AuthorityLimitRow>("board_authority", &self.board_authority)
+            .with_updates_by_pk(|row| &row.role);
+        diff.board_checks =
+            cache.apply_diff_to_table::<ClaimCheck>("board_checks", &self.board_checks);
+        diff.board_facts =
+            cache.apply_diff_to_table::<EvidenceFact>("board_facts", &self.board_facts);
+        diff.board_ledger =
+            cache.apply_diff_to_table::<LedgerEntry>("board_ledger", &self.board_ledger);
+        diff.board_lines = cache.apply_diff_to_table::<ClaimLine>("board_lines", &self.board_lines);
+        diff.board_notes =
+            cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
+        diff.board_policies = cache
+            .apply_diff_to_table::<InsurancePolicy>("board_policies", &self.board_policies)
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_precedents =
+            cache.apply_diff_to_table::<ClaimPrecedent>("board_precedents", &self.board_precedents);
+        diff.board_records =
+            cache.apply_diff_to_table::<MedicalRecord>("board_records", &self.board_records);
+        diff.board_reviews =
+            cache.apply_diff_to_table::<ClaimReview>("board_reviews", &self.board_reviews);
+        diff.board_rules = cache
+            .apply_diff_to_table::<SettlementRuleRow>("board_rules", &self.board_rules)
+            .with_updates_by_pk(|row| &row.id);
         diff.claim_checks =
             cache.apply_diff_to_table::<ClaimCheck>("claim_checks", &self.claim_checks);
         diff.claim_facts =
@@ -2206,6 +2454,7 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<ClaimReview>("claim_reviews", &self.claim_reviews);
         diff.claimed_people =
             cache.apply_diff_to_table::<ClaimedPerson>("claimed_people", &self.claimed_people);
+        diff.claims_board = cache.apply_diff_to_table::<Claim>("claims_board", &self.claims_board);
         diff.event_graph = cache.apply_diff_to_table::<EventLink>("event_graph", &self.event_graph);
         diff.incident_bands =
             cache.apply_diff_to_table::<IncidentBand>("incident_bands", &self.incident_bands);
@@ -2213,15 +2462,25 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.my_band = cache.apply_diff_to_table::<MyBand>("my_band", &self.my_band);
         diff.my_claim_queue =
             cache.apply_diff_to_table::<Claim>("my_claim_queue", &self.my_claim_queue);
+        diff.my_claims = cache.apply_diff_to_table::<MyClaim>("my_claims", &self.my_claims);
         diff.my_encounters =
             cache.apply_diff_to_table::<MyEncounter>("my_encounters", &self.my_encounters);
         diff.my_graph = cache.apply_diff_to_table::<GraphLink>("my_graph", &self.my_graph);
         diff.my_handles = cache.apply_diff_to_table::<SocialHandle>("my_handles", &self.my_handles);
+        diff.my_merch_orders =
+            cache.apply_diff_to_table::<MerchOrder>("my_merch_orders", &self.my_merch_orders);
+        diff.my_merch_suggestions = cache.apply_diff_to_table::<MerchSuggestion>(
+            "my_merch_suggestions",
+            &self.my_merch_suggestions,
+        );
         diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
         diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
         diff.my_shared_visits =
             cache.apply_diff_to_table::<MySharedVisit>("my_shared_visits", &self.my_shared_visits);
         diff.my_visits = cache.apply_diff_to_table::<MyVisit>("my_visits", &self.my_visits);
+        diff.my_wallet = cache.apply_diff_to_table::<MyWallet>("my_wallet", &self.my_wallet);
+        diff.my_wallet_entries =
+            cache.apply_diff_to_table::<WalletEntry>("my_wallet_entries", &self.my_wallet_entries);
         diff.open_incidents =
             cache.apply_diff_to_table::<Incident>("open_incidents", &self.open_incidents);
         diff.social_attendees =
@@ -2275,6 +2534,42 @@ impl __sdk::DbUpdate for DbUpdate {
                 "blob_ref" => db_update
                     .blob_ref
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "booth" => db_update
                     .booth
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2319,6 +2614,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "claimed_people" => db_update
                     .claimed_people
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claims_board" => db_update
+                    .claims_board
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "command" => db_update
                     .command
@@ -2392,6 +2690,15 @@ impl __sdk::DbUpdate for DbUpdate {
                 "medical_record" => db_update
                     .medical_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "merch_order" => db_update
+                    .merch_order
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "merch_shop" => db_update
+                    .merch_shop
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "merch_template" => db_update
+                    .merch_template
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "model_call" => db_update
                     .model_call
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2404,6 +2711,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_claim_queue" => db_update
                     .my_claim_queue
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_encounters" => db_update
                     .my_encounters
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2412,6 +2722,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_handles" => db_update
                     .my_handles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_merch_suggestions" => db_update
+                    .my_merch_suggestions
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_photos" => db_update
                     .my_photos
@@ -2424,6 +2740,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_visits" => db_update
                     .my_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "open_incidents" => db_update
                     .open_incidents
@@ -2520,6 +2842,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "visit" => db_update
                     .visit
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "wallet_entry" => db_update
+                    .wallet_entry
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "worker_jobs" => db_update
                     .worker_jobs
@@ -2570,6 +2895,42 @@ impl __sdk::DbUpdate for DbUpdate {
                 "blob_ref" => db_update
                     .blob_ref
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "booth" => db_update
                     .booth
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2614,6 +2975,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "claimed_people" => db_update
                     .claimed_people
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claims_board" => db_update
+                    .claims_board
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "command" => db_update
                     .command
@@ -2687,6 +3051,15 @@ impl __sdk::DbUpdate for DbUpdate {
                 "medical_record" => db_update
                     .medical_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "merch_order" => db_update
+                    .merch_order
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "merch_shop" => db_update
+                    .merch_shop
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "merch_template" => db_update
+                    .merch_template
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "model_call" => db_update
                     .model_call
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2699,6 +3072,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_claim_queue" => db_update
                     .my_claim_queue
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_encounters" => db_update
                     .my_encounters
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2707,6 +3083,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_handles" => db_update
                     .my_handles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_merch_suggestions" => db_update
+                    .my_merch_suggestions
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_photos" => db_update
                     .my_photos
@@ -2719,6 +3101,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_visits" => db_update
                     .my_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "open_incidents" => db_update
                     .open_incidents
@@ -2816,6 +3204,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "visit" => db_update
                     .visit
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "wallet_entry" => db_update
+                    .wallet_entry
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "worker_jobs" => db_update
                     .worker_jobs
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2849,6 +3240,18 @@ pub struct AppliedDiff<'r> {
     band_claim: __sdk::TableAppliedDiff<'r, BandClaim>,
     band_owner: __sdk::TableAppliedDiff<'r, BandOwner>,
     blob_ref: __sdk::TableAppliedDiff<'r, BlobRef>,
+    board_approvals: __sdk::TableAppliedDiff<'r, Approval>,
+    board_authority: __sdk::TableAppliedDiff<'r, AuthorityLimitRow>,
+    board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
+    board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
+    board_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
+    board_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
+    board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
+    board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
+    board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
+    board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
+    board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
+    board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
     booth: __sdk::TableAppliedDiff<'r, Booth>,
     bridge: __sdk::TableAppliedDiff<'r, Bridge>,
     camera: __sdk::TableAppliedDiff<'r, Camera>,
@@ -2864,6 +3267,7 @@ pub struct AppliedDiff<'r> {
     claim_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
     claimant_account: __sdk::TableAppliedDiff<'r, ClaimantAccount>,
     claimed_people: __sdk::TableAppliedDiff<'r, ClaimedPerson>,
+    claims_board: __sdk::TableAppliedDiff<'r, Claim>,
     command: __sdk::TableAppliedDiff<'r, Command>,
     coverage_rule: __sdk::TableAppliedDiff<'r, CoverageRuleRow>,
     crowd_member: __sdk::TableAppliedDiff<'r, CrowdMember>,
@@ -2888,17 +3292,25 @@ pub struct AppliedDiff<'r> {
     ledger_entry: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     link: __sdk::TableAppliedDiff<'r, Link>,
     medical_record: __sdk::TableAppliedDiff<'r, MedicalRecord>,
+    merch_order: __sdk::TableAppliedDiff<'r, MerchOrder>,
+    merch_shop: __sdk::TableAppliedDiff<'r, MerchShop>,
+    merch_template: __sdk::TableAppliedDiff<'r, MerchTemplate>,
     model_call: __sdk::TableAppliedDiff<'r, ModelCall>,
     my_attendee: __sdk::TableAppliedDiff<'r, Attendee>,
     my_band: __sdk::TableAppliedDiff<'r, MyBand>,
     my_claim_queue: __sdk::TableAppliedDiff<'r, Claim>,
+    my_claims: __sdk::TableAppliedDiff<'r, MyClaim>,
     my_encounters: __sdk::TableAppliedDiff<'r, MyEncounter>,
     my_graph: __sdk::TableAppliedDiff<'r, GraphLink>,
     my_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    my_merch_orders: __sdk::TableAppliedDiff<'r, MerchOrder>,
+    my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
     my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
     my_visits: __sdk::TableAppliedDiff<'r, MyVisit>,
+    my_wallet: __sdk::TableAppliedDiff<'r, MyWallet>,
+    my_wallet_entries: __sdk::TableAppliedDiff<'r, WalletEntry>,
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     owner: __sdk::TableAppliedDiff<'r, Owner>,
@@ -2931,6 +3343,7 @@ pub struct AppliedDiff<'r> {
     venue: __sdk::TableAppliedDiff<'r, Venue>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
+    wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
     worker_jobs: __sdk::TableAppliedDiff<'r, Job>,
     zone: __sdk::TableAppliedDiff<'r, Zone>,
     zone_visit: __sdk::TableAppliedDiff<'r, ZoneVisit>,
@@ -2964,6 +3377,62 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<BandClaim>("band_claim", &self.band_claim, event);
         callbacks.invoke_table_row_callbacks::<BandOwner>("band_owner", &self.band_owner, event);
         callbacks.invoke_table_row_callbacks::<BlobRef>("blob_ref", &self.blob_ref, event);
+        callbacks.invoke_table_row_callbacks::<Approval>(
+            "board_approvals",
+            &self.board_approvals,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<AuthorityLimitRow>(
+            "board_authority",
+            &self.board_authority,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimCheck>(
+            "board_checks",
+            &self.board_checks,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<EvidenceFact>(
+            "board_facts",
+            &self.board_facts,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LedgerEntry>(
+            "board_ledger",
+            &self.board_ledger,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimLine>("board_lines", &self.board_lines, event);
+        callbacks.invoke_table_row_callbacks::<IncidentNote>(
+            "board_notes",
+            &self.board_notes,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<InsurancePolicy>(
+            "board_policies",
+            &self.board_policies,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimPrecedent>(
+            "board_precedents",
+            &self.board_precedents,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalRecord>(
+            "board_records",
+            &self.board_records,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimReview>(
+            "board_reviews",
+            &self.board_reviews,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SettlementRuleRow>(
+            "board_rules",
+            &self.board_rules,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Booth>("booth", &self.booth, event);
         callbacks.invoke_table_row_callbacks::<Bridge>("bridge", &self.bridge, event);
         callbacks.invoke_table_row_callbacks::<Camera>("camera", &self.camera, event);
@@ -3011,6 +3480,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.claimed_people,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Claim>("claims_board", &self.claims_board, event);
         callbacks.invoke_table_row_callbacks::<Command>("command", &self.command, event);
         callbacks.invoke_table_row_callbacks::<CoverageRuleRow>(
             "coverage_rule",
@@ -3091,6 +3561,13 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.medical_record,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<MerchOrder>("merch_order", &self.merch_order, event);
+        callbacks.invoke_table_row_callbacks::<MerchShop>("merch_shop", &self.merch_shop, event);
+        callbacks.invoke_table_row_callbacks::<MerchTemplate>(
+            "merch_template",
+            &self.merch_template,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<ModelCall>("model_call", &self.model_call, event);
         callbacks.invoke_table_row_callbacks::<Attendee>("my_attendee", &self.my_attendee, event);
         callbacks.invoke_table_row_callbacks::<MyBand>("my_band", &self.my_band, event);
@@ -3099,6 +3576,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.my_claim_queue,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<MyClaim>("my_claims", &self.my_claims, event);
         callbacks.invoke_table_row_callbacks::<MyEncounter>(
             "my_encounters",
             &self.my_encounters,
@@ -3106,6 +3584,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<GraphLink>("my_graph", &self.my_graph, event);
         callbacks.invoke_table_row_callbacks::<SocialHandle>("my_handles", &self.my_handles, event);
+        callbacks.invoke_table_row_callbacks::<MerchOrder>(
+            "my_merch_orders",
+            &self.my_merch_orders,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MerchSuggestion>(
+            "my_merch_suggestions",
+            &self.my_merch_suggestions,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
         callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
         callbacks.invoke_table_row_callbacks::<MySharedVisit>(
@@ -3114,6 +3602,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<MyVisit>("my_visits", &self.my_visits, event);
+        callbacks.invoke_table_row_callbacks::<MyWallet>("my_wallet", &self.my_wallet, event);
+        callbacks.invoke_table_row_callbacks::<WalletEntry>(
+            "my_wallet_entries",
+            &self.my_wallet_entries,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Incident>(
             "open_incidents",
             &self.open_incidents,
@@ -3218,6 +3712,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Visit>("visit", &self.visit, event);
+        callbacks.invoke_table_row_callbacks::<WalletEntry>(
+            "wallet_entry",
+            &self.wallet_entry,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Job>("worker_jobs", &self.worker_jobs, event);
         callbacks.invoke_table_row_callbacks::<Zone>("zone", &self.zone, event);
         callbacks.invoke_table_row_callbacks::<ZoneVisit>("zone_visit", &self.zone_visit, event);
@@ -3890,6 +4389,18 @@ impl __sdk::SpacetimeModule for RemoteModule {
         band_claim_table::register_table(client_cache);
         band_owner_table::register_table(client_cache);
         blob_ref_table::register_table(client_cache);
+        board_approvals_table::register_table(client_cache);
+        board_authority_table::register_table(client_cache);
+        board_checks_table::register_table(client_cache);
+        board_facts_table::register_table(client_cache);
+        board_ledger_table::register_table(client_cache);
+        board_lines_table::register_table(client_cache);
+        board_notes_table::register_table(client_cache);
+        board_policies_table::register_table(client_cache);
+        board_precedents_table::register_table(client_cache);
+        board_records_table::register_table(client_cache);
+        board_reviews_table::register_table(client_cache);
+        board_rules_table::register_table(client_cache);
         booth_table::register_table(client_cache);
         bridge_table::register_table(client_cache);
         camera_table::register_table(client_cache);
@@ -3905,6 +4416,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         claim_reviews_table::register_table(client_cache);
         claimant_account_table::register_table(client_cache);
         claimed_people_table::register_table(client_cache);
+        claims_board_table::register_table(client_cache);
         command_table::register_table(client_cache);
         coverage_rule_table::register_table(client_cache);
         crowd_member_table::register_table(client_cache);
@@ -3929,17 +4441,25 @@ impl __sdk::SpacetimeModule for RemoteModule {
         ledger_entry_table::register_table(client_cache);
         link_table::register_table(client_cache);
         medical_record_table::register_table(client_cache);
+        merch_order_table::register_table(client_cache);
+        merch_shop_table::register_table(client_cache);
+        merch_template_table::register_table(client_cache);
         model_call_table::register_table(client_cache);
         my_attendee_table::register_table(client_cache);
         my_band_table::register_table(client_cache);
         my_claim_queue_table::register_table(client_cache);
+        my_claims_table::register_table(client_cache);
         my_encounters_table::register_table(client_cache);
         my_graph_table::register_table(client_cache);
         my_handles_table::register_table(client_cache);
+        my_merch_orders_table::register_table(client_cache);
+        my_merch_suggestions_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
         my_roles_table::register_table(client_cache);
         my_shared_visits_table::register_table(client_cache);
         my_visits_table::register_table(client_cache);
+        my_wallet_table::register_table(client_cache);
+        my_wallet_entries_table::register_table(client_cache);
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         owner_table::register_table(client_cache);
@@ -3972,6 +4492,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         venue_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
+        wallet_entry_table::register_table(client_cache);
         worker_jobs_table::register_table(client_cache);
         zone_table::register_table(client_cache);
         zone_visit_table::register_table(client_cache);
@@ -3986,6 +4507,18 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "band_claim",
         "band_owner",
         "blob_ref",
+        "board_approvals",
+        "board_authority",
+        "board_checks",
+        "board_facts",
+        "board_ledger",
+        "board_lines",
+        "board_notes",
+        "board_policies",
+        "board_precedents",
+        "board_records",
+        "board_reviews",
+        "board_rules",
         "booth",
         "bridge",
         "camera",
@@ -3996,6 +4529,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "claim_review",
         "claimant_account",
         "claimed_people",
+        "claims_board",
         "command",
         "coverage_rule",
         "crowd_member",
@@ -4019,17 +4553,25 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "ledger_entry",
         "link",
         "medical_record",
+        "merch_order",
+        "merch_shop",
+        "merch_template",
         "model_call",
         "my_attendee",
         "my_band",
         "my_claim_queue",
+        "my_claims",
         "my_encounters",
         "my_graph",
         "my_handles",
+        "my_merch_orders",
+        "my_merch_suggestions",
         "my_photos",
         "my_roles",
         "my_shared_visits",
         "my_visits",
+        "my_wallet",
+        "my_wallet_entries",
         "open_incidents",
         "organization",
         "owner",
@@ -4062,6 +4604,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "venue",
         "vision_assessment",
         "visit",
+        "wallet_entry",
         "worker_jobs",
         "zone",
         "zone_visit",

@@ -83,6 +83,7 @@ pub fn update_profile(ctx: &ReducerContext, display_name: String, findable: bool
     if a.findable != old.findable {
         relink(ctx, &a);
     }
+    crate::wallet::open_for(ctx, &a);
     Ok(())
 }
 

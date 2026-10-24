@@ -20,6 +20,8 @@ pub enum Finish {
     ClaimLetters { fnol_hash: String, summary_hash: String, determination_hash: String },
     RecoveryLetter { hash: String },
     ClaimPayout { customer_id: String, account_id: String, deposit_id: String },
+    WalletOpened { customer_id: String, account_id: String },
+    MerchPaid { merchant_id: String, purchase_id: String },
 }
 
 pub enum Sink {
@@ -100,6 +102,8 @@ impl Sink {
             Finish::ClaimPayout { customer_id, account_id, deposit_id } => {
                 reduce!(conn, record_claim_payout_then(job_id, customer_id, account_id, deposit_id))
             }
+            Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
+            Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -165,6 +169,8 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         Finish::ClaimPayout { customer_id, account_id, deposit_id } => {
             ("record_claim_payout", json!({"customer_id": customer_id, "account_id": account_id, "deposit_id": deposit_id}))
         }
+        Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
+        Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);
