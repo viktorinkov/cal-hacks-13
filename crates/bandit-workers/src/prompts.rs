@@ -47,8 +47,9 @@ Verdict:
 - inconsistent: the evidence contradicts the claim.
 
 Each fact line reads [seq] source/key = value (reader, local time). The time is when the fact was observed or \
-recorded: for medical_record facts it is when the record was read, not when the care was given (that is \
-record_date_of_service).
+recorded: for medical_record facts it is the encounter's date and time as printed on the record (noon when \
+the record gives no time), so a first-aid visit comes minutes after the incident and an urgent-care visit can \
+be the next day.
 
 Rules:
 - Cite facts by seq in cited_fact_ids and in each concern's fact_ids, and cite only seqs listed in <facts>.
