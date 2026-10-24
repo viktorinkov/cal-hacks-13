@@ -10,6 +10,7 @@ pub mod add_incident_note_reducer;
 pub mod api_session_table;
 pub mod api_session_type;
 pub mod api_sessions_table;
+pub mod apply_medical_extract_reducer;
 pub mod apply_medical_record_reducer;
 pub mod approval_table;
 pub mod approval_type;
@@ -38,6 +39,7 @@ pub mod board_checks_table;
 pub mod board_facts_table;
 pub mod board_ledger_table;
 pub mod board_lines_table;
+pub mod board_medical_access_table;
 pub mod board_notes_table;
 pub mod board_policies_table;
 pub mod board_precedents_table;
@@ -84,6 +86,7 @@ pub mod command_sent_reducer;
 pub mod command_table;
 pub mod command_type;
 pub mod complete_job_reducer;
+pub mod confirm_medical_card_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
 pub mod crowd_member_table;
@@ -152,6 +155,14 @@ pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
 pub mod load_merch_templates_reducer;
+pub mod medic_card_type;
+pub mod medic_medical_cards_table;
+pub mod medical_access_log_table;
+pub mod medical_access_log_type;
+pub mod medical_card_table;
+pub mod medical_card_type;
+pub mod medical_document_table;
+pub mod medical_document_type;
 pub mod medical_record_table;
 pub mod medical_record_type;
 pub mod merch_order_table;
@@ -175,6 +186,8 @@ pub mod my_encounter_type;
 pub mod my_encounters_table;
 pub mod my_graph_table;
 pub mod my_handles_table;
+pub mod my_medical_card_table;
+pub mod my_medical_documents_table;
 pub mod my_merch_orders_table;
 pub mod my_merch_suggestions_table;
 pub mod my_photo_type;
@@ -224,6 +237,7 @@ pub mod remove_social_handle_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
 pub mod report_sim_band_reducer;
+pub mod request_medical_card_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
@@ -278,6 +292,7 @@ pub mod stop_crowd_reducer;
 pub mod stop_find_reducer;
 pub mod submit_claim_checks_reducer;
 pub mod submit_claim_review_reducer;
+pub mod submit_medical_document_reducer;
 pub mod submit_medical_record_reducer;
 pub mod submit_vision_assessment_reducer;
 pub mod sweep_reducer;
@@ -308,6 +323,7 @@ pub use add_incident_note_reducer::add_incident_note;
 pub use api_session_table::*;
 pub use api_session_type::ApiSession;
 pub use api_sessions_table::*;
+pub use apply_medical_extract_reducer::apply_medical_extract;
 pub use apply_medical_record_reducer::apply_medical_record;
 pub use approval_table::*;
 pub use approval_type::Approval;
@@ -336,6 +352,7 @@ pub use board_checks_table::*;
 pub use board_facts_table::*;
 pub use board_ledger_table::*;
 pub use board_lines_table::*;
+pub use board_medical_access_table::*;
 pub use board_notes_table::*;
 pub use board_policies_table::*;
 pub use board_precedents_table::*;
@@ -382,6 +399,7 @@ pub use command_sent_reducer::command_sent;
 pub use command_table::*;
 pub use command_type::Command;
 pub use complete_job_reducer::complete_job;
+pub use confirm_medical_card_reducer::confirm_medical_card;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
 pub use crowd_member_table::*;
@@ -450,6 +468,14 @@ pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
 pub use load_merch_templates_reducer::load_merch_templates;
+pub use medic_card_type::MedicCard;
+pub use medic_medical_cards_table::*;
+pub use medical_access_log_table::*;
+pub use medical_access_log_type::MedicalAccessLog;
+pub use medical_card_table::*;
+pub use medical_card_type::MedicalCard;
+pub use medical_document_table::*;
+pub use medical_document_type::MedicalDocument;
 pub use medical_record_table::*;
 pub use medical_record_type::MedicalRecord;
 pub use merch_order_table::*;
@@ -473,6 +499,8 @@ pub use my_encounter_type::MyEncounter;
 pub use my_encounters_table::*;
 pub use my_graph_table::*;
 pub use my_handles_table::*;
+pub use my_medical_card_table::*;
+pub use my_medical_documents_table::*;
 pub use my_merch_orders_table::*;
 pub use my_merch_suggestions_table::*;
 pub use my_photo_type::MyPhoto;
@@ -522,6 +550,7 @@ pub use remove_social_handle_reducer::remove_social_handle;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
 pub use report_sim_band_reducer::report_sim_band;
+pub use request_medical_card_reducer::request_medical_card;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
@@ -576,6 +605,7 @@ pub use stop_crowd_reducer::stop_crowd;
 pub use stop_find_reducer::stop_find;
 pub use submit_claim_checks_reducer::submit_claim_checks;
 pub use submit_claim_review_reducer::submit_claim_review;
+pub use submit_medical_document_reducer::submit_medical_document;
 pub use submit_medical_record_reducer::submit_medical_record;
 pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use sweep_reducer::sweep;
@@ -614,6 +644,11 @@ pub enum Reducer {
         incident_id: u64,
         text: String,
         cost_cents: Option<u64>,
+    },
+    ApplyMedicalExtract {
+        job_id: u64,
+        card_json: String,
+        call: ModelCallIn,
     },
     ApplyMedicalRecord {
         job_id: u64,
@@ -669,6 +704,7 @@ pub enum Reducer {
         job_id: u64,
         result: String,
     },
+    ConfirmMedicalCard,
     CrowdTick {
         timer: CrowdTimer,
     },
@@ -798,6 +834,9 @@ pub enum Reducer {
         fall: bool,
         press: bool,
     },
+    RequestMedicalCard {
+        band_id: u8,
+    },
     RequestRecoveryLetter {
         claim_id: u64,
         counterparty_name: String,
@@ -902,6 +941,11 @@ pub enum Reducer {
         review_json: String,
         call: ModelCallIn,
     },
+    SubmitMedicalDocument {
+        kind: String,
+        file_hash: String,
+        page_count: u32,
+    },
     SubmitMedicalRecord {
         claim_id: u64,
         file_hash: String,
@@ -962,6 +1006,7 @@ impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
             Reducer::AddIncidentNote { .. } => "add_incident_note",
+            Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
             Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveClaim { .. } => "approve_claim",
             Reducer::AssignMedic { .. } => "assign_medic",
@@ -976,6 +1021,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClientDisconnected => "client_disconnected",
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
+            Reducer::ConfirmMedicalCard => "confirm_medical_card",
             Reducer::CrowdTick { .. } => "crowd_tick",
             Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
@@ -1006,6 +1052,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportSimBand { .. } => "report_sim_band",
+            Reducer::RequestMedicalCard { .. } => "request_medical_card",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
@@ -1033,6 +1080,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::StopFind { .. } => "stop_find",
             Reducer::SubmitClaimChecks { .. } => "submit_claim_checks",
             Reducer::SubmitClaimReview { .. } => "submit_claim_review",
+            Reducer::SubmitMedicalDocument { .. } => "submit_medical_document",
             Reducer::SubmitMedicalRecord { .. } => "submit_medical_record",
             Reducer::SubmitVisionAssessment { .. } => "submit_vision_assessment",
             Reducer::Sweep { .. } => "sweep",
@@ -1055,6 +1103,15 @@ impl __sdk::Reducer for Reducer {
                 incident_id: incident_id.clone(),
                 text: text.clone(),
                 cost_cents: cost_cents.clone(),
+            }),
+            Reducer::ApplyMedicalExtract {
+                job_id,
+                card_json,
+                call,
+            } => __sats::bsatn::to_vec(&apply_medical_extract_reducer::ApplyMedicalExtractArgs {
+                job_id: job_id.clone(),
+                card_json: card_json.clone(),
+                call: call.clone(),
             }),
             Reducer::ApplyMedicalRecord {
                 job_id,
@@ -1149,6 +1206,9 @@ impl __sdk::Reducer for Reducer {
                     job_id: job_id.clone(),
                     result: result.clone(),
                 })
+            }
+            Reducer::ConfirmMedicalCard => {
+                __sats::bsatn::to_vec(&confirm_medical_card_reducer::ConfirmMedicalCardArgs {})
             }
             Reducer::CrowdTick { timer } => {
                 __sats::bsatn::to_vec(&crowd_tick_reducer::CrowdTickArgs {
@@ -1379,6 +1439,11 @@ impl __sdk::Reducer for Reducer {
                 fall: fall.clone(),
                 press: press.clone(),
             }),
+            Reducer::RequestMedicalCard { band_id } => {
+                __sats::bsatn::to_vec(&request_medical_card_reducer::RequestMedicalCardArgs {
+                    band_id: band_id.clone(),
+                })
+            }
             Reducer::RequestRecoveryLetter {
                 claim_id,
                 counterparty_name,
@@ -1556,6 +1621,17 @@ impl __sdk::Reducer for Reducer {
                 review_json: review_json.clone(),
                 call: call.clone(),
             }),
+            Reducer::SubmitMedicalDocument {
+                kind,
+                file_hash,
+                page_count,
+            } => __sats::bsatn::to_vec(
+                &submit_medical_document_reducer::SubmitMedicalDocumentArgs {
+                    kind: kind.clone(),
+                    file_hash: file_hash.clone(),
+                    page_count: page_count.clone(),
+                },
+            ),
             Reducer::SubmitMedicalRecord {
                 claim_id,
                 file_hash,
@@ -1675,6 +1751,7 @@ pub struct DbUpdate {
     board_facts: __sdk::TableUpdate<EvidenceFact>,
     board_ledger: __sdk::TableUpdate<LedgerEntry>,
     board_lines: __sdk::TableUpdate<ClaimLine>,
+    board_medical_access: __sdk::TableUpdate<MedicalAccessLog>,
     board_notes: __sdk::TableUpdate<IncidentNote>,
     board_policies: __sdk::TableUpdate<InsurancePolicy>,
     board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
@@ -1721,6 +1798,10 @@ pub struct DbUpdate {
     job_reaper_timer: __sdk::TableUpdate<JobReaperTimer>,
     ledger_entry: __sdk::TableUpdate<LedgerEntry>,
     link: __sdk::TableUpdate<Link>,
+    medic_medical_cards: __sdk::TableUpdate<MedicCard>,
+    medical_access_log: __sdk::TableUpdate<MedicalAccessLog>,
+    medical_card: __sdk::TableUpdate<MedicalCard>,
+    medical_document: __sdk::TableUpdate<MedicalDocument>,
     medical_record: __sdk::TableUpdate<MedicalRecord>,
     merch_order: __sdk::TableUpdate<MerchOrder>,
     merch_shop: __sdk::TableUpdate<MerchShop>,
@@ -1733,6 +1814,8 @@ pub struct DbUpdate {
     my_encounters: __sdk::TableUpdate<MyEncounter>,
     my_graph: __sdk::TableUpdate<GraphLink>,
     my_handles: __sdk::TableUpdate<SocialHandle>,
+    my_medical_card: __sdk::TableUpdate<MedicalCard>,
+    my_medical_documents: __sdk::TableUpdate<MedicalDocument>,
     my_merch_orders: __sdk::TableUpdate<MerchOrder>,
     my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
@@ -1830,6 +1913,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_lines" => db_update
                     .board_lines
                     .append(board_lines_table::parse_table_update(table_update)?),
+                "board_medical_access" => db_update.board_medical_access.append(
+                    board_medical_access_table::parse_table_update(table_update)?,
+                ),
                 "board_notes" => db_update
                     .board_notes
                     .append(board_notes_table::parse_table_update(table_update)?),
@@ -1968,6 +2054,18 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "link" => db_update
                     .link
                     .append(link_table::parse_table_update(table_update)?),
+                "medic_medical_cards" => db_update
+                    .medic_medical_cards
+                    .append(medic_medical_cards_table::parse_table_update(table_update)?),
+                "medical_access_log" => db_update
+                    .medical_access_log
+                    .append(medical_access_log_table::parse_table_update(table_update)?),
+                "medical_card" => db_update
+                    .medical_card
+                    .append(medical_card_table::parse_table_update(table_update)?),
+                "medical_document" => db_update
+                    .medical_document
+                    .append(medical_document_table::parse_table_update(table_update)?),
                 "medical_record" => db_update
                     .medical_record
                     .append(medical_record_table::parse_table_update(table_update)?),
@@ -2004,6 +2102,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_handles" => db_update
                     .my_handles
                     .append(my_handles_table::parse_table_update(table_update)?),
+                "my_medical_card" => db_update
+                    .my_medical_card
+                    .append(my_medical_card_table::parse_table_update(table_update)?),
+                "my_medical_documents" => db_update.my_medical_documents.append(
+                    my_medical_documents_table::parse_table_update(table_update)?,
+                ),
                 "my_merch_orders" => db_update
                     .my_merch_orders
                     .append(my_merch_orders_table::parse_table_update(table_update)?),
@@ -2276,6 +2380,15 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.link = cache
             .apply_diff_to_table::<Link>("link", &self.link)
             .with_updates_by_pk(|row| &row.key);
+        diff.medical_access_log = cache
+            .apply_diff_to_table::<MedicalAccessLog>("medical_access_log", &self.medical_access_log)
+            .with_updates_by_pk(|row| &row.id);
+        diff.medical_card = cache
+            .apply_diff_to_table::<MedicalCard>("medical_card", &self.medical_card)
+            .with_updates_by_pk(|row| &row.attendee);
+        diff.medical_document = cache
+            .apply_diff_to_table::<MedicalDocument>("medical_document", &self.medical_document)
+            .with_updates_by_pk(|row| &row.id);
         diff.medical_record = cache
             .apply_diff_to_table::<MedicalRecord>("medical_record", &self.medical_record)
             .with_updates_by_pk(|row| &row.id);
@@ -2379,6 +2492,10 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.board_ledger =
             cache.apply_diff_to_table::<LedgerEntry>("board_ledger", &self.board_ledger);
         diff.board_lines = cache.apply_diff_to_table::<ClaimLine>("board_lines", &self.board_lines);
+        diff.board_medical_access = cache.apply_diff_to_table::<MedicalAccessLog>(
+            "board_medical_access",
+            &self.board_medical_access,
+        );
         diff.board_notes =
             cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
         diff.board_policies = cache
@@ -2408,6 +2525,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.event_graph = cache.apply_diff_to_table::<EventLink>("event_graph", &self.event_graph);
         diff.incident_bands =
             cache.apply_diff_to_table::<IncidentBand>("incident_bands", &self.incident_bands);
+        diff.medic_medical_cards = cache
+            .apply_diff_to_table::<MedicCard>("medic_medical_cards", &self.medic_medical_cards);
         diff.my_attendee = cache.apply_diff_to_table::<Attendee>("my_attendee", &self.my_attendee);
         diff.my_band = cache.apply_diff_to_table::<MyBand>("my_band", &self.my_band);
         diff.my_claim_queue =
@@ -2417,6 +2536,12 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<MyEncounter>("my_encounters", &self.my_encounters);
         diff.my_graph = cache.apply_diff_to_table::<GraphLink>("my_graph", &self.my_graph);
         diff.my_handles = cache.apply_diff_to_table::<SocialHandle>("my_handles", &self.my_handles);
+        diff.my_medical_card =
+            cache.apply_diff_to_table::<MedicalCard>("my_medical_card", &self.my_medical_card);
+        diff.my_medical_documents = cache.apply_diff_to_table::<MedicalDocument>(
+            "my_medical_documents",
+            &self.my_medical_documents,
+        );
         diff.my_merch_orders =
             cache.apply_diff_to_table::<MerchOrder>("my_merch_orders", &self.my_merch_orders);
         diff.my_merch_suggestions = cache.apply_diff_to_table::<MerchSuggestion>(
@@ -2502,6 +2627,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_lines" => db_update
                     .board_lines
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_medical_access" => db_update
+                    .board_medical_access
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
@@ -2641,6 +2769,18 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "medic_medical_cards" => db_update
+                    .medic_medical_cards
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "medical_access_log" => db_update
+                    .medical_access_log
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "medical_card" => db_update
+                    .medical_card
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "medical_document" => db_update
+                    .medical_document
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "medical_record" => db_update
                     .medical_record
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2676,6 +2816,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_handles" => db_update
                     .my_handles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_medical_card" => db_update
+                    .my_medical_card
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_medical_documents" => db_update
+                    .my_medical_documents
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_merch_orders" => db_update
                     .my_merch_orders
@@ -2861,6 +3007,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_lines" => db_update
                     .board_lines
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_medical_access" => db_update
+                    .board_medical_access
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2999,6 +3148,18 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "medic_medical_cards" => db_update
+                    .medic_medical_cards
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "medical_access_log" => db_update
+                    .medical_access_log
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "medical_card" => db_update
+                    .medical_card
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "medical_document" => db_update
+                    .medical_document
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "medical_record" => db_update
                     .medical_record
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3034,6 +3195,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_handles" => db_update
                     .my_handles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_medical_card" => db_update
+                    .my_medical_card
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_medical_documents" => db_update
+                    .my_medical_documents
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_merch_orders" => db_update
                     .my_merch_orders
@@ -3189,6 +3356,7 @@ pub struct AppliedDiff<'r> {
     board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
     board_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     board_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
+    board_medical_access: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
     board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
     board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
@@ -3235,6 +3403,10 @@ pub struct AppliedDiff<'r> {
     job_reaper_timer: __sdk::TableAppliedDiff<'r, JobReaperTimer>,
     ledger_entry: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     link: __sdk::TableAppliedDiff<'r, Link>,
+    medic_medical_cards: __sdk::TableAppliedDiff<'r, MedicCard>,
+    medical_access_log: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
+    medical_card: __sdk::TableAppliedDiff<'r, MedicalCard>,
+    medical_document: __sdk::TableAppliedDiff<'r, MedicalDocument>,
     medical_record: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     merch_order: __sdk::TableAppliedDiff<'r, MerchOrder>,
     merch_shop: __sdk::TableAppliedDiff<'r, MerchShop>,
@@ -3247,6 +3419,8 @@ pub struct AppliedDiff<'r> {
     my_encounters: __sdk::TableAppliedDiff<'r, MyEncounter>,
     my_graph: __sdk::TableAppliedDiff<'r, GraphLink>,
     my_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    my_medical_card: __sdk::TableAppliedDiff<'r, MedicalCard>,
+    my_medical_documents: __sdk::TableAppliedDiff<'r, MedicalDocument>,
     my_merch_orders: __sdk::TableAppliedDiff<'r, MerchOrder>,
     my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
@@ -3349,6 +3523,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<ClaimLine>("board_lines", &self.board_lines, event);
+        callbacks.invoke_table_row_callbacks::<MedicalAccessLog>(
+            "board_medical_access",
+            &self.board_medical_access,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<IncidentNote>(
             "board_notes",
             &self.board_notes,
@@ -3503,6 +3682,26 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Link>("link", &self.link, event);
+        callbacks.invoke_table_row_callbacks::<MedicCard>(
+            "medic_medical_cards",
+            &self.medic_medical_cards,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalAccessLog>(
+            "medical_access_log",
+            &self.medical_access_log,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalCard>(
+            "medical_card",
+            &self.medical_card,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalDocument>(
+            "medical_document",
+            &self.medical_document,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<MedicalRecord>(
             "medical_record",
             &self.medical_record,
@@ -3531,6 +3730,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<GraphLink>("my_graph", &self.my_graph, event);
         callbacks.invoke_table_row_callbacks::<SocialHandle>("my_handles", &self.my_handles, event);
+        callbacks.invoke_table_row_callbacks::<MedicalCard>(
+            "my_medical_card",
+            &self.my_medical_card,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalDocument>(
+            "my_medical_documents",
+            &self.my_medical_documents,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<MerchOrder>(
             "my_merch_orders",
             &self.my_merch_orders,
@@ -4332,6 +4541,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_facts_table::register_table(client_cache);
         board_ledger_table::register_table(client_cache);
         board_lines_table::register_table(client_cache);
+        board_medical_access_table::register_table(client_cache);
         board_notes_table::register_table(client_cache);
         board_policies_table::register_table(client_cache);
         board_precedents_table::register_table(client_cache);
@@ -4378,6 +4588,10 @@ impl __sdk::SpacetimeModule for RemoteModule {
         job_reaper_timer_table::register_table(client_cache);
         ledger_entry_table::register_table(client_cache);
         link_table::register_table(client_cache);
+        medic_medical_cards_table::register_table(client_cache);
+        medical_access_log_table::register_table(client_cache);
+        medical_card_table::register_table(client_cache);
+        medical_document_table::register_table(client_cache);
         medical_record_table::register_table(client_cache);
         merch_order_table::register_table(client_cache);
         merch_shop_table::register_table(client_cache);
@@ -4390,6 +4604,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_encounters_table::register_table(client_cache);
         my_graph_table::register_table(client_cache);
         my_handles_table::register_table(client_cache);
+        my_medical_card_table::register_table(client_cache);
+        my_medical_documents_table::register_table(client_cache);
         my_merch_orders_table::register_table(client_cache);
         my_merch_suggestions_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
@@ -4449,6 +4665,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_facts",
         "board_ledger",
         "board_lines",
+        "board_medical_access",
         "board_notes",
         "board_policies",
         "board_precedents",
@@ -4489,6 +4706,10 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "job_reaper_timer",
         "ledger_entry",
         "link",
+        "medic_medical_cards",
+        "medical_access_log",
+        "medical_card",
+        "medical_document",
         "medical_record",
         "merch_order",
         "merch_shop",
@@ -4501,6 +4722,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_encounters",
         "my_graph",
         "my_handles",
+        "my_medical_card",
+        "my_medical_documents",
         "my_merch_orders",
         "my_merch_suggestions",
         "my_photos",

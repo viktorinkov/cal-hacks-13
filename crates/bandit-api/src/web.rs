@@ -10,7 +10,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use bandit_bindings::{ApiSessionsTableAccess, BandTableAccess, EventStateTableAccess, register_blob};
+use bandit_bindings::{ApiSessionsTableAccess, BandTableAccess, EventStateTableAccess, ZoneTableAccess, register_blob};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use spacetimedb_sdk::{Identity, Table};
@@ -70,6 +70,9 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route("/api/dev/press/{band}", post(press))
         .route("/api/dev/move/{band}/{station}", post(move_band))
         .route("/api/dev/record/{claim}/{template}", post(sample_record))
+        .route("/api/dev/fall/{band}", post(fall))
+        .route("/api/dev/property/{station}", post(property))
+        .nest_service("/samples", ServeDir::new(web.root.join("fixtures/attendee-documents/rendered")))
 }
 
 fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>) {
@@ -128,7 +131,8 @@ async fn recap(State(app): AppState, headers: HeaderMap) -> ApiResult<Json<crate
 
 #[derive(Deserialize)]
 struct UploadQuery {
-    /// `medical` or `photo`.
+    /// `medical` (a clinic bill the medic files), `photo`, or the attendee's own `history` or
+    /// `insurance` PDF, which needs their session and stays theirs.
     purpose: String,
 }
 
@@ -150,12 +154,13 @@ fn count_pages(pdf: &[u8]) -> u32 {
 }
 
 /// Stores the file in the blob store and registers it, so the page can file it on a claim
-/// (medical) or register it as an event photo (photo).
+/// (medical), register it as an event photo (photo), or file it on the attendee's medical card.
 async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: HeaderMap, body: Bytes) -> ApiResult<Json<Value>> {
-    let (access, default_type) = match q.purpose.as_str() {
-        "medical" => ("staff", "application/pdf"),
-        "photo" => ("shared", "image/jpeg"),
-        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical or photo")),
+    let (access, default_type, owner) = match q.purpose.as_str() {
+        "medical" => ("staff", "application/pdf", None),
+        "photo" => ("shared", "image/jpeg", None),
+        "history" | "insurance" => ("owner_only", "application/pdf", Some(session_identity(&app, &headers)?)),
+        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical, photo, history or insurance")),
     };
     if body.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "empty file"));
@@ -169,7 +174,7 @@ async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: Hea
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.conn
         .reducers
-        .register_blob_then(blob.sha256.clone(), None, access.into(), q.purpose.clone(), content_type.clone(), blob.size_bytes, move |_, r| {
+        .register_blob_then(blob.sha256.clone(), owner, access.into(), q.purpose.clone(), content_type.clone(), blob.size_bytes, move |_, r| {
             let _ = tx.send(r.map_err(|e| e.to_string()).and_then(|r| r));
         })
         .map_err(|e| error(StatusCode::BAD_GATEWAY, e))?;
@@ -295,12 +300,33 @@ async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64,
     if !["first-aid-wrist", "urgent-care-wrist", "urgent-care-ankle-home"].contains(&template.as_str()) {
         return Err(error(StatusCode::BAD_REQUEST, "unknown sample record"));
     }
+    let filed = claims_cli(&app, &["attach-record", "--claim", &claim.to_string(), "--template", &template]).await?;
+    Ok(Json(json!({ "filed": filed })))
+}
+
+/// Simulation only: the band falls where it is, with two of the claims story's attendees as the
+/// bands around it, through `bandit-claims fall`. Its heartbeat pauses meanwhile so the fall shows.
+async fn fall(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Value>> {
+    if !app.web.simulate || !(90..=99).contains(&band) {
+        return Err(error(StatusCode::NOT_FOUND, "only simulated bands fall from here"));
+    }
+    let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    let witnesses: Vec<String> = [90u8, 92, 93, 91].iter().filter(|w| **w != band).take(2).map(|w| w.to_string()).collect();
+    let paused = app.web.sim_bands.lock().unwrap().remove(&band);
+    let out = claims_cli(&app, &["fall", "--band", &band.to_string(), "--witnesses", &witnesses.join(","), "--station", &station.to_string(), "--witness-station", &station.to_string()]).await;
+    if let Some(s) = paused {
+        app.web.sim_bands.lock().unwrap().insert(band, s);
+    }
+    Ok(Json(json!({ "fell": out? })))
+}
+
+async fn claims_cli(app: &App, args: &[&str]) -> ApiResult<String> {
     let cli = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.join("bandit-claims")))
         .ok_or_else(|| error(StatusCode::INTERNAL_SERVER_ERROR, "bandit-claims not found"))?;
     let out = tokio::process::Command::new(cli)
-        .args(["attach-record", "--claim", &claim.to_string(), "--template", &template])
+        .args(args)
         .current_dir(&app.web.root)
         .output()
         .await
@@ -308,5 +334,16 @@ async fn sample_record(State(app): AppState, Path((claim, template)): Path<(u64,
     if !out.status.success() {
         return Err(error(StatusCode::BAD_GATEWAY, String::from_utf8_lossy(&out.stderr).trim()));
     }
-    Ok(Json(json!({ "filed": String::from_utf8_lossy(&out.stdout).trim() })))
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Simulation only: a camera sees a speaker knocked off its stand in the zone, through
+/// `bandit-claims property --camera`, which plays the vision service.
+async fn property(State(app): AppState, Path(station): Path<u8>) -> ApiResult<Json<Value>> {
+    if !app.web.simulate {
+        return Err(error(StatusCode::NOT_FOUND, "simulation is off"));
+    }
+    let zone = app.conn.db.zone().iter().find(|z| z.station_id == station).map(|z| z.name).ok_or_else(|| error(StatusCode::BAD_REQUEST, "no zone has that station"))?;
+    let out = claims_cli(&app, &["property", "--zone", &zone, "--note", "a speaker was knocked off its stand and cracked", "--cost", "2400.00", "--camera"]).await?;
+    Ok(Json(json!({ "opened": out })))
 }

@@ -704,6 +704,60 @@ export const Link = __t.object("Link", {
 });
 export type Link = __Infer<typeof Link>;
 
+export const MedicCard = __t.object("MedicCard", {
+  incidentId: __t.u64(),
+  bandId: __t.u8(),
+  name: __t.string(),
+  get card() {
+    return MedicalCard;
+  },
+});
+export type MedicCard = __Infer<typeof MedicCard>;
+
+export const MedicalAccessLog = __t.object("MedicalAccessLog", {
+  id: __t.u64(),
+  reader: __t.identity(),
+  attendee: __t.identity(),
+  bandId: __t.u8(),
+  incidentId: __t.u64(),
+  granted: __t.bool(),
+  reason: __t.string(),
+  readAt: __t.timestamp(),
+});
+export type MedicalAccessLog = __Infer<typeof MedicalAccessLog>;
+
+export const MedicalCard = __t.object("MedicalCard", {
+  attendee: __t.identity(),
+  bloodType: __t.string(),
+  allergies: __t.array(__t.string()),
+  conditions: __t.array(__t.string()),
+  medications: __t.array(__t.string()),
+  emergencyContact: __t.string(),
+  insurer: __t.string(),
+  plan: __t.string(),
+  memberId: __t.string(),
+  groupNumber: __t.string(),
+  insurerPhone: __t.string(),
+  notes: __t.string(),
+  status: __t.string(),
+  updatedAt: __t.timestamp(),
+});
+export type MedicalCard = __Infer<typeof MedicalCard>;
+
+export const MedicalDocument = __t.object("MedicalDocument", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  kind: __t.string(),
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  status: __t.string(),
+  jobId: __t.u64(),
+  modelCallId: __t.u64(),
+  dropped: __t.array(__t.string()),
+  uploadedAt: __t.timestamp(),
+});
+export type MedicalDocument = __Infer<typeof MedicalDocument>;
+
 export const MedicalRecord = __t.object("MedicalRecord", {
   id: __t.u64(),
   claimId: __t.u64(),

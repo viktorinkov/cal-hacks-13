@@ -1,21 +1,23 @@
-// The band's tap link, /t/BANDIT-0n. Sign in, claim the band by pressing it, fill the profile,
-// then the live view of the event. When the host ends the event, the same page turns into the recap.
+// The band's tap link, /t/BANDIT-0n. During the event it is only the band setup: sign in, claim the
+// band by pressing it, name, socials, the medical history and insurance PDFs, then a thank-you.
+// When the host ends the event, the same page turns into the recap.
 
 import {
-  act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, risk, signIn,
-  signOut, signedInEmail, handleLinks, BAND_STATES, EXIT_COLOURS, PLATFORMS,
+  act, api, apiSession, config, connect, finishSignIn, h, idToken, mount, playedToken, signIn, signOut,
+  signedInEmail, PLATFORMS,
 } from '../lib';
-import { recap, wallet, type Recap } from '../recap';
+import { recap, type Recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 
 const QUERIES = [
   'SELECT * FROM my_attendee',
   'SELECT * FROM my_band',
   'SELECT * FROM my_handles',
+  'SELECT * FROM my_medical_card',
+  'SELECT * FROM my_medical_documents',
   'SELECT * FROM my_visits',
   'SELECT * FROM my_encounters',
   'SELECT * FROM my_photos',
-  'SELECT * FROM my_claims',
   'SELECT * FROM merch_template',
   'SELECT * FROM my_merch_orders',
   'SELECT * FROM my_merch_suggestions',
@@ -23,32 +25,29 @@ const QUERIES = [
   'SELECT * FROM my_wallet',
   'SELECT * FROM event_state',
   'SELECT * FROM venue',
-  'SELECT * FROM zone',
-  'SELECT * FROM booth',
   'SELECT * FROM organization',
   'SELECT * FROM person',
   'SELECT * FROM claimed_people',
-  'SELECT * FROM settings',
   'SELECT * FROM band',
-  'SELECT * FROM zone_visit',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
 const bandId = Number(token.replace('BANDIT-', ''));
 
+type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'done';
+
 let conn: DbConnection;
 let simulate = false;
-/** Where this page is in the claim: before the tap, refused, or after a refusal message. */
 let claimError = '';
 let claimAsked = false;
-/** Onboarding steps after the name: socials, then "is this you?". */
-let step: 'name' | 'socials' | 'profile' | 'done' = 'name';
+let step: Step = 'name';
 let session = '';
 let recapData: Recap | undefined;
 let recapLoading = false;
 
-function zoneOfStation(station: number) {
-  return [...conn.db.zone.iter()].find(z => z.stationId === station);
+function go(next: Step) {
+  step = next;
+  render();
 }
 
 async function tryClaim() {
@@ -94,42 +93,27 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
   ];
 }
 
-function onboarding() {
+function nameStep() {
   const me = conn.db.myAttendee.iter().next().value;
-  if (step === 'name') {
-    const save = async (e: Event) => {
-      e.preventDefault();
-      const f = e.target as HTMLFormElement;
-      const name = (f.elements.namedItem('name') as HTMLInputElement).value;
-      const findable = (f.elements.namedItem('findable') as HTMLInputElement).checked;
-      if (await act(() => conn.reducers.updateProfile({ displayName: name, findable }))) {
-        step = 'socials';
-        render();
-      }
-    };
-    return [
-      h('h2', {}, "It's yours"),
-      h('p', {}, 'Tell people who you are.'),
-      h('form', { onsubmit: save },
-        h('label', {}, 'Your name', h('input', { name: 'name', value: me?.displayName || signedInEmail().split('@')[0], required: true })),
-        h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'findable', checked: true }),
-          'People I spend time with can see my name and socials after the event'),
-        h('button', {}, 'Continue')),
-    ];
-  }
-  if (step === 'socials') {
-    return [h('h2', {}, 'Your socials'), socialsForm(() => { step = 'profile'; render(); }, 'Continue')];
-  }
-  const matches = profileMatches();
-  if (step === 'profile' && matches.length) {
-    return [h('h2', {}, 'Are you one of these?'), h('p', { class: 'muted' }, 'From the event pages.'), profileList(matches),
-      h('button', { class: 'link', onclick: () => { step = 'done'; render(); } }, 'None of these')];
-  }
-  step = 'done';
-  return home();
+  const save = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const name = (f.elements.namedItem('name') as HTMLInputElement).value;
+    const findable = (f.elements.namedItem('findable') as HTMLInputElement).checked;
+    if (await act(() => conn.reducers.updateProfile({ displayName: name, findable }))) go('socials');
+  };
+  return [
+    h('h2', {}, "It's yours"),
+    h('p', {}, 'Tell people who you are.'),
+    h('form', { onsubmit: save },
+      h('label', {}, 'Your name', h('input', { name: 'name', value: me?.displayName || signedInEmail().split('@')[0], required: true })),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'findable', checked: true }),
+        'People I spend time with can see my name and socials after the event'),
+      h('button', {}, 'Continue')),
+  ];
 }
 
-function socialsForm(after: () => void, label: string) {
+function socialsStep() {
   const mine = new Map([...conn.db.myHandles.iter()].map(x => [x.platform, x.handle]));
   const save = async (e: Event) => {
     e.preventDefault();
@@ -139,15 +123,51 @@ function socialsForm(after: () => void, label: string) {
       if (handle && handle !== mine.get(platform)) {
         if (!(await act(() => conn.reducers.setSocialHandle({ platform, handle })))) return;
       }
-      if (!handle && mine.has(platform)) {
-        if (!(await act(() => conn.reducers.removeSocialHandle({ platform })))) return;
-      }
     }
-    after();
+    go('history');
   };
-  return h('form', { onsubmit: save },
-    PLATFORMS.map(([key, name]) => h('label', {}, name, h('input', { name: key, placeholder: '@handle', value: mine.get(key) ?? '' }))),
-    h('button', {}, label));
+  return [
+    h('h2', {}, 'Your socials'),
+    h('form', { onsubmit: save },
+      PLATFORMS.map(([key, name]) => h('label', {}, name, h('input', { name: key, placeholder: '@handle', value: mine.get(key) ?? '' }))),
+      h('button', {}, 'Continue')),
+  ];
+}
+
+/** Uploads the PDF as this attendee's own file and asks Claude to read it into the medical card. */
+async function fileDocument(kind: 'history' | 'insurance', bytes: ArrayBuffer) {
+  if (!session) session = await apiSession(conn);
+  const blob = await api<{ hash: string; pages: number }>(`/api/blobs?purpose=${kind}`, session, {
+    method: 'POST', headers: { 'content-type': 'application/pdf' }, body: bytes,
+  });
+  await conn.reducers.submitMedicalDocument({ kind, fileHash: blob.hash, pageCount: blob.pages });
+}
+
+function documentStep(kind: 'history' | 'insurance', next: Step) {
+  const title = kind === 'history' ? 'Your medical history' : 'Your health insurance';
+  const why = kind === 'history'
+    ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. Claude reads it into your medical card. A medic sees the card only if you fall or press SOS, and only by tapping your band.'
+    : 'Upload your insurance card as a PDF, front and back. It goes on the same medical card, so the medic and the clinic have it.';
+  const sample = kind === 'history' ? 'medical-history.pdf' : 'insurance-card.pdf';
+  const upload = async (e: Event) => {
+    e.preventDefault();
+    const file = ((e.target as HTMLFormElement).querySelector('input[type=file]') as HTMLInputElement).files?.[0];
+    if (!file) throw new Error('choose a PDF');
+    await fileDocument(kind, await file.arrayBuffer());
+    go(next);
+  };
+  return [
+    h('h2', {}, title),
+    h('p', {}, why),
+    h('form', { onsubmit: (e: Event) => act(() => upload(e)) },
+      h('label', {}, 'PDF', h('input', { type: 'file', accept: 'application/pdf' })),
+      h('button', {}, 'Upload')),
+    simulate && h('button', { class: 'sim', onclick: () => act(async () => {
+      await fileDocument(kind, await (await fetch(`/samples/${sample}`)).arrayBuffer());
+      go(next);
+    }) }, 'Use the sample PDF'),
+    h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
+  ];
 }
 
 function profileMatches() {
@@ -158,86 +178,71 @@ function profileMatches() {
   return [...conn.db.person.iter()].filter(p => !taken.has(p.id) && words.some(w => p.displayName.toLowerCase().includes(w)));
 }
 
-function profileList(people: ReturnType<typeof profileMatches>) {
-  return h('ul', { class: 'cards' }, people.map(p => {
-    const org = conn.db.organization.id.find(p.organizationId);
-    return h('li', {},
-      h('b', {}, p.displayName), ` ${p.title ? p.title + ', ' : ''}${org?.name ?? ''} (${p.kind})`,
-      h('button', { onclick: () => act(() => conn.reducers.claimPerson({ personId: p.id })).then(() => { step = 'done'; render(); }) }, 'This is me'));
-  }));
+function profileStep() {
+  const matches = profileMatches();
+  if (!matches.length) {
+    step = 'card';
+    return cardStep();
+  }
+  return [
+    h('h2', {}, 'Are you one of these?'),
+    h('p', { class: 'muted' }, 'From the event pages.'),
+    h('ul', { class: 'cards' }, matches.map(p => {
+      const org = conn.db.organization.id.find(p.organizationId);
+      return h('li', {},
+        h('b', {}, p.displayName), ` ${p.title ? p.title + ', ' : ''}${org?.name ?? ''} (${p.kind})`,
+        h('button', { onclick: () => act(() => conn.reducers.claimPerson({ personId: p.id })).then(() => go('card')) }, 'This is me'));
+    })),
+    h('button', { class: 'link', onclick: () => go('card') }, 'None of these'),
+  ];
 }
 
-function bandCard() {
-  const band = conn.db.band.id.find(bandId);
-  const settings = conn.db.settings.iter().next().value;
-  if (!band) return h('section', { class: 'card grey' }, h('h3', {}, `Band ${bandId}`), h('p', {}, 'Not heard yet.'));
-  const stale = !band.online || Date.now() - band.lastSeen.toDate().getTime() > 5000;
-  const [colour, text] = BAND_STATES[band.state] ?? ['grey', ''];
-  const zone = zoneOfStation(band.zone);
-  const exit = zone ? EXIT_COLOURS[zone.exitColour] : '';
-  const say = band.state === 2 && exit ? `Move out: follow the ${exit} lights` : text;
-  const claim = [...conn.db.myClaims.iter()][0];
-  return h('section', { class: `card ${stale ? 'grey' : ''}` },
-    h('h3', {}, `Band ${bandId}`, h('span', { class: `chip ${stale ? 'grey' : colour}` }, stale ? 'not heard' : say)),
-    h('p', {}, zone ? `Near ${zone.name}` : 'No zone yet', band.bat !== 255 ? ` · battery ${band.bat}%` : ''),
-    band.state === 3 && claim && h('p', {}, `Claim: ${claim.status.tag}`),
-    settings && h('p', { class: 'muted' }, `Band density limits: busy at ${settings.yellow}, very busy at ${settings.red} people close by.`),
-    simulate && bandId >= 94 && h('p', { class: 'sim' }, 'Walk your band to ',
-      [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId).map(z =>
-        h('button', { class: 'sim', disabled: z.stationId === band.zone || undefined, onclick: () => act(async () => {
-          const res = await fetch(`/api/dev/move/${bandId}/${z.stationId}`, { method: 'POST' });
-          if (!res.ok) throw new Error((await res.json()).error);
-        }) }, z.name))));
+/** What Claude read, for the wearer to check once. */
+function cardStep() {
+  const docs = [...conn.db.myMedicalDocuments.iter()];
+  if (!docs.length) {
+    step = 'done';
+    return thanks();
+  }
+  const reading = docs.filter(d => d.status === 'reading');
+  const card = conn.db.myMedicalCard.iter().next().value;
+  if (reading.length || !card) {
+    return [h('h2', {}, 'Claude is reading your documents'), h('p', { class: 'muted' }, 'This takes a few seconds.'),
+      h('button', { class: 'link', onclick: () => go('done') }, 'Check later')];
+  }
+  const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
+  return [
+    h('h2', {}, 'Your medical card'),
+    h('p', { class: 'muted' }, 'Read by Claude from your PDFs; each item shows the page it came from.'),
+    h('section', {},
+      card.bloodType && card.bloodType !== 'unknown' && h('p', {}, h('b', {}, 'Blood type: '), card.bloodType),
+      list('Allergies', card.allergies), list('Conditions', card.conditions), list('Medications', card.medications),
+      card.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), card.emergencyContact),
+      card.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${card.insurer} ${card.plan}, member ${card.memberId}, group ${card.groupNumber}${card.insurerPhone ? `, ${card.insurerPhone}` : ''}`),
+      docs.some(d => d.status === 'failed') && h('p', { class: 'error' }, 'One document could not be read.')),
+    h('button', { onclick: () => act(() => conn.reducers.confirmMedicalCard({})).then(ok => ok && go('done')) }, 'Looks right'),
+  ];
 }
 
-function venue() {
-  const settings = conn.db.settings.iter().next().value;
-  const bands = [...conn.db.band.iter()].filter(b => b.online);
-  const inside = [...conn.db.zoneVisit.iter()].filter(v => v.left === undefined);
-  const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
-  return h('section', {},
-    h('h3', {}, 'How busy is it'),
-    h('table', {}, zones.map(z => {
-      const here = bands.filter(b => b.zone === z.stationId);
-      const avg = here.length ? here.reduce((s, b) => s + b.neigh, 0) / here.length : 0;
-      const level = risk(avg, settings?.yellow ?? 3, settings?.red ?? 5);
-      return h('tr', {}, h('td', {}, z.name), h('td', {}, `${inside.filter(v => v.zone === z.stationId).length} people`),
-        h('td', { class: `level ${level.replace(' ', '-')}` }, level),
-        h('td', { class: 'muted' }, `exit: ${EXIT_COLOURS[z.exitColour]}`));
-    })));
-}
-
-function claims() {
-  const mine = [...conn.db.myClaims.iter()];
-  if (!mine.length) return null;
-  return h('section', {},
-    h('h3', {}, 'Your insurance claims'),
-    h('ul', {}, mine.map(c => h('li', {},
-      h('b', {}, `Claim ${c.id}`), ` ${c.incidentKind} in ${c.zoneName}: ${c.status.tag}. ${c.statusNote}`,
-      c.payoutCents > 0n && ` Payout ${money(c.payoutCents)}${c.payoutReference ? ` (${c.payoutReference})` : ''}.`))));
-}
-
-function profile() {
-  const me = conn.db.myAttendee.iter().next().value!;
-  const org = conn.db.organization.id.find(me.organizationId);
-  return h('section', {},
-    h('h3', {}, 'Profile'),
-    h('p', {}, h('b', {}, me.displayName), org ? ` · ${org.name}` : '', me.findable ? ' · findable' : ' · hidden'),
-    h('p', {}, handleLinks([...conn.db.myHandles.iter()])),
-    h('details', {}, h('summary', {}, 'Edit socials'), socialsForm(() => render(), 'Save')),
-    profileMatches().length > 0 && h('details', {}, h('summary', {}, 'Claim your speaker or exhibitor profile'), profileList(profileMatches())));
-}
-
-function home() {
+function thanks() {
   const v = conn.db.venue.iter().next().value;
   return [
-    h('h2', {}, v?.name ?? 'Your event'),
-    bandCard(),
-    venue(),
-    claims(),
-    wallet(conn),
-    profile(),
+    h('h2', {}, "You're all set"),
+    h('p', { class: 'big' }, `Thanks, ${conn.db.myAttendee.iter().next().value?.displayName ?? ''}. Enjoy ${v?.name ?? 'the event'}.`),
+    h('p', {}, 'Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos.'),
   ];
+}
+
+function setup() {
+  switch (step) {
+    case 'name': return nameStep();
+    case 'socials': return socialsStep();
+    case 'history': return documentStep('history', 'insurance');
+    case 'insurance': return documentStep('insurance', 'profile');
+    case 'profile': return profileStep();
+    case 'card': return cardStep();
+    default: return thanks();
+  }
 }
 
 async function loadRecap() {
@@ -256,7 +261,6 @@ async function loadRecap() {
 function render() {
   if (!conn) return;
   const mb = conn.db.myBand.iter().next().value;
-  const me = conn.db.myAttendee.iter().next().value;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'));
@@ -265,8 +269,7 @@ function render() {
       loadRecap();
       return mount('app', top, recap(conn, recapData));
     }
-    if (!me?.displayName || step !== 'done') return mount('app', top, onboarding());
-    return mount('app', top, home());
+    return mount('app', top, setup());
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${bandId}`), h('p', {}, `You wear band ${mb.bandId}.`), h('a', { href: `/t/BANDIT-${String(mb.bandId).padStart(2, '0')}` }, 'Open your band'));
@@ -287,11 +290,12 @@ async function main() {
   conn = await connect(QUERIES, render);
   const mb = conn.db.myBand.iter().next().value;
   if (!mb || (mb.bandId === bandId && mb.status !== 'claimed')) await tryClaim();
+  // Someone who finished setup earlier lands on the thank-you.
   if (conn.db.myAttendee.iter().next().value?.displayName) step = 'done';
-  // The live view ages the band card every second; the recap only changes with its rows.
+  // The claim countdown ticks every second until the band is claimed.
   setInterval(() => {
-    const ended = conn.db.eventState.id.find(0)?.ended ?? false;
-    if (!ended && !(document.activeElement instanceof HTMLInputElement)) render();
+    const claimed = conn.db.myBand.iter().next().value?.status === 'claimed';
+    if (!claimed) render();
   }, 1000);
 }
 

@@ -14,6 +14,7 @@ pub mod vision;
 pub mod web;
 pub mod wallet;
 pub mod merch;
+pub mod medical;
 
 use spacetimedb::{ReducerContext, Table};
 use tables::*;

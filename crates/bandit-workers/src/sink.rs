@@ -22,6 +22,7 @@ pub enum Finish {
     ClaimPayout { customer_id: String, account_id: String, deposit_id: String },
     WalletOpened { customer_id: String, account_id: String },
     MerchPaid { merchant_id: String, purchase_id: String },
+    MedicalCard { card_json: String },
 }
 
 pub enum Sink {
@@ -104,6 +105,7 @@ impl Sink {
             }
             Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
+            Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -171,6 +173,7 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         }
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
+        Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);
