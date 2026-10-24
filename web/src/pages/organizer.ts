@@ -45,7 +45,7 @@ const QUERIES = [
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
-const SAMPLE_RECORDS: [string, string][] = [
+const TEST_RECORDS: [string, string][] = [
   ['first-aid-wrist', 'Event first aid, wrist sprain (Maya Chen, $180)'],
   ['urgent-care-wrist', 'Urgent care, wrist sprain (Jordan Alvarez, $1,308)'],
   ['urgent-care-ankle-home', 'Urgent care, ankle hurt at home (Sam Patel, $565)'],
@@ -58,8 +58,8 @@ let openClaim: bigint | undefined;
 
 /** The staff roles: the organizer (ops) and the medic. */
 const STAFF_ROLES = ['ops', 'medic'];
-/** The simulated bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
-const SIM_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
+/** The test bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
+const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 
 function roles(): Set<string> {
   return new Set([...conn.db.myRoles.iter()].map(r => r.role));
@@ -80,7 +80,7 @@ function can(...wanted: string[]): boolean {
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
   const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['data', 'Imports and Kibana']];
-  return cfg.simulate ? [...all, ['simulate', 'Simulate']] : all;
+  return cfg.simulate ? [...all, ['test-bands', 'Test bands']] : all;
 }
 
 function zoneName(id: bigint) {
@@ -187,17 +187,17 @@ function live() {
 
 function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
-  const real = all.filter(a => !a.simulated).length;
+  const people = all.filter(a => !a.simulated).length;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const takeBack = (bandId: number, name: string) =>
     confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
       && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
-    h('h3', {}, `Attendees (${real} people, ${all.length - real} simulated)`),
+    h('h3', {}, `Attendees (${people} who tapped a band, ${all.length - people} in the crowd)`),
     h('table', {},
       h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
       all.map(a => h('tr', {},
-        h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' simulated')),
+        h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' crowd')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
           a.bandId > 0 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
@@ -248,7 +248,7 @@ function medicCard(incidentId: bigint) {
   return m ? medicalCard(m) : null;
 }
 
-// --- Simulate ------------------------------------------------------------------------------
+// --- Test bands ----------------------------------------------------------------------------
 
 async function post(path: string) {
   const res = await fetch(path, { method: 'POST' });
@@ -262,31 +262,31 @@ function toClaims(ok: boolean) {
   render();
 }
 
-/** The simulated bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
-function simulateTab() {
+/** The test bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
+function testBandsTab() {
   const owners = wearers();
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   return h('section', {},
-    h('h3', {}, 'Simulated bands'),
+    h('h3', {}, 'Test bands'),
     h('p', { class: 'muted' }, 'Bands 90 to 93 are the claims story\'s attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here. A fall uses two of the story attendees as the bands around it, and they stay in that zone afterwards.'),
     h('table', {},
       h('tr', {}, h('th', {}, 'Band'), h('th', {}, 'Wearer'), h('th', {}, 'Zone'), h('th', {}, 'Walk to'), h('th', {})),
-      SIM_BANDS.map(id => {
+      TEST_BANDS.map(id => {
         const b = conn.db.band.id.find(id);
         const claimed = owners.has(id);
         return h('tr', {},
           h('td', {}, h('b', {}, `Band ${id}`), h('div', { class: alive(id) ? 'pass' : 'muted' }, alive(id) ? 'alive' : 'stale')),
           h('td', {}, claimed ? owners.get(id) || '(no name yet)' : h('span', { class: 'muted' }, 'not claimed')),
           h('td', {}, zones.find(z => z.stationId === b?.zone)?.name ?? 'no zone'),
-          h('td', {}, zones.map(z => h('button', { class: 'sim', disabled: z.stationId === b?.zone || undefined,
+          h('td', {}, zones.map(z => h('button', { class: 'test', disabled: z.stationId === b?.zone || undefined,
             onclick: () => act(() => post(`/api/dev/move/${id}/${z.stationId}`)) }, z.name))),
           h('td', {},
-            id >= 94 && h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/press/${id}`)) }, 'Press'),
-            claimed && h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/fall/${id}`)).then(toClaims) }, 'Fall here')));
+            id >= 94 && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/press/${id}`)) }, 'Press'),
+            claimed && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/fall/${id}`)).then(toClaims) }, 'Fall here')));
       })),
     h('h3', {}, 'Property damage'),
     h('p', { class: 'muted' }, 'A venue camera sees a speaker knocked off its stand; the vision check confirms it and a property claim opens.'),
-    zones.map(z => h('button', { class: 'sim', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(toClaims) }, `Speaker breaks in ${z.name}`)));
+    zones.map(z => h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(toClaims) }, `Speaker breaks in ${z.name}`)));
 }
 
 function statusOf(c: Claim) {
@@ -328,9 +328,9 @@ function claimList() {
 
 async function fileRecord(claimId: bigint, form: HTMLFormElement) {
   const input = form.querySelector('input[type=file]') as HTMLInputElement;
-  const sample = field(form, 'sample');
-  if (!input.files?.[0] && sample) {
-    const res = await fetch(`/api/dev/record/${claimId}/${sample}`, { method: 'POST' });
+  const record = field(form, 'test-record');
+  if (!input.files?.[0] && record) {
+    const res = await fetch(`/api/dev/record/${claimId}/${record}`, { method: 'POST' });
     if (!res.ok) throw new Error((await res.json()).error);
     return;
   }
@@ -393,7 +393,7 @@ function claimDetail(id: bigint) {
     c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
-      cfg.simulate && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'sample' }, h('option', { value: '' }, '—'), SAMPLE_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      cfg.simulate && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
     c.status.tag === 'Routed' && (decides(c)
       ? h('div', {}, h('h4', {}, 'Your decision'), decide(c))
@@ -472,7 +472,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'data' ? data() : tab === 'simulate' ? simulateTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'data' ? data() : tab === 'test-bands' ? testBandsTab() : live();
   mount('app', header(), body);
 }
 

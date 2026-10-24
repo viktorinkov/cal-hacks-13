@@ -43,7 +43,7 @@ const bandId = Number(token.replace('BANDIT-', ''));
 type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'wallet' | 'done';
 
 let conn: DbConnection;
-let simulate = false;
+let testMode = false;
 let people: Actor[] = [];
 let claimError = '';
 let claimAsked = false;
@@ -91,7 +91,7 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
     h('h2', {}, `Band ${bandId} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
-    simulate && bandId >= 94 && h('button', { class: 'sim', onclick: () => act(async () => {
+    testMode && bandId >= 94 && h('button', { class: 'test', onclick: () => act(async () => {
       const res = await fetch(`/api/dev/press/${bandId}`, { method: 'POST' });
       if (!res.ok) throw new Error((await res.json()).error);
     }) }, 'Press the band for me'),
@@ -153,7 +153,7 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
   const why = kind === 'history'
     ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. Claude reads it into your medical card. A medic sees the card only if you fall or press SOS, and only by tapping your band.'
     : 'Upload your insurance card as a PDF, front and back. It goes on the same medical card, so the medic and the clinic have it.';
-  const sample = kind === 'history' ? 'medical-history.pdf' : 'insurance-card.pdf';
+  const testFile = kind === 'history' ? 'medical-history.pdf' : 'insurance-card.pdf';
   const upload = async (e: Event) => {
     e.preventDefault();
     const file = ((e.target as HTMLFormElement).querySelector('input[type=file]') as HTMLInputElement).files?.[0];
@@ -167,8 +167,8 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
     h('form', { onsubmit: (e: Event) => act(() => upload(e)) },
       h('label', {}, 'PDF', h('input', { type: 'file', name: kind, accept: 'application/pdf' })),
       h('button', {}, 'Upload')),
-    simulate && h('button', { class: 'sim', onclick: () => act(async () => {
-      await fileDocument(kind, await (await fetch(`/samples/${sample}`)).arrayBuffer());
+    testMode && h('button', { class: 'test', onclick: () => act(async () => {
+      await fileDocument(kind, await (await fetch(`/samples/${testFile}`)).arrayBuffer());
       go(next);
     }) }, 'Use a test record'),
     h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
@@ -339,7 +339,7 @@ function render() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
-    simulate && people.length > 0 && testAs(people));
+    testMode && people.length > 0 && testAs(people));
   if (isMedic()) return mount('app', top, medicView());
   if (mb && mb.bandId === bandId && mb.status === 'claimed') {
     if (ended) {
@@ -357,15 +357,15 @@ function render() {
 async function main() {
   if (location.pathname === '/callback') return finishSignIn();
   const cfg = await config();
-  simulate = cfg.simulate;
+  testMode = cfg.simulate;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
   if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
     return mount('app', h('h2', {}, `Band ${bandId}`), h('p', {}, 'Sign in with your email to make this band yours.'),
       h('button', { onclick: signIn }, 'Sign in with email'),
-      simulate && h('button', { class: 'sim', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
+      testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
-  if (simulate) people = await actors();
+  if (testMode) people = await actors();
   conn = await connect(QUERIES, render);
   // A medic's tap opens the medical card; it never claims the band.
   if (isMedic()) return tapAsMedic();
