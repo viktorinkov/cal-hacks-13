@@ -234,6 +234,7 @@ pub mod refuse_claim_reducer;
 pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
 pub mod register_photo_reducer;
+pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
@@ -548,6 +549,7 @@ pub use refuse_claim_reducer::refuse_claim;
 pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
 pub use register_photo_reducer::register_photo;
+pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
@@ -816,6 +818,9 @@ pub enum Reducer {
         zone_id: u64,
         caption: String,
     },
+    ReleaseBand {
+        band_id: u8,
+    },
     RemoveSocialHandle {
         platform: String,
     },
@@ -1052,6 +1057,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterBlob { .. } => "register_blob",
             Reducer::RegisterBridge => "register_bridge",
             Reducer::RegisterPhoto { .. } => "register_photo",
+            Reducer::ReleaseBand { .. } => "release_band",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
@@ -1406,6 +1412,11 @@ impl __sdk::Reducer for Reducer {
                 zone_id: zone_id.clone(),
                 caption: caption.clone(),
             }),
+            Reducer::ReleaseBand { band_id } => {
+                __sats::bsatn::to_vec(&release_band_reducer::ReleaseBandArgs {
+                    band_id: band_id.clone(),
+                })
+            }
             Reducer::RemoveSocialHandle { platform } => {
                 __sats::bsatn::to_vec(&remove_social_handle_reducer::RemoveSocialHandleArgs {
                     platform: platform.clone(),

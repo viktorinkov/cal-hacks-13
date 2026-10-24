@@ -22,10 +22,13 @@ pub fn register_photo(ctx: &ReducerContext, url: String, taken_at: Timestamp, zo
         added_by: ctx.sender(),
         created_at: ctx.timestamp,
     });
-    let findable = bands_in_zone_at(ctx, zone_id, taken_at)
+    let mut findable: Vec<_> = bands_in_zone_at(ctx, zone_id, taken_at)
         .into_iter()
-        .filter(|o| ctx.db.attendee().identity().find(o.owner).is_some_and(|a| a.findable))
-        .take(PHOTO_TAG_CAP);
+        .filter_map(|o| ctx.db.attendee().identity().find(o.owner).filter(|a| a.findable).map(|a| (a.simulated, o)))
+        .collect();
+    // Real attendees before the simulated crowd, so the cap never crowds out a person.
+    findable.sort_by_key(|(simulated, _)| *simulated);
+    let findable = findable.into_iter().map(|(_, o)| o).take(PHOTO_TAG_CAP);
     for o in findable {
         ctx.db.photo_tag().insert(PhotoTag {
             id: 0,

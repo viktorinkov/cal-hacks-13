@@ -309,9 +309,11 @@ async function main() {
   const cfg = await config();
   simulate = cfg.simulate;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
-  if (cfg.auth_client_id && !idToken() && !(await playedToken())) {
+  const guest = sessionStorage.getItem('bandit-guest') === '1';
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
     return mount('app', h('h2', {}, `Band ${bandId}`), h('p', {}, 'Sign in with your email to make this band yours.'),
-      h('button', { onclick: signIn }, 'Sign in with email'));
+      h('button', { onclick: signIn }, 'Sign in with email'),
+      simulate && h('button', { class: 'sim', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   conn = await connect(QUERIES, render);
   const mb = conn.db.myBand.iter().next().value;

@@ -74,6 +74,7 @@ import RefuseClaimReducer from "./refuse_claim_reducer";
 import RegisterBlobReducer from "./register_blob_reducer";
 import RegisterBridgeReducer from "./register_bridge_reducer";
 import RegisterPhotoReducer from "./register_photo_reducer";
+import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
@@ -890,6 +891,7 @@ const reducersSchema = __reducers(
   __reducerSchema("register_blob", RegisterBlobReducer),
   __reducerSchema("register_bridge", RegisterBridgeReducer),
   __reducerSchema("register_photo", RegisterPhotoReducer),
+  __reducerSchema("release_band", ReleaseBandReducer),
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),

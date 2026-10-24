@@ -12,6 +12,8 @@ case "$E2E_TARGET" in
   maincloud)
     export SPACETIMEDB_URL=https://maincloud.spacetimedb.com SPACETIMEDB_DATABASE=bandit-calhacks13-sp82j
     export ELASTIC_INDEX_PREFIX=bandit
+    # The SpacetimeAuth client the pages sign in with (public, PKCE, no secret).
+    export SPACETIMEAUTH_CLIENT_ID=client_034lYVa0v5zqZJQWQktByi
     STDB_SERVER=maincloud
     ;;
   *) echo "E2E_TARGET must be local or maincloud" >&2; exit 1 ;;
