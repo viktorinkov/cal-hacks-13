@@ -11,7 +11,6 @@ export type Recap = {
   display_name: string;
   suggested_people: { node_id: number; name: string; photo_url: string; handles: Record<string, string> }[];
   suggested_booths: { booth_id: number; name: string; zone_name: string }[];
-  suggestions_ranked: boolean;
 };
 
 let data: Recap | undefined;
@@ -41,7 +40,7 @@ async function load(conn: DbConnection, rerender: () => void) {
     data = await api<Recap>('/api/recap', session);
     document.getElementById('error')!.textContent = '';
   } catch (e: any) {
-    document.getElementById('error')!.textContent = `Recap ranking: ${e?.message ?? e}`;
+    document.getElementById('error')!.textContent = `Recap: ${e?.message ?? e}`;
     setTimeout(rerender, 5000);
   }
   loading = false;
@@ -111,15 +110,8 @@ function spaceTime(conn: DbConnection) {
   ];
 }
 
-function ranking() {
-  if (!data) return null;
-  return h('p', { class: 'muted' }, data.suggestions_ranked
-    ? 'Closest to what you were into first, ranked by Elastic.'
-    : 'Most time together first.');
-}
-
 function people() {
-  if (!data) return h('p', { class: 'muted' }, 'Ranking…');
+  if (!data) return h('p', { class: 'muted' }, 'Loading…');
   if (!data.suggested_people.length) return h('p', { class: 'muted' }, 'Nobody stayed close to you long enough to count.');
   return h('ul', { class: 'cards' }, data.suggested_people.map(p => {
     const handles = Object.entries(p.handles).map(([platform, handle]) => ({ platform, handle }));
@@ -131,7 +123,7 @@ function people() {
 }
 
 function booths() {
-  if (!data) return h('p', { class: 'muted' }, 'Ranking…');
+  if (!data) return h('p', { class: 'muted' }, 'Loading…');
   if (!data.suggested_booths.length) return h('p', { class: 'muted' }, 'No booth visits.');
   return h('ul', { class: 'cards' }, data.suggested_booths.map(b => h('li', {},
     h('b', {}, b.name), ` · ${b.zone_name}`)));
@@ -239,7 +231,7 @@ function merch(conn: DbConnection) {
             h('button', { disabled: !hasWallet || undefined }, `Buy ${money(t.priceCents)}`))));
     })),
     orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
-      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · Nessie purchase ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
+      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · receipt ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
     movements(conn),
   ];
 }
@@ -254,8 +246,8 @@ export function recap(conn: DbConnection, rerender: () => void) {
     h('h2', {}, `Your ${event}`),
     h('p', {}, `Thanks for coming, ${me?.displayName ?? ''}. Here is your night.`),
     h('section', {}, h('h3', {}, 'Where you were'), spaceTime(conn)),
-    h('section', {}, h('h3', {}, 'People you spent time with'), ranking(), people()),
-    h('section', {}, h('h3', {}, 'Booths you spent time at'), ranking(), booths()),
+    h('section', {}, h('h3', {}, 'People you spent time with'), people()),
+    h('section', {}, h('h3', {}, 'Booths you spent time at'), booths()),
     h('section', {}, h('h3', {}, 'Your photos'), photos(conn, event)),
     h('section', {}, h('h3', {}, 'Make it merch'), merch(conn)),
   ];

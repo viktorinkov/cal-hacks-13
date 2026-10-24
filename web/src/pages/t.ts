@@ -150,7 +150,7 @@ async function fileDocument(kind: 'history' | 'insurance', bytes: ArrayBuffer) {
 function documentStep(kind: 'history' | 'insurance', next: Step) {
   const title = kind === 'history' ? 'Your medical history' : 'Your health insurance';
   const why = kind === 'history'
-    ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. Claude reads it into your medical card. A medic sees the card by tapping your band.'
+    ? 'Upload a PDF from your doctor with your allergies, conditions, medications and emergency contact. It becomes your medical card, which a medic sees by tapping your band.'
     : 'Upload your insurance card as a PDF, front and back. It goes on the same medical card, so the medic and the clinic have it.';
   const testFile = kind === 'history' ? 'medical-history.pdf' : 'insurance-card.pdf';
   const upload = async (e: Event) => {
@@ -211,13 +211,13 @@ function cardStep() {
   const reading = docs.filter(d => d.status === 'reading');
   const card = conn.db.myMedicalCard.iter().next().value;
   if (reading.length || !card) {
-    return [h('h2', {}, 'Claude is reading your documents'), h('p', { class: 'muted' }, 'This takes a few seconds.'),
+    return [h('h2', {}, 'Reading your documents'), h('p', { class: 'muted' }, 'This takes a few seconds.'),
       h('button', { class: 'link', onclick: () => go('wallet') }, 'Check later')];
   }
   const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
   return [
     h('h2', {}, 'Your medical card'),
-    h('p', { class: 'muted' }, 'Read by Claude from your PDFs; each item shows the page it came from.'),
+    h('p', { class: 'muted' }, 'Read from your PDFs; each item shows the page it came from.'),
     h('section', {},
       card.bloodType && card.bloodType !== 'unknown' && h('p', {}, h('b', {}, 'Blood type: '), card.bloodType),
       list('Allergies', card.allergies), list('Conditions', card.conditions), list('Medications', card.medications),
