@@ -6,11 +6,12 @@ One branch (`vik-e2e`) with the pipeline, insurance, social and merch work and t
 
 ```sh
 scripts/e2e-server     # local only: a private SpacetimeDB on 127.0.0.1:3097 (leave it running)
-scripts/e2e-setup      # publish, load the event, merch templates, insurance actors, roles, crowd
+scripts/e2e-publish    # build the module and publish it
+scripts/e2e-setup      # load the event, merch templates, insurance actors, roles, crowd
 scripts/e2e-services   # bandit-api with the pages, bandit-indexer, bandit-workers
 ```
 
-`E2E_TARGET=maincloud` points all three scripts at the live database `bandit-calhacks13-sp82j` instead. On Maincloud, setup publishes without wiping data and does not import the event (the pipeline loads the real CalHacks bundle). `BANDIT_DEMO=1` (the default in `e2e-services`) turns on the "play as" switcher, the demo band press and the demo medical records.
+`E2E_TARGET=maincloud` points the scripts at the live database `bandit-calhacks13-sp82j` instead. On Maincloud, publish keeps the data and does not import the event (the pipeline loads the real CalHacks bundle). `BANDIT_DEMO=1` (the default in `e2e-services`) turns on the "play as" switcher, the demo band press and the demo medical records.
 
 Pages, on http://127.0.0.1:8097:
 

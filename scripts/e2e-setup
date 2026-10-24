@@ -1,22 +1,11 @@
 #!/bin/sh
-# Publish the merged module, load the event, create the insurance actors and the services' identities,
-# grant their roles and start the simulated crowd. E2E_TARGET=local (default) wipes the local database.
+# After scripts/e2e-publish: load the event (local only), the merch templates, the insurance actors and
+# the services' identities, grant their roles, and start the safety watch, the job reaper and the crowd.
 set -e
 . "$(dirname "$0")/e2e-env"
 cd "$ROOT"
-(cd spacetimedb/server && cargo build -q --release --target wasm32-unknown-unknown)
 cargo build -q -p bandit-claims -p bandit-api -p bandit-indexer -p bandit-workers
-WASM=target/wasm32-unknown-unknown/release/band1t.wasm
 DB="$SPACETIMEDB_DATABASE"
-
-if [ "$E2E_TARGET" = local ]; then
-  stdb server add --url "$SPACETIMEDB_URL" "$STDB_SERVER" --no-fingerprint >/dev/null 2>&1 || true
-  grep -q spacetimedb_token "$DATA/spacetime/cli.toml" 2>/dev/null || stdb login --server-issued-login "$STDB_SERVER" >/dev/null
-  rm -rf "$DATA/identities" "$DATA/blobs" "$DATA/records"
-  stdb publish --bin-path "$WASM" -s "$STDB_SERVER" -y --delete-data "$DB"
-else
-  stdb publish --bin-path "$WASM" -s "$STDB_SERVER" -y "$DB"
-fi
 call() { stdb call -s "$STDB_SERVER" "$DB" "$@" 2>&1 | grep -v UNSTABLE || true; }
 
 # The event: the newest assembled CalHacks bundle, else the small dev seed.
