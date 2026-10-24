@@ -25,6 +25,7 @@ const QUERIES = [
   'SELECT * FROM claimed_people',
   'SELECT * FROM settings',
   'SELECT * FROM band',
+  'SELECT * FROM zone_visit',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
@@ -81,7 +82,7 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
     h('h2', {}, `Band ${bandId} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
-    demo && h('button', { class: 'demo', onclick: () => act(() => fetch(`/api/dev/press/${bandId}`, { method: 'POST' })) }, 'Demo: press the band for me'),
+    demo && bandId >= 90 && h('button', { class: 'demo', onclick: () => act(() => fetch(`/api/dev/press/${bandId}`, { method: 'POST' })) }, 'Demo: press the band for me'),
   ];
 }
 
@@ -178,6 +179,7 @@ function bandCard() {
 function venue() {
   const settings = conn.db.settings.iter().next().value;
   const bands = [...conn.db.band.iter()].filter(b => b.online);
+  const inside = [...conn.db.zoneVisit.iter()].filter(v => v.left === undefined);
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   return h('section', {},
     h('h3', {}, 'How busy is it'),
@@ -185,7 +187,8 @@ function venue() {
       const here = bands.filter(b => b.zone === z.stationId);
       const avg = here.length ? here.reduce((s, b) => s + b.neigh, 0) / here.length : 0;
       const level = risk(avg, settings?.yellow ?? 3, settings?.red ?? 5);
-      return h('tr', {}, h('td', {}, z.name), h('td', { class: `level ${level.replace(' ', '-')}` }, level),
+      return h('tr', {}, h('td', {}, z.name), h('td', {}, `${inside.filter(v => v.zone === z.stationId).length} people`),
+        h('td', { class: `level ${level.replace(' ', '-')}` }, level),
         h('td', { class: 'muted' }, `exit: ${EXIT_COLOURS[z.exitColour]}`));
     })));
 }

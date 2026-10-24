@@ -1,6 +1,6 @@
 //! The plain web pages and what they need from bandit-api: the static files, the connection
 //! settings, file uploads into the blob store, the Elastic-ranked recap for a signed-in attendee,
-//! and, with `BANDIT_DEMO=1`, the demo identities and a simulated band press.
+//! and, with `BANDIT_DEMO=1`, the demo identities and a press on a simulated band.
 
 use crate::{App, AppState, ranked_summary};
 use anyhow::{Context, Result};
@@ -29,10 +29,10 @@ const DEMO_ACTORS: &[(&str, &str)] = &[
     ("dana", "Dana Ruiz (risk manager)"),
     ("priya", "Priya Nair (adjuster, Northwind Mutual)"),
     ("photographer", "Event photographer"),
-    ("maya", "Maya Chen (attendee, band 3)"),
-    ("jordan", "Jordan Alvarez (attendee, band 7)"),
-    ("sam-patel", "Sam Patel (attendee, band 8)"),
-    ("lee", "Lee Park (attendee, band 6)"),
+    ("jordan", "Jordan Alvarez (attendee, band 90)"),
+    ("maya", "Maya Chen (attendee, band 91)"),
+    ("sam-patel", "Sam Patel (attendee, band 92)"),
+    ("lee", "Lee Park (attendee, band 93)"),
 ];
 
 pub struct Web {
@@ -78,9 +78,9 @@ async fn config(State(app): AppState) -> Json<Value> {
     let ws = w.spacetimedb_url.replacen("https://", "wss://", 1).replacen("http://", "ws://", 1);
     let kibana = w.kibana_url.trim_end_matches('/');
     let dashboards: Vec<Value> = [
-        ("Import run", "bandit-pipeline-dashboard"),
-        ("Event story", "bandit-event-dashboard"),
-        ("Claims", "bandit-claims-dashboard"),
+        ("Import run", "bandit-pipeline-calhacks-13"),
+        ("Event story", "bandit-event-calhacks-13"),
+        ("Claims", "bandit-claims"),
     ]
     .iter()
     .map(|(title, id)| json!({ "title": title, "url": format!("{kibana}/app/dashboards#/view/{id}") }))
@@ -210,41 +210,36 @@ async fn actors(State(app): AppState) -> ApiResult<Json<Value>> {
     Ok(Json(json!(out)))
 }
 
-/// One beacon of a band as the bridge would send it, through SpacetimeDB's HTTP API.
-async fn beacon(web: &Web, token: &str, band: u8, zone: u8, flags: u8, seq: u16) -> Result<()> {
-    let body = json!([{ "id": band, "rssi": -55, "flags": flags | 48, "neigh": 0, "zone": zone, "bat": 90, "state": 0, "seq": seq, "find": 0 }]);
-    let url = format!("{}/v1/database/{}/call/ingest_band", web.spacetimedb_url.trim_end_matches('/'), web.database);
+/// One report of a simulated band (ids 90 to 99) through `report_sim_band`, as the `sim` identity.
+async fn sim_report(web: &Web, token: &str, band: u8, station: u8, press: bool) -> Result<()> {
+    let body = json!([band, station, 0, 0, false, false, press]);
+    let url = format!("{}/v1/database/{}/call/report_sim_band", web.spacetimedb_url.trim_end_matches('/'), web.database);
     let res = web.http.post(url).bearer_auth(token).json(&body).send().await?;
     let status = res.status();
     if !status.is_success() {
-        anyhow::bail!("ingest_band answered {status}: {}", res.text().await.unwrap_or_default());
+        anyhow::bail!("report_sim_band answered {status}: {}", res.text().await.unwrap_or_default());
     }
     Ok(())
 }
 
-/// Demo only: presses a band's button as the registered bridge, for testing the claim without hardware.
+/// Demo only: presses a simulated band's button, for testing the claim without hardware.
 async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Value>> {
     if !app.web.demo {
         return Err(error(StatusCode::NOT_FOUND, "demo press is off"));
     }
+    if !(90..=99).contains(&band) {
+        return Err(error(StatusCode::BAD_REQUEST, "only the simulated bands 90 to 99 can be pressed from here; press a real band's button"));
+    }
     let token = app
         .tokens
-        .load("bridge")
+        .load("sim")
         .ok()
         .flatten()
-        .context("no bridge identity; run scripts/e2e-setup")
+        .context("no simulator identity; run scripts/e2e-setup")
         .map_err(|e| error(StatusCode::CONFLICT, format!("{e:#}")))?;
-    let (zone, seq) = app
-        .conn
-        .db
-        .band()
-        .iter()
-        .find(|b| b.id == band)
-        .map(|b| (b.zone, b.seq))
-        .unwrap_or((104, 0));
-    let w = &app.web;
-    for (flags, n) in [(0u8, 1u16), (4, 2), (0, 3)] {
-        beacon(w, &token, band, zone, flags, seq.wrapping_add(n))
+    let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    for pressed in [false, true, false] {
+        sim_report(&app.web, &token, band, station, pressed)
             .await
             .map_err(|e| error(StatusCode::BAD_GATEWAY, format!("{e:#}")))?;
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;

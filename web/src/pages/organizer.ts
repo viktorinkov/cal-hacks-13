@@ -16,6 +16,7 @@ const QUERIES = [
   'SELECT * FROM booth',
   'SELECT * FROM organization',
   'SELECT * FROM band',
+  'SELECT * FROM zone_visit',
   'SELECT * FROM station',
   'SELECT * FROM gateway',
   'SELECT * FROM settings',
@@ -89,6 +90,7 @@ function live() {
   const gw = conn.db.gateway.id.find(0);
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   const alerts = bands.filter(b => b.sos || b.fall);
+  const inside = [...conn.db.zoneVisit.iter()].filter(v => v.left === undefined);
   const incidents = [...conn.db.openIncidents.iter()];
   return [
     (alerts.length > 0 || incidents.length > 0) && h('section', { class: 'alert' },
@@ -101,16 +103,16 @@ function live() {
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, band ${i.subjectBand}, ${i.status.tag}, opened ${time(i.openedAt)}`)))),
     h('section', {},
       h('h3', {}, 'Zones'),
-      h('p', { class: 'muted' }, `${bands.length} bands heard in the last 5 s. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
+      h('p', { class: 'muted' }, `${inside.length} people in zones right now, ${bands.length} bands heard in the last 5 s. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
       h('table', {},
-        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'Bands'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
+        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Bands reporting'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
         zones.map(z => {
           const here = bands.filter(b => b.zone === z.stationId);
           const avg = here.length ? here.reduce((s, b) => s + b.neigh, 0) / here.length : 0;
           const level = risk(avg, settings?.yellow ?? 3, settings?.red ?? 5);
           const st = conn.db.station.id.find(z.stationId);
           return h('tr', {},
-            h('td', {}, z.name), h('td', {}, here.length), h('td', {}, avg.toFixed(1)),
+            h('td', {}, z.name), h('td', {}, inside.filter(v => v.zone === z.stationId).length), h('td', {}, here.length), h('td', {}, avg.toFixed(1)),
             h('td', { class: `level ${level.replace(' ', '-')}` }, level), h('td', {}, z.capacity),
             h('td', {}, EXIT_COLOURS[z.exitColour]), h('td', {}, `${z.stationId} ${st?.online ? 'online' : 'offline'}`));
         }))),
