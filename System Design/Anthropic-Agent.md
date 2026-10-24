@@ -11,6 +11,7 @@ Responsibilities:
 - Own the catalogue of Claude use cases: trigger, inputs, output, model and effort, validation, and the fallback when the model is unavailable.
 - Own the `model_call` table, the request hash, and the record and replay modes.
 - Own the guardrails that every Claude use case obeys.
+- Be the one place BandIt's judgments are made by a model. Elastic's agents organize and validate data and nothing more ([Elastic](Elastic.md)); a judgment about people or events (what the camera frames show, what a claim letter says, the story of the night) is a Claude use case here. A future question from staff or [Hyphenate](Hyphenate.md) about an incident ("what happened in zone 102 tonight?") also goes to Claude through this crate, over SpacetimeDB rows; it is not designed yet, and incidents never enter Elastic.
 
 Non-responsibilities:
 

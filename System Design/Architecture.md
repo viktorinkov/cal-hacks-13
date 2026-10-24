@@ -194,6 +194,49 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Anthropic-Agent.md: model calls | `model_call` rows plus response blobs | `bandit-workers`, `bandit-ingest`; Vision.md (TBD -- LEO): `bandit-vision` | used for audit and offline replay |
 | Elastic.md: raw scraped records and the organized bundle | Elastic raw indices and `bandit-bundles` | `bandit-ingest`, the organizer workflow | working data before the import; rebuilt from the snapshots at every run, never read at the event |
 
+### What each database does best
+
+SpacetimeDB solves live shared state: many devices, services and screens changing and watching the same venue at once, where every screen must agree within one transaction.
+
+What only SpacetimeDB does here:
+
+| Strength | Where BandIt uses it | Why it matters here |
+|---|---|---|
+| Logic runs inside the database, as transactions | `ingest_band_reports` opens an SOS incident, freezes its snapshot, picks the light circle and schedules the escalation in one reducer ([SpacetimeDB](SpacetimeDB.md), [Safety](Safety.md)) | every screen sees all of it or none of it; there is no app server between a band flag and the incident row |
+| Push to every client on commit | the Ops map, the medic phone, the attendee app and the bridge subscribe to queries and receive each change, with a local cache to render from | an SOS reaches the medic without polling, and the bridge reads its directives from the cache |
+| Timers inside the database | scheduled reducers: `venue_tick` turns band reports into zone state and exit colours; `memory_tick` turns presence into visits and encounters | the derived safety state is computed where the data lives, on a fixed cadence |
+| Identity and access next to the data | claiming a band by pressing it binds the band to the phone's identity; reducers check `staff_role`; views return only the caller's rows (`staff_incidents` for staff; the caller's own band and consent for attendees) | access is enforced once, in the database, for every client, so an app bug cannot widen it |
+| The space-time mapping | `presence_sample`, written by `memory_tick`: which band was in which zone, and when | it is the filter other questions start from (Social.md: visits and encounters; Elastic.md: the search filter through `api_presence_windows`) |
+| One schema, typed clients, run anywhere | `spacetime generate` gives the Rust services and both TypeScript apps the same types; the same module runs on Maincloud and standalone on the demo laptop | six kinds of clients stay in step with one schema, and the demo survives the venue Wi-Fi |
+
+Elastic.md: BandIt uses a second database because it has a second, different problem. Elastic solves finding by meaning: messy scraped text, captions and images, where the answer is a ranked list and a judgment about what matches, plus the analysis of all of it. Neither database is used for the other's job, and they meet in exactly three places, shown in the diagram after this table. What only Elastic does here:
+
+| Strength | Where BandIt uses it | Why it matters here |
+|---|---|---|
+| Ranking by meaning | `semantic_text` embeddings plus keyword matching, merged with reciprocal rank fusion, in `GET /search/booths`, `/search/memories` and `/search/photos` ([Elastic](Elastic.md)) | "booths about wearable robotics" finds booths that never use those words; SpacetimeDB filters by exact values and has no relevance ranking or vectors |
+| Images and text in one vector space | a multimodal embedding of each photo thumbnail | "the photo of me with the robot" finds photos by what is in them, not only by caption |
+| An agent that resolves messy records | the Agent Builder agent `bandit-organizer`, run by the Workflow `bandit-organize` with a JSON schema per section, searching candidates and giving a reason per merge | one company spelled three ways becomes one organisation before anything reaches the live database |
+| Bulk joins where raw data lands | ES\|QL `LOOKUP JOIN` steps match booth numbers, domains and stage names across thousands of raw records | the messy raw records never enter the live database; only the checked bundle does |
+| Place as a ranking signal | `geo_point` distance boosts "near the east hall" | distance shapes the ranking instead of only filtering it |
+| Analysis you can see | Kibana: the Workflows execution view, Agent Builder, and the Import run, Search and Event story dashboards | the team can show how the data was organized and what people looked for, without touching the live screens |
+
+The diagram answers: where do the two meet, and which way does data flow at each meeting point?
+
+```mermaid
+flowchart TB
+  BD["Bright Data records"] -->|"raw JSON"| ES["Elastic: organize, rank by meaning, analyze in Kibana"]
+  ES -->|"1. import: one checked bundle, loaded by import_event"| STDB["SpacetimeDB: live state, every write"]
+  STDB -->|"2. copy: consented rows, one way, by bandit-indexer"| ES
+  ES -->|"3. search: ranked ids only, through bandit-api, inside the caller's zones and times"| APP["Attendee app"]
+  STDB <-->|"live: subscriptions out, reducer calls in"| APP
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+  class STDB stdb
+  class ES,BD ext
+  class APP web
+```
+
 ### Which store does what
 
 | Query or data | Store | Why |
@@ -287,6 +330,8 @@ The demo runs in this order. Each step names the docs that own it.
 
 Simulator.md: a crowd of a few hundred simulated bands can run alongside the real ones so the map looks like a real event.
 
+Elastic.md: Kibana closes step 6. The team opens the Workflows run that loaded the event's real exhibitors, one merge with the agent's reason, and the Event story dashboard of where people spent their time, while the Ops dashboard stays on the live venue.
+
 ### Access model in one paragraph
 
 Every privileged reducer checks the caller's `staff_role`. People roles are `owner`, `ops`, `medic`, `merchant`, `photographer`, `floor_manager`, `risk_manager` and `adjuster`; each Rust service has its own identity with a service role (`bridge`, `simulator`, `vision`, `ingest`, `indexer`, `worker`, `api`). Tables with personal data are private; clients read them only through views keyed on who is asking, so rules such as "a medic sees a card only during an open incident" are enforced by the database, not by the app ([SpacetimeDB](SpacetimeDB.md)).
@@ -295,8 +340,8 @@ Every privileged reducer checks the caller's `staff_role`. People roles are `own
 
 | Track | What BandIt shows | Main docs |
 |---|---|---|
-| SpacetimeDB | the whole live world in one module: band reports, scheduled venue tick, incidents in one transaction, many kinds of clients on one source of truth | [SpacetimeDB](SpacetimeDB.md), [Safety](Safety.md), [Gateway-Bridge](Gateway-Bridge.md) |
-| Elastic.md: best use of Elastic Agent Builder on Serverless | an Agent Builder agent (`bandit-organizer`) that organizes scraped event data before it loads into SpacetimeDB, and meaning-ranked search over a one-way copy | [Elastic](Elastic.md) |
+| SpacetimeDB | the whole live world in one module: reducers as transactions (an SOS incident, its snapshot, its light circle and its escalation in one commit), subscriptions pushing every change to six kinds of clients, scheduled reducers computing zone state and visits, identity and per-caller views enforcing access, typed bindings for Rust and TypeScript, Maincloud with a standalone fallback | [SpacetimeDB](SpacetimeDB.md), [Safety](Safety.md), [Gateway-Bridge](Gateway-Bridge.md) |
+| Elastic.md: best use of Elastic Agent Builder on Serverless | an Agent Builder agent (`bandit-organizer`) run by a Workflow with a schema per section, which resolves messy scraped records into one checked bundle before it loads into SpacetimeDB; meaning-ranked search over booths, memories and photos (text and image vectors); Kibana views of every import run and dashboards of what people searched and where they spent time | [Elastic](Elastic.md) |
 | Hyphenate.md: autonomous systems for finance | incident-to-claim with evidence packs, coverage in code, authority matrix, learned rules, ledger | [Hyphenate](Hyphenate.md) |
 | Payments-Nessie.md: Capital One, best use of Nessie | tap to pay with press to confirm; claim payouts | [Payments-Nessie](Payments-Nessie.md) |
 | Merch.md: Visa, reimagining shopping | merch made from your own memories, bought after the event | [Merch](Merch.md) |

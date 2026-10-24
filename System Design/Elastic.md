@@ -1,6 +1,6 @@
 # Elastic
 
-Elastic Serverless does two jobs for BandIt, and nobody chats with it. Before the event it is the organizer of scraped data: `bandit-ingest` writes the raw Bright Data records into raw indices, an Elastic Workflow runs the Agent Builder agent `bandit-organizer` over them, and the organized event bundle comes back as one document that `bandit-ingest` validates and loads into SpacetimeDB with `import_event`. During and after the event it is the attendee's search: `bandit-indexer` keeps a one-way copy of booths, consented memories and photos, and `bandit-api` serves three search routes that first narrow results to where and when the caller was, then rank by meaning. Elastic never holds truth and never sits in the safety loop: if it disappears, the import falls back to rules and the search box hides, and nothing live changes.
+Elastic Serverless does two jobs for BandIt, and nobody chats with it. Before the event it is the organizer of scraped data: `bandit-ingest` writes the raw Bright Data records into raw indices, an Elastic Workflow runs the Agent Builder agent `bandit-organizer` over them, and the organized event bundle comes back as one document that `bandit-ingest` validates and loads into SpacetimeDB with `import_event`. During and after the event it is the attendee's search: `bandit-indexer` keeps a one-way copy of booths, consented memories and photos, and `bandit-api` serves three search routes that first narrow results to where and when the caller was, then rank by meaning. The team shows both jobs in Kibana: each import run step by step in the Workflows view, the agent's tool calls in Agent Builder, and three dashboards built only on data Elastic already holds. Elastic agents organize and validate data; decisions belong to Claude ([Anthropic-Agent](Anthropic-Agent.md)). Elastic never holds truth and never sits in the safety loop: if it disappears, the import falls back to rules and the search box hides, and nothing live changes.
 
 ## Role in the system
 
@@ -11,12 +11,14 @@ Responsibilities:
 - Keep a one-way copy of booths, consented memories and photos in three search indices: `bandit-booths`, `bandit-memories`, `bandit-photos`.
 - Serve three attendee-scoped search routes in `bandit-api`: `GET /search/booths`, `GET /search/memories`, `GET /search/photos`. `bandit-api` holds every Elastic credential; browsers never talk to Elastic.
 - Define one view for the search filter, `api_presence_windows`, which gives `bandit-api` the caller's zones and time windows from SpacetimeDB.
+- Give the team its Kibana views for the demo and for review: the Workflows execution view of `bandit-organize`, the organizer's tool calls in Agent Builder, and the dashboards Import run, Search and Event story, over the raw and working indices, a search log `bandit-api` writes, and the consented search copy.
 
 Non-responsibilities:
 
 - Not a source of truth. The organizer never writes to SpacetimeDB; `bandit-ingest` validates its output in Rust and calls `import_event` ([BrightData](BrightData.md)). Search results carry SpacetimeDB ids, and any action on a result (a tag confirmation, a connection request, a merch job) is an ordinary reducer call made by the app, owned by [Social](Social.md) or [Merch](Merch.md).
 - No chat. There is no agent that attendees or staff talk to, no conversation route and no per-attendee agent tools or keys. The one agent runs once per import, started by `bandit-ingest`.
-- Not in the safety path. Incidents, directives, density decisions and exit assignment never read or write Elastic ([Safety](Safety.md)). No zone statistics or dashboards live here.
+- No decisions. Elastic agents organize and validate data. Anything that is a judgment about people or events, including any question from staff or [Hyphenate](Hyphenate.md) about an incident, goes to Claude through `claude-client` over SpacetimeDB rows ([Anthropic-Agent](Anthropic-Agent.md)); incidents never enter Elastic.
+- Not in the safety path. Incidents, directives, density decisions and exit assignment never read or write Elastic ([Safety](Safety.md)). No zone statistics live here, and no Kibana view is used to run the live event: the live screen is the [Ops-Dashboard](Ops-Dashboard.md).
 - Never receives medical, insurance, payment or bank data, raw `band_report` or `presence_sample` rows, incidents, scraped `person` or `claim_contact` rows, or any visit, encounter or photo tag the attendee has not consented to share.
 - Does not fetch pages. Bright Data owns every step that touches the web and `bandit-ingest` drives it ([BrightData](BrightData.md)). Elastic receives JSON records, never raw HTML or Markdown, and never runs a model pass per page. The one web call made from Elastic is the organizer's gap-fill tool, which is itself a Bright Data MCP call, capped per run.
 
@@ -30,7 +32,7 @@ Non-responsibilities:
 | Agent tools | internal | `bandit-organizer` | fixed ES\|QL queries and one index search tool over the raw indices; one MCP tool for gap filling | Elastic-internal |
 | Bright Data Web MCP, gap fill | out | `bandit-organizer`, through an Agent Builder MCP tool | `extract` with the null rule on an organisation or event page URL that the raw records name but no snapshot covers (for example an exhibitor whose website was never fetched); back comes one JSON record with `source_url` and `fetched_at`; at most 10 calls per run (starting value) | HTTPS JSON-RPC from Elastic to the remote MCP server, with a Bright Data zone token of its own that has its own spending limit ([BrightData](BrightData.md)) |
 | `bandit-bundles` | out | `bandit-ingest` | one bundle document per run: the organized sections, a match reason per merge, a gaps list, the gap-fill records with their `source_url` and `fetched_at`, the agent's model and tool-call count | HTTPS `_search` by run id, ingest API key |
-| Agent Builder converse (fallback) | in | `bandit-ingest` | when Workflows are unavailable: `agent_id` `bandit-organizer`, the run id and the section schema in the input; back comes JSON text that `bandit-ingest` validates itself | HTTPS to Kibana, ingest API key |
+| Agent Builder converse (fallback) | in | `bandit-ingest` | when a workflow execution fails to start or errors before writing the bundle: `agent_id` `bandit-organizer`, the run id and the section schema in the input; back comes JSON text that `bandit-ingest` validates itself | HTTPS to Kibana, ingest API key |
 | SpacetimeDB subscription | in | `bandit-indexer` (role `indexer`) | rows of `venue`, `zone`, `station`, `booth`, `schedule_slot`, `consent`; from BrightData.md: `organization`, `hall`; from Social.md: `visit`, `encounter`, `photo`, `photo_tag` | SpacetimeDB Rust client SDK over WebSocket; initial full sync then every committed change |
 | `heartbeat` reducer | out | `bandit-indexer` | service `indexer`, version, counters (documents written, bulk failures, lag seconds) every 5 s into `service_heartbeat` | SpacetimeDB reducer call |
 | Elastic Bulk API, search indices | out | `bandit-indexer` | index and delete operations keyed by document id | HTTPS, indexer API key (write on `bandit-booths`, `bandit-memories`, `bandit-photos`) |
@@ -39,7 +41,9 @@ Non-responsibilities:
 | `GET /search/photos` | in | Attendee app | query text, optional `since` and `until`, `limit`; returns ranked photos taken where and when the caller was, or that the caller is tagged in, with `photo_id`, `zone_id`, `taken_at`, caption snippet, `thumbnail_blob_id` | HTTPS JSON on `bandit-api`; `api_session` token required |
 | `api_session` lookup | in | `bandit-api` | the app's session token in the `Authorization` header, hashed and matched against `bandit-api`'s subscription to `api_session` to get the caller's attendee id | SpacetimeDB subscription (defined in [SpacetimeDB](SpacetimeDB.md)) |
 | `api_presence_windows` view | in | `bandit-api` (role `api`) | one row per stay for every attendee: attendee id, zone id, start, end, collapsed from `presence_sample` by the module | SpacetimeDB subscription; the view is defined by this file |
-| Elasticsearch search | out | `bandit-api` | filtered hybrid queries on the three search indices | HTTPS, one service API key (read on `bandit-booths`, `bandit-memories`, `bandit-photos`) |
+| Elasticsearch search | out | `bandit-api` | filtered hybrid queries on the three search indices | HTTPS, one service API key (read on `bandit-booths`, `bandit-memories`, `bandit-photos`; write on `bandit-search-log`) |
+| `bandit-search-log` | out | `bandit-api` | one document per search: route, time, latency, hit count, the top booth ids for booth searches and the query text for booth searches only; no attendee id, and no query text for memory or photo searches | HTTPS index request with the same service key, fire and forget |
+| Kibana | in | the team, signed in to the Elastic Cloud project | the Workflows execution view, Agent Builder, and the dashboards Import run, Search and Event story; read only on every BandIt index | HTTPS in a browser; Elastic Cloud logins, never attendees |
 
 ## Design
 
@@ -65,8 +69,9 @@ Presence is zone-level only ([SpacetimeDB](SpacetimeDB.md)), so a memory is "in 
 
 - It does not serve plain lists. "My visits", "my encounters", "my photos in zone Z between 9 and 10", "the booth with number B12" and "my connections" are SpacetimeDB views and subscriptions in the apps; the search routes require a query and answer only ranked questions.
 - It does not decide who may see what. The indexer copies only rows the `consent` rows allow, and `bandit-api` builds every caller filter from SpacetimeDB rows (`api_session`, `api_presence_windows`). No Elastic query, model or key ever decides access.
-- It does not hold live state or history. Live counts, zone state, incidents and the zone history in `zone_sample` stay in the module and reach screens by subscription; there are no zone statistics or dashboards in Elastic.
+- It does not hold live state or history. Live counts, zone state, incidents and the zone history in `zone_sample` stay in the module and reach screens by subscription. The Kibana dashboards read only the organizer's working data, the search log and the consented copy; none of them shows a live count, a zone's density or a person.
 - It does not write to SpacetimeDB. The organizer's bundle is loaded by `bandit-ingest` through `import_event`; a search result becomes an action only through a reducer the app calls.
+- It does not decide. The organizer links and checks records; judgments about incidents, claims, summaries and merch are Claude's ([Anthropic-Agent](Anthropic-Agent.md)).
 - It does not talk to anyone. There is no chat agent; the one agent runs once per import and reads the raw indices of that run, plus at most a handful of Bright Data MCP calls to fill gaps, whose results go back into the raw indices and the snapshots.
 - It does not fetch or crawl. Elastic's Open Crawler is not used: it handles only static sites, and Bright Data owns fetching ([BrightData](BrightData.md)). Raw records reach Elastic through `bandit-ingest`'s bulk indexing, because Bright Data cannot deliver to Elasticsearch directly, and there are no scheduled re-scrapes: one run per import.
 - It does not read floor plans. Booth geometry comes from the Rust map stage in `bandit-ingest` and reaches Elastic as plan records; `floorplan_check` stays a Claude call in that stage.
@@ -113,7 +118,7 @@ flowchart TB
 
 **The workflow.** `bandit-organize` is an Elastic Workflow that `bandit-ingest` starts once per import run through the Workflows API, passing the run id. Its first steps are deterministic: fixed ES|QL queries with `LOOKUP JOIN`, parameterised only by the run id, that make the exact joins and write their results to a per-run join index (`bandit-joins`). They join an organisation candidate to its company facts on `domain`, a booth mention to its geometry on `booth_number_norm`, a schedule item to a stage booth or zone on `location_norm`, and a person candidate to an organisation on the `org_key` printed on the same page. Nothing a model says can change these rows. Then come the `ai.agent` steps, one per bundle section, in dependency order (organisations, then booths, then people, then schedule and gaps), each with that section's JSON `schema`, and each given only the records the joins left unmatched plus the join results to build on, so the agent's output is structured and a malformed answer fails inside Elastic rather than in Rust. A final index step writes the sections, the match reasons, the gap-fill records and the gaps list as one document to `bandit-bundles`, keyed by the run id. `bandit-ingest` polls the execution, reads the document, saves every gap-fill record as a snapshot and bulk-indexes it into the raw indices of the run, and then validates the bundle in Rust against the same rules `import_event` enforces: every `source_key` must exist in the raw indices of that run, every organisation reference must resolve, booth numbers must be unique per hall, zone and stage names must exist, every category must come from the fixed list, and the gap-fill count must be within the cap. The second validation is deliberate: Elastic shapes the bundle, Rust decides whether it is loadable, and `import_event` decides once more inside the transaction. Why a workflow and not a plain converse call: the join steps and the `ai.agent` step give deterministic links, a schema-checked answer and a durable record of the run, and the bundle lands in an index where a reviewer can read it next to the raw records.
 
-**The fallback.** If Workflows are not available on the Serverless project (an open question below), `bandit-ingest` calls the Agent Builder converse API directly with the same instructions and the section schema in the input, parses the answer as JSON, validates it, and on failure sends the validation errors back on the same conversation once. If the second answer still fails, that section is assembled by rules plus the Claude `scrape_extract` call in `bandit-ingest` ([BrightData](BrightData.md)), which is also what happens when Elastic is absent altogether. `scrape_extract` runs in no other case, so the cross-source merge has one owner at a time. In the fallback the exact joins are the same rules in Rust (domain, normalised booth number, exact stage name), so a section is linked the same way whichever side does it.
+**The fallback.** Elastic's docs list Workflows as generally available on Elastic Cloud Serverless; the feature is turned on in the project settings and needs a role with workflow privileges ([manage workflows](https://www.elastic.co/docs/explore-analyze/workflows/authoring-techniques/manage-workflows)). So the workflow is the normal path. If an execution fails to start, or errors before it writes the bundle document, `bandit-ingest` calls the Agent Builder converse API directly with the same instructions and the section schema in the input, parses the answer as JSON, validates it, and on failure sends the validation errors back on the same conversation once. If the second answer still fails, that section is assembled by rules plus the Claude `scrape_extract` call in `bandit-ingest` ([BrightData](BrightData.md)), which is also what happens when Elastic is absent altogether. `scrape_extract` runs in no other case, so the cross-source merge has one owner at a time. In the fallback the exact joins are the same rules in Rust (domain, normalised booth number, exact stage name), so a section is linked the same way whichever side does it.
 
 **What the agent decides.** The instructions, in prose (the exact wording lives in the agent configuration):
 
@@ -328,12 +333,58 @@ sequenceDiagram
 
 Every response carries SpacetimeDB ids only. The app renders cards from its own subscriptions, shows thumbnails through `bandit-api`'s blob download under the photo's access class ([Social](Social.md) sets it), and acts by calling reducers. A 10 s (starting value, calibrate) timeout on the Elastic call returns an unavailable error and the app falls back to its exact lists.
 
+### Part three: Kibana, what the team shows
+
+Kibana is the web interface of the Elastic project. It is where the workflow and the agent are configured, and it is also the most visual way to show the Elastic side of BandIt: how messy scraped records became one checked bundle, and what people looked for. It reads only what Elastic already holds. The live event is shown on the [Ops-Dashboard](Ops-Dashboard.md) from SpacetimeDB subscriptions, so no Kibana view repeats a live count, a zone's density or an incident. Only the team opens Kibana, signed in to the Elastic Cloud project; attendees never see it.
+
+The diagram answers: which Kibana view reads which data, and where does that data come from?
+
+```mermaid
+flowchart LR
+  subgraph Sources["Data Elastic holds"]
+    RUN["One import run: raw indices, bandit-joins, bandit-bundles"]
+    LOG["bandit-search-log (written by bandit-api)"]
+    COPY["Search copy: bandit-booths, bandit-memories, bandit-photos"]
+  end
+  subgraph Kibana["Kibana, opened by the team"]
+    WFV["Workflows: executions of bandit-organize, step by step"]
+    ABV["Agent Builder: the organizer's tool calls and reasons"]
+    D1["Dashboard: Import run"]
+    D2["Dashboard: Search"]
+    D3["Dashboard: Event story (after the event)"]
+  end
+  RUN --> WFV
+  RUN --> ABV
+  RUN --> D1
+  LOG --> D2
+  COPY --> D3
+  STDB["bandit module: live state"] -->|"subscriptions"| OPS["Ops dashboard: the live screen"]
+  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+  class RUN,LOG,COPY,WFV,ABV,D1,D2,D3 ext
+  class STDB stdb
+  class OPS web
+```
+
+| Kibana view | Reads | What it shows | When the team opens it |
+|---|---|---|---|
+| Workflows, executions of `bandit-organize` | the workflow's own run record | each step of one import run in order: the `LOOKUP JOIN` steps with their match counts, each `ai.agent` section, the final index step, the time each took and any error | in the demo, to show how the event got loaded; when an import needs debugging |
+| Agent Builder, the organizer | the agent's runs | the tools the agent called, the candidates each search returned, the gap fetches it made, and the one-sentence reason behind every merge | in the demo, next to the workflow; when a reviewer checks a merge |
+| Dashboard: Import run | raw indices, `bandit-joins`, `bandit-bundles` for the latest run | records per source and kind; how each record was matched (exact join, alias join, agent, unmatched) as one stacked bar per kind; a table of merges with their reasons; the gaps list; gap-fill calls used against the cap; booths with and without a plan position | before the load stage, to review the bundle; in the demo, to show the validation |
+| Dashboard: Search | `bandit-search-log` | searches per route over time, latency, the share of searches with no hit, the booths booth searches returned most, and the most common booth queries | during and after the event; a quick health check on search |
+| Dashboard: Event story | `bandit-booths`, `bandit-memories`, `bandit-photos` | a Kibana Maps layer of booths sized by total consented visit minutes; visit minutes per booth category per hour; photos per zone per hour; the top booths by time spent. Totals only, never a person | after the event, in the closing demo |
+
+Every dashboard is saved as part of the project setup, so it shows the saved import run even when no new run happens. The Event story is built from the consented search copy, so a visit or photo an attendee withheld is never counted, and it holds no zone history: `zone_sample` stays in SpacetimeDB.
+
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
 | Elastic Serverless unreachable at import time | The organizer cannot run | `bandit-ingest` assembles the bundle itself with rules plus `scrape_extract` ([BrightData](BrightData.md)); the saved bundle covers the demo |
-| Workflows not available on the project | No `bandit-organize` execution | `bandit-ingest` calls the converse API directly, validates the JSON itself and retries once with the errors; then the rules path |
+| Workflow execution fails to start or errors before writing the bundle | No bundle document for the run | `bandit-ingest` calls the converse API directly, validates the JSON itself and retries once with the errors; then the rules path |
+| Kibana slow or a dashboard empty during the demo | Nothing to show on the Elastic side | Nothing live reads Kibana; the dashboards are saved with the project and show the saved import run; the Workflows and Agent Builder views keep the record of every past run |
+| `bandit-search-log` write fails | A search is missing from the Search dashboard | The log write is fire and forget and never delays or fails the search itself |
 | Agent output fails the Rust validation (unknown source key, dangling reference, duplicate booth number) | Section not loadable | The section is rebuilt by rules; the bad output stays in `bandit-bundles` for review; nothing reaches `import_event` unvalidated |
 | Agent merges two different organisations | Wrong facts on a booth | A merge needs a domain match or a candidate from the ladder, never a name alone; every merge carries a reason, and the import report lists merges for a person to read before the load stage |
 | Gap-fill tool runs away (too many calls, or a person page) | Credits spent, scope rule broken | The instruction caps it at 10 per run, the Bright Data zone token has its own spending limit, and `bandit-ingest` drops any gap-fill record of kind person and fails validation when the count exceeds the cap |
@@ -361,7 +412,7 @@ Every response carries SpacetimeDB ids only. The app renders cards from its own 
 - [Rust-Backend](Rust-Backend.md): the `bandit-api` and `bandit-ingest` process shells, configuration and secret handling for the Elastic keys.
 - [Social](Social.md): `visit`, `encounter`, `photo`, `photo_tag` and the consent semantics behind them (optional; without it the memory and photo indices are empty).
 - [Anthropic-Agent](Anthropic-Agent.md): only if Claude is chosen as the organizer agent's LLM; the endpoint is configured in Elastic and does not pass through `claude-client`.
-- An Elastic Cloud Serverless project with Agent Builder and, if available, Workflows enabled.
+- An Elastic Cloud Serverless project with Agent Builder and Workflows (both on Serverless), and Kibana for the team.
 
 **Used by**
 
@@ -369,10 +420,11 @@ Every response carries SpacetimeDB ids only. The app renders cards from its own 
 - [Attendee-App](Attendee-App.md): the search box over `GET /search/booths`, `GET /search/memories` and `GET /search/photos`.
 - [Ops-Dashboard](Ops-Dashboard.md): the indexer's heartbeat card.
 - [Architecture](Architecture.md): the organizer and search container.
+- The team, in Kibana: the Workflows and Agent Builder views and the Import run, Search and Event story dashboards.
 
 **If you delete this file**
 
-- Remove `bandit-indexer` and the three `/search/*` routes from [Rust-Backend](Rust-Backend.md) (process table, binaries row, endpoint registry, the open question on laptop placement) and from [Architecture](Architecture.md) (interfaces rows, context and container diagrams, deployment diagram, data ownership rows, demo flow 6, the prize row and the failure row).
+- Remove `bandit-indexer` and the three `/search/*` routes from [Rust-Backend](Rust-Backend.md) (process table, binaries row, endpoint registry, the open question on laptop placement) and from [Architecture](Architecture.md) (interfaces rows, context and container diagrams, deployment diagram, data ownership rows, demo flow 6, the prize row and the failure row; in "What each database does best", the paragraph starting "Elastic.md:", its table and the diagram after it).
 - Remove the "Elastic.md" rows from [SpacetimeDB](SpacetimeDB.md) (the `bandit-indexer` interfaces row, the `indexer` role row, the subscriptions row, the registry row and the `api_presence_windows` mention on the `api` role) and turn its "Copied" markers into "Not copied".
 - Remove the Elastic.md organize stage row, interface row, diagram node, sequence steps, failure row and dependency bullets from [BrightData](BrightData.md); `bandit-ingest` then always assembles the bundle with rules plus `scrape_extract`.
 - Remove the search box rows from [Attendee-App](Attendee-App.md), the indexer heartbeat rows from [Ops-Dashboard](Ops-Dashboard.md), the Elastic row from the use-case table in [Anthropic-Agent](Anthropic-Agent.md), the Elastic bullets from [Social](Social.md), and the Elastic row and node in [README](README.md).
@@ -381,6 +433,4 @@ Every response carries SpacetimeDB ids only. The app renders cards from its own 
 
 ## Open questions
 
-- Are Workflows available on the Serverless project? They were in preview at launch. If not, the converse fallback is the only organizer path, the exact joins run as ES|QL queries sent by `bandit-ingest`, and the bundle document is written by `bandit-ingest` itself.
-- Can Agent Builder on the project register Bright Data's remote MCP server as a tool, and can a per-run call count be enforced inside Elastic? If not, the zone token's spending limit is the only hard cap and the instruction is the soft one.
-- Do incident questions from staff or from [Hyphenate](Hyphenate.md) (for example "what happened in zone 102 tonight?") go to an Elastic agent over an incident export, or to Claude through `claude-client`? Undecided; neither exists today.
+- Check at setup: whether Agent Builder can enforce a per-run call count on the Bright Data MCP tool. The design does not depend on it: the instruction, the Bright Data zone token's spending limit and the Rust validation already hold the cap of 10 calls per run.
