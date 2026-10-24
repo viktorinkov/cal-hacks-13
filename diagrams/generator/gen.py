@@ -62,15 +62,15 @@ def architecture(y0):
     y = Y0 + 190
     venue, social = row(880, y, 280, 20, [
         ("Venue\nevent_state, zones, organizations, booths, schedule, scraped profiles", None),
-        ("Social\nvisits, people you hung out with, the people graph, photo tags", None)])
+        ("Social\nvisits, shared visits, people you hung out with, the people graph, photo tags; the simulated crowd on bands 10 to 89", None)])
     y += venue.h + 30
     band1t, safety = row(880, y, 280, 20, [
         ("Band and encounter model (TBD Leo)\nbands, stations, encounters, zone visits", "tbd"),
         ("Safety\nincidents from SOS and falls; zone risk, exit colours, buzz", None)])
     y += band1t.h + 30
     insurance, pay = row(880, y, 280, 20, [
-        ("Insurance\nclaims, evidence packs, learned rules, ledger", None),
-        ("Payments and merch\nwallets, payments, merch templates and orders", None)])
+        ("Insurance\nclaims, evidence packs, learned rules, ledger, claimant_account (the Nessie wallet)", None),
+        ("Payments and merch\nthe wallet_entry ledger, merch templates and orders", None)])
     y += insurance.h + 30
     jobs, roles = row(880, y, 280, 20, [
         ("Jobs\nslow and outside work, done by bandit-workers", None),
@@ -83,7 +83,7 @@ def architecture(y0):
     stations = S.box(60, L(bands.bottom) + 80, 200, "Station markers 101 to 105\nzone anchors, exit colours",
                      "device")
     gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
-    sim = S.box(460, 0, 300, "bandit-sim\nsimulated bands: the crowd on ids 10 to 89, demo bands on 90 to 99, each with a simulated owner", "rust",
+    sim = S.box(460, 0, 300, "bandit-claims (demo tool)\ndrives demo bands 90 to 99 through report_sim_band and plants the claims", "rust",
                 cy=L(venue.cy))
     bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band_reports every 250 ms, directives out",
                    "rust", cy=L(band1t.cy))
@@ -92,7 +92,7 @@ def architecture(y0):
                    cy=L(jobs.cy))
 
     # Rust services
-    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; GET /recap/order; holds the Elastic key", "rust")
+    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; POST /api/blobs, GET /recap/order, demo routes; holds the Elastic key", "rust")
     indexer = S.box(1640, L(api.bottom) + 50, 300, "bandit-indexer\none-way copy of booths and interests into "
                                                     "Elastic", "rust")
     bd_label = "Bright Data Web MCP\nscrapes event pages, company pages and the floor plan"
@@ -130,12 +130,12 @@ def architecture(y0):
     S.v(bands, gateway, x=S.ox + 312, label="ESP-NOW\n10 Hz", both=True)
     S.h(gateway, bridge, label="USB serial")
     S.h(bridge, band1t, label="reports and\ndirectives", both=True)
-    S.h(sim, stdb, y=sim.cy, label="simulated\nreports")
+    S.h(sim, stdb, y=sim.cy, label="report_\nsim_band")
     S.h(camera, vision)
     S.h(vision, stdb, y=vision.cy, label="alerts")
     S.v(app, stdb, x=app.cx, label="subscriptions,\nreducer calls", both=True)
     S.v(ops, stdb, x=ops.cx, label="end_event,\napprovals", both=True)
-    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="recap order")
+    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="uploads, recap order")
     S.h(app, auth, y=app.y + 0.3 * app.h, label="sign-in")
     S.v(kib, ez, x=kib.cx, label="reads")
     S.h(stdb, api, y=api.cy, label="reads rows")
@@ -235,7 +235,7 @@ def insurance(y0):
 
     fall = S.box(300, 0, 260, "Fall or SOS\nthe band flags it; bands close by pulse blue and become witnesses",
                  "device", cy=c["L1"] + 15)
-    medic = S.box(610, 0, 260, "Medic\nadds a treatment note, attaches the urgent-care bill, resolves", "web",
+    medic = S.box(610, 0, 260, "Medic\nadds a treatment note, uploads the bill through POST /api/blobs, resolves", "web",
                   cy=c["L1"] + 15)
     cam = S.box(1500, 0, 260, "Overhead camera (TBD Leo)\na second source for falls; sees property damage", "tbd",
                 cy=c["L1"] + 15)
@@ -248,18 +248,18 @@ def insurance(y0):
                                 "check", "stdb", cy=top2)
     pack = S.box(1500, 0, 260, "Evidence pack, hashed\nband report, light circle, staff notes, bill, policy", "stdb",
                  cy=top2)
-    prec = S.box(1500, 0, 320, "Similar past claims\na de-identified copy checked by bandit-claims-validate; top 3 "
-                               "shown as checks, never change an amount", "ext", cy=c["L4"] + 10)
-    checks = S.box(1820, 0, 380, "Code checks\ncorroboration, staff, duplicate, cover", "stdb", shape="diamond",
+    prec = S.box(1500, 0, 320, "Similar past claims\nbandit-claims-validate checks a de-identified copy; the top 3 come "
+                               "back as checks and never refuse", "ext", cy=c["L4"] + 10)
+    checks = S.box(1820, 0, 380, "Code checks at claim open\ncorroboration, staff, cover, payout", "stdb", shape="diamond",
                    h=220, fs=18, cy=top2)
     refused = S.box(1880, 0, 260, "Refused\nevery check listed, both values side by side", "bad", cy=810)
-    cause = S.box(2190, 0, 300, "Causation review: claim_review\nClaude: does the injury follow from the fall? follows or doubt, "
-                                "no amounts", "ext", cy=c["L3"] + 10)
+    cause = S.box(2190, 0, 300, "Causation review: claim_review\nClaude: does the injury follow from the fall? doubt sends it "
+                                "to a person", "ext", cy=c["L3"] + 10)
     rule = S.box(2540, 0, 380, "Rule matches?\nshape, ceiling, corroborated, follows, not mass", "stdb",
                  shape="diamond", h=220, fs=18, cy=top2)
     auto = S.box(3030, 0, 260, "Auto-settled\ncites the rule version and who approved it", "good", cy=top2)
-    route = S.box(2580, 0, 300, "Named approver\nlowest role whose ceiling covers the payout: floor manager $500, "
-                                "risk manager $5,000; 3 or more hurt go to the adjuster", "web", cy=c["L5"] + 10)
+    route = S.box(2580, 0, 300, "Named approver\nthe lowest role whose ceiling covers the payout: floor manager $500, "
+                                "risk manager $5,000; 3 or more hurt: the adjuster", "web", cy=c["L5"] + 10)
     approve = S.box(3030, 0, 280, "Approve, learn on\nfails closed as stale if the amount or pack changed; writes "
                                   "rule v1 with the approver's name", "web", cy=c["L5"] + 10)
     settle = S.box(3370, 0, 260, "Settling\nledger journals: J1 reserve, J2 approval, J3 paid", "stdb", cy=top2)
@@ -291,6 +291,7 @@ def insurance(y0):
     S.h(rule, auto, y=rule.cy, label="yes")
     S.v(rule, route, x=rule.cx, label="no")
     S.h(route, approve, label="approve")
+    S.link(route, "l", refused, "b", via=[(refused.cx, route.cy)], label="refuse_claim, J1r")
     # the learning loop back into the rule check
     lx = rule.right + 40
     ly = rule.cy + 55
@@ -310,18 +311,19 @@ def insurance(y0):
             "manager on the Ops dashboard on their own phone.\n2. A late note makes the first tap fail as stale; the judge approves "
             "again. The payout lands in the wallet and rule v1 is created with the judge's name on it.\n3. A "
             "similar fall from the simulator settles in seconds under rule v1.\n4. A fake with witnesses in "
-            "another zone is refused with every check listed.")
+            "another zone is refused by code with every check listed.")
     S.panel(1260, py, 1260, "Edge cases, live or in the stress test",
             "Injury happened at home: Claude says doubt, a person decides.\nWitness bands in another zone: "
-            "refused, zones side by side.\nAmount changed while approving: fails closed as stale.\nSame bill "
-            "scanned again: refused as a duplicate bill.\nInjured person is venue staff: refused, workers' comp "
-            "applies.\nThree or more hurt in one incident: every claim goes to the adjuster.", kind="bad")
+            "refused at claim open as witness_zone, zones side by side.\nAmount changed while approving: fails "
+            "closed as stale.\nSame bill scanned again: marked duplicate, pays nothing, refused as zero_payout."
+            "\nInjured person is venue staff: refused at claim open; workers' comp applies.\nThree or more hurt in "
+            "one incident: every claim goes to the adjuster.\nOnly code at claim open and the named approver refuse.", kind="bad")
     S.panel(2560, py, 1340, "Accuracy run and scorecard, before the demo",
-            "bandit-sim plants 3 rounds of 12 genuine claims and 6 decoys (sitting down, dropped phone, fake "
+            "bandit-claims plants 3 rounds of 12 genuine claims and 6 decoys (sitting down, dropped phone, fake "
             "witnesses) through the same reducers a medic uses.\nStraight-through rate per round, rising as rules "
             "are learned.\nDollars wrongly paid on decoys: target $0.\nAuto-settle precision and recall; bill-review "
             "savings; incident to payout time; human touches per claim.\nShown in the Claims queue and the Kibana "
-            "claims dashboard.", kind="good")
+            "Claims evidence dashboard.", kind="good")
     return S.end_frame()
 
 
@@ -341,10 +343,11 @@ def social(y0):
     for lbl, k in [("Tap the band with your phone\nits NFC sticker opens /t/{token} in the attendee app", "web"),
                    ("Sign in with SpacetimeAuth\na magic link at the first tap; the same identity on every device", "ext"),
                    ("Press the band's button when it blinks white\nthe band is now yours", "web"),
-                   ("Is this you?\npick your scraped speaker or exhibitor profile and press the band to confirm",
-                    "web"),
-                   ("Your name and Meta socials\nInstagram, Facebook, Threads, typed by you", "web"),
-                   ("Nessie wallet\n$200, opened when you save your name", "ext")]:
+                   ("Your display name\nsaving it opens your wallet", "web"),
+                   ("Is this you?\none tap on your scraped speaker or exhibitor profile; claim_person links it to "
+                    "you as the band's owner", "web"),
+                   ("Your Meta socials\nInstagram, Facebook, Threads, typed by you", "web"),
+                   ("Nessie wallet\nwallet_open puts $200 in claimant_account when you save your name", "ext")]:
         b = S.box(70, y, 500, lbl, k)
         a.append(b)
         y = L(b.bottom) + 46
@@ -362,18 +365,20 @@ def social(y0):
     b5 = S.box(720, L(max(b3.bottom, b4.bottom)) + 70, 710, "People graph: people_link\nmet, visited, works at, "
                                                            "exhibits; written in the same transaction as the visit "
                                                            "or encounter, so the big screen grows live", "stdb")
-    b6 = S.box(1480, 260, 320, "Photographer's photo\nits zone is the photographer's band zone at that moment",
+    b6 = S.box(1480, 260, 320, "Photographer's photo\nuploaded through POST /api/blobs; its zone is the photographer's band zone then",
                "web")
     b7 = S.box(1480, L(b2.y), 320, "Suggested photo tags\nfindable people whose bands were in that zone; each "
                                    "confirms or removes their tag", "stdb")
     b8 = S.box(1480, L(b7.bottom) + 60, 320, "Photo features (TBD Leo)\npeople count and caption", "tbd")
+    b9 = S.box(720, L(b5.bottom) + 60, 400, "Shared visits: shared_visit\ntwo findable people in one zone for 5 minutes "
+                                           "or more, met or not", "stdb")
 
     # 3. after the event
     c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nend_event in the host portal writes event_state; reopen_event undoes it", "web")
     c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to event_state; /t/{token} "
                                              "reopens it later on any device", "web")
-    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_visits, my_photos: the exact lists of "
-                                             "who and what", "stdb")
+    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_shared_visits, my_visits, my_photos: the "
+                                             "exact lists of who and what", "stdb")
     c4 = S.box(2420, 0, 380, "Elastic orders the lists\nGET /recap/order on bandit-api, by meaning against your "
                              "interests (bandit-people, bandit-booths)", "ext", cy=L(c3.cy))
     c5 = S.box(1940, L(max(c3.bottom, c4.bottom)) + 60, 860, "Your recap page\n1. your space-time view of the night\n"
@@ -384,10 +389,10 @@ def social(y0):
     c6 = S.box(1940, L(c5.bottom) + 60, 420, "Merch suggestions\nyour confirmed photo placed in a hand-made template "
                                              "(tee, mug, poster, sponsor booth items); top 3 by minutes at that booth",
                "stdb")
-    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch checks the wallet balance in the same transaction; Nessie records the purchase", "ext",
+    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch checks the wallet balance in the same transaction; merch_purchase records it on Nessie", "ext",
                cy=L(c6.cy))
 
-    zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom)) + 40
+    zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom), L(b9.bottom)) + 40
     S.zone(40, zt, 560, zb - zt, "1. At the door", "web")
     S.zone(690, zt, 1140, zb - zt, "2. During the event", "stdb")
     S.zone(1910, zt, 920, zb - zt, "3. After the event", "plain")
@@ -397,6 +402,8 @@ def social(y0):
     S.v(b2, b3, x=b3.cx)
     S.link(b2, "r", b4, "t", fa=0.75, via=[(b4.cx, b2.y + 0.75 * b2.h)])
     S.v(b3, b5, x=b3.cx, label="visited")
+    S.link(b3, "l", b9, "l", via=[(b3.x - 18, b3.cy), (b3.x - 18, b9.cy)])
+    S.link(b9, "r", c3, "l", fb=0.9, via=[(1890 + S.ox, b9.cy), (1890 + S.ox, c3.y + 0.9 * c3.h)])
     S.v(b4, b5, x=b4.cx, label="met")
     S.v(b6, b7, x=b6.cx)
     S.v(b8, b7, x=b8.cx, dashed=True, label="re-cap to\nthe count")
