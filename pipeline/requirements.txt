@@ -1,3 +1,4 @@
 pyserial
 requests
 Pillow
+pillow-heif
