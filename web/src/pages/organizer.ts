@@ -1,8 +1,7 @@
 // The host portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the import runs, Kibana, and "Event ended".
-// The caller's staff roles decide the tabs: ops and the module owner get the whole portal, a medic or
-// an approver only the Claims tab. The module checks every role again, so this is convenience, not
-// security. The owner also grants and revokes roles from the attendee list.
+// One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
+// and the module checks every role again. The owner also grants and revokes roles from the attendee list.
 
 import {
   act, actors, config, connect, date, field, h, idToken, money, mount, playedToken, risk, short, signIn,
@@ -79,13 +78,11 @@ function can(...wanted: string[]): boolean {
   return wanted.some(r => mine.has(r));
 }
 
-/** The tabs the caller's roles open: the whole portal for ops, only Claims for a medic or an approver. */
+/** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
-  if (can('ops')) {
-    const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana']];
-    return cfg.simulate ? [...all, ['simulate', 'Simulate']] : all;
-  }
-  return can('medic', ...APPROVERS) ? [['claims', 'Claims']] : [];
+  if (!can(...STAFF_ROLES)) return [];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['data', 'Imports and Kibana']];
+  return cfg.simulate ? [...all, ['simulate', 'Simulate']] : all;
 }
 
 function zoneName(id: bigint) {
@@ -462,12 +459,8 @@ function rules() {
     policy && h('p', { class: 'muted' }, `Policy ${policy.policyNumber} with ${policy.insurerName}. Medical payments used ${money(policy.medicalUsedCents)}, property used ${money(policy.propertyUsedCents)}.`));
 }
 
-/** Approvers see their queue first; the medic and ops see the open incidents first. */
 function claimsTab() {
-  const detail = openClaim !== undefined && claimDetail(openClaim);
-  return can('ops', 'medic')
-    ? [incidentDesk(), detail, myQueue(), claimList(), rules()]
-    : [myQueue(), detail, claimList(), rules(), incidentDesk()];
+  return [incidentDesk(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
 }
 
 // --- Imports and Kibana ---------------------------------------------------------------------
