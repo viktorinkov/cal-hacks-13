@@ -3,4 +3,5 @@
 !.env.example
 .DS_Store
 target/
+var/
 .dev/
