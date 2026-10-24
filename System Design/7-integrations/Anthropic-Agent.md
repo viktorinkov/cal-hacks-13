@@ -1,6 +1,6 @@
 # Anthropic Agent
 
-BandIt uses Claude where words or pictures must be read or written: reading a medical PDF into a card, reading booth numbers off the floor plan image, reading an urgent-care bill into service lines, judging whether an injury on a bill follows from the fall a band recorded, drafting the notice of loss or a recovery letter, and, in the vision design (TBD -- LEO), judging what a few camera frames show after a band has already raised the alarm and, after the event, counting the people in each photographer photo and captioning it. Every call goes through one Rust crate, `claude-client`, on one model, `claude-opus-5-5`, made by a Rust process from a `job` row or an event, never from the safety loop. Every call is recorded in `model_call`, so scripted demo calls replay instantly and a rerun gives the same bytes. The model reads and writes words; code decides money, coverage, safety and access.
+BandIt uses Claude where words or pictures must be read or written: reading an attendee's medical history and health insurance PDFs into a card, reading booth numbers off the floor plan image, reading an urgent-care bill into service lines, judging whether an injury on a bill follows from the fall a band recorded, drafting the notice of loss or a recovery letter, and, in the vision design (TBD -- LEO), judging what a few camera frames show after a band has already raised the alarm and, after the event, counting the people in each photographer photo and captioning it. Every call goes through one Rust crate, `claude-client`, on one model, `claude-opus-5-5`, made by a Rust process from a `job` row or an event, never from the safety loop. Every call is recorded in `model_call`, so scripted calls replay instantly and a rerun gives the same bytes. The model reads and writes words; code decides money, coverage, safety and access.
 
 ## Role in the system
 
@@ -30,7 +30,7 @@ Non-responsibilities:
 | In | Blob store folder on the Fly volume ([Rust-Backend](../3-services/Rust-Backend.md)) | PDF bytes for `medical_extract` and Hyphenate's `claim_record_extract`, each found through its `blob_ref` | Read directly from the folder, because `bandit-workers` runs on the same Fly.io Machine as `bandit-api` |
 | In | `bandit-ingest` | `floorplan_check` at ingest time, no job row; recorded with role `ingest` ([BrightData](BrightData.md)) | In-process |
 | In | `bandit-vision` (TBD -- LEO) | event assessment, no job row; and `photo_features` jobs, which `bandit-vision` claims with the `vision` role and answers with `submit_photo_features` ([Vision](../4-devices/Vision.md)); both recorded with role `vision` | In-process |
-| In | `bandit-api` blob download (TBD -- LEO) | The photographer photo named by a `photo_features` job | HTTPS, because `bandit-vision` runs on the demo laptop |
+| In | `bandit-api` blob download (TBD -- LEO) | The photographer photo named by a `photo_features` job | HTTPS, because `bandit-vision` runs on the venue laptop |
 | In | Process configuration ([Rust-Backend](../3-services/Rust-Backend.md)) | `ANTHROPIC_API_KEY` (one key, shared by `bandit-workers`, `bandit-ingest` and `bandit-vision`), `claude_mode` (`live`, `replay`, `replay_then_live`), the replay file path | Environment |
 | Out | Claude API | `POST /v1/messages`, streamed when the output is long; Vision.md (TBD -- LEO): `POST /v1/messages/batches` for `photo_features` only | HTTPS, API key header, `anthropic-version` header `2026-10-21` |
 | Out | `band1t` module | `record_model_call` (one row per attempt), then the feature's submit reducer with the job id and lease token: `apply_medical_extract` (Medical-ID), `apply_medical_record`, `submit_claim_review` and `attach_claim_letters` (Hyphenate, the last one for every letter kind); then `complete_job` or `fail_job` | SpacetimeDB SDK |
@@ -55,11 +55,11 @@ There is no official Anthropic Rust SDK, so `claude-client` is a small crate ove
 | Refusal handling | Checks `stop_reason` before reading content; a `refusal` carries `stop_details` with a category, which is recorded | A refusal is a normal outcome; the feature uses its template fallback |
 | Structured outputs | A JSON schema in `output_config.format`; the response is parsed into the job's Rust type and then validated by code (ids exist, enums allowed, lengths fit, amounts equal the given cents) | Forced tool choice is not available on this model; the schema guarantees shape, and only code can guarantee truth |
 | Prompt caching | `cache_control` breakpoints after the stable system prompt and schema, and after any stable catalogue (the coverage vocabulary); volatile rows follow the last breakpoint | Repeated calls of a kind pay for the stable prefix once per cache window |
-| PDF input | The medical PDF and Hyphenate's urgent-care bill each go in as a `document` block, inline base64 | The card and the bill lines are read from the PDF itself, with page references; the 10 MB upload caps of Medical-ID and Hyphenate keep every request well under the API's 32 MB request limit |
+| PDF input | Each medical PDF and Hyphenate's urgent-care bill go in as a `document` block, inline base64 | The card and the bill lines are read from the PDF itself, with page references; the 10 MB upload caps of Medical-ID and Hyphenate keep every request well under the API's 32 MB request limit |
 | Image input | JPEG or PNG as `image` blocks, inline base64, resized by the caller (the floor plan to fit the image limits, vision frames to 1280 by 720, photographer photos to 1280 on the long edge, starting value) | Used by `bandit-ingest` for `floorplan_check` and by `bandit-vision` (TBD -- LEO) |
 | Message Batches (TBD -- LEO) | One batch request per `photo_features` job, with the job id as `custom_id`; the crate polls the batch every 60 s (starting value) until it ends, then reads each result by `custom_id`. A retry after a validation failure goes into the next batch | Used only for `photo_features`, which runs after the event and nobody waits for; every other kind is a direct call |
 | Recording | Every attempt, success or failure, produces a `model_call` row through the record hook | Audit and replay |
-| Replay | Serves a recorded response from `model_call` by request hash, without the network | Instant, identical scripted demo calls |
+| Replay | Serves a recorded response from `model_call` by request hash, without the network | Instant, identical scripted calls |
 
 Settings fixed for every call: model `claude-opus-5-5`; adaptive thinking, which cannot be turned off on this model, so effort is the only lever; `output_config.effort` set explicitly per kind, because the model's default is `medium`; thinking display omitted, so reasoning is not stored; no assistant prefill, no forced tool choice and no sampling parameters, since all three are rejected. Each kind sends its own `max_tokens` cap from the start. No BandIt job uses tools: each job is one request and one response, so the model cannot act on anything.
 
@@ -136,7 +136,7 @@ Every use case runs on `claude-opus-5-5`, with effort set per kind. Outputs are 
 
 | Owner and use case | Trigger | Inputs (after filters) | Output | Effort | Code validation | Fallback without AI |
 |---|---|---|---|---|---|---|
-| [Medical-ID](../6-features/Medical-ID.md) `medical_extract` | Attendee uploads a medical PDF; the upload flow enqueues the job | The PDF as an inline document block, the attendee's display name, the card schema | A draft medical card: allergies, conditions, medications, blood type, emergency contact, each with the page it came from and a confidence; fields not found are left empty, never guessed | `medium` | Schema; enum values; page references within the page count; the attendee confirms the draft in the app before a medic can see it | Manual entry form in the attendee app |
+| [Medical-ID](../6-features/Medical-ID.md) `medical_extract` | Attendee uploads a medical history or a health insurance PDF in setup; the upload flow enqueues one job per document | The PDF as an inline document block, the attendee's display name, the card schema for the document's kind | The document's part of the draft medical card: allergies, conditions, medications, blood type and emergency contact from the medical history, or the insurer, member id, group number and plan from the insurance document, each with the page it came from and a confidence; fields not found are left empty, never guessed | `medium` | Schema; enum values; page references within the page count; the attendee confirms the draft on the confirm-card screen in setup | Manual entry form on the confirm-card screen |
 | [BrightData](BrightData.md) `floorplan_check` | The map stage of `bandit-ingest`, once per floor plan image; runs in the ingest process, not the queue | The floor plan image as an image block, resized to fit the image limits, and the booth numbers the exhibitor records list | The hall's outer edges in pixels; for each booth number it can see, the centre in pixels and a confidence; a listed number it cannot see is null; it never invents a number that is not printed on the plan | `medium` | Schema with nullable positions; every position inside the image bounds; no booth number twice; code then converts pixels to metres with the hall's real width | Booths load without positions, and ops drags each one into place on the Ops dashboard map |
 | [Hyphenate](Hyphenate.md) `claim_record_extract` | `submit_medical_record` enqueues the job when a medic or ops attaches an urgent-care bill | The bill PDF as an inline document block and the bill schema; never the fee schedule | The header (provider name, provider NPI, invoice number, patient name and service date as printed, billed total, visit reason) and one line per service (code as printed, description, units, billed amount, page); no paid amounts | `medium` | Schema; the lines sum to the billed total; every amount is a positive whole number of cents; every page is within the page count; the NPI passes its check digit. Code decides money: it prices every line against `fee_schedule` and the model never sees a cap or a paid amount | Staff type the lines from the PDF with `enter_claim_lines`, and the same code prices them |
 | [Hyphenate](Hyphenate.md) `claim_review` | Every injury claim that passes the code checks, before its outcome is decided | The pack's facts by id: the band's flag, time and zone, the witnesses, the medic's note and its time, the bill's service date, provider, visit reason and line descriptions, the incident kind; no amounts | A verdict, `follows` or `doubt`, an explanation of a few sentences and the fact ids it relied on | `high` | Schema; every cited fact id exists in this pack version; the explanation contains no dollar figure. Code decides money: the output has no amount field and the coverage function never reads it, so a `doubt` flags the claim and routes it to a person; it never refuses a claim and never changes an amount | Verdict `none`, treated as `doubt`: the claim goes to a person and never settles automatically |
@@ -176,12 +176,12 @@ The canonical request is the request body with field order fixed, whitespace col
 Modes, set in the process configuration:
 
 - `live`: call the API and record.
-- `replay_then_live`: serve a recorded response on a hash hit; call and record on a miss. This is the demo mode: scripted calls replay instantly and identically, and a judge's new request (their own PDF, their own night) goes live.
+- `replay_then_live`: serve a recorded response on a hash hit; call and record on a miss. This is the mode the event runs in: scripted calls replay instantly and identically, and a judge's new request (their own PDF, their own night) goes live.
 - `replay`: serve from recordings only; a miss fails the attempt and the feature's fallback applies. Used for tests without network or key.
 
-A batch request is looked up the same way before the batch is built, so a hit never enters the batch. Replays write their own `model_call` row with status `replayed` and `replay_of`, so the audit trail shows what the demo actually did. A fresh database has no `model_call` rows, so the processes also load a replay file exported before the demo (one recorded call per line, same fields); the file is part of the demo's seed set.
+A batch request is looked up the same way before the batch is built, so a hit never enters the batch. Replays write their own `model_call` row with status `replayed` and `replay_of`, so the audit trail shows what actually ran at the event. A fresh database has no `model_call` rows, so the processes also load a replay file exported before the event (one recorded call per line, same fields); the file is part of the event's seed set.
 
-The diagram answers: in the demo mode, how is a recorded call served again, and what happens to a new one?
+The diagram answers: in `replay_then_live`, how is a recorded call served again, and what happens to a new one?
 
 ```mermaid
 flowchart TD
@@ -221,7 +221,7 @@ flowchart TD
 | A call outlives the 60 s lease | A second worker could claim the job | The 45 s call budget stays under the lease, long kinds extend it every 30 s, and the submit reducer rejects a stale lease, so only one result lands |
 | `refusal` stop reason | No usable output | The kind's template fallback; the content is never resent |
 | Output fails code validation, or stops at `max_tokens` | Wrong or cut-off content | One retry with the errors appended, and the template fallback if that fails too |
-| Claude API unreachable or the key rejected during the demo | Live calls fail | Scripted calls still replay from `model_call` by hash; every other job completes with its template fallback |
+| Claude API unreachable or the key rejected during the event | Live calls fail | Scripted calls still replay from `model_call` by hash; every other job completes with its template fallback |
 | Vision assessment or photo features late, refused or absent (TBD -- LEO) | No `vision_assessment` row, or a photo with no people count | The incident runs on band data, and the photo is tagged by zone and time with the default cap; Claude's output is evidence, never a gate |
 
 ## Dependencies
@@ -243,22 +243,22 @@ flowchart TD
 - In each feature doc, delete the Claude row in its job table and keep the fallback as the only path: manual medical entry, booths placed by hand on the Ops dashboard map, bill lines typed by staff with `enter_claim_lines`, causation `none` so every injury claim goes to a person, template letters.
 - In [Vision](../4-devices/Vision.md) (TBD -- LEO), `bandit-vision` keeps local counting and person-down detection and loses the event assessment, `vision_assessment` and `photo_features`; Social tags photos by zone and time only.
 - Remove the "Anthropic-Agent.md" rows from the interfaces, data ownership and failure tables in [Architecture](../1-overview/Architecture.md), the Claude API column from the `bandit-workers` row and the `claude-client` crate row in [Rust-Backend](../3-services/Rust-Backend.md), and the Anthropic-Agent row and node in [README](../README.md).
-- The safety demo is unchanged.
+- The safety features are unchanged.
 
 ## Decisions
 
 | Decision | Why |
 |---|---|
 | Elastic's organizer runs on the Elastic Managed LLM; Claude is not wired into Elastic | Every Claude call stays in `claude-client` and `model_call`; Elastic agents organize and validate, and judgments go to Claude |
-| `bandit-vision` (TBD -- LEO) shares the workers' API key and account | One key, one rate limit and one bill to watch during the demo |
+| `bandit-vision` (TBD -- LEO) shares the workers' API key and account | One key, one rate limit and one bill to watch during the event |
 | `model_call` has no Ops dashboard panel; the team reads it with the owner's SpacetimeDB tools | It is an audit trail for the team, not something ops acts on during the event |
 | No SpacetimeDB procedure calls Claude | Procedures cannot reach private addresses and keep secrets in the module environment; one Claude path keeps every call recorded and replayable |
 | Every use case runs on `claude-opus-5-5`, with effort set per kind | One model, one cache namespace; effort is the cost lever |
 | No server-side fallback to another model | One model everywhere; a refusal takes the feature's template fallback |
 | Message Batches only for `photo_features` (TBD -- LEO) | Photo features run after the event and nobody waits for them; every other kind has someone waiting for the answer |
-| No Files API; the medical PDF and the urgent-care bill go inline | One way to send a PDF; the 10 MB upload caps fit the request limit |
+| No Files API; the medical PDFs and the urgent-care bill go inline | One way to send a PDF; the 10 MB upload caps fit the request limit |
 | Hyphenate's `claim_review` gets no amounts and has no amount field | A judgment about cause can hold a claim for a person but can never move money or refuse a claim; code alone prices bills and computes payouts |
 | Each kind sends its `max_tokens` cap from the start | A `max_tokens` stop is then a validation failure, so there is one retry path |
-| The demo runs `claude_mode` `replay_then_live` | Scripted calls replay instantly and identically, while a judge's new request still gets a real answer |
+| The event runs `claude_mode` `replay_then_live` | Scripted calls replay instantly and identically, while a judge's new request still gets a real answer |
 | No `scrape_extract` use case | The Elastic organizer is the one place facts are merged across sources |
 | `photo_features` (TBD -- LEO) returns only a people count and a caption | Leo's default: identity always comes from bands; Social needs the count to cap tag suggestions and the caption when the photographer gave none |
