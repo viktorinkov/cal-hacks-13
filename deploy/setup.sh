@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 APP=/opt/bandit
 
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends ca-certificates curl git build-essential pkg-config unzip \
+apt-get install -y -qq --no-install-recommends ca-certificates curl git build-essential pkg-config libssl-dev unzip \
   chromium fonts-liberation caddy > /dev/null
 printf '#!/bin/sh\nexec chromium --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/chrome
 chmod +x /usr/local/bin/chrome
