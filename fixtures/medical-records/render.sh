@@ -12,7 +12,7 @@
 #   VENUE_NAME  fills {{VENUE_NAME}}  (default: Cal Hacks 13.0 venue)
 #   ZONE_NAME   fills {{ZONE_NAME}}   (default: Main stage)
 #   CHROME      path to the Chrome binary
-# macOS only: uses BSD date and Google Chrome in headless mode.
+# Uses BSD date on macOS, GNU date on Linux, and Chrome in headless mode.
 set -eu
 export LC_ALL=C
 
@@ -76,7 +76,11 @@ case $incident in
   *) die "incident date must be YYYY-MM-DD: $incident" ;;
 esac
 day() { # day <YYYY-MM-DD> <offset like +1d> <format>
-  date -j -v"$2" -f "%Y-%m-%d %H:%M:%S" "$1 12:00:00" "$3"
+  if date -j > /dev/null 2>&1; then
+    date -j -v"$2" -f "%Y-%m-%d %H:%M:%S" "$1 12:00:00" "$3"
+  else
+    date -u -d "$1 ${2%d} day" "$3"
+  fi
 }
 [ "$(day "$incident" +0d +%Y-%m-%d 2>/dev/null)" = "$incident" ] || die "not a valid calendar date: $incident"
 
