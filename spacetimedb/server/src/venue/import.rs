@@ -141,6 +141,8 @@ pub fn import_event(ctx: &ReducerContext, bundle: EventBundle) -> Result<(), Str
                 source_url: o.source_url,
                 fetched_at: o.fetched_at,
                 updated_at: ctx.timestamp,
+                crunchbase_url: o.crunchbase_url,
+                funding_summary: o.funding_summary,
             },
             org_count
         );

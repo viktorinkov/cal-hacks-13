@@ -88,6 +88,10 @@ pub struct Organization {
     pub source_url: String,
     pub fetched_at: Timestamp,
     pub updated_at: Timestamp,
+    #[default("")]
+    pub crunchbase_url: String,
+    #[default("")]
+    pub funding_summary: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -233,6 +237,8 @@ pub struct OrganizationIn {
     pub founded_year: u32,
     pub linkedin_url: String,
     pub prizes: Vec<String>,
+    pub crunchbase_url: String,
+    pub funding_summary: String,
     pub source_url: String,
     pub fetched_at: Timestamp,
 }
