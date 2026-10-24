@@ -47,9 +47,7 @@ import ClaimPersonReducer from "./claim_person_reducer";
 import ClearReducer from "./clear_reducer";
 import CommandSentReducer from "./command_sent_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
-import CompletePaymentReducer from "./complete_payment_reducer";
 import CreateSummaryLinkReducer from "./create_summary_link_reducer";
-import DeclinePaymentReducer from "./decline_payment_reducer";
 import EndEventReducer from "./end_event_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
@@ -78,7 +76,6 @@ import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportSimBandReducer from "./report_sim_band_reducer";
-import RequestPaymentReducer from "./request_payment_reducer";
 import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
@@ -166,7 +163,6 @@ import MyWalletRow from "./my_wallet_table";
 import MyWalletEntriesRow from "./my_wallet_entries_table";
 import OpenIncidentsRow from "./open_incidents_table";
 import OrganizationRow from "./organization_table";
-import PaymentRow from "./payment_table";
 import PersonRow from "./person_table";
 import ScheduleSlotRow from "./schedule_slot_table";
 import SettingsRow from "./settings_table";
@@ -369,20 +365,6 @@ const tablesSchema = __schema({
       { name: 'organization_source_key_key', constraint: 'unique', columns: ['sourceKey'] },
     ],
   }, OrganizationRow),
-  payment: __table({
-    name: 'payment',
-    indexes: [
-      { accessor: 'band_id', name: 'payment_band_id_idx_btree', algorithm: 'btree', columns: [
-        'bandId',
-      ] },
-      { accessor: 'id', name: 'payment_id_idx_btree', algorithm: 'btree', columns: [
-        'id',
-      ] },
-    ],
-    constraints: [
-      { name: 'payment_id_key', constraint: 'unique', columns: ['id'] },
-    ],
-  }, PaymentRow),
   person: __table({
     name: 'person',
     indexes: [
@@ -853,9 +835,7 @@ const reducersSchema = __reducers(
   __reducerSchema("clear", ClearReducer),
   __reducerSchema("command_sent", CommandSentReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
-  __reducerSchema("complete_payment", CompletePaymentReducer),
   __reducerSchema("create_summary_link", CreateSummaryLinkReducer),
-  __reducerSchema("decline_payment", DeclinePaymentReducer),
   __reducerSchema("end_event", EndEventReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),
@@ -884,7 +864,6 @@ const reducersSchema = __reducers(
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_sim_band", ReportSimBandReducer),
-  __reducerSchema("request_payment", RequestPaymentReducer),
   __reducerSchema("request_recovery_letter", RequestRecoveryLetterReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
   __reducerSchema("resolve_incident", ResolveIncidentReducer),

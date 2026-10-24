@@ -1,5 +1,5 @@
 use crate::tables::*;
-use crate::{ingest, log_event, payments};
+use crate::{ingest, log_event};
 use spacetimedb::{ReducerContext, ScheduleAt, Table};
 
 const OFFLINE_MICROS: i64 = 5_000_000;
@@ -32,6 +32,5 @@ pub fn sweep(ctx: &ReducerContext, _timer: SweepTimer) -> Result<(), String> {
             ctx.db.gateway().id().update(Gateway { online: false, ..g });
         }
     }
-    payments::expire(ctx);
     Ok(())
 }

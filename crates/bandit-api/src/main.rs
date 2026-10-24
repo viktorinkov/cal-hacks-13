@@ -1,15 +1,14 @@
 //! bandit-api: the HTTP edge. It holds the Elastic key, so browsers never talk to Elastic, and it reads
-//! summary links and social rows from SpacetimeDB by subscription (it needs the `api` role).
-//! It serves the recap behind an attendee's special link, with suggestions ranked by Elastic,
-//! and the plain web pages (see `web`).
+//! API sessions and social rows from SpacetimeDB by subscription (it needs the `api` role).
+//! It ranks the recap's suggestions with Elastic for the signed-in attendee and serves the plain
+//! web pages (see `web`).
 
 mod search;
 mod summary;
 mod web;
 
 use anyhow::{Context, Result};
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::extract::State;
 use axum::routing::get;
 use axum::{Json, Router};
 use bandit_bindings::{
@@ -17,7 +16,7 @@ use bandit_bindings::{
     SocialAttendeesTableAccess,
     SocialEncountersTableAccess, SocialHandlesTableAccess, SocialPhotoTagsTableAccess,
     SocialPhotosTableAccess, SocialSharedVisitsTableAccess, SocialVisitsTableAccess,
-    SummaryLinksTableAccess, ZoneTableAccess, connect,
+    ZoneTableAccess, connect,
 };
 use bandit_common::{BlobStore, Config, TokenStore};
 use search::Elastic;
@@ -28,10 +27,9 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
-const QUERIES: [&str; 14] = [
+const QUERIES: [&str; 13] = [
     "SELECT * FROM zone",
     "SELECT * FROM booth",
-    "SELECT * FROM summary_links",
     "SELECT * FROM social_attendees",
     "SELECT * FROM social_handles",
     "SELECT * FROM social_visits",
@@ -119,7 +117,6 @@ async fn main() -> Result<()> {
     }
     let app = Router::new()
         .route("/health", get(health))
-        .route("/summary/{token}", get(summary_page))
         .merge(pages)
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -129,7 +126,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// The app registers this hash with `create_summary_link` and puts the token itself in the link.
+/// The pages register this hash with `open_api_session` and send the token itself in a header.
 fn token_hash(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
@@ -138,23 +135,6 @@ fn token_hash(token: &str) -> String {
 async fn health(State(app): AppState) -> Json<Value> {
     let roles: Vec<String> = app.conn.db.my_roles().iter().map(|r| r.role).collect();
     Json(json!({ "status": "ok", "roles": roles }))
-}
-
-/// The special link: the token in the URL is the secret, so the route needs no session.
-async fn summary_page(
-    State(app): AppState,
-    Path(token): Path<String>,
-) -> Result<Json<summary::Summary>, (StatusCode, Json<Value>)> {
-    let not_found = || (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
-    let hash = token_hash(&token);
-    let link = app
-        .conn
-        .db
-        .summary_links()
-        .iter()
-        .find(|l| l.token_hash == hash)
-        .ok_or_else(not_found)?;
-    ranked_summary(&app, link.attendee).await.map(Json).ok_or_else(not_found)
 }
 
 /// The summary of `who` from the subscription cache, with the suggestions in Elastic's order.

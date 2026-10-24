@@ -974,30 +974,6 @@ export const Owner = __t.object("Owner", {
 });
 export type Owner = __Infer<typeof Owner>;
 
-export const Payment = __t.object("Payment", {
-  id: __t.u64(),
-  bandId: __t.u8(),
-  amountCents: __t.u32(),
-  merchant: __t.string(),
-  get status() {
-    return PaymentStatus;
-  },
-  created: __t.timestamp(),
-  expires: __t.timestamp(),
-  approvedAt: __t.option(__t.timestamp()),
-  purchaseRef: __t.option(__t.string()),
-});
-export type Payment = __Infer<typeof Payment>;
-
-// The tagged union or sum type for the algebraic type `PaymentStatus`.
-export const PaymentStatus = __t.enum("PaymentStatus", {
-  Pending: __t.unit(),
-  Approved: __t.unit(),
-  Declined: __t.unit(),
-  Completed: __t.unit(),
-});
-export type PaymentStatus = __Infer<typeof PaymentStatus>;
-
 export const PeopleLink = __t.object("PeopleLink", {
   id: __t.u64(),
   key: __t.string(),

@@ -84,7 +84,6 @@ pub mod command_sent_reducer;
 pub mod command_table;
 pub mod command_type;
 pub mod complete_job_reducer;
-pub mod complete_payment_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
 pub mod create_summary_link_reducer;
@@ -93,7 +92,6 @@ pub mod crowd_member_type;
 pub mod crowd_tick_reducer;
 pub mod crowd_timer_table;
 pub mod crowd_timer_type;
-pub mod decline_payment_reducer;
 pub mod encounter_table;
 pub mod encounter_type;
 pub mod end_event_reducer;
@@ -199,9 +197,6 @@ pub mod organization_table;
 pub mod organization_type;
 pub mod owner_table;
 pub mod owner_type;
-pub mod payment_status_type;
-pub mod payment_table;
-pub mod payment_type;
 pub mod people_link_table;
 pub mod people_link_type;
 pub mod person_card_type;
@@ -230,7 +225,6 @@ pub mod remove_social_handle_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
 pub mod report_sim_band_reducer;
-pub mod request_payment_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
@@ -392,7 +386,6 @@ pub use command_sent_reducer::command_sent;
 pub use command_table::*;
 pub use command_type::Command;
 pub use complete_job_reducer::complete_job;
-pub use complete_payment_reducer::complete_payment;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
 pub use create_summary_link_reducer::create_summary_link;
@@ -401,7 +394,6 @@ pub use crowd_member_type::CrowdMember;
 pub use crowd_tick_reducer::crowd_tick;
 pub use crowd_timer_table::*;
 pub use crowd_timer_type::CrowdTimer;
-pub use decline_payment_reducer::decline_payment;
 pub use encounter_table::*;
 pub use encounter_type::Encounter;
 pub use end_event_reducer::end_event;
@@ -507,9 +499,6 @@ pub use organization_table::*;
 pub use organization_type::Organization;
 pub use owner_table::*;
 pub use owner_type::Owner;
-pub use payment_status_type::PaymentStatus;
-pub use payment_table::*;
-pub use payment_type::Payment;
 pub use people_link_table::*;
 pub use people_link_type::PeopleLink;
 pub use person_card_type::PersonCard;
@@ -538,7 +527,6 @@ pub use remove_social_handle_reducer::remove_social_handle;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
 pub use report_sim_band_reducer::report_sim_band;
-pub use request_payment_reducer::request_payment;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
@@ -689,18 +677,11 @@ pub enum Reducer {
         job_id: u64,
         result: String,
     },
-    CompletePayment {
-        payment_id: u64,
-        purchase_ref: String,
-    },
     CreateSummaryLink {
         token_hash: String,
     },
     CrowdTick {
         timer: CrowdTimer,
-    },
-    DeclinePayment {
-        payment_id: u64,
     },
     EndEvent,
     ExtendJobLease {
@@ -827,11 +808,6 @@ pub enum Reducer {
         sos: bool,
         fall: bool,
         press: bool,
-    },
-    RequestPayment {
-        band_id: u8,
-        amount_cents: u32,
-        merchant: String,
     },
     RequestRecoveryLetter {
         claim_id: u64,
@@ -1011,10 +987,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClientDisconnected => "client_disconnected",
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
-            Reducer::CompletePayment { .. } => "complete_payment",
             Reducer::CreateSummaryLink { .. } => "create_summary_link",
             Reducer::CrowdTick { .. } => "crowd_tick",
-            Reducer::DeclinePayment { .. } => "decline_payment",
             Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
             Reducer::FailJob { .. } => "fail_job",
@@ -1044,7 +1018,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportSimBand { .. } => "report_sim_band",
-            Reducer::RequestPayment { .. } => "request_payment",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
@@ -1189,13 +1162,6 @@ impl __sdk::Reducer for Reducer {
                     result: result.clone(),
                 })
             }
-            Reducer::CompletePayment {
-                payment_id,
-                purchase_ref,
-            } => __sats::bsatn::to_vec(&complete_payment_reducer::CompletePaymentArgs {
-                payment_id: payment_id.clone(),
-                purchase_ref: purchase_ref.clone(),
-            }),
             Reducer::CreateSummaryLink { token_hash } => {
                 __sats::bsatn::to_vec(&create_summary_link_reducer::CreateSummaryLinkArgs {
                     token_hash: token_hash.clone(),
@@ -1204,11 +1170,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::CrowdTick { timer } => {
                 __sats::bsatn::to_vec(&crowd_tick_reducer::CrowdTickArgs {
                     timer: timer.clone(),
-                })
-            }
-            Reducer::DeclinePayment { payment_id } => {
-                __sats::bsatn::to_vec(&decline_payment_reducer::DeclinePaymentArgs {
-                    payment_id: payment_id.clone(),
                 })
             }
             Reducer::EndEvent => __sats::bsatn::to_vec(&end_event_reducer::EndEventArgs {}),
@@ -1434,15 +1395,6 @@ impl __sdk::Reducer for Reducer {
                 sos: sos.clone(),
                 fall: fall.clone(),
                 press: press.clone(),
-            }),
-            Reducer::RequestPayment {
-                band_id,
-                amount_cents,
-                merchant,
-            } => __sats::bsatn::to_vec(&request_payment_reducer::RequestPaymentArgs {
-                band_id: band_id.clone(),
-                amount_cents: amount_cents.clone(),
-                merchant: merchant.clone(),
             }),
             Reducer::RequestRecoveryLetter {
                 claim_id,
@@ -1809,7 +1761,6 @@ pub struct DbUpdate {
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
     owner: __sdk::TableUpdate<Owner>,
-    payment: __sdk::TableUpdate<Payment>,
     people_link: __sdk::TableUpdate<PeopleLink>,
     person: __sdk::TableUpdate<Person>,
     person_claim: __sdk::TableUpdate<PersonClaim>,
@@ -2105,9 +2056,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(owner_table::parse_table_update(table_update)?),
-                "payment" => db_update
-                    .payment
-                    .append(payment_table::parse_table_update(table_update)?),
                 "people_link" => db_update
                     .people_link
                     .append(people_link_table::parse_table_update(table_update)?),
@@ -2374,9 +2322,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.owner = cache
             .apply_diff_to_table::<Owner>("owner", &self.owner)
             .with_updates_by_pk(|row| &row.identity);
-        diff.payment = cache
-            .apply_diff_to_table::<Payment>("payment", &self.payment)
-            .with_updates_by_pk(|row| &row.id);
         diff.people_link = cache
             .apply_diff_to_table::<PeopleLink>("people_link", &self.people_link)
             .with_updates_by_pk(|row| &row.id);
@@ -2795,9 +2740,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment" => db_update
-                    .payment
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3162,9 +3104,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment" => db_update
-                    .payment
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3361,7 +3300,6 @@ pub struct AppliedDiff<'r> {
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     owner: __sdk::TableAppliedDiff<'r, Owner>,
-    payment: __sdk::TableAppliedDiff<'r, Payment>,
     people_link: __sdk::TableAppliedDiff<'r, PeopleLink>,
     person: __sdk::TableAppliedDiff<'r, Person>,
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
@@ -3672,7 +3610,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Owner>("owner", &self.owner, event);
-        callbacks.invoke_table_row_callbacks::<Payment>("payment", &self.payment, event);
         callbacks.invoke_table_row_callbacks::<PeopleLink>("people_link", &self.people_link, event);
         callbacks.invoke_table_row_callbacks::<Person>("person", &self.person, event);
         callbacks.invoke_table_row_callbacks::<PersonClaim>(
@@ -4518,7 +4455,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         owner_table::register_table(client_cache);
-        payment_table::register_table(client_cache);
         people_link_table::register_table(client_cache);
         person_table::register_table(client_cache);
         person_claim_table::register_table(client_cache);
@@ -4632,7 +4568,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "open_incidents",
         "organization",
         "owner",
-        "payment",
         "people_link",
         "person",
         "person_claim",

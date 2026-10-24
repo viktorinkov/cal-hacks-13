@@ -1,5 +1,5 @@
 use crate::tables::*;
-use crate::{log_event, payments, require_bridge};
+use crate::{log_event, require_bridge};
 use spacetimedb::{ReducerContext, Table};
 
 const ENCOUNTER_GAP_MICROS: i64 = 5_000_000;
@@ -78,7 +78,6 @@ pub fn ingest_band(ctx: &ReducerContext, beacon: BandBeacon) -> Result<(), Strin
     }
     if row.pressed && !prev.pressed {
         log_event(ctx, id, EventKind::Press, "");
-        payments::on_press(ctx, id);
     }
     if row.find != prev.find {
         if row.find != 0 {

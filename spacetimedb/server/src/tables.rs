@@ -104,30 +104,6 @@ pub struct Command {
     pub error: Option<String>,
 }
 
-#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PaymentStatus {
-    Pending,
-    Approved,
-    Declined,
-    Completed,
-}
-
-#[spacetimedb::table(accessor = payment, public)]
-pub struct Payment {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    #[index(btree)]
-    pub band_id: u8,
-    pub amount_cents: u32,
-    pub merchant: String,
-    pub status: PaymentStatus,
-    pub created: Timestamp,
-    pub expires: Timestamp,
-    pub approved_at: Option<Timestamp>,
-    pub purchase_ref: Option<String>,
-}
-
 #[spacetimedb::table(accessor = settings, public)]
 pub struct Settings {
     #[primary_key]

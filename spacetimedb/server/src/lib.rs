@@ -1,6 +1,5 @@
 pub mod commands;
 pub mod ingest;
-pub mod payments;
 pub mod tuning;
 pub mod sweep;
 pub mod tables;
