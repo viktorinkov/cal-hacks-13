@@ -180,6 +180,10 @@ function live() {
 function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
   const real = all.filter(a => !a.simulated).length;
+  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const takeBack = (bandId: number, name: string) =>
+    confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
+      && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `Attendees (${real} people, ${all.length - real} simulated)`),
     h('table', {},
@@ -187,7 +191,8 @@ function attendees() {
       all.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' simulated')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
-        h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId)),
+        h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
+          a.bandId && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
         h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
 }
