@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import cv2
@@ -16,30 +17,43 @@ from elastic import DATA, ROOT
 
 USAGE = """3D model of the venue for the security page: a Gaussian splat trained from a walk-through video
 
+  python3 pipeline/splat.py check walk.mov        is the walk usable, and how long the rest takes (minutes)
   python3 pipeline/splat.py frames walk.mov [more.mov ...]   the sharpest frames of the walk -> images/
   python3 pipeline/splat.py poses                 where the phone was for each frame (COLMAP) -> sparse/0, undistorted/
   python3 pipeline/splat.py train                 the splat (Brush, on the Mac's GPU) -> splat.ply
   python3 pipeline/splat.py level                 stand it level on the floor, in metres from the phone height -> scene.json, venue.splat
   python3 pipeline/splat.py align                 level it on the floor and match it to the plan -> scene.json, venue.splat
   python3 pipeline/splat.py camera --name pit --frame pit.mov   place the security camera in it -> cameras/pit.json
-  python3 pipeline/splat.py all walk.mov          frames, poses, train and align in one go
+  python3 pipeline/splat.py all walk.mov          frames, poses, train and level in one go, unattended
 
 Everything goes to pipeline/data/venue/splat (or --work). Needs ffmpeg and colmap (brew install ffmpeg colmap) and
 Brush's app (--brush, default .tools/brush/brush-app-aarch64-apple-darwin/brush_app from github.com/ArthurBrussee/brush).
 
-The walk: the phone's 1x lens in landscape, 4K at 30 fps, HDR video off, exposure and focus locked. Walk slowly and turn
-with the body; round the edges of the space facing the middle, once at chest height and once held high, then across
-the middle. Keep the floor in view. frames keeps the sharpest frame of each stretch (--count, 300).
+The walk: the phone's 1x lens in landscape, 4K at 30 fps, HDR video off, exposure and focus locked. Keep walking: depth
+comes from the phone moving through the space, so standing still or turning on the spot adds nothing (a fixed
+camera's clip gives no model at all). Walk slowly and turn with the body; round the edges facing the middle, once at
+chest height and once held high, then across the middle. Keep the floor in view. A long walk is fine, and several
+videos of the same place can go in together.
 
-poses runs COLMAP on the CPU: features, matching (--matcher exhaustive for up to 350 frames, else sequential), the
-global mapper, then undistorted images for training. A few minutes to half an hour.
+check runs in a few minutes on any length: the share of the walk where the phone was really moving (against turning on
+the spot, standing still, or moving too fast to follow), the stretches to redo, blur, HDR and a time estimate. Run it
+before leaving the venue.
+
+frames scores every frame from a small copy decoded on the video hardware, then takes the sharpest of each stretch at
+full size (--width 1600): one a second of video, 300 to 1500 (--count), none where the phone stood still.
+
+poses runs COLMAP on the CPU: features, then matching (every pair for up to 350 frames; beyond that each frame with its
+neighbours, plus loop closing so the walk joins up where it passes the same place again, using COLMAP's vocabulary tree,
+fetched once into .tools/colmap), the global mapper, then undistorted images for training. 15 minutes for 300 frames,
+about an hour for 1500.
 
 level needs no plan: it finds the floor, stands the model on it at height 0 and scales it so the phone was
 --phone-height (1.5 m) above the floor, which is right to about 10%. Good for looking at the splat before the stations
 are placed; align replaces it.
 
 train runs Brush for --steps (30000; 7000 gives a quick look) with colour only (no view-dependent shading, which the
-page does not draw) and at most --max-splats.
+page does not draw) and at most --max-splats, at up to 1600 px (1280 above 600 frames). It saves a snapshot every 5000
+steps and prints how long is left; a snapshot can go through level while training continues.
 
 align finds the floor (the lowest large flat area facing up, under the phone) and shows a view of the model from above
 next to the venue plan. Click a point on the left, then the same point on the plan; two pairs fix the model, three or
@@ -60,8 +74,16 @@ WORK = os.path.join(DATA, 'venue', 'splat')
 BRUSH = os.path.join(ROOT, '.tools', 'brush', 'brush-app-aarch64-apple-darwin', 'brush_app')
 VENUE = os.path.join(ROOT, 'pipeline', 'venues', 'palace-of-fine-arts.json')
 SECURITY = os.path.join(DATA, 'security')
+VOCAB = os.path.join(ROOT, '.tools', 'colmap', 'vocab_tree_faiss_flickr100K_words32K.bin')
+VOCAB_URL = 'https://github.com/colmap/colmap/releases/download/3.11.1/vocab_tree_faiss_flickr100K_words32K.bin'
 SH_C0 = 0.28209479177387814
 EYE_M = 1.5
+SECONDS_PER_FRAME, MAX_FRAMES = 1.0, 1500
+EXHAUSTIVE_MAX = 350
+GRAB_WORKERS = 6
+SNAPSHOT_STEPS = 5000
+CHECK_FPS, CHECK_GAP = 2.0, 2
+MOTION_MATCHES, PARALLAX_MIN, TURN_PX = 40, 0.15, 8.0
 FLOOR_TILT_DEG = 20.0
 WIN = 'BandIt splat align'
 PANEL_W, PANEL_H = 800, 860
@@ -93,54 +115,184 @@ def colmap(work, *args):
     return run(['colmap', *args], os.path.join(work, 'colmap.log'))
 
 
+def probe(video):
+    r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+                        'stream=width,height,r_frame_rate,codec_name,color_transfer:stream_side_data=rotation'
+                        ':format=duration', '-of', 'json', video], capture_output=True, text=True)
+    d = json.loads(r.stdout or '{}')
+    if not d.get('streams'):
+        raise SystemExit(f'cannot read {video}')
+    s = d['streams'][0]
+    num, den = (s.get('r_frame_rate') or '30/1').split('/')
+    rot = next((int(x['rotation']) for x in s.get('side_data_list') or [] if 'rotation' in x), 0)
+    w, h = s.get('width', 0), s.get('height', 0)
+    if abs(rot) % 180 == 90:
+        w, h = h, w
+    return {'duration': float(d.get('format', {}).get('duration', 0)), 'width': w, 'height': h, 'rotation': rot,
+            'fps': float(num) / float(den or 1), 'codec': s.get('codec_name'), 'transfer': s.get('color_transfer', '')}
+
+
+def small_frames(video, fps, width):
+    info = probe(video)
+    height = int(round(info['height'] * width / info['width'] / 2) * 2)
+    hw = ['-hwaccel', 'videotoolbox'] if info['codec'] in ('h264', 'hevc') else []
+    p = subprocess.Popen(['ffmpeg', '-loglevel', 'error', *hw, '-i', video, '-vf',
+                          f'fps={fps},scale={width}:{height}', '-pix_fmt', 'gray', '-f', 'rawvideo', '-'],
+                         stdout=subprocess.PIPE)
+    size, n = width * height, 0
+    while True:
+        buf = p.stdout.read(size)
+        if len(buf) < size:
+            break
+        yield n / fps, np.frombuffer(buf, np.uint8).reshape(height, width)
+        n += 1
+    p.wait()
+
+
+def sharpness(grey):
+    return float(cv2.Laplacian(grey, cv2.CV_32F).var())
+
+
+def motion(a, b, orb, matcher):
+    ka, da = orb.detectAndCompute(a, None)
+    kb, db = orb.detectAndCompute(b, None)
+    if da is None or db is None or len(ka) < 50 or len(kb) < 50:
+        return 0, 0.0, 0.0
+    m = matcher.match(da, db)
+    if len(m) < MOTION_MATCHES:
+        return len(m), 0.0, 0.0
+    pa = np.float32([ka[x.queryIdx].pt for x in m])
+    pb = np.float32([kb[x.trainIdx].pt for x in m])
+    shift = float(np.median(np.linalg.norm(pa - pb, axis=1)))
+    H, hin = cv2.findHomography(pa, pb, cv2.RANSAC, 2.0)
+    F, fin = cv2.findFundamentalMat(pa, pb, cv2.FM_RANSAC, 1.0, 0.99)
+    if H is None or F is None or fin is None or F.shape != (3, 3):
+        return len(m), 0.0, shift
+    hin, fin = hin.ravel() > 0, fin.ravel() > 0
+    return len(m), float((fin & ~hin).sum()) / max(1, int(fin.sum())), shift
+
+
+def auto_count(seconds):
+    return int(np.clip(round(seconds / SECONDS_PER_FRAME), 300, MAX_FRAMES))
+
+
+def runs(flags, times, minimum):
+    out, start = [], None
+    for f, t in zip(list(flags) + [False], list(times) + [times[-1] if times else 0]):
+        if f and start is None:
+            start = t
+        elif not f and start is not None:
+            if t - start >= minimum:
+                out.append((start, t))
+            start = None
+    return out
+
+
+def clock(t):
+    return f'{int(t) // 60}:{int(t) % 60:02d}'
+
+
+def check(args):
+    total, moving_s = 0.0, 0.0
+    orb, matcher = cv2.ORB_create(1500), cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    for video in args.video:
+        info = probe(video)
+        total += info['duration']
+        say(f'{os.path.basename(video)}: {clock(info["duration"])}, {info["width"]} x {info["height"]} at '
+            f'{info["fps"]:.0f} fps, {info["codec"]}')
+        if info['transfer'] in ('arib-std-b67', 'smpte2084'):
+            say('  recorded in HDR: the colours of the splat will look flat (Settings, Camera, Record Video, HDR off)')
+        if info['height'] > info['width']:
+            say('  portrait: landscape covers more of the room per frame')
+        frames_, times, sharp, kind = [], [], [], []
+        for t, g in small_frames(video, CHECK_FPS, 640):
+            frames_.append(g)
+            times.append(t)
+            sharp.append(sharpness(g))
+            if len(frames_) > CHECK_GAP:
+                n, par, shift = motion(frames_[-1 - CHECK_GAP], g, orb, matcher)
+                kind.append('lost' if n < MOTION_MATCHES else 'moving' if par >= PARALLAX_MIN
+                            else 'turning' if shift >= TURN_PX else 'still')
+                frames_[-1 - CHECK_GAP] = None
+        steps = times[CHECK_GAP:]
+        share = {k: kind.count(k) / max(1, len(kind)) for k in ('moving', 'turning', 'still', 'lost')}
+        moving_s += share['moving'] * info['duration']
+        say(f'  moving {100 * share["moving"]:.0f}%, only turning {100 * share["turning"]:.0f}%, standing still '
+            f'{100 * share["still"]:.0f}%, too fast or blurred to follow {100 * share["lost"]:.0f}%')
+        for name in ('still', 'turning', 'lost'):
+            for a, b in runs([k == name for k in kind], steps, 6.0)[:6]:
+                say(f'  {clock(a)} to {clock(b)}: {"standing still" if name == "still" else "turning on the spot" if name == "turning" else "lost track (too fast or blurred)"}')
+        s = np.array(sharp)
+        blur = runs(s < 0.35 * np.median(s), times, 2.0)
+        for a, b in blur[:6]:
+            say(f'  {clock(a)} to {clock(b)}: blurred')
+    count = auto_count(total)
+    say(f'usable walking: {clock(moving_s)} of {clock(total)}'
+        + ('' if moving_s >= 0.5 * total else '; most of it does not move the phone, so the model will be thin. '
+           'Walk the whole time; turning on the spot or standing adds nothing'))
+    feat, match = count * 0.25, count * (2.9 if count <= EXHAUSTIVE_MAX else 0.6)
+    say(f'plan: about {count} frames; frames {clock(total / 25 + count * 0.15)}, positions '
+        f'{clock(feat + match + count * 0.6)}, training {clock(50 * 60)}, so roughly '
+        f'{(total / 25 + count * 0.15 + feat + match + count * 0.6 + 3000) / 3600:.1f} h in all')
+
+
 def frames(args):
     images = os.path.join(args.work, 'images')
-    cand = os.path.join(args.work, 'candidates')
-    for d in (images, cand):
-        shutil.rmtree(d, ignore_errors=True)
-        os.makedirs(d)
-    side = args.width
-    scale = f"scale='if(gt(iw,ih),{side},-2)':'if(gt(iw,ih),-2,{side})'"
-    files, source = [], []
-    for v, video in enumerate(args.video):
-        run(['ffmpeg', '-loglevel', 'error', '-i', video, '-vf', f'fps={args.sample_fps},{scale}', '-q:v', '2',
-             os.path.join(cand, f'v{v}_%05d.jpg')])
-        got = sorted(glob.glob(os.path.join(cand, f'v{v}_*.jpg')))
+    shutil.rmtree(images, ignore_errors=True)
+    os.makedirs(images)
+    infos = [probe(v) for v in args.video]
+    total = sum(i['duration'] for i in infos)
+    count = args.count or auto_count(total)
+    fps = args.sample_fps or float(np.clip(3.0 * count / max(1.0, total), 1.0, 6.0))
+    source, sharp, thumbs = [], [], []
+    t0 = time.time()
+    for video in args.video:
+        got = 0
+        for t, g in small_frames(video, fps, 480):
+            source.append((video, t))
+            sharp.append(sharpness(g))
+            thumbs.append(cv2.resize(g, (160, int(160 * g.shape[0] / g.shape[1])), interpolation=cv2.INTER_AREA)
+                          .astype(np.float32))
+            got += 1
         if not got:
             raise SystemExit(f'no frames came out of {video}')
-        files += got
-        source += [(os.path.basename(video), i / args.sample_fps) for i in range(len(got))]
-    sharp, thumbs = [], []
-    for f in files:
-        g = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-        k = 640 / max(g.shape)
-        g = cv2.resize(g, None, fx=k, fy=k, interpolation=cv2.INTER_AREA)
-        sharp.append(float(cv2.Laplacian(g, cv2.CV_32F).var()))
-        thumbs.append(cv2.resize(g, (160, int(160 * g.shape[0] / g.shape[1])), interpolation=cv2.INTER_AREA)
-                      .astype(np.float32))
-    n = len(files)
-    if n <= args.count:
+    n = len(source)
+    say(f'{n} frames scored ({fps:.1f} a second over {clock(total)}) in {time.time() - t0:.0f} s')
+    if n <= count:
         pick = list(range(n))
     else:
-        edges = np.linspace(0, n, args.count + 1).astype(int)
+        edges = np.linspace(0, n, count + 1).astype(int)
         pick = [a + int(np.argmax(sharp[a:b])) for a, b in zip(edges[:-1], edges[1:]) if b > a]
     kept, last, still = [], None, 0
     for i in pick:
-        if last is not None and float(np.abs(thumbs[i] - thumbs[last]).mean()) < 1.5:
+        if last is not None and source[i][0] == source[last][0] and \
+                float(np.abs(thumbs[i] - thumbs[last]).mean()) < 1.5:
             still += 1
             continue
         kept.append(i)
         last = i
-    for k, i in enumerate(kept, 1):
-        shutil.copy(files[i], os.path.join(images, f'frame_{k:05d}.jpg'))
+    side = args.width
+    scale = f"scale='if(gt(iw,ih),{side},-2)':'if(gt(iw,ih),-2,{side})'"
+
+    def grab(job):
+        k, i = job
+        video, t = source[i]
+        out = os.path.join(images, f'frame_{k:05d}.jpg')
+        subprocess.run(['ffmpeg', '-loglevel', 'error', '-ss', f'{t:.3f}', '-i', video, '-frames:v', '1', '-vf', scale,
+                        '-q:v', '2', '-y', out], check=True)
+        return out
+
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=GRAB_WORKERS) as pool:
+        list(pool.map(grab, enumerate(kept, 1)))
     with open(os.path.join(args.work, 'frames.json'), 'w') as f:
-        json.dump({'videos': [os.path.basename(v) for v in args.video], 'sample_fps': args.sample_fps,
-                   'frames': {f'frame_{k:05d}.jpg': {'video': source[i][0], 'time': round(source[i][1], 3)}
+        json.dump({'videos': [os.path.basename(v) for v in args.video], 'sample_fps': fps,
+                   'frames': {f'frame_{k:05d}.jpg': {'video': os.path.basename(source[i][0]),
+                                                     'time': round(source[i][1], 3)}
                               for k, i in enumerate(kept, 1)}}, f, indent=1)
-    shutil.rmtree(cand)
     s = np.array(sharp)
     ks = s[kept]
-    say(f'{n} frames looked at ({args.sample_fps} a second), {len(kept)} kept in {os.path.relpath(images, ROOT)}'
+    say(f'{len(kept)} frames kept in {os.path.relpath(images, ROOT)} ({time.time() - t0:.0f} s to extract)'
         + (f', {still} dropped where the phone stood still' if still else ''))
     say(f'sharpness of the kept frames: median {np.median(ks):.0f}, lowest {ks.min():.0f} '
         f'(all frames median {np.median(s):.0f})')
@@ -176,13 +328,16 @@ def poses(args):
                '--ImageReader.single_camera', '1', '--ImageReader.camera_model', 'SIMPLE_RADIAL',
                '--FeatureExtraction.use_gpu', '0', '--SiftExtraction.max_num_features', str(args.features))
     say(f'features for {n} frames in {t:.0f} s')
-    matcher = args.matcher if args.matcher != 'auto' else ('exhaustive' if n <= 350 else 'sequential')
+    matcher = args.matcher if args.matcher != 'auto' else ('exhaustive' if n <= EXHAUSTIVE_MAX else 'sequential')
     if matcher == 'exhaustive':
         t = colmap(args.work, 'exhaustive_matcher', '--database_path', db, '--FeatureMatching.use_gpu', '0')
     else:
         t = colmap(args.work, 'sequential_matcher', '--database_path', db, '--FeatureMatching.use_gpu', '0',
-                   '--SequentialMatching.overlap', '20', '--SequentialMatching.quadratic_overlap', '1')
-    say(f'{matcher} matching in {t:.0f} s')
+                   '--SequentialMatching.overlap', '15', '--SequentialMatching.quadratic_overlap', '1',
+                   '--SequentialMatching.loop_detection', '1', '--SequentialMatching.loop_detection_period', '10',
+                   '--SequentialMatching.loop_detection_num_images', '40',
+                   '--SequentialMatching.vocab_tree_path', vocab_tree(args.vocab))
+    say(f'{matcher} matching in {t:.0f} s' + ('' if matcher == 'exhaustive' else ', with loop closing'))
     mapper = 'global_mapper' if args.mapper == 'global' else 'mapper'
     t = colmap(args.work, mapper, '--database_path', db, '--image_path', images, '--output_path', sparse)
     model, count = largest_model(sparse)
@@ -216,6 +371,21 @@ def undistort(work):
             shutil.move(f, os.path.join(flat, '0'))
 
 
+def vocab_tree(path):
+    path = path or VOCAB
+    if os.path.exists(path):
+        return path
+    import requests
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    say(f'fetching the vocabulary tree for loop closing ({VOCAB_URL})')
+    r = requests.get(VOCAB_URL, timeout=120)
+    r.raise_for_status()
+    with open(path + '.part', 'wb') as f:
+        f.write(r.content)
+    os.replace(path + '.part', path)
+    return path
+
+
 def train(args):
     data = os.path.join(args.work, 'undistorted')
     if not os.path.exists(os.path.join(data, 'sparse', '0', 'images.bin')):
@@ -224,16 +394,40 @@ def train(args):
         undistort(args.work)
     if not os.path.exists(args.brush):
         raise SystemExit(f'no Brush at {args.brush}')
+    n = len(glob.glob(os.path.join(data, 'images', '*')))
+    res = args.max_resolution or (1600 if n <= 600 else 1280)
     out = os.path.join(args.work, 'splat.ply')
-    if os.path.exists(out):
-        os.remove(out)
-    cmd = [args.brush, data, '--total-steps', str(args.steps), '--export-every', str(args.steps),
-           '--export-path', args.work, '--export-name', 'splat.ply', '--sh-degree', '0',
-           '--max-splats', str(args.max_splats), '--max-resolution', str(args.max_resolution)]
-    t = run(cmd, os.path.join(args.work, 'brush.log'))
-    if not os.path.exists(out):
-        raise SystemExit(f'Brush wrote no {out}, see brush.log')
-    say(f'{args.steps} steps in {t / 60:.1f} min: {os.path.relpath(out, ROOT)}, {read_ply(out)[1]} splats')
+    for f in glob.glob(os.path.join(args.work, 'splat*.ply')):
+        os.remove(f)
+    every = min(args.steps, SNAPSHOT_STEPS)
+    cmd = [args.brush, data, '--total-steps', str(args.steps), '--export-every', str(every),
+           '--export-path', args.work, '--export-name', 'splat_{iter}.ply', '--sh-degree', '0',
+           '--max-splats', str(args.max_splats), '--max-resolution', str(res)]
+    say(f'$ {os.path.basename(args.brush)} {" ".join(cmd[1:])}')
+    say(f'training on {n} frames at up to {res} px for {args.steps} steps; a snapshot every {every} steps')
+    t0, seen = time.time(), set()
+    with open(os.path.join(args.work, 'brush.log'), 'a') as log:
+        p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+        while p.poll() is None:
+            time.sleep(5)
+            for f in sorted(glob.glob(os.path.join(args.work, 'splat_*.ply')), key=os.path.getmtime):
+                step = int(os.path.basename(f)[6:-4])
+                if step in seen:
+                    continue
+                seen.add(step)
+                mins = (time.time() - t0) / 60
+                say(f'step {step} of {args.steps} after {mins:.0f} min, about {mins * (args.steps / step - 1):.0f} min '
+                    f'to go; snapshot {os.path.basename(f)}')
+    if p.returncode:
+        raise SystemExit('Brush failed, see brush.log')
+    shots = sorted(glob.glob(os.path.join(args.work, 'splat_*.ply')), key=lambda f: int(os.path.basename(f)[6:-4]))
+    if not shots:
+        raise SystemExit('Brush wrote no splat, see brush.log')
+    os.replace(shots[-1], out)
+    for f in shots[:-1]:
+        os.remove(f)
+    say(f'{args.steps} steps in {(time.time() - t0) / 60:.1f} min: {os.path.relpath(out, ROOT)}, '
+        f'{read_ply(out)[1]} splats')
 
 
 def qvec_to_R(q):
@@ -804,16 +998,16 @@ def everything(args):
     frames(args)
     poses(args)
     train(args)
-    align(args)
+    level(args)
 
 
 def main():
     ap = argparse.ArgumentParser(description=USAGE, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('mode', choices=['frames', 'poses', 'train', 'level', 'align', 'camera', 'all'])
+    ap.add_argument('mode', choices=['check', 'frames', 'poses', 'train', 'level', 'align', 'camera', 'all'])
     ap.add_argument('video', nargs='*', help='frames, all: the walk-through video, or several of the same place')
     ap.add_argument('--work', default=WORK)
-    ap.add_argument('--count', type=int, default=300)
-    ap.add_argument('--sample-fps', type=float, default=6.0)
+    ap.add_argument('--count', type=int, default=0, help='frames: how many to keep (default: one a second of video, 300 to 1500)')
+    ap.add_argument('--sample-fps', type=float, default=0, help='frames: frames looked at a second (default: three per kept frame)')
     ap.add_argument('--width', type=int, default=1600, help='frames: longer side in pixels')
     ap.add_argument('--features', type=int, default=4096)
     ap.add_argument('--matcher', choices=['auto', 'exhaustive', 'sequential'], default='auto')
@@ -821,7 +1015,8 @@ def main():
     ap.add_argument('--brush', default=BRUSH)
     ap.add_argument('--steps', type=int, default=30000)
     ap.add_argument('--max-splats', type=int, default=3000000)
-    ap.add_argument('--max-resolution', type=int, default=1600)
+    ap.add_argument('--max-resolution', type=int, default=0, help='train: longest side (default 1600, 1280 above 600 frames)')
+    ap.add_argument('--vocab', help='poses: COLMAP vocabulary tree (default: fetched once into .tools/colmap)')
     ap.add_argument('--venue', default=VENUE)
     ap.add_argument('--anchors', default=os.path.join(SECURITY, 'anchors.json'))
     ap.add_argument('--metres-per-px', type=float)
@@ -840,12 +1035,12 @@ def main():
     ap.add_argument('--phone-height', type=float, default=EYE_M, help='level: metres the phone was held above the floor')
     ap.add_argument('--out', default=SECURITY)
     args = ap.parse_args()
-    if args.mode in ('frames', 'all') and not args.video:
+    if args.mode in ('check', 'frames', 'all') and not args.video:
         ap.error('the walk-through video')
     if args.mode == 'camera' and not (args.name and args.frame):
         ap.error('camera needs --name and --frame')
     os.makedirs(args.work, exist_ok=True)
-    {'frames': frames, 'poses': poses, 'train': train, 'level': level, 'align': align, 'camera': camera,
+    {'check': check, 'frames': frames, 'poses': poses, 'train': train, 'level': level, 'align': align, 'camera': camera,
      'all': everything}[args.mode](args)
 
 
