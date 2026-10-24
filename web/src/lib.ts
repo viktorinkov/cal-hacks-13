@@ -204,7 +204,8 @@ export async function api<T>(path: string, session: string, init: RequestInit = 
 // --- Formatting and DOM ---------------------------------------------------------------------
 
 export function money(cents: bigint | number): string {
-  return `$${(Number(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = Number(cents) / 100;
+  return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function time(t: Timestamp | undefined): string {
