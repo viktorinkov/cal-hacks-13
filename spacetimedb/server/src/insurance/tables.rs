@@ -12,6 +12,8 @@ pub enum ClaimStatus {
     Reviewing,
     /// Waiting for the named person in `routed_to_name`.
     Routed,
+    /// Approved; the payout is being deposited into the claimant's Nessie account.
+    Paying,
     /// Paid to the claimant; the insurer's payment is outstanding.
     Settled,
     Refused,
@@ -128,6 +130,8 @@ pub struct Claim {
     pub routed_to: Identity,
     pub routed_to_name: String,
     pub refusal_reason: String,
+    /// The Nessie deposit id, or `repair vendor` for property claims.
+    pub payout_reference: String,
     pub fnol_hash: String,
     pub summary_hash: String,
     pub determination_hash: String,
@@ -296,6 +300,17 @@ pub struct ClaimReview {
     /// Why code rejected the review, when it did.
     pub rejected: Vec<String>,
     pub model_call_id: u64,
+    pub created_at: Timestamp,
+}
+
+/// The claimant's Nessie customer and account, created on their first payout.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = claimant_account)]
+pub struct ClaimantAccount {
+    #[primary_key]
+    pub identity: Identity,
+    pub customer_id: String,
+    pub account_id: String,
     pub created_at: Timestamp,
 }
 

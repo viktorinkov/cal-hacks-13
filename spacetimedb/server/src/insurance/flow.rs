@@ -4,7 +4,7 @@
 
 use super::evidence::*;
 use super::*;
-use crate::jobs::{self, Job, ModelCallIn, blob_ref};
+use crate::jobs::{self, Job, ModelCallIn, blob_ref, job};
 use crate::venue::zone;
 use crate::roles::*;
 use crate::safety::*;
@@ -120,7 +120,7 @@ fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, St
     let policy = ctx.db.insurance_policy().iter().max_by_key(|p| p.id).ok_or("no insurance policy is set up")?;
     let kind = incident.kind.core();
     let cover = CoverKind::for_incident(kind);
-    let (claimant, claimant_name) = match super::people::claimant_for_band(ctx, incident.band_id) {
+    let (claimant, claimant_name) = match super::people::claimant_for_band(ctx, incident.subject_band) {
         Some((id, name)) => (Some(id), name),
         None => (None, String::new()),
     };
@@ -132,7 +132,7 @@ fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, St
         cover_kind: cover.as_str().into(),
         claimant,
         claimant_name,
-        band_id: incident.band_id,
+        band_id: incident.subject_band,
         zone_id: incident.zone_id,
         zone_name,
         policy_id: policy.id,
@@ -154,6 +154,7 @@ fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, St
         routed_to: Identity::ZERO,
         routed_to_name: String::new(),
         refusal_reason: String::new(),
+        payout_reference: String::new(),
         fnol_hash: String::new(),
         summary_hash: String::new(),
         determination_hash: String::new(),
@@ -613,11 +614,11 @@ fn refuse(ctx: &ReducerContext, claim: Claim, reason: String, decided_by: &str) 
     ))
 }
 
-/// Posts the receivable and the claimant payment, counts the payout against
-/// the aggregate, and queues the letters.
+/// Posts the receivable and counts the payout against the aggregate. An
+/// injury payout is then deposited into the claimant's Nessie account; a
+/// property payout goes to the venue's repair vendor and is booked at once.
 fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), String> {
     post(ctx, claim.id, hyphenate_core::ledger::receivable(claim.recoverable_cents), outcome)?;
-    post(ctx, claim.id, hyphenate_core::ledger::claimant_payment(claim.payout_cents), outcome)?;
     if let Some(p) = ctx.db.insurance_policy().id().find(claim.policy_id) {
         let p = match cover_of(&claim) {
             CoverKind::MedicalPayments => InsurancePolicy { medical_used_cents: p.medical_used_cents + claim.payout_cents, ..p },
@@ -625,24 +626,72 @@ fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), Strin
         };
         ctx.db.insurance_policy().id().update(InsurancePolicy { updated_at: ctx.timestamp, ..p });
     }
-    let note = if outcome == "auto_settled" {
-        format!("settled automatically under rule v{}", claim.settlement_rule_version)
-    } else {
-        format!("approved by {}", claim.routed_to_name)
+    let claim = save(ctx, Claim { decided_at: Some(ctx.timestamp), routed_to: Identity::ZERO, ..claim });
+    if cover_of(&claim) == CoverKind::Property {
+        return paid(ctx, claim, "repair vendor".into(), outcome);
+    }
+    let account = claim.claimant.and_then(|c| ctx.db.claimant_account().identity().find(c));
+    let payload = PayoutPayload {
+        claim_id: claim.id,
+        claimant: claim.claimant.map(|c| c.to_hex().to_string()).unwrap_or_default(),
+        claimant_name: claim.claimant_name.clone(),
+        customer_id: account.as_ref().map(|a| a.customer_id.clone()).unwrap_or_default(),
+        account_id: account.as_ref().map(|a| a.account_id.clone()).unwrap_or_default(),
+        payout_cents: claim.payout_cents,
+        memo: format!("BandIt claim {} payout", claim.id),
+    };
+    jobs::enqueue(ctx, KIND_PAYOUT, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
+    let note = format!("{outcome}; paying {} into the claimant's Nessie account", hyphenate_core::money::format_cents(claim.payout_cents));
+    save(ctx, Claim { status: ClaimStatus::Paying, status_note: note, ..claim });
+    Ok(())
+}
+
+/// Books the claimant payment (J3), marks the claim settled and queues the letters.
+fn paid(ctx: &ReducerContext, claim: Claim, reference: String, outcome: &str) -> Result<(), String> {
+    post(ctx, claim.id, hyphenate_core::ledger::claimant_payment(claim.payout_cents), outcome)?;
+    let note = match claim.decided_by.as_str() {
+        "rule" => format!("settled automatically under rule v{}", claim.settlement_rule_version),
+        _ => format!("approved by {}", claim.routed_to_name),
     };
     let claim = save(
         ctx,
-        Claim {
-            status: ClaimStatus::Settled,
-            status_note: note,
-            decided_at: Some(ctx.timestamp),
-            settled_at: Some(ctx.timestamp),
-            routed_to: Identity::ZERO,
-            ..claim
-        },
+        Claim { status: ClaimStatus::Settled, status_note: note, payout_reference: reference, settled_at: Some(ctx.timestamp), ..claim },
     );
+    let outcome = if claim.decided_by == "rule" { "auto_settled" } else { "approved" };
     let payload = DraftPayload { claim_id: claim.id, pack_version: claim.pack_version, outcome: outcome.into(), letter: letter_data(ctx, &claim, "", "") };
     jobs::enqueue(ctx, KIND_DRAFT, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
+    Ok(())
+}
+
+/// The worker's Nessie deposit for an injury payout.
+#[spacetimedb::reducer]
+pub fn record_claim_payout(ctx: &ReducerContext, job_id: u64, customer_id: String, account_id: String, deposit_id: String) -> Result<(), String> {
+    require_role(ctx, &["worker"])?;
+    let job = jobs::leased_by_caller(ctx, job_id)?;
+    let claim = claim_by_id(ctx, job.subject_id)?;
+    jobs::finish(ctx, job, deposit_id.clone());
+    if claim.status != ClaimStatus::Paying {
+        return Ok(());
+    }
+    if let Some(identity) = claim.claimant {
+        if ctx.db.claimant_account().identity().find(identity).is_none() {
+            ctx.db.claimant_account().insert(ClaimantAccount { identity, customer_id, account_id, created_at: ctx.timestamp });
+        }
+    }
+    paid(ctx, claim, format!("Nessie deposit {deposit_id}"), "record_claim_payout")
+}
+
+/// Queues the Nessie deposit again after it failed.
+#[spacetimedb::reducer]
+pub fn retry_claim_payout(ctx: &ReducerContext, claim_id: u64) -> Result<(), String> {
+    require_role(ctx, &["risk_manager", "adjuster"])?;
+    let claim = claim_by_id(ctx, claim_id)?;
+    if claim.status != ClaimStatus::Paying {
+        return Err(format!("claim {claim_id} is not waiting for its payout"));
+    }
+    let last = ctx.db.job().kind().filter(KIND_PAYOUT).filter(|j| j.subject_id == claim_id).max_by_key(|j| j.id).ok_or("no payout job")?;
+    jobs::enqueue(ctx, KIND_PAYOUT, last.payload, "claim", claim_id);
+    save(ctx, Claim { status_note: "payout queued again".into(), ..claim });
     Ok(())
 }
 
@@ -874,6 +923,9 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
         KIND_VERIFY if claim.status == ClaimStatus::Verifying => {
             store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or precedents").by(hyphenate_core::Reader::Elastic));
             queue_review(ctx, claim);
+        }
+        KIND_PAYOUT if claim.status == ClaimStatus::Paying => {
+            save(ctx, Claim { status_note: format!("the Nessie payout failed: {}; retry_claim_payout queues it again", job.error), ..claim });
         }
         KIND_REVIEW if claim.status == ClaimStatus::Reviewing => {
             let claim = save(ctx, Claim { review_verdict: "unavailable".into(), ..claim });

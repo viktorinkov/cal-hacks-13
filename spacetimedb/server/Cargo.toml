@@ -15,3 +15,4 @@ hyphenate-core = { path = "../../crates/hyphenate-core" }
 
 [dev-dependencies]
 spacetimedb = { version = "2.13", features = ["test-utils"] }
+icu_calendar = "~2.1"

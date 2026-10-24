@@ -65,7 +65,7 @@ pub struct Incident {
     pub station_id: u8,
     /// The subject band, 0 for property incidents.
     #[index(btree)]
-    pub band_id: u8,
+    pub subject_band: u8,
     /// `band`, `ops` or `vision`.
     pub opened_by: String,
     pub opened_at: Timestamp,
@@ -168,7 +168,7 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
         resolved: false,
         zone_id,
         station_id,
-        band_id,
+        subject_band: band_id,
         opened_by: opened_by.into(),
         opened_at: ctx.timestamp,
         last_signal_at: ctx.timestamp,
@@ -222,14 +222,14 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
 fn active_band_incident(ctx: &ReducerContext, band_id: u8) -> Option<Incident> {
     ctx.db
         .incident()
-        .band_id()
+        .subject_band()
         .filter(band_id)
         .filter(|i| !i.resolved && i.kind != IncidentKind::Property)
         .max_by_key(|i| i.id)
 }
 
 fn resolved_moments_ago(ctx: &ReducerContext, band_id: u8) -> bool {
-    ctx.db.incident().band_id().filter(band_id).any(|i| {
+    ctx.db.incident().subject_band().filter(band_id).any(|i| {
         i.resolved_at
             .is_some_and(|t| ctx.timestamp.duration_since(t).is_some_and(|d| d.as_micros() < REOPEN_GRACE_MICROS as u128))
     })
@@ -259,7 +259,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
         .incident()
         .resolved()
         .filter(false)
-        .filter(|i| i.kind != IncidentKind::Property && i.band_id != 0)
+        .filter(|i| i.kind != IncidentKind::Property && i.subject_band != 0)
         .collect();
     if active.is_empty() {
         return Ok(());
@@ -285,7 +285,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
                     .link()
                     .from_id()
                     .filter(b.id)
-                    .find(|l| l.to_id == incident.band_id)
+                    .find(|l| l.to_id == incident.subject_band)
                     .map(|l| l.rssi)
                     .unwrap_or(0);
                 ctx.db.incident_band().insert(IncidentBand {
@@ -378,7 +378,7 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
     if i.resolved {
         return Err(format!("incident {incident_id} is already resolved"));
     }
-    let band_id = i.band_id;
+    let band_id = i.subject_band;
     let resolved = ctx.db.incident().id().update(Incident {
         status: IncidentStatus::Resolved,
         resolved: true,

@@ -12,6 +12,9 @@ pub mod setup;
 pub mod tables;
 pub mod views;
 
+#[cfg(test)]
+mod tests;
+
 pub use flow::{on_incident_resolved, on_job_dead};
 pub use tables::*;
 

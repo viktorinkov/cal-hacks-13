@@ -62,7 +62,7 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         opened_at,
         resolved_at: inc.resolved_at.map(micros).unwrap_or(micros(ctx.timestamp)),
         zone_id: inc.zone_id,
-        band_id: inc.band_id,
+        band_id: inc.subject_band,
     };
 
     let snapshot = ctx.db.incident_snapshot().incident_id().find(inc.id).map(|s| SnapshotInfo {
@@ -71,8 +71,8 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         bands_present: s.bands_present.clone(),
         neigh_mean: s.neigh_mean,
         circle_bands: s.circle_bands.clone(),
-        subject: (inc.band_id != 0).then(|| SubjectBand {
-            band_id: inc.band_id,
+        subject: (inc.subject_band != 0).then(|| SubjectBand {
+            band_id: inc.subject_band,
             state: s.band_state,
             flags: s.band_flags,
             neigh: s.band_neigh,
@@ -134,13 +134,13 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         }
     });
 
-    let mut presence: Vec<ZoneStay> = if inc.band_id == 0 {
+    let mut presence: Vec<ZoneStay> = if inc.subject_band == 0 {
         Vec::new()
     } else {
         ctx.db
             .zone_visit()
             .band_id()
-            .filter(inc.band_id)
+            .filter(inc.subject_band)
             .filter(|v| micros(v.entered) <= opened_at && v.left.is_none_or(|l| micros(l) >= opened_at - PRESENCE_WINDOW_MICROS))
             .map(|v| {
                 let z = zone_for_station(ctx, v.zone);

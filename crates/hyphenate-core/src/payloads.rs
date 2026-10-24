@@ -17,8 +17,10 @@ pub const KIND_REVIEW: &str = "claim_review";
 pub const KIND_DRAFT: &str = "claim_draft";
 /// Claude drafts a recovery letter, worded as a question, for a property claim.
 pub const KIND_RECOVERY: &str = "recovery_letter";
+/// Deposits an injury claim's payout into the claimant's Nessie account.
+pub const KIND_PAYOUT: &str = "claim_payout";
 
-pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY];
+pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RecordExtractPayload {
@@ -105,4 +107,17 @@ pub struct DraftPayload {
 pub struct RecoveryPayload {
     pub claim_id: u64,
     pub letter: LetterData,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PayoutPayload {
+    pub claim_id: u64,
+    /// The claimant's SpacetimeDB identity, hex.
+    pub claimant: String,
+    pub claimant_name: String,
+    /// The claimant's Nessie customer and account from an earlier payout; empty the first time.
+    pub customer_id: String,
+    pub account_id: String,
+    pub payout_cents: Cents,
+    pub memo: String,
 }
