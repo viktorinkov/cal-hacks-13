@@ -34,7 +34,7 @@ pub struct WalletEntry {
 
 /// Queues the wallet for an attendee who has none and none on the way.
 pub fn open_for(ctx: &ReducerContext, a: &Attendee) {
-    if a.simulated || ctx.db.claimant_account().identity().find(a.identity).is_some() {
+    if a.crowd || ctx.db.claimant_account().identity().find(a.identity).is_some() {
         return;
     }
     if ctx.db.job().kind().filter(KIND_WALLET_OPEN).any(|j| j.open && j.subject_id == a.node_id) {

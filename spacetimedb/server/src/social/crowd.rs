@@ -357,7 +357,7 @@ pub fn venue_plan(ctx: &AnonymousViewContext) -> Vec<PlanArea> {
 
 /// Removes every attendee of the crowd, their bands and everything they left behind.
 fn clear_crowd(ctx: &ReducerContext) {
-    let crowd: Vec<Attendee> = ctx.db.attendee().iter().filter(|a| a.simulated).collect();
+    let crowd: Vec<Attendee> = ctx.db.attendee().iter().filter(|a| a.crowd).collect();
     for a in crowd {
         let links: Vec<u64> = ctx
             .db
@@ -455,7 +455,7 @@ fn add_member(ctx: &ReducerContext, band_id: u16, g: &CrowdGroup, organization_i
         findable: true,
         person_id: 0,
         organization_id,
-        simulated: true,
+        crowd: true,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });

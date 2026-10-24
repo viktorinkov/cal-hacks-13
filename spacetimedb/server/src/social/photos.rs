@@ -24,7 +24,7 @@ pub fn register_photo(ctx: &ReducerContext, url: String, taken_at: Timestamp, zo
     });
     let mut findable: Vec<_> = wearers_in_zone_at(ctx, zone_id, taken_at)
         .into_iter()
-        .filter_map(|who| ctx.db.attendee().identity().find(who).filter(|a| a.findable).map(|a| (a.simulated, who)))
+        .filter_map(|who| ctx.db.attendee().identity().find(who).filter(|a| a.findable).map(|a| (a.crowd, who)))
         .collect();
     // People who tapped their bands before the crowd, so the cap never leaves out a person.
     findable.sort_by_key(|(crowd, _)| *crowd);

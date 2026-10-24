@@ -14,7 +14,7 @@ pub struct Attendee {
     pub findable: bool,
     pub person_id: u64,
     pub organization_id: u64,
-    pub simulated: bool,
+    pub crowd: bool,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
 }
@@ -34,7 +34,7 @@ pub struct AttendeeCols {
     pub findable: __sdk::__query_builder::Col<Attendee, bool>,
     pub person_id: __sdk::__query_builder::Col<Attendee, u64>,
     pub organization_id: __sdk::__query_builder::Col<Attendee, u64>,
-    pub simulated: __sdk::__query_builder::Col<Attendee, bool>,
+    pub crowd: __sdk::__query_builder::Col<Attendee, bool>,
     pub created_at: __sdk::__query_builder::Col<Attendee, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<Attendee, __sdk::Timestamp>,
 }
@@ -50,7 +50,7 @@ impl __sdk::__query_builder::HasCols for Attendee {
             findable: __sdk::__query_builder::Col::new(table_name, "findable"),
             person_id: __sdk::__query_builder::Col::new(table_name, "person_id"),
             organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
-            simulated: __sdk::__query_builder::Col::new(table_name, "simulated"),
+            crowd: __sdk::__query_builder::Col::new(table_name, "crowd"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
         }

@@ -84,7 +84,7 @@ impl World {
                 findable: true,
                 person_id: 0,
                 organization_id: 0,
-                simulated: false,
+                crowd: false,
                 created_at: t.clock.now(),
                 updated_at: t.clock.now(),
             });

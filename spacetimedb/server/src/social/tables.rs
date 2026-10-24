@@ -21,9 +21,8 @@ pub struct Attendee {
     /// Organisation of the claimed profile, 0 when none.
     #[index(btree)]
     pub organization_id: u64,
-    /// One of the crowd's attendees, not a person who tapped a band. The column keeps its first name because
-    /// SpacetimeDB cannot rename a column without dropping the attendees.
-    pub simulated: bool,
+    /// One of the crowd's attendees, not a person who tapped a band.
+    pub crowd: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }

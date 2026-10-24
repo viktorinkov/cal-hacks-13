@@ -155,6 +155,7 @@ function live() {
   const alerts = bands.filter(b => b.sos || b.fall);
   const inside = bands.filter(b => b.zone !== 0);
   const crowd = bands.filter(b => b.id >= 100).length;
+  const test = bands.filter(b => b.id >= 90 && b.id < 100).length;
   const incidents = [...conn.db.openIncidents.iter()];
   const names = wearers();
   const wearer = (band: number) => names.has(band) ? ` (${names.get(band) || 'no name yet'})` : '';
@@ -170,7 +171,7 @@ function live() {
           h('a', { href: '#claims' }, 'open in Claims'))))),
     h('section', {},
       h('h3', {}, 'Venue'),
-      h('p', { class: 'muted' }, `${bands.length} bands at the event right now, ${bands.length - crowd} of them numbered 1 to 99. Every dot is a band row in SpacetimeDB, moving as the module writes it.`),
+      h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands. Every dot is a band row in SpacetimeDB, moving as the module writes it.`),
       venueMap(conn),
       h('p', { class: 'legend' }, MAP_LEGEND.map(([c, label]) => h('span', {}, h('i', { class: 'dot', style: `background:${c}` }), label)))),
     h('section', {},
@@ -180,7 +181,7 @@ function live() {
         : h('button', { onclick: () => confirm('Fire or smoke? Every band starts guiding its wearer to the exit.') && act(() => conn.reducers.setLowVis({ on: true })) }, 'Low visibility: guide everyone to the exits')),
       h('p', { class: 'muted' }, `${inside.length} people in zones right now, ${bands.length} bands online. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
       h('table', {},
-        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Bands 1 to 99'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
+        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Hardware and test bands'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
         zones.map(z => {
           const here = bands.filter(b => b.zone === z.stationId);
           const avg = here.length ? here.reduce((s, b) => s + b.neigh, 0) / here.length : 0;
