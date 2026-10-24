@@ -1,11 +1,45 @@
-//! What the plain web pages read beyond the feature views: the claims board for staff and an
-//! attendee's own claims. Staff here means the module owner or anyone holding a staff role.
+//! What the plain web pages read beyond the feature views: whether the event has ended, the claims
+//! board for staff and an attendee's own claims. Staff here means the module owner or anyone holding
+//! a staff role.
 
 use crate::insurance::*;
 use crate::roles::*;
 use crate::safety::*;
 use crate::tables::*;
-use spacetimedb::{Identity, RawQuery, SpacetimeType, Timestamp, ViewContext};
+use spacetimedb::{Identity, RawQuery, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
+
+/// One row, id 0. Once the host ends the event, the band's link shows the recap instead of the live view.
+#[spacetimedb::table(accessor = event_state, public)]
+pub struct EventState {
+    #[primary_key]
+    pub id: u8,
+    pub ended: bool,
+    pub ended_at: Option<Timestamp>,
+    pub ended_by: Identity,
+}
+
+fn set_ended(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let row = EventState { id: 0, ended, ended_at: ended.then_some(ctx.timestamp), ended_by: ctx.sender() };
+    if ctx.db.event_state().id().find(0).is_some() {
+        ctx.db.event_state().id().update(row);
+    } else {
+        ctx.db.event_state().insert(row);
+    }
+    Ok(())
+}
+
+/// The host's "Event ended" button.
+#[spacetimedb::reducer]
+pub fn end_event(ctx: &ReducerContext) -> Result<(), String> {
+    set_ended(ctx, true)
+}
+
+/// Back to the live event, for running the demo again.
+#[spacetimedb::reducer]
+pub fn reopen_event(ctx: &ReducerContext) -> Result<(), String> {
+    set_ended(ctx, false)
+}
 
 fn is_staff(ctx: &ViewContext) -> bool {
     ctx.db.owner().identity().find(ctx.sender()).is_some()
