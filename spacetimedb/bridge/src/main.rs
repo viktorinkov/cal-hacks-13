@@ -8,7 +8,7 @@ use spacetimedb_sdk::{DbContext, Table, credentials};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{ErrorKind, Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
@@ -405,11 +405,11 @@ impl Forwarder {
 
 type Reader = Box<dyn Read + Send>;
 
-fn open_port(path: &str) -> Result<(Reader, Writer)> {
+fn open_port(path: &str) -> Result<(Reader, Writer, Option<RawFd>)> {
     match serialport::new(path, 115200).timeout(Duration::from_millis(200)).open() {
         Ok(p) => {
             let w = p.try_clone().context("cloning the serial port")?;
-            Ok((Box::new(p), Box::new(w)))
+            Ok((Box::new(p), Box::new(w), None))
         }
         Err(e) => {
             let f = OpenOptions::new().read(true).write(true).open(path).with_context(|| format!("opening {path}"))?;
@@ -420,12 +420,17 @@ fn open_port(path: &str) -> Result<(Reader, Writer)> {
             }
             eprintln!("{path} is not a serial port ({e}); using it as a plain terminal");
             let w = f.try_clone()?;
-            Ok((Box::new(f), Box::new(w)))
+            Ok((Box::new(f), Box::new(w), Some(fd)))
         }
     }
 }
 
-fn read_port(a: &Args, mut reader: Reader, writer: &SharedWriter, fwd: &mut Forwarder) -> anyhow::Error {
+fn wait_readable(fd: RawFd, timeout: Duration) -> bool {
+    let mut p = libc::pollfd { fd, events: libc::POLLIN, revents: 0 };
+    unsafe { libc::poll(&mut p, 1, timeout.as_millis() as libc::c_int) > 0 }
+}
+
+fn read_port(a: &Args, mut reader: Reader, fd: Option<RawFd>, writer: &SharedWriter, fwd: &mut Forwarder) -> anyhow::Error {
     let opened = Instant::now();
     let mut lines = Lines::new();
     let mut settled = false;
@@ -439,6 +444,11 @@ fn read_port(a: &Args, mut reader: Reader, writer: &SharedWriter, fwd: &mut Forw
         if settled && !gateway_known && last_info.is_none_or(|t| t.elapsed() >= INFO_RETRY) {
             let _ = write_line(writer, "info\n");
             last_info = Some(Instant::now());
+        }
+        if let Some(fd) = fd {
+            if !wait_readable(fd, Duration::from_millis(100)) {
+                continue;
+            }
         }
         match reader.read(&mut buf) {
             Ok(0) => return anyhow!("{} closed", a.port),
@@ -521,11 +531,11 @@ fn main() -> Result<()> {
     eprintln!("bridging {} -> {} / {}, bands {:?}", a.port, a.server, a.db, a.bands);
     loop {
         match open_port(&a.port) {
-            Ok((reader, w)) => {
+            Ok((reader, w, fd)) => {
                 if let Ok(mut slot) = writer.lock() {
                     *slot = Some(w);
                 }
-                let why = read_port(&a, reader, &writer, &mut fwd);
+                let why = read_port(&a, reader, fd, &writer, &mut fwd);
                 if let Ok(mut slot) = writer.lock() {
                     *slot = None;
                 }
