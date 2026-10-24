@@ -84,7 +84,7 @@ async fn config(State(app): AppState) -> Json<Value> {
     let ws = w.spacetimedb_url.replacen("https://", "wss://", 1).replacen("http://", "ws://", 1);
     let kibana = w.kibana_url.trim_end_matches('/');
     let dashboards: Vec<Value> = [
-        ("Import run", "bandit-pipeline-calhacks-13"),
+        ("Scrape pipeline", "bandit-pipeline-calhacks-13"),
         ("Sponsors and prizes", "bandit-event-calhacks-13"),
         ("Claims", "bandit-claims"),
     ]
