@@ -135,6 +135,20 @@ export const BlobRef = __t.object("BlobRef", {
 });
 export type BlobRef = __Infer<typeof BlobRef>;
 
+export const BoardMerchOrder = __t.object("BoardMerchOrder", {
+  id: __t.u64(),
+  attendeeName: __t.string(),
+  templateId: __t.u64(),
+  title: __t.string(),
+  size: __t.string(),
+  amountCents: __t.u64(),
+  status: __t.string(),
+  failure: __t.string(),
+  nessiePurchaseId: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type BoardMerchOrder = __Infer<typeof BoardMerchOrder>;
+
 export const Booth = __t.object("Booth", {
   id: __t.u64(),
   sourceKey: __t.string(),

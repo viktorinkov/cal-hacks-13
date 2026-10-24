@@ -1,5 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// medic's filing to the named approver's decision, the Kibana dashboards, and "Event ended".
+// medic's filing to the named approver's decision, the merch templates and orders, the Kibana
+// dashboards, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -41,6 +42,8 @@ const QUERIES = [
   'SELECT * FROM board_policies',
   'SELECT * FROM medic_medical_cards',
   'SELECT * FROM event_graph',
+  'SELECT * FROM merch_template',
+  'SELECT * FROM board_merch_orders',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -78,7 +81,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['kibana', 'Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['merch', 'Merch'], ['kibana', 'Kibana']];
   return cfg.simulate ? [...all, ['bands', 'Bands']] : all;
 }
 
@@ -442,6 +445,40 @@ function claimsTab() {
   return [incidentDesk(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
 }
 
+// --- Merch --------------------------------------------------------------------------------
+
+/** The loaded templates and every attendee's order: who, what, the size, the status and the Nessie purchase. */
+function merchTab() {
+  const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
+  const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
+  const paid = orders.filter(o => o.status === 'paid');
+  const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
+  return [
+    h('section', {},
+      h('h3', {}, `Templates (${templates.length})`),
+      !templates.length && h('p', { class: 'muted' }, 'None loaded. scripts/merch-setup loads assets/merch/templates.json after the event import.'),
+      templates.length > 0 && h('table', {},
+        h('tr', {}, h('th', {}, 'Image'), h('th', {}, 'Title'), h('th', {}, 'Kind'), h('th', {}, 'Price'), h('th', {}, 'Photo area'), h('th', {}, 'Sponsor booths')),
+        templates.map(t => h('tr', {},
+          h('td', {}, h('a', { href: t.imageUrl, target: '_blank' }, h('img', { src: t.imageUrl, width: 64, alt: t.title }))),
+          h('td', {}, t.title, h('div', { class: 'muted' }, t.name)), h('td', {}, t.kind), h('td', {}, money(t.priceCents)),
+          h('td', {}, `${t.photoW}×${t.photoH} at ${t.photoX},${t.photoY}`),
+          h('td', {}, t.boothIds.length ? booths(t.boothIds) : h('span', { class: 'muted' }, 'plain')))))),
+    h('section', {},
+      h('h3', {}, `Orders (${orders.length}, ${paid.length} paid, ${money(paid.reduce((s, o) => s + o.amountCents, 0n))})`),
+      !can('ops') && h('p', { class: 'muted' }, 'Orders show for the organizer.'),
+      can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees buy merch from their recap once the event ends.'),
+      orders.length > 0 && h('table', {},
+        h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
+        orders.map(o => h('tr', {},
+          h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title), h('td', {}, o.size || '—'),
+          h('td', {}, money(o.amountCents)),
+          h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
+          h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
+          h('td', {}, date(o.createdAt)))))),
+  ];
+}
+
 // --- Kibana ---------------------------------------------------------------------------------
 
 function kibana() {
@@ -460,7 +497,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'merch' ? merchTab() : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
   mount('app', header(), body);
 }
 

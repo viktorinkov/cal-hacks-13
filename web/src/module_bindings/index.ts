@@ -125,6 +125,7 @@ import BoardFactsRow from "./board_facts_table";
 import BoardLedgerRow from "./board_ledger_table";
 import BoardLinesRow from "./board_lines_table";
 import BoardMedicalAccessRow from "./board_medical_access_table";
+import BoardMerchOrdersRow from "./board_merch_orders_table";
 import BoardNotesRow from "./board_notes_table";
 import BoardPoliciesRow from "./board_policies_table";
 import BoardPrecedentsRow from "./board_precedents_table";
@@ -545,6 +546,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardMedicalAccessRow),
+  boardMerchOrders: __table({
+    name: 'board_merch_orders',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardMerchOrdersRow),
   boardNotes: __table({
     name: 'board_notes',
     indexes: [
@@ -962,6 +970,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_lines": Omit<typeof tablesSchema.schemaType.tables["boardLines"], "accessorName"> & { readonly accessorName: "board_lines" };
     /** @deprecated Use `boardMedicalAccess` instead. This alias will be removed in the next major version. */
     readonly "board_medical_access": Omit<typeof tablesSchema.schemaType.tables["boardMedicalAccess"], "accessorName"> & { readonly accessorName: "board_medical_access" };
+    /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
+    readonly "board_merch_orders": Omit<typeof tablesSchema.schemaType.tables["boardMerchOrders"], "accessorName"> & { readonly accessorName: "board_merch_orders" };
     /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
     readonly "board_notes": Omit<typeof tablesSchema.schemaType.tables["boardNotes"], "accessorName"> & { readonly accessorName: "board_notes" };
     /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
@@ -1080,6 +1090,7 @@ const tableAccessorAliases = {
   "board_ledger": "boardLedger",
   "board_lines": "boardLines",
   "board_medical_access": "boardMedicalAccess",
+  "board_merch_orders": "boardMerchOrders",
   "board_notes": "boardNotes",
   "board_policies": "boardPolicies",
   "board_precedents": "boardPrecedents",
@@ -1169,6 +1180,8 @@ export type DbView = __DbViewBase & {
   readonly "board_lines": __DbViewBase["boardLines"];
   /** @deprecated Use `boardMedicalAccess` instead. This alias will be removed in the next major version. */
   readonly "board_medical_access": __DbViewBase["boardMedicalAccess"];
+  /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_orders": __DbViewBase["boardMerchOrders"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __DbViewBase["boardNotes"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
@@ -1285,6 +1298,8 @@ export type Tables = __TablesBase & {
   readonly "board_lines": __TablesBase["boardLines"];
   /** @deprecated Use `boardMedicalAccess` instead. This alias will be removed in the next major version. */
   readonly "board_medical_access": __TablesBase["boardMedicalAccess"];
+  /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_orders": __TablesBase["boardMerchOrders"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __TablesBase["boardNotes"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */

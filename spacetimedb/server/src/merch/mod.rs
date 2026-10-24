@@ -6,8 +6,9 @@
 
 use crate::insurance::*;
 use crate::jobs::{self, *};
-use crate::roles::require_role;
+use crate::roles::*;
 use crate::social::tables::*;
+use crate::tables::*;
 use crate::venue::*;
 use crate::wallet;
 use crate::web::event_state;
@@ -236,6 +237,48 @@ pub fn my_held_cents(ctx: &ViewContext, who: Identity) -> i64 {
 #[spacetimedb::view(accessor = my_merch_orders, public)]
 pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {
     ctx.db.merch_order().attendee().filter(ctx.sender()).collect()
+}
+
+/// One order with who placed it, for the organizer portal's Merch tab.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BoardMerchOrder {
+    pub id: u64,
+    pub attendee_name: String,
+    pub template_id: u64,
+    pub title: String,
+    pub size: String,
+    pub amount_cents: u64,
+    pub status: String,
+    pub failure: String,
+    pub nessie_purchase_id: String,
+    pub created_at: Timestamp,
+}
+
+/// Every attendee's merch orders, for the organizer (ops) only.
+#[spacetimedb::view(accessor = board_merch_orders, public)]
+pub fn board_merch_orders(ctx: &ViewContext) -> Vec<BoardMerchOrder> {
+    let ops = ctx.db.owner().identity().find(ctx.sender()).is_some()
+        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "ops");
+    if !ops {
+        return Vec::new();
+    }
+    ctx.db
+        .merch_order()
+        .attendee()
+        .filter(Identity::ZERO..)
+        .map(|o| BoardMerchOrder {
+            id: o.id,
+            attendee_name: ctx.db.attendee().identity().find(o.attendee).map(|a| a.display_name).unwrap_or_default(),
+            template_id: o.template_id,
+            title: ctx.db.merch_template().id().find(o.template_id).map(|t| t.title).unwrap_or_default(),
+            size: o.size,
+            amount_cents: o.amount_cents,
+            status: o.status,
+            failure: o.failure,
+            nessie_purchase_id: o.nessie_purchase_id,
+            created_at: o.created_at,
+        })
+        .collect()
 }
 
 /// One template with the caller's best photo for it, ready to draw.
