@@ -1,0 +1,17 @@
+# One BandIt service on the Vultr server: bandit@api, bandit@indexer or bandit@workers. They share
+# /var/lib/bandit (identities, uploaded files, rendered records) and read their keys from /opt/bandit/.env.
+[Unit]
+Description=BandIt %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/bandit
+ExecStart=/opt/bandit/target/debug/bandit-%i
+Environment=BANDIT_DATA_DIR=/var/lib/bandit BANDIT_API_ADDR=127.0.0.1:8080 BANDIT_SIMULATE=1
+Environment=ELASTIC_INDEX_PREFIX=bandit CHROME=/usr/local/bin/chrome
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
