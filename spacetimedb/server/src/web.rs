@@ -5,6 +5,8 @@
 use crate::insurance::*;
 use crate::roles::*;
 use crate::safety::*;
+use crate::social::tables::*;
+use crate::venue::*;
 use crate::tables::*;
 use spacetimedb::{Identity, RawQuery, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
@@ -182,6 +184,48 @@ pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {
             payout_reference: c.payout_reference,
             opened_at: c.opened_at,
             settled_at: c.settled_at,
+        })
+        .collect()
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct AttendeeOut {
+    pub node_id: u64,
+    pub display_name: String,
+    /// 0 when the attendee wears no band.
+    pub band_id: u8,
+    pub findable: bool,
+    pub simulated: bool,
+    pub organization: String,
+    pub handles: Vec<crate::social::views::HandleOut>,
+    pub created_at: Timestamp,
+}
+
+/// Everyone who joined, for the host portal.
+#[spacetimedb::view(accessor = board_attendees, public)]
+pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
+    if !is_staff(ctx) {
+        return Vec::new();
+    }
+    ctx.db
+        .attendee()
+        .person_id()
+        .filter(0u64..)
+        .map(|a| AttendeeOut {
+            node_id: a.node_id,
+            band_id: ctx.db.band_owner().owner().find(a.identity).map(|o| o.band_id).unwrap_or(0),
+            findable: a.findable,
+            simulated: a.simulated,
+            organization: ctx.db.organization().id().find(a.organization_id).map(|o| o.name).unwrap_or_default(),
+            handles: ctx
+                .db
+                .social_handle()
+                .owner()
+                .filter(a.identity)
+                .map(|h| crate::social::views::HandleOut { platform: h.platform, handle: h.handle })
+                .collect(),
+            display_name: a.display_name,
+            created_at: a.created_at,
         })
         .collect()
 }
