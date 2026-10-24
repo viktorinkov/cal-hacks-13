@@ -191,7 +191,7 @@ function profileStep() {
     h('ul', { class: 'cards' }, matches.map(p => {
       const org = conn.db.organization.id.find(p.organizationId);
       return h('li', {},
-        h('b', {}, p.displayName), ` ${p.title ? p.title + ', ' : ''}${org?.name ?? ''} (${p.kind})`,
+        h('b', {}, p.displayName), ` ${[p.title, org?.name].filter(Boolean).join(', ')} (${p.kind})`,
         h('button', { onclick: () => act(() => conn.reducers.claimPerson({ personId: p.id })).then(() => go('card')) }, 'This is me'));
     })),
     h('button', { class: 'link', onclick: () => go('card') }, 'None of these'),
@@ -258,6 +258,16 @@ function thanks() {
   ];
 }
 
+function resumeStep(): Step {
+  if (!conn.db.myAttendee.iter().next().value?.displayName) return 'name';
+  const docs = [...conn.db.myMedicalDocuments.iter()];
+  if (!docs.some(d => d.kind === 'history')) return 'history';
+  if (!docs.some(d => d.kind === 'insurance')) return 'insurance';
+  if (conn.db.myMedicalCard.iter().next().value?.status !== 'confirmed') return 'card';
+  if (!conn.db.myWallet.iter().next().value) return 'wallet';
+  return 'done';
+}
+
 function setup() {
   switch (step) {
     case 'name': return nameStep();
@@ -318,8 +328,8 @@ async function main() {
   conn = await connect(QUERIES, render);
   const mb = conn.db.myBand.iter().next().value;
   if (!mb || (mb.bandId === bandId && mb.status !== 'claimed')) await tryClaim();
-  // Someone who finished setup earlier lands on the thank-you.
-  if (conn.db.myAttendee.iter().next().value?.displayName) step = 'done';
+  // Someone who reloads mid-setup picks up at the first step they have not finished.
+  step = resumeStep();
   // The claim countdown ticks every second until the band is claimed.
   setInterval(() => {
     const claimed = conn.db.myBand.iter().next().value?.status === 'claimed';
