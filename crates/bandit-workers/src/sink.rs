@@ -23,6 +23,7 @@ pub enum Finish {
     WalletOpened { customer_id: String, account_id: String },
     MerchPaid { merchant_id: String, purchase_id: String },
     MedicalCard { card_json: String },
+    VenueSetup { result: VenueSetupResult },
 }
 
 pub enum Sink {
@@ -80,10 +81,34 @@ impl Sink {
         }
     }
 
+    /// Registers a file anyone with its link may load, such as a venue model.
+    pub async fn register_shared(&self, blob: &BlobInfo, purpose: &str, content_type: &str) -> Result<()> {
+        let (hash, size) = (blob.sha256.clone(), blob.size_bytes);
+        match self {
+            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "shared".into(), purpose.into(), content_type.into(), size)),
+            Sink::Print => {
+                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "shared", "purpose": purpose, "content_type": content_type, "size_bytes": size}));
+                Ok(())
+            }
+        }
+    }
+
+    /// Reports a step of a venue setup run, so the portal shows it as it happens.
+    pub async fn step(&self, job_id: u64, name: String, detail: String) -> Result<()> {
+        match self {
+            Sink::Db(conn) => reduce!(conn, report_venue_setup_step_then(job_id, name, detail)),
+            Sink::Print => {
+                print_call("report_venue_setup_step", json!({"job_id": job_id, "name": name, "detail": detail}));
+                Ok(())
+            }
+        }
+    }
+
     /// Calls the result reducer. The last call record goes with it; earlier
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
-        let last = calls.pop();
+        // The venue setup reducer takes no call record, so its last call is recorded too.
+        let last = if matches!(finish, Finish::VenueSetup { .. }) { None } else { calls.pop() };
         for call in calls {
             self.record_call(call).await?;
         }
@@ -106,6 +131,7 @@ impl Sink {
             Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
+            Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -174,6 +200,15 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
         Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
+        Finish::VenueSetup { result: r } => (
+            "finish_venue_setup",
+            json!({
+                "event_site": r.event_site, "venue_name": r.venue_name, "address": r.address, "map_url": r.map_url,
+                "method": r.method, "model_hash": r.model_hash, "layout_hash": r.layout_hash, "model_bytes": r.model_bytes,
+                "meshes": r.meshes, "triangles": r.triangles, "places": r.places, "size": [r.size_x, r.size_y, r.size_z],
+                "floor_plans": r.floor_plans, "sources": r.sources.iter().map(|f| json!({"label": f.label, "value": f.value})).collect::<Vec<_>>(),
+            }),
+        ),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);

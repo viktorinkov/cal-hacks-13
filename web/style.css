@@ -40,6 +40,7 @@ nav .on { font-weight: bold; text-decoration: none; color: #111; }
 .alert { background: #ffe1e1; border-color: #f99; }
 code { background: #eee; padding: 1px 4px; border-radius: 3px; }
 .venue-map canvas { width: 100%; display: block; background: #fff; }
+.venue-3d canvas { width: 100%; display: block; }
 .graph { position: relative; height: 70vh; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #0b1020; }
 .graph:fullscreen { border-radius: 0; }
 .graph-card { position: absolute; top: 8px; left: 8px; z-index: 2; max-width: 240px; padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, .94); font-size: 13px; }

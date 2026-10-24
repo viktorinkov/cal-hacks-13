@@ -292,6 +292,7 @@ dependencies = [
  "bandit-insurance",
  "claims-elastic",
  "claude-client",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

@@ -14,7 +14,7 @@ HOST="${TARGET#*@}"
 SSH="ssh -o StrictHostKeyChecking=accept-new $TARGET"
 
 {
-  grep -E '^(SPACETIMEDB_URL|SPACETIMEDB_DATABASE|NESSIE_BASE_URL|NESSIE_API_KEY|ELASTICSEARCH_URL|ELASTICSEARCH_API_KEY|KIBANA_URL|ANTHROPIC_API_KEY|ANTHROPIC_MODEL)=' "$ENV_FILE"
+  grep -E '^(SPACETIMEDB_URL|SPACETIMEDB_DATABASE|NESSIE_BASE_URL|NESSIE_API_KEY|ELASTICSEARCH_URL|ELASTICSEARCH_API_KEY|KIBANA_URL|ANTHROPIC_API_KEY|ANTHROPIC_MODEL|BRIGHTDATA_[A-Z_]+)=' "$ENV_FILE"
   printf 'BANDIT_OWNER_TOKEN=%s\n' "$(sed -n 's/^spacetimedb_token *= *"\(.*\)"/\1/p' "$HOME/.config/spacetime/cli.toml")"
 } | $SSH 'sudo install -d -m 700 /opt/bandit && sudo sh -c "umask 077 && cat > /opt/bandit/.env"'
 COPYFILE_DISABLE=1 tar --no-xattrs -C "$IDENTITIES" -cz . \

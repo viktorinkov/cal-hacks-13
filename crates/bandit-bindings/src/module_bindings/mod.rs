@@ -59,6 +59,9 @@ pub mod buy_merch_reducer;
 pub mod camera_table;
 pub mod camera_type;
 pub mod check_in_type;
+pub mod choose_venue_reducer;
+pub mod chosen_venue_table;
+pub mod chosen_venue_type;
 pub mod claim_band_reducer;
 pub mod claim_check_table;
 pub mod claim_check_type;
@@ -119,6 +122,7 @@ pub mod evidence_pack_type;
 pub mod extend_job_lease_reducer;
 pub mod fact_type;
 pub mod fail_job_reducer;
+pub mod finish_venue_setup_reducer;
 pub mod force_state_reducer;
 pub mod gateway_table;
 pub mod gateway_type;
@@ -247,6 +251,7 @@ pub mod remove_social_handle_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
 pub mod report_test_band_reducer;
+pub mod report_venue_setup_step_reducer;
 pub mod request_medical_card_reducer;
 pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
@@ -294,6 +299,7 @@ pub mod start_crowd_reducer;
 pub mod start_find_reducer;
 pub mod start_job_reaper_reducer;
 pub mod start_safety_watch_reducer;
+pub mod start_venue_setup_reducer;
 pub mod station_table;
 pub mod station_type;
 pub mod stop_crowd_reducer;
@@ -312,6 +318,11 @@ pub mod upsert_coverage_rule_reducer;
 pub mod upsert_insurance_policy_reducer;
 pub mod venue_in_type;
 pub mod venue_plan_table;
+pub mod venue_setup_result_type;
+pub mod venue_setup_step_table;
+pub mod venue_setup_step_type;
+pub mod venue_setup_table;
+pub mod venue_setup_type;
 pub mod venue_table;
 pub mod venue_type;
 pub mod vision_assessment_table;
@@ -381,6 +392,9 @@ pub use buy_merch_reducer::buy_merch;
 pub use camera_table::*;
 pub use camera_type::Camera;
 pub use check_in_type::CheckIn;
+pub use choose_venue_reducer::choose_venue;
+pub use chosen_venue_table::*;
+pub use chosen_venue_type::ChosenVenue;
 pub use claim_band_reducer::claim_band;
 pub use claim_check_table::*;
 pub use claim_check_type::ClaimCheck;
@@ -441,6 +455,7 @@ pub use evidence_pack_type::EvidencePack;
 pub use extend_job_lease_reducer::extend_job_lease;
 pub use fact_type::Fact;
 pub use fail_job_reducer::fail_job;
+pub use finish_venue_setup_reducer::finish_venue_setup;
 pub use force_state_reducer::force_state;
 pub use gateway_table::*;
 pub use gateway_type::Gateway;
@@ -569,6 +584,7 @@ pub use remove_social_handle_reducer::remove_social_handle;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
 pub use report_test_band_reducer::report_test_band;
+pub use report_venue_setup_step_reducer::report_venue_setup_step;
 pub use request_medical_card_reducer::request_medical_card;
 pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
@@ -616,6 +632,7 @@ pub use start_crowd_reducer::start_crowd;
 pub use start_find_reducer::start_find;
 pub use start_job_reaper_reducer::start_job_reaper;
 pub use start_safety_watch_reducer::start_safety_watch;
+pub use start_venue_setup_reducer::start_venue_setup;
 pub use station_table::*;
 pub use station_type::Station;
 pub use stop_crowd_reducer::stop_crowd;
@@ -634,6 +651,11 @@ pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
 pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
 pub use venue_in_type::VenueIn;
 pub use venue_plan_table::*;
+pub use venue_setup_result_type::VenueSetupResult;
+pub use venue_setup_step_table::*;
+pub use venue_setup_step_type::VenueSetupStep;
+pub use venue_setup_table::*;
+pub use venue_setup_type::VenueSetup;
 pub use venue_table::*;
 pub use venue_type::Venue;
 pub use vision_assessment_table::*;
@@ -703,6 +725,9 @@ pub enum Reducer {
         photo_id: u64,
         size: String,
     },
+    ChooseVenue {
+        setup_id: u64,
+    },
     ClaimBand {
         token: String,
     },
@@ -738,6 +763,10 @@ pub enum Reducer {
         job_id: u64,
         error: String,
         call: Option<ModelCallIn>,
+    },
+    FinishVenueSetup {
+        job_id: u64,
+        result: VenueSetupResult,
     },
     ForceState {
         target: u8,
@@ -859,6 +888,11 @@ pub enum Reducer {
         fall: bool,
         press: bool,
     },
+    ReportVenueSetupStep {
+        job_id: u64,
+        name: String,
+        detail: String,
+    },
     RequestMedicalCard {
         band_id: u8,
     },
@@ -941,6 +975,9 @@ pub enum Reducer {
     },
     StartJobReaper,
     StartSafetyWatch,
+    StartVenueSetup {
+        event_name: String,
+    },
     StopCrowd,
     StopFind {
         seeker: u8,
@@ -1028,6 +1065,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
             Reducer::BuyMerch { .. } => "buy_merch",
+            Reducer::ChooseVenue { .. } => "choose_venue",
             Reducer::ClaimBand { .. } => "claim_band",
             Reducer::ClaimJob { .. } => "claim_job",
             Reducer::ClaimPerson { .. } => "claim_person",
@@ -1042,6 +1080,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
             Reducer::FailJob { .. } => "fail_job",
+            Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
             Reducer::GrantRole { .. } => "grant_role",
@@ -1069,6 +1108,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportTestBand { .. } => "report_test_band",
+            Reducer::ReportVenueSetupStep { .. } => "report_venue_setup_step",
             Reducer::RequestMedicalCard { .. } => "request_medical_card",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
@@ -1091,6 +1131,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::StartFind { .. } => "start_find",
             Reducer::StartJobReaper => "start_job_reaper",
             Reducer::StartSafetyWatch => "start_safety_watch",
+            Reducer::StartVenueSetup { .. } => "start_venue_setup",
             Reducer::StopCrowd => "stop_crowd",
             Reducer::StopFind { .. } => "stop_find",
             Reducer::SubmitClaimChecks { .. } => "submit_claim_checks",
@@ -1191,6 +1232,11 @@ impl __sdk::Reducer for Reducer {
                 photo_id: photo_id.clone(),
                 size: size.clone(),
             }),
+            Reducer::ChooseVenue { setup_id } => {
+                __sats::bsatn::to_vec(&choose_venue_reducer::ChooseVenueArgs {
+                    setup_id: setup_id.clone(),
+                })
+            }
             Reducer::ClaimBand { token } => {
                 __sats::bsatn::to_vec(&claim_band_reducer::ClaimBandArgs {
                     token: token.clone(),
@@ -1253,6 +1299,12 @@ impl __sdk::Reducer for Reducer {
                 error: error.clone(),
                 call: call.clone(),
             }),
+            Reducer::FinishVenueSetup { job_id, result } => {
+                __sats::bsatn::to_vec(&finish_venue_setup_reducer::FinishVenueSetupArgs {
+                    job_id: job_id.clone(),
+                    result: result.clone(),
+                })
+            }
             Reducer::ForceState {
                 target,
                 state,
@@ -1467,6 +1519,17 @@ impl __sdk::Reducer for Reducer {
                 fall: fall.clone(),
                 press: press.clone(),
             }),
+            Reducer::ReportVenueSetupStep {
+                job_id,
+                name,
+                detail,
+            } => {
+                __sats::bsatn::to_vec(&report_venue_setup_step_reducer::ReportVenueSetupStepArgs {
+                    job_id: job_id.clone(),
+                    name: name.clone(),
+                    detail: detail.clone(),
+                })
+            }
             Reducer::RequestMedicalCard { band_id } => {
                 __sats::bsatn::to_vec(&request_medical_card_reducer::RequestMedicalCardArgs {
                     band_id: band_id.clone(),
@@ -1605,6 +1668,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::StartSafetyWatch => {
                 __sats::bsatn::to_vec(&start_safety_watch_reducer::StartSafetyWatchArgs {})
+            }
+            Reducer::StartVenueSetup { event_name } => {
+                __sats::bsatn::to_vec(&start_venue_setup_reducer::StartVenueSetupArgs {
+                    event_name: event_name.clone(),
+                })
             }
             Reducer::StopCrowd => __sats::bsatn::to_vec(&stop_crowd_reducer::StopCrowdArgs {}),
             Reducer::StopFind { seeker } => {
@@ -1771,6 +1839,7 @@ pub struct DbUpdate {
     booth: __sdk::TableUpdate<Booth>,
     bridge: __sdk::TableUpdate<Bridge>,
     camera: __sdk::TableUpdate<Camera>,
+    chosen_venue: __sdk::TableUpdate<ChosenVenue>,
     claim: __sdk::TableUpdate<Claim>,
     claim_check: __sdk::TableUpdate<ClaimCheck>,
     claim_checks: __sdk::TableUpdate<ClaimCheck>,
@@ -1864,6 +1933,8 @@ pub struct DbUpdate {
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     venue: __sdk::TableUpdate<Venue>,
     venue_plan: __sdk::TableUpdate<PlanArea>,
+    venue_setup: __sdk::TableUpdate<VenueSetup>,
+    venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
     wallet_entry: __sdk::TableUpdate<WalletEntry>,
@@ -1959,6 +2030,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "camera" => db_update
                     .camera
                     .append(camera_table::parse_table_update(table_update)?),
+                "chosen_venue" => db_update
+                    .chosen_venue
+                    .append(chosen_venue_table::parse_table_update(table_update)?),
                 "claim" => db_update
                     .claim
                     .append(claim_table::parse_table_update(table_update)?),
@@ -2238,6 +2312,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue_plan" => db_update
                     .venue_plan
                     .append(venue_plan_table::parse_table_update(table_update)?),
+                "venue_setup" => db_update
+                    .venue_setup
+                    .append(venue_setup_table::parse_table_update(table_update)?),
+                "venue_setup_step" => db_update
+                    .venue_setup_step
+                    .append(venue_setup_step_table::parse_table_update(table_update)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(vision_assessment_table::parse_table_update(table_update)?),
@@ -2314,6 +2394,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.identity);
         diff.camera = cache
             .apply_diff_to_table::<Camera>("camera", &self.camera)
+            .with_updates_by_pk(|row| &row.id);
+        diff.chosen_venue = cache
+            .apply_diff_to_table::<ChosenVenue>("chosen_venue", &self.chosen_venue)
             .with_updates_by_pk(|row| &row.id);
         diff.claim = cache
             .apply_diff_to_table::<Claim>("claim", &self.claim)
@@ -2488,6 +2571,12 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.scheduled_id);
         diff.venue = cache
             .apply_diff_to_table::<Venue>("venue", &self.venue)
+            .with_updates_by_pk(|row| &row.id);
+        diff.venue_setup = cache
+            .apply_diff_to_table::<VenueSetup>("venue_setup", &self.venue_setup)
+            .with_updates_by_pk(|row| &row.id);
+        diff.venue_setup_step = cache
+            .apply_diff_to_table::<VenueSetupStep>("venue_setup_step", &self.venue_setup_step)
             .with_updates_by_pk(|row| &row.id);
         diff.vision_assessment = cache
             .apply_diff_to_table::<VisionAssessment>("vision_assessment", &self.vision_assessment)
@@ -2692,6 +2781,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "camera" => db_update
                     .camera
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "chosen_venue" => db_update
+                    .chosen_venue
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "claim" => db_update
                     .claim
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2970,6 +3062,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_setup" => db_update
+                    .venue_setup
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_setup_step" => db_update
+                    .venue_setup_step
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -3083,6 +3181,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "camera" => db_update
                     .camera
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "chosen_venue" => db_update
+                    .chosen_venue
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "claim" => db_update
                     .claim
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3362,6 +3463,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue_plan" => db_update
                     .venue_plan
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_setup" => db_update
+                    .venue_setup
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_setup_step" => db_update
+                    .venue_setup_step
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3422,6 +3529,7 @@ pub struct AppliedDiff<'r> {
     booth: __sdk::TableAppliedDiff<'r, Booth>,
     bridge: __sdk::TableAppliedDiff<'r, Bridge>,
     camera: __sdk::TableAppliedDiff<'r, Camera>,
+    chosen_venue: __sdk::TableAppliedDiff<'r, ChosenVenue>,
     claim: __sdk::TableAppliedDiff<'r, Claim>,
     claim_check: __sdk::TableAppliedDiff<'r, ClaimCheck>,
     claim_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
@@ -3515,6 +3623,8 @@ pub struct AppliedDiff<'r> {
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
     venue_plan: __sdk::TableAppliedDiff<'r, PlanArea>,
+    venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
+    venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
     wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
@@ -3625,6 +3735,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Booth>("booth", &self.booth, event);
         callbacks.invoke_table_row_callbacks::<Bridge>("bridge", &self.bridge, event);
         callbacks.invoke_table_row_callbacks::<Camera>("camera", &self.camera, event);
+        callbacks.invoke_table_row_callbacks::<ChosenVenue>(
+            "chosen_venue",
+            &self.chosen_venue,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Claim>("claim", &self.claim, event);
         callbacks.invoke_table_row_callbacks::<ClaimCheck>("claim_check", &self.claim_check, event);
         callbacks.invoke_table_row_callbacks::<ClaimCheck>(
@@ -3918,6 +4033,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<SweepTimer>("sweep_timer", &self.sweep_timer, event);
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
         callbacks.invoke_table_row_callbacks::<PlanArea>("venue_plan", &self.venue_plan, event);
+        callbacks.invoke_table_row_callbacks::<VenueSetup>("venue_setup", &self.venue_setup, event);
+        callbacks.invoke_table_row_callbacks::<VenueSetupStep>(
+            "venue_setup_step",
+            &self.venue_setup_step,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
             "vision_assessment",
             &self.vision_assessment,
@@ -4619,6 +4740,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         booth_table::register_table(client_cache);
         bridge_table::register_table(client_cache);
         camera_table::register_table(client_cache);
+        chosen_venue_table::register_table(client_cache);
         claim_table::register_table(client_cache);
         claim_check_table::register_table(client_cache);
         claim_checks_table::register_table(client_cache);
@@ -4712,6 +4834,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         sweep_timer_table::register_table(client_cache);
         venue_table::register_table(client_cache);
         venue_plan_table::register_table(client_cache);
+        venue_setup_table::register_table(client_cache);
+        venue_setup_step_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
         wallet_entry_table::register_table(client_cache);
@@ -4747,6 +4871,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "booth",
         "bridge",
         "camera",
+        "chosen_venue",
         "claim",
         "claim_check",
         "claim_line",
@@ -4834,6 +4959,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "sweep_timer",
         "venue",
         "venue_plan",
+        "venue_setup",
+        "venue_setup_step",
         "vision_assessment",
         "visit",
         "wallet_entry",
