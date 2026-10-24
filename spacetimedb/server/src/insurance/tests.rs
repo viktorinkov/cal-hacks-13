@@ -511,18 +511,11 @@ fn simulated_bands_raise_incidents_without_the_bridge() {
 }
 
 #[test]
-fn a_medic_who_reaches_someone_first_opens_the_sos_from_the_tap() {
+fn a_medic_tap_opens_the_card_without_an_incident() {
     use crate::medical::*;
     let w = World::new();
-    let denied = w.try_as("medic", |ctx| request_medical_card(ctx, 3)).unwrap_err();
-    assert!(denied.contains("no open SOS or fall"), "{denied}");
-    assert!(w.try_as("ops", |ctx| medic_open_incident(ctx, 3)).is_err());
-    w.as_("medic", |ctx| medic_open_incident(ctx, 3));
-    assert!(w.try_as("medic", |ctx| medic_open_incident(ctx, 3)).is_err());
-    let incident = w.t.db.incident().subject_band().filter(3u8).next().unwrap();
-    assert_eq!((incident.kind, incident.status, incident.assigned_medic), (IncidentKind::Sos, IncidentStatus::Responding, Some(id("medic"))));
-    assert_eq!(w.t.db.zone().id().find(incident.zone_id).unwrap().name, "Main stage");
+    assert!(w.try_as("ops", |ctx| request_medical_card(ctx, 3)).is_err());
     w.as_("medic", |ctx| request_medical_card(ctx, 3));
-    let read = w.t.db.medical_access_log().reader().filter(id("medic")).find(|l| l.granted).unwrap();
-    assert_eq!((read.attendee, read.incident_id), (id("Maya Chen"), incident.id));
+    let read = w.t.db.medical_access_log().reader().filter(id("medic")).next().unwrap();
+    assert_eq!((read.attendee, read.incident_id, read.granted), (id("Maya Chen"), 0, true));
 }
