@@ -314,10 +314,11 @@ pub fn register_blob(
     if !["owner_only", "staff", "shared"].contains(&access.as_str()) {
         return Err(format!("unknown access class {access}"));
     }
+    let hash = hash.to_lowercase();
     if ctx.db.blob_ref().hash().find(&hash).is_none() {
         ctx.db.blob_ref().insert(BlobRef {
             id: 0,
-            hash: hash.to_lowercase(),
+            hash,
             owner,
             access,
             purpose,

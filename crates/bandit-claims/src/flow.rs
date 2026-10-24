@@ -226,7 +226,9 @@ pub fn attach_record(app: &App, claim_id: u64, template: &str, suffix: Option<&s
         let hms = hyphenate_core::time::local_hms(t, app.tz());
         hms[..2].parse::<i32>().unwrap_or(0) * 60 + hms[3..5].parse::<i32>().unwrap_or(0)
     };
-    let html = align_times(&html, template, minute(micros(incident.opened_at)), minute(now_micros()));
+    // The visit is never earlier than the minute after the band raised the alarm.
+    let injury = minute(micros(incident.opened_at));
+    let html = align_times(&html, template, injury, minute(now_micros()).max(injury) + 1);
     let template_arg = out_dir.join(format!("claim-{claim_id}-{template}.html"));
     std::fs::write(&template_arg, html)?;
     let out = out_dir.join(format!("claim-{claim_id}-{template}.pdf"));

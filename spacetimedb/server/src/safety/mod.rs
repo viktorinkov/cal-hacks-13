@@ -349,6 +349,14 @@ pub fn report_sim_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state:
     if press && !was(|b| b.pressed) {
         crate::log_event(ctx, band_id, EventKind::Press, "simulated");
     }
+    if prev.as_ref().is_none_or(|b| b.zone != station_id || !b.online) {
+        for v in ctx.db.zone_visit().band_id().filter(band_id).filter(|v| v.left.is_none()).collect::<Vec<_>>() {
+            ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), ..v });
+        }
+        if station_id != 0 {
+            ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone: station_id, entered: ctx.timestamp, left: None });
+        }
+    }
     if prev.is_some() {
         ctx.db.band().id().update(row);
     } else {

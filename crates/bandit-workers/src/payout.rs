@@ -1,6 +1,6 @@
 //! `claim_payout`: deposits an injury payout into the claimant's Nessie account.
 //! Safe to retry: a customer and account made for a claim are remembered in
-//! `<data_dir>/nessie/claim-<id>.json` until the module stores them, and a
+//! `<data_dir>/nessie/<database>-claim-<id>.json` until the module stores them, and a
 //! deposit whose description equals the memo is reused.
 
 use std::path::{Path, PathBuf};
@@ -19,8 +19,10 @@ pub(crate) struct Made {
     pub account_id: String,
 }
 
+/// Keyed by database too, so a republished database never reuses another's deposit.
 fn made_path(data_dir: &Path, claim_id: u64) -> PathBuf {
-    data_dir.join("nessie").join(format!("claim-{claim_id}.json"))
+    let db = std::env::var("SPACETIMEDB_DATABASE").unwrap_or_default();
+    data_dir.join("nessie").join(format!("{db}-claim-{claim_id}.json"))
 }
 
 pub(crate) fn load_made(path: &Path) -> Made {

@@ -260,7 +260,12 @@ impl ClaimsIndex {
                 "filter": { "exists": { "field": "outcome" } },
                 "must_not": [
                     { "term": { "claim_id": exclude_claim_id } },
-                    { "term": { "outcome": "" } }
+                    { "term": { "outcome": "" } },
+                    // Precedents are decided claims from earlier events, never tonight's other claims.
+                    { "bool": { "filter": [
+                        { "term": { "source": "live" } },
+                        { "range": { "incident_at": { "gte": "now-24h" } } }
+                    ]}}
                 ]
             }},
             "collapse": { "field": "claim_id" },
