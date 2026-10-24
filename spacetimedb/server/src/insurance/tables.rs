@@ -60,7 +60,8 @@ pub struct CoverageRuleRow {
     pub updated_at: Timestamp,
 }
 
-/// One rung of the authority matrix and the named person who holds it.
+/// One rung of the former authority matrix. Nothing writes or reads it since every claim goes to the
+/// organizer; it stays so the live database keeps its schema.
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = authority_limit)]
 pub struct AuthorityLimitRow {

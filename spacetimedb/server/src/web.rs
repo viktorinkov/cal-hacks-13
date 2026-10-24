@@ -145,13 +145,6 @@ pub fn board_policies(ctx: &ViewContext) -> RawQuery<InsurancePolicy> {
     staff_query(ctx, "insurance_policy")
 }
 
-/// The authority matrix: who approves up to which amount.
-#[spacetimedb::view(accessor = board_authority, public)]
-pub fn board_authority(ctx: &ViewContext) -> RawQuery<AuthorityLimitRow> {
-    let filter = if is_staff(ctx) { "" } else { " WHERE rank = 255" };
-    RawQuery::new(format!("SELECT * FROM authority_limit{filter}"))
-}
-
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct MyClaim {
     pub id: u64,
@@ -191,8 +184,6 @@ pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct AttendeeOut {
     pub node_id: u64,
-    /// For the owner's grant a role control.
-    pub identity: Identity,
     pub display_name: String,
     /// 0 when the attendee wears no band.
     pub band_id: u8,
@@ -215,7 +206,6 @@ pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
         .filter(0u64..)
         .map(|a| AttendeeOut {
             node_id: a.node_id,
-            identity: a.identity,
             band_id: ctx.db.band_owner().owner().find(a.identity).map(|o| o.band_id).unwrap_or(0),
             findable: a.findable,
             simulated: a.simulated,

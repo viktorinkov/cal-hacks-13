@@ -15,7 +15,7 @@ const WATCH_MILLIS: u64 = 500;
 /// (the `clear` command is still on its way to the band).
 const REOPEN_GRACE_MICROS: i64 = 10_000_000;
 
-pub const STAFF_ROLES: &[&str] = &["ops", "medic", "floor_manager", "risk_manager", "adjuster"];
+pub const STAFF_ROLES: &[&str] = &["ops", "medic"];
 
 /// Band ids the claims story simulates. No real band carries them (the fleet is
 /// 1 to 9, social's simulated crowd starts at 10), so a rehearsal on the live
@@ -382,7 +382,7 @@ pub fn start_safety_watch(ctx: &ReducerContext) -> Result<(), String> {
 /// nobody's band flagged. `band_id` 0 means no band.
 #[spacetimedb::reducer]
 pub fn open_incident(ctx: &ReducerContext, kind: String, zone_id: u64, band_id: u8, note: String) -> Result<(), String> {
-    require_role(ctx, &["ops", "floor_manager", "risk_manager", "medic"])?;
+    require_role(ctx, &["ops", "medic"])?;
     let kind = IncidentKind::parse(&kind).ok_or_else(|| format!("unknown incident kind {kind}"))?;
     let zone = ctx.db.zone().id().find(zone_id).ok_or_else(|| format!("no zone {zone_id}"))?;
     let incident = open(ctx, kind, zone.id, zone.station_id, band_id, "ops");
@@ -434,7 +434,7 @@ pub fn add_incident_note(ctx: &ReducerContext, incident_id: u64, text: String, c
 /// insurance claim when the incident qualifies.
 #[spacetimedb::reducer]
 pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: String) -> Result<(), String> {
-    require_role(ctx, &["ops", "medic", "floor_manager"])?;
+    require_role(ctx, &["ops", "medic"])?;
     let i = ctx.db.incident().id().find(incident_id).ok_or_else(|| format!("no incident {incident_id}"))?;
     if i.resolved {
         return Err(format!("incident {incident_id} is already resolved"));

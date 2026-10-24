@@ -2,8 +2,7 @@
 //! with a hashed evidence pack; Claude reads the medical record, Elastic
 //! validates the evidence and finds similar claims, the claims agent reviews
 //! the pack, and code decides coverage, amounts and the route: settle under a
-//! learned rule, send to the named person whose authority covers the amount,
-//! or refuse and show every check. Money moves on a double-entry ledger.
+//! learned rule, send to the organizer, or refuse and show every check. Money moves on a double-entry ledger.
 
 pub mod evidence;
 pub mod flow;
@@ -20,7 +19,7 @@ pub use tables::*;
 
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
-pub const CLAIM_ROLES: &[&str] = &["ops", "floor_manager", "risk_manager", "adjuster"];
+pub const CLAIM_ROLES: &[&str] = &["ops"];
 
 pub fn micros(t: Timestamp) -> i64 {
     t.to_micros_since_unix_epoch()
