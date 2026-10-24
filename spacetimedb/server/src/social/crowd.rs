@@ -1,4 +1,4 @@
-//! A simulated crowd: fake, findable attendees wearing simulated bands (ids 10 and up), moving between
+//! A simulated crowd: fake, findable attendees wearing simulated bands (ids 10 to 89), moving between
 //! the venue's station zones in small groups. Their bands write the same band1t `zone_visit` and
 //! `encounter` rows a real band does, so the social tick turns them into visits, encounters and graph
 //! links exactly like real ones and the big-screen graph looks like an event instead of nine people.
@@ -8,12 +8,14 @@ use super::logic::*;
 use super::tables::*;
 use super::tick::ensure_tick;
 use crate::roles::require_role;
-use crate::tables::{encounter, pair_key, zone_visit, Encounter, ZoneVisit, BAND_ID_MAX};
+use crate::tables::{encounter, pair_key, zone_visit, Encounter, ZoneVisit};
 use crate::venue::{organization, zone};
 use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
 
 pub const FIRST_SIM_BAND: u8 = 10;
+/// Bands 90 to 99 belong to the insurance demo's simulated bands.
+pub const LAST_SIM_BAND: u8 = 89;
 const CROWD_TICK_SECONDS: u64 = 5;
 /// Each tick two people spend together counts this many seconds, so links appear within a minute.
 const TOGETHER_SECONDS_PER_TICK: u32 = 30;
@@ -72,7 +74,7 @@ pub fn start_crowd(ctx: &ReducerContext, size: u8) -> Result<(), String> {
         return Err("import the venue first: the crowd moves between zones that have a station".into());
     }
     let orgs: Vec<u64> = ctx.db.organization().iter().map(|o| o.id).collect();
-    let last = (FIRST_SIM_BAND as u16 + size as u16).min(BAND_ID_MAX as u16 + 1) as u8;
+    let last = (FIRST_SIM_BAND as u16 + size as u16).min(LAST_SIM_BAND as u16 + 1) as u8;
     for band_id in FIRST_SIM_BAND..last {
         if ctx.db.band_owner().band_id().find(band_id).is_some() {
             continue;

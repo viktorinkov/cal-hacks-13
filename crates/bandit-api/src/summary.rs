@@ -132,7 +132,7 @@ pub struct PhotoOut {
     pub zone_id: u64,
     pub zone_name: String,
     pub caption: String,
-    /// The other people who confirmed they are in it.
+    /// The other people the bands put in it, minus anyone who removed their tag.
     pub people: Vec<Person>,
 }
 
@@ -252,7 +252,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
             people: rows
                 .photo_tags
                 .iter()
-                .filter(|t| t.photo_id == p.id && t.attendee != who && t.status == "confirmed")
+                .filter(|t| t.photo_id == p.id && t.attendee != who && t.status != "removed")
                 .filter_map(|t| person(rows, t.attendee))
                 .collect(),
         })
@@ -669,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn photos_show_the_others_who_confirmed() {
+    fn photos_show_everyone_the_bands_put_in_them() {
         let s = summary(&rows(), who(1)).unwrap();
         let ids: Vec<u64> = s.photos.iter().map(|p| p.photo_id).collect();
         assert_eq!(ids, vec![2, 1]);
@@ -677,7 +677,7 @@ mod tests {
         assert_eq!(robots.zone_name, "Expo");
         assert_eq!(robots.caption, "Robots!");
         let names: Vec<&str> = robots.people.iter().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, vec!["Bo"]);
+        assert_eq!(names, vec!["Bo", "Di"]);
     }
 
     #[test]
