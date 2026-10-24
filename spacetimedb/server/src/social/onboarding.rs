@@ -156,15 +156,3 @@ pub fn open_api_session(ctx: &ReducerContext, token_hash: String) -> Result<(), 
     });
     Ok(())
 }
-
-/// The special link to the summary: the app keeps the token for the URL and registers only its hash.
-#[spacetimedb::reducer]
-pub fn create_summary_link(ctx: &ReducerContext, token_hash: String) -> Result<(), String> {
-    check_token_hash(&token_hash)?;
-    let me = my_attendee(ctx)?.identity;
-    if ctx.db.summary_link().token_hash().find(&token_hash).is_some() {
-        return Err("token already registered".into());
-    }
-    ctx.db.summary_link().insert(SummaryLink { token_hash, attendee: me, created_at: ctx.timestamp });
-    Ok(())
-}

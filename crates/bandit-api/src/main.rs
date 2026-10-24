@@ -1,34 +1,32 @@
 //! bandit-api: the HTTP edge. It holds the Elastic key, so browsers never talk to Elastic, and it reads
-//! summary links and social rows from SpacetimeDB by subscription (it needs the `api` role).
-//! It serves the recap behind an attendee's special link, with suggestions ranked by Elastic.
+//! social rows from SpacetimeDB by subscription (it needs the `api` role).
+//! `ranked_summary` builds an attendee's recap with suggestions ranked by Elastic; the attendee pages
+//! reached from the band's tap link call it.
 
 mod search;
 mod summary;
 
 use anyhow::{Context, Result};
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::extract::State;
 use axum::routing::get;
 use axum::{Json, Router};
 use bandit_bindings::{
     BoothTableAccess, DbConnection, MyRolesTableAccess, SocialAttendeesTableAccess,
     SocialEncountersTableAccess, SocialHandlesTableAccess, SocialPhotoTagsTableAccess,
     SocialPhotosTableAccess, SocialSharedVisitsTableAccess, SocialVisitsTableAccess,
-    SummaryLinksTableAccess, ZoneTableAccess, connect,
+    ZoneTableAccess, connect,
 };
 use bandit_common::Config;
 use search::Elastic;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
-use spacetimedb_sdk::{DbContext, Table};
+use spacetimedb_sdk::{DbContext, Identity, Table};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
-const QUERIES: [&str; 11] = [
+const QUERIES: [&str; 10] = [
     "SELECT * FROM zone",
     "SELECT * FROM booth",
-    "SELECT * FROM summary_links",
     "SELECT * FROM social_attendees",
     "SELECT * FROM social_handles",
     "SELECT * FROM social_visits",
@@ -85,7 +83,6 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/summary/{token}", get(summary_page))
         .layer(CorsLayer::permissive())
         .with_state(Arc::new(App { conn, es }));
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -94,31 +91,17 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// The app registers this hash with `create_summary_link` and puts the token itself in the link.
-fn token_hash(token: &str) -> String {
-    hex::encode(Sha256::digest(token.as_bytes()))
-}
-
 /// Liveness, and the roles this service holds, so the owner can see that `grant_role` landed.
 async fn health(State(app): AppState) -> Json<Value> {
     let roles: Vec<String> = app.conn.db.my_roles().iter().map(|r| r.role).collect();
     Json(json!({ "status": "ok", "roles": roles }))
 }
 
-/// The special link: the token in the URL is the secret, so the route needs no session.
+/// The recap of `who` from the subscription cache, with the suggestions in Elastic's order.
 /// When Elastic cannot rank, the suggestions keep their minutes order and say so.
-async fn summary_page(
-    State(app): AppState,
-    Path(token): Path<String>,
-) -> Result<Json<summary::Summary>, (StatusCode, Json<Value>)> {
-    let not_found = || (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
-    let hash = token_hash(&token);
+#[allow(dead_code)]
+async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary> {
     let db = &app.conn.db;
-    let link = db
-        .summary_links()
-        .iter()
-        .find(|l| l.token_hash == hash)
-        .ok_or_else(not_found)?;
     let rows = summary::Rows {
         zones: db.zone().iter().collect(),
         booths: db.booth().iter().collect(),
@@ -130,28 +113,14 @@ async fn summary_page(
         photos: db.social_photos().iter().collect(),
         photo_tags: db.social_photo_tags().iter().collect(),
     };
-    let mut recap = summary::summary(&rows, link.attendee).ok_or_else(not_found)?;
+    let mut recap = summary::summary(&rows, who)?;
     let people: Vec<u64> = recap.suggested_people.iter().map(|p| p.node_id).collect();
     let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
-    let fallback = summary::visited_text(&rows, link.attendee);
-    let attendee_id = link.attendee.to_hex().to_string();
+    let fallback = summary::visited_text(&rows, who);
+    let attendee_id = who.to_hex().to_string();
     match app.es.rank(&attendee_id, &fallback, &people, &booths).await {
         Ok(ranking) => summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths),
         Err(e) => eprintln!("suggestions left unranked: {e:#}"),
     }
-    Ok(Json(recap))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn token_hash_is_lowercase_sha256_hex() {
-        assert_eq!(
-            token_hash("abc"),
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
-        assert_eq!(token_hash("").len(), 64);
-    }
+    Some(recap)
 }
