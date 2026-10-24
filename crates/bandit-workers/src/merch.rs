@@ -37,7 +37,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: PurchasePayload) -> Result<(), JobEr
             x.id
         }
         None => {
-            let date = hyphenate_core::time::local_date(spacetimedb_sdk::Timestamp::now().to_micros_since_unix_epoch(), ctx.tz_offset_minutes);
+            let date = bandit_insurance::time::local_date(spacetimedb_sdk::Timestamp::now().to_micros_since_unix_epoch(), ctx.tz_offset_minutes);
             nessie.purchase(&p.account_id, &merchant_id, p.amount_cents, &date, &p.memo).await?
         }
     };

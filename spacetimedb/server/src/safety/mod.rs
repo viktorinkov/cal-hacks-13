@@ -30,11 +30,11 @@ pub enum IncidentKind {
 }
 
 impl IncidentKind {
-    pub fn core(self) -> hyphenate_core::IncidentKind {
+    pub fn core(self) -> bandit_insurance::IncidentKind {
         match self {
-            IncidentKind::Sos => hyphenate_core::IncidentKind::Sos,
-            IncidentKind::Fall => hyphenate_core::IncidentKind::Fall,
-            IncidentKind::Property => hyphenate_core::IncidentKind::Property,
+            IncidentKind::Sos => bandit_insurance::IncidentKind::Sos,
+            IncidentKind::Fall => bandit_insurance::IncidentKind::Fall,
+            IncidentKind::Property => bandit_insurance::IncidentKind::Property,
         }
     }
 

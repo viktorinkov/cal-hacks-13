@@ -1,10 +1,10 @@
 //! `claim_review`: the claims agent's verdict on the whole pack.
 
 use claude_client::{Effort, MessageRequest};
-use hyphenate_core::Cents;
-use hyphenate_core::payloads::ReviewPayload;
-use hyphenate_core::review::{AgentReview, validate_review};
-use hyphenate_core::schemas::agent_review_schema;
+use bandit_insurance::Cents;
+use bandit_insurance::payloads::ReviewPayload;
+use bandit_insurance::review::{AgentReview, validate_review};
+use bandit_insurance::schemas::agent_review_schema;
 
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::{Model, Tries, ask_twice};

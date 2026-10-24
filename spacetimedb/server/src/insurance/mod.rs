@@ -32,7 +32,7 @@ pub fn timestamp(micros: i64) -> Timestamp {
 /// The settings row, created with the starting values on first use.
 pub fn settings(ctx: &ReducerContext) -> InsuranceSettings {
     ctx.db.insurance_settings().id().find(0).unwrap_or_else(|| {
-        let c = hyphenate_core::config::Config::default();
+        let c = bandit_insurance::config::Config::default();
         ctx.db.insurance_settings().insert(InsuranceSettings {
             id: 0,
             venue_name: "Cal Hacks 13.0".into(),
@@ -46,8 +46,8 @@ pub fn settings(ctx: &ReducerContext) -> InsuranceSettings {
     })
 }
 
-pub fn config(s: &InsuranceSettings) -> hyphenate_core::config::Config {
-    hyphenate_core::config::Config {
+pub fn config(s: &InsuranceSettings) -> bandit_insurance::config::Config {
+    bandit_insurance::config::Config {
         photo_window_secs: s.photo_window_secs,
         note_window_secs: s.note_window_secs,
         min_witnesses: s.min_witnesses,

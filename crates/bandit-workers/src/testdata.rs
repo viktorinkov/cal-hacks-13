@@ -1,7 +1,7 @@
 //! The payload files under `testdata/`, shared by the unit tests and `--once` runs.
 
-use hyphenate_core::letters::LetterData;
-use hyphenate_core::payloads::*;
+use bandit_insurance::letters::LetterData;
+use bandit_insurance::payloads::*;
 
 fn load<T: serde::de::DeserializeOwned>(json: &str) -> T {
     serde_json::from_str(json).unwrap()

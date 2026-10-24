@@ -4,7 +4,7 @@ use crate::app::*;
 use crate::sim::{Pose, SIM_BANDS, Sim};
 use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
-use hyphenate_core::time::{civil_from_days, local_date, micros_at, parse_date};
+use bandit_insurance::time::{civil_from_days, local_date, micros_at, parse_date};
 use spacetimedb_sdk::{DbContext, Identity, Table, Timestamp};
 use std::collections::HashMap;
 
@@ -160,7 +160,7 @@ fn this_month(tz: i32) -> Result<(Timestamp, Timestamp)> {
 /// five CalHacks zones with the pipeline's stations, two booths and one
 /// schedule slot running now on Main stage.
 fn venue_bundle() -> Result<EventBundle> {
-    let tz = hyphenate_core::config::Config::default().tz_offset_minutes;
+    let tz = bandit_insurance::config::Config::default().tz_offset_minutes;
     let ts = Timestamp::from_micros_since_unix_epoch;
     let today = parse_date(&local_date(now_micros(), tz)).context("today's date")?;
     let (y, m, d) = civil_from_days(today);

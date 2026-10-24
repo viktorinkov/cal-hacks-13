@@ -226,13 +226,13 @@ impl App {
 
     /// The venue's UTC offset, from the module's settings row.
     pub fn tz(&self) -> i32 {
-        let default = hyphenate_core::config::Config::default().tz_offset_minutes;
+        let default = bandit_insurance::config::Config::default().tz_offset_minutes;
         self.db().ok().and_then(|db| db.db.insurance_settings().id().find(&0)).map_or(default, |s| s.tz_offset_minutes)
     }
 
     /// `HH:MM:SS` in venue time.
     pub fn hms(&self, t: Timestamp) -> String {
-        hyphenate_core::time::local_hms(micros(t), self.tz())
+        bandit_insurance::time::local_hms(micros(t), self.tz())
     }
 
     /// The display name of an identity: attendee, staff label, or short hex.
@@ -327,12 +327,12 @@ pub fn now_micros() -> i64 {
 
 /// `$1,234.56`.
 pub fn money(cents: u64) -> String {
-    hyphenate_core::money::format_cents(cents)
+    bandit_insurance::money::format_cents(cents)
 }
 
 /// Dollars from the command line (`2400`, `2,400.00`, `$895.00`) to cents.
 pub fn parse_money(s: &str) -> Result<u64> {
-    hyphenate_core::money::parse_dollars(s.trim().trim_start_matches('$')).with_context(|| format!("{s:?} is not a dollar amount"))
+    bandit_insurance::money::parse_dollars(s.trim().trim_start_matches('$')).with_context(|| format!("{s:?} is not a dollar amount"))
 }
 
 pub fn short_id(who: Identity) -> String {
@@ -340,7 +340,7 @@ pub fn short_id(who: Identity) -> String {
 }
 
 pub fn short_hash(h: &str) -> &str {
-    hyphenate_core::pack::short_sha(h)
+    bandit_insurance::pack::short_sha(h)
 }
 
 pub fn status_name(s: ClaimStatus) -> &'static str {

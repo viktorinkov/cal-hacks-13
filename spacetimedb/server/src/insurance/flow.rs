@@ -8,15 +8,15 @@ use crate::jobs::{self, Job, ModelCallIn, blob_ref, job};
 use crate::venue::zone;
 use crate::roles::*;
 use crate::safety::*;
-use hyphenate_core::coverage::{Amounts, compute_amounts};
-use hyphenate_core::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
-use hyphenate_core::letters::LetterData;
-use hyphenate_core::medical::{ExtractedRecord, validate_record};
-use hyphenate_core::outcome::{Decision, DecisionInput, ReviewGate, decide};
-use hyphenate_core::payloads::*;
-use hyphenate_core::review::{AgentReview, gate, validate_review};
-use hyphenate_core::rules::{SettlementRule, learned_ceiling, matching_rule, next_version};
-use hyphenate_core::{Check, CoverKind, Verdict};
+use bandit_insurance::coverage::{Amounts, compute_amounts};
+use bandit_insurance::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
+use bandit_insurance::letters::LetterData;
+use bandit_insurance::medical::{ExtractedRecord, validate_record};
+use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
+use bandit_insurance::payloads::*;
+use bandit_insurance::review::{AgentReview, gate, validate_review};
+use bandit_insurance::rules::{SettlementRule, learned_ceiling, matching_rule, next_version};
+use bandit_insurance::{Check, CoverKind, Verdict};
 use spacetimedb::{Identity, ReducerContext, Table};
 
 fn claim_by_id(ctx: &ReducerContext, claim_id: u64) -> Result<Claim, String> {
@@ -61,7 +61,7 @@ fn current_amounts(ctx: &ReducerContext, claim: &Claim) -> Option<Amounts> {
 }
 
 /// Posts one journal; refuses one that does not balance.
-fn post(ctx: &ReducerContext, claim_id: u64, journal: hyphenate_core::ledger::Journal, posted_by: &str) -> Result<(), String> {
+fn post(ctx: &ReducerContext, claim_id: u64, journal: bandit_insurance::ledger::Journal, posted_by: &str) -> Result<(), String> {
     if !journal.is_balanced() {
         return Err(format!("{} does not balance", journal.name));
     }
@@ -186,11 +186,11 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
             ..claim
         },
     );
-    if let Some(staff) = pack.checks.iter().find(|c| c.name == "claimant_not_staff" && c.result == hyphenate_core::CheckResult::Fail) {
+    if let Some(staff) = pack.checks.iter().find(|c| c.name == "claimant_not_staff" && c.result == bandit_insurance::CheckResult::Fail) {
         return refuse(ctx, claim, format!("medical payments cover excludes staff: {}", staff.detail), "code");
     }
-    if pack.corroboration == hyphenate_core::Corroboration::Disputed {
-        let failed = hyphenate_core::outcome::failed_check_names(&pack.checks);
+    if pack.corroboration == bandit_insurance::Corroboration::Disputed {
+        let failed = bandit_insurance::outcome::failed_check_names(&pack.checks);
         return refuse(ctx, claim, format!("evidence disputed: {}", failed.join(", ")), "code");
     }
     let needs_record = cover_of(&claim) == CoverKind::MedicalPayments && extracted_record(ctx, claim.id).is_none();
@@ -200,7 +200,7 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
     let a = current_amounts(ctx, &claim).unwrap_or_default();
     let mut claim = with_amounts(claim, a);
     if !claim.reserved {
-        post(ctx, claim.id, hyphenate_core::ledger::reserve(a.payout_cents), "rebuild")?;
+        post(ctx, claim.id, bandit_insurance::ledger::reserve(a.payout_cents), "rebuild")?;
         claim.reserved = true;
     }
     let payload = verify_payload(ctx, &claim, &pack.input);
@@ -208,7 +208,7 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
     Ok(save(ctx, Claim { status: ClaimStatus::Verifying, status_note: "Elastic is validating the evidence".into(), ..claim }))
 }
 
-fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &hyphenate_core::evidence::EvidenceInput) -> VerifyPayload {
+fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance::evidence::EvidenceInput) -> VerifyPayload {
     let s = settings(ctx);
     let opened = input.incident.opened_at;
     let rec = extracted_record(ctx, claim.id);
@@ -222,7 +222,7 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &hyphenate_core::e
         zone_id: claim.zone_id,
         zone_name: claim.zone_name.clone(),
         incident_at_micros: opened,
-        local_time: hyphenate_core::time::local_hms(opened, s.tz_offset_minutes)[..5].to_string(),
+        local_time: bandit_insurance::time::local_hms(opened, s.tz_offset_minutes)[..5].to_string(),
         corroboration: claim.corroboration.clone(),
         witness_count: input.witnesses.iter().filter(|w| w.zone_id == claim.zone_id).count() as u32,
         minutes_to_first_note: input.notes.iter().map(|n| (n.created_at - opened) / 60_000_000).min(),
@@ -313,7 +313,7 @@ pub fn apply_medical_record(ctx: &ReducerContext, job_id: u64, record_json: Stri
     };
     let s = settings(ctx);
     let incident = ctx.db.incident().id().find(claim.incident_id).ok_or("no incident")?;
-    let incident_date = hyphenate_core::time::local_date(micros(incident.opened_at), s.tz_offset_minutes);
+    let incident_date = bandit_insurance::time::local_date(micros(incident.opened_at), s.tz_offset_minutes);
     let window = policy_rule(ctx, claim.policy_id, cover_of(&claim)).map(|r| r.service_window_days).unwrap_or(0);
     let lines = cover_lines(&valid, &incident_date, window);
     for l in &lines {
@@ -371,11 +371,11 @@ pub fn submit_claim_checks(ctx: &ReducerContext, job_id: u64, checks: Vec<CheckI
     }
     for c in &checks {
         let result = match c.result.as_str() {
-            "pass" => hyphenate_core::CheckResult::Pass,
-            "fail" => hyphenate_core::CheckResult::Fail,
-            _ => hyphenate_core::CheckResult::Info,
+            "pass" => bandit_insurance::CheckResult::Pass,
+            "fail" => bandit_insurance::CheckResult::Fail,
+            _ => bandit_insurance::CheckResult::Info,
         };
-        let check = Check { name: c.name.clone(), result, detail: c.detail.clone(), reader: hyphenate_core::Reader::Elastic };
+        let check = Check { name: c.name.clone(), result, detail: c.detail.clone(), reader: bandit_insurance::Reader::Elastic };
         store_check(ctx, claim.id, claim.pack_version, &check);
     }
     for pr in precedents {
@@ -428,7 +428,7 @@ fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     let Some(r) = policy_rule(ctx, claim.policy_id, cover_of(claim)) else {
         return "no cover".into();
     };
-    let f = hyphenate_core::money::format_cents;
+    let f = bandit_insurance::money::format_cents;
     if cover_of(claim) == CoverKind::MedicalPayments {
         format!(
             "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to {} per claim and {} for the event, services within {} days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event.",
@@ -465,7 +465,7 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         incident_kind: claim.incident_kind.clone(),
         cover_kind: claim.cover_kind.clone(),
         zone_name: claim.zone_name.clone(),
-        incident_time: hyphenate_core::time::local_datetime(opened, s.tz_offset_minutes),
+        incident_time: bandit_insurance::time::local_datetime(opened, s.tz_offset_minutes),
         claimant_name: claim.claimant_name.clone(),
         corroboration: claim.corroboration.clone(),
         facts: pack_facts(ctx, claim.id, claim.pack_version),
@@ -531,7 +531,7 @@ fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
         .filter_map(|r| {
             Some(SettlementRule {
                 rule_id: r.id,
-                incident_kind: hyphenate_core::IncidentKind::parse(&r.incident_kind)?,
+                incident_kind: bandit_insurance::IncidentKind::parse(&r.incident_kind)?,
                 cover_kind: CoverKind::parse(&r.cover_kind)?,
                 zone_id: r.zone_id,
                 requires_corroborated: r.requires_corroborated,
@@ -548,9 +548,9 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     let rules = core_rules(ctx);
     let rule = matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id);
     let corroboration = match claim.corroboration.as_str() {
-        "corroborated" => hyphenate_core::Corroboration::Corroborated,
-        "disputed" => hyphenate_core::Corroboration::Disputed,
-        _ => hyphenate_core::Corroboration::Uncorroborated,
+        "corroborated" => bandit_insurance::Corroboration::Corroborated,
+        "disputed" => bandit_insurance::Corroboration::Disputed,
+        _ => bandit_insurance::Corroboration::Uncorroborated,
     };
     let decision = decide(&DecisionInput {
         has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
@@ -612,7 +612,7 @@ fn organizer_name(ctx: &ReducerContext) -> String {
 
 fn refuse(ctx: &ReducerContext, claim: Claim, reason: String, decided_by: &str) -> Result<Claim, String> {
     if claim.reserved {
-        post(ctx, claim.id, hyphenate_core::ledger::reserve_reversal(claim.payout_cents), decided_by)?;
+        post(ctx, claim.id, bandit_insurance::ledger::reserve_reversal(claim.payout_cents), decided_by)?;
     }
     Ok(save(
         ctx,
@@ -633,7 +633,7 @@ fn refuse(ctx: &ReducerContext, claim: Claim, reason: String, decided_by: &str) 
 /// injury payout is then deposited into the claimant's Nessie account; a
 /// property payout goes to the venue's repair vendor and is booked at once.
 fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), String> {
-    post(ctx, claim.id, hyphenate_core::ledger::receivable(claim.recoverable_cents), outcome)?;
+    post(ctx, claim.id, bandit_insurance::ledger::receivable(claim.recoverable_cents), outcome)?;
     if let Some(p) = ctx.db.insurance_policy().id().find(claim.policy_id) {
         let p = match cover_of(&claim) {
             CoverKind::MedicalPayments => InsurancePolicy { medical_used_cents: p.medical_used_cents + claim.payout_cents, ..p },
@@ -656,14 +656,14 @@ fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), Strin
         memo: format!("BandIt claim {} payout", claim.id),
     };
     jobs::enqueue(ctx, KIND_PAYOUT, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
-    let note = format!("{outcome}; paying {} into the claimant's Nessie account", hyphenate_core::money::format_cents(claim.payout_cents));
+    let note = format!("{outcome}; paying {} into the claimant's Nessie account", bandit_insurance::money::format_cents(claim.payout_cents));
     save(ctx, Claim { status: ClaimStatus::Paying, status_note: note, ..claim });
     Ok(())
 }
 
 /// Books the claimant payment (J3), marks the claim settled and queues the letters.
 fn paid(ctx: &ReducerContext, claim: Claim, reference: String, outcome: &str) -> Result<(), String> {
-    post(ctx, claim.id, hyphenate_core::ledger::claimant_payment(claim.payout_cents), outcome)?;
+    post(ctx, claim.id, bandit_insurance::ledger::claimant_payment(claim.payout_cents), outcome)?;
     let note = match claim.decided_by.as_str() {
         "rule" => format!("settled automatically under rule v{}", claim.settlement_rule_version),
         _ => format!("approved by {}", claim.routed_to_name),
@@ -739,7 +739,7 @@ fn letter_data(ctx: &ReducerContext, claim: &Claim, counterparty_name: &str, cou
         claimant_name: claim.claimant_name.clone(),
         incident_kind: claim.incident_kind.clone(),
         zone_name: claim.zone_name.clone(),
-        incident_time: hyphenate_core::time::local_datetime(opened, s.tz_offset_minutes),
+        incident_time: bandit_insurance::time::local_datetime(opened, s.tz_offset_minutes),
         amounts: amounts(claim),
         decision_text: decision_text(ctx, claim),
         fact_lines: pack_facts(ctx, claim.id, claim.pack_version)
@@ -780,7 +780,7 @@ fn approver_check(ctx: &ReducerContext, claim: &Claim, pack_hash_seen: &str) -> 
         return Err(format!("claim {} is waiting for {} ({})", claim.id, claim.routed_to_name, claim.routed_to_role));
     }
     if pack_hash_seen != claim.pack_hash {
-        return Err(format!("stale: the evidence pack is now {}", hyphenate_core::pack::short_sha(&claim.pack_hash)));
+        return Err(format!("stale: the evidence pack is now {}", bandit_insurance::pack::short_sha(&claim.pack_hash)));
     }
     Ok(())
 }
@@ -798,7 +798,7 @@ pub fn approve_claim(
     approver_check(ctx, &claim, &pack_hash_seen)?;
     let now = current_amounts(ctx, &claim).ok_or("no cover for this claim")?;
     if now.payout_cents != claim.payout_cents || amount_seen_cents != claim.payout_cents {
-        return Err(format!("stale: the payout is now {}", hyphenate_core::money::format_cents(now.payout_cents)));
+        return Err(format!("stale: the payout is now {}", bandit_insurance::money::format_cents(now.payout_cents)));
     }
     let approver_name = organizer_name(ctx);
     let approval = ctx.db.approval().insert(Approval {
@@ -877,12 +877,12 @@ pub fn record_insurer_payment(ctx: &ReducerContext, claim_id: u64, amount_cents:
     if claim.status != ClaimStatus::Settled {
         return Err(format!("claim {claim_id} is not settled"));
     }
-    post(ctx, claim_id, hyphenate_core::ledger::insurer_payment(amount_cents, claim.recoverable_cents), "record_insurer_payment")?;
+    post(ctx, claim_id, bandit_insurance::ledger::insurer_payment(amount_cents, claim.recoverable_cents), "record_insurer_payment")?;
     save(
         ctx,
         Claim {
             status: ClaimStatus::Reconciled,
-            status_note: format!("insurer paid {} ({reference})", hyphenate_core::money::format_cents(amount_cents)),
+            status_note: format!("insurer paid {} ({reference})", bandit_insurance::money::format_cents(amount_cents)),
             reconciled_at: Some(ctx.timestamp),
             ..claim
         },
@@ -954,7 +954,7 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
             route(ctx, claim, "the medical record could not be read; a person must enter it".into());
         }
         KIND_VERIFY if claim.status == ClaimStatus::Verifying => {
-            store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or precedents").by(hyphenate_core::Reader::Elastic));
+            store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or precedents").by(bandit_insurance::Reader::Elastic));
             queue_review(ctx, claim);
         }
         KIND_PAYOUT if claim.status == ClaimStatus::Paying => {

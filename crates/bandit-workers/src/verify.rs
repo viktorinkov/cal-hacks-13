@@ -2,7 +2,7 @@
 
 use bandit_bindings::{CheckIn, PrecedentIn};
 use claims_elastic::{ClaimDoc, NarrativeParts, ValidationResult, narrative_for};
-use hyphenate_core::payloads::VerifyPayload;
+use bandit_insurance::payloads::VerifyPayload;
 
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::sink::Finish;

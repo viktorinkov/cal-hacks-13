@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use hyphenate_core::payloads::PayoutPayload;
+use bandit_insurance::payloads::PayoutPayload;
 use serde::{Deserialize, Serialize};
 
 use crate::jobs::{Ctx, JobError, JobIn};
@@ -43,7 +43,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: PayoutPayload) -> Result<(), JobErro
         return Err(JobError::msg("nothing to pay"));
     }
     let (customer_id, account_id) = account(nessie, &ctx.data_dir, &p).await?;
-    let date = hyphenate_core::time::local_date(spacetimedb_sdk::Timestamp::now().to_micros_since_unix_epoch(), ctx.tz_offset_minutes);
+    let date = bandit_insurance::time::local_date(spacetimedb_sdk::Timestamp::now().to_micros_since_unix_epoch(), ctx.tz_offset_minutes);
     let existing = nessie.deposits(&account_id).await?.into_iter().find(|d| d.description == p.memo);
     let deposit_id = match existing {
         Some(d) => {

@@ -11,7 +11,7 @@ bandit-bindings = { path = "../bandit-bindings" }
 bandit-common = { path = "../bandit-common" }
 claims-elastic = { path = "../claims-elastic" }
 claude-client = { path = "../claude-client" }
-hyphenate-core = { path = "../hyphenate-core" }
+bandit-insurance = { path = "../bandit-insurance" }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

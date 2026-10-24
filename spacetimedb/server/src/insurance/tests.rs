@@ -14,8 +14,8 @@ use crate::social::tables::*;
 use crate::tables::*;
 use crate::venue::*;
 use crate::vision::*;
-use hyphenate_core::payloads::*;
-use hyphenate_core::time::micros_at;
+use bandit_insurance::payloads::*;
+use bandit_insurance::time::micros_at;
 use spacetimedb::test_utils::{TestAuth, TestContext};
 use spacetimedb::{ConnectionId, Identity, ScheduleAt, Table, TimeDuration};
 
@@ -345,7 +345,7 @@ fn the_claims_agent_stops_an_injury_that_happened_at_home() {
     w.verify(claim.id);
     let version = w.claim(claim.id).pack_version;
     let checks = w.as_("ops", |ctx| Ok(pack_checks(ctx, claim.id, version)));
-    assert!(checks.iter().all(|c| c.result != hyphenate_core::CheckResult::Fail), "{checks:?}");
+    assert!(checks.iter().all(|c| c.result != bandit_insurance::CheckResult::Fail), "{checks:?}");
     w.review(claim.id, "needs_human", "unsupported", Some("the record says the ankle was hurt playing basketball at home the day before"));
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
@@ -473,7 +473,7 @@ fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     w.pay(claim.id);
     let p: DraftPayload = serde_json::from_str(&w.open_job(KIND_DRAFT, claim.id).payload).unwrap();
     assert_eq!(p.letter.related_claims.len(), 2, "{:?}", p.letter.related_claims);
-    assert!(hyphenate_core::letters::fnol_template(&p.letter).contains("Sam Patel"));
+    assert!(bandit_insurance::letters::fnol_template(&p.letter).contains("Sam Patel"));
 }
 
 #[test]
@@ -489,7 +489,7 @@ fn the_same_invoice_on_another_claim_goes_to_a_person() {
     let version = w.claim(second.id).pack_version;
     let checks = w.as_("ops", |ctx| Ok(pack_checks(ctx, second.id, version)));
     let dup = checks.iter().find(|c| c.name == "record_duplicate").unwrap();
-    assert_eq!(dup.result, hyphenate_core::CheckResult::Fail);
+    assert_eq!(dup.result, bandit_insurance::CheckResult::Fail);
     assert!(dup.detail.starts_with("invoice FA-1024-0007"), "{}", dup.detail);
 }
 

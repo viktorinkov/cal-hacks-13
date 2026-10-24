@@ -6,7 +6,7 @@ use std::fmt;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use hyphenate_core::Cents;
+use bandit_insurance::Cents;
 use reqwest::{Client, Method};
 use serde::Deserialize;
 use serde_json::{Value, json};

@@ -11,4 +11,4 @@ clap = { workspace = true }
 spacetimedb-sdk = { workspace = true }
 bandit-bindings = { path = "../bandit-bindings" }
 bandit-common = { path = "../bandit-common" }
-hyphenate-core = { path = "../hyphenate-core" }
+bandit-insurance = { path = "../bandit-insurance" }

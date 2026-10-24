@@ -4,10 +4,10 @@
 
 use bandit_bindings::ModelCallIn;
 use claude_client::{Effort, MessageRequest};
-use hyphenate_core::Cents;
-use hyphenate_core::letters::*;
-use hyphenate_core::payloads::{DraftPayload, RecoveryPayload};
-use hyphenate_core::schemas::{ClaimLetters, RecoveryLetter, claim_letters_schema, recovery_letter_schema};
+use bandit_insurance::Cents;
+use bandit_insurance::letters::*;
+use bandit_insurance::payloads::{DraftPayload, RecoveryPayload};
+use bandit_insurance::schemas::{ClaimLetters, RecoveryLetter, claim_letters_schema, recovery_letter_schema};
 use serde_json::Value;
 
 use crate::jobs::{Ctx, JobError, JobIn};
