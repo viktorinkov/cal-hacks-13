@@ -1,5 +1,9 @@
 use crate::commands::enqueue;
 use crate::log_event;
+use crate::roles::require_role;
+
+/// Who may charge a band and settle the charge.
+const PAYMENT_ROLES: &[&str] = &["merchant", "ops", "api"];
 use crate::tables::*;
 use spacetimedb::{ReducerContext, Table, TimeDuration};
 
@@ -7,6 +11,7 @@ const PROMPT_MICROS: i64 = 8_000_000;
 
 #[spacetimedb::reducer]
 pub fn request_payment(ctx: &ReducerContext, band_id: u8, amount_cents: u32, merchant: String) -> Result<(), String> {
+    require_role(ctx, PAYMENT_ROLES)?;
     if band_id == 0 || band_id > BAND_ID_MAX {
         return Err(format!("band id {band_id} out of range"));
     }
@@ -45,6 +50,7 @@ pub(crate) fn on_press(ctx: &ReducerContext, band_id: u8) {
 
 #[spacetimedb::reducer]
 pub fn complete_payment(ctx: &ReducerContext, payment_id: u64, purchase_ref: String) -> Result<(), String> {
+    require_role(ctx, PAYMENT_ROLES)?;
     let Some(p) = ctx.db.payment().id().find(payment_id) else {
         return Err(format!("no payment {payment_id}"));
     };
@@ -59,6 +65,7 @@ pub fn complete_payment(ctx: &ReducerContext, payment_id: u64, purchase_ref: Str
 
 #[spacetimedb::reducer]
 pub fn decline_payment(ctx: &ReducerContext, payment_id: u64) -> Result<(), String> {
+    require_role(ctx, PAYMENT_ROLES)?;
     let Some(p) = ctx.db.payment().id().find(payment_id) else {
         return Err(format!("no payment {payment_id}"));
     };

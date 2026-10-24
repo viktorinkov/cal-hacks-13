@@ -1,5 +1,9 @@
 use crate::tables::*;
+use crate::roles::require_role;
 use crate::{log_event, require_bridge};
+
+/// Who may send commands to the bands from a screen or a tool.
+const COMMAND_ROLES: &[&str] = &["ops"];
 use spacetimedb::{ReducerContext, Table};
 
 const NAMES: &[&str] = &[
@@ -26,6 +30,7 @@ pub(crate) fn enqueue(ctx: &ReducerContext, target: u8, name: &str, arg: u8, arg
 
 #[spacetimedb::reducer]
 pub fn send_command(ctx: &ReducerContext, target: u8, name: String, arg: u8, arg2: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     if !NAMES.contains(&name.as_str()) {
         return Err(format!("unknown command {name}"));
     }
@@ -35,6 +40,7 @@ pub fn send_command(ctx: &ReducerContext, target: u8, name: String, arg: u8, arg
 
 #[spacetimedb::reducer]
 pub fn force_state(ctx: &ReducerContext, target: u8, state: u8, tenths: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     if state > S_FOUND_ME {
         return Err(format!("state {state} out of range"));
     }
@@ -43,12 +49,15 @@ pub fn force_state(ctx: &ReducerContext, target: u8, state: u8, tenths: u8) -> R
 }
 
 #[spacetimedb::reducer]
-pub fn clear(ctx: &ReducerContext, target: u8) {
+pub fn clear(ctx: &ReducerContext, target: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     enqueue(ctx, target, "clear", 0, 0);
+    Ok(())
 }
 
 #[spacetimedb::reducer]
 pub fn set_exit(ctx: &ReducerContext, target: u8, colour: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     if !(1..=6).contains(&colour) {
         return Err("exit colour is 1..6".into());
     }
@@ -58,6 +67,7 @@ pub fn set_exit(ctx: &ReducerContext, target: u8, colour: u8) -> Result<(), Stri
 
 #[spacetimedb::reducer]
 pub fn haptic(ctx: &ReducerContext, target: u8, pattern: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     if pattern > 6 {
         return Err("haptic pattern is 0..6".into());
     }
@@ -67,6 +77,7 @@ pub fn haptic(ctx: &ReducerContext, target: u8, pattern: u8) -> Result<(), Strin
 
 #[spacetimedb::reducer]
 pub fn start_find(ctx: &ReducerContext, seeker: u8, friend: u8, colour: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     if seeker == 0 || friend == 0 || seeker == friend || seeker > BAND_ID_MAX || friend > BAND_ID_MAX {
         return Err("seeker and friend must be two different band ids".into());
     }
@@ -75,13 +86,17 @@ pub fn start_find(ctx: &ReducerContext, seeker: u8, friend: u8, colour: u8) -> R
 }
 
 #[spacetimedb::reducer]
-pub fn stop_find(ctx: &ReducerContext, seeker: u8) {
+pub fn stop_find(ctx: &ReducerContext, seeker: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     enqueue(ctx, seeker, "find", 0, 0);
+    Ok(())
 }
 
 #[spacetimedb::reducer]
-pub fn sleep_bands(ctx: &ReducerContext, target: u8, minutes: u8) {
+pub fn sleep_bands(ctx: &ReducerContext, target: u8, minutes: u8) -> Result<(), String> {
+    require_role(ctx, COMMAND_ROLES)?;
     enqueue(ctx, target, "sleep", minutes, 0);
+    Ok(())
 }
 
 #[spacetimedb::reducer]

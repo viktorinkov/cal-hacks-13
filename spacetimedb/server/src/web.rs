@@ -1,12 +1,11 @@
-//! What the plain web pages read and write beyond the feature views: the claims board for staff,
-//! an attendee's own claims and Nessie wallet, and merch orders from the recap.
-//! Staff here means the module owner or anyone holding a staff role.
+//! What the plain web pages read beyond the feature views: the claims board for staff and an
+//! attendee's own claims. Staff here means the module owner or anyone holding a staff role.
 
 use crate::insurance::*;
 use crate::roles::*;
 use crate::safety::*;
 use crate::tables::*;
-use spacetimedb::{Identity, RawQuery, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
+use spacetimedb::{Identity, RawQuery, SpacetimeType, Timestamp, ViewContext};
 
 fn is_staff(ctx: &ViewContext) -> bool {
     ctx.db.owner().identity().find(ctx.sender()).is_some()
@@ -151,88 +150,4 @@ pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {
             settled_at: c.settled_at,
         })
         .collect()
-}
-
-/// The attendee's Nessie wallet. It is the account claim payouts go into.
-#[spacetimedb::view(accessor = my_wallet, public)]
-pub fn my_wallet(ctx: &ViewContext) -> Option<ClaimantAccount> {
-    ctx.db.claimant_account().identity().find(ctx.sender())
-}
-
-/// Every wallet, for bandit-api (role `api`).
-#[spacetimedb::view(accessor = wallets, public)]
-pub fn wallets(ctx: &ViewContext) -> RawQuery<ClaimantAccount> {
-    let api = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "api");
-    let filter = if api { "" } else { " WHERE customer_id = ''" };
-    RawQuery::new(format!("SELECT * FROM claimant_account{filter}"))
-}
-
-/// bandit-api opened a funded Nessie wallet for the attendee at sign-up.
-#[spacetimedb::reducer]
-pub fn set_wallet(ctx: &ReducerContext, identity: Identity, customer_id: String, account_id: String) -> Result<(), String> {
-    require_role(ctx, &["api"])?;
-    if ctx.db.claimant_account().identity().find(identity).is_some() {
-        return Ok(());
-    }
-    ctx.db.claimant_account().insert(ClaimantAccount { identity, customer_id, account_id, created_at: ctx.timestamp });
-    Ok(())
-}
-
-/// A merch item bought from the recap: a template with the attendee's photo, paid through Nessie.
-#[derive(Clone, Debug)]
-#[spacetimedb::table(accessor = merch_order)]
-pub struct MerchOrder {
-    #[primary_key]
-    #[auto_inc]
-    pub id: u64,
-    #[index(btree)]
-    pub attendee: Identity,
-    /// The template file in assets/merch, for example tee_spacetimedb.png.
-    pub template: String,
-    pub product: String,
-    pub photo_id: u64,
-    pub amount_cents: u64,
-    pub nessie_purchase_id: String,
-    pub created_at: Timestamp,
-}
-
-#[spacetimedb::reducer]
-pub fn record_merch_order(
-    ctx: &ReducerContext,
-    attendee: Identity,
-    template: String,
-    product: String,
-    photo_id: u64,
-    amount_cents: u64,
-    nessie_purchase_id: String,
-) -> Result<(), String> {
-    require_role(ctx, &["api"])?;
-    ctx.db.merch_order().insert(MerchOrder {
-        id: 0,
-        attendee,
-        template,
-        product,
-        photo_id,
-        amount_cents,
-        nessie_purchase_id,
-        created_at: ctx.timestamp,
-    });
-    Ok(())
-}
-
-#[spacetimedb::view(accessor = my_merch_orders, public)]
-pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {
-    ctx.db.merch_order().attendee().filter(ctx.sender()).collect()
-}
-
-/// Every merch order, for bandit-api, which shows them on the recap.
-#[spacetimedb::view(accessor = merch_orders, public)]
-pub fn merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {
-    let api = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "api");
-    if !api {
-        return Vec::new();
-    }
-    ctx.db.merch_order().attendee().filter(Identity::ZERO..).collect()
 }
