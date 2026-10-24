@@ -7,7 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct Band {
-    pub id: u16,
+    pub id: u32,
     pub state: u8,
     pub flags: u8,
     pub neigh: u8,
@@ -37,7 +37,7 @@ impl __sdk::InModule for Band {
 ///
 /// Provides typed access to columns for query building.
 pub struct BandCols {
-    pub id: __sdk::__query_builder::Col<Band, u16>,
+    pub id: __sdk::__query_builder::Col<Band, u32>,
     pub state: __sdk::__query_builder::Col<Band, u8>,
     pub flags: __sdk::__query_builder::Col<Band, u8>,
     pub neigh: __sdk::__query_builder::Col<Band, u8>,
@@ -91,7 +91,7 @@ impl __sdk::__query_builder::HasCols for Band {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct BandIxCols {
-    pub id: __sdk::__query_builder::IxCol<Band, u16>,
+    pub id: __sdk::__query_builder::IxCol<Band, u32>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Band {

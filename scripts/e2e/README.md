@@ -19,13 +19,13 @@ Pages, on http://127.0.0.1:8097:
 
 | Page | Who | What |
 |---|---|---|
-| `/t/BANDIT-0n` | attendee | the band's tap link: sign in, claim by press, name, socials, medical history and insurance PDFs, "is this you?", the Capital One wallet, then a thank-you; after "Event ended", the recap |
+| `/t/<band code>` (`/t/BANDIT-0n` on the first tags) | attendee | the band's tap link: sign in, claim by press, name, socials, medical history and insurance PDFs, "is this you?", the Capital One wallet, then a thank-you; after "Event ended", the recap |
 | `/organizer` | host and staff | live zones and alerts, low visibility, attendees, incidents, medical cards and claims, learned rules, Kibana links, the Bands tab, "Event ended" |
 | `/photo` | photographer | add a photo taken in a zone; the people whose bands were there are tagged |
 
 ## Happy path to test
 
-1. Open `/t/BANDIT-94` (no radio needed) and press "Press the band for me". Fill the name, keep findable on, add Instagram. Upload the medical history and the insurance card ("Use a test record" gives synthetic ones); Claude reads them into the medical card, which you confirm with "Looks right". Connect the Capital One wallet ($200 on Nessie). The page ends on a thank-you.
+1. Open `/t/AJMN-676X` (test band 94, no radio needed) and press "Press the band for me". Fill the name, keep findable on, add Instagram. Upload the medical history and the insurance card ("Use a test record" gives synthetic ones); Claude reads them into the medical card, which you confirm with "Looks right". Connect the Capital One wallet ($200 on Nessie). The page ends on a thank-you.
 2. Host portal, Bands tab (`/organizer?as=ops#bands`): walk the band between zones; the Live tab shows it on the venue map among the crowd of 1,000 and the people per zone change.
 3. `/photo?as=photographer`: add a photo in the zone the band is in.
 4. Bands tab: "Fall here" on your own band (94-99), so the claim you run by hand never collides with the story's attendees. The incident opens with two bands around you.

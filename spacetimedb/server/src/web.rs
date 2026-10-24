@@ -186,7 +186,7 @@ pub struct AttendeeOut {
     pub node_id: u64,
     pub display_name: String,
     /// 0 when the attendee wears no band.
-    pub band_id: u16,
+    pub band_id: u32,
     pub findable: bool,
     /// One of the crowd's attendees.
     pub crowd: bool,

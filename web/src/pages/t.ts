@@ -1,6 +1,6 @@
-// The band's tap link, /t/BANDIT-0n. During the event it is only the band setup: sign in, claim the
-// band by pressing it, name, socials, the medical history and insurance PDFs, the Capital One wallet,
-// then a thank-you.
+// The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it is only
+// the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
+// PDFs, the Capital One wallet, then a thank-you.
 // When the host ends the event, the same page turns into the recap.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
 // for first aid.
@@ -9,6 +9,7 @@ import {
   act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
   signIn, signOut, signedInEmail, testAs, time, type Actor, PLATFORMS,
 } from '../lib';
+import { bandCode, bandFromCode } from '../band-code';
 import { recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 
@@ -37,7 +38,8 @@ const QUERIES = [
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
-const bandId = Number(token.replace('BANDIT-', ''));
+const bandId = bandFromCode(token);
+const code = bandId ? bandCode(bandId) : token;
 
 type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'wallet' | 'done';
 
@@ -70,24 +72,24 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
   const heard = band && band.online && Date.now() - band.lastSeen.toDate().getTime() < 5000;
   if (claimError) {
     const text = claimError.includes('belongs to someone')
-      ? `Band ${bandId} is already claimed. If it is yours, ask staff at the entrance.`
+      ? `Band ${code} is already claimed. If it is yours, ask staff at the entrance.`
       : claimError.includes('another band')
         ? 'You already wear another band.'
         : claimError.includes('wait a few seconds')
           ? 'Someone just tapped this band. Wait a few seconds and tap again.'
           : claimError;
-    return [h('h2', {}, `Band ${bandId}`), h('p', {}, text), h('button', { onclick: tryClaim }, 'Try again')];
+    return [h('h2', {}, `Band ${code}`), h('p', {}, text), h('button', { onclick: tryClaim }, 'Try again')];
   }
   if (!waiting) {
     return [
-      h('h2', {}, `Band ${bandId}`),
+      h('h2', {}, `Band ${code}`),
       h('p', {}, claimAsked ? 'No press arrived in time.' : 'Getting your band ready…'),
       claimAsked && h('button', { onclick: tryClaim }, 'Try again'),
     ];
   }
   const left = expiresAt ? Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 1000)) : 0;
   return [
-    h('h2', {}, `Band ${bandId} is blinking white`),
+    h('h2', {}, `Band ${code} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
     testMode && bandId >= 94 && h('button', { class: 'test', onclick: () => act(async () => {
@@ -308,7 +310,7 @@ async function tapAsMedic() {
 function medicView() {
   const m = [...conn.db.medicMedicalCards.iter()].filter(c => c.bandId === bandId).pop();
   const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && i.kind.tag !== 'Property');
-  const title = h('h2', {}, `Medic view: band ${bandId}`);
+  const title = h('h2', {}, `Medic view: band ${code}`);
   const again = h('button', { class: 'link', onclick: tapAsMedic }, 'Tap again');
   if (m) {
     return [
@@ -322,7 +324,7 @@ function medicView() {
     ];
   }
   if (tap === 'asking' || tap === 'granted') return [title, h('p', { class: 'muted' }, 'Opening the medical card…')];
-  if (tap.includes('nobody wears')) return [title, h('p', {}, `Nobody wears band ${bandId}.`), again];
+  if (tap.includes('nobody wears')) return [title, h('p', {}, `Nobody wears band ${code}.`), again];
   return [title, h('p', { class: 'error' }, tap), again];
 }
 
@@ -341,7 +343,7 @@ function render() {
     return mount('app', top, setup());
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
-    return mount('app', top, h('h2', {}, `Band ${bandId}`), h('p', {}, `You wear band ${mb.bandId}.`), h('a', { href: `/t/BANDIT-${String(mb.bandId).padStart(2, '0')}` }, 'Open your band'));
+    return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));
   }
   const waiting = !!mb && mb.status === 'waiting_for_press' && mb.bandId === bandId;
   mount('app', top, claimScreen(waiting, mb?.expiresAt?.toDate()));
@@ -354,7 +356,7 @@ async function main() {
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
   if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
-    return mount('app', h('h2', {}, `Band ${bandId}`), h('p', {}, 'Sign in with your email to make this band yours.'),
+    return mount('app', h('h2', {}, `Band ${code}`), h('p', {}, 'Sign in with your email to make this band yours.'),
       h('button', { onclick: signIn }, 'Sign in with email'),
       testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }

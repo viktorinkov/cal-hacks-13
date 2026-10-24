@@ -4,7 +4,7 @@
 | --- | --- |
 | Live site | https://band1t.vip |
 | Organizer portal | https://band1t.vip/organizer |
-| Band tap link (written on each NFC tag) | https://band1t.vip/t/BANDIT-01 to `/t/BANDIT-09` |
+| Band tap link (written on each NFC tag) | https://band1t.vip/t/ and the band's code; bands 1 to 9 are `D3CW-EPX2`, `T0WV-FWHT`, `CA8D-7K7J`, `K33M-PZ2C`, `A240-KHQV`, `S9M3-CFCS`, `QY1G-XHXT`, `GBHE-TYN5`, `EM93-0X5M`. Tags still saying `/t/BANDIT-01` to `09` keep working |
 | Event photographer upload | https://band1t.vip/photo |
 | Health check | https://band1t.vip/health |
 | Page settings (database, dashboards, sign-in client) | https://band1t.vip/config.json |

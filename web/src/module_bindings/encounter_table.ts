@@ -11,9 +11,9 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  key: __t.u32().primaryKey(),
-  bandA: __t.u16().name("band_a"),
-  bandB: __t.u16().name("band_b"),
+  key: __t.u64().primaryKey(),
+  bandA: __t.u32().name("band_a"),
+  bandB: __t.u32().name("band_b"),
   firstSeen: __t.timestamp().name("first_seen"),
   lastSeen: __t.timestamp().name("last_seen"),
   secondsClose: __t.u32().name("seconds_close"),

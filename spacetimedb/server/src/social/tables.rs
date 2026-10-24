@@ -99,7 +99,7 @@ pub struct Visit {
     pub attendee: Identity,
     #[index(btree)]
     pub zone_id: u64,
-    pub band_id: u16,
+    pub band_id: u32,
     pub started_at: Timestamp,
     pub ended_at: Option<Timestamp>,
     pub minutes: f32,
@@ -121,7 +121,7 @@ pub struct SocialEncounter {
     pub id: u64,
     /// band1t `encounter.key` of the two bands.
     #[unique]
-    pub band_pair: u32,
+    pub band_pair: u64,
     /// The pair, lower identity first.
     #[index(btree)]
     pub attendee_a: Identity,
@@ -253,7 +253,7 @@ pub struct CrowdGroup {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CrowdMember {
     #[primary_key]
-    pub band_id: u16,
+    pub band_id: u32,
     /// The attendee wearing the band, and since when.
     #[unique]
     pub identity: Identity,
@@ -266,7 +266,7 @@ pub struct CrowdMember {
     /// Booth tags this attendee is drawn to.
     pub interests: Vec<String>,
     /// The band of the stranger this attendee is talking to, 0 when none.
-    pub chat: u16,
+    pub chat: u32,
 }
 
 #[spacetimedb::table(accessor = crowd_timer, scheduled(crate::social::crowd::crowd_tick))]

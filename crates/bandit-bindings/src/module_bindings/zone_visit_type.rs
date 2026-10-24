@@ -8,7 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct ZoneVisit {
     pub id: u64,
-    pub band_id: u16,
+    pub band_id: u32,
     pub zone: u8,
     pub entered: __sdk::Timestamp,
     pub left: Option<__sdk::Timestamp>,
@@ -25,7 +25,7 @@ impl __sdk::InModule for ZoneVisit {
 /// Provides typed access to columns for query building.
 pub struct ZoneVisitCols {
     pub id: __sdk::__query_builder::Col<ZoneVisit, u64>,
-    pub band_id: __sdk::__query_builder::Col<ZoneVisit, u16>,
+    pub band_id: __sdk::__query_builder::Col<ZoneVisit, u32>,
     pub zone: __sdk::__query_builder::Col<ZoneVisit, u8>,
     pub entered: __sdk::__query_builder::Col<ZoneVisit, __sdk::Timestamp>,
     pub left: __sdk::__query_builder::Col<ZoneVisit, Option<__sdk::Timestamp>>,
@@ -52,7 +52,7 @@ impl __sdk::__query_builder::HasCols for ZoneVisit {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct ZoneVisitIxCols {
-    pub band_id: __sdk::__query_builder::IxCol<ZoneVisit, u16>,
+    pub band_id: __sdk::__query_builder::IxCol<ZoneVisit, u32>,
     pub id: __sdk::__query_builder::IxCol<ZoneVisit, u64>,
     pub open: __sdk::__query_builder::IxCol<ZoneVisit, bool>,
 }

@@ -194,7 +194,7 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
     };
     let mut circle: Vec<u8> = online.iter().filter(|b| b.state == S_NEAR_SOS).filter_map(|b| radio_id(b.id)).collect();
     circle.sort();
-    let subject = online.iter().find(|b| band_id != 0 && b.id == u16::from(band_id));
+    let subject = online.iter().find(|b| band_id != 0 && b.id == u32::from(band_id));
     ctx.db.incident_snapshot().insert(IncidentSnapshot {
         id: 0,
         incident_id: incident.id,
@@ -327,7 +327,7 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
         return Err(format!("test bands are {} to {}", TEST_BANDS.start(), TEST_BANDS.end()));
     }
     let flags = sos as u8 * F_SOS | fall as u8 * F_FALL | press as u8 * F_PRESS | F_MPU | F_MOTOR;
-    let id = u16::from(band_id);
+    let id = u32::from(band_id);
     let prev = ctx.db.band().id().find(id);
     // Test bands stand a step apart around their zone's centre, so each shows on the venue map.
     let (cx, cy) = crate::venue::station_spot(ctx, station_id);

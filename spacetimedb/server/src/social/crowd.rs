@@ -79,11 +79,11 @@ const HANDLE_ENDINGS: &[&str] = &["builds", ".dev", "codes", "hacks", ".ai", "ma
 /// Booth tags that say who sponsors, not what a booth is about, so nobody is drawn to them.
 const NOT_INTERESTS: &[&str] = &["sponsor", "partner", "bronze", "silver", "gold", "golden-bear", "anchor", "other"];
 
-fn crowd_identity(band_id: u16) -> Identity {
+fn crowd_identity(band_id: u32) -> Identity {
     Identity::from_claims("bandit-crowd", &format!("band-{band_id}"))
 }
 
-fn rng_for(band_id: u16) -> StdRng {
+fn rng_for(band_id: u32) -> StdRng {
     StdRng::seed_from_u64(SEED ^ (band_id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
 }
 
@@ -442,7 +442,7 @@ fn interests(pool: &[(String, u32)], rng: &mut impl Rng) -> Vec<String> {
 }
 
 /// One attendee of the crowd and their band, generated from the seed and the band id.
-fn add_member(ctx: &ReducerContext, band_id: u16, g: &CrowdGroup, organization_id: u64, pool: &[(String, u32)]) {
+fn add_member(ctx: &ReducerContext, band_id: u32, g: &CrowdGroup, organization_id: u64, pool: &[(String, u32)]) {
     let mut rng = rng_for(band_id);
     let first = FIRST_NAMES[rng.gen_range(0..FIRST_NAMES.len())];
     let last = LAST_NAMES[rng.gen_range(0..LAST_NAMES.len())];
@@ -506,7 +506,7 @@ pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
 
     let mut groups: Vec<CrowdGroup> = Vec::new();
     let mut band_id = FIRST_CROWD_BAND;
-    let last = FIRST_CROWD_BAND + size;
+    let last = FIRST_CROWD_BAND + u32::from(size);
     let mut add_group = |staff: Option<&BoothSpot>, rng: &mut StdRng| -> CrowdGroup {
         let id = groups.len() as u16 + 1;
         let (home_station, home_booth, (hx, hy)) = match staff {
@@ -643,7 +643,7 @@ impl Grid {
 }
 
 /// Two bands spent `secs` close together, as band1t's radio encounter would record it.
-fn together(ctx: &ReducerContext, a: u16, b: u16, secs: u32) -> Encounter {
+fn together(ctx: &ReducerContext, a: u32, b: u32, secs: u32) -> Encounter {
     let key = pair_key(a, b);
     match ctx.db.encounter().key().find(key) {
         Some(e) => ctx.db.encounter().key().update(Encounter { last_seen: ctx.timestamp, seconds_close: e.seconds_close + secs, ..e }),
@@ -660,13 +660,13 @@ fn together(ctx: &ReducerContext, a: u16, b: u16, secs: u32) -> Encounter {
 }
 
 /// How many strangers an attendee talks to over the event: 2 to 10 for hackers, four times that for staff.
-fn sociability(band_id: u16, staff: bool) -> u32 {
+fn sociability(band_id: u32, staff: bool) -> u32 {
     let n = StdRng::seed_from_u64(SEED ^ 0x50C1A1 ^ band_id as u64).gen_range(2..=10);
     if staff { n * 4 } else { n }
 }
 
 /// Everyone the band has been close to so far, teammates included.
-fn close_count(ctx: &ReducerContext, counts: &mut HashMap<u16, u32>, band: u16) -> u32 {
+fn close_count(ctx: &ReducerContext, counts: &mut HashMap<u32, u32>, band: u32) -> u32 {
     *counts
         .entry(band)
         .or_insert_with(|| ctx.db.encounter().band_a().filter(band).chain(ctx.db.encounter().band_b().filter(band)).count() as u32)
@@ -688,7 +688,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     groups.sort_by_key(|g| g.id);
     let mut members: Vec<CrowdMember> = ctx.db.crowd_member().iter().collect();
     members.sort_by_key(|m| m.band_id);
-    let mut bands: HashMap<u16, Band> = ctx.db.band().iter().filter(|b| b.id >= FIRST_CROWD_BAND).map(|b| (b.id, b)).collect();
+    let mut bands: HashMap<u32, Band> = ctx.db.band().iter().filter(|b| b.id >= FIRST_CROWD_BAND).map(|b| (b.id, b)).collect();
     let mut rng = ctx.rng();
 
     // Teams whose time is up move on together; whoever was talking to one of them stops.
@@ -704,7 +704,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         moved.push(groups[i].id);
     }
     let group_of: HashMap<u16, &CrowdGroup> = groups.iter().map(|g| (g.id, g)).collect();
-    let moved_bands: HashSet<u16> = members.iter().filter(|m| moved.contains(&m.group_id)).map(|m| m.band_id).collect();
+    let moved_bands: HashSet<u32> = members.iter().filter(|m| moved.contains(&m.group_id)).map(|m| m.band_id).collect();
     for m in members.iter_mut().filter(|m| m.chat != 0 && (moved_bands.contains(&m.band_id) || moved_bands.contains(&m.chat))) {
         m.chat = 0;
         ctx.db.crowd_member().band_id().update(m.clone());
@@ -767,7 +767,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
 
     // Strangers at the same spot start talking; booth staff talk to their visitors more often. Everyone
     // talks to only so many strangers.
-    let mut counts: HashMap<u16, u32> = HashMap::new();
+    let mut counts: HashMap<u32, u32> = HashMap::new();
     let same_spot = |i: usize, j: usize| spots[i].0 == spots[j].0 && spots[i].1 == spots[j].1;
     for i in 0..members.len() {
         let staff = group_of[&members[i].group_id].staff_booth != 0;
@@ -796,10 +796,10 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
 
     // Close time for this tick's slice of the crowd: teammates, who always share their team's spot, and the
     // strangers talking. Each pair is credited through its lower band.
-    let index: HashMap<u16, usize> = members.iter().enumerate().map(|(i, m)| (m.band_id, i)).collect();
+    let index: HashMap<u32, usize> = members.iter().enumerate().map(|(i, m)| (m.band_id, i)).collect();
     let slice = tick % SLICES;
     let credit = (SLICES * TICK_MILLIS / 1_000 * TOGETHER_SPEEDUP) as u32;
-    let mut teams: HashMap<u16, Vec<u16>> = HashMap::new();
+    let mut teams: HashMap<u16, Vec<u32>> = HashMap::new();
     for m in &members {
         teams.entry(m.group_id).or_default().push(m.band_id);
     }
@@ -807,7 +807,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         if m.band_id as u64 % SLICES != slice {
             continue;
         }
-        let mut close: Vec<u16> = teams[&m.group_id].iter().copied().filter(|b| *b > m.band_id).collect();
+        let mut close: Vec<u32> = teams[&m.group_id].iter().copied().filter(|b| *b > m.band_id).collect();
         if m.chat > m.band_id && index.get(&m.chat).is_some_and(|&j| same_spot(i, j)) {
             close.push(m.chat);
         }

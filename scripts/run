@@ -25,7 +25,7 @@ until curl -s "http://$BANDIT_API_ADDR/health" | grep -q ok; do
 done
 if [ "${BANDIT_OPEN:-1}" = 1 ]; then
   open "http://$BANDIT_API_ADDR/organizer?as=ops"
-  open "http://$BANDIT_API_ADDR/t/BANDIT-94"
+  open "http://$BANDIT_API_ADDR/t/AJMN-676X"
 fi
 echo "running on $E2E_TARGET at http://$BANDIT_API_ADDR (Ctrl-C stops it)"
 wait $SERVICES

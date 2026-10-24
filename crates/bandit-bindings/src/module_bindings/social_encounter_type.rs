@@ -8,7 +8,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[sats(crate = __lib)]
 pub struct SocialEncounter {
     pub id: u64,
-    pub band_pair: u32,
+    pub band_pair: u64,
     pub attendee_a: __sdk::Identity,
     pub attendee_b: __sdk::Identity,
     pub zone_id: u64,
@@ -29,7 +29,7 @@ impl __sdk::InModule for SocialEncounter {
 /// Provides typed access to columns for query building.
 pub struct SocialEncounterCols {
     pub id: __sdk::__query_builder::Col<SocialEncounter, u64>,
-    pub band_pair: __sdk::__query_builder::Col<SocialEncounter, u32>,
+    pub band_pair: __sdk::__query_builder::Col<SocialEncounter, u64>,
     pub attendee_a: __sdk::__query_builder::Col<SocialEncounter, __sdk::Identity>,
     pub attendee_b: __sdk::__query_builder::Col<SocialEncounter, __sdk::Identity>,
     pub zone_id: __sdk::__query_builder::Col<SocialEncounter, u64>,
@@ -66,7 +66,7 @@ impl __sdk::__query_builder::HasCols for SocialEncounter {
 pub struct SocialEncounterIxCols {
     pub attendee_a: __sdk::__query_builder::IxCol<SocialEncounter, __sdk::Identity>,
     pub attendee_b: __sdk::__query_builder::IxCol<SocialEncounter, __sdk::Identity>,
-    pub band_pair: __sdk::__query_builder::IxCol<SocialEncounter, u32>,
+    pub band_pair: __sdk::__query_builder::IxCol<SocialEncounter, u64>,
     pub id: __sdk::__query_builder::IxCol<SocialEncounter, u64>,
 }
 
