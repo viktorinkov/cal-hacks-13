@@ -285,7 +285,7 @@ pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
         .filter(0u64..)
         .map(|t| {
             let zones: BTreeSet<u64> = t.booth_ids.iter().filter_map(|b| ctx.db.booth().id().find(*b)).map(|b| b.zone_id).collect();
-            let minutes: f32 = zones.iter().map(|z| zone_minutes.get(z).copied().unwrap_or_default()).sum();
+            let minutes = zones.iter().fold(0.0f32, |sum, z| sum + zone_minutes.get(z).copied().unwrap_or_default());
             let photo = photos.iter().max_by_key(|p| (zones.contains(&p.zone_id), p.taken_at, p.id)).expect("photos is not empty");
             let at_booth = zones.contains(&photo.zone_id);
             (t, photo, minutes, at_booth)
