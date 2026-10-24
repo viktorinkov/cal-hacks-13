@@ -1,0 +1,147 @@
+#![allow(unused, clippy::all)]
+use super::merch_suggestion_type::MerchSuggestion;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct MyMerchSuggestionsTableHandle<'ctx> {
+    imp: __sdk::TableHandle<MerchSuggestion>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct MyMerchSuggestionsTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for MyMerchSuggestionsTableAccessor {
+    type Row = MerchSuggestion;
+    type Handle<'db> = MyMerchSuggestionsTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.my_merch_suggestions()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait MyMerchSuggestionsTableAccess {
+    #[allow(non_snake_case)]
+    fn my_merch_suggestions(&self) -> MyMerchSuggestionsTableHandle<'_>;
+}
+
+impl MyMerchSuggestionsTableAccess for super::RemoteTables {
+    fn my_merch_suggestions(&self) -> MyMerchSuggestionsTableHandle<'_> {
+        MyMerchSuggestionsTableHandle {
+            imp: self
+                .imp
+                .get_table::<MerchSuggestion>("my_merch_suggestions"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct MyMerchSuggestionsInsertCallbackId(__sdk::CallbackId);
+pub struct MyMerchSuggestionsDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for MyMerchSuggestionsTableHandle<'ctx> {
+    type Row = MerchSuggestion;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MerchSuggestion> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for MyMerchSuggestionsTableHandle<'ctx> {
+    type Row = MerchSuggestion;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MerchSuggestion> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = MyMerchSuggestionsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchSuggestionsInsertCallbackId {
+        MyMerchSuggestionsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyMerchSuggestionsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = MyMerchSuggestionsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchSuggestionsDeleteCallbackId {
+        MyMerchSuggestionsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyMerchSuggestionsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for MyMerchSuggestionsTableHandle<'ctx> {
+    type InsertCallbackId = MyMerchSuggestionsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchSuggestionsInsertCallbackId {
+        MyMerchSuggestionsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyMerchSuggestionsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for MyMerchSuggestionsTableHandle<'ctx> {
+    type DeleteCallbackId = MyMerchSuggestionsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchSuggestionsDeleteCallbackId {
+        MyMerchSuggestionsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyMerchSuggestionsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<MerchSuggestion>("my_merch_suggestions");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<MerchSuggestion>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<MerchSuggestion>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait my_merch_suggestionsQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn my_merch_suggestions(&self) -> __sdk::__query_builder::Table<MerchSuggestion>;
+}
+
+impl my_merch_suggestionsQueryTableAccess for __sdk::QueryTableAccessor {
+    fn my_merch_suggestions(&self) -> __sdk::__query_builder::Table<MerchSuggestion> {
+        __sdk::__query_builder::Table::new("my_merch_suggestions")
+    }
+}

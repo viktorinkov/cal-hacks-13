@@ -1,0 +1,65 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Visit {
+    pub zone_visit_id: u64,
+    pub attendee: __sdk::Identity,
+    pub zone_id: u64,
+    pub band_id: u8,
+    pub started_at: __sdk::Timestamp,
+    pub ended_at: Option<__sdk::Timestamp>,
+    pub minutes: f32,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for Visit {
+    type Module = super::RemoteModule;
+}
+
+pub struct VisitCols {
+    pub zone_visit_id: __sdk::__query_builder::Col<Visit, u64>,
+    pub attendee: __sdk::__query_builder::Col<Visit, __sdk::Identity>,
+    pub zone_id: __sdk::__query_builder::Col<Visit, u64>,
+    pub band_id: __sdk::__query_builder::Col<Visit, u8>,
+    pub started_at: __sdk::__query_builder::Col<Visit, __sdk::Timestamp>,
+    pub ended_at: __sdk::__query_builder::Col<Visit, Option<__sdk::Timestamp>>,
+    pub minutes: __sdk::__query_builder::Col<Visit, f32>,
+    pub updated_at: __sdk::__query_builder::Col<Visit, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for Visit {
+    type Cols = VisitCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        VisitCols {
+            zone_visit_id: __sdk::__query_builder::Col::new(table_name, "zone_visit_id"),
+            attendee: __sdk::__query_builder::Col::new(table_name, "attendee"),
+            zone_id: __sdk::__query_builder::Col::new(table_name, "zone_id"),
+            band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
+            started_at: __sdk::__query_builder::Col::new(table_name, "started_at"),
+            ended_at: __sdk::__query_builder::Col::new(table_name, "ended_at"),
+            minutes: __sdk::__query_builder::Col::new(table_name, "minutes"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct VisitIxCols {
+    pub attendee: __sdk::__query_builder::IxCol<Visit, __sdk::Identity>,
+    pub zone_id: __sdk::__query_builder::IxCol<Visit, u64>,
+    pub zone_visit_id: __sdk::__query_builder::IxCol<Visit, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Visit {
+    type IxCols = VisitIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        VisitIxCols {
+            attendee: __sdk::__query_builder::IxCol::new(table_name, "attendee"),
+            zone_id: __sdk::__query_builder::IxCol::new(table_name, "zone_id"),
+            zone_visit_id: __sdk::__query_builder::IxCol::new(table_name, "zone_visit_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Visit {}

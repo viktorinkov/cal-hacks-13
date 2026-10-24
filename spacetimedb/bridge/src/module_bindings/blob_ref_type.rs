@@ -1,0 +1,66 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct BlobRef {
+    pub id: u64,
+    pub hash: String,
+    pub owner: Option<__sdk::Identity>,
+    pub access: String,
+    pub purpose: String,
+    pub content_type: String,
+    pub size_bytes: u64,
+    pub created_by: __sdk::Identity,
+    pub created_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for BlobRef {
+    type Module = super::RemoteModule;
+}
+
+pub struct BlobRefCols {
+    pub id: __sdk::__query_builder::Col<BlobRef, u64>,
+    pub hash: __sdk::__query_builder::Col<BlobRef, String>,
+    pub owner: __sdk::__query_builder::Col<BlobRef, Option<__sdk::Identity>>,
+    pub access: __sdk::__query_builder::Col<BlobRef, String>,
+    pub purpose: __sdk::__query_builder::Col<BlobRef, String>,
+    pub content_type: __sdk::__query_builder::Col<BlobRef, String>,
+    pub size_bytes: __sdk::__query_builder::Col<BlobRef, u64>,
+    pub created_by: __sdk::__query_builder::Col<BlobRef, __sdk::Identity>,
+    pub created_at: __sdk::__query_builder::Col<BlobRef, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for BlobRef {
+    type Cols = BlobRefCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        BlobRefCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            hash: __sdk::__query_builder::Col::new(table_name, "hash"),
+            owner: __sdk::__query_builder::Col::new(table_name, "owner"),
+            access: __sdk::__query_builder::Col::new(table_name, "access"),
+            purpose: __sdk::__query_builder::Col::new(table_name, "purpose"),
+            content_type: __sdk::__query_builder::Col::new(table_name, "content_type"),
+            size_bytes: __sdk::__query_builder::Col::new(table_name, "size_bytes"),
+            created_by: __sdk::__query_builder::Col::new(table_name, "created_by"),
+            created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+        }
+    }
+}
+
+pub struct BlobRefIxCols {
+    pub hash: __sdk::__query_builder::IxCol<BlobRef, String>,
+    pub id: __sdk::__query_builder::IxCol<BlobRef, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for BlobRef {
+    type IxCols = BlobRefIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        BlobRefIxCols {
+            hash: __sdk::__query_builder::IxCol::new(table_name, "hash"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for BlobRef {}

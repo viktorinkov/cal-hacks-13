@@ -1,0 +1,20 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+use super::handle_out_type::HandleOut;
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct PersonCard {
+    pub name: String,
+    pub photo_url: String,
+    pub person_id: u64,
+    pub title: String,
+    pub organization: String,
+    pub node_id: u64,
+    pub handles: Vec<HandleOut>,
+}
+
+impl __sdk::InModule for PersonCard {
+    type Module = super::RemoteModule;
+}

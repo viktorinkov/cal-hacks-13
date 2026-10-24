@@ -1,0 +1,58 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct AuthorityLimitRow {
+    pub role: String,
+    pub rank: u8,
+    pub ceiling_cents: Option<u64>,
+    pub assignee: Option<__sdk::Identity>,
+    pub assignee_name: String,
+    pub updated_by: __sdk::Identity,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for AuthorityLimitRow {
+    type Module = super::RemoteModule;
+}
+
+pub struct AuthorityLimitRowCols {
+    pub role: __sdk::__query_builder::Col<AuthorityLimitRow, String>,
+    pub rank: __sdk::__query_builder::Col<AuthorityLimitRow, u8>,
+    pub ceiling_cents: __sdk::__query_builder::Col<AuthorityLimitRow, Option<u64>>,
+    pub assignee: __sdk::__query_builder::Col<AuthorityLimitRow, Option<__sdk::Identity>>,
+    pub assignee_name: __sdk::__query_builder::Col<AuthorityLimitRow, String>,
+    pub updated_by: __sdk::__query_builder::Col<AuthorityLimitRow, __sdk::Identity>,
+    pub updated_at: __sdk::__query_builder::Col<AuthorityLimitRow, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for AuthorityLimitRow {
+    type Cols = AuthorityLimitRowCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        AuthorityLimitRowCols {
+            role: __sdk::__query_builder::Col::new(table_name, "role"),
+            rank: __sdk::__query_builder::Col::new(table_name, "rank"),
+            ceiling_cents: __sdk::__query_builder::Col::new(table_name, "ceiling_cents"),
+            assignee: __sdk::__query_builder::Col::new(table_name, "assignee"),
+            assignee_name: __sdk::__query_builder::Col::new(table_name, "assignee_name"),
+            updated_by: __sdk::__query_builder::Col::new(table_name, "updated_by"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct AuthorityLimitRowIxCols {
+    pub role: __sdk::__query_builder::IxCol<AuthorityLimitRow, String>,
+}
+
+impl __sdk::__query_builder::HasIxCols for AuthorityLimitRow {
+    type IxCols = AuthorityLimitRowIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        AuthorityLimitRowIxCols {
+            role: __sdk::__query_builder::IxCol::new(table_name, "role"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for AuthorityLimitRow {}

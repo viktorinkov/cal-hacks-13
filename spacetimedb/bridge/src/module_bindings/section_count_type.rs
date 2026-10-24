@@ -1,0 +1,14 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct SectionCount {
+    pub section: String,
+    pub inserted: u32,
+    pub updated: u32,
+}
+
+impl __sdk::InModule for SectionCount {
+    type Module = super::RemoteModule;
+}

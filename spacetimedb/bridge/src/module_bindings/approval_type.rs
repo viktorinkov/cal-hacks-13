@@ -1,0 +1,78 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Approval {
+    pub id: u64,
+    pub claim_id: u64,
+    pub approver: __sdk::Identity,
+    pub approver_name: String,
+    pub approver_role: String,
+    pub decision: String,
+    pub amount_seen_cents: u64,
+    pub pack_hash_seen: String,
+    pub learn: bool,
+    pub requested_ceiling_cents: Option<u64>,
+    pub reason: String,
+    pub decided_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for Approval {
+    type Module = super::RemoteModule;
+}
+
+pub struct ApprovalCols {
+    pub id: __sdk::__query_builder::Col<Approval, u64>,
+    pub claim_id: __sdk::__query_builder::Col<Approval, u64>,
+    pub approver: __sdk::__query_builder::Col<Approval, __sdk::Identity>,
+    pub approver_name: __sdk::__query_builder::Col<Approval, String>,
+    pub approver_role: __sdk::__query_builder::Col<Approval, String>,
+    pub decision: __sdk::__query_builder::Col<Approval, String>,
+    pub amount_seen_cents: __sdk::__query_builder::Col<Approval, u64>,
+    pub pack_hash_seen: __sdk::__query_builder::Col<Approval, String>,
+    pub learn: __sdk::__query_builder::Col<Approval, bool>,
+    pub requested_ceiling_cents: __sdk::__query_builder::Col<Approval, Option<u64>>,
+    pub reason: __sdk::__query_builder::Col<Approval, String>,
+    pub decided_at: __sdk::__query_builder::Col<Approval, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for Approval {
+    type Cols = ApprovalCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        ApprovalCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            claim_id: __sdk::__query_builder::Col::new(table_name, "claim_id"),
+            approver: __sdk::__query_builder::Col::new(table_name, "approver"),
+            approver_name: __sdk::__query_builder::Col::new(table_name, "approver_name"),
+            approver_role: __sdk::__query_builder::Col::new(table_name, "approver_role"),
+            decision: __sdk::__query_builder::Col::new(table_name, "decision"),
+            amount_seen_cents: __sdk::__query_builder::Col::new(table_name, "amount_seen_cents"),
+            pack_hash_seen: __sdk::__query_builder::Col::new(table_name, "pack_hash_seen"),
+            learn: __sdk::__query_builder::Col::new(table_name, "learn"),
+            requested_ceiling_cents: __sdk::__query_builder::Col::new(
+                table_name,
+                "requested_ceiling_cents",
+            ),
+            reason: __sdk::__query_builder::Col::new(table_name, "reason"),
+            decided_at: __sdk::__query_builder::Col::new(table_name, "decided_at"),
+        }
+    }
+}
+
+pub struct ApprovalIxCols {
+    pub claim_id: __sdk::__query_builder::IxCol<Approval, u64>,
+    pub id: __sdk::__query_builder::IxCol<Approval, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Approval {
+    type IxCols = ApprovalIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        ApprovalIxCols {
+            claim_id: __sdk::__query_builder::IxCol::new(table_name, "claim_id"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Approval {}

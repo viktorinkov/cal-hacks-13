@@ -1,0 +1,78 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct CoverageRuleRow {
+    pub id: u64,
+    pub policy_id: u64,
+    pub cover_kind: String,
+    pub incident_kinds: Vec<String>,
+    pub per_claim_limit_cents: u64,
+    pub aggregate_limit_cents: u64,
+    pub deductible_cents: u64,
+    pub service_window_days: u32,
+    pub active: bool,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for CoverageRuleRow {
+    type Module = super::RemoteModule;
+}
+
+pub struct CoverageRuleRowCols {
+    pub id: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
+    pub policy_id: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
+    pub cover_kind: __sdk::__query_builder::Col<CoverageRuleRow, String>,
+    pub incident_kinds: __sdk::__query_builder::Col<CoverageRuleRow, Vec<String>>,
+    pub per_claim_limit_cents: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
+    pub aggregate_limit_cents: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
+    pub deductible_cents: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
+    pub service_window_days: __sdk::__query_builder::Col<CoverageRuleRow, u32>,
+    pub active: __sdk::__query_builder::Col<CoverageRuleRow, bool>,
+    pub updated_at: __sdk::__query_builder::Col<CoverageRuleRow, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for CoverageRuleRow {
+    type Cols = CoverageRuleRowCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        CoverageRuleRowCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            policy_id: __sdk::__query_builder::Col::new(table_name, "policy_id"),
+            cover_kind: __sdk::__query_builder::Col::new(table_name, "cover_kind"),
+            incident_kinds: __sdk::__query_builder::Col::new(table_name, "incident_kinds"),
+            per_claim_limit_cents: __sdk::__query_builder::Col::new(
+                table_name,
+                "per_claim_limit_cents",
+            ),
+            aggregate_limit_cents: __sdk::__query_builder::Col::new(
+                table_name,
+                "aggregate_limit_cents",
+            ),
+            deductible_cents: __sdk::__query_builder::Col::new(table_name, "deductible_cents"),
+            service_window_days: __sdk::__query_builder::Col::new(
+                table_name,
+                "service_window_days",
+            ),
+            active: __sdk::__query_builder::Col::new(table_name, "active"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct CoverageRuleRowIxCols {
+    pub id: __sdk::__query_builder::IxCol<CoverageRuleRow, u64>,
+    pub policy_id: __sdk::__query_builder::IxCol<CoverageRuleRow, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for CoverageRuleRow {
+    type IxCols = CoverageRuleRowIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        CoverageRuleRowIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            policy_id: __sdk::__query_builder::IxCol::new(table_name, "policy_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for CoverageRuleRow {}

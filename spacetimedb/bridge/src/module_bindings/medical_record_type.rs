@@ -1,0 +1,107 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct MedicalRecord {
+    pub id: u64,
+    pub claim_id: u64,
+    pub file_hash: String,
+    pub page_count: u32,
+    pub status: String,
+    pub job_id: u64,
+    pub model_call_id: u64,
+    pub document_kind: String,
+    pub patient_name: String,
+    pub provider_name: String,
+    pub date_of_service: String,
+    pub invoice_number: String,
+    pub reason_for_visit: String,
+    pub history: String,
+    pub diagnoses: Vec<String>,
+    pub billed_cents: u64,
+    pub covered_cents: u64,
+    pub dropped: Vec<String>,
+    pub record_json: String,
+    pub submitted_by: __sdk::Identity,
+    pub submitted_at: __sdk::Timestamp,
+    pub extracted_at: Option<__sdk::Timestamp>,
+}
+
+impl __sdk::InModule for MedicalRecord {
+    type Module = super::RemoteModule;
+}
+
+pub struct MedicalRecordCols {
+    pub id: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub claim_id: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub file_hash: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub page_count: __sdk::__query_builder::Col<MedicalRecord, u32>,
+    pub status: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub job_id: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub model_call_id: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub document_kind: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub patient_name: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub provider_name: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub date_of_service: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub invoice_number: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub reason_for_visit: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub history: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub diagnoses: __sdk::__query_builder::Col<MedicalRecord, Vec<String>>,
+    pub billed_cents: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub covered_cents: __sdk::__query_builder::Col<MedicalRecord, u64>,
+    pub dropped: __sdk::__query_builder::Col<MedicalRecord, Vec<String>>,
+    pub record_json: __sdk::__query_builder::Col<MedicalRecord, String>,
+    pub submitted_by: __sdk::__query_builder::Col<MedicalRecord, __sdk::Identity>,
+    pub submitted_at: __sdk::__query_builder::Col<MedicalRecord, __sdk::Timestamp>,
+    pub extracted_at: __sdk::__query_builder::Col<MedicalRecord, Option<__sdk::Timestamp>>,
+}
+
+impl __sdk::__query_builder::HasCols for MedicalRecord {
+    type Cols = MedicalRecordCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        MedicalRecordCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            claim_id: __sdk::__query_builder::Col::new(table_name, "claim_id"),
+            file_hash: __sdk::__query_builder::Col::new(table_name, "file_hash"),
+            page_count: __sdk::__query_builder::Col::new(table_name, "page_count"),
+            status: __sdk::__query_builder::Col::new(table_name, "status"),
+            job_id: __sdk::__query_builder::Col::new(table_name, "job_id"),
+            model_call_id: __sdk::__query_builder::Col::new(table_name, "model_call_id"),
+            document_kind: __sdk::__query_builder::Col::new(table_name, "document_kind"),
+            patient_name: __sdk::__query_builder::Col::new(table_name, "patient_name"),
+            provider_name: __sdk::__query_builder::Col::new(table_name, "provider_name"),
+            date_of_service: __sdk::__query_builder::Col::new(table_name, "date_of_service"),
+            invoice_number: __sdk::__query_builder::Col::new(table_name, "invoice_number"),
+            reason_for_visit: __sdk::__query_builder::Col::new(table_name, "reason_for_visit"),
+            history: __sdk::__query_builder::Col::new(table_name, "history"),
+            diagnoses: __sdk::__query_builder::Col::new(table_name, "diagnoses"),
+            billed_cents: __sdk::__query_builder::Col::new(table_name, "billed_cents"),
+            covered_cents: __sdk::__query_builder::Col::new(table_name, "covered_cents"),
+            dropped: __sdk::__query_builder::Col::new(table_name, "dropped"),
+            record_json: __sdk::__query_builder::Col::new(table_name, "record_json"),
+            submitted_by: __sdk::__query_builder::Col::new(table_name, "submitted_by"),
+            submitted_at: __sdk::__query_builder::Col::new(table_name, "submitted_at"),
+            extracted_at: __sdk::__query_builder::Col::new(table_name, "extracted_at"),
+        }
+    }
+}
+
+pub struct MedicalRecordIxCols {
+    pub claim_id: __sdk::__query_builder::IxCol<MedicalRecord, u64>,
+    pub file_hash: __sdk::__query_builder::IxCol<MedicalRecord, String>,
+    pub id: __sdk::__query_builder::IxCol<MedicalRecord, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for MedicalRecord {
+    type IxCols = MedicalRecordIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        MedicalRecordIxCols {
+            claim_id: __sdk::__query_builder::IxCol::new(table_name, "claim_id"),
+            file_hash: __sdk::__query_builder::IxCol::new(table_name, "file_hash"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for MedicalRecord {}

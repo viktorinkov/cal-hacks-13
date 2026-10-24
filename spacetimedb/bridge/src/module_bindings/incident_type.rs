@@ -1,0 +1,89 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+use super::incident_kind_type::IncidentKind;
+use super::incident_status_type::IncidentStatus;
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Incident {
+    pub id: u64,
+    pub kind: IncidentKind,
+    pub status: IncidentStatus,
+    pub resolved: bool,
+    pub zone_id: u64,
+    pub station_id: u8,
+    pub subject_band: u8,
+    pub opened_by: String,
+    pub opened_at: __sdk::Timestamp,
+    pub last_signal_at: __sdk::Timestamp,
+    pub assigned_medic: Option<__sdk::Identity>,
+    pub resolved_at: Option<__sdk::Timestamp>,
+    pub resolved_by: Option<__sdk::Identity>,
+    pub resolution: String,
+    pub vision_status: String,
+}
+
+impl __sdk::InModule for Incident {
+    type Module = super::RemoteModule;
+}
+
+pub struct IncidentCols {
+    pub id: __sdk::__query_builder::Col<Incident, u64>,
+    pub kind: __sdk::__query_builder::Col<Incident, IncidentKind>,
+    pub status: __sdk::__query_builder::Col<Incident, IncidentStatus>,
+    pub resolved: __sdk::__query_builder::Col<Incident, bool>,
+    pub zone_id: __sdk::__query_builder::Col<Incident, u64>,
+    pub station_id: __sdk::__query_builder::Col<Incident, u8>,
+    pub subject_band: __sdk::__query_builder::Col<Incident, u8>,
+    pub opened_by: __sdk::__query_builder::Col<Incident, String>,
+    pub opened_at: __sdk::__query_builder::Col<Incident, __sdk::Timestamp>,
+    pub last_signal_at: __sdk::__query_builder::Col<Incident, __sdk::Timestamp>,
+    pub assigned_medic: __sdk::__query_builder::Col<Incident, Option<__sdk::Identity>>,
+    pub resolved_at: __sdk::__query_builder::Col<Incident, Option<__sdk::Timestamp>>,
+    pub resolved_by: __sdk::__query_builder::Col<Incident, Option<__sdk::Identity>>,
+    pub resolution: __sdk::__query_builder::Col<Incident, String>,
+    pub vision_status: __sdk::__query_builder::Col<Incident, String>,
+}
+
+impl __sdk::__query_builder::HasCols for Incident {
+    type Cols = IncidentCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        IncidentCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            kind: __sdk::__query_builder::Col::new(table_name, "kind"),
+            status: __sdk::__query_builder::Col::new(table_name, "status"),
+            resolved: __sdk::__query_builder::Col::new(table_name, "resolved"),
+            zone_id: __sdk::__query_builder::Col::new(table_name, "zone_id"),
+            station_id: __sdk::__query_builder::Col::new(table_name, "station_id"),
+            subject_band: __sdk::__query_builder::Col::new(table_name, "subject_band"),
+            opened_by: __sdk::__query_builder::Col::new(table_name, "opened_by"),
+            opened_at: __sdk::__query_builder::Col::new(table_name, "opened_at"),
+            last_signal_at: __sdk::__query_builder::Col::new(table_name, "last_signal_at"),
+            assigned_medic: __sdk::__query_builder::Col::new(table_name, "assigned_medic"),
+            resolved_at: __sdk::__query_builder::Col::new(table_name, "resolved_at"),
+            resolved_by: __sdk::__query_builder::Col::new(table_name, "resolved_by"),
+            resolution: __sdk::__query_builder::Col::new(table_name, "resolution"),
+            vision_status: __sdk::__query_builder::Col::new(table_name, "vision_status"),
+        }
+    }
+}
+
+pub struct IncidentIxCols {
+    pub id: __sdk::__query_builder::IxCol<Incident, u64>,
+    pub resolved: __sdk::__query_builder::IxCol<Incident, bool>,
+    pub subject_band: __sdk::__query_builder::IxCol<Incident, u8>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Incident {
+    type IxCols = IncidentIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        IncidentIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            resolved: __sdk::__query_builder::IxCol::new(table_name, "resolved"),
+            subject_band: __sdk::__query_builder::IxCol::new(table_name, "subject_band"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Incident {}

@@ -1,0 +1,24 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct ScheduleSlotIn {
+    pub source_key: String,
+    pub title: String,
+    pub kind: String,
+    pub description: String,
+    pub location_text: String,
+    pub zone_key: String,
+    pub booth_key: String,
+    pub host_organization_key: String,
+    pub speaker_keys: Vec<String>,
+    pub starts_at: __sdk::Timestamp,
+    pub ends_at: Option<__sdk::Timestamp>,
+    pub source_url: String,
+    pub fetched_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for ScheduleSlotIn {
+    type Module = super::RemoteModule;
+}
