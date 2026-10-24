@@ -208,7 +208,7 @@ The medic view shows the card fields with their page references, the band id, th
 
 - [Hyphenate](../7-integrations/Hyphenate.md): reads `medical_card` as evidence and writes the `via = claim` log row.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the "Medical access log (Medical-ID.md)" panel row.
-- [Flows](../1-overview/Flows.md): the medic step of the demo.
+- [Flows](../1-overview/Flows.md): the medic step of the event.
 
 **If you delete this file**
 
@@ -223,9 +223,9 @@ The medic view shows the card fields with their page references, the band id, th
 
 | Decision | Why |
 |---|---|
-| The medic always taps the band to see the card; there is no card in the dashboard's incident panel | the tap proves the medic is standing at the person, and it is the demo moment |
+| The medic always taps the band to see the card; there is no card in the dashboard's incident panel | the tap proves the medic is standing at the person, and it is the moment judges watch |
 | `medic_open_incident` leaves the band's light state alone | the medic is already at the person, so a light circle adds nothing |
 | The upload cap is 10 MB | enough for a scanned medical summary of a few pages |
 | The static NFC token counts as a tap in v0.1 | the role check and the open-incident check guard the card; every attempt is logged |
 | An unconfirmed card is still shown to a medic, labelled | a card with a caveat beats no card in an emergency |
-| After 3 failed extraction attempts the app opens the manual form | one fallback keeps the card step from stopping the demo |
+| After 3 failed extraction attempts the app opens the manual form | one fallback keeps the card step from stopping the event flow |

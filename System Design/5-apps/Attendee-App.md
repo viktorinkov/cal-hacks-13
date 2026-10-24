@@ -108,7 +108,7 @@ The tap alone proves nothing, because anyone can read the tag. The press proves 
 4. Inside `ingest_band_reports`, in the same transaction as the report, the module sees a press from a band whose `claim_candidate` is set and whose window has not passed. It sets `band.owner` to the candidate, clears the candidate, and deletes the IDENT directive; the bridge then lets the forced blink expire and never sends `clear` for it ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). The band returns to density-driven colours. Later batches in the same second see no candidate and do nothing.
 5. The app's `my_band` subscription updates with the owner set; the screen says "It's yours" and continues with onboarding.
 6. Onboarding, in order, each step skippable except the first:
-   - Display name: `update_profile`. There is no company field. Payments-Nessie.md: saving the name also opens the attendee's $200 demo wallet, with no extra screen, for merch and claim payouts.
+   - Display name: `update_profile`. There is no company field. Payments-Nessie.md: saving the name also opens the attendee's $200 sandbox wallet, with no extra screen, for merch and claim payouts.
    - BrightData.md: the profile claim. The app lists the `person` rows whose name matches the typed display name and that `claimed_people` does not list, each with a "This is me" button. The attendee taps theirs, and the app calls `claim_person`. There is no second press: the band claim one step earlier made the attendee a band owner, and `claim_person` refuses anyone who owns no band with "claim your band first". It writes a `person_claim` row and copies the profile's organisation and headshot onto the attendee ([BrightData](../7-integrations/BrightData.md)).
    - The `findable` switch, off by default: `set_consent` (see Profile and consent).
    - Social.md: add your socials. The attendee types their Instagram, Facebook and Threads handles, and the app saves each with `set_social_handle`. No other networks are asked for, and nobody's profile is looked up or scraped ([Social](../6-features/Social.md)).
@@ -231,7 +231,7 @@ flowchart LR
 
 ### After the event
 
-There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the host, a staff member with `ops`: when they press "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so it switches from "Now" to "Your event" live, with no reload. `reopen_event` clears it and switches the pages back, for running the demo again.
+There is no separate post-event app and no email. `/me` has a "Now" view and a "Your event" view, which is the recap page. The switch belongs to the host, a staff member with `ops`: when they press "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so it switches from "Now" to "Your event" live, with no reload. `reopen_event` clears it and switches the pages back, to run the event flow again.
 
 Later, the attendee reopens their tap link `/t/BANDIT-0n` (or `/me`) on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, `release_band` is refused, so every band keeps its owner for the recap.
 
@@ -272,7 +272,7 @@ Every call on the recap page runs as the signed-in attendee. Other sections, eac
 - Android opens an NDEF URL in the default browser from the system tag dispatch when the phone is unlocked.
 - Every view whose input is a band (the band claim and the medic view) starts from the OS opening the tag URL, so it works the same on both platforms with no in-page NFC reading.
 - The tag is an NTAG215 holding one NDEF URL on the `bandit-api` host, locked read-only once written ([Hardware](../4-devices/Hardware.md)).
-- Simulator.md: crowd bands have no tag and an empty `nfc_token`, and `start_crowd` gives each a simulated owner inside the module. The demo bands 94 to 99 have a tap link (`/t/BANDIT-94` to `/t/BANDIT-99`) but no tag: a tester opens it and claims the band with `bandit-api`'s demo press instead of a real press ([Simulator](../3-services/Simulator.md)).
+- Simulator.md: crowd bands have no tag and an empty `nfc_token`, and `start_crowd` gives each a simulated owner inside the module. The scripted bands 94 to 99 have a tap link (`/t/BANDIT-94` to `/t/BANDIT-99`) but no tag: a tester opens it and claims the band with a press from `bandit-api`'s dev routes instead of a real press ([Simulator](../3-services/Simulator.md)).
 
 ## Failure modes and fallbacks
 
@@ -303,11 +303,11 @@ Every call on the recap page runs as the signed-in attendee. Other sections, eac
 - [BrightData](../7-integrations/BrightData.md): the profile claim step.
 - [Merch](../6-features/Merch.md): the merch section at the bottom of the recap page.
 - [Hyphenate](../7-integrations/Hyphenate.md), [Elastic](../7-integrations/Elastic.md): the insurance details on the profile; the order of the recap's people and booths.
-- [Flows](../1-overview/Flows.md): the join and claim step and the recap step of the demo.
+- [Flows](../1-overview/Flows.md): the join and claim step and the recap step of the event.
 
 **If you delete this file**
 
-- The demo loses tap to join; bands would be registered to people by ops only (`register_band`) and `claim_band` would have no caller.
+- The event loses tap to join; bands would be registered to people by ops only (`register_band`) and `claim_band` would have no caller.
 - Medical-ID.md needs another host for the medic view; Social.md needs another host for the photographer route.
 - Remove the Attendee app row from the component table in Architecture.md and the attendee row from SpacetimeDB.md's "subscriptions per client".
 - Remove the "attendee app" bullets in Social.md, BrightData.md, Elastic.md, Merch.md, Hyphenate.md, Payments-Nessie.md and Medical-ID.md.

@@ -23,13 +23,13 @@ Every process, where it runs, what it may do in the database, and what it talks 
 | Process | Crate | Runs on | SpacetimeDB role | Talks to | Secrets it holds |
 |---|---|---|---|---|---|
 | `band1t` module | `bandit-module` | SpacetimeDB Maincloud | runs inside the database | nothing outside the database | none |
-| `bandit-bridge` | `bandit-bridge` | demo laptop | `bridge` | the gateway over USB serial | its SpacetimeDB token |
-| Simulator.md: the `bandit-claims` command-line tool | `bandit-claims` | demo laptop | `simulator` (its `sim` identity, for the demo bands); Hyphenate.md: the demo identities it plays, among them `medic` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
-| `bandit-ingest` | `bandit-ingest` | demo laptop, before the event | `ingest` | the `band1t` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Hyphenate.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
+| `bandit-bridge` | `bandit-bridge` | venue laptop | `bridge` | the gateway over USB serial | its SpacetimeDB token |
+| Simulator.md: the `bandit-claims` command-line tool | `bandit-claims` | venue laptop | `simulator` (its `sim` identity, for the scripted bands); Hyphenate.md: the test identities it plays, among them `medic` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
+| `bandit-ingest` | `bandit-ingest` | venue laptop, before the event | `ingest` | the `band1t` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Hyphenate.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Fly.io Machine | `indexer` | Elastic Serverless: the one-way copy, including the `bandit-people` sync of each findable attendee's interests | SpacetimeDB token, Elastic key |
-| `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key; Simulator.md: the `simulator` token for the demo routes |
+| `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key; Simulator.md: the `simulator` token for the dev routes |
 | `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie; Elastic.md, Hyphenate.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie base URL and key; Elastic.md, Hyphenate.md: Elastic claims key |
-| Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | demo laptop | `vision` | the overhead phone camera, `bandit-api` for frame uploads; Anthropic-Agent.md: Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
+| Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | venue laptop | `vision` | the overhead phone camera, `bandit-api` for frame uploads; Anthropic-Agent.md: Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
 
 ## Design
 
@@ -95,9 +95,9 @@ Each process reaches the database the same way, as a SpacetimeDB client of Mainc
 - `bandit-api`, `bandit-workers` and `bandit-indexer` run side by side on one small Fly.io Machine with auto-stop turned off, so they keep running when the laptop sleeps. Fly's proxy serves the Machine's public HTTPS host.
 - A Fly volume attached to that Machine holds the blob store folder and the three services' credentials files. Both processes that write blobs, `bandit-api` and `bandit-workers`, run on that Machine and share the folder directly.
 - `bandit-api` serves the Ops dashboard and the attendee app as static files from that host. The NFC tags hold that host, so judges open the app on their own phones, and the apps' uploads and API calls go to the same origin with no cross-origin setup.
-- The demo laptop runs `bandit-bridge`, because it needs the gateway's USB cable, and runs `bandit-ingest` once before the event.
-- Simulator.md: the `bandit-claims` command-line tool runs on the demo laptop.
-- Vision.md (TBD -- LEO): `bandit-vision` runs on the demo laptop.
+- The venue laptop runs `bandit-bridge`, because it needs the gateway's USB cable, and runs `bandit-ingest` once before the event.
+- Simulator.md: the `bandit-claims` command-line tool runs on the venue laptop.
+- Vision.md (TBD -- LEO): `bandit-vision` runs on the venue laptop.
 
 ### Service identity and roles
 
@@ -124,7 +124,7 @@ sequenceDiagram
 
 ### Configuration and secrets
 
-- Each process reads one config file plus environment variables for secrets. The config holds the Maincloud address, the database name `band1t`, and process-specific settings such as the serial port or the job kinds a worker handles. Anthropic-Agent.md: every process that calls Claude reads `claude_mode`, which is `replay_then_live` in the demo ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)).
+- Each process reads one config file plus environment variables for secrets. The config holds the Maincloud address, the database name `band1t`, and process-specific settings such as the serial port or the job kinds a worker handles. Anthropic-Agent.md: every process that calls Claude reads `claude_mode`, which is `replay_then_live` at the event ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)).
 - Secrets are the SpacetimeDB tokens plus the feature keys in the Interfaces table. On the Fly Machine they are Fly secrets, which reach the processes as environment variables; on the laptop they sit in a local environment file outside the repo. They are never written to SpacetimeDB rows, never sent to browsers and never committed.
 
 ### `bandit-api`: the HTTP edge
@@ -165,7 +165,7 @@ sequenceDiagram
 | Medical-ID.md: `POST /api/medical/document` | upload the medical PDF as `owner_only`, call `submit_medical_document`, which enqueues `medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
 | Hyphenate.md: bill upload | the Ops dashboard's incident card uploads an urgent-care bill PDF (at most 10 MB) through `POST /api/blobs` with purpose `medical`, then calls `submit_medical_record` as the signed-in staff member, which enqueues `claim_record_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
 | Social.md: photographer photo upload, share-link page | photos in through `POST /api/blobs` with purpose `photo`; the public page for a share token | [Social](../6-features/Social.md) |
-| Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | demo mode only: press a demo band 94 to 99 or move it to a station, through `report_sim_band` as the `simulator` identity; the pressed bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
+| Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | test mode only (`BANDIT_SIMULATE=1`): press a scripted band 94 to 99 or move it to a station, through `report_sim_band` as the `simulator` identity; the pressed bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
 
 ### `bandit-workers`: the job runner
 
@@ -217,10 +217,10 @@ Both profiles use the one Maincloud database.
 
 | Profile | Bands | Use |
 |---|---|---|
-| Live demo | real bands through the bridge | the judged demo |
-| Simulator.md: Rehearsal | demo bands and replayed bridge logs only, on the demo ids 90 to 99 | practising the choreography without wearers |
+| Live event | real bands through the bridge | the event in front of the judges |
+| Simulator.md: Rehearsal | scripted bands and replayed bridge logs only, on the scripted ids 90 to 99 | practising the safety choreography without wearers |
 
-Simulator.md: in the live demo, the crowd (up to 80 bands inside the module) and the 10 demo bands run alongside the real ones.
+Simulator.md: in the live event, the crowd (up to 80 bands inside the module) and the 10 scripted bands run alongside the real ones.
 
 ## Failure modes and fallbacks
 

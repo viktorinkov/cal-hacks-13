@@ -1,6 +1,6 @@
 # Ops dashboard
 
-The ops dashboard is the staff web app. On the demo laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. On staff phones it is the same app trimmed by role, so a medic sees incidents first, an approver sees claims and ops sees the host portal. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
+The ops dashboard is the staff web app. On the venue laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. On staff phones it is the same app trimmed by role, so a medic sees incidents first, an approver sees claims and ops sees the host portal. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
 
 ## Role in the system
 
@@ -54,10 +54,10 @@ One app, one bundle; the caller's `staff_role` rows decide what renders. Reducer
 | `owner` | laptop | everything `ops` sees, plus the staff panel (grant and revoke roles, service identities) |
 | `ops` | laptop, phone | the host portal (below), venue map, fleet, incidents, controls, calibration, jobs, service health; Social.md: the event graph on the big screen |
 | `medic` | phone | incidents (assigned to me first, then open), venue map, fleet read-only. Medical-ID.md: the hint "tap the band for the medical card", which opens the medic view in the attendee app |
-| `floor_manager`, `risk_manager`, `adjuster` | phone, laptop | incidents read-only; Hyphenate.md: the claims queue filtered to their authority, with the approval grid; in the demo a judge holds `risk_manager` on their own phone |
+| `floor_manager`, `risk_manager`, `adjuster` | phone, laptop | incidents read-only; Hyphenate.md: the claims queue filtered to their authority, with the approval grid; at the event a judge holds `risk_manager` on their own phone |
 | `photographer` | none here | Social.md: the `/photo` route in the attendee app |
 
-Staff onboarding happens at setup, before the demo. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and the dashboard then shows their identity as a short code on an otherwise empty screen; a Rust service prints its identity on first start. The owner, the team member signed in with the identity that published the module, enters each code in the staff panel and calls `grant_role`; no other role may grant. Nobody types codes in front of judges. Hyphenate.md: the one grant made during the demo is `risk_manager` for the judge who approves the first claim. The judge opens the dashboard on the phone they joined with, signed in, so it is the same identity and display name as their attendee app; the owner picks the judge from the host portal's attendee list, and revokes the grant after the demo.
+Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and the dashboard then shows their identity as a short code on an otherwise empty screen; a Rust service prints its identity on first start. The owner, the team member signed in with the identity that published the module, enters each code in the staff panel and calls `grant_role`; no other role may grant. Nobody types codes in front of judges. Hyphenate.md: the one grant made during the event is `risk_manager` for the judge who approves the first claim. The judge opens the dashboard on the phone they joined with, signed in, so it is the same identity and display name as their attendee app; the owner picks the judge from the host portal's attendee list, and revokes the grant after the event.
 
 ### Host portal
 
@@ -71,7 +71,7 @@ The host portal is the dashboard's layout for the `ops` role: one screen to run 
 | Hyphenate.md: Claims queue | the claims waiting for approval | the Claims queue's tables | `approve_claim`, `refuse_claim`, as the authority matrix allows |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
-When a staff member with `ops` presses "Event ended", `end_event` sets `event_state.ended`. Every open attendee page turns into the recap page live, and from then on bands cannot be released ([Attendee-App](Attendee-App.md)). "Reopen the event" runs `reopen_event`, which clears it, for running the demo again.
+When a staff member with `ops` presses "Event ended", `end_event` sets `event_state.ended`. Every open attendee page turns into the recap page live, and from then on bands cannot be released ([Attendee-App](Attendee-App.md)). "Reopen the event" runs `reopen_event`, which clears it, to run the event flow again.
 
 ### Panels
 
@@ -142,7 +142,7 @@ Booths are labelled dots at `booth.plan_x_m`, `booth.plan_y_m`. Ops drags a misp
 
 | Column | Source | Rule |
 |---|---|---|
-| Band id | `band` | real bands 1 to 9; Simulator.md: demo bands 90 to 99 (the crowd has no reports, so no row) |
+| Band id | `band` | real bands 1 to 9; Simulator.md: scripted bands 90 to 99 (the crowd has no reports, so no row) |
 | Alive | `band_report` age | green dot when heard in the last 2 s, grey row after 5 s |
 | State | `band_report.state` | chip in the ring's colour with the state name; a forced state shows a pin icon from `band_directive` |
 | Zone | `band_report.zone` | station id mapped to the zone name; blank when 0 |
@@ -219,7 +219,7 @@ Every control writes a row; `bandit-bridge` turns the row into gateway text and 
 |---|---|---|---|
 | Force a state on all bands or one, with a hold in tenths of a second | `force_band_state(target, state, hold)` | `band_directive` with reason `manual` (`plan_b` during Plan B) for target 0 or a band id | `cmd <target> state <n> [tenths]`, re-sent before the 25.5 s per-command limit while the directive stands |
 | Buzz or clear one band | `send_band_command(target, buzz or clear, arg)` | a one-shot `band_command`; the bridge sends it once and calls `ack_band_command` | `cmd <id> buzz <pattern>` or `cmd <id> clear` |
-| Clear all (the demo's reset button) | `clear_all` | deletes every `band_directive`, clears `zone.evacuating` and the forced exit and risk columns, sets `venue_mode` back to `normal`, writes one `clear` command for target 0 | `cmd 0 clear` |
+| Clear all (the full reset button) | `clear_all` | deletes every `band_directive`, clears `zone.evacuating` and the forced exit and risk columns, sets `venue_mode` back to `normal`, writes one `clear` command for target 0 | `cmd 0 clear` |
 | Exit colour per zone | `set_zone_exit(zone, exit or none)` | `zone.forced_exit_id`; `venue_tick` honours it, also in evacuation mode; none returns the zone to automatic | `cmd <band> exit <n>` for the zone's bands and `cmd <station> exit <n>` for its station |
 | Force a zone's risk level | `set_zone_risk(zone, level or none)` | `zone.forced_risk`; the tick writes that level with `density_source` `manual` so the map and the lights agree with what staff see | exit and state commands that follow from the level |
 | Evacuation mode | `set_venue_mode(mode, zones)` | `venue_mode` evacuate for the venue, or `zone.evacuating` on the listed zones; the tick writes forced GUIDE directives with each zone's exit colour (a pinned exit stays pinned) and an `evacuation` incident; full bands also get a `buzz` that points their wearers along the route | `cmd <band> state 2`, `exit <n>` and, on full bands, `buzz` for every band in scope |
@@ -269,7 +269,7 @@ sequenceDiagram
 
 ### Event graph (Social.md)
 
-The event graph is a big-screen view for the demo: the whole event as one live people graph, so judges watch it grow as people meet and visit booths. It reads the anonymous `event_graph` view, which holds node ids and links only, with no names, zones or times, and is computed once for every viewer ([Social](../6-features/Social.md)). Booths and companies are shared nodes, so two people who visited the same booth are pulled together without any link stored between them. A new link appears in the same transaction that records it, once a visit reaches 2 min or two people have been together for 3 min (starting values). Simulator.md: simulated bands have simulated owners with `findable` on, so the screen shows a crowd of up to 200 rather than nine people.
+The event graph is a big-screen view for the event: the whole event as one live people graph, so judges watch it grow as people meet and visit booths. It reads the anonymous `event_graph` view, which holds node ids and links only, with no names, zones or times, and is computed once for every viewer ([Social](../6-features/Social.md)). Booths and companies are shared nodes, so two people who visited the same booth are pulled together without any link stored between them. A new link appears in the same transaction that records it, once a visit reaches 2 min or two people have been together for 3 min (starting values). Simulator.md: simulated bands have simulated owners with `findable` on, so the screen shows a crowd of up to 80 simulated attendees rather than nine people.
 
 The view is drawn with Sigma.js and graphology. The ForceAtlas2 layout and the Louvain clusters run in a web worker, so the laptop stays responsive.
 
@@ -303,7 +303,7 @@ A read-only table of jobs from the `staff_jobs` view: id, kind, status (`queued`
 
 ### Service health
 
-Every Rust service calls `heartbeat` every 5 s, writing one `service_heartbeat` row per service keyed by its `service` name ([SpacetimeDB](../2-data/SpacetimeDB.md)). The panel shows one card per row: version, uptime from `started_at`, age of `last_at`, and the counters that apply (`lines_per_second` and `loss_percent` for the bridge, `backlog` for workers, and the free-text `note`, for example the serial port name). A card turns amber when `last_at` is older than 10 s and red after 15 s (starting values). The strip also shows the dashboard's own connection state. A red bridge card during the demo is the cue to reach for manual override.
+Every Rust service calls `heartbeat` every 5 s, writing one `service_heartbeat` row per service keyed by its `service` name ([SpacetimeDB](../2-data/SpacetimeDB.md)). The panel shows one card per row: version, uptime from `started_at`, age of `last_at`, and the counters that apply (`lines_per_second` and `loss_percent` for the bridge, `backlog` for workers, and the free-text `note`, for example the serial port name). A card turns amber when `last_at` is older than 10 s and red after 15 s (starting values). The strip also shows the dashboard's own connection state. A red bridge card during the event is the cue to reach for manual override.
 
 Cards in the core: `bridge`, `workers`, `api`. Optional cards, each one line to remove:
 
@@ -336,7 +336,7 @@ Private tables arrive through the staff views that [SpacetimeDB](../2-data/Space
 | Social.md: `event_graph` | event graph | yes | no |
 | BrightData.md: `hall`, `organization` | floor-plan image and booth labels | yes | no |
 
-Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Simulator.md)), so the laptop subscribes to every `band_report` and paints every update.
+Simulator.md: only the 10 scripted bands send reports ([Simulator](../3-services/Simulator.md)), so the laptop subscribes to every `band_report` and paints every update.
 
 ## Failure modes and fallbacks
 
@@ -345,7 +345,7 @@ Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Sim
 | Bridge or gateway down | every real band goes grey within 5 s; the `bridge` heartbeat card goes red | the operator forces zone levels with `set_zone_risk` so the map still tells the story, and the team tells the judges |
 | Density unstable in the room | zones flicker between colours | Plan B ([Safety](../6-features/Safety.md)): `density_override` on, and ops drives the band colours from the zone's risk with `force_band_state`; SOS, fall and the light circle keep working on the bands |
 | SpacetimeDB connection drops (phone hotspot) | panels freeze | the SDK reconnects and replays subscriptions; controls are disabled while disconnected and rows show their age |
-| Operator forgets override is on | bands stay green during the density demo | the banner cannot be dismissed while the override stands |
+| Operator forgets override is on | bands stay green during the crowd density step | the banner cannot be dismissed while the override stands |
 
 ## Dependencies
 
@@ -362,11 +362,11 @@ Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Sim
 - [Attendee app](Attendee-App.md): unclaiming a band through `release_band`; `grant_role` for staff; the "Event ended" button that turns every attendee page into the recap.
 - [Medical-ID](../6-features/Medical-ID.md): the medic's incident list; the card itself opens from the attendee app.
 - [Hyphenate](../7-integrations/Hyphenate.md), [Medical-ID](../6-features/Medical-ID.md), [Social](../6-features/Social.md), [Vision](../4-devices/Vision.md), [Elastic](../7-integrations/Elastic.md), [Simulator](../3-services/Simulator.md), [BrightData](../7-integrations/BrightData.md): host their optional panels, map layers, the event graph and service cards.
-- [Flows](../1-overview/Flows.md): the demo's SOS, manual-override and Event ended steps.
+- [Flows](../1-overview/Flows.md): the SOS, manual-override and Event ended steps.
 
 **If you delete this file**
 
-- Ops loses every control; forced states, evacuation and calibration would need another client calling the same reducers, and the manual-override fallback disappears from the demo.
+- Ops loses every control; forced states, evacuation and calibration would need another client calling the same reducers, and the manual-override fallback disappears from the event flow.
 - Remove the Ops dashboard row from the component table in Architecture.md and the ops subscriptions from SpacetimeDB.md's "subscriptions per client".
 - Remove the "ops dashboard" bullets in Hyphenate.md (claims queue with its scorecard, incident card controls, property-damage button, the judge's live grant), Medical-ID.md (medical access log), Social.md (event graph), Vision.md (camera tile), Elastic.md (indexer card, booths by hand), Simulator.md (legend and counts) and BrightData.md (floor plan and booth fixes).
 
@@ -376,15 +376,15 @@ Simulator.md: only the 10 demo bands send reports ([Simulator](../3-services/Sim
 |---|---|
 | `set_zone_exit` pins survive a switch to evacuation mode | ops pinned that exit for a reason they can see in the room; evacuation must not undo it |
 | A medic's `resolve_incident` is one tap, with no ops confirmation | the medic is the person standing there; a second approval adds nothing |
-| Zones are rectangles in plan metres | the demo zones are taped squares and booth areas; a rectangle draws them, and a dropped booth lands in exactly one zone |
+| Zones are rectangles in plan metres | the event's zones are taped squares and booth areas; a rectangle draws them, and a dropped booth lands in exactly one zone |
 | Booths are fixed by dragging them on the venue map, through `upsert_booth` | one place to see and fix the booth layout, and a hand fix survives a re-import |
 | `release_band` works until the event ends, after a confirm tap; the band's owner can also release it from the attendee app | ops can fix a band claimed by mistake mid-event; the confirm tap stops an accidental release |
-| Staff roles are granted by the owner at setup, before the demo | nobody types identity codes in front of judges |
+| Staff roles are granted by the owner at setup, before doors open | nobody types identity codes in front of judges |
 | Hyphenate.md: a judge approves the first claim as `risk_manager` on their own phone, granted live by the owner with one tap on the judge's name in the host portal's attendee list | the rule that settles the next claim is stamped with the judge's own display name; a tap is not typing a code |
 | Hyphenate.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Hyphenate.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
 | Ops picks the medic's entry zone with one tap; medics wear no bands | the entry zone drives the medic approach, and a tap is faster than any default |
-| The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 demo bands report, next to the 9 real ones |
+| The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 scripted bands report, next to the 9 real ones |
 | Simulator.md: scenarios start from the `bandit-claims` command line; the dashboard has no simulator panel | the dashboard only shows what the simulator does |
 | Social.md: the event graph is anonymous on the big screen, and its links come only from `event_graph` | a public screen shows no names; SpacetimeDB pushes the measured links live |
 | The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the attendee's wallet and the claims queue |

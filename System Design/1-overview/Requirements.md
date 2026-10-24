@@ -1,6 +1,6 @@
 # Requirements
 
-BandIt must show, live at Cal Hacks 13.0, that one wristband can keep a crowd safe and then turn the night into memories, payments and settled claims. This file states what the system must do, how well, at what scale and under which constraints. Every other file is a design that meets these requirements; [Architecture](Architecture.md) shows how they fit together and [Flows](Flows.md) walks the demo.
+BandIt must show, live at Cal Hacks 13.0, that one wristband can keep a crowd safe and then turn the night into memories, payments and settled claims. This file states what the system must do, how well, at what scale and under which constraints. Every other file is a design that meets these requirements; [Architecture](Architecture.md) shows how they fit together and [Flows](Flows.md) walks the event step by step.
 
 ## Goals
 
@@ -8,11 +8,11 @@ BandIt must show, live at Cal Hacks 13.0, that one wristband can keep a crowd sa
 2. A person in trouble (SOS or a fall) is found fast: the bands around them light up, staff see the incident with its witnesses, and a medic is sent.
 3. Every screen (staff dashboard, medic phone, attendee phone, the bands themselves) agrees on the state of the venue at every moment.
 4. When a staff member with `ops` ends the event, every attendee's page turns into their recap, which gives them their night back: where they went, who they met, their photos, and things to buy or claim.
-5. Each sponsor integration is real, visible in the demo, and removable without breaking the core.
+5. Each sponsor integration is real, visible at the event, and removable without breaking the core.
 
 ## Functional requirements
 
-Core requirements are what the safety demo needs. Rows that start with a file name belong to an optional feature and go away with that file.
+Core requirements are what the safety features need. Rows that start with a file name belong to an optional feature and go away with that file.
 
 | Id | The system must | Owner |
 |---|---|---|
@@ -31,7 +31,7 @@ Core requirements are what the safety demo needs. Rows that start with a file na
 | F13 | BrightData.md: load any event's real organisations, booths, floor plan and schedule from its public pages, given as start URLs in the event's seed | [BrightData](../7-integrations/BrightData.md) |
 | F14 | Elastic.md: organize the scraped records into one checked bundle, and order each attendee's recap suggestions by meaning | [Elastic](../7-integrations/Elastic.md) |
 | F15 | Vision.md (TBD -- LEO): count people from a camera and confirm falls from frames | [Vision](../4-devices/Vision.md) |
-| F16 | Simulator.md: run a simulated crowd inside the module and ten demo bands that report into the same tables as real ones | [Simulator](../3-services/Simulator.md) |
+| F16 | Simulator.md: run a simulated crowd inside the module and ten scripted bands that report into the same tables as real ones | [Simulator](../3-services/Simulator.md) |
 | F17 | When a staff member with `ops` presses "Event ended", turn every open attendee page into the recap page live, and reopen it from the tap link for the band's signed-in owner on any device | [Attendee-App](../5-apps/Attendee-App.md) |
 
 ## Non-functional requirements
@@ -49,15 +49,15 @@ Core requirements are what the safety demo needs. Rows that start with a file na
 
 ## Scale
 
-BandIt is sized for the demo, with headroom from the simulator.
+BandIt is sized for the event, with headroom from the simulator.
 
 | Quantity | Value | Consequence |
 |---|---|---|
 | Real bands | 9 (6 lite, 3 full with fall detection) | the radio channel is lightly loaded |
 | Station markers | 2 to 5 (ids 101 to 105), one per zone | zone-level presence only, never x/y |
-| Gateway | 1 (id 200) on USB to the demo laptop | one bridge process |
+| Gateway | 1 (id 200) on USB to the venue laptop | one bridge process |
 | Beacons | 10 per second per band | about 90 serial lines per second from the real fleet |
-| Simulator.md: simulated bands | a crowd of up to 80 (ids 10 to 89) and 10 demo bands (ids 90 to 99) | the crowd moves inside the module every 5 s and sends no reports; the demo bands report once a second through `report_sim_band`, about 10 reducer calls per second |
+| Simulator.md: simulated bands | a crowd of up to 80 (ids 10 to 89) and 10 scripted bands (ids 90 to 99) | the crowd moves inside the module every 5 s and sends no reports; the scripted bands report once a second through `report_sim_band`, about 10 reducer calls per second |
 | Real band reports to the module | one batch every 250 ms | 4 reducer calls per second from the bridge |
 | Venue tick | every 500 ms | zone state and exits recomputed twice a second |
 | Clients | 1 Ops dashboard, a few medic phones, tens of attendee phones | subscriptions carry only changes |
@@ -66,8 +66,8 @@ BandIt is sized for the demo, with headroom from the simulator.
 
 - The hardware is fixed: XIAO ESP32-C3 bands, ESP-NOW on Wi-Fi channel 1, zone-level presence from station markers, no compass and no positions ([Hardware](../4-devices/Hardware.md)).
 - Every backend service is Rust; only the two browser apps are TypeScript ([Rust-Backend](../3-services/Rust-Backend.md)).
-- The database is SpacetimeDB on Maincloud; the demo laptop gets internet from a team phone's hotspot ([Decisions](Decisions.md)).
-- It is a hackathon demo: the design follows a few clear happy paths, and an edge case is kept only when it protects a person, is something a judge will see, or wins a sponsor track.
+- The database is SpacetimeDB on Maincloud; the venue laptop gets internet from a team phone's hotspot ([Decisions](Decisions.md)).
+- It runs first at a hackathon, Cal Hacks 13.0: the design follows a few clear happy paths, and an edge case is kept only when it protects a person, is something judges see at the event, or wins a sponsor track.
 
 ## Out of scope
 

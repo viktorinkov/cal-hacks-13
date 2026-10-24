@@ -66,7 +66,7 @@ flowchart LR
 
 ### The wallet
 
-The attendee app saves the display name with `update_profile` ([Attendee-App](../5-apps/Attendee-App.md)). The reducer then enqueues `wallet_open` with the name and the opening amount, 20000 cents ($200, starting value). It skips simulated attendees, attendees who already have a wallet, and attendees whose `wallet_open` job is still open, so saving the name again queues nothing. The worker creates the customer and a `Checking` account named "BandIt wallet" with $200, then calls `record_wallet` with both ids. The reducer rejects a stale lease, writes the `claimant_account` row and adds an `opening` entry of +20000. The demo opens a new account rather than linking an existing one, so every judge has a funded wallet, with no bank details typed and no screen of its own.
+The attendee app saves the display name with `update_profile` ([Attendee-App](../5-apps/Attendee-App.md)). The reducer then enqueues `wallet_open` with the name and the opening amount, 20000 cents ($200, starting value). It skips simulated attendees, attendees who already have a wallet, and attendees whose `wallet_open` job is still open, so saving the name again queues nothing. The worker creates the customer and a `Checking` account named "BandIt wallet" with $200, then calls `record_wallet` with both ids. The reducer rejects a stale lease, writes the `claimant_account` row and adds an `opening` entry of +20000. BandIt opens a new account rather than linking an existing one, so every judge has a funded wallet, with no bank details typed and no screen of its own.
 
 Hyphenate.md: `claimant_account` is defined in [Hyphenate](Hyphenate.md), which pays claims into it. The wallet writes the same row at sign-up, so claim payouts and merch purchases use one Nessie account per attendee. It holds every attendee's wallet.
 
@@ -187,7 +187,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 
 - [Merch](../6-features/Merch.md): the wallet, the spendable balance and the `merch_purchase` work. Merch cannot run without this file.
 - [Hyphenate](Hyphenate.md): the `claim_payout` work and the wallet's `payout` entry. Without this file, Hyphenate pays ledger-only.
-- [Flows](../1-overview/Flows.md): the merch checkout and claim payout steps of the demo.
+- [Flows](../1-overview/Flows.md): the merch checkout and claim payout steps of the event.
 
 **If you delete this file**
 

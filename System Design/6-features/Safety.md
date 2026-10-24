@@ -27,7 +27,7 @@ Non-responsibilities:
 | Direction | Counterpart | What flows | Tables or reducers | Transport |
 |---|---|---|---|---|
 | In | `bandit-bridge` | per band: `neigh`, `zone`, `state`, SOS, fall and press flags, every 250 ms | `band_report` through `ingest_band_reports` | reducer |
-| In | Simulator.md: the `bandit-claims` tool and `bandit-api` demo routes | the same fields for demo bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
+| In | Simulator.md: the `bandit-claims` tool and `bandit-api` dev routes | the same fields for scripted bands 90 to 99, once a second | `band_report` through `report_sim_band` ([Simulator](../3-services/Simulator.md)) | reducer |
 | In | Venue seed | zones with areas, zone graph with distances, exits with colours and status, stations | `zone`, `zone_link`, `exit`, `station` | seed load |
 | In | Ops (calibration screen) | measured points mapping `neigh` to people per square metre | `calibration_point` through `set_calibration` | TypeScript SDK |
 | In | Ops | mode, blocked exits, pinned exit, pinned risk, forced states, reset | `set_venue_mode`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
@@ -62,7 +62,7 @@ The band's precedence order matters for everything below. From the firmware: IDE
 
 **Vision.md (TBD -- LEO): camera estimate.** The local detector writes a `camera_count` row for the pit through `report_zone_count` every 3 s. While the row is fresh (within 6 s, starting value), `density_camera` is its count divided by the area the camera covers.
 
-**Choosing.** `density` is the higher fresh estimate, and `density_source` records which one won (`band` or `camera`). A false alarm costs a few seconds of yellow light; a missed one costs the point of the demo. When ops has set `zone.forced_risk`, the tick writes that level with `density_source` `manual` and skips the estimate.
+**Choosing.** `density` is the higher fresh estimate, and `density_source` records which one won (`band` or `camera`). A false alarm costs a few seconds of yellow light; a missed one leaves a crowd at risk. When ops has set `zone.forced_risk`, the tick writes that level with `density_source` `manual` and skips the estimate.
 
 **Thresholds.** `normal` below 4.0 people per square metre, `watch` from 4.0, `high` from 5.0. These are the published crowd-safety limits for a moving crowd (4) and a standing crowd (5), and they match the dashboard's yellow and red. They are fixed; the calibration table is what gets tuned.
 
@@ -89,11 +89,11 @@ stateDiagram-v2
   end note
 ```
 
-**Band colour before zone colour.** Each band decides its colour from its own neighbour count, so during the demo the rings go red a second or two before the zone turns `high` on the dashboard. That is the right order: the crowd learns first, staff confirm second. `zone_state` and `zone_sample` record both estimates and the source.
+**Band colour before zone colour.** Each band decides its colour from its own neighbour count, so during the event the rings go red a second or two before the zone turns `high` on the dashboard. That is the right order: the crowd learns first, staff confirm second. `zone_state` and `zone_sample` record both estimates and the source.
 
-### The calibration table and the demo squares
+### The calibration table and the taped squares
 
-The calibration table is recorded in the demo spot with all bands on wrists. Each row is one measurement: a label, the mean `neigh` across bands over a 60 s log, and the density known from the taped area.
+The calibration table is recorded in the pit with all bands on wrists. Each row is one measurement: a label, the mean `neigh` across bands over a 60 s log, and the density known from the taped area.
 
 | Label | How it is staged | People per square metre (known) | Expected `neigh` (measured on the day) | Band colour | Zone risk |
 |---|---|---|---|---|---|
@@ -285,7 +285,7 @@ Two overrides exist, and the team tells the judges when one is used. The dashboa
 | Vision.md (TBD -- LEO): camera | everything band-based | the camera estimate, person-down corroboration and the Claude assessment | `density_source` stays `band`; nothing waits on the camera |
 | `venue_tick` stalled | the bands; incidents from `ingest_band_reports` still open | zone risk, assignment, crowd-risk incidents, directives | `venue_mode.tick_at` stops moving and the dashboard says so after 2 s |
 
-### Demo choreography, mapped
+### Safety choreography, mapped
 
 | Moment | What the people do | Band (local) | Module | Dashboard |
 |---|---|---|---|---|
@@ -320,11 +320,11 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Attendee-App](../5-apps/Attendee-App.md) (medic view, evacuation banner, busy map), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (end-to-end demo flows).
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Attendee-App](../5-apps/Attendee-App.md) (medic view, evacuation banner, busy map), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
 
 **If you delete this file**
 
-- The safety demo has no specification: `venue_tick`, the incident steps in `ingest_band_reports` and `escalate_incident` in [SpacetimeDB](../2-data/SpacetimeDB.md) would have no policy to implement. This file is core and is not deletable.
+- The safety features have no specification: `venue_tick`, the incident steps in `ingest_band_reports` and `escalate_incident` in [SpacetimeDB](../2-data/SpacetimeDB.md) would have no policy to implement. This file is core and is not deletable.
 - Deleting Vision removes the lines that start with Vision.md: the camera estimate, corroboration and judgment, the property assessment, its rows in the interfaces and "what keeps working" tables, and the camera sentence in Plan B. The band-based path is complete without it.
 
 ## Decisions

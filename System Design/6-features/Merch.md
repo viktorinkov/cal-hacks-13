@@ -1,6 +1,6 @@
 # Merch
 
-Merch turns an attendee's own night into something they can hold. Before the event the team makes six merch templates by hand: for Cal Hacks 13.0, a plain t-shirt, mug and poster, and three that name sponsors. Each template image has a marked photo area. After the event, the bottom of the recap page suggests up to three templates, each with one of the attendee's own confirmed photos, ranked by how long they spent at the booths the template names. The app places the photo straight into the photo area. One tap buys it from the attendee's BandIt wallet. Nothing is generated: no image API, no AI and no rendering on the server. Any event loads its own templates; Cal Hacks 13.0 is the demo instance. The whole feature is optional and far from the safety loop.
+Merch turns an attendee's own night into something they can hold. Before the event the team makes six merch templates by hand: for Cal Hacks 13.0, a plain t-shirt, mug and poster, and three that name sponsors. Each template image has a marked photo area. After the event, the bottom of the recap page suggests up to three templates, each with one of the attendee's own confirmed photos, ranked by how long they spent at the booths the template names. The app places the photo straight into the photo area. One tap buys it from the attendee's BandIt wallet. Nothing is generated: no image API, no AI and no rendering on the server. Any event loads its own templates; Cal Hacks 13.0 is the first event it runs at. The whole feature is optional and far from the safety loop.
 
 ## Role in the system
 
@@ -16,7 +16,7 @@ Non-responsibilities:
 - It renders nothing on the server and stores no merged image.
 - It does not derive visits or tag photos; [Social](Social.md) does.
 - It does not open wallets or call Nessie; [Payments-Nessie](../7-integrations/Payments-Nessie.md) does. Nothing is sold at the venue.
-- It does not print or ship. The demo ends at a paid order.
+- It does not print or ship. The flow ends at a paid order.
 
 ## Interfaces
 
@@ -190,16 +190,16 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 
 | Decision | Why |
 |---|---|
-| A few templates are made by hand before the event, each with a marked photo area; the product has no image API and generates no images | A hackathon needs only a few images, so nothing can fail or stall at demo time; any event loads its own templates |
+| A few templates are made by hand before the event, each with a marked photo area; the product has no image API and generates no images | A hackathon needs only a few images, so nothing can fail or stall during the event; any event loads its own templates |
 | The photo area is painted pure green (`#00FF00`) in each image, and its rectangle is written in `templates.json` | The team sees the area while drawing, and the app needs only a rectangle, with no image analysis |
 | The attendee's own photo goes straight into the photo area, scaled to cover it, drawn by the attendee app | The server renders and stores nothing; an order keeps the template and the photo |
 | Suggestions are the view `my_merch_suggestions`, ranked by the caller's minutes at the template's booths, then by a photo taken at those booths, then plain templates before sponsor ones; top 3 | No job and no AI; the suggestion is instant and easy to explain: your photo, from the booth you loved; an attendee who never stopped at a sponsor booth still gets the plain tee, mug and poster |
 | A sponsor template names its sponsors in `templates.json`; the loader matches them to the imported organisations and stores their booths | The team knows sponsor names, not database ids, and the booth crawl poster names six sponsors at once; merch from the booth the attendee spent time at is the Visa shopping story |
 | A photo can be bought only by someone with a confirmed tag on it; there is no merch consent switch | Tags exist only for `findable` attendees and only the tagged person confirms one, so the buyer is always in the photo |
 | Sizes and prices go by kind: a `tee` costs 2500 cents and comes in S, M, L and XL; a `mug` costs 1800 and a `poster` 1500, in one size | No size list to keep, and the same kind costs the same with or without a sponsor |
-| One item per order, with no quantity | The demo buys one thing; a second item is a second order |
+| One item per order, with no quantity | An attendee buys one thing at a time; a second item is a second order |
 | Checkout is one tap: `buy_merch` checks the wallet, writes the order and holds its amount in one transaction, and a worker records the purchase on Nessie afterwards | No confirm screen and no payment row; the module's own balance makes the check exact, and a second tap cannot spend the same money |
 | Merch is bought only from the recap page after the event, by the signed-in attendee; no counter and no band press | Nothing is paid at the venue, and the SpacetimeAuth sign-in proves who is buying on any device |
-| A failed purchase fails the order and frees its money; there is no cancel and no refund | Buying again is a new order, and the demo ends at a paid order |
-| Printing and shipping are out of scope | The demo ends at a paid order |
+| A failed purchase fails the order and frees its money; there is no cancel and no refund | Buying again is a new order, and the flow ends at a paid order |
+| Printing and shipping are out of scope | The flow ends at a paid order |
 | Merch is deleted together with Social.md or Payments-Nessie.md | Every suggestion starts from a visit and a confirmed photo, and every order is paid from the wallet |

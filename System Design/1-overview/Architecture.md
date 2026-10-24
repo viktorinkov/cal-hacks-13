@@ -24,7 +24,7 @@ Every connection in the system. Names match the component docs.
 | Gateway | Band, station marker | commands (`state`, `exit`, `clear`, `buzz`, `thresh`, `rssi`, `override`) | ESP-NOW broadcast, each sent 3 times |
 | Gateway | `bandit-bridge` | one JSON line per packet heard; command lines back | USB serial, 115200 baud |
 | `bandit-bridge` | `band1t` module | `ingest_band_reports` every 250 ms; subscriptions to `band_directive`, `band_command`, `fleet_config` | SpacetimeDB Rust client SDK (WebSocket) |
-| Simulator.md: the `bandit-claims` command-line tool and `bandit-api`'s demo routes | `band1t` module | reports for the 10 demo bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
+| Simulator.md: the `bandit-claims` command-line tool and `bandit-api`'s dev routes | `band1t` module | reports for the 10 scripted bands (90 to 99) through `report_sim_band`; the crowd of up to 80 bands runs inside the module | SpacetimeDB Rust client SDK |
 | Ops dashboard, Attendee app | `band1t` module | reducer calls; subscriptions to their slice | SpacetimeDB TypeScript client SDK (WebSocket) |
 | Ops dashboard, Attendee app | SpacetimeAuth | the magic-link email sign-in; an ID token that SpacetimeDB checks on connect | HTTPS, OpenID Connect |
 | Ops dashboard, Attendee app | `bandit-api` | the app files, uploads and downloads, and the feature endpoints listed in [Rust-Backend](../3-services/Rust-Backend.md) | HTTPS, same origin |
@@ -47,7 +47,7 @@ Every connection in the system. Names match the component docs.
 2. **One source of truth.** The SpacetimeDB module `band1t` holds all live state. Every change is a reducer call, so it happens completely or not at all, and every screen sees the same committed state through subscriptions.
 3. **Copies flow one way.** Any other store holds only files or a copy of committed rows. Results come back as SpacetimeDB ids, and acting on them is again a reducer call.
 4. **Slow and external work goes through a queue.** AI and bank work are `job` rows claimed by `bandit-workers`. Code decides money, coverage, safety and access; the model only reads and writes words.
-5. **Every feature can be deleted.** Core components are enough for the safety demo. Each optional feature owns its tables, reducers and jobs, so removing its doc and code removes it cleanly.
+5. **Every feature can be deleted.** Core components are enough for the safety features. Each optional feature owns its tables, reducers and jobs, so removing its doc and code removes it cleanly.
 6. **The backend is Rust.** The module, every service and every shared library are Rust. Only the two browser apps are TypeScript.
 
 ### System context
@@ -99,7 +99,7 @@ flowchart LR
     Stations["Station markers"]
     Gateway["Gateway"]
   end
-  subgraph Laptop["Demo laptop"]
+  subgraph Laptop["Venue laptop"]
     Bridge["bandit-bridge"]
     Sim["bandit-claims (Simulator.md)"]
   end
@@ -126,7 +126,7 @@ flowchart LR
   Bands <-->|"beacons up, commands down"| Gateway
   Gateway <-->|"USB serial lines"| Bridge
   Bridge <-->|"reports up, directives down"| STDB
-  Sim -->|"demo band reports"| STDB
+  Sim -->|"scripted band reports"| STDB
   Ops <-->|"subscriptions, ops reducers"| STDB
   App <-->|"subscriptions, attendee reducers"| STDB
   Ops -->|"app files"| API
@@ -158,7 +158,7 @@ flowchart LR
   class Elastic,Claude,Nessie,Bright,Auth ext
 ```
 
-Vision.md (TBD -- LEO): the Vision service is left out of this picture. Leo's default is a Rust process, `bandit-vision`, on the demo laptop. It pulls snapshots from one overhead phone camera over the pit, runs person and pose detection locally for head counts and person-down alerts, asks Claude to assess an event only after a band or the detector flags it, and writes the results through the reducers in [Vision](../4-devices/Vision.md). Identity always comes from the bands, never from faces.
+Vision.md (TBD -- LEO): the Vision service is left out of this picture. Leo's default is a Rust process, `bandit-vision`, on the venue laptop. It pulls snapshots from one overhead phone camera over the pit, runs person and pose detection locally for head counts and person-down alerts, asks Claude to assess an event only after a band or the detector flags it, and writes the results through the reducers in [Vision](../4-devices/Vision.md). Identity always comes from the bands, never from faces.
 
 ### The live loop in one picture
 
@@ -281,7 +281,7 @@ flowchart TB
     Gateway["Gateway on USB"]
     Phones["Phones: judges' own, medic"]
   end
-  subgraph Laptop["Demo laptop, online through a team phone's hotspot"]
+  subgraph Laptop["Venue laptop, online through a team phone's hotspot"]
     Bridge["bandit-bridge"]
     Sim["bandit-claims (Simulator.md)"]
     Ingest["bandit-ingest, before the event"]
@@ -318,16 +318,16 @@ flowchart TB
 
 - The `band1t` database runs on SpacetimeDB Maincloud only. There is no standalone copy and no second host, so there is never a second source of truth.
 - `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Fly.io Machine. `bandit-api` serves both web apps as static files from its public HTTPS host, which is the host written into the NFC tags, so judges use their own phones. Blobs are files on a Fly volume attached to that Machine ([Rust-Backend](../3-services/Rust-Backend.md)).
-- The demo laptop runs only what needs the room: `bandit-bridge` on the gateway's USB cable and the Ops dashboard in a browser. `bandit-ingest` runs on it once before the event.
-- Simulator.md: the `bandit-claims` command-line tool runs on the demo laptop.
-- Vision.md (TBD -- LEO): `bandit-vision` runs on the demo laptop.
+- The venue laptop runs only what needs the room: `bandit-bridge` on the gateway's USB cable and the Ops dashboard in a browser. `bandit-ingest` runs on it once before the event.
+- Simulator.md: the `bandit-claims` command-line tool runs on the venue laptop.
+- Vision.md (TBD -- LEO): `bandit-vision` runs on the venue laptop.
 - The laptop gets internet from a team phone's hotspot, so venue Wi-Fi is not on the critical path.
 
 ### Identifiers that cross component boundaries
 
 | Identifier | Format | Assigned by | Used by |
 |---|---|---|---|
-| Band id | one byte, as on the radio: 1 to 9 for real bands; Simulator.md: 10 to 89 for the crowd, 90 to 99 for the demo bands | firmware flag; Simulator.md: `start_crowd` and the demo id range | radio, bridge, module, dashboard |
+| Band id | one byte, as on the radio: 1 to 9 for real bands; Simulator.md: 10 to 89 for the crowd, 90 to 99 for the scripted bands | firmware flag; Simulator.md: `start_crowd` and the scripted id range | radio, bridge, module, dashboard |
 | Station id | 101 to 105; exit colour index defaults to id minus 100 | firmware flag | radio, zone selection, exit guidance |
 | Gateway id | 200 | firmware | radio |
 | NFC token | `BANDIT-01` to `BANDIT-09` in the URL `https://<host>/t/BANDIT-0n`, where `<host>` is `bandit-api`'s public host | written to each sticker | attendee app landing, medic view |
@@ -335,9 +335,9 @@ flowchart TB
 | Service identity | one SpacetimeDB identity per Rust process, with a `staff_role` row | the owner at setup | role checks in reducers |
 | Row ids | auto-increment ids assigned by the module | SpacetimeDB | every other table, Elastic document ids, job payloads |
 
-### Demo flows
+### The event flow
 
-The demo runs as a fixed sequence of steps from joining to the insurance claim, and [Flows](Flows.md) walks each step, names the doc that owns it and indexes the sequence diagrams in the other files.
+The event runs as a fixed sequence of steps from joining to the insurance claim, and [Flows](Flows.md) walks each step, names the doc that owns it and indexes the sequence diagrams in the other files.
 
 ### Access model in one paragraph
 
@@ -356,15 +356,15 @@ Every person signs in with the SpacetimeAuth magic link, and every privileged re
 
 ## Failure modes and fallbacks
 
-The failures that can happen during the demo, and the one answer to each. The first three are on the live path.
+The failures that can happen during the event, and the one answer to each. The first three are on the live path.
 
 | Failure | Effect | Design answer |
 |---|---|---|
 | The laptop, the bridge, the gateway or the laptop's hotspot fails | No new reports reach the database; the dashboard greys bands after 5 s | Bands keep density colours, SOS, fall detection and the light circle on their own; the bridge resyncs directives when it reconnects ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). |
-| Radio density readings flap in the demo square | Rings and the map disagree | Ops drives the colours from the dashboard with the override badge showing, and the presenter says so ([Safety](../6-features/Safety.md)). |
+| Radio density readings flap in the taped square | Rings and the map disagree | Ops drives the colours from the dashboard with the override badge showing, and the presenter says so ([Safety](../6-features/Safety.md)). |
 | A band reboots | It loses forced states and live calibration | The bridge sees its `seq` reset and re-sends directives and `fleet_config` ([Gateway-Bridge](../3-services/Gateway-Bridge.md)). |
 | A sign-in email is slow | A judge waits on the sign-in screen | The screen offers "Send again"; a judge already signed in on their phone stays signed in ([Attendee-App](../5-apps/Attendee-App.md)). |
-| Elastic.md: Elastic is unreachable during the demo | The recap's suggestions are not ordered by meaning | The recap shows both lists by minutes together; Hyphenate.md: claims carry no precedent checks and decide the same way; nothing live reads Elastic ([Elastic](../7-integrations/Elastic.md)). |
+| Elastic.md: Elastic is unreachable during the event | The recap's suggestions are not ordered by meaning | The recap shows both lists by minutes together; Hyphenate.md: claims carry no precedent checks and decide the same way; nothing live reads Elastic ([Elastic](../7-integrations/Elastic.md)). |
 | Anthropic-Agent.md: Claude is slow or refuses | A letter or card is late; Hyphenate.md: a bill is not read or a claim has no causation review | Each feature falls back without AI as its doc describes; Hyphenate.md: staff type the bill lines and the claim goes to a person; nothing live waits on Claude ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). |
 | Payments-Nessie.md: Nessie is down | A wallet cannot open, and a merch order or a payout cannot settle | Each job retries without paying twice; a dead purchase fails the order and frees its money, so the attendee can buy again; a dead payout waits for `retry_claim_payout`; nothing else waits on Nessie ([Payments-Nessie](../7-integrations/Payments-Nessie.md)). |
 
@@ -380,12 +380,12 @@ The failures that can happen during the demo, and the one answer to each. The fi
 
 | Decision | Why |
 |---|---|
-| The `band1t` database runs on Maincloud only, and the demo laptop gets internet from a team phone's hotspot | one deployment means one source of truth, one set of identities and no switch-over during the demo; venue Wi-Fi is off the critical path |
-| BrightData.md: the import works for any event, from the start URLs in its seed; the demo instance is Cal Hacks 13.0 | the product must work at any venue, and the judges are at Cal Hacks 13.0, so the booths, schedule and organisations on screen are ones they can check against the room |
+| The `band1t` database runs on Maincloud only, and the venue laptop gets internet from a team phone's hotspot | one deployment means one source of truth, one set of identities and no switch-over during the event; venue Wi-Fi is off the critical path |
+| BrightData.md: the import works for any event, from the start URLs in its seed; Cal Hacks 13.0 is the first event it runs at | the product must work at any venue, and the judges are at Cal Hacks 13.0, so the booths, schedule and organisations on screen are ones they can check against the room |
 | Judges use their own phones; `bandit-api` serves both web apps from its public HTTPS host, which the NFC tags hold | one host in the tags, and the app files, uploads and API calls share one origin |
 | `bandit-api`, `bandit-workers` and `bandit-indexer` run on one Fly.io Machine; the laptop runs only the bridge, the `bandit-claims` tool, `bandit-ingest` and the Ops dashboard | the laptop holds what needs the gateway's cable or the team's hands; the services keep running when the laptop sleeps |
 | Social.md: people and the links between them live in SpacetimeDB tables; no graph database, separate Postgres or Kibana Graph | every link is an exact fact from a visit, an encounter row or the import, written in the same transaction as its visit or encounter, pushed live and filtered per caller by views; a graph of hundreds of nodes needs only one or two hops of indexed lookups; Kibana Graph is unavailable on Serverless and discovers implicit links, which the visit and encounter rows already record. Elastic.md: Elastic only orders the recap's suggestions |
-| Payments-Nessie.md: nobody pays at the venue; Nessie settles only the merch bought in the app after the event and the claim payouts | the band press stays for claiming a band, and the money moments the demo shows are the merch checkout and the insurance payout |
+| Payments-Nessie.md: nobody pays at the venue; Nessie settles only the merch bought in the app after the event and the claim payouts | the band press stays for claiming a band, and the money moments judges see at the event are the merch checkout and the insurance payout |
 | Full bands vibrate through `buzz` alongside the route colour whenever the module guides people | the ring has no compass, so colour plus vibration is how a band points its wearer along the dispersion route |
 | One sign-in for every person: the SpacetimeAuth magic link, with no other providers | the identity comes from the ID token's issuer and subject, so a judge is the same attendee on every device, and BandIt keeps no password and sends no email |
-| The failure table keeps only failures that can happen during the demo | infrastructure faults outside the demo are handled in each component's own doc |
+| The failure table keeps only failures that can happen during the event | other infrastructure faults are handled in each component's own doc |
