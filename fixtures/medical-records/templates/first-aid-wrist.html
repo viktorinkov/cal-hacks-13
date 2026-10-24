@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="default-invoice-suffix" content="1024-0007">
+<title>First Aid Treatment Record FA-{{INVOICE_SUFFIX}} (synthetic demo data)</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 8.5pt; line-height: 1.28; color: #161616; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { position: relative; width: 8.5in; height: 11in; padding: 0.45in 0.6in 0.7in; overflow: hidden; break-after: page; }
+  .page:last-of-type { break-after: auto; }
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #8a1c1c; padding-bottom: 6px; margin-bottom: 4px; }
+  .org-name { font-size: 14pt; font-weight: 700; color: #8a1c1c; letter-spacing: 0.01em; }
+  .org-sub { font-weight: 600; color: #333; margin: 1px 0 1px; }
+  .org .line { font-size: 8pt; color: #222; }
+  .doc-title { white-space: nowrap; font-size: 11.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; text-align: right; }
+  table { border-collapse: collapse; width: 100%; }
+  table.mini { width: auto; margin-left: auto; font-size: 8pt; }
+  .mini th { text-align: right; font-weight: 600; color: #555; padding: 0.5px 8px 0.5px 0; white-space: nowrap; }
+  .mini td { text-align: left; padding: 0.5px 0; white-space: nowrap; }
+  .sec-title { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #8a1c1c; background: #f6eaea; border-left: 3px solid #8a1c1c; padding: 1.5px 6px; margin: 5px 0 3px; }
+  table.kv { table-layout: fixed; }
+  .kv th { text-align: left; font-weight: 600; color: #555; font-size: 7.5pt; padding: 1px 6px 1px 0; vertical-align: top; white-space: nowrap; }
+  .kv td { padding: 1px 10px 1px 0; vertical-align: top; }
+  p { margin: 0 0 2px; }
+  table.exam { table-layout: fixed; }
+  .exam th { width: 1.15in; text-align: left; font-weight: 600; color: #333; vertical-align: top; padding: 0.5px 6px 0.5px 0; }
+  .exam td { padding: 0.5px 0; vertical-align: top; }
+  ol.plan { margin: 0; padding-left: 15px; }
+  .grid th, .grid td { border: 1px solid #cdbcbc; padding: 2px 6px; text-align: left; vertical-align: top; }
+  .grid thead th { white-space: nowrap; background: #f6eaea; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.04em; color: #333; }
+  .grid .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .grid .code { white-space: nowrap; font-weight: 600; }
+  .grid tfoot td { font-weight: 700; background: #faf4f4; }
+  .vitals span { margin-right: 12px; white-space: nowrap; }
+  .note { font-size: 7.5pt; color: #444; margin-top: 3px; }
+  .sig { display: flex; gap: 20px; margin-top: 10px; }
+  .sig > div { flex: 1; border-top: 1px solid #555; padding-top: 2px; font-size: 7.5pt; }
+  .sig .who { font-weight: 600; font-size: 8pt; }
+  .footer { position: absolute; left: 0.6in; right: 0.6in; bottom: 0.38in; border-top: 1px solid #888; padding-top: 4px; display: flex; justify-content: space-between; font-size: 8pt; color: #222; }
+  .footer .synthetic { font-weight: 700; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="doc-head">
+    <div class="org">
+      <div class="org-name">Event Medical Station - {{EVENT_NAME}}</div>
+      <div class="org-sub">On-Site First Aid &amp; Emergency Medical Services</div>
+      <div class="line">Location: {{VENUE_NAME}}</div>
+      <div class="line">Tel (510) 555-0142 &middot; Billing (510) 555-0144 &middot; NPI 1952000417</div>
+    </div>
+    <div class="doc-id">
+      <div class="doc-title">First Aid Treatment Record</div>
+      <table class="mini">
+        <tr><th>Invoice No.</th><td>FA-{{INVOICE_SUFFIX}}</td></tr>
+        <tr><th>Date of service</th><td>{{INCIDENT_DATE}}</td></tr>
+        <tr><th>Event</th><td>{{EVENT_NAME}}</td></tr>
+      </table>
+    </div>
+  </header>
+
+  <div class="sec-title">Patient</div>
+  <table class="kv">
+    <colgroup><col style="width:1.05in"><col style="width:2.35in"><col style="width:0.8in"><col style="width:1.2in"><col style="width:0.85in"><col></colgroup>
+    <tr><th>Name</th><td>Maya Chen</td><th>Date of birth</th><td>2001-03-14</td><th>Sex</th><td>F</td></tr>
+    <tr><th>Address</th><td colspan="3">2217 Quillfeather Ave, Apt 3, Port Alder, CA 94998</td><th>Phone</th><td>(510) 555-0167</td></tr>
+    <tr><th>Allergies</th><td>No known drug allergies</td><th>Medications</th><td>None</td><th>Wristband ID</th><td>BND-7F3A-0219</td></tr>
+    <tr><th>Emergency contact</th><td colspan="5">Lin Chen (mother), (510) 555-0181</td></tr>
+  </table>
+
+  <div class="sec-title">Encounter</div>
+  <table class="kv">
+    <colgroup><col style="width:1.05in"><col style="width:2.35in"><col style="width:0.8in"><col style="width:1.2in"><col style="width:0.85in"><col></colgroup>
+    <tr><th>Date of service</th><td>{{INCIDENT_DATE}}</td><th>Time seen</th><td>22:20</td><th>Time released</th><td>22:50</td></tr>
+    <tr><th>Incident time</th><td>approx. 22:05</td><th>Location</th><td>{{ZONE_NAME}}</td><th>Arrival</th><td>Walk-in</td></tr>
+    <tr><th>Chief complaint</th><td colspan="5">Right wrist pain after a fall.</td></tr>
+  </table>
+
+  <div class="sec-title">History of Present Illness</div>
+  <p>Patient presented to the Event Medical Station on foot at 22:20, accompanied by a friend. At approximately 22:05, while attending {{EVENT_NAME}}, she slipped on a spilled drink near {{ZONE_NAME}} and fell onto her outstretched right hand. She did not strike her head and had no loss of consciousness. She reports immediate pain over the back of the right wrist, rated 5/10, worse with wrist extension and gripping. Denies numbness, tingling, or any other injury. Right-hand dominant. No prior injury to the right wrist.</p>
+
+  <div class="sec-title">Vital Signs / Physical Exam</div>
+  <table class="exam">
+    <tr><th>Vitals (22:24)</th><td class="vitals"><span>BP 122/78</span><span>Pulse 88</span><span>Resp 16</span><span>SpO2 99% RA</span><span>Temp 98.4 &deg;F</span><span>Pain 5/10</span><span>GCS 15</span></td></tr>
+    <tr><th>General</th><td>Alert and oriented x4, mild distress due to pain.</td></tr>
+    <tr><th>Head / neck</th><td>No signs of head trauma. No midline cervical tenderness.</td></tr>
+    <tr><th>Right wrist</th><td>Mild swelling over the dorsal wrist. Tenderness over the dorsal radiocarpal joint. No deformity. No anatomic snuffbox tenderness. No distal radius or ulna point tenderness. Full active range of motion, painful at end of extension. Grip 4/5, limited by pain.</td></tr>
+    <tr><th>Neurovascular</th><td>Radial pulse 2+, capillary refill &lt; 2 s, sensation intact in median, ulnar and radial distributions.</td></tr>
+    <tr><th>Skin / other</th><td>Skin intact, no abrasions or lacerations. No injury found to other extremities.</td></tr>
+  </table>
+
+  <div class="sec-title">Assessment</div>
+  <table class="grid">
+    <thead><tr><th style="width:4%">#</th><th style="width:13%">ICD-10-CM</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="code">S63.501A</td><td>Sprain of right wrist, initial encounter</td></tr>
+      <tr><td>2</td><td class="code">W01.0XXA</td><td>Fall on same level from slipping, tripping and stumbling without subsequent striking against object, initial encounter</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sec-title">Plan / Treatment Provided</div>
+  <ol class="plan">
+    <li>Cold pack applied to right wrist for 15 minutes (22:27&ndash;22:42).</li>
+    <li>Light elastic compression bandage applied. Distal neurovascular status rechecked after application: intact.</li>
+    <li>Prefabricated wrist-hand orthosis fitted to right wrist.</li>
+    <li>Home care: rest, ice 15&ndash;20 minutes every 2&ndash;3 hours for 48 hours, elevation; over-the-counter acetaminophen or ibuprofen per label.</li>
+    <li>Follow up with primary care or urgent care in 24&ndash;48 hours if pain persists, for possible X-ray. Seek emergency care for numbness, color change in the fingers, or severe pain.</li>
+  </ol>
+  <p style="margin-top:2px"><b>Disposition:</b> Released ambulatory at 22:50 in stable condition, with a friend. Transport not indicated. Patient verbalized understanding.</p>
+
+  <div class="sec-title">Itemized Charges</div>
+  <table class="grid">
+    <thead><tr><th style="width:14%">Service date</th><th style="width:12%">CPT/HCPCS</th><th>Description</th><th style="width:7%" class="num">Units</th><th style="width:12%" class="num">Charge</th></tr></thead>
+    <tbody>
+      <tr><td>{{INCIDENT_DATE}}</td><td class="code">99211</td><td>First-aid assessment</td><td class="num">1</td><td class="num">$65.00</td></tr>
+      <tr><td>{{INCIDENT_DATE}}</td><td class="code">A6448</td><td>Light compression bandage, elastic, width under 3 in</td><td class="num">1</td><td class="num">$25.00</td></tr>
+      <tr><td>{{INCIDENT_DATE}}</td><td class="code">A9273</td><td>Cold pack</td><td class="num">1</td><td class="num">$30.00</td></tr>
+      <tr><td>{{INCIDENT_DATE}}</td><td class="code">L3908</td><td>Wrist-hand orthosis, prefabricated, off-the-shelf</td><td class="num">1</td><td class="num">$40.00</td></tr>
+      <tr><td>{{INCIDENT_DATE}}</td><td class="code">99070</td><td>Supplies and materials</td><td class="num">1</td><td class="num">$20.00</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="4" class="num">Total charges</td><td class="num">$180.00</td></tr></tfoot>
+  </table>
+
+  <div class="sig">
+    <div><span class="who">Priya Lindqvist, EMT-B</span><br>Treating provider &middot; e-signed {{INCIDENT_DATE}} 22:58</div>
+    <div><span class="who">Tomas Achterberg, RN</span><br>Charge nurse &middot; reviewed {{INCIDENT_DATE}} 23:10</div>
+    <div><span class="who">Helena Strand-Adeyemi, MD</span><br>Medical director &middot; NPI 1295550142</div>
+  </div>
+
+  <div class="footer"><span class="synthetic">SYNTHETIC RECORD - DEMO DATA - NOT A REAL PATIENT</span><span>FA-{{INVOICE_SUFFIX}} &middot; Page 1 of 1</span></div>
+</div>
+
+</body>
+</html>

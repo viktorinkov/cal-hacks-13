@@ -1,0 +1,83 @@
+// Script processor of the bandit-claims-validate ingest pipeline.
+// It never rejects a document: every problem becomes a string in
+// validation.errors and validation.valid is true only when there are none.
+
+boolean blank(def v) {
+  return v == null || (v instanceof String && ((String) v).trim().isEmpty());
+}
+
+boolean whole(def v) {
+  return v instanceof Integer || v instanceof Long;
+}
+
+List errors = new ArrayList();
+
+for (String f : params.required) {
+  if (blank(ctx[f])) {
+    errors.add('missing:' + f);
+  }
+}
+
+def kind = ctx.incident_kind;
+if (!blank(kind) && !params.kinds.contains(kind)) {
+  errors.add('bad_incident_kind:' + kind);
+}
+if (kind == 'sos' || kind == 'fall') {
+  if (!whole(ctx.zone_id) || ctx.zone_id <= 0) {
+    errors.add('injury_needs_zone');
+  }
+  if (!whole(ctx.witness_count) || ctx.witness_count < 0) {
+    errors.add('injury_needs_witness_count');
+  }
+}
+
+for (String f : params.cents) {
+  def v = ctx[f];
+  if (v != null && (!whole(v) || v < 0)) {
+    errors.add('bad_cents:' + f);
+  }
+}
+
+// ICD-10-CM shape, for example S63.501A.
+def dx = ctx.diagnosis_codes;
+if (dx != null) {
+  for (def c : (dx instanceof List ? dx : [dx])) {
+    if (!(c instanceof String) || !(((String) c) ==~ /^[A-TV-Z][0-9][0-9A-Z](\.[0-9A-Z]{1,4})?$/)) {
+      errors.add('bad_diagnosis_code:' + c);
+    }
+  }
+}
+
+// CPT (99213, 0001F) or HCPCS Level II (A6449).
+def sx = ctx.service_codes;
+if (sx != null) {
+  for (def c : (sx instanceof List ? sx : [sx])) {
+    if (!(c instanceof String) || !(((String) c) ==~ /^[0-9]{4}[0-9A-Z]$/ || ((String) c) ==~ /^[A-V][0-9]{4}$/)) {
+      errors.add('bad_service_code:' + c);
+    }
+  }
+}
+
+long now = metadata().now.toInstant().toEpochMilli();
+def at = ctx.incident_at;
+if (whole(at)) {
+  if (at > now + params.skew_ms) {
+    errors.add('incident_in_future');
+  }
+} else if (!blank(at)) {
+  errors.add('bad_incident_at');
+}
+
+def billed = ctx.billed_cents;
+def covered = ctx.covered_cents;
+if (whole(billed) && whole(covered) && covered > billed) {
+  errors.add('covered_exceeds_billed');
+}
+
+// An empty narrative has nothing to embed; drop it so inference cannot fail the write.
+if (blank(ctx.narrative)) {
+  ctx.remove('narrative');
+}
+
+ctx.validation = ['valid': errors.isEmpty(), 'errors': errors];
+ctx.indexed_at = now;
