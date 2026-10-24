@@ -46,12 +46,13 @@ def architecture(y0):
     legend(1900, 34)
 
     # browsers across the top
-    ops_l = "Host portal\nattendees, live zones and alerts, insurance approvals, Event ended"
-    app_l = "Attendee page (the NFC tap link)\nSpacetimeAuth sign-in; turns into your recap live when the event ends"
+    ops_l = "Ops dashboard\nmap, incidents, claims queue; the organizer's host portal: attendees, alerts, Event ended"
+    app_l = "Attendee app at /t/{token}\nSpacetimeAuth sign-in; turns into the recap live when the event ends"
     top_h = max(measure(ops_l, 320), measure(app_l, 420))
     Y0 = 190 + top_h + 80 + 70  # top of the SpacetimeDB, services and Elastic zones
     ops = S.box(880, 230, 320, ops_l, "web", h=top_h)
     app = S.box(1230, 230, 420, app_l, "web", h=top_h)
+    auth = S.box(1980, 230, 330, "SpacetimeAuth\nmagic-link sign-in for attendees and staff", "ext", h=top_h)
     kib = S.box(2420, 230, 350, "Kibana\nimport runs, organizer decisions, dashboards", "ext", h=top_h)
 
     # SpacetimeDB
@@ -60,11 +61,11 @@ def architecture(y0):
                      "memory_tick) derive zone state and history inside the database.", fs=18, width=580)
     y = Y0 + 190
     venue, social = row(880, y, 280, 20, [
-        ("Venue\nevent_state, zones, organizations, booths, schedule, scraped profiles", None),
+        ("Venue\nvenue with ended_at, zones, organizations, booths, schedule, scraped profiles", None),
         ("Social\nvisits, people you hung out with, the people graph, photo tags", None)])
     y += venue.h + 30
     band1t, safety = row(880, y, 280, 20, [
-        ("Bands, stations, encounters, zone visits\nband1t (TBD Leo)", "tbd"),
+        ("Band and encounter model (TBD Leo)\nbands, stations, encounters, zone visits", "tbd"),
         ("Safety\nincidents from SOS and falls; zone risk, exit colours, buzz", None)])
     y += band1t.h + 30
     insurance, pay = row(880, y, 280, 20, [
@@ -82,7 +83,7 @@ def architecture(y0):
     stations = S.box(60, L(bands.bottom) + 80, 200, "Station markers 101 to 105\nzone anchors, exit colours",
                      "device")
     gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
-    sim = S.box(460, 0, 300, "bandit-sim\nsimulated demo bands, ids 90 to 99, each with a simulated owner", "rust",
+    sim = S.box(460, 0, 300, "bandit-sim\nup to 200 virtual bands (ids 1000 and up), each with a simulated owner", "rust",
                 cy=L(venue.cy))
     bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band_reports every 250 ms, directives out",
                    "rust", cy=L(band1t.cy))
@@ -91,7 +92,7 @@ def architecture(y0):
                    cy=L(jobs.cy))
 
     # Rust services
-    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps, ranks the recap suggestions; holds the Elastic key", "rust")
+    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; GET /recap/order; holds the Elastic key", "rust")
     indexer = S.box(1640, L(api.bottom) + 50, 300, "bandit-indexer\none-way copy of booths and interests into "
                                                     "Elastic", "rust")
     bd_label = "Bright Data Web MCP\nscrapes event pages, company pages and the floor plan"
@@ -109,8 +110,8 @@ def architecture(y0):
     nessie = S.box(2070, wy + cl_h + 80, 250, ns_label, "ext", h=ns_h)
 
     # Elastic boxes line up with the services that use them
-    idx = S.box(2420, L(api.y) - 10, 350, "Rank by meaning\nbandit-booths and bandit-people: order the recap's "
-                                          "suggestions by what the attendee is into", "ext",
+    idx = S.box(2420, L(api.y) - 10, 350, "Order by meaning\nbandit-booths and bandit-people: GET /recap/order puts "
+                                          "the people and booths closest to what the attendee is into first", "ext",
                 h=indexer.bottom - api.y + 20)
     org = S.box(2420, L(ingest.y), 350, "Organize scraped records\nWorkflow bandit-organize: ES|QL joins, then "
                                         "the bandit-organizer agent, a reason for every merge", "ext", h=ingest.h)
@@ -121,7 +122,7 @@ def architecture(y0):
     venue_z = S.zone(40, 200, 320, zb - 200, "Venue floor", "device")
     S.zone(440, 200, 340, zb - 200, "Demo laptop, online through a phone hotspot", "rust")
     S.zone(840, 190, 1950, top_h + 80, "Browsers", "web")
-    stdb = S.zone(860, Y0, 620, zb - Y0, "SpacetimeDB Maincloud: the bandit module", "stdb")
+    stdb = S.zone(860, Y0, 620, zb - Y0, "SpacetimeDB Maincloud: the band1t module", "stdb")
     S.zone(1620, Y0, 340, zb - Y0, "Rust services", "rust")
     ez = S.zone(2400, Y0, 390, zb - Y0, "Elastic Serverless", "ext")
 
@@ -132,15 +133,16 @@ def architecture(y0):
     S.h(sim, stdb, y=sim.cy, label="simulated\nreports")
     S.h(camera, vision)
     S.h(vision, stdb, y=vision.cy, label="alerts")
-    S.v(app, stdb, x=app.cx, label="subscriptions,\nevent_state", both=True)
-    S.v(ops, stdb, x=ops.cx, label="Event ended,\napprovals", both=True)
-    S.link(app, "r", api, "t", via=[(api.cx, app.cy)], label="ranked suggestions")
+    S.v(app, stdb, x=app.cx, label="subscriptions,\nreducer calls", both=True)
+    S.v(ops, stdb, x=ops.cx, label="end_event,\napprovals", both=True)
+    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="recap order")
+    S.h(app, auth, y=app.y + 0.3 * app.h, label="sign-in")
     S.v(kib, ez, x=kib.cx, label="reads")
     S.h(stdb, api, y=api.cy, label="reads rows")
     S.h(stdb, indexer, y=indexer.cy, label="subscribes")
     S.h(ingest, stdb, y=ingest.cy, label="import_event")
     S.h(stdb, workers, y=workers.cy, label="jobs and\nresults", both=True)
-    S.h(api, idx, y=api.cy, label="rank suggestions")
+    S.h(api, idx, y=api.cy, label="recap order")
     S.h(indexer, idx, y=indexer.cy, label="one-way copy")
     S.h(ingest, bd, y=bd.cy, label="fetch")
     S.h(ingest, org, y=bd.bottom + 38, label="records in, bundle back", both=True)
@@ -152,7 +154,7 @@ def architecture(y0):
 
 # ---------------------------------------------------------------- 2. Data pipeline
 def pipeline(y0):
-    W, H = 3560, 600
+    W, H = 3840, 600
     S.begin_frame("2 · Event data pipeline", 0, y0, W, H)
     title("2 · Event data pipeline: Bright Data, then Elastic, then SpacetimeDB",
           "Runs once before the event from any event's public pages (Cal Hacks 13.0 is the first run), so no live "
@@ -189,7 +191,8 @@ def pipeline(y0):
     tables = S.box(3200, 0, 300, "Live tables\nvenue, hall, organization, booth, schedule_slot, person "
                                  "(unclaimed profiles)", "stdb", cy=L(imp.cy))
     indexer = S.box(3200, 0, 300, "bandit-indexer\none-way copy of booths into bandit-booths for the recap "
-                                  "ranking", "rust", cy=L(e1.cy))
+                                  "order", "rust", cy=L(e1.cy))
+    ops = S.box(3560, 0, 240, "Ops dashboard\ndrag a misplaced booth (upsert_booth)", "web", cy=L(imp.cy))
 
     S.zone(40, L1[0], W - 80, L1[1] - L1[0], "Outside APIs: Bright Data and Claude", "ext")
     S.zone(40, L2[0], W - 80, L2[1] - L2[0], "bandit-ingest (Rust)", "rust")
@@ -213,6 +216,7 @@ def pipeline(y0):
     S.link(validate, "r", imp, "t", via=[(imp.cx, validate.cy)], label="last good bundle")
     S.h(imp, tables, label="rows")
     S.v(tables, indexer, x=tables.cx, label="subscribes")
+    S.h(tables, ops, label="flags")
     return S.end_frame()
 
 
@@ -238,7 +242,7 @@ def insurance(y0):
     inc = S.box(300, 0, 260, "Incident\nsnapshot and witnesses frozen in one transaction", "stdb", cy=top2)
     opn = S.box(610, 0, 260, "Claim opens on resolve\none per injured person, one per property incident", "stdb",
                 cy=top2)
-    bill = S.box(900, 0, 270, "Bill reader\nClaude reads the bill PDF into lines; it never sees the fee schedule",
+    bill = S.box(900, 0, 270, "Bill reader: claim_record_extract\nClaude reads the bill PDF into lines; it never sees the fee schedule",
                  "ext", cy=c["L3"] + 10)
     price = S.box(1200, 0, 260, "Price in code\nthe fee schedule caps each line, billed vs paid; duplicate bill "
                                 "check", "stdb", cy=top2)
@@ -249,8 +253,8 @@ def insurance(y0):
     checks = S.box(1820, 0, 380, "Code checks\ncorroboration, staff, duplicate, cover", "stdb", shape="diamond",
                    h=220, fs=18, cy=top2)
     refused = S.box(1880, 0, 260, "Refused\nevery check listed, both values side by side", "bad", cy=810)
-    cause = S.box(2190, 0, 300, "Causation review\nClaude: does the injury follow from the fall? follows or doubt, "
-                                "citing facts, no amounts", "ext", cy=c["L3"] + 10)
+    cause = S.box(2190, 0, 300, "Causation review: claim_review\nClaude: does the injury follow from the fall? follows or doubt, "
+                                "no amounts", "ext", cy=c["L3"] + 10)
     rule = S.box(2540, 0, 380, "Rule matches?\nshape, ceiling, corroborated, follows, not mass", "stdb",
                  shape="diamond", h=220, fs=18, cy=top2)
     auto = S.box(3030, 0, 260, "Auto-settled\ncites the rule version and who approved it", "good", cy=top2)
@@ -259,7 +263,7 @@ def insurance(y0):
     approve = S.box(3030, 0, 280, "Approve, learn on\nfails closed as stale if the amount or pack changed; writes "
                                   "rule v1 with the approver's name", "web", cy=c["L5"] + 10)
     settle = S.box(3370, 0, 260, "Settling\nledger journals: J1 reserve, J2 approval, J3 paid", "stdb", cy=top2)
-    payout = S.box(3370, 0, 280, "Payout\nnessie_payout deposits into the attendee's wallet; property goes to the "
+    payout = S.box(3370, 0, 280, "Payout\nclaim_payout deposits into the claimant's Nessie wallet; a property claim pays the "
                                  "repair vendor", "ext", cy=c["L6"] + 15)
     letters = S.box(3700, 0, 280, "Letters\nClaude drafts the decision letter and a recovery letter worded as a "
                                   "question", "ext", cy=c["L3"] + 10)
@@ -267,7 +271,7 @@ def insurance(y0):
 
     names = {"L1": "Bands and staff on the floor", "L2": "SpacetimeDB: claim state; code decides every amount",
              "L3": "Claude agents, run as jobs by bandit-workers", "L4": "Elastic",
-             "L5": "People: named approvers, in the host portal", "L6": "Nessie"}
+             "L5": "People: named approvers, in the Claims queue", "L6": "Nessie"}
     kinds = {"L1": "device", "L2": "stdb", "L3": "ext", "L4": "ext", "L5": "web", "L6": "ext"}
     for k, (a, b) in lanes.items():
         S.zone(40, a, W - 80, b - a, names[k], kinds[k])
@@ -296,14 +300,14 @@ def insurance(y0):
     S.text(L(lx, "x") + 14, c["L3"] - 30, "rule v1 settles\nthe next similar\nfall by itself", fs=18, color="#2b8a3e")
     S.h(auto, settle, label="J2")
     S.link(approve, "r", settle, "b", fb=0.3, via=[(settle.x + 0.3 * settle.w, approve.cy)])
-    S.v(settle, payout, x=settle.x + 0.72 * settle.w, label="request_payout")
+    S.v(settle, payout, x=settle.x + 0.72 * settle.w, label="claim_payout")
     S.h(settle, recon, label="insurer\npays")
     S.link(settle, "b", letters, "t", fa=0.92, via=[(settle.x + 0.92 * settle.w, S.oy + 870), (letters.cx, S.oy + 870)])
 
     py = lanes["L6"][1] + 50
     S.panel(40, py, 1180, "Live-learning demo",
             "1. The fall from the demo becomes a claim. No rule exists yet, so it waits for a judge playing risk "
-            "manager in the host portal on their own phone.\n2. A late note makes the first tap fail as stale; the judge approves "
+            "manager on the Ops dashboard on their own phone.\n2. A late note makes the first tap fail as stale; the judge approves "
             "again. The payout lands in the wallet and rule v1 is created with the judge's name on it.\n3. A "
             "similar fall from the simulator settles in seconds under rule v1.\n4. A fake with witnesses in "
             "another zone is refused with every check listed.")
@@ -328,19 +332,19 @@ def social(y0):
     title("4 · Social and recap flow",
           "The bands are the identity during the event. Memories come only from band, zone and time; the "
           "people you see afterwards are the ones you actually spent time with. When the host ends the event, "
-          "your tap link page turns into your recap live.")
+          "every open attendee page turns into the recap live.")
     zt, zb = 190, 1320
 
     # 1. at the door
     a = []
     y = 260
-    for lbl, k in [("Tap the band with your phone\nits NFC link opens your attendee page", "web"),
-                   ("Sign in with SpacetimeAuth\nby email; one identity for the whole event", "stdb"),
+    for lbl, k in [("Tap the band with your phone\nits NFC sticker opens /t/{token} in the attendee app", "web"),
+                   ("Sign in with SpacetimeAuth\na magic link at the first tap; the same identity on every device", "ext"),
                    ("Press the band's button when it blinks white\nthe band is now yours", "web"),
                    ("Is this you?\npick your scraped speaker or exhibitor profile and press the band to confirm",
                     "web"),
                    ("Your name and Meta socials\nInstagram, Facebook, Threads, typed by you", "web"),
-                   ("Nessie wallet\na funded $200 sandbox account, created at sign-up", "ext")]:
+                   ("Nessie wallet\n$200, opened when you save your name", "ext")]:
         b = S.box(70, y, 500, lbl, k)
         a.append(b)
         y = L(b.bottom) + 46
@@ -348,12 +352,12 @@ def social(y0):
         S.v(p, q, x=p.cx)
 
     # 2. during the event
-    b1 = S.box(720, 260, 330, "Bands and zones\nband1t radio data: encounters, zone visits (TBD Leo)", "tbd")
+    b1 = S.box(720, 260, 330, "Bands and zones (TBD Leo)\nthe band and encounter model in band1t", "tbd")
     b2 = S.box(720, L(b1.bottom) + 60, 330, "memory_tick every 5 s\npresence_sample: which band was in which zone, "
                                             "and when", "stdb")
     b3 = S.box(720, L(b2.bottom) + 70, 330, "Visits\nsame zone for 2 minutes or more, named by the zone's booth",
                "stdb")
-    b4 = S.box(1100, 0, 330, "Encounter rule (TBD Leo)\nstarting default: both findable, together for 3 minutes",
+    b4 = S.box(1100, 0, 330, "Encounter rule (TBD Leo)\nstarting default: both findable, together for 3 minutes; writes social_encounter",
                "tbd", cy=L(b3.cy))
     b5 = S.box(720, L(max(b3.bottom, b4.bottom)) + 70, 710, "People graph: people_link\nmet, visited, works at, "
                                                            "exhibits; written in the same transaction as the visit "
@@ -365,14 +369,13 @@ def social(y0):
     b8 = S.box(1480, L(b7.bottom) + 60, 320, "Photo features (TBD Leo)\npeople count and caption", "tbd")
 
     # 3. after the event
-    c1 = S.box(1940, 260, 420, "The host taps Event ended\nin the host portal; event_state changes in "
-                               "SpacetimeDB", "web")
-    c2 = S.box(1940, L(c1.bottom) + 50, 420, "Your tap link page switches live\nit subscribes to event_state, so it "
-                                             "turns into your recap with no reload; the link keeps working", "web")
-    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nthe exact list: people and booths you spent time "
-                                             "with, minutes, your photos", "stdb")
-    c4 = S.box(2420, 0, 380, "Elastic ranks the suggestions\nthrough bandit-api, by meaning against your interests "
-                             "(bandit-people, bandit-booths)", "ext", cy=L(c3.cy))
+    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nend_event in the host portal sets venue.ended_at", "web")
+    c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to venue; /t/{token} "
+                                             "reopens it later on any device", "web")
+    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_visits, my_photos: the exact lists of "
+                                             "who and what", "stdb")
+    c4 = S.box(2420, 0, 380, "Elastic orders the lists\nGET /recap/order on bandit-api, by meaning against your "
+                             "interests (bandit-people, bandit-booths)", "ext", cy=L(c3.cy))
     c5 = S.box(1940, L(max(c3.bottom, c4.bottom)) + 60, 860, "Your recap page\n1. your space-time view of the night\n"
                                                              "2. your most visited booths\n3. the people you hung out "
                                                              "with, and their socials when they allow it\n4. your photos "
@@ -381,7 +384,7 @@ def social(y0):
     c6 = S.box(1940, L(c5.bottom) + 60, 420, "Merch suggestions\nyour confirmed photo placed in a hand-made template "
                                              "(tee, mug, poster, sponsor booth items); top 3 by minutes at that booth",
                "stdb")
-    c7 = S.box(2420, 0, 380, "Buy with Nessie\ntap Pay; nessie_purchase pays from your wallet", "ext",
+    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch checks the wallet balance in the same transaction; Nessie records the purchase", "ext",
                cy=L(c6.cy))
 
     zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom)) + 40
@@ -401,11 +404,11 @@ def social(y0):
     S.link(b5, "r", c3, "l", fa=0.5, fb=0.72, via=[(1870 + S.ox, b5.cy), (1870 + S.ox, c3.y + 0.72 * c3.h)])
     S.link(b7, "r", c3, "l", fa=0.5, fb=0.3, via=[(1850 + S.ox, b7.cy), (1850 + S.ox, c3.y + 0.3 * c3.h)],
            label="confirmed\ntags")
-    S.v(c1, c2, x=c1.cx, label="event_state")
+    S.v(c1, c2, x=c1.cx, label="ended_at")
     S.v(c2, c3, x=c2.cx)
     S.h(c3, c4)
     S.v(c3, c5, x=c3.cx)
-    S.link(c4, "b", c5, "t", fb=(c4.cx - c5.x) / c5.w, label="ranked")
+    S.link(c4, "b", c5, "t", fb=(c4.cx - c5.x) / c5.w, label="order")
     S.v(c5, c6, x=c6.cx)
     S.h(c6, c7, label="order")
     S.link(a[-1], "b", c7, "b", via=[(a[-1].cx, S.oy + zb + 40), (c7.cx, S.oy + zb + 40)], dashed=True,
