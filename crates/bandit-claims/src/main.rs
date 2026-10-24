@@ -3,13 +3,13 @@
 
 #[macro_use]
 mod app;
-mod bridge;
 mod decide;
 mod demo;
 mod flow;
 mod scorecard;
 mod setup;
 mod show;
+mod sim;
 
 use anyhow::Result;
 use app::{App, parse_money, parse_status};
@@ -30,9 +30,10 @@ enum Cmd {
     Status,
     /// A band reports a fall and the bands around it show the light circle
     Fall {
+        /// A simulated band, 90-99
         #[arg(long)]
         band: u8,
-        /// Comma-separated band ids, for example 2,4,9
+        /// Comma-separated simulated band ids (90-99), for example 94,95,96
         #[arg(long, value_delimiter = ',')]
         witnesses: Vec<u8>,
         /// The zone the band falls in
@@ -180,10 +181,10 @@ fn run(cli: Cli) -> Result<()> {
                 (None, Some(z)) => app.station(&z)?,
                 (None, None) => station,
             };
-            let bridge = bridge::Bridge::open(&app)?;
+            let sim = sim::Sim::open(&app)?;
             sleep_for_preroll();
-            let incident = flow::fall(&app, &bridge, band, station, &witnesses, witness_station)?;
-            drop(bridge);
+            let incident = flow::fall(&app, &sim, band, station, &witnesses, witness_station)?;
+            drop(sim);
             flow::print_incident(&app, incident.id)
         }
         Cmd::Treat { incident, note } => flow::treat(&app, incident, &note),

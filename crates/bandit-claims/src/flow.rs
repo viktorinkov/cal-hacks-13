@@ -1,8 +1,8 @@
-//! The people and devices on the floor: the bridge reporting a fall, the
+//! The people and devices on the floor: the simulated bands reporting a fall, the
 //! medic, the floor manager, the vision stub and the medical record.
 
 use crate::app::*;
-use crate::bridge::{Bridge, F_FALL, Pose, S_CIRCLE, S_FALLEN};
+use crate::sim::{Pose, S_CIRCLE, S_FALLEN, Sim, check_bands};
 use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
 use spacetimedb_sdk::{Table, Timestamp};
@@ -12,7 +12,9 @@ use std::process::Command;
 /// The subject band reports a fall in `station` while the witness bands show
 /// the light circle in `witness_station`, held about 2 s so the 500 ms watch
 /// sees both, then everything clears. Returns the incident the watch opened.
-pub fn fall(app: &App, bridge: &Bridge, band: u8, station: u8, witnesses: &[u8], witness_station: u8) -> Result<Incident> {
+pub fn fall(app: &App, sim: &Sim, band: u8, station: u8, witnesses: &[u8], witness_station: u8) -> Result<Incident> {
+    check_bands(&[band])?;
+    check_bands(witnesses)?;
     let db = app.db()?;
     if let Some(open) = db.db.incident().iter().find(|i| i.subject_band == band && !i.resolved && i.kind != IncidentKind::Property) {
         bail!("band {band} already has open incident {}; resolve it first", open.id);
@@ -21,13 +23,10 @@ pub fn fall(app: &App, bridge: &Bridge, band: u8, station: u8, witnesses: &[u8],
         bail!("band {band} cannot witness its own fall");
     }
     let before = db.db.incident().iter().map(|i| i.id).max().unwrap_or(0);
-    bridge.place(&[(band, Pose { zone: station, state: S_FALLEN, flags: F_FALL })]);
+    sim.place(&[(band, Pose { station, state: S_FALLEN, fall: true, press: false })]);
     sleep_ms(600);
-    for (i, w) in witnesses.iter().enumerate() {
-        bridge.heard(*w, band, -50 - 3 * (i as i8 % 5));
-    }
-    let circle: Vec<(u8, Pose)> = witnesses.iter().map(|w| (*w, Pose { zone: witness_station, state: S_CIRCLE, flags: 0 })).collect();
-    bridge.place(&circle);
+    let circle: Vec<(u8, Pose)> = witnesses.iter().map(|w| (*w, Pose { state: S_CIRCLE, ..Pose::at(witness_station) })).collect();
+    sim.place(&circle);
     sleep_ms(1600);
     let incident = until(5.0, || db.db.incident().iter().find(|i| i.id > before && i.subject_band == band))
         .with_context(|| format!("the safety watch opened no incident for band {band}; run setup (it starts the watch)"))?;
@@ -37,7 +36,7 @@ pub fn fall(app: &App, bridge: &Bridge, band: u8, station: u8, witnesses: &[u8],
     });
     let mut calm = vec![(band, Pose::at(station))];
     calm.extend(witnesses.iter().map(|w| (*w, Pose::at(witness_station))));
-    bridge.place(&calm);
+    sim.place(&calm);
     sleep_ms(500);
     app.incident(incident.id)
 }
@@ -75,13 +74,8 @@ pub fn print_incident(app: &App, id: u64) -> Result<()> {
         println!("  witnesses none");
     }
     for r in rows {
-        println!(
-            "  witness   band {} in {}, heard the subject at {} dBm, {}",
-            r.band_id,
-            app.zone_name(r.zone_id),
-            r.rssi,
-            app.hms(r.first_seen_at)
-        );
+        let rssi = if r.rssi == 0 { String::new() } else { format!(", heard the subject at {} dBm", r.rssi) };
+        println!("  witness   band {} in {}{rssi}, {}", r.band_id, app.zone_name(r.zone_id), app.hms(r.first_seen_at));
     }
     Ok(())
 }

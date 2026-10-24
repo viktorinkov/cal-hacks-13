@@ -1,13 +1,16 @@
 //! The accuracy run. Each round plants genuine falls and the four kinds of
 //! fake, lets the flow run, plays the human approvers (approve what is
 //! genuine, refuse what is planted) and scores what the automation paid.
+//! Only the simulated bands 90-99 exist, so each planted claim reuses a band
+//! and gives its owner a new display name (patients must differ, or the
+//! module's duplicate check would fire); setup restores the demo names.
 
 use crate::app::*;
-use crate::bridge::{Bridge, Pose};
+use crate::sim::{Pose, SIM_BANDS, Sim};
 use crate::{decide, flow, setup};
 use anyhow::{Context, Result};
 use bandit_bindings::*;
-use spacetimedb_sdk::Table;
+use spacetimedb_sdk::{Identity, Table};
 use std::time::Instant;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -43,8 +46,8 @@ impl Kind {
 }
 
 const FAKES: [Kind; 4] = [Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::SameBillTwice, Kind::InjuredStaff];
-/// Bands that stand around and light the circle.
-const CROWD: [u8; 9] = [1, 2, 4, 5, 9, 3, 6, 7, 8];
+/// Bands that fall, in turn: the spare simulated bands first, then the demo attendees'.
+const SUBJECTS: [u8; 10] = [94, 95, 96, 97, 98, 99, 90, 91, 92, 93];
 /// The module's occurrence window (5 min) plus slack for when the incident opens.
 const WINDOW: i64 = 330_000_000;
 const ROUND_SECS: u64 = 600;
@@ -60,21 +63,29 @@ struct Planted {
     decided: Option<String>,
 }
 
+/// Turns in the subject and witness rotations.
+#[derive(Default)]
+struct Turns {
+    subject: usize,
+    witness: usize,
+}
+
 pub fn run(app: &App, rounds: u32) -> Result<()> {
-    let bridge = setup::run(app)?;
+    let sim = setup::run(app)?;
     if !app.worker_active() {
         println!("\nnote: {}", app.worker_hint());
     }
     let main = app.station(MAIN_STAGE)?;
-    let crowd: Vec<(u8, Pose)> = CROWD.iter().map(|b| (*b, bridge.pose(*b).unwrap_or(Pose::at(main)))).collect();
-    bridge.place(&crowd);
+    let crowd: Vec<(u8, Pose)> = SIM_BANDS.map(|b| (b, sim.pose(b).unwrap_or(Pose::at(main)))).collect();
+    sim.place(&crowd);
+    drop_crew(app)?;
     let mut all: Vec<Planted> = Vec::new();
-    let mut witness_turn = 0usize;
+    let mut turns = Turns::default();
     for round in 1..=rounds {
         println!("\n== round {round}: 2 genuine falls and 4 fakes ({})", FAKES.map(Kind::label).join(", "));
         let mut planted = Vec::new();
         for kind in [Kind::Genuine, Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::Genuine, Kind::InjuredStaff] {
-            planted.push(plant(app, &bridge, kind, None, &mut witness_turn)?);
+            planted.push(plant(app, &sim, kind, None, &mut turns)?);
         }
         let first = &planted[0];
         app.quiet.set(true);
@@ -83,7 +94,7 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
         });
         app.quiet.set(false);
         original.context("the first genuine claim never got past reading its record")?;
-        let dup = plant(app, &bridge, Kind::SameBillTwice, Some(first), &mut witness_turn)?;
+        let dup = plant(app, &sim, Kind::SameBillTwice, Some(first), &mut turns)?;
         planted.push(dup);
 
         println!("  the flow runs:");
@@ -103,17 +114,20 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
                 clip(&p.name, 16),
                 status_name(c.status),
                 money(c.payout_cents),
-                c.status_note
+                clip(&c.status_note, 110)
             );
         }
         score(app, &planted, &format!("round {round}"))?;
         all.extend(planted);
     }
-    drop(bridge);
     if rounds > 1 {
         println!("\n== all {rounds} rounds");
         score(app, &all, "total")?;
     }
+    for (name, display, band) in ATTENDEES {
+        setup::ensure_attendee(app, &sim, name, display, *band)?;
+    }
+    drop(sim);
     Ok(())
 }
 
@@ -121,51 +135,68 @@ fn clip(s: &str, n: usize) -> String {
     s.chars().take(n).collect()
 }
 
-/// A new attendee (a fresh band 10-99 and identity) for one planted claim.
-fn person(app: &App, bridge: &Bridge, kind: Kind, station: u8) -> Result<(u8, String)> {
+/// Removes the temporary `crew` role a planted injured-staff claim gave a band's owner.
+fn drop_crew(app: &App) -> Result<()> {
     let db = app.db()?;
-    let band = (10..=99u8)
-        .find(|b| db.db.band_owner().band_id().find(b).is_none() && bridge.pose(*b).is_none())
-        .context("no free band ids left in 10-99; republish the local database")?;
+    let crew: Vec<Identity> = db.db.staff_role().iter().filter(|r| r.role == "crew").map(|r| r.identity).collect();
+    for who in crew {
+        call!(db, revoke_role_then(who, "crew".into()))?;
+    }
+    Ok(())
+}
+
+/// The owner of `band` takes the name `name` (claiming the band first if it is new).
+fn become_person(app: &App, sim: &Sim, band: u8, name: &str) -> Result<Identity> {
+    let token = ATTENDEES.iter().find(|a| a.2 == band).map(|a| a.0.to_string()).unwrap_or_else(|| format!("sc-{band}"));
+    setup::ensure_attendee(app, sim, &token, name, band)
+}
+
+/// A fresh patient name for the next claim, so no two planted records share one.
+fn fresh_name(app: &App, kind: Kind) -> Result<String> {
     const F: [&str; 10] = ["Ava", "Nora", "Leah", "Iris", "Zoe", "Ruby", "Elena", "Hana", "Tessa", "Mila"];
     const M: [&str; 10] = ["Omar", "Theo", "Ravi", "Marco", "Eli", "Jonah", "Kenji", "Luis", "Felix", "Dev"];
     const X: [&str; 10] = ["Kai", "Rowan", "Quinn", "Sage", "Reese", "Avery", "Drew", "Emery", "Jules", "Remy"];
     const LAST: [&str; 10] = ["Brooks", "Nguyen", "Rivera", "Haddad", "Silva", "Novak", "Mensah", "Tanaka", "Byrne", "Duarte"];
+    let seed = app.db()?.db.claim().iter().map(|c| c.id).max().unwrap_or(0) as usize + 1;
     // The first-aid record is written for a woman, the ankle record for a man.
     let first = match kind {
         Kind::Genuine | Kind::SameBillTwice => F,
         Kind::InjuryAtHome => M,
         _ => X,
     };
-    let name = format!("{} {}", first[band as usize % 10], LAST[band as usize / 10 % 10]);
-    bridge.place(&[(band, Pose::at(station))]);
-    sleep_ms(700);
-    let me = setup::ensure_attendee(app, bridge, &format!("sc-{band}"), &name, band)?;
-    if kind == Kind::InjuredStaff {
-        call!(db, grant_role_then(me, "crew".into(), format!("{name}, stage crew")))?;
-    }
-    Ok((band, name))
+    Ok(format!("{} {}", first[seed % 10], LAST[seed / 10 % 10]))
 }
 
-/// Plants one claim: a person (new, or the source's for the same bill twice)
-/// falls in a zone with room, the medic treats and resolves, a record is filed.
-fn plant(app: &App, bridge: &Bridge, kind: Kind, source: Option<&Planted>, turn: &mut usize) -> Result<Planted> {
+/// Plants one claim: a band (the source's, for the same bill twice) falls in a
+/// zone with room under a fresh name, the medic treats and resolves, a record is filed.
+fn plant(app: &App, sim: &Sim, kind: Kind, source: Option<&Planted>, turns: &mut Turns) -> Result<Planted> {
     let station = pick_station(app)?;
     let witness_station = match kind {
         Kind::CircleElsewhere if app.station(SPONSOR_ROW)? != station => app.station(SPONSOR_ROW)?,
         Kind::CircleElsewhere => app.station(MAIN_STAGE)?,
         _ => station,
     };
-    let n = if kind == Kind::CircleElsewhere { 3 } else { 2 + *turn % 2 };
-    let witnesses: Vec<u8> = (0..n).map(|i| CROWD[(*turn + i) % CROWD.len()]).collect();
-    *turn += n;
-    let (band, name) = match &source {
+    let (band, name) = match source {
         Some(p) => (p.band, p.name.clone()),
-        None => person(app, bridge, kind, station)?,
+        None => {
+            let band = SUBJECTS[turns.subject % SUBJECTS.len()];
+            turns.subject += 1;
+            (band, fresh_name(app, kind)?)
+        }
     };
+    let n = if kind == Kind::CircleElsewhere { 3 } else { 2 + turns.witness % 2 };
+    let pool: Vec<u8> = SIM_BANDS.filter(|b| *b != band).collect();
+    let witnesses: Vec<u8> = (0..n).map(|i| pool[(turns.witness + i) % pool.len()]).collect();
+    turns.witness += n;
+    let me = become_person(app, sim, band, &name)?;
+    let db = app.db()?;
+    if kind == Kind::InjuredStaff {
+        call!(db, grant_role_then(me, "crew".into(), format!("{name}, stage crew")))?;
+    }
+    sim.place(&[(band, Pose::at(station))]);
     app.quiet.set(true);
     let planted = (|| {
-        let incident = flow::fall(app, bridge, band, station, &witnesses, witness_station)?;
+        let incident = flow::fall(app, sim, band, station, &witnesses, witness_station)?;
         sleep_ms(flow::RESPONSE_SECS * 1000);
         flow::treat(app, incident.id, kind.note())?;
         let claim = flow::resolve(app, incident.id, "treated on site", "medic")?.context("no claim opened")?;
@@ -183,6 +214,9 @@ fn plant(app: &App, bridge: &Bridge, kind: Kind, source: Option<&Planted>, turn:
         Ok::<_, anyhow::Error>(Planted { kind, claim: claim.id, band, name: name.clone(), record, decided: None })
     })();
     app.quiet.set(false);
+    if kind == Kind::InjuredStaff {
+        drop_crew(app)?;
+    }
     let p = planted?;
     let filed = match kind {
         Kind::Genuine => ", first-aid record",

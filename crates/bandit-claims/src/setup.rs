@@ -1,7 +1,7 @@
 //! `setup` and `status`: the actors, the venue, the bands, the policy and the camera.
 
 use crate::app::*;
-use crate::bridge::{Bridge, Pose};
+use crate::sim::{Pose, SIM_BANDS, Sim};
 use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
 use hyphenate_core::time::{civil_from_days, local_date, micros_at, parse_date};
@@ -11,25 +11,18 @@ use std::collections::HashMap;
 pub const POLICY: &str = "GL-2026-04417";
 
 /// Creates every actor and the demo world. Safe to run again: every step is an
-/// upsert. Returns the running bridge, so a demo keeps the bands online.
-pub fn run(app: &App) -> Result<Bridge> {
+/// upsert. Never touches the hardware bridge or real bands: only the
+/// simulated bands 90-99. Returns the running simulator, so a demo keeps the
+/// bands online.
+pub fn run(app: &App) -> Result<Sim> {
     let db = app.db()?;
     println!("server     {}  database {}", app.uri, app.database);
     println!("owner      {}", short_id(db.identity()));
 
     let mut ids: HashMap<&str, Identity> = HashMap::new();
-    let names = STAFF.iter().map(|s| s.0).chain(["bridge"]).chain(ATTENDEES.iter().map(|a| a.0));
+    let names = STAFF.iter().map(|s| s.0).chain(ATTENDEES.iter().map(|a| a.0));
     for name in names {
-        let id = if name == "bridge" {
-            app.connect_as(name, true).map(|c| {
-                let id = c.identity();
-                let _ = c.disconnect();
-                id
-            })?
-        } else {
-            app.actor_with(name, true)?.identity()
-        };
-        ids.insert(name, id);
+        ids.insert(name, identity_of(app, name, true)?);
     }
     for (name, role, label) in STAFF {
         call!(db, grant_role_then(ids[name], role.to_string(), label.to_string()))?;
@@ -92,34 +85,34 @@ pub fn run(app: &App) -> Result<Bridge> {
     call!(vision, upsert_camera_then("overhead pit".into(), main.id, "overhead".into()))?;
     println!("camera     overhead pit on Main stage");
 
-    let bridge_conn = app.connect_as("bridge", false)?;
-    if let Err(e) = call!(bridge_conn, register_bridge_then()) {
-        if !e.to_string().contains("another bridge") {
-            return Err(e);
-        }
-        call!(db, reset_bridge_then())?;
-        call!(bridge_conn, register_bridge_then())?;
-    }
-    for z in &zones {
-        call!(bridge_conn, ingest_station_then(z.station_id, z.exit_colour, -48))?;
-    }
-    let _ = bridge_conn.disconnect();
-    let bridge = Bridge::open(app)?;
-    let missing: Vec<(u8, Pose)> = (1..=9u8).filter(|b| bridge.pose(*b).is_none()).map(|b| (b, Pose::at(main.station_id))).collect();
-    bridge.place(&missing);
+    let sim = Sim::open(app)?;
+    let missing: Vec<(u8, Pose)> = SIM_BANDS.filter(|b| sim.pose(*b).is_none()).map(|b| (b, Pose::at(main.station_id))).collect();
+    sim.place(&missing);
     sleep_ms(800);
-    println!("bridge     {}  registered; bands 1-9 online (new ones at Main stage)", short_id(ids["bridge"]));
+    println!("bands      {}-{} simulated and online (new ones at Main stage)", SIM_BANDS.start(), SIM_BANDS.end());
 
     for (name, display, band) in ATTENDEES {
-        ensure_attendee(app, &bridge, name, display, *band)?;
+        ensure_attendee(app, &sim, name, display, *band)?;
         println!("{name:<10} {}  attendee {display}, band {band}", short_id(ids[name]));
     }
     println!("tokens     {}", app.tokens().dir().display());
-    Ok(bridge)
+    Ok(sim)
+}
+
+/// The identity behind a token. `sim` gets a short-lived connection, so the
+/// simulator pump stays the only `sim` connection in the process.
+fn identity_of(app: &App, name: &str, create: bool) -> Result<Identity> {
+    if name != "sim" {
+        return Ok(app.actor_with(name, create)?.identity());
+    }
+    let c = app.connect_as(name, create)?;
+    let id = c.identity();
+    let _ = c.disconnect();
+    Ok(id)
 }
 
 /// Claims the band (NFC tap, then a press on the band within a few seconds) and sets the profile.
-pub fn ensure_attendee(app: &App, bridge: &Bridge, name: &str, display: &str, band: u8) -> Result<Identity> {
+pub fn ensure_attendee(app: &App, sim: &Sim, name: &str, display: &str, band: u8) -> Result<Identity> {
     let conn = app.actor_with(name, true)?;
     let me = conn.identity();
     let db = app.db()?;
@@ -128,7 +121,7 @@ pub fn ensure_attendee(app: &App, bridge: &Bridge, name: &str, display: &str, ba
         Some(o) => bail!("band {band} already belongs to {}; republish the local database for a clean run", app.person(o.owner)),
         None => {
             call!(conn, claim_band_then(format!("BANDIT-{band:02}")))?;
-            bridge.press(band);
+            sim.press(band);
             until(8.0, || db.db.band_owner().band_id().find(&band).filter(|o| o.owner == me))
                 .with_context(|| format!("band {band} was pressed but the claim did not complete"))?;
         }
@@ -242,25 +235,15 @@ pub fn status(app: &App) -> Result<()> {
     println!("server     {}  database {}", app.uri, app.database);
     println!("owner      {}", short_id(db.identity()));
     let store = app.tokens();
-    let names = STAFF.iter().map(|s| s.0).chain(["bridge"]).chain(ATTENDEES.iter().map(|a| a.0));
+    let names = STAFF.iter().map(|s| s.0).chain(ATTENDEES.iter().map(|a| a.0));
     for name in names {
         if store.load(name)?.is_none() {
             println!("{name:<10} (no identity yet)");
             continue;
         }
-        let id = if name == "bridge" {
-            let c = app.connect_as(name, false)?;
-            let id = c.identity();
-            let _ = c.disconnect();
-            id
-        } else {
-            app.actor(name)?.identity()
-        };
+        let id = identity_of(app, name, false)?;
         let mut what: Vec<String> =
             db.db.staff_role().iter().filter(|r| r.identity == id).map(|r| format!("{} ({})", r.role, r.label)).collect();
-        if db.db.bridge().iter().any(|b| b.identity == id) {
-            what.push("registered bridge".into());
-        }
         if let Some(a) = db.db.attendee().identity().find(&id) {
             let band = db.db.band_owner().owner().find(&id).map(|o| format!(", band {}", o.band_id)).unwrap_or_default();
             what.push(format!("attendee {}{band}", a.display_name));
