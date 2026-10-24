@@ -15,7 +15,8 @@
     info   save   reset (reboot)   defaults (everything except id and motor; then save)
   Bench: sos  clear  pay  paid  press  buzz  haptic <0..7>  state <0..11>  auto  exit <1..6>  find <id> [colour]
          ident  sleep [minutes]
-  Output: one JSON line per answer ({"info":"band",...}, {"ok":...}, {"err":...}), a {"boot":"band",...} line, and
+  Output: one JSON line per answer ({"info":"band",...}, {"ok":...}, {"err":...}), a {"boot":"band",...} line,
+  {"event":...} lines (cmd, ping, sought, found_me, find_start, find_end, fall), and
   a {"status":"band",...} line every second with the neighbour list ("heard": [[id, rssi], ...]) and peak g.
 
   Thresholds pushed by the gateway ("cmd 0 thresh", "cmd 0 rssi", "cmd 0 lowvis") are saved to NVS on receipt.

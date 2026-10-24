@@ -1,41 +1,133 @@
 """Live view of the BandIt fleet through the gateway's serial port, plus a command prompt.
-    pip install pyserial
-    python gateway_monitor.py /dev/cu.usbmodem1101        (macOS; Windows: COM5)
-Logs every JSON line to bandit_log_<time>.jsonl for calibration. Type gateway commands at the prompt, e.g.  cmd 0 exit 2
+
+    python3 tools/gateway_monitor.py [port] [--label spread]
+
+port defaults to the connected board that answers "info" as the gateway. Every line from the gateway is logged
+unchanged to logs/bandit_<label>_<time>.jsonl (calibrate.py reads these). At the prompt:
+    cmd <target> <name> [arg] [arg2]     sent to the gateway, e.g. cmd 0 exit 2, cmd 3 pay, cmd 0 thresh 3 5
+    info                                 the gateway's identity line
+    label <name>                         writes {"label":"<name>","wall":<unix time>} into the log (marks a run)
+    quit
+Needs pyserial (pip install pyserial).
 """
-import sys, json, time, threading, serial
+import json
+import os
+import sys
+import threading
+import time
 
-port = sys.argv[1] if len(sys.argv) > 1 else '/dev/cu.usbmodem1101'
-ser = serial.Serial(port, 115200, timeout=0.2)
-log = open(time.strftime('bandit_log_%Y%m%d_%H%M%S.jsonl'), 'a')
-STATE = ['IDLE', 'YELLOW', 'GUIDE', 'SOS', 'NEAR_SOS', 'PAY', 'PAID', 'CONNECT', 'IDENT', 'OFF']
-fleet = {}
+import serial
 
-def reader():
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fleet  # noqa: E402
+
+STATE = ['IDLE', 'YELLOW', 'GUIDE', 'SOS', 'NEAR_SOS', 'PAY', 'PAID', 'CONNECT', 'IDENT', 'OFF', 'FIND', 'FOUND_ME']
+FLAGS = (('S', 1), ('F', 2), ('P', 4), ('L', 8), ('M', 16), ('V', 32))
+EXITS = ['-', 'blue', 'magenta', 'cyan', 'white', 'orange', 'violet']
+
+
+def find_gateway():
+    for port, _ in fleet.esp_ports():
+        d = fleet.info(port)
+        if d and d.get('info') == 'gateway':
+            return port
+    sys.exit('no gateway found; pass the port')
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    label = 'run'
+    if '--label' in sys.argv:
+        label = sys.argv[sys.argv.index('--label') + 1]
+        args = [a for a in args if a != label]
+    port = args[0] if args else find_gateway()
+    ser = serial.Serial(port, 115200, timeout=0.2)
+    logdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
+    os.makedirs(logdir, exist_ok=True)
+    logpath = os.path.join(logdir, time.strftime(f'bandit_{label}_%Y%m%d_%H%M%S.jsonl'))
+    log = open(logpath, 'a')
+    lock = threading.Lock()
+    bands, stations, heard, notes = {}, {}, {}, []
+
+    def write_log(line):
+        with lock:
+            log.write(line + '\n')
+            log.flush()
+
+    def reader():
+        buf, synced = b'', False
+        ser.reset_input_buffer()
+        while True:
+            buf += ser.read(4096)
+            if not synced:   # the port opened mid-line: drop the fragment before the first newline
+                if b'\n' not in buf:
+                    continue
+                buf, synced = buf.split(b'\n', 1)[1], True
+            while b'\n' in buf:
+                raw, buf = buf.split(b'\n', 1)
+                line = raw.decode(errors='replace').strip()
+                if not line:
+                    continue
+                write_log(line)
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    notes.append(line)
+                    continue
+                d['seen'] = time.time()
+                t = d.get('type')
+                if t == 1:
+                    bands[d['id']] = d
+                elif t == 2:
+                    stations[d['id']] = d
+                elif t == 4:
+                    heard[d['id']] = d
+                elif t != 3:
+                    notes.append(line)
+                del notes[:-6]
+
+    def painter():
+        while True:
+            time.sleep(0.5)
+            now = time.time()
+            out = [f'BandIt fleet via {port}   log {os.path.basename(logpath)}   flags S=SOS F=fall P=press L=lowbat M=mpu V=motor',
+                   ' id  rssi neigh zone  bat state     flags  find  age  heard (id:rssi)']
+            for i in sorted(bands):
+                d = bands[i]
+                st = STATE[d['state']] if d['state'] < len(STATE) else d['state']
+                fl = ''.join(c for c, m in FLAGS if d['flags'] & m)
+                h = heard.get(i, {}).get('heard', [])
+                hs = ' '.join(f'{a}:{b}' for a, b in h[:8])
+                out.append(f"{i:>3} {d['rssi']:>5} {d['neigh']:>5} {d['zone']:>4} {d['bat']:>4} {st:<9} {fl:<6} {d.get('find', 0):>4} "
+                           f"{now - d['seen']:4.1f}s  {hs}")
+            for i in sorted(stations):
+                d = stations[i]
+                c = d['state']
+                out.append(f"{i:>3} {d['rssi']:>5}  station exit {c} ({EXITS[c] if c < len(EXITS) else '?'})  {now - d['seen']:4.1f}s")
+            out += [''] + notes[-6:] + ['', 'cmd> ']
+            sys.stdout.write('\x1b[2J\x1b[H' + '\n'.join(out))
+            sys.stdout.flush()
+
+    threading.Thread(target=reader, daemon=True).start()
+    if sys.stdout.isatty():
+        threading.Thread(target=painter, daemon=True).start()
     while True:
-        line = ser.readline().decode(errors='replace').strip()
-        if not line: continue
-        log.write(line + '\n'); log.flush()
-        try: d = json.loads(line)
-        except Exception: print(line); continue
-        if 'id' in d: d['seen'] = time.time(); fleet[d['id']] = d
+        try:
+            cmd = input().strip()
+        except EOFError:
+            break
+        if not cmd:
+            continue
+        if cmd == 'quit':
+            break
+        if cmd.startswith('label '):
+            write_log(json.dumps({'label': cmd[6:].strip(), 'wall': round(time.time(), 3)}, separators=(',', ':')))
+            notes.append(f'label {cmd[6:].strip()}')
+            continue
+        ser.write((cmd + '\n').encode())
+    time.sleep(0.3)
+    log.close()
 
-def painter():
-    while True:
-        time.sleep(0.5)
-        rows = []
-        for i in sorted(fleet):
-            d = fleet[i]; age = time.time() - d['seen']
-            kind = {1: 'band', 2: 'station', 3: 'gateway'}.get(d.get('type'), '?')
-            st = STATE[d['state']] if d.get('state', 99) < len(STATE) else d.get('state')
-            flags = ''.join(f for f, m in (('S', 1), ('F', 2), ('P', 4), ('L', 8)) if d.get('flags', 0) & m)
-            rows.append(f"{i:>4} {kind:<8} rssi {d.get('rssi'):>4}  neigh {d.get('neigh'):>2}  zone {d.get('zone'):>3}  bat {d.get('bat'):>3}  {st:<9} {flags:<4} {age:4.1f}s")
-        sys.stdout.write('\x1b[2J\x1b[H' + 'BandIt fleet (S=SOS F=fall P=press L=lowbat)\n' + '\n'.join(rows) + '\n\ncmd> ')
-        sys.stdout.flush()
 
-threading.Thread(target=reader, daemon=True).start()
-threading.Thread(target=painter, daemon=True).start()
-while True:
-    try: cmd = input()
-    except EOFError: break
-    if cmd.strip(): ser.write((cmd.strip() + '\n').encode())
+if __name__ == '__main__':
+    main()

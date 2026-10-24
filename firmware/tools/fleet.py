@@ -8,7 +8,7 @@
     python3 tools/fleet.py ports                 port and MAC of every connected ESP32-C3 (no serial traffic)
 
 Needs pyserial (pip install pyserial). The C3's USB serial number is its MAC, so ports are told apart without
-touching the boards; "table" and "send" open the port without toggling DTR/RTS, so nothing resets.
+touching the boards; "table" and "send" open the port with default DTR/RTS, so nothing resets.
 """
 import json
 import os
@@ -29,12 +29,8 @@ def esp_ports():
 
 
 def open_port(port):
-    s = serial.Serial()
-    s.port, s.baudrate, s.timeout = port, 115200, 0.05
-    s.dtr = False
-    s.rts = False
-    s.open()
-    return s
+    # Leave DTR/RTS alone. pyserial sets them one at a time, and DTR low with RTS high is the C3's reset request.
+    return serial.Serial(port, 115200, timeout=0.05)
 
 
 def converse(port, lines, wait=1.2, want=None):

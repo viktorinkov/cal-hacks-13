@@ -20,11 +20,12 @@
            10 find, 11 found me.
 
   Other lines
-    boot:            {"gateway":"up","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"1023.2215-ede7124"}
-    "info" typed in: {"info":"gateway","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"1023.2215-ede7124"}
+    boot:            {"gateway":"up","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"ede7124"}
+    "info" typed in: {"info":"gateway","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"ede7124"}
+    fw = the git hash of the build, plus "+MMDD.HHMM" when it was built from uncommitted changes
     per command:     {"ack":"cmd","target":3,"cmd":5,"arg":0,"arg2":0}
     errors:          {"err":"usage: cmd <target> <name> [arg] [arg2]"}  {"err":"unknown cmd"}  {"err":"bad args"}
-                     {"err":"busy"}  {"err":"rx queue full","dropped":12}
+                     {"err":"busy"}  {"err":"rx queue full","dropped":12}  {"err":"send failed","target":3,"cmd":5}
                      {"err":"dup id","id":3,"mac":"AA:..","other":"BB:.."}  (two boards configured with one id)
 
   Laptop -> radio: one command per line, broadcast 3 times 40 ms apart

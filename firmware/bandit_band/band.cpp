@@ -114,7 +114,7 @@ uint16_t  seq = 0;
 uint8_t   lastCmdFrom = 0;
 uint16_t  lastCmdSeq = 0;
 uint32_t  lastCmdAt = 0;
-uint32_t  nextBeacon = 0, nextHeard = 0, nextDensity = 0;
+uint32_t  beaconSlot = 0, nextBeacon = 0, nextHeard = 0, nextDensity = 0;   // beacons: 100 ms grid + 0..30 ms jitter
 
 inline bool before(uint32_t now, uint32_t until) { return (int32_t)(until - now) > 0; }
 
@@ -187,14 +187,17 @@ void startFind(uint8_t friendId, uint8_t colour, uint32_t now) {
   findColour = colour < N_PAIR ? colour : 0;
   findUntil = now + FIND_TIMEOUT_MS;
   lastTick = 0;
+  emitf("{\"event\":\"find_start\",\"friend\":%u,\"colour\":%u}", findId, findColour);
 }
 
-void stopFind() {
+void stopFind(const char* why) {
+  if (findId) emitf("{\"event\":\"find_end\",\"friend\":%u,\"why\":\"%s\"}", findId, why);
   findId = 0;
   hapticHold(false);
 }
 
 void ping(uint8_t from) {
+  emitf("{\"event\":\"ping\",\"from\":%u}", from);
   flashColour = PAIR_COLOURS[from == findId ? findColour : seekerColour];
   flashUntil = millis() + PING_FLASH_MS;
   hapticPlay(H_SHORT);
@@ -209,7 +212,7 @@ float mapClamp(float x, float x0, float x1, float y0, float y1) {
 void serviceFind(uint32_t now) {
   if (findId) {
     if (!before(now, findUntil)) {
-      stopFind();
+      stopFind("timeout");
     } else {
       const Peer* fr = peerFor(findId, false);
       const bool heard = fr && fr->fresh(now, FIND_LOST_MS);
@@ -237,7 +240,10 @@ void serviceFind(uint32_t now) {
     if (!foundMe) {
       if (r >= FOUND_ME_RSSI) {
         if (!closeSince) closeSince = now;
-        else if (now - closeSince >= FOUND_ME_DWELL_MS) foundMe = true;
+        else if (now - closeSince >= FOUND_ME_DWELL_MS) {
+          foundMe = true;
+          emitf("{\"event\":\"found_me\",\"by\":%u}", seekerId);
+        }
       } else {
         closeSince = 0;
       }
@@ -298,7 +304,7 @@ void updateDensity(uint32_t now) {
 void goToSleep(uint8_t minutes) {
   const uint32_t now = millis();
   sos = fell = false;
-  stopFind();
+  stopFind("sleep");
   foundMe = false;
   hapticsOff();
   ringOff();
@@ -332,7 +338,7 @@ void onShortPress(uint32_t now) {
 void onHold3(uint32_t now) {
   (void)now;
   if (findId) {   // 3 s hold on the seeker ends find; the next 3 s hold raises SOS
-    stopFind();
+    stopFind("hold");
     hapticPlay(H_LONG);
   } else if (sos || fell) {
     sos = fell = false;
@@ -390,6 +396,7 @@ void handleCmd(const Pkt& p, uint32_t now) {
   lastCmdFrom = p.id;
   lastCmdSeq = p.seq;
   lastCmdAt = now;
+  emitf("{\"event\":\"cmd\",\"cmd\":%u,\"arg\":%u,\"arg2\":%u}", p.cmd, p.arg, p.arg2);
   const uint32_t hold = p.arg2 * 100UL;
   switch (p.cmd) {
     case CMD_STATE:
@@ -439,7 +446,7 @@ void handleCmd(const Pkt& p, uint32_t now) {
       break;
     case CMD_FIND:
       if (p.arg) startFind(p.arg, p.arg2, now);
-      else stopFind();
+      else stopFind("cmd");
       break;
     case CMD_SLEEP:
       goToSleep(p.arg);
@@ -480,6 +487,7 @@ void onFrame(const RxFrame& f) {
         foundMe = false;
         closeSince = 0;
         raisePending = true;
+        emitf("{\"event\":\"sought\",\"by\":%u}", p.id);
       }
       seekerColour = p.arg < N_PAIR ? p.arg : 0;
       soughtLast = f.t;
@@ -541,7 +549,7 @@ void handleSerial(char* line, uint32_t now) {
   else if (is("state") && n1 && a >= 0 && a < S_COUNT) { forcedState = a; forcedUntil = 0; ok(); }
   else if (is("auto")) { forcedState = NO_FORCE; overrideAuto = false; ok(); }
   else if (is("exit") && n1 && a >= 1 && a <= N_EXIT) { exitIdx = a; ok(); }
-  else if (is("find") && n1 && a >= 0 && a <= ID_BAND_MAX) { if (a) startFind(a, n2 ? b : 0, now); else stopFind(); ok(); }
+  else if (is("find") && n1 && a >= 0 && a <= ID_BAND_MAX) { if (a) startFind(a, n2 ? b : 0, now); else stopFind("serial"); ok(); }
   else if (is("ident")) { identUntil = now + IDENT_MS; ok(); }
   else if (is("sleep")) { goToSleep(n1 && a > 0 && a < 256 ? a : 0); }
   else emitf("{\"err\":\"bad command\",\"cmd\":\"%s\"}", c);
@@ -624,7 +632,9 @@ void loop() {
   const uint32_t now = millis();
   if (cfg.id && (int32_t)(now - nextBeacon) >= 0) {
     sendBeacon(now);
-    nextBeacon = now + BAND_BEACON_MS + random(0, BAND_JITTER_MS + 1);
+    beaconSlot += BAND_BEACON_MS;   // the jitter does not accumulate: exactly 10 Hz on average
+    if ((int32_t)(now - beaconSlot) >= (int32_t)BAND_BEACON_MS) beaconSlot = now;   // after a stall, restart the grid
+    nextBeacon = beaconSlot + random(0, BAND_JITTER_MS + 1);
   }
   if (cfg.id && (int32_t)(now - nextHeard) >= 0) {
     sendHeard(now);
@@ -638,6 +648,7 @@ void loop() {
   if (hasMpu && fall.service(now, cfg.fallG, cfg.fallTolG, cfg.fallStillMs, cfg.fallWindowMs)) {
     fell = true;
     hapticPlay(H_SOS);
+    emitf("{\"event\":\"fall\",\"g\":%.2f}", fall.lastG());
   }
   serviceFind(now);
   const BandState s = currentState(now);

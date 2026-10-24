@@ -114,7 +114,8 @@ bool queueCmd(uint8_t target, uint8_t cmd, uint8_t arg, uint8_t arg2) {
 void serviceOut(uint32_t now) {
   for (auto& o : outq) {
     if (!o.left || (int32_t)(now - o.next) < 0) continue;
-    radioSend(&o.p, sizeof(o.p));
+    if (!radioSend(&o.p, sizeof(o.p)))
+      emitf("{\"err\":\"send failed\",\"target\":%u,\"cmd\":%u}", o.p.target, o.p.cmd);
     o.left--;
     o.next = now + CMD_REPEAT_MS;
   }
