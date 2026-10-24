@@ -1,0 +1,43 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Bridge {
+    pub identity: __sdk::Identity,
+    pub since: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for Bridge {
+    type Module = super::RemoteModule;
+}
+
+pub struct BridgeCols {
+    pub identity: __sdk::__query_builder::Col<Bridge, __sdk::Identity>,
+    pub since: __sdk::__query_builder::Col<Bridge, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for Bridge {
+    type Cols = BridgeCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        BridgeCols {
+            identity: __sdk::__query_builder::Col::new(table_name, "identity"),
+            since: __sdk::__query_builder::Col::new(table_name, "since"),
+        }
+    }
+}
+
+pub struct BridgeIxCols {
+    pub identity: __sdk::__query_builder::IxCol<Bridge, __sdk::Identity>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Bridge {
+    type IxCols = BridgeIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        BridgeIxCols {
+            identity: __sdk::__query_builder::IxCol::new(table_name, "identity"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Bridge {}

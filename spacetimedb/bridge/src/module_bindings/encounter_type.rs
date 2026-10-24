@@ -1,0 +1,62 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Encounter {
+    pub key: u16,
+    pub band_a: u8,
+    pub band_b: u8,
+    pub first_seen: __sdk::Timestamp,
+    pub last_seen: __sdk::Timestamp,
+    pub seconds_close: u32,
+    pub best_rssi: i8,
+}
+
+impl __sdk::InModule for Encounter {
+    type Module = super::RemoteModule;
+}
+
+pub struct EncounterCols {
+    pub key: __sdk::__query_builder::Col<Encounter, u16>,
+    pub band_a: __sdk::__query_builder::Col<Encounter, u8>,
+    pub band_b: __sdk::__query_builder::Col<Encounter, u8>,
+    pub first_seen: __sdk::__query_builder::Col<Encounter, __sdk::Timestamp>,
+    pub last_seen: __sdk::__query_builder::Col<Encounter, __sdk::Timestamp>,
+    pub seconds_close: __sdk::__query_builder::Col<Encounter, u32>,
+    pub best_rssi: __sdk::__query_builder::Col<Encounter, i8>,
+}
+
+impl __sdk::__query_builder::HasCols for Encounter {
+    type Cols = EncounterCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        EncounterCols {
+            key: __sdk::__query_builder::Col::new(table_name, "key"),
+            band_a: __sdk::__query_builder::Col::new(table_name, "band_a"),
+            band_b: __sdk::__query_builder::Col::new(table_name, "band_b"),
+            first_seen: __sdk::__query_builder::Col::new(table_name, "first_seen"),
+            last_seen: __sdk::__query_builder::Col::new(table_name, "last_seen"),
+            seconds_close: __sdk::__query_builder::Col::new(table_name, "seconds_close"),
+            best_rssi: __sdk::__query_builder::Col::new(table_name, "best_rssi"),
+        }
+    }
+}
+
+pub struct EncounterIxCols {
+    pub band_a: __sdk::__query_builder::IxCol<Encounter, u8>,
+    pub band_b: __sdk::__query_builder::IxCol<Encounter, u8>,
+    pub key: __sdk::__query_builder::IxCol<Encounter, u16>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Encounter {
+    type IxCols = EncounterIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        EncounterIxCols {
+            band_a: __sdk::__query_builder::IxCol::new(table_name, "band_a"),
+            band_b: __sdk::__query_builder::IxCol::new(table_name, "band_b"),
+            key: __sdk::__query_builder::IxCol::new(table_name, "key"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Encounter {}
