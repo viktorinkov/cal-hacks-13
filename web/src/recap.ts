@@ -70,32 +70,34 @@ function spaceTime(conn: DbConnection) {
   const end = (v: (typeof visits)[number]) => Math.min(close, v.endedAt?.toDate().getTime() ?? close);
   const t0 = Math.min(...visits.map(v => v.startedAt.toDate().getTime()), ...met.map(e => e.startedAt.toDate().getTime()));
   const t1 = Math.max(...visits.map(end), ...met.map(e => Math.min(close, e.lastSeenAt.toDate().getTime())));
-  const W = 560, left = 130, right = 16, row = 34, H = zones.length * row + 36;
+  // Drawn at the section's own width so the text stays readable on a phone. Each zone is a label
+  // with its lane under it.
+  const W = Math.max(300, (document.getElementById('app')?.clientWidth ?? 560) - 34);
+  const left = 6, right = 6, row = 46, H = zones.length * row + 24;
   const x = (t: number) => left + ((t - t0) / Math.max(1, t1 - t0)) * (W - left - right);
   const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'spacetime' });
   zones.forEach((z, i) => {
-    svg.appendChild(s('text', { x: 4, y: i * row + 24 }, z));
-    svg.appendChild(s('line', { x1: left, x2: W - right, y1: i * row + 20, y2: i * row + 20, class: 'grid' }));
+    svg.appendChild(s('text', { x: left, y: i * row + 14 }, z));
+    svg.appendChild(s('line', { x1: left, x2: W - right, y1: i * row + 31, y2: i * row + 31, class: 'grid' }));
   });
   for (const v of visits) {
-    const y = zones.indexOf(v.zoneName) * row + 8;
+    const y = zones.indexOf(v.zoneName) * row + 20;
     const a = x(v.startedAt.toDate().getTime()), b = x(end(v));
-    const bar = s('rect', { x: a, y, width: Math.max(3, b - a), height: 24, rx: 4, class: 'stay' });
+    const bar = s('rect', { x: a, y, width: Math.max(3, b - a), height: 22, rx: 4, class: 'stay' });
     bar.appendChild(s('title', {}, `${v.zoneName}: ${time(v.startedAt)} to ${clock(end(v))}`));
     svg.appendChild(bar);
   }
   for (const e of met) {
     const i = Math.max(0, zones.indexOf(e.zoneName));
-    const mid = (e.startedAt.toDate().getTime() + Math.min(close, e.lastSeenAt.toDate().getTime())) / 2;
-    const dot = s('circle', { cx: x(mid), cy: i * row + 20, r: 6, class: 'met' });
-    dot.appendChild(s('title', {}, `${e.person.name}, ${Math.round(e.minutes)} min together`));
+    const dot = s('circle', { cx: x(e.startedAt.toDate().getTime()), cy: i * row + 31, r: 6, class: 'met' });
+    dot.appendChild(s('title', {}, `Met ${e.person.name} at ${time(e.startedAt)}`));
     svg.appendChild(dot);
   }
   svg.appendChild(s('text', { x: left, y: H - 6, class: 'tick' }, clock(t0)));
   svg.appendChild(s('text', { x: W - right, y: H - 6, class: 'tick', 'text-anchor': 'end' }, clock(t1)));
   return [
     svg,
-    h('p', { class: 'muted' }, 'Bars are where your band was; pink dots are people you met.'),
+    h('p', { class: 'muted' }, 'Bars are where your band was; pink dots are when you met someone.'),
     h('ul', { class: 'cards' }, visits.map(v => h('li', {},
       `${time(v.startedAt)} to ${clock(end(v))} `, h('b', {}, v.zoneName),
       ` · ${Math.max(1, Math.round((end(v) - v.startedAt.toDate().getTime()) / 60000))} min`,
@@ -144,7 +146,7 @@ async function share(p: MyPhoto, event: string) {
   if (navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file], text }).catch(e => { if (e?.name !== 'AbortError') throw e; });
   } else {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard?.writeText(text).catch(() => {});
     const a = h('a', { href: URL.createObjectURL(file), download: file.name }) as HTMLAnchorElement;
     a.click();
     alert(`Photo saved and caption copied: ${text}`);
@@ -200,15 +202,16 @@ function mockup(t: MerchSuggestion) {
 
 const mockups = new Map<string, HTMLCanvasElement>();
 
-function wallet(conn: DbConnection) {
+function balance(conn: DbConnection) {
   const w = conn.db.myWallet.iter().next().value;
-  const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
   if (!w) return h('p', { class: 'muted' }, 'Connect your Capital One wallet at band setup to buy merch.');
-  return [
-    h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w.accountId.slice(0, 8)}`)),
-    entries.length > 0 && h('table', {}, entries.map(e => h('tr', {},
-      h('td', {}, date(e.createdAt)), h('td', {}, e.memo || e.kind), h('td', { class: e.amountCents < 0n ? '' : 'pass' }, money(e.amountCents))))),
-  ];
+  return h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w.accountId.slice(0, 8)}`));
+}
+
+function movements(conn: DbConnection) {
+  const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
+  return entries.length > 0 && [h('h4', {}, 'Wallet activity'), h('table', {}, entries.map(e => h('tr', {},
+    h('td', {}, date(e.createdAt)), h('td', {}, e.memo || e.kind), h('td', { class: e.amountCents < 0n ? '' : 'pass' }, money(e.amountCents)))))];
 }
 
 function merch(conn: DbConnection) {
@@ -222,7 +225,7 @@ function merch(conn: DbConnection) {
     await act(() => conn.reducers.buyMerch({ templateId: t.templateId, photoId: t.photoId, size }));
   };
   return [
-    wallet(conn),
+    balance(conn),
     !picks.length && h('p', { class: 'muted' }, 'Merch appears once you confirm a photo of you above ("That\'s me").'),
     h('div', { class: 'merch' }, picks.map(t => {
       const key = `${t.templateId}:${t.photoId}`;
@@ -230,7 +233,7 @@ function merch(conn: DbConnection) {
       return h('figure', {}, mockups.get(key)!,
         h('figcaption', {},
           h('b', {}, t.title), ` · ${money(t.priceCents)}`,
-          t.minutes > 0 && h('div', { class: 'muted' }, `${Math.max(1, Math.round(t.minutes))} min at this sponsor's booth`),
+          t.minutes > 0 && h('div', { class: 'muted' }, `You spent ${Math.max(1, Math.round(t.minutes))} min at the sponsor booths`),
           h('form', { onsubmit: (e: Event) => buy(e, t) },
             t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `size-${t.templateId}` },
               ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
@@ -238,6 +241,7 @@ function merch(conn: DbConnection) {
     })),
     orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
       `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · Nessie purchase ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
+    movements(conn),
   ];
 }
 
