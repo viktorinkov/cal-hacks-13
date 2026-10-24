@@ -177,6 +177,7 @@ function medicCard(incidentId: bigint) {
   const m = [...conn.db.medicMedicalCards.iter()].find(c => c.incidentId === incidentId);
   if (!m) return null;
   const c = m.card;
+  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`), h('p', {}, 'No medical card on file.'));
   const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
   return h('section', { class: 'alert' },
     h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),

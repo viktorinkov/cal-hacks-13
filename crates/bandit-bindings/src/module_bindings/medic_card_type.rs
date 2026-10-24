@@ -12,7 +12,7 @@ pub struct MedicCard {
     pub incident_id: u64,
     pub band_id: u8,
     pub name: String,
-    pub card: MedicalCard,
+    pub card: Option<MedicalCard>,
 }
 
 impl __sdk::InModule for MedicCard {
@@ -26,7 +26,7 @@ pub struct MedicCardCols {
     pub incident_id: __sdk::__query_builder::Col<MedicCard, u64>,
     pub band_id: __sdk::__query_builder::Col<MedicCard, u8>,
     pub name: __sdk::__query_builder::Col<MedicCard, String>,
-    pub card: __sdk::__query_builder::Col<MedicCard, MedicalCard>,
+    pub card: __sdk::__query_builder::Col<MedicCard, Option<MedicalCard>>,
 }
 
 impl __sdk::__query_builder::HasCols for MedicCard {

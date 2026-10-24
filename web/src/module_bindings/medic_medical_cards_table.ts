@@ -19,6 +19,6 @@ export default __t.row({
   bandId: __t.u8().name("band_id"),
   name: __t.string(),
   get card() {
-    return MedicalCard;
+    return __t.option(MedicalCard);
   },
 });

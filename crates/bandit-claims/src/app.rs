@@ -49,6 +49,7 @@ pub fn approver_for_role(role: &str) -> Option<&'static str> {
 /// Tables the owner connection mirrors (private ones included).
 const TABLES: &[&str] = &[
     "staff_role",
+    "medical_document",
     "band",
     "band_owner",
     "attendee",
