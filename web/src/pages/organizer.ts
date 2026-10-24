@@ -58,7 +58,7 @@ let openClaim: bigint | undefined;
 
 /** The staff roles: the organizer (ops) and the medic. */
 const STAFF_ROLES = ['ops', 'medic'];
-/** The test bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
+/** Bands 90 to 99, which need no radio: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
 const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 
 function roles(): Set<string> {
@@ -80,7 +80,7 @@ function can(...wanted: string[]): boolean {
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
   const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['data', 'Imports and Kibana']];
-  return cfg.simulate ? [...all, ['test-bands', 'Test bands']] : all;
+  return cfg.simulate ? [...all, ['bands', 'Bands']] : all;
 }
 
 function zoneName(id: bigint) {
@@ -248,7 +248,7 @@ function medicCard(incidentId: bigint) {
   return m ? medicalCard(m) : null;
 }
 
-// --- Test bands ----------------------------------------------------------------------------
+// --- Bands ---------------------------------------------------------------------------------
 
 async function post(path: string) {
   const res = await fetch(path, { method: 'POST' });
@@ -262,12 +262,12 @@ function toClaims(ok: boolean) {
   render();
 }
 
-/** The test bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
-function testBandsTab() {
+/** Bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
+function bandsTab() {
   const owners = wearers();
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   return h('section', {},
-    h('h3', {}, 'Test bands'),
+    h('h3', {}, 'Bands 90 to 99'),
     h('p', { class: 'muted' }, 'Bands 90 to 93 are the claims story\'s attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here. A fall uses two of the story attendees as the bands around it, and they stay in that zone afterwards.'),
     h('table', {},
       h('tr', {}, h('th', {}, 'Band'), h('th', {}, 'Wearer'), h('th', {}, 'Zone'), h('th', {}, 'Walk to'), h('th', {})),
@@ -472,7 +472,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'data' ? data() : tab === 'test-bands' ? testBandsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'data' ? data() : tab === 'bands' ? bandsTab() : live();
   mount('app', header(), body);
 }
 
