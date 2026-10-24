@@ -38,11 +38,11 @@ const QUERIES = [
   'SELECT * FROM board_policies',
 ];
 
-/** The synthetic clinic records in fixtures/medical-records, for filing without a real PDF. */
+/** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
 const DEMO_RECORDS: [string, string][] = [
-  ['first-aid-wrist.pdf', 'Event first aid, wrist sprain (Maya Chen, $180)'],
-  ['urgent-care-wrist.pdf', 'Urgent care, wrist sprain (Jordan Alvarez, $1,308)'],
-  ['urgent-care-ankle-home.pdf', 'Urgent care, ankle hurt at home (Sam Patel, $565)'],
+  ['first-aid-wrist', 'Event first aid, wrist sprain (Maya Chen, $180)'],
+  ['urgent-care-wrist', 'Urgent care, wrist sprain (Jordan Alvarez, $1,308)'],
+  ['urgent-care-ankle-home', 'Urgent care, ankle hurt at home (Sam Patel, $565)'],
 ];
 
 let conn: DbConnection;
@@ -189,7 +189,12 @@ function claimList() {
 async function fileRecord(claimId: bigint, form: HTMLFormElement) {
   const input = form.querySelector('input[type=file]') as HTMLInputElement;
   const demo = field(form, 'demo');
-  const bytes = input.files?.[0] ? await input.files[0].arrayBuffer() : demo ? await (await fetch(`/fixtures/${demo}`)).arrayBuffer() : undefined;
+  if (!input.files?.[0] && demo) {
+    const res = await fetch(`/api/dev/record/${claimId}/${demo}`, { method: 'POST' });
+    if (!res.ok) throw new Error((await res.json()).error);
+    return;
+  }
+  const bytes = await input.files?.[0]?.arrayBuffer();
   if (!bytes) throw new Error('choose the clinic PDF');
   const res = await fetch('/api/blobs?purpose=medical', { method: 'POST', headers: { 'content-type': 'application/pdf' }, body: bytes });
   const blob = await res.json();
@@ -244,7 +249,7 @@ function claimDetail(id: bigint) {
     c.status.tag === 'AwaitingRecord' && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', accept: 'application/pdf' })),
-      h('label', {}, 'or a demo record', h('select', { name: 'demo' }, h('option', { value: '' }, '—'), DEMO_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      cfg.demo && h('label', {}, 'or a demo record, dated for this incident', h('select', { name: 'demo' }, h('option', { value: '' }, '—'), DEMO_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
     c.status.tag === 'Routed' && h('div', {}, h('h4', {}, `Your decision (${c.routedToName}, ${c.routedToRole})`), decide(c)),
     h('h4', {}, 'Checks'),

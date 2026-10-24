@@ -62,7 +62,6 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/style.css", file("style.css"))
         .nest_service("/js", ServeDir::new(web.root.join("web/dist")))
         .nest_service("/assets/merch", ServeDir::new(web.root.join("assets/merch")))
-        .nest_service("/fixtures", ServeDir::new(web.root.join("fixtures/medical-records/rendered")))
         .route("/config.json", get(config))
         .route("/api/blobs", post(upload))
         .route("/blobs/{hash}", get(blob))
@@ -70,6 +69,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route("/api/actors", get(actors))
         .route("/api/dev/press/{band}", post(press))
         .route("/api/dev/move/{band}/{station}", post(move_band))
+        .route("/api/dev/record/{claim}/{template}", post(demo_record))
 }
 
 fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>) {
@@ -281,4 +281,29 @@ pub async fn heartbeat(app: Arc<App>) {
             }
         }
     }
+}
+
+/// Demo only: renders one of the synthetic clinic records for the claim's incident date and time and
+/// files it as the medic, through `bandit-claims attach-record`.
+async fn demo_record(State(app): AppState, Path((claim, template)): Path<(u64, String)>) -> ApiResult<Json<Value>> {
+    if !app.web.demo {
+        return Err(error(StatusCode::NOT_FOUND, "demo records are off"));
+    }
+    if !["first-aid-wrist", "urgent-care-wrist", "urgent-care-ankle-home"].contains(&template.as_str()) {
+        return Err(error(StatusCode::BAD_REQUEST, "unknown demo record"));
+    }
+    let cli = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("bandit-claims")))
+        .ok_or_else(|| error(StatusCode::INTERNAL_SERVER_ERROR, "bandit-claims not found"))?;
+    let out = tokio::process::Command::new(cli)
+        .args(["attach-record", "--claim", &claim.to_string(), "--template", &template])
+        .current_dir(&app.web.root)
+        .output()
+        .await
+        .map_err(|e| error(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    if !out.status.success() {
+        return Err(error(StatusCode::BAD_GATEWAY, String::from_utf8_lossy(&out.stderr).trim()));
+    }
+    Ok(Json(json!({ "filed": String::from_utf8_lossy(&out.stdout).trim() })))
 }
