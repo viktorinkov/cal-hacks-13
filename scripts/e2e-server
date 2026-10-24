@@ -1,0 +1,5 @@
+#!/bin/sh
+# The private local SpacetimeDB for end-to-end runs, on 127.0.0.1:3097 with its data in .dev/e2e-stdb.
+. "$(dirname "$0")/e2e-env"
+mkdir -p "$ROOT/.dev/e2e-stdb"
+exec "$SPACETIME" --config-path "$DATA/spacetime/cli.toml" start --listen-addr 127.0.0.1:3097 --data-dir "$ROOT/.dev/e2e-stdb" --non-interactive
