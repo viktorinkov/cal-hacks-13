@@ -198,7 +198,7 @@ pub struct Photo {
     pub created_at: Timestamp,
 }
 
-/// A findable attendee whose band was in the photo's zone when it was taken. They confirm or remove it.
+/// A findable attendee whose band was in the photo's zone when it was taken.
 #[spacetimedb::table(accessor = photo_tag)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PhotoTag {
@@ -209,7 +209,7 @@ pub struct PhotoTag {
     pub photo_id: u64,
     #[index(btree)]
     pub attendee: Identity,
-    /// suggested, confirmed or removed.
+    /// No longer read; kept so the live database keeps its schema.
     pub status: String,
     pub updated_at: Timestamp,
 }

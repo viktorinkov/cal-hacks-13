@@ -237,7 +237,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
     let mut photos: Vec<&Photo> = rows
         .photo_tags
         .iter()
-        .filter(|t| t.attendee == who && t.status != "removed")
+        .filter(|t| t.attendee == who)
         .filter_map(|t| rows.photos.iter().find(|p| p.id == t.photo_id))
         .collect();
     photos.sort_by_key(|p| (p.taken_at, p.id));
@@ -253,7 +253,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
             people: rows
                 .photo_tags
                 .iter()
-                .filter(|t| t.photo_id == p.id && t.attendee != who && t.status != "removed")
+                .filter(|t| t.photo_id == p.id && t.attendee != who)
                 .filter_map(|t| {
                     let card = person(rows, t.attendee)?;
                     Some(if met(rows, who, t.attendee) { card } else { someone() })
@@ -559,12 +559,12 @@ mod tests {
         }
     }
 
-    fn tag(id: u64, photo_id: u64, n: u8, status: &str) -> PhotoTag {
+    fn tag(id: u64, photo_id: u64, n: u8) -> PhotoTag {
         PhotoTag {
             id,
             photo_id,
             attendee: who(n),
-            status: status.into(),
+            status: String::new(),
             updated_at: at(0),
         }
     }
@@ -631,24 +631,14 @@ mod tests {
                     added_by: who(9),
                     created_at: at(300),
                 },
-                Photo {
-                    id: 3,
-                    url: "https://example.test/p3.jpg".into(),
-                    taken_at: at(100),
-                    zone_id: 2,
-                    caption: "Gone".into(),
-                    added_by: who(9),
-                    created_at: at(100),
-                },
             ],
             photo_tags: vec![
-                tag(1, 1, 1, "suggested"),
-                tag(2, 1, 2, "confirmed"),
-                tag(3, 1, 3, "confirmed"),
-                tag(4, 1, 4, "suggested"),
-                tag(7, 1, 5, "suggested"),
-                tag(5, 2, 1, "confirmed"),
-                tag(6, 3, 1, "removed"),
+                tag(1, 1, 1),
+                tag(2, 1, 2),
+                tag(3, 1, 3),
+                tag(4, 1, 4),
+                tag(7, 1, 5),
+                tag(5, 2, 1),
             ],
         }
     }

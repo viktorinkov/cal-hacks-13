@@ -21,7 +21,6 @@ pub struct MerchSuggestion {
     pub photo_h: u32,
     pub photo_id: u64,
     pub photo_url: String,
-    pub minutes: f32,
 }
 
 impl __sdk::InModule for MerchSuggestion {
@@ -46,7 +45,6 @@ pub struct MerchSuggestionCols {
     pub photo_h: __sdk::__query_builder::Col<MerchSuggestion, u32>,
     pub photo_id: __sdk::__query_builder::Col<MerchSuggestion, u64>,
     pub photo_url: __sdk::__query_builder::Col<MerchSuggestion, String>,
-    pub minutes: __sdk::__query_builder::Col<MerchSuggestion, f32>,
 }
 
 impl __sdk::__query_builder::HasCols for MerchSuggestion {
@@ -67,7 +65,6 @@ impl __sdk::__query_builder::HasCols for MerchSuggestion {
             photo_h: __sdk::__query_builder::Col::new(table_name, "photo_h"),
             photo_id: __sdk::__query_builder::Col::new(table_name, "photo_id"),
             photo_url: __sdk::__query_builder::Col::new(table_name, "photo_url"),
-            minutes: __sdk::__query_builder::Col::new(table_name, "minutes"),
         }
     }
 }

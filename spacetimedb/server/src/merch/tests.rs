@@ -163,8 +163,8 @@ impl World {
         });
     }
 
-    /// A photo taken now in `zone_id`, with `name` tagged as `status`.
-    fn photo(&self, name: &str, zone_id: u64, status: &str) -> u64 {
+    /// A photo taken now in `zone_id`, with `name` tagged in it.
+    fn photo(&self, name: &str, zone_id: u64) -> u64 {
         let photo = self.t.db.photo().insert(Photo {
             id: 0,
             url: format!("/photos/{zone_id}-{}.jpg", self.t.db.photo().iter().count()),
@@ -174,7 +174,7 @@ impl World {
             added_by: id("photographer"),
             created_at: self.t.clock.now(),
         });
-        self.t.db.photo_tag().insert(PhotoTag { id: 0, photo_id: photo.id, attendee: id(name), status: status.into(), updated_at: self.t.clock.now() });
+        self.t.db.photo_tag().insert(PhotoTag { id: 0, photo_id: photo.id, attendee: id(name), status: String::new(), updated_at: self.t.clock.now() });
         self.t.clock.advance(TimeDuration::from_micros(60_000_000));
         photo.id
     }
@@ -267,30 +267,29 @@ fn connecting_the_wallet_opens_it_once() {
 #[test]
 fn suggestions_rank_sponsor_templates_by_minutes_at_their_booths() {
     let w = World::new();
-    assert!(my_merch_suggestions(&w.view("Maya Chen")).is_empty(), "no confirmed photo, nothing to suggest");
+    assert!(my_merch_suggestions(&w.view("Maya Chen")).is_empty(), "no photo, nothing to suggest");
 
     w.visit("Maya Chen", w.sponsor_row, 25.0);
     w.visit("Maya Chen", w.sponsor_row, 15.0);
     w.visit("Maya Chen", w.food, 50.0);
-    let at_booths = w.photo("Maya Chen", w.sponsor_row, "confirmed");
-    let newest = w.photo("Maya Chen", w.food, "confirmed");
-    w.photo("Maya Chen", w.food, "suggested");
+    let at_booths = w.photo("Maya Chen", w.sponsor_row);
+    let newest = w.photo("Maya Chen", w.food);
 
     let s = my_merch_suggestions(&w.view("Maya Chen"));
     let names: Vec<&str> = s.iter().map(|s| s.title.as_str()).collect();
     assert_eq!(names, ["SpacetimeDB tee", "Elastic mug", "Booth crawl poster"]);
-    assert!(s.iter().all(|s| s.photo_id == at_booths && s.minutes == 40.0));
+    assert!(s.iter().all(|s| s.photo_id == at_booths));
     assert_eq!(s.iter().map(|s| s.rank).collect::<Vec<_>>(), [1, 2, 3]);
     assert_eq!((s[0].photo_x, s[0].photo_w, s[0].price_cents), (100, 400, 2500));
 
     // Someone who never went to the sponsor row gets the plain templates with their newest photo.
     w.visit("Jordan Alvarez", w.food, 30.0);
-    w.photo("Jordan Alvarez", w.food, "confirmed");
-    let jordan = w.photo("Jordan Alvarez", w.food, "confirmed");
+    w.photo("Jordan Alvarez", w.food);
+    let jordan = w.photo("Jordan Alvarez", w.food);
     let s = my_merch_suggestions(&w.view("Jordan Alvarez"));
     let names: Vec<&str> = s.iter().map(|s| s.title.as_str()).collect();
     assert_eq!(names, ["Cal Hacks 13.0 tee", "Cal Hacks 13.0 mug", "Cal Hacks 13.0 poster"]);
-    assert!(s.iter().all(|s| s.photo_id == jordan && s.minutes == 0.0));
+    assert!(s.iter().all(|s| s.photo_id == jordan));
     assert_ne!(newest, jordan);
 }
 
@@ -298,7 +297,7 @@ fn suggestions_rank_sponsor_templates_by_minutes_at_their_booths() {
 fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
     let w = World::new();
     w.sign_up("Maya Chen");
-    let photo = w.photo("Maya Chen", w.sponsor_row, "confirmed");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
     let tee = w.template("tee_spacetimedb.png");
 
     let err = w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err();
@@ -338,7 +337,7 @@ fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
 #[test]
 fn a_failed_purchase_frees_the_money_and_the_wallet_cannot_overspend() {
     let w = World::new();
-    let photo = w.photo("Maya Chen", w.sponsor_row, "confirmed");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
     let tee = w.template("tee.png");
     w.end_event();
     w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya Chen".into(), true));

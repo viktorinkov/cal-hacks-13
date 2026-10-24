@@ -349,15 +349,12 @@ pub fn event_graph(ctx: &AnonymousViewContext) -> Vec<EventLink> {
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub struct MyPhoto {
-    pub tag_id: u64,
     pub photo_id: u64,
     pub url: String,
     pub taken_at: Timestamp,
     pub zone_name: String,
     pub caption: String,
-    /// suggested or confirmed: your own tag on this photo.
-    pub status: String,
-    /// The other people the bands put in it, minus anyone who removed their tag.
+    /// The other people the bands put in it.
     pub people: Vec<PersonCard>,
 }
 
@@ -389,7 +386,6 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
         .photo_tag()
         .attendee()
         .filter(me)
-        .filter(|t| t.status != "removed")
         .filter_map(|t| {
             let p = ctx.db.photo().id().find(t.photo_id)?;
             let people = ctx
@@ -397,20 +393,18 @@ pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
                 .photo_tag()
                 .photo_id()
                 .filter(p.id)
-                .filter(|o| o.attendee != me && o.status != "removed")
+                .filter(|o| o.attendee != me)
                 .filter_map(|o| {
                     let card = person_card(ctx, o.attendee)?;
                     Some(if met(ctx, me, o.attendee) { card } else { someone() })
                 })
                 .collect();
             Some(MyPhoto {
-                tag_id: t.id,
                 photo_id: p.id,
                 url: p.url,
                 taken_at: p.taken_at,
                 zone_name: zone_name(ctx, p.zone_id),
                 caption: p.caption,
-                status: t.status,
                 people,
             })
         })

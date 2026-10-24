@@ -84,7 +84,6 @@ import RequestMedicalCardReducer from "./request_medical_card_reducer";
 import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
-import RespondPhotoTagReducer from "./respond_photo_tag_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
@@ -901,7 +900,6 @@ const reducersSchema = __reducers(
   __reducerSchema("request_recovery_letter", RequestRecoveryLetterReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
-  __reducerSchema("respond_photo_tag", RespondPhotoTagReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),

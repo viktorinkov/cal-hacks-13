@@ -1,5 +1,5 @@
 //! Merch: a few hand-made templates in `assets/merch`, each with a green photo area. After the event
-//! the recap suggests the attendee's own confirmed photos on the templates, ranked by the minutes they
+//! the recap suggests the attendee's own photos on the templates, ranked by the minutes they
 //! spent at the booths a template names, and the attendee buys one from their BandIt wallet. A worker
 //! records the purchase on Nessie. The app draws the photo into the photo area; the server renders
 //! and stores no image, and an order keeps the template and the photo.
@@ -7,7 +7,6 @@
 use crate::insurance::*;
 use crate::jobs::{self, *};
 use crate::roles::require_role;
-use crate::social::logic::TAG_CONFIRMED;
 use crate::social::tables::*;
 use crate::venue::*;
 use crate::wallet;
@@ -150,7 +149,7 @@ pub fn load_merch_templates(ctx: &ReducerContext, templates: Vec<MerchTemplateIn
     Ok(())
 }
 
-/// Buys one template with one of the caller's confirmed photos, paid from their wallet.
+/// Buys one template with one of the caller's photos, paid from their wallet.
 #[spacetimedb::reducer]
 pub fn buy_merch(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
     if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) {
@@ -163,8 +162,8 @@ pub fn buy_merch(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: St
         "tee" => return Err(format!("pick a size: {}", TEE_SIZES.join(", "))),
         _ => String::new(),
     };
-    if !ctx.db.photo_tag().photo_id().filter(photo_id).any(|tag| tag.attendee == me && tag.status == TAG_CONFIRMED) {
-        return Err("confirm that you are in this photo first".into());
+    if !ctx.db.photo_tag().photo_id().filter(photo_id).any(|tag| tag.attendee == me) {
+        return Err("you are not in this photo".into());
     }
     let account = ctx.db.claimant_account().identity().find(me).ok_or("your BandIt wallet is still opening")?;
     if wallet::spendable(ctx, me) < t.price_cents as i64 {
@@ -257,12 +256,10 @@ pub struct MerchSuggestion {
     pub photo_h: u32,
     pub photo_id: u64,
     pub photo_url: String,
-    /// Minutes the caller spent at the template's booths.
-    pub minutes: f32,
 }
 
 /// The caller's top three template and photo pairs. Each template is paired with the caller's best
-/// confirmed photo for it (taken at its booths, else the newest) and ranked by the minutes the caller
+/// photo for it (taken at its booths, else the newest) and ranked by the minutes the caller
 /// spent at its booths, then by a photo from those booths, then plain templates before sponsor ones.
 #[spacetimedb::view(accessor = my_merch_suggestions, public)]
 pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
@@ -272,7 +269,6 @@ pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
         .photo_tag()
         .attendee()
         .filter(me)
-        .filter(|t| t.status == TAG_CONFIRMED)
         .filter_map(|t| ctx.db.photo().id().find(t.photo_id))
         .collect();
     if photos.is_empty() {
@@ -306,7 +302,7 @@ pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
         .into_iter()
         .take(SUGGESTIONS)
         .enumerate()
-        .map(|(i, (t, p, minutes, _))| MerchSuggestion {
+        .map(|(i, (t, p, _, _))| MerchSuggestion {
             rank: i as u32 + 1,
             template_id: t.id,
             title: t.title,
@@ -321,7 +317,6 @@ pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
             photo_h: t.photo_h,
             photo_id: p.id,
             photo_url: p.url.clone(),
-            minutes,
         })
         .collect()
 }

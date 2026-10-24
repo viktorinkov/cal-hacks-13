@@ -820,7 +820,6 @@ export const MerchSuggestion = __t.object("MerchSuggestion", {
   photoH: __t.u32(),
   photoId: __t.u64(),
   photoUrl: __t.string(),
-  minutes: __t.f32(),
 });
 export type MerchSuggestion = __Infer<typeof MerchSuggestion>;
 
@@ -928,13 +927,11 @@ export const MyEncounter = __t.object("MyEncounter", {
 export type MyEncounter = __Infer<typeof MyEncounter>;
 
 export const MyPhoto = __t.object("MyPhoto", {
-  tagId: __t.u64(),
   photoId: __t.u64(),
   url: __t.string(),
   takenAt: __t.timestamp(),
   zoneName: __t.string(),
   caption: __t.string(),
-  status: __t.string(),
   get people() {
     return __t.array(PersonCard);
   },

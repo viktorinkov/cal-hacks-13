@@ -1,5 +1,5 @@
 //! Event photos: a photo lands in a zone at a time, and the findable people whose bands were there are
-//! suggested as tags. Each person confirms or removes their own tag; confirmed photos go into their summary.
+//! tagged in it. Tagged photos go straight into each person's recap and merch.
 
 use super::logic::*;
 use super::tables::*;
@@ -34,18 +34,9 @@ pub fn register_photo(ctx: &ReducerContext, url: String, taken_at: Timestamp, zo
             id: 0,
             photo_id: photo.id,
             attendee: o.owner,
-            status: TAG_SUGGESTED.into(),
+            status: String::new(),
             updated_at: ctx.timestamp,
         });
     }
-    Ok(())
-}
-
-/// The tagged person keeps or removes their own tag.
-#[spacetimedb::reducer]
-pub fn respond_photo_tag(ctx: &ReducerContext, tag_id: u64, confirm: bool) -> Result<(), String> {
-    let tag = ctx.db.photo_tag().id().find(tag_id).filter(|t| t.attendee == ctx.sender()).ok_or("no such tag")?;
-    let status = if confirm { TAG_CONFIRMED } else { TAG_REMOVED };
-    ctx.db.photo_tag().id().update(PhotoTag { status: status.into(), updated_at: ctx.timestamp, ..tag });
     Ok(())
 }
