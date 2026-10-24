@@ -159,13 +159,15 @@ sequenceDiagram
 |---|---|---|
 | health | liveness for the dashboard and scripts | this file |
 | app files | the Ops dashboard and attendee app bundles, and every app route including `/t/BANDIT-0n` | this file |
-| `POST /api/blobs` | stream a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Hyphenate.md: purpose `medical` as `staff`); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
+| `POST /api/blobs` | stream a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Hyphenate.md: purpose `medical` as `staff`; Medical-ID.md: purposes `history` and `insurance` as `owner_only`, owned by the attendee whose API session sent the file); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
 | `GET /blobs/{hash}` | serve a stored file by its hash if the caller passes its access class | this file |
 | Elastic.md: `GET /recap/order` | handler `rank_recap`: orders the caller's recap people and booths by meaning, holding the Elastic key; the candidates come from Social.md's views `social_encounters` and `social_visits`, never from Elastic | [Elastic](../7-integrations/Elastic.md) |
-| Medical-ID.md: `POST /api/medical/document` | upload one medical PDF, the medical history or the health insurance document, with its kind, as `owner_only`; call `submit_medical_document`, which enqueues `medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
+| Medical-ID.md: document upload, `/samples` | the attendee page sends each medical PDF to `POST /api/blobs` with purpose `history` or `insurance` and the attendee's API session, then calls `submit_medical_document` itself as the attendee, which enqueues `medical_extract`; `/samples` serves the synthetic `medical-history.pdf` and `insurance-card.pdf` for the "Use the sample PDF" button, which the page shows in test mode only | [Medical-ID](../6-features/Medical-ID.md) |
 | Hyphenate.md: bill upload | the Ops dashboard's incident card uploads an urgent-care bill PDF (at most 10 MB) through `POST /api/blobs` with purpose `medical`, then calls `submit_medical_record` as the signed-in staff member, which enqueues `claim_record_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
 | Social.md: photographer photo upload, share-link page | photos in through `POST /api/blobs` with purpose `photo`; the public page for a share token | [Social](../6-features/Social.md) |
 | Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | test mode only (`BANDIT_SIMULATE=1`): press a simulated band 94 to 99 or move it to a station, through `report_sim_band` as the `simulator` identity; the pressed bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
+| Simulator.md: `POST /api/dev/fall/{band}` | test mode only, the Simulate tab's "Fall here": runs `bandit-claims fall` for a simulated band 90 to 99, with two of the claims story's bands (the first two of 90, 92, 93 and 91 that are not the band) as the light circle; the band's own 2 s reports pause meanwhile | [Simulator](Simulator.md) |
+| Simulator.md: `POST /api/dev/property/{station}` | test mode only, the Simulate tab's "Speaker breaks in <zone>": runs `bandit-claims property --camera` for the zone of that station, with the note "a speaker was knocked off its stand and cracked" and a repair cost of $2,400 | [Simulator](Simulator.md), [Hyphenate](../7-integrations/Hyphenate.md) |
 
 ### `bandit-workers`: the job runner
 
@@ -198,7 +200,7 @@ stateDiagram-v2
 
 | Job kind | Handler does | Owner |
 |---|---|---|
-| Medical-ID.md: `medical_extract` | one medical PDF to its part of the validated medical card through Claude | [Medical-ID](../6-features/Medical-ID.md) |
+| Medical-ID.md: `medical_extract` | read one medical PDF from the blob store with Claude (effort low), check the answer in code, then `apply_medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
 | Payments-Nessie.md: `wallet_open` | open the attendee's Nessie customer and $200 checking account when they tap "Connect your Capital One wallet", then `record_wallet` | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | Merch.md, Payments-Nessie.md: `merch_purchase` | record a merch order as a Nessie purchase at the "BandIt merch" merchant, creating the merchant on the first purchase, then `settle_merch_order` | [Merch](../6-features/Merch.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | Hyphenate.md, Payments-Nessie.md: `claim_payout` | deposit an approved claim's payout into the claimant's Nessie wallet, opening an account if they have none, then `record_claim_payout` | [Hyphenate](../7-integrations/Hyphenate.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
@@ -229,7 +231,7 @@ Simulator.md: in the live event, the crowd (up to 80 crowd bands inside the modu
 | The Fly Machine restarts or is redeployed | The three cloud services drop for a few seconds | They restart with the identities saved on the volume and reconnect; leased jobs return through `job_reaper`. |
 | A service gets a new identity because its credentials file is lost | Its reducer calls are refused | The owner grants the role to the new identity from the dashboard; the refusal is logged loudly. |
 | `bandit-workers` crashes mid-job | Jobs stay leased | `job_reaper` returns them after the lease; an external call checks its recorded request id before it runs again. |
-| `bandit-api` is down | New phones cannot load the app; no uploads and no recap order | Phones that already loaded the app keep the thank-you screen, the medic view and the recap, which talk to SpacetimeDB directly. |
+| `bandit-api` is down | New phones cannot load the app; no uploads and no recap order | Phones that already loaded the app keep the thank-you screen and the recap, and the Ops dashboard keeps its incident desk, because they talk to SpacetimeDB directly. |
 | A secret is missing for one feature | That feature's handlers fail | Only those job kinds go `dead`; other features run, and the job monitor shows which kind is failing. |
 | Bindings out of date after a schema change | A service fails to start or misreads rows | The Rust and TypeScript bindings are regenerated on every publish and every client is rebuilt before the next rehearsal ([SpacetimeDB](../2-data/SpacetimeDB.md)). |
 

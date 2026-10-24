@@ -119,7 +119,7 @@ sequenceDiagram
     M-->>AT: my_merch_orders shows paid, my_wallet the new balance
 ```
 
-1. **Suggest.** The recap page subscribes to `my_merch_suggestions` and shows the three previews, each with its price, next to the wallet balance from `my_wallet`, or the "Connect your Capital One wallet" button when the attendee has no wallet ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
+1. **Suggest.** The recap page subscribes to `my_merch_suggestions` and shows the three previews, each with its price, next to the wallet balance from `my_wallet`, or "Opening your wallet" while `my_wallet` has no row ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
 2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended (`event_state.ended` is set, otherwise "merch opens in your recap once the event ends"), that the size fits the kind, that the caller has a confirmed tag on the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price. It then writes a `merch_order` in status `paying`, with the template's price as `amount_cents`, and enqueues `merch_purchase`. From then on the order's amount is held: the spendable balance leaves it out, so a second tap cannot spend the same money.
 3. **Settle.** `bandit-workers` records the purchase on the attendee's Nessie account and calls `settle_merch_order` ([Payments-Nessie](../7-integrations/Payments-Nessie.md)). The reducer rejects a stale lease, stores the merchant in `merch_shop` if it is not there yet, adds a `purchase` entry of minus the amount to `wallet_entry`, and sets the order `paid` with the Nessie purchase id.
 
@@ -159,7 +159,7 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 | Failure | Effect | Design answer |
 |---|---|---|
 | No photo qualifies: no confirmed tag yet | The merch section is empty | The section says there is nothing to suggest yet and points to the photos above, where confirming a tag makes a photo eligible |
-| The attendee has no wallet, or it is still opening | `buy_merch` refuses with "your BandIt wallet is still opening" | The recap shows "Connect your Capital One wallet" in place of "Buy" until `my_wallet` has a row |
+| The attendee has no wallet, or it is still opening | `buy_merch` refuses with "your BandIt wallet is still opening" | No order and no Nessie call; the wallet section shows "Opening your wallet" until `my_wallet` has a row |
 | Balance too low | `buy_merch` refuses with "not enough money in your BandIt wallet" | No order and no Nessie call |
 | Nessie unreachable | The order stays `paying` | The job retries, and a retry reuses a purchase with the same memo, so it never buys twice; after 3 attempts the order is `failed`, the money is free again, and the attendee can buy again |
 | Two quick taps | Two orders | Each order holds its amount at once, so the wallet never spends more than it holds |

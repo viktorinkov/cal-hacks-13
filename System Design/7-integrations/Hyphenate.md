@@ -27,7 +27,7 @@ Responsibilities:
 Non-responsibilities:
 
 - Detecting incidents, freezing snapshots, recording witnesses: [Safety](../6-features/Safety.md).
-- Storing or extracting medical data: [Medical-ID](../6-features/Medical-ID.md). Hyphenate only reads a card into evidence.
+- Medical-ID.md: the attendee's own medical card ([Medical-ID](../6-features/Medical-ID.md)). Hyphenate never reads it; a claim rests on the bill, the incident and the venue's policy.
 - Camera frames, property-damage detection and the per-incident `vision_assessment`: [Vision](../4-devices/Vision.md) (TBD -- LEO). Hyphenate only reads those rows into evidence.
 - Raw bridge logs: they stay on the venue laptop and are never evidence. The pack reads the `incident_snapshot` frozen in the same transaction as the incident ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
 - Calling banks: [Payments-Nessie](Payments-Nessie.md). Hyphenate enqueues the `claim_payout` job and records the result with `record_claim_payout`.
@@ -133,7 +133,7 @@ The pack is a set of `evidence_fact` rows plus one `evidence_pack` row that hash
 | `evidence_fact` field | Meaning |
 |---|---|
 | `claim_id`, `pack_version` | which claim and which pack build the fact belongs to |
-| `source` | one of `band_report`, `incident_snapshot`, `light_circle`, `staff_note`, `claimant`, `bill`, `vision_assessment` (TBD -- LEO), `medical_card`, `policy` |
+| `source` | one of `band_report`, `incident_snapshot`, `light_circle`, `staff_note`, `claimant`, `bill`, `vision_assessment` (TBD -- LEO), `policy` |
 | `key`, `value` | what the fact says, as text: for example `fall_flag` = `1`, `zone_id` = `102`, `allowed_cents` = `12000` |
 | `observed_at` | the time the fact is about (the beacon time, the note time, the service date, the frame time) |
 | `read_at` | when code or the model read it into the pack |
@@ -149,7 +149,6 @@ The pack is a set of `evidence_fact` rows plus one `evidence_pack` row that hash
 | `claimant` | the `injured_party` row and `staff_role` | the injured band, how they were added (`band` or the medic's pick), the venue staff role they hold or none (reader `code`) |
 | `bill` | `medical_record` and `claim_line` rows | provider NPI, invoice number, service date, billed total, visit reason and each line's code and billed amount (reader `model`, validated by code); each line's cap, allowed amount and decision (reader `code`); `ref` is the bill's SHA-256 and the page |
 | Vision.md (TBD -- LEO): `vision_assessment` | the incident's `vision_assessment` row, written a few seconds after the flag | confirmed yes or no, confidence, description (reader `model`; `ref` is the `model_call` id); each frame's capture time and the camera's zone from its `camera` row (reader `code`; `ref` is the frame's blob SHA-256) |
-| Medical-ID.md: `medical_card` | the subject attendee's `medical_card` | card status and emergency contact present (reader `code`); conditions relevant to the note (reader `model`, through `claim_draft`); the read is logged in `medical_access_log` with `via = claim` |
 | `policy` | `insurance_policy`, `coverage_rule` | policy number, purpose, cover kind, limit, deductible, aggregate remaining at open |
 
 Money uses only `code` facts and bill lines that passed code validation. A model judgment (the causation review, the vision assessment) never sets an amount.
@@ -382,7 +381,7 @@ Anthropic-Agent.md: without it, `claim_draft` and `recovery_letter` fill a fixed
 
 When an injury claim reaches `settling`, the module enqueues `claim_payout` ([Payments-Nessie](Payments-Nessie.md)) with the claim id, the claimant, their name, their wallet's account, `payout_cents` and the memo `BandIt claim <id> payout`. The worker deposits the amount into the claimant's Nessie wallet, where it shows in the attendee's recap, and calls `record_claim_payout` with the deposit id. That reducer rejects a stale lease, adds the wallet's `payout` entry, posts J3 with the deposit as the reference and moves the claim to `settled`. When the job is dead after its attempts, the claim stays `settling` and the Claims queue shows the job's error; a risk manager or adjuster calls `retry_claim_payout`, which queues the same job again. There is no manual payout.
 
-Simulator.md: a simulated claimant has no wallet. The worker opens a Nessie customer and an account with 0 for the payout, and `record_claim_payout` stores it as their wallet, so a simulated claim is paid the same way as a real one.
+A claimant with no wallet gets one at payout time: the job carries an empty customer and account, the worker opens a Nessie customer and an account with 0, and `record_claim_payout` stores it as their `claimant_account` with the `payout` entry and no $200 opening. Simulator.md: the test attendees that the `bandit-claims` tool sets up connect their wallet right after `update_profile`, so their payouts land in a $200 wallet, like a judge's.
 
 A `property` claim pays the venue's repair vendor, who has no Nessie account in BandIt, so J3 posts ledger-only at once, with reference `vendor`, and the claim moves to `settled`. The ledger and letters are the same either way; only the cash leg differs.
 
@@ -408,7 +407,7 @@ The question this diagram answers: what happens, in which component, from the fa
 
 ```mermaid
 sequenceDiagram
-  participant Med as Medic phone
+  participant Med as Medic (Ops dashboard)
   participant M as band1t module
   participant W as bandit-workers
   participant C as Claude
@@ -601,7 +600,6 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` blob upload `POST /api/blobs` with purpose `medical`, and the `bandit-workers` handlers.
 - Payments-Nessie.md: the `claim_payout` work in `bandit-workers`, which fills this file's `claimant_account`, and the wallet's `wallet_entry`. Without it, every payout is ledger-only: J3 posts at once when the claim reaches `settling`.
 - Anthropic-Agent.md: `claude-client`, `model_call`, the prompts for `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`. Without it, bill lines are typed with `enter_claim_lines`, every injury claim's causation is `none` and goes to a person, and letters are templates.
-- Medical-ID.md: `medical_card` as an evidence source, `medical_access_log` for the read. Without it, the pack has no card facts.
 - Vision.md (TBD -- LEO): `vision_assessment`, `camera` zones, frame blobs and `property_event`. Without it, the medic note and witnesses are the second source, and property incidents come only from the staff button.
 - Simulator.md: planted claims for the accuracy run, the stress test and steps 6 and 7 of the live-learning run. Without it, there is no scorecard, and steps 6 and 7 need a second real fall.
 - Elastic.md: `bandit-claims`, `bandit-claims-validate` and the 30 seeded past claims. Without it, claims carry no precedent checks and decide exactly the same.
@@ -621,7 +619,6 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 - Remove the Hyphenate hook bullet from `resolve_incident` in Safety.md and SpacetimeDB.md, the Hyphenate.md rows in SpacetimeDB.md's registry and roles tables, and the policy, coverage, authority, fee schedule and fallback rule files from the seed.
 - Remove the Hyphenate.md rows in Ops-Dashboard.md: the Claims queue with its scorecard, the incident card controls, the Report property damage button, their interface and subscription rows and the decision on the judge's grant. Staff can still open a `property` incident with the core Open incident control.
 - Remove the Hyphenate.md lines in Payments-Nessie.md: the `claim_payout` job, `record_claim_payout` and the `payout` entry.
-- Remove the `via = claim` row from the access log table in Medical-ID.md.
 - Remove the Hyphenate use cases from Anthropic-Agent.md, and the Hyphenate.md parts of Simulator.md (`plant_medic_visit`, `planted_incident`, the accuracy run, the stress test, the scripted claims run and the seeded staff grant).
 - Remove the Hyphenate.md part of Elastic.md (`bandit-claims`, `bandit-claims-validate`, the past-claims seed, the claims evidence dashboard, and their interface, failure and decision rows) and the claim precedent parts in Architecture.md (interfaces row, container diagram edge, data ownership note, the fourth meeting place and its diagram edge, the store row, the failure notes) and SpacetimeDB.md.
 - Remove the Hyphenate.md rows from the handler and endpoint registries in Rust-Backend.md, the Hyphenate.md rows in Flows.md (the risk manager, step 0c, step 9, its diagram index row, its failure row and its decision row), the prize row in Architecture.md, the Hyphenate consumer rows in Vision.md, F12 in Requirements.md, the two Hyphenate.md rows in Decisions.md, and the Hyphenate row and node in README.md.
@@ -649,7 +646,7 @@ Seed files: the two policies and their covers, the authority limits, the fee sch
 | A refusal writes a ceiling-0 rule version only when the rule would have settled that claim | a decoy refused for its own reason must not switch off a good rule during the accuracy run |
 | A learned rule matches only while its policy's period is open; it does not carry over to the next event | the rule is an approval under this policy's limits; a new policy starts with no rules |
 | Payments-Nessie.md: claim payouts go into the same `claimant_account` the wallet opens when the attendee connects it in setup | one Nessie account per attendee, so a payout and a merch purchase show in one balance |
-| A claimant with no wallet, such as a simulated one or an attendee who never connected one, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
+| A claimant with no wallet, an attendee who skipped the wallet step, is paid into a Nessie account opened at payout time | every payout to a person goes through Nessie, so the ledger and the timing are the same for every claimant |
 | Evidence windows: camera frames within 120 s of the band's flag time, the medic note within 30 min of resolution, the bill's service date within 3 days; all starting values, calibrate at the venue | wide enough for a real medic visit and an urgent-care trip, narrow enough that another event's paperwork cannot corroborate |
 | J1 is posted when a claim passes the code checks; a claim refused by them posts nothing | nothing was reserved, so nothing needs reversing; J1r then always means a refusal after the reserve |
 | `claim_draft` runs per incident when its claims are routed or auto-settled, and again for a rebuilt pack | the approver needs the summary and the suggested tolerance before deciding, and every figure must match the current pack |

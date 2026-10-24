@@ -40,16 +40,16 @@ Core components are what the safety features need. Optional components are featu
 | [Rust-Backend.md](3-services/Rust-Backend.md) | Cargo workspace and services | core | crates, processes and where they run, service identity, config and secrets, `bandit-api` and `bandit-workers` | SpacetimeDB |
 | [Gateway-Bridge.md](3-services/Gateway-Bridge.md) | `bandit-bridge`, `bandit-protocol` | core | serial to SpacetimeDB, batching, directive reconciliation, command delivery, press to confirm, raw logs | Hardware, SpacetimeDB |
 | [Hardware.md](4-devices/Hardware.md) | Bands, gateway, station markers | core | the fleet, radio, packet, on-band logic, state precedence, gateway wire protocol, NFC, power, limits | none |
-| [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, medic approach, evacuation, override | SpacetimeDB, Hardware, Gateway-Bridge |
+| [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, a medic taking an incident, low visibility, override, and the medic approach and dispersion routing (TBD -- LEO) | SpacetimeDB, Hardware, Gateway-Bridge |
 | [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for `ops`, the big-screen graph | SpacetimeDB, Safety |
-| [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, band setup and the thank-you screen, medic view, the recap page after the event | SpacetimeDB |
+| [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, band setup and the thank-you screen, the recap page after the event | SpacetimeDB |
 | [Simulator.md](3-services/Simulator.md) | The in-module crowd and the simulated bands, driven by `bandit-claims` | optional | a crowd of crowd bands with simulated owners inside the module, simulated bands 90 to 99 through `report_sim_band`, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
 | [Vision.md](4-devices/Vision.md) | Vision service (TBD -- LEO) | optional | camera counts, person-down alerts, incident assessments, photo features | SpacetimeDB; uses Anthropic-Agent when present |
-| [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one structured card, the medic access rule, the medic tap flow | Attendee-App; uses Anthropic-Agent when present |
+| [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card in the incident desk | Attendee-App, Ops-Dashboard, Anthropic-Agent |
 | [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
 | [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
 | [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Hyphenate when present |
-| [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims run, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Medical-ID, Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
+| [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims run, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
 | [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
 | [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
@@ -73,13 +73,12 @@ flowchart LR
   Merch --> Pay
   Merch -.-> BD
   Pay -.-> Hyp
-  Hyp -.-> Med
   Hyp -.-> Pay
   Hyp -.-> AI
   Hyp -.-> Vision
   Hyp -.-> Sim
   Hyp -.-> Ela
-  Med -.-> AI
+  Med --> AI
   Soc -.-> AI
   Soc -.-> Vision
   Soc -.-> BD
@@ -121,7 +120,7 @@ Deleting a core file is not intended; the safety features need all of them.
 | Grey, dashed | vision, still (TBD -- LEO) |
 
 - **Excalidraw diagrams.** The whole system is also drawn in [bandit-system-design.excalidraw](../diagrams/bandit-system-design.excalidraw), on branch `vik-excalidraw-diagrams`. Open it at excalidraw.com or with the Excalidraw extension for VS Code. The generator that draws it is in `diagrams/generator`. The Mermaid diagrams in these files are the reference.
-- **(TBD -- LEO)** marks anything about cameras or computer vision. Leo owns that part. The sections give Leo's starting defaults and the interface the rest of the system needs.
+- **(TBD -- LEO)** marks anything about cameras or computer vision, the space-time mapping (which zone a band is in over time), the medic-approach guidance and the dispersion routing. Leo owns those parts. The sections give Leo's starting defaults and the interface the rest of the system needs.
 - **Starting values.** Thresholds and timings that the firmware does not fix are labelled as starting values, to calibrate at the venue.
 - **Names.** Tables, reducers, roles and job kinds use exact `snake_case` names, defined once in the file that owns them ([SpacetimeDB](2-data/SpacetimeDB.md) for the core).
 - **Out of scope** is listed in [Requirements](1-overview/Requirements.md).

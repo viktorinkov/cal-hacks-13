@@ -21,13 +21,12 @@ Non-responsibilities:
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| `connect_wallet` | in | the attendee app: the wallet step at the end of setup, and the recap before checkout ([Attendee-App](../5-apps/Attendee-App.md)) | no arguments; the module enqueues `wallet_open` with the caller's display name and 20000 cents, unless the attendee is simulated, already has a wallet, or has one on the way | reducer |
+| `connect_wallet` | in | the attendee app: "Connect" on the wallet step at the end of setup ([Attendee-App](../5-apps/Attendee-App.md)) | no arguments; refuses "claim your band first" and "add your name first"; otherwise the module enqueues `wallet_open` with the caller's display name and 20000 cents, unless the attendee is simulated, already has a wallet, or has one on the way | reducer |
 | `record_wallet` | in | role `worker` | job id, Nessie customer id, account id | reducer; writes `claimant_account` and the `opening` entry; rejects a stale lease |
 | Merch.md: `settle_merch_order` | in | role `worker` | job id, merchant id, purchase id | reducer in Merch.md; adds the `purchase` entry |
 | Hyphenate.md: `record_claim_payout` | in | role `worker` | job id, customer id, account id, deposit id | reducer in Hyphenate.md; stores the account if the claimant had none and adds the `payout` entry |
 | Jobs `wallet_open`, `merch_purchase`, `claim_payout` | out | `bandit-workers` | payloads named below | `job` table, `claim_job`, `fail_job` |
-| `my_wallet`, `my_wallet_entries` | out | Attendee app: the wallet step ("Connected", $200) and the recap page | the account id, the spendable balance and when the wallet opened; the entries, oldest first | subscription |
-| `my_jobs` (core) | out | Attendee app, the wallet step | the status of the caller's `wallet_open` job, so a failed connection shows "Try again" | subscription |
+| `my_wallet`, `my_wallet_entries` | out | Attendee app: the wallet step ("Your wallet is connected", $200 to start) and the recap page's "Your BandIt wallet" | the account id, the spendable balance and when the wallet opened; the entries, oldest first | subscription |
 | Spendable balance | out | Merch.md's `buy_merch` | the sum of the caller's entries minus their merch orders still `paying` | module-internal call |
 | Nessie REST API | out | `bandit-workers` | customers, accounts, merchants, purchases, deposits | HTTPS; base URL and api key from configuration; the key as the `key` query parameter |
 
@@ -67,9 +66,9 @@ flowchart LR
 
 ### The wallet
 
-The last step of band setup is "Connect your Capital One wallet" ([Attendee-App](../5-apps/Attendee-App.md)). The attendee taps the button and the app calls `connect_wallet`. The reducer enqueues `wallet_open` with the caller's display name and the opening amount, 20000 cents ($200, starting value). It skips simulated attendees, attendees who already have a wallet, and attendees whose `wallet_open` job is still open, so a second tap queues nothing. The worker creates the customer and a `Checking` account named "BandIt wallet" with $200, then calls `record_wallet` with both ids. The reducer rejects a stale lease, writes the `claimant_account` row and adds an `opening` entry of +20000. The step shows "Connected" with the $200 opening balance from `my_wallet`, then the thank-you screen. BandIt opens a new account rather than linking an existing one, so every judge who taps has a funded wallet, with no bank details typed.
+The last step of band setup is "Connect your Capital One wallet", with "Connect" and "Skip" ([Attendee-App](../5-apps/Attendee-App.md)). "Connect" calls `connect_wallet`. The reducer refuses "claim your band first" when the caller has no `attendee` row and "add your name first" when the display name is empty. Otherwise it enqueues `wallet_open` with the caller's display name and the opening amount, 20000 cents ($200, starting value). It skips simulated attendees, attendees who already have a wallet, and attendees whose `wallet_open` job is still open, so a second tap queues nothing. The worker creates the customer and a `Checking` account named "BandIt wallet" with $200, then calls `record_wallet` with both ids. The reducer rejects a stale lease, writes the `claimant_account` row and adds an `opening` entry of +20000. The step shows "Connecting your Capital One wallet" until `my_wallet` has a row, then "Your wallet is connected" with the balance from `my_wallet`, $200 to start, and "Continue", which leads to the thank-you screen. BandIt opens a new account rather than linking an existing one, so every judge who taps has a funded wallet, with no bank details typed.
 
-When the job is dead after its 3 attempts, `my_jobs` shows it failed and the step shows "Try again", which calls `connect_wallet` again. Setup finishes without a wallet when the attendee skips the step or moves on; the recap page offers the same button before checkout.
+"Skip" finishes setup without a wallet. The wallet step is the only place that connects a wallet: the recap's wallet section, "Your BandIt wallet", shows the balance and its entries, or "Opening your wallet" while the attendee has no account, and has no connect button.
 
 Hyphenate.md: `claimant_account` is defined in [Hyphenate](Hyphenate.md), which pays claims into it. The wallet writes the same row when the attendee connects it, so claim payouts and merch purchases use one Nessie account per attendee. It holds every attendee's wallet.
 
@@ -99,21 +98,22 @@ sequenceDiagram
   participant M as band1t module
   participant W as bandit-workers
   participant N as Nessie
-  A->>M: connect_wallet (tap on Connect your Capital One wallet)
+  A->>M: connect_wallet (tap on Connect)
   M->>M: no wallet and none on the way: job wallet_open
+  A->>A: Connecting your Capital One wallet
   W->>M: claim_job (wallet_open)
   W->>N: POST customer
   W->>N: POST account, Checking, BandIt wallet, $200
   N-->>W: customer id, account id
   W->>M: record_wallet (customer id, account id)
   M->>M: claimant_account, wallet_entry opening +$200
-  M-->>A: my_wallet: Connected, $200
-  A->>A: the thank-you screen
+  M-->>A: my_wallet: Your wallet is connected, $200
+  A->>A: Continue, the thank-you screen
 ```
 
 ### Merch checkout
 
-After the event the attendee buys merch from the bottom of their recap page with one tap ([Merch](../6-features/Merch.md)); an attendee with no wallet first taps "Connect your Capital One wallet" there. `buy_merch` runs as the signed-in attendee: SpacetimeAuth gives the same SpacetimeDB identity on any device ([Attendee-App](../5-apps/Attendee-App.md)), so the attendee who taps is the attendee who pays. In the same transaction the reducer reads the caller's `claimant_account` and spendable balance, refuses anything the wallet cannot cover, writes the order as `paying` and enqueues `merch_purchase`.
+After the event the attendee buys merch from the bottom of their recap page with one tap ([Merch](../6-features/Merch.md)). An attendee with no wallet cannot buy: `buy_merch` refuses with "your BandIt wallet is still opening". `buy_merch` runs as the signed-in attendee: SpacetimeAuth gives the same SpacetimeDB identity on any device ([Attendee-App](../5-apps/Attendee-App.md)), so the attendee who taps is the attendee who pays. In the same transaction the reducer reads the caller's `claimant_account` and spendable balance, refuses anything the wallet cannot cover, writes the order as `paying` and enqueues `merch_purchase`.
 
 The worker claims the job. On the first purchase the payload's merchant id is empty, so the worker creates the "BandIt merch" merchant and keeps its id in its data folder (`<data_dir>/nessie/merchant.json`). It then looks for a purchase on the account whose description equals the memo (`BandIt merch order <id>: <title>`). It reuses that purchase, or posts a new one. Then it calls `settle_merch_order` with the merchant id and the purchase id. That reducer stores the merchant in `merch_shop` once, adds the `purchase` entry and marks the order paid.
 
@@ -141,7 +141,7 @@ sequenceDiagram
 
 A payout is money to an attendee: a claim settlement from [Hyphenate](Hyphenate.md). When a claim is approved, Hyphenate.md enqueues `claim_payout` with the claim id, the claimant, their name, their wallet's customer and account ids, the amount and the memo `BandIt claim <id> payout`. The worker deposits the amount into the account, reusing a deposit with the same memo, and calls `record_claim_payout` ([Hyphenate](Hyphenate.md)). That reducer adds a `payout` entry, so the money shows in the wallet section of the attendee's recap with the claim's memo.
 
-A claimant with no wallet (an attendee who never connected one; Simulator.md: every simulated claimant) gets a new Nessie customer and an account opened with 0 at payout time. The worker keeps their ids in `<data_dir>/nessie/claim-<id>.json` until `record_claim_payout` stores them as the claimant's `claimant_account`. A payout whose job fails 3 times leaves the claim waiting until a risk manager or adjuster calls `retry_claim_payout`, which queues the same job again.
+A claimant with no wallet (an attendee who skipped the wallet step) gets a new Nessie customer and an account opened with 0 at payout time: Hyphenate.md queues `claim_payout` with an empty customer and account. The worker keeps their ids in `<data_dir>/nessie/<database>-claim-<id>.json` until `record_claim_payout` stores them as the claimant's `claimant_account`. That wallet has no $200 `opening` entry, only the `payout` entry, and a later `connect_wallet` queues nothing, because the attendee now has a wallet. Simulator.md: the test attendees that the `bandit-claims` tool sets up call `connect_wallet` right after `update_profile`, so their payouts land in a $200 wallet. A payout whose job fails 3 times leaves the claim waiting until a risk manager or adjuster calls `retry_claim_payout`, which queues the same job again.
 
 ### Retries
 
@@ -171,7 +171,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 | Failure | Effect | Design answer |
 |---|---|---|
 | Balance too low | The purchase cannot be covered | `buy_merch` refuses before any order or Nessie call; the app shows "not enough money in your BandIt wallet" |
-| Nessie unreachable when the wallet opens | No wallet yet | The job retries within its 3 attempts; once it is dead, the wallet step shows "Try again", and setup can finish without a wallet; the recap offers the button again before checkout |
+| Nessie unreachable when the wallet opens | No wallet yet | The job retries within its 3 attempts; while it runs the step shows "Connecting your Capital One wallet". Once it is dead, the next tap of the band opens the thank-you screen, and the attendee has no wallet until a claim payout opens one |
 | Nessie unreachable during a purchase | The order stays `paying` | The job retries; after 3 attempts the order is `failed` and its money is free again, and the attendee can buy again |
 | Nessie unreachable during a payout | The claimant is not paid yet | The job retries; after 3 attempts the claim waits for `retry_claim_payout` (Hyphenate.md) |
 | A worker stops after Nessie answered | The job is leased again | The retry reuses the kept ids, the purchase or the deposit, so nothing is created twice |
@@ -181,7 +181,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): `attendee`, `staff_role`, `job`, the job reducers, `my_jobs`.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): `attendee`, `staff_role`, `job`, the job reducers.
 - Hyphenate.md: the definition of `claimant_account`. Without Hyphenate.md, the table moves into this file unchanged ([Hyphenate](Hyphenate.md)).
 - [Attendee-App](../5-apps/Attendee-App.md): the wallet step at the end of setup and the recap's wallet section.
 - [Rust-Backend](../3-services/Rust-Backend.md): `bandit-workers` and the Nessie base URL and key in its configuration.
@@ -207,7 +207,7 @@ A small module inside `bandit-workers`. It has a base URL and api key from confi
 | Decision | Why |
 |---|---|
 | The wallet opens at the last setup step, when the attendee taps "Connect your Capital One wallet": `connect_wallet` queues `wallet_open` | The attendee chooses to connect it, and every judge who taps has a funded wallet for merch and claim payouts, with nothing to type |
-| A failed connection shows "Try again" on the step; setup finishes without a wallet, and the recap offers the same button before checkout | A Nessie problem never blocks setup, and the money moments come after the event |
+| The wallet step has "Connect" and "Skip", and nothing else connects a wallet; the recap shows the wallet or "Opening your wallet" | one place to ask, and a Nessie problem never blocks setup |
 | During the event the attendee sees the wallet only on the wallet step; the balance and movements show in the recap | The attendee page is the thank-you screen during the event; the recap is where the attendee spends and receives money |
 | Every new wallet opens with $200 | Enough for every template at once |
 | The balance is the sum of `wallet_entry` in the module, never Nessie's balance | The sandbox never moves an account's balance; the module's sum is exact and live |
