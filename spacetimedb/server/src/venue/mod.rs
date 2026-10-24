@@ -1,4 +1,5 @@
 pub mod import;
+pub mod setup;
 pub mod tables;
 
 pub use tables::*;

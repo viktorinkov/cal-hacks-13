@@ -222,6 +222,14 @@ export const CheckIn = __t.object("CheckIn", {
 });
 export type CheckIn = __Infer<typeof CheckIn>;
 
+export const ChosenVenue = __t.object("ChosenVenue", {
+  id: __t.u8(),
+  setupId: __t.u64(),
+  chosenBy: __t.identity(),
+  chosenAt: __t.timestamp(),
+});
+export type ChosenVenue = __Infer<typeof ChosenVenue>;
+
 export const Claim = __t.object("Claim", {
   id: __t.u64(),
   incidentId: __t.u64(),
@@ -1371,6 +1379,66 @@ export const VenueIn = __t.object("VenueIn", {
   fetchedAt: __t.timestamp(),
 });
 export type VenueIn = __Infer<typeof VenueIn>;
+
+export const VenueSetup = __t.object("VenueSetup", {
+  id: __t.u64(),
+  eventName: __t.string(),
+  status: __t.string(),
+  eventSite: __t.string(),
+  venueName: __t.string(),
+  address: __t.string(),
+  mapUrl: __t.string(),
+  method: __t.string(),
+  modelUrl: __t.string(),
+  layoutUrl: __t.string(),
+  modelBytes: __t.u64(),
+  meshes: __t.u32(),
+  triangles: __t.u32(),
+  places: __t.u32(),
+  sizeX: __t.f32(),
+  sizeY: __t.f32(),
+  sizeZ: __t.f32(),
+  floorPlans: __t.array(__t.string()),
+  get sources() {
+    return __t.array(Fact);
+  },
+  error: __t.string(),
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type VenueSetup = __Infer<typeof VenueSetup>;
+
+export const VenueSetupResult = __t.object("VenueSetupResult", {
+  eventSite: __t.string(),
+  venueName: __t.string(),
+  address: __t.string(),
+  mapUrl: __t.string(),
+  method: __t.string(),
+  modelHash: __t.string(),
+  layoutHash: __t.string(),
+  modelBytes: __t.u64(),
+  meshes: __t.u32(),
+  triangles: __t.u32(),
+  places: __t.u32(),
+  sizeX: __t.f32(),
+  sizeY: __t.f32(),
+  sizeZ: __t.f32(),
+  floorPlans: __t.array(__t.string()),
+  get sources() {
+    return __t.array(Fact);
+  },
+});
+export type VenueSetupResult = __Infer<typeof VenueSetupResult>;
+
+export const VenueSetupStep = __t.object("VenueSetupStep", {
+  id: __t.u64(),
+  setupId: __t.u64(),
+  step: __t.string(),
+  detail: __t.string(),
+  at: __t.timestamp(),
+});
+export type VenueSetupStep = __Infer<typeof VenueSetupStep>;
 
 export const VisionAssessment = __t.object("VisionAssessment", {
   id: __t.u64(),

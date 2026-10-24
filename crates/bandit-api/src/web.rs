@@ -59,6 +59,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/style.css", file("style.css"))
         .nest_service("/js", ServeDir::new(web.root.join("web/dist")))
         .nest_service("/assets/merch", ServeDir::new(web.root.join("assets/merch")))
+        .nest_service("/venue", ServeDir::new(web.root.join("web/venue")))
         .route("/config.json", get(config))
         .route("/api/blobs", post(upload))
         .route("/blobs/{hash}", get(blob))
@@ -195,6 +196,10 @@ async fn blob(State(app): AppState, Path(hash): Path<String>) -> Response {
                 "application/pdf"
             } else if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
                 "image/png"
+            } else if bytes.starts_with(b"glTF") {
+                "model/gltf-binary"
+            } else if bytes.starts_with(b"{") || bytes.starts_with(b"[") {
+                "application/json"
             } else {
                 "image/jpeg"
             };

@@ -12,6 +12,7 @@ bandit-common = { path = "../bandit-common" }
 claims-elastic = { path = "../claims-elastic" }
 claude-client = { path = "../claude-client" }
 bandit-insurance = { path = "../bandit-insurance" }
+regex = "1"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Runs as root on the Debian VM: installs Chromium (for the medical record PDFs), Caddy, Rust and Bun,
-# checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, then (re)starts
+# checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, sets up the Python the
+# venue setup runs pipeline/venue_model.py with (Playwright drives Bright Data's browser), then (re)starts
 # bandit-api, bandit-indexer and bandit-workers under systemd behind Caddy on https://$BANDIT_HOST.
 # scripts/deploy-vm copies /opt/bandit/.env and /var/lib/bandit/identities first, then runs this.
 set -euo pipefail
@@ -9,7 +10,7 @@ APP=/opt/bandit
 
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl git build-essential pkg-config libssl-dev unzip \
-  chromium fonts-liberation caddy > /dev/null
+  chromium fonts-liberation caddy python3-venv > /dev/null
 printf '#!/bin/sh\nexec chromium --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/chrome
 chmod +x /usr/local/bin/chrome
 [ -x /root/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --default-toolchain 1.97.1
@@ -32,6 +33,8 @@ git reset -q --hard FETCH_HEAD
 echo "building $(git log --oneline -1)"
 (cd web && bun install --silent && bun run --silent build > /dev/null)
 CARGO_PROFILE_DEV_DEBUG=0 cargo build -q -p bandit-api -p bandit-indexer -p bandit-workers -p bandit-claims
+[ -x var/venv/bin/python3 ] || python3 -m venv var/venv
+var/venv/bin/pip install -q playwright requests
 
 install -m 644 deploy/bandit@.service /etc/systemd/system/bandit@.service
 systemctl daemon-reload
