@@ -1,8 +1,8 @@
 #!/bin/sh
-# Deploy BandIt to a Debian VM, for example the Azure one: scripts/deploy-vm azureuser@<dns name>.
+# Deploy BandIt to the Debian VM: scripts/deploy-vm root@band1t.vip (the Vultr server).
 # Copies the service keys from .env, the module owner's token and the Maincloud identities over SSH straight
 # to the VM, then runs deploy/setup.sh there with sudo, which builds $BANDIT_BRANCH (default vik-deploy) and
-# serves it on https://<dns name>. Run it again to update the VM.
+# serves it on https://<dns name> and www. Run it again to update the VM.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="$1"
