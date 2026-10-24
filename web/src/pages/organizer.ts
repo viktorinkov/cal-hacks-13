@@ -1,11 +1,11 @@
-// The host portal: the live event from the bands, alerts, who joined, insurance claims from the
+// The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the import runs, Kibana, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
 
 import {
-  act, actors, config, connect, date, field, h, idToken, money, mount, playedToken, risk, short, signIn,
+  act, actors, config, connect, date, field, h, idToken, money, mount, risk, signIn,
   signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
 import type { DbConnection } from '../module_bindings';
@@ -109,15 +109,15 @@ function header() {
   const state = conn.db.eventState.id.find(0);
   const ended = state?.ended ?? false;
   return [
-    h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} host portal`),
+    h('h2', {}, `${conn.db.venue.iter().next().value?.name ?? 'Event'} organizer portal`),
     h('p', {},
-      cfg.simulate && h('label', { class: 'check' }, 'Play as',
-        h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
-          h('option', { value: '' }, 'choose a person'),
+      signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
+    h('p', {},
+      cfg.simulate && h('label', { class: 'check' }, 'Test as',
+        h('select', { onchange: (e: Event) => { const v = (e.target as HTMLSelectElement).value; location.search = v ? `?as=${v}` : ''; } },
+          h('option', { value: '' }, 'myself'),
           people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
-      !as && signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')],
-      !as && !idToken() && cfg.auth_client_id && h('button', { onclick: signIn }, 'Sign in with email'),
-      h('span', { class: 'muted' }, ` Identity ${short(conn.identity!)}: ${roleList.length ? roleList.join(', ') : 'no staff role yet'}`)),
+      h('span', { class: 'muted' }, ` Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`)),
     can('ops') && h('p', {},
       ended
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
@@ -127,13 +127,21 @@ function header() {
   ];
 }
 
-/** A signed-in person with no staff role sees their identity, for the owner to grant a role to with the CLI. */
+/** A signed-in person with no staff role sees the code the organizer adds them by. */
 function noRole() {
   return h('section', {},
-    h('h3', {}, 'This page is for event staff'),
-    h('p', {}, 'Show this code to the module owner, who grants your role:'),
-    h('p', { class: 'big' }, h('code', {}, short(conn.identity!))),
-    h('p', { class: 'muted' }, `Full identity ${conn.identity!.toHexString()}`));
+    h('h3', {}, 'This account has no staff role'),
+    h('p', {}, 'The organizer portal is for the event\'s organizer and medics. To get access, send this code to the organizer:'),
+    h('p', {}, h('code', {}, conn.identity!.toHexString())));
+}
+
+/** The first screen: staff sign in before they see anything. */
+function signInScreen() {
+  return [
+    h('h2', {}, 'BandIt organizer portal'),
+    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, claims and the end of the event.'),
+    h('button', { onclick: signIn }, 'Sign in with email'),
+  ];
 }
 
 // --- Live -----------------------------------------------------------------------------------
@@ -485,10 +493,9 @@ function render() {
 
 async function main() {
   cfg = await config();
+  // Sign-in comes first wherever SpacetimeAuth is set up; testing as someone else is only offered after it.
+  if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.simulate) people = await actors();
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.simulate) {
-    return mount('app', h('h2', {}, 'Host portal'), h('button', { onclick: signIn }, 'Sign in with email'));
-  }
   conn = await connect(QUERIES, render);
   window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);
