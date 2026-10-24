@@ -12,6 +12,7 @@ pub mod insurance;
 pub mod jobs;
 pub mod safety;
 pub mod vision;
+pub mod web;
 
 use spacetimedb::{ReducerContext, Table};
 use tables::*;
