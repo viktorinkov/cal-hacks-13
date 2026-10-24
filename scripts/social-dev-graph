@@ -25,7 +25,7 @@ def sql(query):
 
 
 def graph():
-    people = {a["node_id"]: a for a in sql("SELECT node_id, display_name, photo_url, simulated FROM attendee WHERE findable = true")}
+    people = {a["node_id"]: a for a in sql("SELECT node_id, display_name, photo_url, crowd FROM attendee WHERE findable = true")}
     booths = {b["id"]: b["name"] for b in sql("SELECT id, name FROM booth")}
     companies = {o["id"]: o["name"] for o in sql("SELECT id, name FROM organization")}
     links = sql("SELECT key, kind, from_kind, from_id, to_kind, to_id, weight FROM people_link")

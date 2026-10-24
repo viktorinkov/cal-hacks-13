@@ -514,7 +514,7 @@ mod tests {
             findable,
             person_id: 0,
             organization_id: 0,
-            simulated: false,
+            crowd: false,
             created_at: at(0),
             updated_at: at(0),
         }

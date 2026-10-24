@@ -132,7 +132,7 @@ fn write_visit(ctx: &ReducerContext, zv: &ZoneVisit, zones: &mut HashMap<u8, u64
     };
     link_visited(ctx, visit.attendee, visit.zone_id, visit.booth_id);
     // Shared visits are between people who tapped their bands; the crowd only meets people up close.
-    if !a.simulated {
+    if !a.crowd {
         update_shared_visits(ctx, &visit);
     }
 }
@@ -152,7 +152,7 @@ fn update_shared_visits(ctx: &ReducerContext, v: &Visit) {
         .zone_id()
         .filter(v.zone_id)
         .filter(|o| o.attendee != v.attendee)
-        .filter(|o| ctx.db.attendee().identity().find(o.attendee).is_some_and(|a| a.findable && !a.simulated))
+        .filter(|o| ctx.db.attendee().identity().find(o.attendee).is_some_and(|a| a.findable && !a.crowd))
         .collect();
     for other in others {
         let (secs, started_at) = overlap(stay(v, ctx.timestamp), stay(&other, ctx.timestamp));

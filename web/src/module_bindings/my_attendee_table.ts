@@ -18,7 +18,7 @@ export default __t.row({
   findable: __t.bool(),
   personId: __t.u64().name("person_id"),
   organizationId: __t.u64().name("organization_id"),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
 });

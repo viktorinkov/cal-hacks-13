@@ -20,4 +20,4 @@ attendee update_profile '"Viktor"' true
 attendee set_social_handle '"instagram"' '"viktorinkovski"'
 attendee claim_person 1
 "$ROOT/scripts/q" "SELECT band_id FROM band_owner WHERE band_id = 3"
-"$ROOT/scripts/q" "SELECT display_name, findable, person_id, organization_id FROM attendee WHERE simulated = false"
+"$ROOT/scripts/q" "SELECT display_name, findable, person_id, organization_id FROM attendee WHERE crowd = false"

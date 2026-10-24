@@ -133,5 +133,5 @@ export function venueMap(c: DbConnection) {
 
 export const MAP_LEGEND: [string, string][] = [
   [STATE_COLOURS[0], 'calm'], [STATE_COLOURS[1], 'busy'], [STATE_COLOURS[2], 'very busy'],
-  [NUMBERED, 'bands 1 to 99'], [ALARM, 'fall or SOS'], ['#c69500', 'booth'],
+  [NUMBERED, 'hardware and test bands'], [ALARM, 'fall or SOS'], ['#c69500', 'booth'],
 ];

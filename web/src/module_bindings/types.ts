@@ -42,7 +42,7 @@ export const Attendee = __t.object("Attendee", {
   findable: __t.bool(),
   personId: __t.u64(),
   organizationId: __t.u64(),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
 });

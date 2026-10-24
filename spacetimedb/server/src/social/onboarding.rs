@@ -20,7 +20,7 @@ fn attendee_or_new(ctx: &ReducerContext, who: Identity) -> Attendee {
             findable: false,
             person_id: 0,
             organization_id: 0,
-            simulated: false,
+            crowd: false,
             created_at: ctx.timestamp,
             updated_at: ctx.timestamp,
         })

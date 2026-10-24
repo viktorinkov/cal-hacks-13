@@ -216,7 +216,7 @@ pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
                 .or_else(|| ctx.db.crowd_member().identity().find(a.identity).map(|m| m.band_id))
                 .unwrap_or(0),
             findable: a.findable,
-            crowd: a.simulated,
+            crowd: a.crowd,
             organization: ctx.db.organization().id().find(a.organization_id).map(|o| o.name).unwrap_or_default(),
             handles: ctx
                 .db
