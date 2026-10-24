@@ -24,11 +24,11 @@ Every process, where it runs, what it may do in the database, and what it talks 
 |---|---|---|---|---|---|
 | `band1t` module | `bandit-module` | SpacetimeDB Maincloud | runs inside the database | nothing outside the database | none |
 | `bandit-bridge` | `bandit-bridge` | venue laptop | `bridge` | the gateway over USB serial | its SpacetimeDB token |
-| Simulator.md: the `bandit-claims` command-line tool | `bandit-claims` | venue laptop | `simulator` (its `sim` identity, for the simulated bands); Hyphenate.md: the test identities it plays, among them `medic` | nothing outside; Hyphenate.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
-| `bandit-ingest` | `bandit-ingest` | venue laptop, before the event | `ingest` | the `band1t` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Hyphenate.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
+| Simulator.md: the `bandit-claims` command-line tool | `bandit-claims` | venue laptop | `simulator` (its `sim` identity, for the simulated bands); Insurance.md: the test identities it plays, among them the medic (`medic`) and the organizer (`ops`) | nothing outside; Insurance.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
+| `bandit-ingest` | `bandit-ingest` | venue laptop, before the event | `ingest` | the `band1t` module (seed mode); BrightData.md: the Bright Data Web MCP, the Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the organizer workflow; Insurance.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; BrightData.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Fly.io Machine | `indexer` | Elastic Serverless: the one-way copy, including the `bandit-people` sync of each findable attendee's interests | SpacetimeDB token, Elastic key |
 | `bandit-api` | `bandit-api` | Fly.io Machine | `api` | browsers over HTTPS, the blob store on the Fly volume; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key; Simulator.md: the `simulator` token for the dev routes |
-| `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie; Elastic.md, Hyphenate.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie base URL and key; Elastic.md, Hyphenate.md: Elastic claims key |
+| `bandit-workers` | `bandit-workers` | Fly.io Machine | `worker` | the blob store on the Fly volume; Anthropic-Agent.md: Claude API; Payments-Nessie.md: Nessie; Elastic.md, Insurance.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token; Anthropic-Agent.md: Anthropic key; Payments-Nessie.md: Nessie base URL and key; Elastic.md, Insurance.md: Elastic claims key |
 | Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | venue laptop | `vision` | the overhead phone camera, `bandit-api` for frame uploads; Anthropic-Agent.md: Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
 
 ## Design
@@ -107,7 +107,7 @@ Every process is a SpacetimeDB client with its own identity, so every reducer ca
 sequenceDiagram
   participant P as Rust service
   participant M as band1t module
-  participant O as Owner (Ops dashboard staff panel)
+  participant O as Owner (SpacetimeDB command line)
   P->>M: first connect, no saved token
   M-->>P: new identity and token
   P->>P: save token to its credentials file, log its identity
@@ -117,8 +117,8 @@ sequenceDiagram
   M->>M: check staff_role for caller, then act
 ```
 
-- The module's init reducer records the publishing identity as `owner`. Only the owner can call `grant_role` and `revoke_role`; the module refuses every other caller.
-- People do not keep a saved token: they sign in with SpacetimeAuth, and the owner grants their roles the same way, from the short identity code on their screen ([SpacetimeDB](../2-data/SpacetimeDB.md)).
+- The module's init reducer records the publishing identity as `owner`. Only the owner can call `grant_role`, `revoke_role` and `add_owner`; the module refuses every other caller.
+- People do not keep a saved token: they sign in with SpacetimeAuth, and the owner grants their roles the same way, with `grant_role` from the command line and the short identity code on their screen ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 - Each service keeps its token in a credentials file, never in the repo. The three services on the Fly Machine keep theirs on the Fly volume, so a redeploy keeps their identities; the laptop processes keep theirs in a local file. A restart therefore keeps the identity, and the role survives it.
 - Service roles are narrow: the bridge can report bands and acknowledge commands but cannot touch claims; workers can submit job results but cannot force band states.
 
@@ -159,15 +159,15 @@ sequenceDiagram
 |---|---|---|
 | health | liveness for the dashboard and scripts | this file |
 | app files | the Ops dashboard and attendee app bundles, and every app route including `/t/BANDIT-0n` | this file |
-| `POST /api/blobs` | stream a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Hyphenate.md: purpose `medical` as `staff`; Medical-ID.md: purposes `history` and `insurance` as `owner_only`, owned by the attendee whose API session sent the file); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
+| `POST /api/blobs` | stream a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Insurance.md: purpose `medical` as `staff`; Medical-ID.md: purposes `history` and `insurance` as `owner_only`, owned by the attendee whose API session sent the file); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
 | `GET /blobs/{hash}` | serve a stored file by its hash if the caller passes its access class | this file |
 | Elastic.md: `GET /recap/order` | handler `rank_recap`: orders the caller's recap people and booths by meaning, holding the Elastic key; the candidates come from Social.md's views `social_encounters` and `social_visits`, never from Elastic | [Elastic](../7-integrations/Elastic.md) |
 | Medical-ID.md: document upload, `/samples` | the attendee page sends each medical PDF to `POST /api/blobs` with purpose `history` or `insurance` and the attendee's API session, then calls `submit_medical_document` itself as the attendee, which enqueues `medical_extract`; `/samples` serves the synthetic `medical-history.pdf` and `insurance-card.pdf` for the "Use the sample PDF" button, which the page shows in test mode only | [Medical-ID](../6-features/Medical-ID.md) |
-| Hyphenate.md: bill upload | the Ops dashboard's incident card uploads an urgent-care bill PDF (at most 10 MB) through `POST /api/blobs` with purpose `medical`, then calls `submit_medical_record` as the signed-in staff member, which enqueues `claim_record_extract` | [Hyphenate](../7-integrations/Hyphenate.md) |
+| Insurance.md: bill upload | the Ops dashboard's incident card uploads an urgent-care bill PDF (at most 10 MB) through `POST /api/blobs` with purpose `medical`, then calls `submit_medical_record` as the signed-in staff member, which enqueues `claim_record_extract` | [Insurance](../6-features/Insurance.md) |
 | Social.md: photographer photo upload, share-link page | photos in through `POST /api/blobs` with purpose `photo`; the public page for a share token | [Social](../6-features/Social.md) |
-| Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | test mode only (`BANDIT_SIMULATE=1`): press a simulated band 94 to 99 or move it to a station, through `report_sim_band` as the `simulator` identity; the pressed bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
+| Simulator.md: `POST /api/dev/press/{band}`, `POST /api/dev/move/{band}/{station}` | test mode only (`BANDIT_SIMULATE=1`): press a simulated band 94 to 99, or move any simulated band 90 to 99 to a station, through `report_sim_band` as the `simulator` identity; the pressed and moved bands keep reporting every 2 s until `event_state.ended` is set | [Simulator](Simulator.md) |
 | Simulator.md: `POST /api/dev/fall/{band}` | test mode only, the Simulate tab's "Fall here": runs `bandit-claims fall` for a simulated band 90 to 99, with two of the claims story's bands (the first two of 90, 92, 93 and 91 that are not the band) as the light circle; the band's own 2 s reports pause meanwhile | [Simulator](Simulator.md) |
-| Simulator.md: `POST /api/dev/property/{station}` | test mode only, the Simulate tab's "Speaker breaks in <zone>": runs `bandit-claims property --camera` for the zone of that station, with the note "a speaker was knocked off its stand and cracked" and a repair cost of $2,400 | [Simulator](Simulator.md), [Hyphenate](../7-integrations/Hyphenate.md) |
+| Simulator.md: `POST /api/dev/property/{station}` | test mode only, the Simulate tab's "Speaker breaks in <zone>": runs `bandit-claims property --camera` for the zone of that station, with the note "a speaker was knocked off its stand and cracked" and a repair cost of $2,400 | [Simulator](Simulator.md), [Insurance](../6-features/Insurance.md) |
 
 ### `bandit-workers`: the job runner
 
@@ -203,9 +203,9 @@ stateDiagram-v2
 | Medical-ID.md: `medical_extract` | read one medical PDF from the blob store with Claude (effort low), check the answer in code, then `apply_medical_extract` | [Medical-ID](../6-features/Medical-ID.md) |
 | Payments-Nessie.md: `wallet_open` | open the attendee's Nessie customer and $200 checking account when they tap "Connect your Capital One wallet", then `record_wallet` | [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
 | Merch.md, Payments-Nessie.md: `merch_purchase` | record a merch order as a Nessie purchase at the "BandIt merch" merchant, creating the merchant on the first purchase, then `settle_merch_order` | [Merch](../6-features/Merch.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
-| Hyphenate.md, Payments-Nessie.md: `claim_payout` | deposit an approved claim's payout into the claimant's Nessie wallet, opening an account if they have none, then `record_claim_payout` | [Hyphenate](../7-integrations/Hyphenate.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
-| Hyphenate.md: `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | bill PDF to validated service lines through Claude, priced later by the module; a causation verdict from the pack's facts, with no amounts; the first notice of loss in ACORD 3 layout and the claim summaries; the recovery query letter | [Hyphenate](../7-integrations/Hyphenate.md) |
-| Elastic.md, Hyphenate.md: `claim_verify` | build the de-identified claim copy in code, index it into `bandit-claims` through `bandit-claims-validate`, rank it against the seeded past claims, and submit the ids and scores with `submit_claim_checks` | [Hyphenate](../7-integrations/Hyphenate.md), [Elastic](../7-integrations/Elastic.md) |
+| Insurance.md, Payments-Nessie.md: `claim_payout` | deposit an approved claim's payout into the claimant's Nessie wallet, opening an account if they have none, then `record_claim_payout` | [Insurance](../6-features/Insurance.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md) |
+| Insurance.md: `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | bill PDF to validated service lines through Claude, priced later by the module; a causation verdict from the pack's facts, with no amounts; the first notice of loss in ACORD 3 layout and the claim summaries; the recovery query letter | [Insurance](../6-features/Insurance.md) |
+| Elastic.md, Insurance.md: `claim_verify` | build the de-identified claim copy in code, index it into `bandit-claims` through `bandit-claims-validate`, rank it against the seeded past claims, and submit the ids and scores with `submit_claim_checks` | [Insurance](../6-features/Insurance.md), [Elastic](../7-integrations/Elastic.md) |
 | Vision.md (TBD -- LEO): `photo_features` | not a `bandit-workers` handler; `bandit-vision` claims it with the `vision` role | [Vision](../4-devices/Vision.md) |
 
 ### Health and logs
@@ -239,7 +239,7 @@ Simulator.md: in the live event, the crowd (up to 80 crowd bands inside the modu
 
 **Depends on:** [SpacetimeDB](../2-data/SpacetimeDB.md) (tables, reducers, roles, the job queue), [Architecture](../1-overview/Architecture.md) (deployment).
 
-**Used by:** every Rust component doc ([Gateway-Bridge](Gateway-Bridge.md), [Simulator](Simulator.md), [BrightData](../7-integrations/BrightData.md), [Elastic](../7-integrations/Elastic.md), [Anthropic-Agent](../7-integrations/Anthropic-Agent.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md), [Medical-ID](../6-features/Medical-ID.md), [Hyphenate](../7-integrations/Hyphenate.md), [Social](../6-features/Social.md), [Merch](../6-features/Merch.md), [Vision](../4-devices/Vision.md)), and the web apps, which `bandit-api` serves.
+**Used by:** every Rust component doc ([Gateway-Bridge](Gateway-Bridge.md), [Simulator](Simulator.md), [BrightData](../7-integrations/BrightData.md), [Elastic](../7-integrations/Elastic.md), [Anthropic-Agent](../7-integrations/Anthropic-Agent.md), [Payments-Nessie](../7-integrations/Payments-Nessie.md), [Medical-ID](../6-features/Medical-ID.md), [Insurance](../6-features/Insurance.md), [Social](../6-features/Social.md), [Merch](../6-features/Merch.md), [Vision](../4-devices/Vision.md)), and the web apps, which `bandit-api` serves.
 
 **If you delete this file:** not intended; it is core. When you delete an optional feature, remove its rows from the endpoint registry and the handler registry above, its crate if it has one (`claude-client` with Anthropic-Agent.md), its module in `bandit-workers` if it has one (`nessie` with Payments-Nessie.md), its third-party crate (`image` with Vision.md), its process row and its secrets in the Interfaces table, and its bullet in "Where the processes run" and its run profile row and line (Simulator.md, Vision.md).
 

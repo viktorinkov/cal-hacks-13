@@ -303,7 +303,7 @@ The log serves three purposes: replay through [Simulator](Simulator.md), a post-
 |---|---|
 | No per-band "desired versus reported" field on `band_report` | the bridge's heartbeat counters are enough, and a band that has not obeyed shows its real colour on the dashboard map |
 | Each band is re-sent at least once a second (the heartbeat report), with one gateway | it keeps the module's heard time moving at a cost of at most nine extra records a second |
-| Raw logs stay on the laptop as JSON-lines files and are not uploaded | they serve replay, post-mortem and calibration; Hyphenate.md's evidence pack uses the incident snapshot rows instead |
+| Raw logs stay on the laptop as JSON-lines files and are not uploaded | they serve replay, post-mortem and calibration; Insurance.md's evidence pack uses the incident snapshot rows instead |
 | The serial port is a configured path, not auto-detected | a band charging on the same laptop has the same USB ids as the gateway |
 | One reboot rule: a `seq` that goes backwards is a reboot unless the last value was above 64000 | one rule covers a quick reboot and a band that comes back after a long silence |
 | A guidance `buzz` goes out after its target's pending `state` and `exit` commands | the wearer who feels it must see the new colour when they look down |

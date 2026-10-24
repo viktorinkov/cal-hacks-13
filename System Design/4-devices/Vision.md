@@ -11,7 +11,7 @@ Responsibilities (the interface):
 - Write a fresh people count for the pit into `camera_count` through `report_zone_count`.
 - Raise and refresh a person-down alert through `report_ground_alert`.
 - On each new `sos`, `fall` or `property` incident in the pit, have Claude judge the frames and write the result through `submit_vision_assessment`.
-- Report property events through `report_property_event`, attached to a `property` incident; [Hyphenate](../7-integrations/Hyphenate.md) reads them as evidence.
+- Report property events through `report_property_event`, attached to a `property` incident; [Insurance](../6-features/Insurance.md) reads them as evidence.
 - Supply photo features through `submit_photo_features` for [Social](../6-features/Social.md)'s photo tagging.
 - Store frames as blobs through `bandit-api` and pass `blob_ref` ids as evidence.
 - Send a `heartbeat` every 5 s like every other Rust service.
@@ -51,7 +51,7 @@ One Rust process, `bandit-vision`, on the venue laptop. All of this is Leo's to 
 - Detector. YOLO person and pose models run through ONNX Runtime inside `bandit-vision`, with no sidecar process. They yield boxes and pose keypoints for each frame.
 - Pit check, on every third frame (every 3 s). From the boxes, the people count inside the taped square and the count per cell of a 3 by 3 grid over it; from the frame's colours, whether a ring of blue lights (the light circle) is visible. It goes out through `report_zone_count`. Every 10 s one frame is also uploaded for the Ops dashboard's camera tile.
 - Person down, on every frame. From the pose: a torso near horizontal and low in two consecutive frames (starting value) raises a `ground_alert` through `report_ground_alert`, refreshed every second while the person stays down.
-- Claude, live, on incidents only. When `vision_incidents` delivers a new `sos`, `fall` or `property` incident in the pit, `bandit-vision` waits until 3 s after the incident's first signal, then builds a bundle: the 8 frames from 4 s before to 3 s after, labelled with their time offset; the detector's boxes and a pose summary as text; and the snapshot's band rows as text (band ids in the zone, states, flags, light-circle members). It calls `claude-opus-5-5` at medium effort with structured JSON output, through `claude-client` with the workers' Anthropic key, and caches the system prompt and an empty-pit reference frame. The judgment (confirmed yes or no, confidence, a description for staff, a recommended action) and the insurance-ready incident description go out through `submit_vision_assessment`, which also sets `incident.vision_status`. For a `property` incident the result also goes out through `report_property_event` with the incident id, so [Hyphenate](../7-integrations/Hyphenate.md) has the event row and its frames. There is no periodic Claude loop.
+- Claude, live, on incidents only. When `vision_incidents` delivers a new `sos`, `fall` or `property` incident in the pit, `bandit-vision` waits until 3 s after the incident's first signal, then builds a bundle: the 8 frames from 4 s before to 3 s after, labelled with their time offset; the detector's boxes and a pose summary as text; and the snapshot's band rows as text (band ids in the zone, states, flags, light-circle members). It calls `claude-opus-5-5` at medium effort with structured JSON output, through `claude-client` with the workers' Anthropic key, and caches the system prompt and an empty-pit reference frame. The judgment (confirmed yes or no, confidence, a description for staff, a recommended action) and the insurance-ready incident description go out through `submit_vision_assessment`, which also sets `incident.vision_status`. For a `property` incident the result also goes out through `report_property_event` with the incident id, so [Insurance](../6-features/Insurance.md) has the event row and its frames. There is no periodic Claude loop.
 - Photo features, after the event. For each `photo_features` job (Social.md's `register_photo` enqueues one per photographer photo), `bandit-vision` fetches the photo from `bandit-api` and asks Claude (`claude-opus-5-5`, medium effort, through Message Batches) for how many people are in it and a one-line caption. It writes them through `submit_photo_features`. Social combines the count with band zone and time to suggest who is in the photo. Identity always comes from bands, never faces.
 - Every Claude call goes through `claude-client` and is recorded in `model_call` ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). Claude reads and writes words; code decides safety, money, coverage and access.
 
@@ -82,7 +82,7 @@ flowchart LR
     CC -->|"camera density estimate"| Tick["venue_tick and incident logic"]
     GA -->|"fall corroboration"| Tick
     VA -->|"assessment per incident"| Ops["Ops dashboard"]
-    VA -->|"evidence facts"| Hyph["Hyphenate claim flow"]
+    VA -->|"evidence facts"| Hyph["Insurance claim flow"]
     PE -->|"property incidents"| Hyph
     PF -->|"people count, caption"| Soc["Social photo tagging"]
     classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
@@ -161,8 +161,8 @@ All five tables and the view are owned by this file. The module defines them onl
 | confidence | 0 to 1 |
 | description | what the frames show, for staff |
 | recommended action | one line |
-| incident description | the insurance-ready paragraph Hyphenate copies into the evidence pack |
-| camera id | which camera, so Hyphenate can check the camera's zone against the band's zone |
+| incident description | the insurance-ready paragraph Insurance copies into the evidence pack |
+| camera id | which camera, so Insurance can check the camera's zone against the band's zone |
 | frame blob refs | the frames sent to Claude, each with its capture time |
 | model call id | the `model_call` row, for audit and replay |
 | created at | server time |
@@ -193,7 +193,7 @@ All five tables and the view are owned by this file. The module defines them onl
 | Plan B ([Safety](../6-features/Safety.md)) | ops sets `fleet_config.density_override` through `set_fleet_config`: bands stop their own density colours, the camera count is the only fresh estimate, and ops drives band colours from the zone's risk; SOS, fall and the light circle keep working on the bands | no camera half of Plan B; `set_zone_risk` and forced states remain |
 | Incident corroboration ([Safety](../6-features/Safety.md)) | a `ground_alert` in the same zone within 3 s (starting value) of a band fall or SOS sets `incident.camera_corroborated`, is linked in `incident_snapshot` and marked `matched`; a second source, never a gate. An unmatched alert that persists 5 s opens a `fall` incident with `opened_by` `vision` | falls rely on the band's IMU alone |
 | Incident assessment | `incident.vision_status` goes `pending` when the bundle is sent and `confirmed` or `not_confirmed` when the `vision_assessment` lands, seconds later, with confidence, description, recommended action and frames | `vision_status` stays `none`; ops reads band facts and witnesses only |
-| [Hyphenate](../7-integrations/Hyphenate.md) | `property` incidents from the staff button and from `report_property_event`; `vision_assessment`, `property_event` rows and frames become evidence facts in the pack, and the camera's zone is checked against the band's zone | no property incidents from cameras; claims proceed on band facts and staff notes |
+| [Insurance](../6-features/Insurance.md) | `property` incidents from the staff button and from `report_property_event`; `vision_assessment`, `property_event` rows and frames become evidence facts in the pack, and the camera's zone is checked against the band's zone | no property incidents from cameras; claims proceed on band facts and staff notes |
 | [Social](../6-features/Social.md) photo tagging | `submit_photo_features` fills the people count and caption on the `photo`; tag suggestions are capped by the people count | `register_photo` stands alone; tagging by zone and time co-presence with the default cap |
 | [Ops-Dashboard](../5-apps/Ops-Dashboard.md) | the camera tile, the detector count beside the bands' own count for the pit, person-down alerts, assessments on incidents | the Vision rows are removed |
 
@@ -241,14 +241,14 @@ sequenceDiagram
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `incident` (its two Vision columns `camera_corroborated` and `vision_status`, and the `opened_by` value `vision`), `incident_snapshot`, `zone`, `job`, `blob_ref`, `model_call` (Anthropic-Agent.md), `service_heartbeat`; reducers `claim_job`, `extend_job_lease`, `complete_job`, `fail_job`, `heartbeat`, `grant_role`; the view `worker_jobs`.
 - [Rust-Backend](../3-services/Rust-Backend.md): the blob upload and photo fetch through `bandit-api`, `register_blob`, the service identity pattern.
 - [Anthropic-Agent](../7-integrations/Anthropic-Agent.md): `claude-client`, structured outputs, prompt caching, Message Batches, `model_call` recording.
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): staff open the `property` incidents that `report_property_event` attaches to with `open_incident` (Hyphenate.md: the Report property damage button).
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): staff open the `property` incidents that `report_property_event` attaches to with `open_incident` (Insurance.md: the Report property damage button).
 - [Hardware](Hardware.md): the overhead camera stand.
 
 **Used by**
 
 - [Safety](../6-features/Safety.md): the camera density estimate, the Plan B density source, fall corroboration.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the camera tile and the assessment on incidents.
-- [Hyphenate](../7-integrations/Hyphenate.md): `property` incidents, `vision_assessment`, frames as evidence.
+- [Insurance](../6-features/Insurance.md): `property` incidents, `vision_assessment`, frames as evidence.
 - [Social](../6-features/Social.md): photo features for tagging.
 
 **If you delete this file**
@@ -256,7 +256,7 @@ sequenceDiagram
 - Drop the five tables, the view `vision_incidents`, the vision reducers (`report_zone_count`, `report_ground_alert`, `submit_vision_assessment`, `report_property_event`, `submit_photo_features`), `upsert_camera`, the job kind `photo_features` and the role `vision`.
 - SpacetimeDB.md and Safety.md: remove the two Vision columns on `incident`, the `opened_by` value `vision`, the camera estimate from the density rule and the camera half of Plan B.
 - Ops-Dashboard.md: remove the "Vision.md" rows (camera tile, corroboration and assessment on incidents) and the `vision` service card.
-- Hyphenate.md: remove the camera-sourced property incidents and the vision evidence facts.
+- Insurance.md: remove the camera-sourced property incidents and the vision evidence facts.
 - Social.md: remove the photo-features fields and the cap by people count; `register_photo` runs without features and enqueues no job.
 - Architecture.md, Requirements.md (F15), Decisions.md and README.md: remove the Vision rows. Hardware.md: remove the overhead camera row and subsection.
 - Rust-Backend.md: remove the `bandit-vision` row from the process table, the Vision node from the workspace diagram, the Vision row from the crate table and the `photo_features` row in the handler registry.

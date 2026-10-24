@@ -13,8 +13,8 @@ The folders follow the usual order of a system design: what the system must do, 
 | 3-services | [Rust-Backend](3-services/Rust-Backend.md), [Gateway-Bridge](3-services/Gateway-Bridge.md), [Simulator](3-services/Simulator.md) | the Rust processes and where they run |
 | 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, gateway, station markers and the camera (TBD -- LEO) |
 | 5-apps | [Ops-Dashboard](5-apps/Ops-Dashboard.md), [Attendee-App](5-apps/Attendee-App.md) | the two browser apps |
-| 6-features | [Safety](6-features/Safety.md), [Social](6-features/Social.md), [Medical-ID](6-features/Medical-ID.md), [Merch](6-features/Merch.md) | what BandIt does for people |
-| 7-integrations | [Elastic](7-integrations/Elastic.md), [BrightData](7-integrations/BrightData.md), [Payments-Nessie](7-integrations/Payments-Nessie.md), [Hyphenate](7-integrations/Hyphenate.md), [Anthropic-Agent](7-integrations/Anthropic-Agent.md) | the sponsor and outside services |
+| 6-features | [Safety](6-features/Safety.md), [Social](6-features/Social.md), [Medical-ID](6-features/Medical-ID.md), [Merch](6-features/Merch.md), [Insurance](6-features/Insurance.md) | what BandIt does for people |
+| 7-integrations | [Elastic](7-integrations/Elastic.md), [BrightData](7-integrations/BrightData.md), [Payments-Nessie](7-integrations/Payments-Nessie.md), [Anthropic-Agent](7-integrations/Anthropic-Agent.md) | the sponsor and outside services |
 
 ## Reading order
 
@@ -48,8 +48,8 @@ Core components are what the safety features need. Optional components are featu
 | [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | the medical history and health insurance PDFs to one card, the medic access rule, the card in the incident desk | Attendee-App, Ops-Dashboard, Anthropic-Agent |
 | [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
 | [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
-| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Hyphenate when present |
-| [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims run, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
+| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App; uses Insurance when present |
+| [Insurance.md](6-features/Insurance.md) | Incident to claim | optional | the scripted claims run, evidence packs, bill review, coverage in code, the organizer's decisions, learned rules, ledger, the accuracy scorecard | Safety; uses Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
 | [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
 | [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
@@ -59,7 +59,7 @@ How the optional features lean on each other. Every optional feature also builds
 ```mermaid
 flowchart LR
   Merch["Merch"]
-  Hyp["Hyphenate"]
+  Hyp["Insurance"]
   Soc["Social"]
   Ela["Elastic"]
   Med["Medical-ID"]
@@ -107,7 +107,7 @@ Deleting a core file is not intended; the safety features need all of them.
 
 - **Every file has the same sections:** Role in the system, Interfaces, Design, Failure modes and fallbacks, Dependencies, and a closing Decisions table. Every choice is decided.
 - **Rust backend.** The SpacetimeDB module and every service are Rust ([Rust-Backend](3-services/Rust-Backend.md)). Only the two browser apps are TypeScript, using SpacetimeDB's TypeScript client SDK.
-- **Happy paths first.** The design follows a few clear paths. An edge case stays only when it protects a person, judges see it at the event, or it wins a sponsor track, such as the insurance cases in [Hyphenate](7-integrations/Hyphenate.md).
+- **Happy paths first.** The design follows a few clear paths. An edge case stays only when it protects a person, judges see it at the event, or it wins a sponsor track, such as the insurance cases in [Insurance](6-features/Insurance.md).
 - **Diagrams are Mermaid.** GitHub renders them inline and they diff as text. Every diagram here was rendered and checked before it was committed. Colours mean the same thing in every file:
 
 | Colour | Meaning |

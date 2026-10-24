@@ -18,7 +18,7 @@ Non-responsibilities:
 - The setup screens and their order: [Attendee-App](../5-apps/Attendee-App.md). This file defines what the upload, document and card steps call and show.
 - The incident desk and its layout: [Ops-Dashboard](../5-apps/Ops-Dashboard.md). This file defines what the medical card part calls and shows.
 - The blob store and the upload route: [Rust-Backend](../3-services/Rust-Backend.md).
-- The venue's insurance policy and claims: [Hyphenate](../7-integrations/Hyphenate.md). The health insurance on the card is the attendee's own, and Hyphenate never reads the card.
+- The venue's insurance policy and claims: [Insurance](Insurance.md). The health insurance on the card is the attendee's own, and Insurance never reads the card.
 - Calling Claude, `ask_twice`, recording in `model_call`: [Anthropic-Agent](../7-integrations/Anthropic-Agent.md).
 
 ## Interfaces
@@ -114,7 +114,7 @@ This step is the only place the attendee sees the card. After setup the attendee
 
 ### The medic at the incident desk
 
-The medic works in the Ops dashboard's Claims tab, in the incident desk "Open incidents (medic)" ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Each open incident shows "Take it", which calls `assign_medic` (role `medic`, the medic takes the incident, [Safety](Safety.md)), and, for an incident with a band, "Tap band N for the medical card", which calls `request_medical_card(band_id)` with the incident's band. The medic presses it while at the person.
+The medic works in the Ops dashboard's Claims tab, in the incident desk "Open incidents" ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Each open incident shows "Take it", which calls `assign_medic` (role `medic`, the medic takes the incident, [Safety](Safety.md)), and, for an incident with a band, "Tap band N for the medical card", which calls `request_medical_card(band_id)` with the incident's band. The medic presses it while at the person.
 
 The granted card shows inside the incident as "Medical card: <name>, band N", with " (not yet confirmed by the wearer)" until the wearer confirmed it. It lists the blood type, allergies, conditions, medications, emergency contact, insurance and notes, each item with its page. The card leaves the desk when the incident resolves.
 
@@ -175,7 +175,7 @@ flowchart TD
 | Attendee never confirms | card not checked by the wearer | the medic still sees it, labelled "not yet confirmed by the wearer", because a card with a caveat beats no card in an emergency |
 | Medic asks for a band with no open `sos` or `fall` incident | denied | the log row is written and the reason shows as the error |
 | Someone without role `medic` calls `request_medical_card` | could expose the card | the role check comes first and refuses |
-| The wearer has no card | nothing to show | the request is still granted and logged; the desk shows no card and the incident goes on |
+| The wearer has no card | nothing to show | the request is still granted and logged; the desk shows "Medical card: <name>, band N" with "No medical card on file." and the incident goes on |
 
 ## Dependencies
 

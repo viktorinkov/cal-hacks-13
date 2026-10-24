@@ -91,7 +91,7 @@ flowchart TD
 | `rule` | Which encounter rule produced the row (TBD -- LEO) |
 | `status` | `open`, `closed` |
 
-What an encounter shows each side: "Sam, 40 minutes together in Zone B around 21:10", with Sam's socials. Both sides see each other at the same moment, because the encounter exists only when both are `findable`.
+What an encounter shows each side: "Noor, 40 minutes together in Zone B around 21:10", with Noor's socials. Both sides see each other at the same moment, because the encounter exists only when both are `findable`.
 
 **Shared visits.** A shared visit is two attendees who were in the same place for a while: people you were near at a booth, whether or not you met. When the social step opens or grows a visit of a `findable` attendee, it compares it with the other `findable` attendees' visits to the same zone. Where two visits overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value, calibrate at the venue), it writes one `shared_visit` row for that pair of visits and grows `overlap_minutes` while both stay. A shared visit is not a `people_link` kind and adds nothing to the graph: it is two people measured in the same zone at the same time, shown in the recap next to the encounters.
 

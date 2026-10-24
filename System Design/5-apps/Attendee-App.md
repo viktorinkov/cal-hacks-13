@@ -10,7 +10,7 @@ Responsibilities:
 - Sign the attendee in. At the first tap the attendee signs in with the SpacetimeAuth magic link; the SpacetimeDB identity that comes with the sign-in is the attendee id.
 - Claim the band by press, then run the onboarding steps, then show the thank-you screen.
 - Hold the display name and the `findable` consent switch, both set during setup.
-- Show the same thank-you screen at every later tap during the event, and nothing else.
+- At every later tap during the event, resume setup at the first step not yet finished, or show the thank-you screen once setup is finished, and nothing else.
 - Turn every open page into the recap page, live, when a staff member with `ops` ends the event, and open it again later for the signed-in owner of the tapped band, on any device.
 
 Not responsible for:
@@ -33,7 +33,7 @@ Not responsible for:
 | Reducers | out | app to module | `claim_band`, `update_profile` (display name), `set_consent`, `open_api_session` (once per page load, see Identity) | SDK reducer call |
 | Blob upload | out | app to `bandit-api` | files for features that need them through `POST /api/blobs`, with the API session token; `bandit-api` stores the file under its SHA-256, calls `register_blob` and returns the hash and the URL `/blobs/<sha256>` | HTTPS, endpoint in [Rust-Backend](../3-services/Rust-Backend.md) |
 | Medical-ID.md | both | app, module and `bandit-api` | the two document steps of setup, "Your medical history" and "Your health insurance": each PDF goes to `POST /api/blobs?purpose=history` or `purpose=insurance` with the API session token, then the app calls `submit_medical_document` with the kind, the hash and the page count; in test mode "Use the sample PDF" loads the synthetic PDF from `/samples`; the card step after "Are you one of these?", from `my_medical_documents` and `my_medical_card`, with "Looks right" calling `confirm_medical_card` | HTTPS and SDK |
-| Payments-Nessie.md | both | app and module | the wallet step after the card step, "Connect your Capital One wallet" with "Connect" and "Skip": "Connect" calls `connect_wallet`, the step shows "Connecting your Capital One wallet" until `my_wallet` has a row, then "Your wallet is connected" with the balance ($200 to start) and "Continue"; the wallet section of the recap page, "Your BandIt wallet": the balance from `my_wallet` and the entries from `my_wallet_entries`, among them each claim payout, or "Opening your wallet" while there is no account | SDK |
+| Payments-Nessie.md | both | app and module | the wallet step after the card step, "Connect your Capital One wallet" with "Connect" and "Skip": "Connect" calls `connect_wallet`, the step shows "Connecting your Capital One wallet" until `my_wallet` has a row, then "Your wallet is connected" with the balance ($200 to start) and "Continue"; on the recap, the balance line from `my_wallet` ("$X in your BandIt wallet · Capital One account" and the first 8 characters of the account id, or "Connect your Capital One wallet at band setup to buy merch." without a wallet) and the "Wallet activity" table from `my_wallet_entries`, among them each claim payout | SDK |
 | Social.md | both | app and module | the setup socials step: the attendee types their Instagram, Facebook and Threads handles, saved with `set_social_handle` into `social_handle`; the recap's space-time view from `my_visits` and `my_encounters`; the social part of the recap page through `my_visits`, `my_encounters`, `my_shared_visits`, `my_photos` (with `respond_photo_tag`), `my_share_links` and the recap's graph from `my_graph`; the photographer route (role `photographer`, read from `my_roles`) that uploads a photo through `POST /api/blobs` and calls `register_photo` with its URL | SDK and HTTPS |
 | BrightData.md | both | app and module | the profile claim step in setup, "Are you one of these?", shown only when the name matches: the app lists the `person` rows (exhibitor, speaker or artist scraped from event pages) whose name matches the typed display name and that `claimed_people` does not list; the attendee taps "This is me" and the app calls `claim_person`, which works only for an attendee who already owns a band; "None of these" goes on | SDK |
 | Elastic.md | out | app to `bandit-api` | `GET /recap/order` when the recap page opens: the order of the recap's people and booths. The lists themselves come from the app's own subscriptions. Without Elastic.md, the app orders both lists by minutes together | HTTPS |
@@ -55,8 +55,11 @@ Not responsible for:
 The landing route works out who tapped which band. Band rows are private, and `my_band` returns only bands the caller owns or is the claim candidate for, so the route learns a band's status by trying to claim it: `claim_band` accepts, which starts the press window, or rejects. Nothing is lost by trying, because a claim completes only with a press on that band.
 
 1. Sign in. With no SpacetimeAuth session in this browser, the app shows the sign-in screen: the attendee types an email and opens the magic link (see Identity). The tap token stays in the URL, so the route continues after the sign-in.
+   - Simulator.md: in test mode the sign-in screen also offers "Continue without an account". It marks this browser tab as a guest in session storage, and the app connects with a SpacetimeDB token kept in the browser instead of an ID token, so a tester claims a simulated band without an email.
 2. Connect to SpacetimeDB with the ID token and subscribe to `my_attendee`, `my_band` and `event_state`.
-3. `my_band` already holds a band with this token: the caller owns it. Once `event_state.ended` is set, the page is the recap. Before that, the page is the thank-you screen when `my_attendee` has a display name, and the onboarding steps when it has none. So a later visit by someone who finished setup lands on the thank-you screen.
+3. `my_band` already holds a band with this token: the caller owns it. Once `event_state.ended` is set, the page is the recap. Before that, the page resumes setup at the first step not yet finished (`resumeStep`, run on every load). The name step comes first while `my_attendee` has no display name. The optional steps that have a resume check follow, in setup order. When none is left, the page is the thank-you screen. So a later visit by someone who finished setup lands on the thank-you screen, and someone who left setup halfway picks up where they left off.
+   - Medical-ID.md: setup resumes at "Your medical history" while no history document is on file, at "Your health insurance" while no insurance document is, and at the card check while the card is not confirmed.
+   - Payments-Nessie.md: setup resumes at the wallet step while the attendee has no wallet.
 4. Otherwise call `claim_band` with the token:
    - accepted: the band blinks white; show the claim screen ("Press the button on your band").
    - rejected: the "taken" page, which says only that the band is taken. Anyone can read the tag, so this page reveals nothing about the owner. After the event every band keeps its owner, so a stranger who taps a claimed band always gets this page.
@@ -72,9 +75,9 @@ flowchart TD
     Conn -->|"subscribe: my_attendee, my_band, event_state"| Mine{"my_band holds this token"}
     Mine -->|"yes, caller owns it"| Ended{"event_state.ended"}
     Ended -->|"yes"| Recap["Recap page"]
-    Ended -->|"no"| Named{"display name saved"}
+    Ended -->|"no"| Named{"setup finished: no step left to resume"}
     Named -->|"yes"| Thanks["Thank-you screen"]
-    Named -->|"no"| Onb["Onboarding steps"]
+    Named -->|"no"| Onb["Onboarding steps, from the first one not finished"]
     Mine -->|"no"| Start["call claim_band(token)"]
     Start -->|"accepted, band blinks white"| Claim["Claim screen: press your band"]
     Start -->|"rejected"| Taken["Taken page: the band is taken, nothing more"]
@@ -112,7 +115,7 @@ The tap alone proves nothing, because anyone can read the tag. The press proves 
    - BrightData.md: "Are you one of these?", shown only when the display name matches unclaimed `person` rows. The app lists the `person` rows whose name matches the typed display name and that `claimed_people` does not list, each with a "This is me" button. The attendee taps theirs, and the app calls `claim_person`; "None of these" goes on. There is no second press: the band claim made the attendee a band owner, and `claim_person` refuses anyone who owns no band with "claim your band first". It writes a `person_claim` row and copies the profile's organisation and headshot onto the attendee ([BrightData](../7-integrations/BrightData.md)).
    - Medical-ID.md: the card check, skipped when nothing was uploaded. While a document is being read it shows "Claude is reading your documents" with "Check later". Then it shows the card with the page of each item, and "Looks right" calls `confirm_medical_card`. It is the only time the attendee sees the card ([Medical-ID](../6-features/Medical-ID.md)).
    - Payments-Nessie.md: "Connect your Capital One wallet", with "Connect" and "Skip". "Connect" calls `connect_wallet`, which queues the opening of a $200 Nessie sandbox wallet for merch and claim payouts. The step shows "Connecting your Capital One wallet" until `my_wallet` has a row, then "Your wallet is connected" with the balance and "Continue". "Skip" finishes setup without a wallet ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
-7. Done: the thank-you screen. A skipped step is not offered again during the event.
+7. Done: the thank-you screen. Within one visit a skipped step is not offered again; a later visit resumes at the first step that is still not finished (see Landing route decision).
 
 If no press arrives within 8 s, the pending claim expires, the IDENT directive ends on its own, and the screen says "No press arrived in time." with a button that calls `claim_band` once more. The screen also shows whether the band is being heard at all (alive or stale from `my_band_report`, which already returns the candidate's band), so an attendee whose band is out of range knows to walk toward the gateway rather than press again.
 
@@ -164,7 +167,7 @@ Setup asks for little: a display name, one consent switch and whatever the optio
 
 ### The thank-you screen
 
-When the last setup step is done, the page shows the thank-you screen: "You're all set", "Thanks, <name>. Enjoy <venue>." and "Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos." It shows nothing else: no band status, no zones and how busy they are, no exit colours or alerts, no wallet, no profile, no graph, no schedule and no photos. Every later tap on the band during the event opens the same screen, on any signed-in device. The screen's one live input is `event_state`: when the event ends, it turns into the recap page.
+When the last setup step is done, the page shows the thank-you screen: "You're all set", "Thanks, <name>. Enjoy <venue>." and "Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos." It shows nothing else: no band status, no zones and how busy they are, no exit colours or alerts, no wallet, no profile, no graph, no schedule and no photos. Once setup is finished, every later tap on the band during the event opens the same screen, on any signed-in device; before that, a tap resumes setup at the first step not yet finished. The screen's one live input is `event_state`: when the event ends, it turns into the recap page.
 
 Safety guidance reaches the attendee only through the band: the ring's colour and, on full bands, the vibration along the route ([Safety](../6-features/Safety.md)). The phone repeats none of it.
 
@@ -174,7 +177,8 @@ The flowchart below answers one question: which state the attendee's page is in,
 flowchart LR
     First["First tap"] -->|"sign in, press, onboarding, wallet"| Setup["Band setup"]
     Setup -->|"last step done"| Thanks["Thank-you screen"]
-    Later["Later tap during the event"] -->|"same screen"| Thanks
+    Later["Later tap during the event"] -->|"setup finished"| Thanks
+    Later -->|"a step not finished"| Setup
     Thanks -->|"end_event sets event_state.ended"| Recap["Recap page"]
     After["Tap link after the event, signed in, any device"] -->|"same page"| Recap
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
@@ -187,7 +191,7 @@ flowchart LR
 
 There is no separate post-event app and no email. The page the attendee already has becomes the recap page. The switch belongs to the host, a staff member with `ops`: when they press "Event ended" in the host portal ([Ops-Dashboard](Ops-Dashboard.md)), `end_event` sets `event_state.ended`. Every open attendee page subscribes to `event_state`, so the thank-you screen turns into the recap live, with no reload. `reopen_event` clears it and the pages show the thank-you screen again, to run the event flow again.
 
-Later, the attendee reopens their tap link `/t/BANDIT-0n` on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, `release_band` is refused, so every band keeps its owner for the recap.
+Later, the attendee reopens their tap link `/t/BANDIT-0n` on any device, signed in with SpacetimeAuth, and the recap opens as them. The link is plain and lasting: it is the URL on the band, not a secret, and it shows the recap only to the band's signed-in owner. Anyone else who opens it gets the taken page. Once the event has ended, the Ops dashboard no longer offers "Take the band back", so every band keeps its owner for the recap.
 
 The sequence below answers one question: how the "Event ended" press by a staff member with `ops` turns every open page into the recap, and how the attendee opens it again later.
 
@@ -199,7 +203,7 @@ sequenceDiagram
     participant Q as Attendee, another device later
     participant Auth as SpacetimeAuth
     Host->>Mod: end_event
-    Mod->>Mod: event_state.ended set, release_band refused from now on
+    Mod->>Mod: event_state.ended set, Take the band back hidden from now on
     Mod-->>P: event_state row update (subscription)
     P->>P: thank-you screen becomes the recap page, no reload
     Q->>Q: open /t/BANDIT-03
@@ -218,7 +222,8 @@ The recap page, top to bottom. How it looks is front end and not designed here.
 Every call on the recap page runs as the signed-in attendee. Other sections, each separable:
 
 - Elastic.md: the order of the recap's people and booths. When the page opens it calls `GET /recap/order`, and the people and booths closest to what the attendee was into come first. Without Elastic.md, both lists go by minutes together.
-- Payments-Nessie.md: the wallet, "Your BandIt wallet": the balance (`my_wallet`) and every opening, purchase and claim payout (`my_wallet_entries`), or "Opening your wallet" while the attendee has no account. This is where the attendee spends and receives money. The recap has no button that connects the wallet.
+- Payments-Nessie.md: the wallet, at the end of the recap: the balance line (`my_wallet`), "$X in your BandIt wallet" with the Capital One account, or "Connect your Capital One wallet at band setup to buy merch." without a wallet; then "Wallet activity", every opening, purchase and claim payout (`my_wallet_entries`), newest first. This is where the attendee spends and receives money. The recap has no button that connects the wallet.
+- Merch.md: the wallet's balance line opens the merch section, above the suggestions, and "Wallet activity" closes it, below "Your orders".
 
 ### The recap's graph (Social.md)
 
@@ -258,7 +263,7 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 **Used by**
 
 - [Medical-ID](../6-features/Medical-ID.md): the two document steps and the card step in setup.
-- [Payments-Nessie](../7-integrations/Payments-Nessie.md): the wallet step at the end of setup, and the recap's wallet section.
+- [Payments-Nessie](../7-integrations/Payments-Nessie.md): the wallet step at the end of setup, its resume check, and the recap's wallet (the balance line and "Wallet activity").
 - [Social](../6-features/Social.md): the socials step, the photographer route, the recap's space-time view and its social part with its graph and share links.
 - [BrightData](../7-integrations/BrightData.md): the profile claim step, "Are you one of these?".
 - [Merch](../6-features/Merch.md): the merch section at the bottom of the recap page.
@@ -270,14 +275,14 @@ The graph is a tab on the recap page that draws the attendee's own people graph.
 - The event loses tap to join; bands would be registered to people by ops only (`register_band`) and `claim_band` would have no caller.
 - Medical-ID.md needs another host for its document and card steps; Social.md needs another host for the photographer route.
 - Remove the Attendee app row from the component table in Architecture.md and the attendee row from SpacetimeDB.md's "subscriptions per client".
-- Remove the "attendee app" bullets in Social.md, BrightData.md, Elastic.md, Merch.md, Hyphenate.md, Payments-Nessie.md and Medical-ID.md.
+- Remove the "attendee app" bullets in Social.md, BrightData.md, Elastic.md, Merch.md, Insurance.md, Payments-Nessie.md and Medical-ID.md.
 
 ## Decisions
 
 | Decision | Why |
 |---|---|
 | During the event the attendee page is band setup, then a thank-you screen, and nothing else; the recap replaces it when the event ends | the band carries every safety cue on the wrist, and the night comes back in the recap, so the page has nothing to show in between |
-| A later tap during the event opens the same thank-you screen; a skipped setup step is not offered again | one screen with one meaning: you are set up |
+| A later tap during the event resumes setup at the first step not yet finished (`resumeStep`), and opens the same thank-you screen once setup is finished | someone who closed the page halfway does not start over, and the thank-you keeps one meaning: you are set up |
 | Safety guidance reaches the attendee only through the band: the ring's colour and, on full bands, vibration; the phone shows none of it | the ring has no compass, so colour and vibration are the guidance, and they work with the phone in a pocket |
 | Every tag holds the one public `bandit-api` host; there is no second entry such as a QR code | there is one deployment, so one host always works, on judges' own phones |
 | Every rejection of `claim_band` shows the same taken page, which says only that the band is taken | a stranger learns nothing about the owner, and a band someone else is claiming right now is taken for this caller too |

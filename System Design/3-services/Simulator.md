@@ -7,18 +7,18 @@ Nine real bands cannot show how an event behaves, so BandIt adds bands that no r
 Responsibilities:
 
 - Social.md: add up to 80 crowd bands (ids 10 to 89) with `start_crowd`, each with a simulated owner, and move them in groups every 5 s with `crowd_tick`, so the big-screen people graph shows a real-looking crowd. `stop_crowd` freezes it.
-- Report the simulated bands (ids 90 to 99) through `report_sim_band`, under the `simulator` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press and move bands 94 to 99 and start the tool's `fall` and `property` commands.
+- Report the simulated bands (ids 90 to 99) through `report_sim_band`, under the `simulator` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press bands 94 to 99, move any simulated band 90 to 99, and start the tool's `fall` and `property` commands.
 - Obey `band_directive` and `band_command` rows for the simulated bands and for target 0, and acknowledge the one-shots addressed to their ids.
 - Run scenarios on the simulated bands: crush build-up, SOS, fall.
 - (TBD -- LEO) Run the two-exit low-visibility and the medic-approach scenarios.
-- Hyphenate.md: plant insurance claims with the `bandit-claims` tool, each with a medic visit and a synthetic bill: three accuracy rounds of genuine claims and decoys, the stress-test run of the edge cases, and the two planted claims of the scripted claims run.
+- Insurance.md: plant insurance claims with the `bandit-claims` tool, each with a medic visit and a synthetic bill: three accuracy rounds of genuine claims and decoys, the stress-test run of the edge cases, and the six claims of the scripted claims run, in which the tool also plays the medic and the organizer.
 - Replay a bridge `.jsonl` log through `report_sim_band` at recorded or accelerated speed, with real bands 1 to 9 mapped onto simulated ids 91 to 99.
 - Report the tool's health through `heartbeat` every 5 s.
 
 Explicit non-responsibilities:
 
 - It never opens the serial port and never sends radio commands; real bands are [Gateway-Bridge](Gateway-Bridge.md)'s alone.
-- It never writes `band_directive` or any ops table; it is a device, not an operator. Hyphenate.md: the one exception is the medic visit of a planted incident on a simulated band, which the `bandit-claims` tool plays through `plant_medic_visit`.
+- It never writes `band_directive` or any ops table; it is a device, not an operator. Insurance.md: the one exception is the medic visit of a planted incident on a simulated band, which the `bandit-claims` tool plays through `plant_medic_visit`.
 - It never reports ids 1 to 9 (a replay maps them onto 91 to 99, see below).
 - It does not validate the radio: it reports what a band would report, which cannot tell whether the venue's RSSI thresholds are right. That is calibration ([Hardware](../4-devices/Hardware.md)).
 - It holds no truth. Stopping the `bandit-claims` tool makes the simulated bands go stale; the crowd stops only with `stop_crowd`.
@@ -32,9 +32,9 @@ Explicit non-responsibilities:
 | Social.md: `crowd_tick` | internal, every 5 s | the `band1t` scheduler | moves the groups, writes the crowd bands' `presence_sample` rows and which crowd bands were close | schedule table `crowd_timer`; only the scheduler may call it |
 | `report_sim_band` | out, once a second per simulated band and at once on a change | `band1t` module | band id 90 to 99, station, state, `neigh`, and the SOS, fall and press flags | SpacetimeDB Rust client SDK, caller role `simulator` |
 | `bandit-claims` command line | in | the operator | `setup` (the test identities and their role grants), then a scenario file, `fall`, `property`, `scorecard` (the accuracy run), `story` (the scripted claims run) or a replay log | local process arguments |
-| `bandit-api` dev routes | in | a tester's browser, only while test mode (`BANDIT_SIMULATE=1`) is on | `POST /api/dev/press/{band}` presses one of the bands 94 to 99; `POST /api/dev/move/{band}/{station}` moves it to that station's zone; `POST /api/dev/fall/{band}` runs `bandit-claims fall` for a simulated band 90 to 99; `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that station's zone. The Ops dashboard's Simulate tab calls all four | HTTPS to `bandit-api` ([Rust-Backend](Rust-Backend.md)), which calls `report_sim_band` as the `simulator` identity |
-| Hyphenate.md: `plant_medic_visit` | out | `band1t` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `simulator` |
-| Hyphenate.md: bill upload | out | `bandit-api`, then `band1t` module | a synthetic bill PDF from the tool's seed folder through `POST /api/blobs` with purpose `medical`, then `submit_medical_record` as the tool's `medic` test identity ([Hyphenate](../7-integrations/Hyphenate.md)) | HTTPS, then SDK |
+| `bandit-api` dev routes | in | a tester's browser, only while test mode (`BANDIT_SIMULATE=1`) is on | `POST /api/dev/press/{band}` presses one of the bands 94 to 99; `POST /api/dev/move/{band}/{station}` moves any simulated band 90 to 99 to that station's zone; `POST /api/dev/fall/{band}` runs `bandit-claims fall` for a simulated band 90 to 99; `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that station's zone. The Ops dashboard's Simulate tab calls all four | HTTPS to `bandit-api` ([Rust-Backend](Rust-Backend.md)), which calls `report_sim_band` as the `simulator` identity |
+| Insurance.md: `plant_medic_visit` | out | `band1t` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `simulator` |
+| Insurance.md: bill upload | out | `bandit-api`, then `band1t` module | a synthetic bill PDF from the tool's seed folder through `POST /api/blobs` with purpose `medical`, then `submit_medical_record` as the tool's `medic` test identity ([Insurance](../6-features/Insurance.md)) | HTTPS, then SDK |
 | `ack_band_command` | out | `band1t` module | command id and outcome for one-shots addressed to the simulated bands | SDK |
 | `heartbeat` | out, every 5 s | `band1t` module | service `simulator`, version, counters: simulated bands reporting, reports per second, active scenario and its clock, replay position | SDK |
 | `zone`, `zone_link`, `exit`, `station`, `zone_state` | in, subscription | `band1t` module | the venue graph (areas, walking distances, exits, the station colour at each) and zone state | SDK |
@@ -96,7 +96,7 @@ flowchart TB
 Two drivers report them, both as the `simulator` identity:
 
 - **The `bandit-claims` command-line tool**, on the venue laptop. Its `setup` command connects as the module owner, the only identity that may grant, and creates the test identities and their role grants; its `sim` identity holds `simulator`. While it runs, it reports every simulated band once a second, so none goes stale (5 s), and at once when a band changes station, state or flags. A simulated band's `neigh` is the number of other simulated bands at its station, unless a scenario sets it. A press is the press flag held for 400 ms, as a person presses a real band after the tap.
-- **`bandit-api`'s dev routes**, only while test mode is on. `POST /api/dev/press/{band}` presses one of the bands 94 to 99, so a tester claims it from the tap link with no hardware. `POST /api/dev/move/{band}/{station}` moves it to another station's zone. `bandit-api` keeps reporting each band pressed this way every 2 s, so it stays live, keeps its zone and mixes with the crowd. Once `event_state.ended` is set, those reports stop. `POST /api/dev/fall/{band}` runs the tool's `fall` command for any simulated band 90 to 99, with two of the claims story's bands around it as the light circle, and `POST /api/dev/property/{station}` runs the tool's `property --camera` command for that station's zone: a venue camera sees a speaker knocked off its stand, and Hyphenate.md's property claim follows. The Ops dashboard's Simulate tab calls all four routes ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Bands 90 to 93 belong to the scripted claims run: the dev routes never press or move them, and only the tool drives them.
+- **`bandit-api`'s dev routes**, only while test mode is on. `POST /api/dev/press/{band}` presses one of the bands 94 to 99, so a tester claims it from the tap link with no hardware. `POST /api/dev/move/{band}/{station}` moves any simulated band 90 to 99 to another station's zone. `bandit-api` keeps reporting each band pressed or moved this way every 2 s, so it stays live, keeps its zone and mixes with the crowd. Once `event_state.ended` is set, those reports stop. `POST /api/dev/fall/{band}` runs the tool's `fall` command for any simulated band 90 to 99, with two of the claims story's bands around it as the light circle, and `POST /api/dev/property/{station}` runs the tool's `property --camera` command for that station's zone: a venue camera sees a speaker knocked off its stand, and Insurance.md's property claim follows. The Ops dashboard's Simulate tab calls all four routes ([Ops-Dashboard](../5-apps/Ops-Dashboard.md)). Bands 90 to 93 belong to the scripted claims run: the dev routes never press them, and while the run plays, only the tool drives them.
 
 ### Simulated bands obey the server
 
@@ -136,38 +136,36 @@ A scenario is a small text file of timed steps that the `bandit-claims` tool pla
 | Fall on a full band | a simulated band sets the fall flag after a short "impact" | a `fall` incident, otherwise identical to SOS |
 | (TBD -- LEO) Two-exit low visibility | waits for ops to turn low visibility on with `set_low_vis`, lets the simulated bands follow their exit colours toward two exits, then waits for ops to block one exit with `set_exit_status` | zones drain along the assigned colours and exit loads balance; after the block, every zone that used that exit changes colour at once and the blocked exit draws nobody |
 | (TBD -- LEO) Medic approach | runs the SOS scenario, then waits for a medic to take it with `assign_medic`; simulated bands outside the circle follow the GUIDE directive out of the zone, and the circle stays | space opens around the person while the blue ring remains |
-| Hyphenate.md: Accuracy run | the tool's `scorecard` command: three rounds, each planting 12 genuine claims (8 falls, 4 SOS) and 6 decoys (2 sitting down, 2 dropped phone, 2 fake witnesses), starting values; between rounds it waits until the run's claims queue is empty | the scorecard on the Ops dashboard's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling ([Hyphenate](../7-integrations/Hyphenate.md)) |
-| Hyphenate.md: Stress test | plants the edge cases not shown live: an injury the urgent-care record places at home, a bill re-filed as a new scan, a staff injury, and one more fake with witnesses in another zone | each claim next to its expected outcome: a doubt sent to a person, `zero_payout` for the duplicate bill, `claimant_not_staff`, `witness_zone` |
-| Hyphenate.md: Scripted claims run | the tool's `story` command, during the event: a second fall similar to the judge's approved claim, then a fake claim for Lee, a simulated attendee on band 93, whose witness bands sit in another zone | the second fall settles in seconds under rule v1; Lee's claim is refused by code as `witness_zone`, with every check listed |
+| Insurance.md: Accuracy run | the tool's `scorecard` command: three rounds (starting value), each planting 2 genuine falls and 4 fakes, one of each kind: a light circle in another zone, an injury at home, the same bill twice and an injured staff member. After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one. It plants each fall in a zone where no three injuries land within 5 minutes | the scorecard on the Ops dashboard's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling ([Insurance](../6-features/Insurance.md)) |
+| Insurance.md: Stress test | plants the edge cases not shown live: an injury the urgent-care record places at home, a bill re-filed as a new scan, a staff injury, and one more fake with witnesses in another zone | each claim next to its expected outcome: a doubt sent to the organizer, `zero_payout` for the duplicate bill, `claimant_not_staff`, `witness_zone` |
+| Insurance.md: Scripted claims run | the tool's `story` command, after the event and before the organizer decides the real claims: six claims on bands 90 to 93, with bands 94 to 99 as the light circles. The tool plays the medic (Ari Ramos) and the organizer (the `ops` identity labelled "Ops desk") | Jordan's claim waits for the organizer, a stale approval fails closed and the real approval creates rule v1; Maya's similar fall settles in seconds under v1; the injury at home waits for the organizer; Lee's claim is refused by code as `witness_zone`, with every check listed; the speaker is approved with a recovery letter; the insurer's payment reconciles claim 1 |
 
 (TBD -- LEO) The two-exit low-visibility run is on the rehearsal checklist, because it is the run that tests the exit choice's crowding penalty and switch margin ([Safety](../6-features/Safety.md)).
 
 Scenarios can be stacked: a crush with an SOS inside it is the event's full safety story.
 
-### Hyphenate.md: planted claims
+### Insurance.md: planted claims
 
-A planted claim goes through the same path as a real one: a simulated band latches a fall or SOS, simulated witness bands report state 4 in a chosen zone, and then the `bandit-claims` tool plays the medic. It uploads the claim's synthetic bill PDF through `POST /api/blobs` with purpose `medical` and files it with `submit_medical_record` as its `medic` test identity, then calls `plant_medic_visit`. That reducer (role `simulator`) accepts only an open incident whose subject band is a simulated band. It runs the same logic as `assign_medic` (the simulator as the medic), `add_incident_note` and `resolve_incident`, so the claim sees exactly what a real medic visit leaves. It also writes one `planted_incident` row. Hyphenate's decision code never reads that row; only the scorecard does.
+A planted claim goes through the same path as a real one: a simulated band latches a fall or SOS, simulated witness bands report state 4 in a chosen zone, and then the `bandit-claims` tool plays the medic. It uploads the claim's synthetic bill PDF through `POST /api/blobs` with purpose `medical` and files it with `submit_medical_record` as its `medic` test identity, then calls `plant_medic_visit`. That reducer (role `simulator`) accepts only an open incident whose subject band is a simulated band. It runs the same logic as `assign_medic` (the simulator as the medic), `add_incident_note` and `resolve_incident`, so the claim sees exactly what a real medic visit leaves. It also writes one `planted_incident` row. Insurance's decision code never reads that row; only the scorecard does.
 
 | `planted_incident` field | Meaning |
 |---|---|
 | `incident_id` | the planted incident |
 | `run` | `accuracy`, `stress` or `story` (the scripted claims run) |
 | `round` | 1, 2 or 3 in the accuracy run; empty otherwise |
-| `planted_type` | `genuine`, `sit_down`, `dropped_phone`, `fake_witness`, `at_home`, `duplicate_bill`, `staff` |
+| `planted_type` | `genuine`, `fake_witness`, `at_home`, `duplicate_bill`, `staff` |
 | `expected` | `paid`, `person` or `refused` |
 | `planted_at` | when it was planted |
 
 | Planted type | What the tool plants |
 |---|---|
-| `genuine` | a fall or SOS, at least 2 witnesses in the same zone, a medic note within the window, a bill dated that night with codes on the fee schedule |
-| `sit_down` | a fall flag and witnesses, a medic note "no injury found", and a bill for a visit anyway |
-| `dropped_phone` | a fall flag and witnesses, a medic note "phone screen broken, no injury", and a phone repair invoice as the bill |
+| `genuine` | a fall, 2 or 3 witnesses in the same zone, a medic note within the window, a bill dated that night with codes on the fee schedule |
 | `fake_witness` | a fall flag whose witness bands report another zone |
 | `at_home` | a genuine-looking fall whose bill gives the visit reason "twisted wrist at home this morning" |
 | `duplicate_bill` | a new fall whose bill is a re-scan of an earlier planted bill: the same provider and invoice number in a new file |
-| `staff` | a genuine-looking fall on the simulated band whose owner holds a staff role |
+| `staff` | a genuine-looking fall on a simulated band whose owner the tool has just granted the role `crew`, labelled as stage crew |
 
-The tool's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one. For the stress test the tool grants `ops` to the test identity that wears band 92 (starting value), so the stress test can plant a staff injury without borrowing a person's identity. The accuracy run and the stress test run before doors open, inside the period of Hyphenate.md's accuracy-run policy, so the rules they teach expire before the event starts. Each test attendee the tool sets up claims its band with a press, then saves its name with `update_profile`. Payments-Nessie.md: right after that it calls `connect_wallet`, so its Hyphenate.md payout lands in a $200 wallet, like a judge's ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
+The tool's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one. For a staff injury the tool grants the role `crew` to the test identity that wears the band, plants the fall, and revokes the grant after the round, so no person's identity is borrowed and no staff screen opens for it. The accuracy run and the stress test run before doors open, inside the period of Insurance.md's accuracy-run policy, so the rules they teach expire before the event starts. Each test attendee the tool sets up claims its band with a press, then saves its name with `update_profile`. Payments-Nessie.md: right after that it calls `connect_wallet`, so its Insurance.md payout lands in a $200 wallet, like a judge's ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
 
 ### Replay mode
 
@@ -195,21 +193,21 @@ Real bands arrive through `ingest_band_reports` and simulated bands through `rep
 - [Safety](../6-features/Safety.md): what the directives mean, so simulated bands react the way the venue tick expects.
 - [Rust-Backend](Rust-Backend.md): `bandit-api`, which hosts the dev routes and the blob upload.
 - Social.md: `attendee`, the `findable` consent, `social_handle` and the social step of `memory_tick` for the crowd and its simulated owners ([Social](../6-features/Social.md)).
-- Hyphenate.md: `POST /api/blobs` with purpose `medical`, `submit_medical_record`, the accuracy-run policy, and the claims queue the tool waits on between rounds ([Hyphenate](../7-integrations/Hyphenate.md)).
+- Insurance.md: `POST /api/blobs` with purpose `medical`, `submit_medical_record`, the accuracy-run policy, and the claims queue the tool waits on between rounds ([Insurance](../6-features/Insurance.md)).
 
 **Used by**
 
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the simulated legend, the real-plus-simulated counts, the Simulate tab and, through Social.md, the crowd on the event graph.
-- [Flows](../1-overview/Flows.md): the crowd that runs through the whole event flow.
+- [Flows](../1-overview/Flows.md): the crowd that runs through the whole event flow, and the scripted claims run after the event.
 - [Safety](../6-features/Safety.md): scenario runs as the test bed for density, guidance and escalation.
 - (TBD -- LEO) [Safety](../6-features/Safety.md): the medic-approach scenario, and the two-exit run on the rehearsal checklist.
-- [Hyphenate](../7-integrations/Hyphenate.md): planted claims for the accuracy run, the stress test and steps 6 and 7 of the live-learning run.
+- [Insurance](../6-features/Insurance.md): planted claims for the accuracy run and the stress test, and the scripted claims run.
 
 **If you delete this file**
 
-- Remove the simulator rows, the legend and the Simulate tab from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the Simulator.md rows (the `bandit-claims` tool's band reports and `bandit-api`'s dev routes) from [Architecture](../1-overview/Architecture.md), [Rust-Backend](Rust-Backend.md) and the README, row F16 and the simulated-bands scale row from [Requirements](../1-overview/Requirements.md), and the Simulator.md sentence in [Flows](../1-overview/Flows.md).
+- Remove the simulator rows, the legend and the Simulate tab from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), the Simulator.md rows (the `bandit-claims` tool's band reports and `bandit-api`'s dev routes) from [Architecture](../1-overview/Architecture.md), [Rust-Backend](Rust-Backend.md) and the README, row F16 and the simulated-bands scale row from [Requirements](../1-overview/Requirements.md), and the Simulator.md sentence and failure row, step 0c's planted claims and step 9a, the scripted claims run, in [Flows](../1-overview/Flows.md).
 - In [SpacetimeDB](../2-data/SpacetimeDB.md), the `simulator` role, `report_sim_band`, `start_crowd`, `stop_crowd`, `crowd_tick`, the crowd and simulated id ranges and the `band.simulated` flag become unused and can be dropped; `ingest_band_reports` already takes only the `bridge` role. Remove the Simulator.md rows and notes from its interfaces, registry, roles, subscriptions and lifecycle tables.
-- Remove the Simulator.md lines in [Social](../6-features/Social.md) and [Attendee-App](../5-apps/Attendee-App.md), the two-exit run from the rehearsal checklist in [Safety](../6-features/Safety.md), and the Simulator.md parts of [Hyphenate](../7-integrations/Hyphenate.md): `plant_medic_visit`, `planted_incident`, the accuracy run and its scorecard, the stress test and the simulated-claimant payout. Steps 6 and 7 of the live-learning run then need a second real fall and a staged fake on real bands.
+- Remove the Simulator.md lines in [Social](../6-features/Social.md) and [Attendee-App](../5-apps/Attendee-App.md), the two-exit run from the rehearsal checklist in [Safety](../6-features/Safety.md), and the Simulator.md parts of [Insurance](../6-features/Insurance.md): `plant_medic_visit`, `planted_incident`, the accuracy run and its scorecard, the stress test, the scripted claims run and the simulated-claimant payout. Claims then come only from real incidents, worked by the medic and decided by the organizer after the event.
 - Replay disappears; the bridge's raw log remains a post-mortem and calibration record only ([Gateway-Bridge](Gateway-Bridge.md)).
 - The dashboard shows the nine real bands only, and the event graph shows only real attendees.
 
@@ -221,7 +219,7 @@ Real bands arrive through `ingest_band_reports` and simulated bands through `rep
 | The crowd sends no band reports; `crowd_tick` writes its `presence_sample` rows itself | the crowd is there for the people graph and the recaps, so it never touches the safety path |
 | Social.md: the crowd moves in groups of 3 that change zone every 3 to 8 minutes, and strangers in one zone are close on 15 percent of ticks (starting values) | friends meet each other and strangers only sometimes, so the graph looks like an event and not one big cluster |
 | The simulated bands are 90 to 99 and report through one reducer, `report_sim_band`, that only the `simulator` role may call | one byte of id like the radio, and the module needs no rule about when a simulator may report a real id |
-| `bandit-api`'s dev routes press and move only bands 94 to 99, and only in test mode; the fall and property routes start the tool | a tester can try the band claim without hardware, and the scripted claims run's bands 90 to 93 stay under the tool |
+| `bandit-api`'s dev routes press only bands 94 to 99 and move any simulated band 90 to 99, only in test mode; the fall and property routes start the tool | a tester can try the band claim without hardware and walk any simulated band, and the scripted claims run's bands 90 to 93 are never claimed by a tester |
 | Replays map real bands 1 to 9 onto 91 to 99 | a replay never fights the bridge over a live band |
 | Scenarios and replays start from the `bandit-claims` command line; the Ops dashboard's Simulate tab starts only a walk, a fall or a broken speaker, through the dev routes | the dashboard needs no scenario controls, and a single fall or property claim is one tap for a tester |
 | A replay is a separate run from a scenario and never runs during the scripted claims run | the mapped replay ids include that run's bands |
@@ -229,6 +227,6 @@ Real bands arrive through `ingest_band_reports` and simulated bands through `rep
 | The bridge acknowledges target-0 one-shots; the tool acknowledges only one-shots addressed to the simulated bands | one acknowledger per command; with no bridge running, `memory_tick` deletes the unacknowledged row after 30 s |
 | Social.md: each crowd band gets a simulated owner with `findable` on, a made-up name and the Instagram handle of a well-known public account | the big-screen people graph shows a real-looking crowd instead of at most nine people |
 | A simulated owner is keyed by a placeholder identity derived from its band id | it needs no app connection, and no client can sign in as it |
-| Hyphenate.md: the `bandit-claims` tool plays the medic only for planted incidents on simulated bands, through `plant_medic_visit` | an accuracy run of 54 claims cannot wait for a person at every bedside, and the claim must see what a real medic visit leaves |
-| Hyphenate.md: planted ground truth lives in `planted_incident`, which only the scorecard reads | the claim decisions stay blind to which claims are planted, so the scorecard measures the real rules |
-| Hyphenate.md: the stress test's staff injury uses a test identity that the tool grants `ops` | the staff check reads real `staff_role` rows, and no person's identity has to be borrowed |
+| Insurance.md: the `bandit-claims` tool plays the medic only for planted incidents on simulated bands, through `plant_medic_visit` | an accuracy run of 18 claims cannot wait for a person at every bedside, and the claim must see what a real medic visit leaves |
+| Insurance.md: planted ground truth lives in `planted_incident`, which only the scorecard reads | the claim decisions stay blind to which claims are planted, so the scorecard measures the real rules |
+| Insurance.md: a planted staff injury uses a test identity that the tool grants `crew` for the round | the staff check reads real `staff_role` rows, no person's identity has to be borrowed, and `crew` opens no staff screen |

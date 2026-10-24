@@ -20,7 +20,7 @@ Non-responsibilities:
 - Tables and reducers are defined in [SpacetimeDB](../2-data/SpacetimeDB.md); this file specifies the policy inside them.
 - The staff screens are [Ops-Dashboard](../5-apps/Ops-Dashboard.md); medics work in its incident desk.
 - Medical-ID.md: the medical card.
-- Hyphenate.md: claims and evidence.
+- Insurance.md: claims and evidence.
 - What the camera does internally is Vision (TBD -- LEO). This file states only what it reads from `camera_count`, `ground_alert` and `vision_assessment`.
 
 ## Interfaces
@@ -32,7 +32,7 @@ Non-responsibilities:
 | In | Venue seed | zones with areas, zone graph with distances, exits with colours and status, stations | `zone`, `zone_link`, `exit`, `station` | seed load |
 | In | Ops (calibration screen) | measured points mapping `neigh` to people per square metre | `calibration_point` through `set_calibration` | TypeScript SDK |
 | In | Ops | low visibility, blocked exits, pinned exit, pinned risk, forced states, reset | `set_low_vis`, `set_exit_status`, `set_zone_exit`, `set_zone_risk`, `force_band_state`, `send_band_command`, `clear_all`, `set_fleet_config` | TypeScript SDK |
-| In | Ops, medics | incident handling; a medic takes an incident with `assign_medic` (role `medic`) | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | TypeScript SDK |
+| In | Ops, medics | incident handling; a medic takes an incident with `assign_medic` (role `medic`); `ack_incident`, `add_incident_note`, `open_incident` and `resolve_incident` take `ops` or `medic` | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | TypeScript SDK |
 | In | Vision.md (TBD -- LEO): `bandit-vision` | a people count for the pit every 3 s; a person-down alert within about a second; a Claude assessment of the event a few seconds later | `report_zone_count`, `report_ground_alert`, `submit_vision_assessment` ([Vision](../4-devices/Vision.md)) | reducer |
 | Out | everyone | density, source, risk and assigned exit per zone, twice a second | `zone_state` | subscription |
 | Out | `bandit-bridge` | exit colour per band; the guidance and light-circle buzzes; `clear` on resolve | `band_directive`, `band_command` | subscription, then gateway commands |
@@ -162,7 +162,7 @@ Guidance happens in three situations, and the band shows GUIDE (red with the exi
 
 A zone that stays `high` for 10 consecutive ticks (5 s, starting value) with no open `crowd_risk` incident gets one, opened by `venue_tick` with a snapshot and an escalation timer like any other incident. The risk level already has hysteresis; the extra wait separates "the dashboard went red" from "staff must act", so a crowd that compresses for a moment does not page every medic.
 
-The incident closes itself when the zone has been `normal` for 60 consecutive ticks (30 s, starting value): `venue_tick` sets `resolved` with resolution `recovered`. When a medic has taken it, the tick does not close it; a person resolves it. Ops can also open a `crowd_risk` incident by hand with `open_incident`.
+The incident closes itself when the zone has been `normal` for 60 consecutive ticks (30 s, starting value): `venue_tick` sets `resolved` with resolution `recovered`. When a medic has taken it, the tick does not close it; a person resolves it. Ops or a medic can also open a `crowd_risk` incident by hand with `open_incident`.
 
 ### SOS and fall
 
@@ -183,9 +183,9 @@ Later batches refresh `incident.last_signal_at` while the flag stays set, and ad
 
 **Vision.md (TBD -- LEO): corroboration and judgment.** A person-down alert from the camera's pose detector that lands in the zone of an open `sos` or `fall` incident within 3 s of the flag (starting value) sets `incident.camera_corroborated`, which the dashboard shows as a second source. A person-down alert with no band flag that lasts 5 s opens its own `fall` incident with `opened_by` `vision` and no band: the same snapshot, timer, escalation and medic approach, with no light circle and no `clear` on resolve. A few seconds after the flag, `bandit-vision` sends Claude frames from around the event and writes a `vision_assessment`, which sets `incident.vision_status` to `confirmed` or `not_confirmed`. None of this gates the band's reaction, the incident, the light circle or escalation; those have already happened.
 
-**Resolving.** `resolve_incident` sets `resolved`, deletes the directives tied to the incident, and writes a `clear` command for the subject band so the SOS latch releases without the wearer holding the button again. For 10 s after resolution (starting value) a still-set flag from that band does not reopen an incident, which gives the `clear` time to arrive. Hyphenate.md: `resolve_incident` ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note; the snapshot and witness rows are its evidence.
+**Resolving.** `resolve_incident` sets `resolved`, deletes the directives tied to the incident, and writes a `clear` command for the subject band so the SOS latch releases without the wearer holding the button again. For 10 s after resolution (starting value) a still-set flag from that band does not reopen an incident, which gives the `clear` time to arrive. Insurance.md: `resolve_incident` ends with the claims hook, which records the subject of an `sos` or `fall` as an injured party and runs the `open_claim` logic for every injured party with a first-aid cost or an urgent-care bill, or for a `property` incident with a cost note; the snapshot and witness rows are its evidence.
 
-**Property incidents.** Staff open one from the Ops dashboard with `open_incident`, kind `property` and the zone. Hyphenate.md: the dashboard's Report property damage button makes this one tap. It gets the same snapshot and escalation timer as any incident and follows the same lifecycle. Vision.md (TBD -- LEO): `bandit-vision` assesses the scene and attaches frames and an assessment through `report_property_event`, and opens the incident itself with `opened_by` `vision` when the camera sees the damage first.
+**Property incidents.** Staff open one from the Ops dashboard with `open_incident`, kind `property` and the zone. Insurance.md: the dashboard's Report property damage button makes this one tap. It gets the same snapshot and escalation timer as any incident and follows the same lifecycle. Vision.md (TBD -- LEO): `bandit-vision` assesses the scene and attaches frames and an assessment through `report_property_event`, and opens the incident itself with `opened_by` `vision` when the camera sees the damage first.
 
 This diagram answers: what happens, in order, from a fall to a medic standing next to the person.
 
@@ -322,7 +322,7 @@ If the manual override or Plan B is used at any step, the badge is visible and t
 
 **Used by**
 
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Hyphenate](../7-integrations/Hyphenate.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
+- [Ops-Dashboard](../5-apps/Ops-Dashboard.md) (map colours, incident cards, override badge, calibration screen), [Simulator](../3-services/Simulator.md) (scenarios that drive these behaviours), [Insurance](Insurance.md) (snapshot and witnesses as evidence), [Vision](../4-devices/Vision.md) (TBD -- LEO) (the rows it feeds), [Flows](../1-overview/Flows.md) (the end-to-end event flow).
 
 **If you delete this file**
 

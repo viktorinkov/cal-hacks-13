@@ -1,6 +1,6 @@
 # Ops dashboard
 
-The ops dashboard is the staff web app. On the venue laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. On staff phones it is the same app trimmed by role, so a medic sees incidents first, an approver sees claims and ops sees the host portal. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
+The ops dashboard is the staff web app. On the venue laptop it is the screen the judges watch: the venue map, the fleet, the incidents and the controls. It is one page for every staff member: the medic and the organizer see the same tabs on a phone or the laptop, and a button a person's role cannot use is hidden. It reads everything by subscription from the `band1t` module through SpacetimeDB's TypeScript client SDK and changes the world only by calling reducers, so it can never disagree with the bands, the bridge or the attendee app. It computes nothing about safety; the module does, and the dashboard shows the result.
 
 ## Role in the system
 
@@ -12,8 +12,9 @@ Responsibilities:
 - Host the calibration UI: live `thresh` and `rssi` through `fleet_config`, and the three calibration steps recorded into `calibration_point`.
 - Show where each booth stands and let ops fix it.
 - Monitor the work queue (`job`, through `staff_jobs`) and the Rust services (`service_heartbeat`).
-- Give ops the host portal: the attendee list with band status, live zones and alerts, the claims waiting for approval, and the "Event ended" button (`end_event`), which becomes "Reopen the event" (`reopen_event`) once the event has ended.
-- Let the module owner grant and revoke roles.
+- Give ops the host portal: the attendee list with band status and "Take the band back" (`release_band`), live zones and alerts, and the "Event ended" button (`end_event`), which becomes "Reopen the event" (`reopen_event`) once the event has ended.
+- Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
+- Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 
 Not responsible for:
 
@@ -29,51 +30,55 @@ Not responsible for:
 |---|---|---|---|---|
 | Static bundle | in | `bandit-api` to browser | the app, from the same public HTTPS host as the attendee app | HTTPS |
 | SpacetimeAuth sign-in | both | dashboard and SpacetimeAuth | the magic-link email sign-in for every staff member; an ID token back | HTTPS, OpenID Connect |
-| SpacetimeDB connection | both | dashboard and `band1t` module | the ID token, subscriptions, reducer calls; the caller's `staff_role` rows decide which panels render and which reducers accept it | TypeScript client SDK over WebSocket |
-| Subscriptions | in | module to dashboard | venue tables, live tables, control tables, incident tables, `calibration_point`, `staff_jobs`, `service_heartbeat`, `staff_role`, `band`, and `host_attendees` for ops; see Subscriptions below | SDK subscription |
+| SpacetimeDB connection | both | dashboard and `band1t` module | the ID token, subscriptions, reducer calls; the caller's roles, from `my_roles` and `my_owner`, decide which buttons render, and the module checks the role again on every reducer call | TypeScript client SDK over WebSocket |
+| Subscriptions | in | module to dashboard | venue tables, live tables, control tables, incident tables, `calibration_point`, `staff_jobs`, `service_heartbeat`, `my_roles`, `my_owner`, `band` and `host_attendees`; see Subscriptions below | SDK subscription |
 | Control reducers | out | dashboard to module | `force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_low_vis`, `set_exit_status`, `set_fleet_config` (calibration values and `density_override`), `set_calibration` | SDK reducer call |
 | Incident reducers | out | dashboard to module | `ack_incident`, `assign_medic`, `add_incident_note`, `resolve_incident`, `open_incident` | SDK reducer call |
-| Fleet, booth and staff reducers | out | dashboard to module | `register_band` (add, rename), `release_band` (unclaim), `upsert_booth` (place or add a booth), `grant_role`, `revoke_role`; `end_event` and `reopen_event` (the host portal's "Event ended" and "Reopen the event" buttons) | SDK reducer call |
-| API session | out | dashboard to module, then to `bandit-api` | on page load the dashboard makes a random token, registers its hash with `open_api_session` and sends the token with each `bandit-api` request: BrightData.md: the floor-plan image; Vision.md (TBD -- LEO): the latest frame; Hyphenate.md: the bill upload through `POST /api/blobs` and the letter downloads | SDK reducer call, then HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| Hyphenate.md | both | dashboard, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`, plus `planted_incident` (Simulator.md) for the scorecard and `claim_precedent` (Elastic.md); `approve_claim` and its siblings for the approver roles; on the incident card, Attach bill (`POST /api/claims/bill`) and Add injured person (`add_injured_party`); the Report property damage button, which calls `open_incident` with kind `property` and the zone | SDK and HTTPS |
+| Fleet and booth reducers | out | dashboard to module | `register_band` (add, rename), `release_band` ("Take the band back"), `upsert_booth` (place or add a booth); `end_event` and `reopen_event` (the host portal's "Event ended" and "Reopen the event" buttons) | SDK reducer call |
+| API session | out | dashboard to module, then to `bandit-api` | on page load the dashboard makes a random token, registers its hash with `open_api_session` and sends the token with each `bandit-api` request: BrightData.md: the floor-plan image; Vision.md (TBD -- LEO): the latest frame; Insurance.md: the bill upload through `POST /api/blobs` and the letter downloads | SDK reducer call, then HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| Insurance.md | both | dashboard, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, plus `planted_incident` (Simulator.md) for the scorecard and `claim_precedent` (Elastic.md); "Waiting for your decision" with `approve_claim` and `refuse_claim` for `ops`; on the incident card, Attach bill (`POST /api/blobs` with purpose `medical`) and Add injured person (`add_injured_party`); the Report property damage button, which calls `open_incident` with kind `property` and the zone | SDK and HTTPS |
 | Medical-ID.md | both | dashboard and module | in the incident desk, "Tap band N for the medical card" calls `request_medical_card` with the incident's band, and the granted card comes from `medic_medical_cards`; the medical access log from `board_medical_access` (which medic asked for which band's card, when, for which incident, granted or not) | SDK |
 | Vision.md (TBD -- LEO) | both | module and dashboard | camera tile: `camera`, `camera_count`, `ground_alert`, `vision_assessment`; latest frame `blob_ref`; the `vision` heartbeat | SDK and HTTPS |
 | Social.md | in | module to dashboard | the event graph: the anonymous `event_graph` view (node ids and links only) | SDK |
 | Elastic.md | in | module to dashboard | the `indexer` heartbeat in service health. Zone history is read from `zone_sample` here, never from Elastic | SDK |
-| Simulator.md | both | module and `bandit-api` to dashboard | `band.simulated` for the legend and the counts; the `simulator` heartbeat; the Simulate tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| Simulator.md | both | module and `bandit-api` to dashboard | `band.simulated` for the legend and the counts; the `simulator` heartbeat; the Simulate tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | BrightData.md | in | `bandit-api` and module to dashboard | each `hall` floor-plan image as a `blob_ref` with access class `staff`, booth `organization` names, the `ingest` heartbeat | HTTPS blob endpoint ([Rust-Backend](../3-services/Rust-Backend.md)) and SDK |
 
 ## Design
 
-### Layouts by role
+### One page for all staff
 
-One app, one bundle; the caller's `staff_role` rows decide what renders. Reducers check the role again on the server, so hiding a panel is convenience, not security.
+One app, one bundle, one page. There are two staff roles: the medic (`medic`) works incidents during the event, and the organizer (`ops`) runs the room. Anyone with either role, and the module owner, sees every tab. A button the caller's role cannot use is hidden, and the module checks the role again on every reducer, so hiding a button is convenience, not security. The header shows "Identity" with the caller's short identity code and roles, each with its label; for `ops` it also holds the "Event ended" button.
 
-| Role | Device | Panels |
+| Role | Who, on which device | What they do on the page |
 |---|---|---|
-| `owner` | laptop | everything `ops` sees, plus the staff panel (grant and revoke roles, service identities) |
-| `ops` | laptop, phone | the host portal (below), venue map, fleet, incidents, controls, calibration, jobs, service health; Social.md: the event graph on the big screen |
-| `medic` | phone, laptop | the incident desk, "Open incidents (medic)": per open incident "Take it" (`assign_medic`), notes and "Resolve"; venue map, fleet read-only. Medical-ID.md: per incident with a band, "Tap band N for the medical card" (`request_medical_card`), and the granted card inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the wearer confirmed it |
-| `floor_manager`, `risk_manager`, `adjuster` | phone, laptop | incidents read-only; Hyphenate.md: the claims queue filtered to their authority, with the approval grid; at the event a judge holds `risk_manager` on their own phone |
-| `photographer` | none here | Social.md: the `/photo` route in the attendee app |
+| `medic` | the paramedic, on a phone | takes an incident with "Take it" (`assign_medic`), adds notes with a cost, and resolves it; reads the venue map and the fleet |
+| `ops` | the organizer, on the venue laptop or a phone | the host portal (below), venue map, fleet, incidents, controls, calibration, jobs and service health |
+| owner | the team member signed in with the identity that published the module | passes every role check, on the page as in the module; grants roles from the command line |
 
-On the laptop the panels sit in tabs: Live (the zones, the alerts and the low-visibility button), Attendees (the host portal's attendee list) and Claims (the incident desk, "Open incidents (medic)", on top). Optional tabs:
+- Medical-ID.md: the medic also opens the medical card with "Tap band N for the medical card" (`request_medical_card`), and the granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the wearer confirms it.
+- Insurance.md: after the event the organizer decides every claim no learned rule settled, in "Waiting for your decision" on the Claims tab.
+- Social.md: the event graph on the big screen is for `ops`; the `photographer` role has no screen here and uses the `/photo` route in the attendee app.
 
-- Hyphenate.md: the claims queue sits in the Claims tab, under the incident desk.
+The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This page is for event staff", then "Show this code to the module owner, who grants your role:", their short identity code in large type, and their full identity below it.
+
+The tabs are the same on every device: Live (the zones, the alerts and the low-visibility button), Attendees (the host portal's attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs:
+
+- Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
 - Simulator.md: the Simulate tab, shown in test mode only (see Simulate tab below).
 
-Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and the dashboard then shows their identity as a short code on an otherwise empty screen; a Rust service prints its identity on first start. The owner, the team member signed in with the identity that published the module, enters each code in the staff panel and calls `grant_role`; no other role may grant. Nobody types codes in front of judges. Hyphenate.md: the one grant made during the event is `risk_manager` for the judge who approves the first claim. The judge opens the dashboard on the phone they joined with, signed in, so it is the same identity and display name as their attendee app; the owner picks the judge from the host portal's attendee list, and revokes the grant after the event.
+Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeAuth magic link, the same sign-in attendees use, and sees the no-role screen with their identity code; a Rust service prints its identity on first start. The owner grants each role with `grant_role` from the SpacetimeDB command line, with a label such as the person's name, and the tabs appear as soon as the grant lands. Only the owner may call `grant_role`, `revoke_role` and `add_owner`; the page has no grant button. Nobody types codes in front of judges.
 
 ### Host portal
 
-The host portal is the dashboard's layout for the `ops` role: one screen to run the event as its host.
+The host portal is the part of the page that runs the event as its host. Its controls are for `ops`.
 
 | Part | Shows | Reads | Controls (reducer) |
 |---|---|---|---|
-| Attendee list | every attendee by display name, with their band and its status (alive or stale) | `host_attendees` | per attendee, for the owner only: grant a role (`grant_role`) |
+| Attendee list | every attendee by display name, with their band and its status (alive or stale) | `host_attendees` | per attendee with a band, while the event has not ended: "Take the band back" (`release_band`), after the confirm "Take band N back from <name>? They keep their profile and memories; the next person can claim the band." |
 | Live zones | the Venue map | the Venue map's tables | the Venue map's controls |
 | Alerts | open incidents and whether low visibility is on | `staff_incidents`, `fleet_config` | the Incidents panel's actions |
-| Hyphenate.md: Claims queue | the claims waiting for approval | the Claims queue's tables | `approve_claim`, `refuse_claim`, as the authority matrix allows |
+| Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note | the Claims queue's tables | `approve_claim`, `refuse_claim` |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
 When a staff member with `ops` presses "Event ended", `end_event` sets `event_state.ended`. Every open attendee page turns into the recap page live, and from then on bands cannot be released ([Attendee-App](Attendee-App.md)). "Reopen the event" runs `reopen_event`, which clears it, to run the event flow again.
@@ -84,15 +89,14 @@ When a staff member with `ops` presses "Event ended", `end_event` sets `event_st
 |---|---|---|---|
 | Venue map | zone rectangles coloured by risk, stations with their exit colour, exits (blocked struck through), the assigned exit per zone, band count, density and its source badge per zone, booths as labelled dots | `venue`, `zone`, `zone_link`, `exit`, `station`, `booth`, `zone_state`, `fleet_config`, `band_report` | per zone: `set_zone_exit`, `set_zone_risk`; per exit: `set_exit_status`; per booth: `upsert_booth` |
 | Fleet table | one row per band: alive or grey, battery, state, zone, flags, simulated, last seq, claimed yes or no | `band`, `band_report`, `band_directive` | per band: `force_band_state`, `send_band_command` (buzz, clear), identify; `register_band` (add, rename), `release_band` (unclaim) |
-| Incidents (the incident desk, "Open incidents (medic)") | open and recent incidents with zone, wearer, witnesses, countdown, status, snapshot, notes | `incident` (with `escalates_at` for the countdown), `incident_snapshot`, `incident_band`, `incident_note`; the wearer's display name comes with `staff_incidents` | `ack_incident`, `assign_medic` ("Take it"), `add_incident_note`, `resolve_incident`, `open_incident` |
+| Incidents (the incident desk, "Open incidents") | open and recent incidents with zone, wearer, witnesses, countdown, status, snapshot, notes | `incident` (with `escalates_at` for the countdown), `incident_snapshot`, `incident_band`, `incident_note`; the wearer's display name comes with `staff_incidents` | `ack_incident`, `assign_medic` ("Take it"), `add_incident_note`, `resolve_incident`, `open_incident` |
 | Controls | fleet-wide actions, the low-visibility button and the override banner | `band_directive`, `fleet_config`, `zone_state` | `force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_low_vis`, `set_exit_status`, `set_fleet_config` (`density_override`) |
 | Calibration | live thresholds, live `neigh` histogram, the three calibration steps and the resulting mapping | `fleet_config`, `band_report`, `calibration_point` | `set_fleet_config`, `set_calibration` |
 | Job monitor | queue depth per kind, each job's status, attempts, lease expiry and last error | `staff_jobs` | none |
 | Service health | one card per Rust service: last heartbeat, version, counters | `service_heartbeat` | none |
-| Staff panel (owner) | identities and roles | `staff_role` | `grant_role`, `revoke_role` |
-| Hyphenate.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, who may approve, the approval grid, and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Simulator.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`, `staff_incidents`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule`, `load_fallback_rule` (ops) |
-| Hyphenate.md: Incident card controls | Attach bill and Add injured person on an incident row, for `medic` and `ops` | `injured_party`, `medical_record`, `incident_snapshot` (bands present) | the bill upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record`; `add_injured_party` |
-| Hyphenate.md: Report property damage button | one button on the Incidents panel; ops picks the zone | `zone` | `open_incident` with kind `property` and the zone |
+| Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), Claude's causation explanation, the decision form for `ops` ("Learn a rule from this approval, so similar claims settle on their own", ticked by default; "Rule ceiling in dollars (optional)"; "Approve $X"; Refuse with a reason), and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Simulator.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `staff_incidents`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (ops) |
+| Insurance.md: Incident card controls | Attach bill and Add injured person on an incident row, for `medic` and `ops` | `injured_party`, `medical_record`, `incident_snapshot` (bands present) | the bill upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record`; `add_injured_party` |
+| Insurance.md: Report property damage button | one button on the Incidents panel; ops picks the zone | `zone` | `open_incident` with kind `property` and the zone |
 | Medical-ID.md: Medical card | inside an incident in the incident desk: "Medical card: <name>, band N", with " (not yet confirmed by the wearer)" until confirmed; blood type, allergies, conditions, medications, emergency contact, insurance and notes, each item with its page | `medic_medical_cards` | "Tap band N for the medical card" (`request_medical_card`) |
 | Medical-ID.md: Medical access log | every request: medic, band, incident, time, granted or refused, reason | `board_medical_access` | none |
 | Social.md: Event graph | the whole event as a live people graph for the big screen: anonymous people, booths and companies, links from `people_link`, clusters | `event_graph` | the cluster toggle |
@@ -166,7 +170,7 @@ Row actions:
 - Force a state with a hold time (`force_band_state`).
 - Identify: `force_band_state` with state 8 for 8 s, which blinks the band white so a staff member can find it on a wrist.
 - Buzz a full band or clear this band: `send_band_command` with `buzz` and a pattern 1 to 3, or with `clear`.
-- Unclaim the band: `release_band`, after a confirm tap. It works until the event ends and is how ops fixes a band claimed by mistake ([Attendee app](Attendee-App.md)).
+- Unclaim the band: `release_band`, after a confirm tap, the same reducer as "Take the band back" in the attendee list. It works until the event ends and is how ops fixes a band claimed by mistake ([Attendee app](Attendee-App.md)).
 - `register_band` adds or renames a band and sets its `nfc_token` and full or lite flag.
 
 ### Incidents panel
@@ -180,7 +184,7 @@ Each row shows: kind (`sos`, `fall`, `crowd_risk`, `property`), zone, the band i
 | Acknowledge | `ack_incident` | status `acknowledged`; the escalation timer row is deleted, so a handled incident never escalates |
 | Take it | `assign_medic` | role `medic`; shown while the incident is open; the medic who taps it takes the incident: status `responding`, `assigned_medic` is the caller ([Safety](../6-features/Safety.md)) |
 | (TBD -- LEO) Medic approach | none yet | the medic who took the incident taps the zone they enter from on the map (`medic_entry_zone_id`); the module issues the medic-approach guidance, an exit colour and a vibration that point the crowd out of the medic's way ([Safety](../6-features/Safety.md)) |
-| Add note | `add_incident_note` | free text and a cost in cents when there is one (first aid supplies, damage); Hyphenate.md reads the cost |
+| Add note | `add_incident_note` | free text and a cost in cents when there is one (first aid supplies, damage); Insurance.md reads the cost |
 | Resolve | `resolve_incident` | one tap by the medic or ops; status `resolved`; directives for the incident lapse and the band is cleared |
 | Open incident | `open_incident` | ops opens an incident by hand on a zone (kind `crowd_risk` or `property`) when they see something the sensors did not |
 
@@ -325,11 +329,12 @@ Cards in the core: `bridge`, `workers`, `api`. Optional cards, each one line to 
 
 ### Simulate tab (Simulator.md)
 
-Simulator.md: the Simulate tab is shown in test mode only. It lists the simulated bands 90 to 99 that have an owner, with the owner's name and the band's zone, under the line "Bands 90 to 93 are the claims story's attendees; 94 to 99 are the ones testers claim from a tap link."
+Simulator.md: the Simulate tab is shown in test mode only. Under "Simulated bands" it lists every simulated band 90 to 99: the band with alive or stale, its wearer or "not claimed", and its zone. The line above the table reads "Bands 90 to 93 are the claims story's attendees; 94 to 99 are the ones testers claim from a tap link: open /t/BANDIT-94, then press band 94 here."
 
-- Walk: bands 94 to 99 get one button per zone. A press calls `POST /api/dev/move/{band}/{station}`, and the band reports from that zone's station.
-- "Fall here", on every listed band: `POST /api/dev/fall/{band}` runs `bandit-claims fall` for that band, with two of the story's bands around it as the light circle. The fall incident opens in the incident desk.
-- "Speaker breaks in <zone>", one button per zone under "Property damage": `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that zone. Hyphenate.md: the property incident and its claim follow.
+- "Walk to": every band gets one button per zone, and the button for the zone it is in is greyed. A press calls `POST /api/dev/move/{band}/{station}`, and the band reports from that zone's station.
+- "Press", on bands 94 to 99: `POST /api/dev/press/{band}` presses the band's button, so a tester who opened its tap link claims it.
+- "Fall here", on every claimed band: `POST /api/dev/fall/{band}` runs `bandit-claims fall` for that band, with two of bands 90 to 93 around it as the light circle. They stay in that zone afterwards. The fall incident opens in the incident desk.
+- "Speaker breaks in <zone>", one button per zone under "Property damage": `POST /api/dev/property/{station}` runs `bandit-claims property --camera` for that zone. Insurance.md: the property incident and its claim follow.
 
 After "Fall here" or a property button the dashboard switches to the Claims tab, where the new incident waits ([Simulator](../3-services/Simulator.md), [Rust-Backend](../3-services/Rust-Backend.md)).
 
@@ -346,12 +351,12 @@ Private tables arrive through the staff views that [SpacetimeDB](../2-data/Space
 | `fleet_config`, `calibration_point` | calibration panel; `density_override` for the banner; `low_vis` for the low-visibility button and the map frame | yes | `fleet_config` only |
 | `incident` (with `escalates_at`), `incident_snapshot`, `incident_band`, `incident_note` | incidents panel and countdown | yes | yes |
 | `display_name` carried on `staff_incidents` | the wearer's name on an open incident | yes | medics |
-| `staff_role` | own role, staff panel | yes | own rows |
-| `host_attendees` | the host portal's attendee list | yes | no |
+| `my_roles`, `my_owner` | the caller's own roles and whether they are the owner, for the header, the tabs and the hidden buttons | yes | yes |
+| `host_attendees` | the host portal's attendee list | yes | yes |
 | `event_state` | the host portal's Event ended part | yes | no |
 | `staff_jobs` | job monitor | yes | no |
 | `service_heartbeat` | service health | yes | yes |
-| Hyphenate.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, `authority_limit`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | claims queue, ledger, rules, scorecard, incident card controls | yes | approvers, medics |
+| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Simulator.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, incident card controls | yes | yes |
 | Medical-ID.md: `medic_medical_cards`, `board_medical_access` | the medical card in the incident desk, the medical access log | yes | medics |
 | Vision.md (TBD -- LEO): `camera`, `camera_count`, `ground_alert`, `vision_assessment` | camera tile | yes | no |
 | Social.md: `event_graph` | event graph | yes | no |
@@ -372,7 +377,7 @@ Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-service
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): every table listed under Subscriptions; the ops reducers (`force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_low_vis`, `set_exit_status`, `set_fleet_config`, `set_calibration`, `open_incident`), the incident reducers, `upsert_booth`, `register_band` and `release_band`; `service_heartbeat` and `heartbeat`; `grant_role` and `revoke_role`; `staff_jobs`; `end_event` and `host_attendees` for the host portal; the zone rectangle in plan metres.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): every table listed under Subscriptions; the ops reducers (`force_band_state`, `send_band_command`, `clear_all`, `set_zone_exit`, `set_zone_risk`, `set_low_vis`, `set_exit_status`, `set_fleet_config`, `set_calibration`, `open_incident`), the incident reducers, `upsert_booth`, `register_band` and `release_band`; `service_heartbeat` and `heartbeat`; `my_roles` and `my_owner`; `staff_jobs`; `end_event` and `host_attendees` for the host portal; the zone rectangle in plan metres.
 - [Safety](../6-features/Safety.md): the meaning of risk levels, escalation, a medic taking an incident, low visibility, manual override and Plan B.
 - (TBD -- LEO) [Safety](../6-features/Safety.md): exit assignment along `zone_link` paths and the medic-approach guidance.
 - [Gateway-Bridge](../3-services/Gateway-Bridge.md): directive reconciliation and command delivery that make the controls take effect; the raw log for calibration.
@@ -381,16 +386,16 @@ Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-service
 
 **Used by**
 
-- [Attendee app](Attendee-App.md): unclaiming a band through `release_band`; `grant_role` for staff; the "Event ended" button that turns every attendee page into the recap.
+- [Attendee app](Attendee-App.md): unclaiming a band through `release_band`; the "Event ended" button that turns every attendee page into the recap.
 - [Medical-ID](../6-features/Medical-ID.md): the incident desk, where the medic asks for the card and sees it.
-- [Hyphenate](../7-integrations/Hyphenate.md), [Medical-ID](../6-features/Medical-ID.md), [Social](../6-features/Social.md), [Vision](../4-devices/Vision.md), [Elastic](../7-integrations/Elastic.md), [Simulator](../3-services/Simulator.md), [BrightData](../7-integrations/BrightData.md): host their optional panels, map layers, the event graph and service cards.
+- [Insurance](../6-features/Insurance.md), [Medical-ID](../6-features/Medical-ID.md), [Social](../6-features/Social.md), [Vision](../4-devices/Vision.md), [Elastic](../7-integrations/Elastic.md), [Simulator](../3-services/Simulator.md), [BrightData](../7-integrations/BrightData.md): host their optional panels, map layers, the event graph and service cards.
 - [Flows](../1-overview/Flows.md): the SOS, manual-override and Event ended steps.
 
 **If you delete this file**
 
 - Ops loses every control; forced states, low visibility and calibration would need another client calling the same reducers, and the manual-override fallback disappears from the event flow.
 - Remove the Ops dashboard row from the component table in Architecture.md and the ops subscriptions from SpacetimeDB.md's "subscriptions per client".
-- Remove the "ops dashboard" bullets in Hyphenate.md (claims queue with its scorecard, incident card controls, property-damage button, the judge's live grant), Medical-ID.md (the medical card in the incident desk, medical access log), Social.md (event graph), Vision.md (camera tile), Elastic.md (indexer card, booths by hand), Simulator.md (legend and counts, the Simulate tab) and BrightData.md (floor plan and booth fixes).
+- Remove the "ops dashboard" bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", incident card controls, property-damage button), Medical-ID.md (the medical card in the incident desk, medical access log), Social.md (event graph), Vision.md (camera tile), Elastic.md (indexer card, booths by hand), Simulator.md (legend and counts, the Simulate tab) and BrightData.md (floor plan and booth fixes).
 
 ## Decisions
 
@@ -401,17 +406,19 @@ Simulator.md: only the 10 simulated bands send reports ([Simulator](../3-service
 | A medic's `resolve_incident` is one tap, with no ops confirmation | the medic is the person standing there; a second approval adds nothing |
 | Zones are rectangles in plan metres | the event's zones are taped squares and booth areas; a rectangle draws them, and a dropped booth lands in exactly one zone |
 | Booths are fixed by dragging them on the venue map, through `upsert_booth` | one place to see and fix the booth layout, and a hand fix survives a re-import |
-| `release_band` works until the event ends, after a confirm tap; the band's owner can also release it from the attendee app | ops can fix a band claimed by mistake mid-event; the confirm tap stops an accidental release |
-| Staff roles are granted by the owner at setup, before doors open | nobody types identity codes in front of judges |
-| Hyphenate.md: a judge approves the first claim as `risk_manager` on their own phone, granted live by the owner with one tap on the judge's name in the host portal's attendee list | the rule that settles the next claim is stamped with the judge's own display name; a tap is not typing a code |
-| Hyphenate.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
-| Hyphenate.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
+| `release_band` ("Take the band back") is for `ops` only, after a confirm tap, until the event ends; the wearer keeps their profile and memories | ops can fix a band claimed by mistake mid-event; the confirm tap stops an accidental release |
+| Staff roles are granted by the owner with `grant_role` from the command line at setup, before doors open; the page has no grant button | nobody types identity codes in front of judges, and no staff screen can widen its own access |
+| One page for all staff: every tab for anyone with `ops` or `medic`, with the buttons a role cannot use hidden | two roles need no separate layouts; the module checks every role again, so the page cannot grant more than the role |
+| A signed-in person with no staff role sees their identity code and nothing else | the owner reads the code off their screen to grant the role, and no venue data shows to a stranger |
+| Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works the room during the event, and one person decides every claim no learned rule settled |
+| Insurance.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
+| Insurance.md: bills are attached and injured people added from the incident card | medics already work incidents on the dashboard on their phones, and the card knows the incident and its bands present |
 | A medic takes an incident with "Take it" (`assign_medic`); ops does not assign medics; medics wear no bands | the medic knows whether they are free, and the desk shows who took it |
 | Medical-ID.md: the medic asks for the medical card from the incident desk | the medic already works the incident there, and the card shows inside it |
 | The laptop paints every `band_report` update without throttling | Simulator.md: only the 10 simulated bands report, next to the 9 real ones |
 | Simulator.md: the Simulate tab is shown in test mode only and calls the dev routes; scenarios also start from the `bandit-claims` command line | a tester runs a fall or a property claim from the laptop with one tap, and outside test mode the tab does not exist |
 | Social.md: the event graph is anonymous on the big screen, and its links come only from `event_graph` | a public screen shows no names; SpacetimeDB pushes the measured links live |
-| The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the wallet section of the attendee's recap and in the claims queue |
+| The dashboard has no payments panel | BandIt takes no payments at the venue; merch payments and claim payouts are seen in the wallet on the attendee's recap and in the claims queue |
 | The job monitor reads the `staff_jobs` view, and the incident countdown reads `incident.escalates_at`; the dashboard subscribes to neither `job` nor `escalation_timer` | both are private, the job payload can hold personal data, and the countdown arrives with the incident row the panel already has |
-| The host portal is the dashboard's layout for `ops`, and its "Event ended" button runs `end_event` ("Reopen the event" runs `reopen_event`) | the host chooses the moment the night ends, with one press, and every attendee page turns into the recap at once |
+| The host portal's controls are for `ops`, and its "Event ended" button runs `end_event` ("Reopen the event" runs `reopen_event`) | the host chooses the moment the night ends, with one press, and every attendee page turns into the recap at once |
 | Staff sign in with the same SpacetimeAuth magic link as attendees | one sign-in to build, and the identity code the owner grants is the same on every device |
