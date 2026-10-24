@@ -6,7 +6,7 @@
 //! - Shared visits: two people in the same zone at the same time.
 //! - The people graph: `people_link` rows between people, booths and companies, read through `my_graph` and `event_graph`.
 //! - Photos: the findable people whose bands were in a photo's zone are suggested as tags.
-//! - A simulated crowd of fake attendees, so the graph looks like an event.
+//! - The crowd: a thousand attendees generated in code, moving through the venue, so the venue and the graph look like an event.
 //!
 //! Location and encounter detection is read only in `tick.rs`, so it can be swapped when the bands or cameras change.
 

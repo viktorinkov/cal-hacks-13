@@ -7,8 +7,9 @@ const ENCOUNTER_STEP_CAP_MICROS: i64 = 2_000_000;
 const ZONE_BLIP_MICROS: i64 = 5_000_000;
 
 fn band_row(b: &BandBeacon, ctx: &ReducerContext) -> Band {
+    let (x_m, y_m) = crate::venue::station_spot(ctx, b.zone);
     Band {
-        id: b.id,
+        id: b.id.into(),
         state: b.state,
         flags: b.flags,
         neigh: b.neigh,
@@ -25,6 +26,9 @@ fn band_row(b: &BandBeacon, ctx: &ReducerContext) -> Band {
         has_motor: b.flags & F_MOTOR != 0,
         online: true,
         last_seen: ctx.timestamp,
+        x_m,
+        y_m,
+        booth_id: 0,
     }
 }
 
@@ -55,10 +59,10 @@ pub fn ingest_band(ctx: &ReducerContext, beacon: BandBeacon) -> Result<(), Strin
     }
     touch_gateway(ctx);
     let row = band_row(&beacon, ctx);
-    let id = row.id;
-    let Some(prev) = ctx.db.band().id().find(id) else {
+    let id = beacon.id;
+    let Some(prev) = ctx.db.band().id().find(row.id) else {
         if row.zone != 0 {
-            enter_zone(ctx, id, row.zone);
+            open_stay(ctx, row.id, row.zone, 0);
         }
         ctx.db.band().insert(row);
         log_event(ctx, id, EventKind::Online, "");
@@ -93,7 +97,7 @@ pub fn ingest_band(ctx: &ReducerContext, beacon: BandBeacon) -> Result<(), Strin
         log_event(ctx, id, EventKind::Sleep, "");
     }
     if row.zone != prev.zone {
-        change_zone(ctx, id, row.zone);
+        change_zone(ctx, row.id, row.zone);
     }
     ctx.db.band().id().update(row);
     Ok(())
@@ -132,12 +136,12 @@ pub fn ingest_heard(ctx: &ReducerContext, id: u8, heard: Vec<HeardEntry>) -> Res
     }
     let threshold = ctx.db.settings().id().find(0).map(|s| s.neigh_rssi).unwrap_or(-62);
     for h in heard.iter().filter(|h| h.id != 0 && h.id <= BAND_ID_MAX && h.id > id && h.rssi >= threshold) {
-        record_encounter(ctx, id, h.id, h.rssi);
+        record_encounter(ctx, id.into(), h.id.into(), h.rssi);
     }
     Ok(())
 }
 
-fn record_encounter(ctx: &ReducerContext, a: u8, b: u8, rssi: i8) {
+fn record_encounter(ctx: &ReducerContext, a: u16, b: u16, rssi: i8) {
     let key = pair_key(a, b);
     let now = ctx.timestamp;
     match ctx.db.encounter().key().find(key) {
@@ -166,18 +170,23 @@ fn record_encounter(ctx: &ReducerContext, a: u8, b: u8, rssi: i8) {
     }
 }
 
-fn enter_zone(ctx: &ReducerContext, band_id: u8, zone: u8) {
-    ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone, entered: ctx.timestamp, left: None });
+/// A band starts a stay in a station's zone, at a booth when its spot is known.
+pub(crate) fn open_stay(ctx: &ReducerContext, band_id: u16, zone: u8, booth_id: u64) {
+    ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone, entered: ctx.timestamp, left: None, booth_id, open: true });
 }
 
-fn change_zone(ctx: &ReducerContext, band_id: u8, zone: u8) {
+pub(crate) fn close_stay(ctx: &ReducerContext, v: ZoneVisit) {
+    ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), open: false, ..v });
+}
+
+fn change_zone(ctx: &ReducerContext, band_id: u16, zone: u8) {
     let now = micros(ctx.timestamp);
     let visits: Vec<ZoneVisit> = ctx.db.zone_visit().band_id().filter(band_id).collect();
-    if let Some(open) = visits.iter().find(|v| v.left.is_none()) {
+    if let Some(open) = visits.iter().find(|v| v.open) {
         if now - micros(open.entered) < ZONE_BLIP_MICROS {
             ctx.db.zone_visit().id().delete(open.id);
         } else {
-            ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), ..open.clone() });
+            close_stay(ctx, open.clone());
         }
     }
     if zone == 0 {
@@ -189,14 +198,14 @@ fn change_zone(ctx: &ReducerContext, band_id: u8, zone: u8) {
         .max_by_key(|v| v.id);
     match recent {
         Some(v) => {
-            ctx.db.zone_visit().id().update(ZoneVisit { left: None, ..v.clone() });
+            ctx.db.zone_visit().id().update(ZoneVisit { left: None, open: true, ..v.clone() });
         }
-        None => enter_zone(ctx, band_id, zone),
+        None => open_stay(ctx, band_id, zone, 0),
     }
 }
 
-pub(crate) fn leave_zone(ctx: &ReducerContext, band_id: u8) {
-    for v in ctx.db.zone_visit().band_id().filter(band_id).filter(|v| v.left.is_none()).collect::<Vec<_>>() {
-        ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), ..v });
+pub(crate) fn leave_zone(ctx: &ReducerContext, band_id: u16) {
+    for v in ctx.db.zone_visit().band_id().filter(band_id).filter(|v| v.open).collect::<Vec<_>>() {
+        close_stay(ctx, v);
     }
 }

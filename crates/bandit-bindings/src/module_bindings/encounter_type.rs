@@ -7,9 +7,9 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct Encounter {
-    pub key: u16,
-    pub band_a: u8,
-    pub band_b: u8,
+    pub key: u32,
+    pub band_a: u16,
+    pub band_b: u16,
     pub first_seen: __sdk::Timestamp,
     pub last_seen: __sdk::Timestamp,
     pub seconds_close: u32,
@@ -24,9 +24,9 @@ impl __sdk::InModule for Encounter {
 ///
 /// Provides typed access to columns for query building.
 pub struct EncounterCols {
-    pub key: __sdk::__query_builder::Col<Encounter, u16>,
-    pub band_a: __sdk::__query_builder::Col<Encounter, u8>,
-    pub band_b: __sdk::__query_builder::Col<Encounter, u8>,
+    pub key: __sdk::__query_builder::Col<Encounter, u32>,
+    pub band_a: __sdk::__query_builder::Col<Encounter, u16>,
+    pub band_b: __sdk::__query_builder::Col<Encounter, u16>,
     pub first_seen: __sdk::__query_builder::Col<Encounter, __sdk::Timestamp>,
     pub last_seen: __sdk::__query_builder::Col<Encounter, __sdk::Timestamp>,
     pub seconds_close: __sdk::__query_builder::Col<Encounter, u32>,
@@ -52,9 +52,9 @@ impl __sdk::__query_builder::HasCols for Encounter {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct EncounterIxCols {
-    pub band_a: __sdk::__query_builder::IxCol<Encounter, u8>,
-    pub band_b: __sdk::__query_builder::IxCol<Encounter, u8>,
-    pub key: __sdk::__query_builder::IxCol<Encounter, u16>,
+    pub band_a: __sdk::__query_builder::IxCol<Encounter, u16>,
+    pub band_b: __sdk::__query_builder::IxCol<Encounter, u16>,
+    pub key: __sdk::__query_builder::IxCol<Encounter, u32>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Encounter {

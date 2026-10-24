@@ -17,10 +17,10 @@ const REOPEN_GRACE_MICROS: i64 = 10_000_000;
 
 pub const STAFF_ROLES: &[&str] = &["ops", "medic"];
 
-/// Band ids the claims story simulates. No real band carries them (the fleet is
-/// 1 to 9, social's simulated crowd starts at 10), so a rehearsal on the live
-/// database never touches real hardware or the real bridge.
-pub const SIM_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
+/// The test bands: no radio carries them (the fleet is 1 to 9, the crowd starts
+/// at 100), so the claims story and a tester's tap link on the live database
+/// never touch real hardware or the real bridge.
+pub const TEST_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IncidentKind {
@@ -183,7 +183,8 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
         resolution: String::new(),
         vision_status: "none".into(),
     });
-    let online: Vec<Band> = ctx.db.band().iter().filter(|b| b.online).collect();
+    // The crowd stays out of the safety path: only radio and test bands are evidence.
+    let online: Vec<Band> = ctx.db.band().iter().filter(|b| b.id < FIRST_CROWD_BAND).filter(|b| b.online).collect();
     let mut present: Vec<&Band> = online.iter().filter(|b| station_id != 0 && b.zone == station_id).collect();
     present.sort_by_key(|b| b.id);
     let neigh_mean = if present.is_empty() {
@@ -191,9 +192,9 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
     } else {
         present.iter().map(|b| b.neigh as f32).sum::<f32>() / present.len() as f32
     };
-    let mut circle: Vec<u8> = online.iter().filter(|b| b.state == S_NEAR_SOS).map(|b| b.id).collect();
+    let mut circle: Vec<u8> = online.iter().filter(|b| b.state == S_NEAR_SOS).filter_map(|b| radio_id(b.id)).collect();
     circle.sort();
-    let subject = online.iter().find(|b| band_id != 0 && b.id == band_id);
+    let subject = online.iter().find(|b| band_id != 0 && b.id == u16::from(band_id));
     ctx.db.incident_snapshot().insert(IncidentSnapshot {
         id: 0,
         incident_id: incident.id,
@@ -205,15 +206,15 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
         band_neigh: subject.map(|b| b.neigh).unwrap_or(0),
         band_battery: subject.map(|b| b.bat).unwrap_or(0),
         band_seen_at: subject.map(|b| b.last_seen).unwrap_or(ctx.timestamp),
-        bands_present: present.iter().map(|b| b.id).collect(),
+        bands_present: present.iter().filter_map(|b| radio_id(b.id)).collect(),
         neigh_mean,
         circle_bands: circle,
     });
-    if let Some(b) = subject {
+    if subject.is_some() {
         ctx.db.incident_band().insert(IncidentBand {
             id: 0,
             incident_id: incident.id,
-            band_id: b.id,
+            band_id,
             role: "subject".into(),
             zone_id,
             rssi: 0,
@@ -246,16 +247,23 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
     if ctx.sender() != ctx.database_identity() {
         return Err("watch_bands is internal".into());
     }
-    let online: Vec<Band> = ctx.db.band().iter().filter(|b| b.online).collect();
-    for b in online.iter().filter(|b| b.sos || b.fall) {
-        match active_band_incident(ctx, b.id) {
+    let online: Vec<(u8, Band)> = ctx
+        .db
+        .band()
+        .iter()
+        .filter(|b| b.id < FIRST_CROWD_BAND)
+        .filter(|b| b.online)
+        .filter_map(|b| Some((radio_id(b.id)?, b)))
+        .collect();
+    for (id, b) in online.iter().filter(|(_, b)| b.sos || b.fall) {
+        match active_band_incident(ctx, *id) {
             Some(i) => {
                 ctx.db.incident().id().update(Incident { last_signal_at: ctx.timestamp, ..i });
             }
-            None if resolved_moments_ago(ctx, b.id) => {}
+            None if resolved_moments_ago(ctx, *id) => {}
             None => {
                 let kind = if b.fall { IncidentKind::Fall } else { IncidentKind::Sos };
-                open(ctx, kind, zone_id_for_station(ctx, b.zone), b.zone, b.id, "band");
+                open(ctx, kind, zone_id_for_station(ctx, b.zone), b.zone, *id, "band");
             }
         }
     }
@@ -269,7 +277,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
     if active.is_empty() {
         return Ok(());
     }
-    for b in online.iter().filter(|b| b.state == S_NEAR_SOS) {
+    for (id, b) in online.iter().filter(|(_, b)| b.state == S_NEAR_SOS) {
         let zone_id = zone_id_for_station(ctx, b.zone);
         let Some(incident) = active
             .iter()
@@ -279,7 +287,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
         else {
             continue;
         };
-        let existing = ctx.db.incident_band().incident_id().filter(incident.id).find(|r| r.band_id == b.id);
+        let existing = ctx.db.incident_band().incident_id().filter(incident.id).find(|r| r.band_id == *id);
         match existing {
             Some(r) => {
                 ctx.db.incident_band().id().update(IncidentBand { last_seen_at: ctx.timestamp, ..r });
@@ -289,14 +297,14 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
                     .db
                     .link()
                     .from_id()
-                    .filter(b.id)
+                    .filter(*id)
                     .find(|l| l.to_id == incident.subject_band)
                     .map(|l| l.rssi)
                     .unwrap_or(0);
                 ctx.db.incident_band().insert(IncidentBand {
                     id: 0,
                     incident_id: incident.id,
-                    band_id: b.id,
+                    band_id: *id,
                     role: "witness".into(),
                     zone_id,
                     rssi,
@@ -309,19 +317,23 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
     Ok(())
 }
 
-/// A simulated band's beacon, written the way band1t's ingest writes a real
-/// one (the band row, plus `event` rows when SOS, fall or press rise), but only
-/// for `SIM_BANDS` and only by the `simulator` role.
+/// A test band's beacon, written the way band1t's ingest writes a radio one
+/// (the band row, plus `event` rows when SOS, fall or press rise), but only
+/// for `TEST_BANDS` and only by the `tester` role.
 #[spacetimedb::reducer]
-pub fn report_sim_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state: u8, neigh: u8, sos: bool, fall: bool, press: bool) -> Result<(), String> {
-    require_role(ctx, &["simulator"])?;
-    if !SIM_BANDS.contains(&band_id) {
-        return Err(format!("simulated bands are {} to {}", SIM_BANDS.start(), SIM_BANDS.end()));
+pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state: u8, neigh: u8, sos: bool, fall: bool, press: bool) -> Result<(), String> {
+    require_role(ctx, &["tester"])?;
+    if !TEST_BANDS.contains(&band_id) {
+        return Err(format!("test bands are {} to {}", TEST_BANDS.start(), TEST_BANDS.end()));
     }
     let flags = sos as u8 * F_SOS | fall as u8 * F_FALL | press as u8 * F_PRESS | F_MPU | F_MOTOR;
-    let prev = ctx.db.band().id().find(band_id);
+    let id = u16::from(band_id);
+    let prev = ctx.db.band().id().find(id);
+    // Test bands stand a step apart around their zone's centre, so each shows on the venue map.
+    let (cx, cy) = crate::venue::station_spot(ctx, station_id);
+    let slot = (band_id - TEST_BANDS.start()) as f32;
     let row = Band {
-        id: band_id,
+        id,
         state,
         flags,
         neigh,
@@ -338,23 +350,24 @@ pub fn report_sim_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state:
         has_motor: true,
         online: true,
         last_seen: ctx.timestamp,
+        x_m: cx + (slot % 5.0 - 2.0) * 1.5,
+        y_m: cy + (slot / 5.0).floor() * 1.5 - 0.75,
+        booth_id: 0,
     };
     let was = |f: fn(&Band) -> bool| prev.as_ref().is_some_and(f);
     if sos && !was(|b| b.sos) {
-        crate::log_event(ctx, band_id, EventKind::SosRaised, "simulated");
+        crate::log_event(ctx, band_id, EventKind::SosRaised, "test band");
     }
     if fall && !was(|b| b.fall) {
-        crate::log_event(ctx, band_id, EventKind::Fall, "simulated");
+        crate::log_event(ctx, band_id, EventKind::Fall, "test band");
     }
     if press && !was(|b| b.pressed) {
-        crate::log_event(ctx, band_id, EventKind::Press, "simulated");
+        crate::log_event(ctx, band_id, EventKind::Press, "test band");
     }
     if prev.as_ref().is_none_or(|b| b.zone != station_id || !b.online) {
-        for v in ctx.db.zone_visit().band_id().filter(band_id).filter(|v| v.left.is_none()).collect::<Vec<_>>() {
-            ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), ..v });
-        }
+        crate::ingest::leave_zone(ctx, id);
         if station_id != 0 {
-            ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone: station_id, entered: ctx.timestamp, left: None });
+            crate::ingest::open_stay(ctx, id, station_id, 0);
         }
     }
     if prev.is_some() {
@@ -448,7 +461,7 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
         resolution,
         ..i
     });
-    if band_id != 0 && !SIM_BANDS.contains(&band_id) {
+    if band_id != 0 && !TEST_BANDS.contains(&band_id) {
         crate::commands::enqueue(ctx, band_id, "clear", 0, 0);
     }
     crate::insurance::on_incident_resolved(ctx, &resolved)

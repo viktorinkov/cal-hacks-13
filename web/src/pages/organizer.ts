@@ -10,6 +10,7 @@ import {
   signOut, signedInEmail, time, type Config, EXIT_COLOURS,
 } from '../lib';
 import { graphTab } from '../graph';
+import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import type { DbConnection } from '../module_bindings';
 import type { Claim } from '../module_bindings/types';
 
@@ -22,7 +23,7 @@ const QUERIES = [
   'SELECT * FROM booth',
   'SELECT * FROM organization',
   'SELECT * FROM band',
-  'SELECT * FROM zone_visit',
+  'SELECT * FROM venue_plan',
   'SELECT * FROM station',
   'SELECT * FROM gateway',
   'SELECT * FROM settings',
@@ -62,6 +63,8 @@ let openClaim: bigint | undefined;
 const STAFF_ROLES = ['ops', 'medic'];
 /** Bands 90 to 99, which need no radio: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
 const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
+/** The crowd's attendees listed on the Attendees tab, after everyone who tapped a band. */
+const CROWD_ROWS = 200;
 
 function roles(): Set<string> {
   return new Set([...conn.db.myRoles.iter()].map(r => r.role));
@@ -82,7 +85,7 @@ function can(...wanted: string[]): boolean {
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
   const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['merch', 'Merch'], ['kibana', 'Kibana']];
-  return cfg.simulate ? [...all, ['bands', 'Bands']] : all;
+  return cfg.test_mode ? [...all, ['bands', 'Bands']] : all;
 }
 
 function zoneName(id: bigint) {
@@ -94,10 +97,10 @@ function wearers(): Map<number, string> {
   return new Map([...conn.db.boardAttendees.iter()].filter(a => a.bandId).map(a => [a.bandId, a.displayName]));
 }
 
-/** A band is alive when it was heard in the last 5 s, else stale. */
+/** A band is alive when it was heard in the last 5 s (the crowd's while they are online), else stale. */
 function alive(bandId: number): boolean {
   const b = conn.db.band.id.find(bandId);
-  return !!b && b.online && Date.now() - b.lastSeen.toDate().getTime() < 5000;
+  return !!b && present(b);
 }
 
 function bandStatus(bandId: number): string {
@@ -146,11 +149,12 @@ function signInScreen() {
 function live() {
   const settings = conn.db.settings.iter().next().value;
   const now = Date.now();
-  const bands = [...conn.db.band.iter()].filter(b => b.online && now - b.lastSeen.toDate().getTime() < 5000);
+  const bands = [...conn.db.band.iter()].filter(b => present(b, now));
   const gw = conn.db.gateway.id.find(0);
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   const alerts = bands.filter(b => b.sos || b.fall);
-  const inside = [...conn.db.zoneVisit.iter()].filter(v => v.left === undefined);
+  const inside = bands.filter(b => b.zone !== 0);
+  const crowd = bands.filter(b => b.id >= 100).length;
   const incidents = [...conn.db.openIncidents.iter()];
   const names = wearers();
   const wearer = (band: number) => names.has(band) ? ` (${names.get(band) || 'no name yet'})` : '';
@@ -165,20 +169,25 @@ function live() {
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${i.subjectBand}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
           h('a', { href: '#claims' }, 'open in Claims'))))),
     h('section', {},
+      h('h3', {}, 'Venue'),
+      h('p', { class: 'muted' }, `${bands.length} bands at the event right now, ${bands.length - crowd} of them numbered 1 to 99. Every dot is a band row in SpacetimeDB, moving as the module writes it.`),
+      venueMap(conn),
+      h('p', { class: 'legend' }, MAP_LEGEND.map(([c, label]) => h('span', {}, h('i', { class: 'dot', style: `background:${c}` }), label)))),
+    h('section', {},
       h('h3', {}, 'Zones'),
       h('p', {}, settings?.lowVis
         ? [h('b', {}, 'Low visibility is on: every band guides its wearer to the exit colour of its zone. '), h('button', { onclick: () => act(() => conn.reducers.setLowVis({ on: false })) }, 'Turn it off')]
         : h('button', { onclick: () => confirm('Fire or smoke? Every band starts guiding its wearer to the exit.') && act(() => conn.reducers.setLowVis({ on: true })) }, 'Low visibility: guide everyone to the exits')),
-      h('p', { class: 'muted' }, `${inside.length} people in zones right now, ${bands.length} bands heard in the last 5 s. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
+      h('p', { class: 'muted' }, `${inside.length} people in zones right now, ${bands.length} bands online. Gateway ${gw?.online ? 'online' : 'offline'}${gw ? `, last line ${time(gw.lastLine)}` : ''}. Busy at ${settings?.yellow ?? 3} neighbours, very busy at ${settings?.red ?? 5}.`),
       h('table', {},
-        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Bands reporting'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
+        h('tr', {}, h('th', {}, 'Zone'), h('th', {}, 'People now'), h('th', {}, 'Bands 1 to 99'), h('th', {}, 'Neighbours per band'), h('th', {}, 'Level'), h('th', {}, 'Capacity'), h('th', {}, 'Exit'), h('th', {}, 'Station')),
         zones.map(z => {
           const here = bands.filter(b => b.zone === z.stationId);
           const avg = here.length ? here.reduce((s, b) => s + b.neigh, 0) / here.length : 0;
           const level = risk(avg, settings?.yellow ?? 3, settings?.red ?? 5);
           const st = conn.db.station.id.find(z.stationId);
           return h('tr', {},
-            h('td', {}, z.name), h('td', {}, inside.filter(v => v.zone === z.stationId).length), h('td', {}, here.length), h('td', {}, avg.toFixed(1)),
+            h('td', {}, z.name), h('td', {}, here.length), h('td', {}, here.filter(b => b.id < 100).length), h('td', {}, avg.toFixed(1)),
             h('td', { class: `level ${level.replace(' ', '-')}` }, level), h('td', {}, z.capacity),
             h('td', {}, EXIT_COLOURS[z.exitColour]), h('td', {}, `${z.stationId} ${st?.online ? 'online' : 'offline'}`));
         }))),
@@ -188,21 +197,23 @@ function live() {
 // --- Attendees ------------------------------------------------------------------------------
 
 function attendees() {
-  const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
-  const people = all.filter(a => !a.simulated).length;
+  const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.crowd) - Number(b.crowd) || a.displayName.localeCompare(b.displayName));
+  const people = all.filter(a => !a.crowd).length;
+  const shown = all.slice(0, people + CROWD_ROWS);
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const takeBack = (bandId: number, name: string) =>
     confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
       && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `Attendees (${people} who tapped a band, ${all.length - people} in the crowd)`),
+    all.length > shown.length && h('p', { class: 'muted' }, `Showing the first ${CROWD_ROWS} of the crowd by name.`),
     h('table', {},
       h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
-      all.map(a => h('tr', {},
-        h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' crowd')),
+      shown.map(a => h('tr', {},
+        h('td', {}, a.displayName || '(no name yet)', a.crowd && h('span', { class: 'muted' }, ' crowd')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
-          a.bandId > 0 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
+          a.bandId > 0 && a.bandId < 100 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
         h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
 }
@@ -395,7 +406,7 @@ function claimDetail(id: bigint) {
     c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'File the medical record'),
       h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
-      cfg.simulate && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      cfg.test_mode && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'File it, Claude reads it')),
     c.status.tag === 'Routed' && (decides(c)
       ? h('div', {}, h('h4', {}, 'Your decision'), decide(c))

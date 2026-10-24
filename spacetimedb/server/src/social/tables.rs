@@ -21,13 +21,15 @@ pub struct Attendee {
     /// Organisation of the claimed profile, 0 when none.
     #[index(btree)]
     pub organization_id: u64,
-    /// A fake attendee wearing a simulated band, so the graph shows a crowd.
+    /// One of the crowd's attendees, not a person who tapped a band. The column keeps its first name because
+    /// SpacetimeDB cannot rename a column without dropping the attendees.
     pub simulated: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
 
-/// Which attendee wears which band. Separate from band1t's hardware `band` row.
+/// Which attendee wears which radio or test band. Separate from band1t's hardware `band` row; the crowd's
+/// bands are worn by the attendees in `crowd_member`.
 #[spacetimedb::table(accessor = band_owner)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct BandOwner {
@@ -98,11 +100,16 @@ pub struct Visit {
     pub attendee: Identity,
     #[index(btree)]
     pub zone_id: u64,
-    pub band_id: u8,
+    pub band_id: u16,
     pub started_at: Timestamp,
     pub ended_at: Option<Timestamp>,
     pub minutes: f32,
     pub updated_at: Timestamp,
+    /// The booth of the stay, 0 when only the zone is known.
+    pub booth_id: u64,
+    /// True while the stay runs.
+    #[index(btree)]
+    pub open: bool,
 }
 
 /// Two findable attendees whose bands heard each other up close: people who hung out together.
@@ -115,7 +122,7 @@ pub struct SocialEncounter {
     pub id: u64,
     /// band1t `encounter.key` of the two bands.
     #[unique]
-    pub band_pair: u16,
+    pub band_pair: u32,
     /// The pair, lower identity first.
     #[index(btree)]
     pub attendee_a: Identity,
@@ -222,16 +229,45 @@ pub struct SocialTickTimer {
     pub scheduled_at: ScheduleAt,
 }
 
-/// State of one fake attendee in the simulated crowd.
+/// Friends who move through the venue together: a team of hackers with a home table on the hacking
+/// floor, or one sponsor's staff member whose home is their booth.
+#[spacetimedb::table(accessor = crowd_group)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CrowdGroup {
+    #[primary_key]
+    pub id: u16,
+    /// The booth this group staffs, 0 for hackers.
+    pub staff_booth: u64,
+    pub home_station: u8,
+    pub home_x_m: f32,
+    pub home_y_m: f32,
+    /// Where the group stands now.
+    pub station: u8,
+    pub booth_id: u64,
+    pub x_m: f32,
+    pub y_m: f32,
+    pub next_move_at: Timestamp,
+}
+
+/// One attendee of the crowd: their band, their group, where they stand within it and what they care about.
 #[spacetimedb::table(accessor = crowd_member)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct CrowdMember {
     #[primary_key]
-    pub band_id: u8,
+    pub band_id: u16,
+    /// The attendee wearing the band, and since when.
+    #[unique]
+    pub identity: Identity,
+    pub joined_at: Timestamp,
     #[index(btree)]
-    pub group_id: u8,
-    pub station: u8,
-    pub next_move_at: Timestamp,
+    pub group_id: u16,
+    /// Offset from the group's spot, in metres.
+    pub dx_m: f32,
+    pub dy_m: f32,
+    /// Booth tags this attendee is drawn to.
+    pub interests: Vec<String>,
+    /// The band of the stranger this attendee is talking to, 0 when none.
+    pub chat: u16,
 }
 
 #[spacetimedb::table(accessor = crowd_timer, scheduled(crate::social::crowd::crowd_tick))]

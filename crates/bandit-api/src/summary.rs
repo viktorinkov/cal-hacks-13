@@ -151,7 +151,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
             let mut booths: Vec<&Booth> = rows
                 .booths
                 .iter()
-                .filter(|b| b.zone_id == v.zone_id)
+                .filter(|b| b.zone_id == v.zone_id && (v.booth_id == 0 || b.id == v.booth_id))
                 .collect();
             booths.sort_by_key(|b| b.id);
             VisitOut {
@@ -535,18 +535,20 @@ mod tests {
             zone_visit_id: id,
             attendee: who(n),
             zone_id,
-            band_id: n,
+            band_id: n.into(),
             started_at: at(start),
             ended_at: None,
             minutes,
             updated_at: at(start),
+            booth_id: 0,
+            open: true,
         }
     }
 
     fn encounter(id: u64, a: u8, b: u8, seconds: u32) -> SocialEncounter {
         SocialEncounter {
             id,
-            band_pair: id as u16,
+            band_pair: id as u32,
             attendee_a: who(a),
             attendee_b: who(b),
             zone_id: 1,

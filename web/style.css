@@ -39,6 +39,7 @@ nav a, nav button { margin-right: 12px; }
 nav .on { font-weight: bold; text-decoration: none; color: #111; }
 .alert { background: #ffe1e1; border-color: #f99; }
 code { background: #eee; padding: 1px 4px; border-radius: 3px; }
+.venue-map canvas { width: 100%; display: block; background: #fff; }
 .graph { height: 70vh; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
 .legend span { margin-right: 14px; font-size: 14px; color: #555; white-space: nowrap; }
 .legend i { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle; }

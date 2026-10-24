@@ -51,9 +51,9 @@ export type Attendee = __Infer<typeof Attendee>;
 export const AttendeeOut = __t.object("AttendeeOut", {
   nodeId: __t.u64(),
   displayName: __t.string(),
-  bandId: __t.u8(),
+  bandId: __t.u16(),
   findable: __t.bool(),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   organization: __t.string(),
   get handles() {
     return __t.array(HandleOut);
@@ -74,7 +74,7 @@ export const AuthorityLimitRow = __t.object("AuthorityLimitRow", {
 export type AuthorityLimitRow = __Infer<typeof AuthorityLimitRow>;
 
 export const Band = __t.object("Band", {
-  id: __t.u8(),
+  id: __t.u16(),
   state: __t.u8(),
   flags: __t.u8(),
   neigh: __t.u8(),
@@ -91,6 +91,9 @@ export const Band = __t.object("Band", {
   hasMotor: __t.bool(),
   online: __t.bool(),
   lastSeen: __t.timestamp(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  boothId: __t.u64(),
 });
 export type Band = __Infer<typeof Band>;
 
@@ -367,11 +370,29 @@ export const CoverageRuleRow = __t.object("CoverageRuleRow", {
 });
 export type CoverageRuleRow = __Infer<typeof CoverageRuleRow>;
 
-export const CrowdMember = __t.object("CrowdMember", {
-  bandId: __t.u8(),
-  groupId: __t.u8(),
+export const CrowdGroup = __t.object("CrowdGroup", {
+  id: __t.u16(),
+  staffBooth: __t.u64(),
+  homeStation: __t.u8(),
+  homeXM: __t.f32(),
+  homeYM: __t.f32(),
   station: __t.u8(),
+  boothId: __t.u64(),
+  xM: __t.f32(),
+  yM: __t.f32(),
   nextMoveAt: __t.timestamp(),
+});
+export type CrowdGroup = __Infer<typeof CrowdGroup>;
+
+export const CrowdMember = __t.object("CrowdMember", {
+  bandId: __t.u16(),
+  identity: __t.identity(),
+  joinedAt: __t.timestamp(),
+  groupId: __t.u16(),
+  dxM: __t.f32(),
+  dyM: __t.f32(),
+  interests: __t.array(__t.string()),
+  chat: __t.u16(),
 });
 export type CrowdMember = __Infer<typeof CrowdMember>;
 
@@ -382,9 +403,9 @@ export const CrowdTimer = __t.object("CrowdTimer", {
 export type CrowdTimer = __Infer<typeof CrowdTimer>;
 
 export const Encounter = __t.object("Encounter", {
-  key: __t.u16(),
-  bandA: __t.u8(),
-  bandB: __t.u8(),
+  key: __t.u32(),
+  bandA: __t.u16(),
+  bandB: __t.u16(),
   firstSeen: __t.timestamp(),
   lastSeen: __t.timestamp(),
   secondsClose: __t.u32(),
@@ -1126,6 +1147,17 @@ export const PhotoTag = __t.object("PhotoTag", {
 });
 export type PhotoTag = __Infer<typeof PhotoTag>;
 
+export const PlanArea = __t.object("PlanArea", {
+  stationId: __t.u8(),
+  boothId: __t.u64(),
+  name: __t.string(),
+  x0M: __t.f32(),
+  y0M: __t.f32(),
+  x1M: __t.f32(),
+  y1M: __t.f32(),
+});
+export type PlanArea = __Infer<typeof PlanArea>;
+
 export const PrecedentIn = __t.object("PrecedentIn", {
   reference: __t.string(),
   outcome: __t.string(),
@@ -1235,7 +1267,7 @@ export type SharedVisit = __Infer<typeof SharedVisit>;
 
 export const SocialEncounter = __t.object("SocialEncounter", {
   id: __t.u64(),
-  bandPair: __t.u16(),
+  bandPair: __t.u32(),
   attendeeA: __t.identity(),
   attendeeB: __t.identity(),
   zoneId: __t.u64(),
@@ -1351,11 +1383,13 @@ export const Visit = __t.object("Visit", {
   zoneVisitId: __t.u64(),
   attendee: __t.identity(),
   zoneId: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u16(),
   startedAt: __t.timestamp(),
   endedAt: __t.option(__t.timestamp()),
   minutes: __t.f32(),
   updatedAt: __t.timestamp(),
+  boothId: __t.u64(),
+  open: __t.bool(),
 });
 export type Visit = __Infer<typeof Visit>;
 
@@ -1403,10 +1437,12 @@ export type ZoneIn = __Infer<typeof ZoneIn>;
 
 export const ZoneVisit = __t.object("ZoneVisit", {
   id: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u16(),
   zone: __t.u8(),
   entered: __t.timestamp(),
   left: __t.option(__t.timestamp()),
+  boothId: __t.u64(),
+  open: __t.bool(),
 });
 export type ZoneVisit = __Infer<typeof ZoneVisit>;
 

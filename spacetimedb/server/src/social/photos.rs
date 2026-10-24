@@ -3,7 +3,7 @@
 
 use super::logic::*;
 use super::tables::*;
-use super::tick::bands_in_zone_at;
+use super::tick::wearers_in_zone_at;
 use crate::roles::require_role;
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
@@ -22,18 +22,18 @@ pub fn register_photo(ctx: &ReducerContext, url: String, taken_at: Timestamp, zo
         added_by: ctx.sender(),
         created_at: ctx.timestamp,
     });
-    let mut findable: Vec<_> = bands_in_zone_at(ctx, zone_id, taken_at)
+    let mut findable: Vec<_> = wearers_in_zone_at(ctx, zone_id, taken_at)
         .into_iter()
-        .filter_map(|o| ctx.db.attendee().identity().find(o.owner).filter(|a| a.findable).map(|a| (a.simulated, o)))
+        .filter_map(|who| ctx.db.attendee().identity().find(who).filter(|a| a.findable).map(|a| (a.simulated, who)))
         .collect();
-    // Real attendees before the simulated crowd, so the cap never crowds out a person.
-    findable.sort_by_key(|(simulated, _)| *simulated);
-    let findable = findable.into_iter().map(|(_, o)| o).take(PHOTO_TAG_CAP);
-    for o in findable {
+    // People who tapped their bands before the crowd, so the cap never leaves out a person.
+    findable.sort_by_key(|(crowd, _)| *crowd);
+    let findable = findable.into_iter().map(|(_, who)| who).take(PHOTO_TAG_CAP);
+    for who in findable {
         ctx.db.photo_tag().insert(PhotoTag {
             id: 0,
             photo_id: photo.id,
-            attendee: o.owner,
+            attendee: who,
             status: String::new(),
             updated_at: ctx.timestamp,
         });

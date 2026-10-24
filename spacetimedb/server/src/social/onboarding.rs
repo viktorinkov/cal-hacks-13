@@ -6,7 +6,7 @@ use super::logic::*;
 use super::tables::*;
 use super::tick::ensure_tick;
 use crate::commands::enqueue;
-use crate::safety::SIM_BANDS;
+use crate::safety::TEST_BANDS;
 use crate::venue::person;
 use spacetimedb::{Identity, ReducerContext, Table};
 
@@ -61,8 +61,8 @@ pub fn claim_band(ctx: &ReducerContext, token: String) -> Result<(), String> {
         started_at: ctx.timestamp,
         expires_at: ctx.timestamp + seconds(CLAIM_WINDOW_SECONDS),
     });
-    // Simulated bands have no radio, so only a real band gets the white blink.
-    if !SIM_BANDS.contains(&band_id) {
+    // Test bands have no radio, so only a radio band gets the white blink.
+    if !TEST_BANDS.contains(&band_id) {
         enqueue(ctx, band_id, "state", STATE_IDENT, IDENT_TENTHS);
     }
     Ok(())
@@ -75,7 +75,7 @@ pub fn complete_claim(ctx: &ReducerContext, claim: BandClaim) {
         return;
     }
     ctx.db.band_owner().insert(BandOwner { band_id: claim.band_id, owner: claim.claimant, claimed_at: ctx.timestamp });
-    if !SIM_BANDS.contains(&claim.band_id) {
+    if !TEST_BANDS.contains(&claim.band_id) {
         enqueue(ctx, claim.band_id, "state", STATE_IDLE, 1);
     }
 }

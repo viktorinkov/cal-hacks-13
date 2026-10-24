@@ -8,7 +8,7 @@ Wants=network-online.target
 [Service]
 WorkingDirectory=/opt/bandit
 ExecStart=/opt/bandit/target/debug/bandit-%i
-Environment=BANDIT_DATA_DIR=/var/lib/bandit BANDIT_API_ADDR=127.0.0.1:8080 BANDIT_SIMULATE=1
+Environment=BANDIT_DATA_DIR=/var/lib/bandit BANDIT_API_ADDR=127.0.0.1:8080 BANDIT_TEST_MODE=1
 Environment=ELASTIC_INDEX_PREFIX=bandit CHROME=/usr/local/bin/chrome SPACETIMEAUTH_CLIENT_ID=client_034lYVa0v5zqZJQWQktByi
 Restart=always
 RestartSec=3

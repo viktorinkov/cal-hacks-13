@@ -31,7 +31,6 @@ const QUERIES = [
   'SELECT * FROM organization',
   'SELECT * FROM person',
   'SELECT * FROM claimed_people',
-  'SELECT * FROM band',
   'SELECT * FROM my_roles',
   'SELECT * FROM open_incidents',
   'SELECT * FROM medic_medical_cards',
@@ -168,7 +167,7 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
       h('label', {}, 'PDF', h('input', { type: 'file', name: kind, accept: 'application/pdf' })),
       h('button', {}, 'Upload')),
     testMode && h('button', { class: 'test', onclick: () => act(async () => {
-      await fileDocument(kind, await (await fetch(`/samples/${testFile}`)).arrayBuffer());
+      await fileDocument(kind, await (await fetch(`/test-records/${testFile}`)).arrayBuffer());
       go(next);
     }) }, 'Use a test record'),
     h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
@@ -351,7 +350,7 @@ function render() {
 async function main() {
   if (location.pathname === '/callback') return finishSignIn();
   const cfg = await config();
-  testMode = cfg.simulate;
+  testMode = cfg.test_mode;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
   if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
@@ -360,7 +359,7 @@ async function main() {
       testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   if (testMode) people = await actors();
-  conn = await connect(QUERIES, render);
+  conn = await connect([...QUERIES, `SELECT * FROM band WHERE id = ${bandId}`], render);
   // A medic's tap opens the medical card; it never claims the band.
   if (isMedic()) return tapAsMedic();
   const mb = conn.db.myBand.iter().next().value;

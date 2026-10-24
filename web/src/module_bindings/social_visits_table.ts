@@ -14,9 +14,11 @@ export default __t.row({
   zoneVisitId: __t.u64().name("zone_visit_id"),
   attendee: __t.identity(),
   zoneId: __t.u64().name("zone_id"),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u16().name("band_id"),
   startedAt: __t.timestamp().name("started_at"),
   endedAt: __t.option(__t.timestamp()).name("ended_at"),
   minutes: __t.f32(),
   updatedAt: __t.timestamp().name("updated_at"),
+  boothId: __t.u64().name("booth_id"),
+  open: __t.bool(),
 });

@@ -47,7 +47,7 @@ impl World {
             ("medic", "medic", "Ari Medic"),
             ("ops", "ops", "Ops desk"),
             ("vision", "vision", "bandit-vision"),
-            ("sim", "simulator", "bandit-claims"),
+            ("tester", "tester", "bandit-claims"),
         ] {
             t.db.staff_role().insert(StaffRole {
                 id: 0,
@@ -88,7 +88,7 @@ impl World {
                 created_at: t.clock.now(),
                 updated_at: t.clock.now(),
             });
-            t.db.band_owner().insert(BandOwner { band_id: band, owner: id(name), claimed_at: t.clock.now() });
+            t.db.band_owner().insert(BandOwner { band_id: band.into(), owner: id(name), claimed_at: t.clock.now() });
         }
         for b in 1..=9u8 {
             t.db.band().insert(band(b, 101));
@@ -116,7 +116,7 @@ impl World {
     }
 
     fn set_band(&self, b: u8, f: impl FnOnce(&mut Band)) {
-        let mut row = self.t.db.band().id().find(b).unwrap();
+        let mut row = self.t.db.band().id().find(u16::from(b)).unwrap();
         f(&mut row);
         self.t.db.band().id().update(row);
     }
@@ -237,7 +237,7 @@ impl World {
 
 fn band(id: u8, station: u8) -> Band {
     Band {
-        id,
+        id: id.into(),
         state: 0,
         flags: 0,
         neigh: 4,
@@ -254,6 +254,9 @@ fn band(id: u8, station: u8) -> Band {
         has_motor: true,
         online: true,
         last_seen: spacetimedb::Timestamp::from_micros_since_unix_epoch(micros_at(2026, 10, 24, 22, 14, 5, PDT)),
+        x_m: 0.0,
+        y_m: 0.0,
+        booth_id: 0,
     }
 }
 
@@ -494,17 +497,17 @@ fn the_same_invoice_on_another_claim_goes_to_a_person() {
 }
 
 #[test]
-fn simulated_bands_raise_incidents_without_the_bridge() {
+fn test_bands_raise_incidents_without_the_bridge() {
     let w = World::new();
-    assert!(w.try_as("sim", |ctx| report_sim_band(ctx, 7, 101, 3, 4, false, true, false)).is_err());
-    w.as_("sim", |ctx| report_sim_band(ctx, 95, 101, 3, 4, false, true, false));
+    assert!(w.try_as("tester", |ctx| report_test_band(ctx, 7, 101, 3, 4, false, true, false)).is_err());
+    w.as_("tester", |ctx| report_test_band(ctx, 95, 101, 3, 4, false, true, false));
     for b in [96u8, 97] {
-        w.as_("sim", |ctx| report_sim_band(ctx, b, 101, S_NEAR_SOS, 5, false, false, false));
+        w.as_("tester", |ctx| report_test_band(ctx, b, 101, S_NEAR_SOS, 5, false, false, false));
     }
     w.watch();
     w.advance(1);
     w.watch();
-    let incident = w.t.db.incident().subject_band().filter(95u8).next().expect("incident from a simulated fall");
+    let incident = w.t.db.incident().subject_band().filter(95u8).next().expect("incident from a test band fall");
     assert_eq!(incident.kind, IncidentKind::Fall);
     assert_eq!(w.t.db.incident_band().incident_id().filter(incident.id).filter(|r| r.role == "witness").count(), 2);
     assert!(w.t.db.event().iter().any(|e| e.band_id == 95 && e.kind == EventKind::Fall));

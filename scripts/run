@@ -1,6 +1,6 @@
 #!/bin/sh
 # One command for the end-to-end run: sets up the database the first time, starts bandit-api with the
-# pages, bandit-indexer and bandit-workers, and opens the host portal and a simulated band's tap link.
+# pages, bandit-indexer and bandit-workers, and opens the host portal and a test band's tap link.
 # E2E_TARGET=maincloud (default) uses the live database; E2E_TARGET=local uses scripts/e2e-server.
 # BANDIT_OPEN=0 skips opening the browser. Stop with Ctrl-C.
 set -e

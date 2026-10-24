@@ -79,7 +79,7 @@ import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
-import ReportSimBandReducer from "./report_sim_band_reducer";
+import ReportTestBandReducer from "./report_test_band_reducer";
 import RequestMedicalCardReducer from "./request_medical_card_reducer";
 import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
@@ -184,6 +184,7 @@ import SocialSharedVisitsRow from "./social_shared_visits_table";
 import SocialVisitsRow from "./social_visits_table";
 import StationRow from "./station_table";
 import VenueRow from "./venue_table";
+import VenuePlanRow from "./venue_plan_table";
 import WorkerJobsRow from "./worker_jobs_table";
 import ZoneRow from "./zone_table";
 import ZoneVisitRow from "./zone_visit_table";
@@ -484,6 +485,9 @@ const tablesSchema = __schema({
       ] },
       { accessor: 'id', name: 'zone_visit_id_idx_btree', algorithm: 'btree', columns: [
         'id',
+      ] },
+      { accessor: 'open', name: 'zone_visit_open_idx_btree', algorithm: 'btree', columns: [
+        'open',
       ] },
     ],
     constraints: [
@@ -847,6 +851,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, SocialVisitsRow),
+  venuePlan: __table({
+    name: 'venue_plan',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, VenuePlanRow),
   workerJobs: __table({
     name: 'worker_jobs',
     indexes: [
@@ -903,7 +914,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
-  __reducerSchema("report_sim_band", ReportSimBandReducer),
+  __reducerSchema("report_test_band", ReportTestBandReducer),
   __reducerSchema("request_medical_card", RequestMedicalCardReducer),
   __reducerSchema("request_recovery_letter", RequestRecoveryLetterReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
@@ -1056,6 +1067,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "social_shared_visits": Omit<typeof tablesSchema.schemaType.tables["socialSharedVisits"], "accessorName"> & { readonly accessorName: "social_shared_visits" };
     /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
     readonly "social_visits": Omit<typeof tablesSchema.schemaType.tables["socialVisits"], "accessorName"> & { readonly accessorName: "social_visits" };
+    /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
+    readonly "venue_plan": Omit<typeof tablesSchema.schemaType.tables["venuePlan"], "accessorName"> & { readonly accessorName: "venue_plan" };
     /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
     readonly "worker_jobs": Omit<typeof tablesSchema.schemaType.tables["workerJobs"], "accessorName"> & { readonly accessorName: "worker_jobs" };
   };
@@ -1133,6 +1146,7 @@ const tableAccessorAliases = {
   "social_photos": "socialPhotos",
   "social_shared_visits": "socialSharedVisits",
   "social_visits": "socialVisits",
+  "venue_plan": "venuePlan",
   "worker_jobs": "workerJobs",
 } as const;
 
@@ -1266,6 +1280,8 @@ export type DbView = __DbViewBase & {
   readonly "social_shared_visits": __DbViewBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __DbViewBase["socialVisits"];
+  /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
+  readonly "venue_plan": __DbViewBase["venuePlan"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __DbViewBase["workerJobs"];
 };
@@ -1384,6 +1400,8 @@ export type Tables = __TablesBase & {
   readonly "social_shared_visits": __TablesBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __TablesBase["socialVisits"];
+  /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
+  readonly "venue_plan": __TablesBase["venuePlan"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __TablesBase["workerJobs"];
 };

@@ -1,5 +1,5 @@
-//! The simulated bands (ids 90-99), reported through the module's
-//! `report_sim_band` as the `sim` identity. Real bands and the hardware
+//! The test bands (ids 90-99), reported through the module's
+//! `report_test_band` as the `tester` identity. Real bands and the hardware
 //! bridge are never touched. A pump thread reports every band in the scenario
 //! once a second (band1t marks a band offline after 5 s of silence) and at
 //! once whenever a band's pose changes.
@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-/// The band ids the module lets the simulator report (`safety::SIM_BANDS`).
-pub const SIM_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
+/// The band ids the module lets the tester report (`safety::TEST_BANDS`).
+pub const TEST_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
 /// The subject band's state after a fall (red, SOS).
 pub const S_FALLEN: u8 = 3;
 /// The light circle around a fallen band.
@@ -42,44 +42,44 @@ struct Shared {
     stop: bool,
 }
 
-pub struct Sim {
+pub struct TestBands {
     shared: Arc<Mutex<Shared>>,
     kick: Sender<()>,
     pump: Option<JoinHandle<()>>,
 }
 
-/// Fails unless every band is one the simulator may report.
+/// Fails unless every band is one the tester may report.
 pub fn check_bands(bands: &[u8]) -> Result<()> {
-    if let Some(b) = bands.iter().find(|b| !SIM_BANDS.contains(b)) {
-        bail!("band {b} is not a simulated band; use {} to {}", SIM_BANDS.start(), SIM_BANDS.end());
+    if let Some(b) = bands.iter().find(|b| !TEST_BANDS.contains(b)) {
+        bail!("band {b} is not a test band; use {} to {}", TEST_BANDS.start(), TEST_BANDS.end());
     }
     Ok(())
 }
 
-impl Sim {
-    /// Connects as `sim` and starts reporting every simulated band the module
+impl TestBands {
+    /// Connects as `tester` and starts reporting every test band the module
     /// knows, in its last station (Main stage when it has none).
-    pub fn open(app: &App) -> Result<Sim> {
-        let conn = app.connect_as("sim", false)?;
+    pub fn open(app: &App) -> Result<TestBands> {
+        let conn = app.connect_as("tester", false)?;
         let main = app.station(crate::app::MAIN_STAGE)?;
         let known: Vec<(u8, Pose)> = app
             .db()?
             .db
             .band()
             .iter()
-            .filter(|b| SIM_BANDS.contains(&b.id))
-            .map(|b| (b.id, Pose::at(if b.zone == 0 { main } else { b.zone })))
+            .filter_map(|b| Some((u8::try_from(b.id).ok().filter(|id| TEST_BANDS.contains(id))?, b.zone)))
+            .map(|(id, zone)| (id, Pose::at(if zone == 0 { main } else { zone })))
             .collect();
         if let Some((id, p)) = known.first() {
-            call!(conn, report_sim_band_then(*id, p.station, 0, 0, false, false, false))
-                .context("the sim identity cannot report bands; run setup (it grants the simulator role)")?;
+            call!(conn, report_test_band_then(*id, p.station, 0, 0, false, false, false))
+                .context("the tester identity cannot report bands; run setup (it grants the tester role)")?;
         }
-        let sim = Sim::start(conn);
-        sim.place(&known);
-        Ok(sim)
+        let test_bands = TestBands::start(conn);
+        test_bands.place(&known);
+        Ok(test_bands)
     }
 
-    fn start(conn: DbConnection) -> Sim {
+    fn start(conn: DbConnection) -> TestBands {
         let shared = Arc::new(Mutex::new(Shared::default()));
         let (kick, rx) = channel::<()>();
         let s = shared.clone();
@@ -93,7 +93,7 @@ impl Sim {
                 };
                 for (&id, &p) in &bands {
                     let neigh = bands.values().filter(|o| o.station == p.station).count().saturating_sub(1).min(255) as u8;
-                    let _ = conn.reducers.report_sim_band(id, p.station, p.state, neigh, false, p.fall, p.press);
+                    let _ = conn.reducers.report_test_band(id, p.station, p.state, neigh, false, p.fall, p.press);
                 }
                 if stop {
                     break;
@@ -102,13 +102,13 @@ impl Sim {
             crate::app::sleep_ms(300);
             let _ = spacetimedb_sdk::DbContext::disconnect(&conn);
         });
-        Sim { shared, kick, pump: Some(pump) }
+        TestBands { shared, kick, pump: Some(pump) }
     }
 
     /// Sets poses (new bands included) and reports them now. Ids outside 90-99 are ignored.
     pub fn place(&self, poses: &[(u8, Pose)]) {
         let mut g = self.shared.lock().unwrap();
-        for (id, p) in poses.iter().filter(|(id, _)| SIM_BANDS.contains(id)) {
+        for (id, p) in poses.iter().filter(|(id, _)| TEST_BANDS.contains(id)) {
             g.bands.insert(*id, *p);
         }
         drop(g);
@@ -129,7 +129,7 @@ impl Sim {
     }
 }
 
-impl Drop for Sim {
+impl Drop for TestBands {
     fn drop(&mut self) {
         self.shared.lock().unwrap().stop = true;
         let _ = self.kick.send(());

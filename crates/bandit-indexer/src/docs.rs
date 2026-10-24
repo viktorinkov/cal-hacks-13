@@ -6,8 +6,8 @@ use serde_json::{Value, json};
 use spacetimedb_sdk::Identity;
 use std::collections::{BTreeMap, HashMap};
 
-/// A person's interests come from the booths in the zones where they spent the most minutes.
-pub const TOP_ZONES: usize = 5;
+/// A person's interests come from the booths, or the whole zones, where they spent the most minutes.
+pub const TOP_SPOTS: usize = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Index {
@@ -49,6 +49,10 @@ pub fn build(s: &Snapshot) -> Docs {
         .filter(|a| a.findable)
         .map(|a| (a.identity, a))
         .collect();
+    let mut visits: HashMap<Identity, Vec<&Visit>> = HashMap::new();
+    for v in s.visits.iter().filter(|v| findable.contains_key(&v.attendee)) {
+        visits.entry(v.attendee).or_default().push(v);
+    }
     let mut docs = Docs::new();
     for b in &s.booths {
         docs.insert(
@@ -59,7 +63,7 @@ pub fn build(s: &Snapshot) -> Docs {
     for a in findable.values() {
         docs.insert(
             (Index::People, hex(a.identity)),
-            venue.person_doc(a, &s.visits),
+            venue.person_doc(a, visits.get(&a.identity).map(Vec::as_slice).unwrap_or_default()),
         );
     }
     docs
@@ -93,6 +97,10 @@ impl<'a> Venue<'a> {
             .get(&zone_id)
             .map(|z| z.name.as_str())
             .unwrap_or_default()
+    }
+
+    fn booth_line(b: &Booth) -> String {
+        format!("{}: {} ({})", b.name, b.description, b.tags.join(", "))
     }
 
     fn booths_in(&self, zone_id: u64) -> &[&'a Booth] {
@@ -151,17 +159,17 @@ impl<'a> Venue<'a> {
     }
 
     /// No names and no socials: an attendee id, a graph node id, a company and what they spent time on.
-    fn person_doc(&self, a: &Attendee, visits: &[Visit]) -> Value {
-        let lines: Vec<String> = top_zones(a.identity, visits)
-            .into_iter()
-            .flat_map(|zone_id| {
-                std::iter::once(self.zone_line(zone_id)).chain(
-                    self.booths_in(zone_id)
-                        .iter()
-                        .map(|b| format!("{}: {} ({})", b.name, b.description, b.tags.join(", "))),
-                )
-            })
-            .collect();
+    /// A stay at one booth adds that booth; a stay somewhere in a zone adds every booth of the zone.
+    fn person_doc(&self, a: &Attendee, visits: &[&Visit]) -> Value {
+        let mut lines: Vec<String> = Vec::new();
+        for (zone_id, booth_id) in top_spots(visits) {
+            let zone = self.zone_line(zone_id);
+            if !lines.contains(&zone) {
+                lines.push(zone);
+            }
+            let booths = self.booths_in(zone_id).iter().filter(|b| booth_id == 0 || b.id == booth_id);
+            lines.extend(booths.map(|b| Self::booth_line(b)).filter(|l| !lines.contains(l)).collect::<Vec<_>>());
+        }
         json!({
             "attendee_id": hex(a.identity),
             "node_id": a.node_id,
@@ -171,19 +179,18 @@ impl<'a> Venue<'a> {
     }
 }
 
-/// The zones where `who` spent the most minutes, most first; ties go to the lower zone id.
-pub fn top_zones(who: Identity, visits: &[Visit]) -> Vec<u64> {
-    let mut minutes: HashMap<u64, f64> = HashMap::new();
-    for v in visits.iter().filter(|v| v.attendee == who) {
-        *minutes.entry(v.zone_id).or_default() += v.minutes as f64;
+/// The booths (or whole zones, booth 0) where one person spent the most minutes, ties to the lower ids,
+/// in zone and booth order: the document only changes when the set changes, not as minutes add up.
+pub fn top_spots(visits: &[&Visit]) -> Vec<(u64, u64)> {
+    let mut minutes: HashMap<(u64, u64), f64> = HashMap::new();
+    for v in visits {
+        *minutes.entry((v.zone_id, v.booth_id)).or_default() += v.minutes as f64;
     }
-    let mut zones: Vec<(u64, f64)> = minutes.into_iter().collect();
-    zones.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
-    zones
-        .into_iter()
-        .take(TOP_ZONES)
-        .map(|(zone_id, _)| zone_id)
-        .collect()
+    let mut spots: Vec<((u64, u64), f64)> = minutes.into_iter().collect();
+    spots.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    let mut top: Vec<(u64, u64)> = spots.into_iter().take(TOP_SPOTS).map(|(spot, _)| spot).collect();
+    top.sort();
+    top
 }
 
 pub fn hex(id: Identity) -> String {
@@ -311,11 +318,13 @@ mod tests {
             zone_visit_id: id,
             attendee: who(n),
             zone_id,
-            band_id: n,
+            band_id: n.into(),
             started_at: at(60),
             ended_at: Some(at(600)),
             minutes,
             updated_at: at(600),
+            booth_id: 0,
+            open: false,
         }
     }
 
@@ -341,6 +350,7 @@ mod tests {
                 visit(100, 1, 1, 12.34),
                 visit(101, 1, 2, 30.0),
                 visit(102, 3, 1, 5.0),
+                Visit { booth_id: 12, ..visit(103, 2, 2, 4.0) },
             ],
         }
     }
@@ -372,25 +382,26 @@ mod tests {
     }
 
     #[test]
-    fn interests_follow_the_zones_with_most_minutes() {
+    fn interests_follow_the_zones_and_booths_with_most_minutes() {
         let docs = build(&snapshot());
         let d = doc(&docs, Index::People, &hex(who(1)));
         assert_eq!(d["node_id"], 1);
         assert_eq!(d["organization"], "Elastic");
         assert_eq!(
             d["interests"],
-            "Stage\nDrone show: Drone show showcases. (drones)\nExpo\nElastic booth: Elastic booth showcases. (search, ai)\nRobot arms: Robot arms showcases. (robotics)"
+            "Expo\nElastic booth: Elastic booth showcases. (search, ai)\nRobot arms: Robot arms showcases. (robotics)\nStage\nDrone show: Drone show showcases. (drones)"
         );
         assert!(d.get("display_name").is_none());
-        assert_eq!(doc(&docs, Index::People, &hex(who(2)))["interests"], "");
+        assert_eq!(doc(&docs, Index::People, &hex(who(2)))["interests"], "Stage\nDrone show: Drone show showcases. (drones)");
     }
 
     #[test]
-    fn top_zones_keeps_five_most_visited() {
+    fn top_spots_keeps_five_most_visited_in_a_stable_order() {
         let visits: Vec<Visit> = (1..=7)
             .map(|z| visit(z, 1, z, z as f32))
-            .chain([visit(20, 1, 1, 10.0)])
+            .chain([visit(20, 1, 1, 10.0), Visit { booth_id: 9, ..visit(21, 1, 3, 0.5) }])
             .collect();
-        assert_eq!(top_zones(who(1), &visits), vec![1, 7, 6, 5, 4]);
+        let refs: Vec<&Visit> = visits.iter().collect();
+        assert_eq!(top_spots(&refs), vec![(1, 0), (4, 0), (5, 0), (6, 0), (7, 0)]);
     }
 }

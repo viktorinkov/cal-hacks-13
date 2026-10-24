@@ -19,7 +19,7 @@ fi
 # Merch: the templates in assets/merch, matched to the sponsors' booths.
 scripts/merch-setup
 
-# Insurance: actors, roles, policy, authority matrix, camera, simulated bands and the four attendees.
+# Insurance: actors, roles, policy, authority matrix, camera, test bands and the four attendees.
 ./target/debug/bandit-claims setup
 
 # Identities for the services and the photographer, saved in the same token store.
@@ -46,5 +46,5 @@ done
 
 call start_safety_watch
 call start_job_reaper
-call start_crowd 30
+call start_crowd 1000
 echo "e2e ready on $E2E_TARGET: run scripts/e2e-services, then open http://$BANDIT_API_ADDR/organizer"

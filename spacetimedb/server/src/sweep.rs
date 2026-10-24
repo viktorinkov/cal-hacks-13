@@ -17,9 +17,10 @@ pub fn sweep(ctx: &ReducerContext, _timer: SweepTimer) -> Result<(), String> {
         return Err("sweep is internal".into());
     }
     let now = micros(ctx.timestamp);
-    for b in ctx.db.band().iter().filter(|b| b.online && now - micros(b.last_seen) > OFFLINE_MICROS).collect::<Vec<_>>() {
-        if b.state != S_OFF {
-            log_event(ctx, b.id, EventKind::Offline, "");
+    // Only radio and test bands report; the crowd's bands stay online while the crowd moves them.
+    for b in ctx.db.band().iter().filter(|b| b.id < FIRST_CROWD_BAND).filter(|b| b.online && now - micros(b.last_seen) > OFFLINE_MICROS).collect::<Vec<_>>() {
+        if let Some(id) = radio_id(b.id).filter(|_| b.state != S_OFF) {
+            log_event(ctx, id, EventKind::Offline, "");
         }
         ingest::leave_zone(ctx, b.id);
         ctx.db.band().id().update(Band { online: false, ..b });
