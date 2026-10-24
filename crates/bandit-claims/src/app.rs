@@ -264,9 +264,13 @@ impl App {
         db.db.job().iter().any(|j| j.status == JobStatus::Leased || (j.attempts > 0 && now - micros(j.updated_at) < 60_000_000))
     }
 
+    /// How to start the worker; a local database gets its own Elastic index so
+    /// test claims never become precedents in the live one.
     pub fn worker_hint(&self) -> String {
+        let local = self.uri.contains("127.0.0.1") || self.uri.contains("localhost");
+        let index = if local { format!(" ELASTIC_INDEX_PREFIX={}-local", self.database) } else { String::new() };
         format!(
-            "no worker has leased a job in the last minute; if it is not running, start it with\n    SPACETIMEDB_URL={} SPACETIMEDB_DATABASE={} cargo run -p bandit-workers",
+            "no worker has leased a job in the last minute; if it is not running, start it with\n    SPACETIMEDB_URL={} SPACETIMEDB_DATABASE={}{index} cargo run -p bandit-workers",
             self.uri, self.database
         )
     }

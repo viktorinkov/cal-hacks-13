@@ -251,6 +251,7 @@ pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: Str
     if claim.status != ClaimStatus::AwaitingRecord {
         return Err(format!("claim {claim_id} is not waiting for a medical record"));
     }
+    let file_hash = file_hash.to_lowercase();
     if ctx.db.blob_ref().hash().find(&file_hash).is_none() {
         return Err("register the PDF with register_blob first".into());
     }
@@ -832,10 +833,11 @@ pub fn approve_claim(
         reason: String::new(),
         decided_at: ctx.timestamp,
     });
-    if learn {
+    let rules = core_rules(ctx);
+    let covered_already = matching_rule(&rules, kind_of(&claim), cover_of(&claim), 0).is_some_and(|r| r.ceiling_cents >= claim.payout_cents);
+    if learn && !covered_already {
         let kind = kind_of(&claim);
         let cover = cover_of(&claim);
-        let rules = core_rules(ctx);
         let version = next_version(&rules, kind, cover, 0);
         for old in ctx.db.settlement_rule().iter().filter(|r| r.status == "active" && r.incident_kind == kind.as_str() && r.cover_kind == cover.as_str() && r.zone_id == 0) {
             ctx.db.settlement_rule().id().update(SettlementRuleRow { status: "superseded".into(), ..old });

@@ -178,7 +178,7 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         diagnoses: r.diagnoses.clone(),
         billed_cents: r.billed_cents,
         covered_cents: r.covered_cents,
-        extracted_at: r.extracted_at.map(micros).unwrap_or(micros(r.submitted_at)),
+        observed_at: encounter_micros(&r, settings(ctx).tz_offset_minutes).unwrap_or(micros(r.submitted_at)),
         model_call_id: r.model_call_id,
     });
 
@@ -198,6 +198,21 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
     });
 
     EvidenceInput { incident, snapshot, witnesses, notes, zone, presence, vision, record, policy }
+}
+
+/// The record's encounter as a timestamp: its date and time of service in
+/// venue time, noon when the record gives no time.
+fn encounter_micros(r: &MedicalRecord, tz_offset_minutes: i32) -> Option<i64> {
+    let record: hyphenate_core::medical::ExtractedRecord = serde_json::from_str(&r.record_json).ok()?;
+    let days = hyphenate_core::time::parse_date(&record.encounter.date_of_service)?;
+    let (h, m) = record
+        .encounter
+        .time
+        .split_once(':')
+        .and_then(|(h, m)| Some((h.trim().parse::<i64>().ok()?, m.trim().parse::<i64>().ok()?)))
+        .unwrap_or((12, 0));
+    let (y, mo, d) = hyphenate_core::time::civil_from_days(days);
+    Some(hyphenate_core::time::micros_at(y, mo, d, h, m, 0, tz_offset_minutes))
 }
 
 /// Code checks on the filed medical record: patient, dates, injury code,

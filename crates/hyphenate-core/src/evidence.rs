@@ -122,7 +122,8 @@ pub struct RecordSummary {
     pub billed_cents: Cents,
     /// Sum of covered service lines, computed by code.
     pub covered_cents: Cents,
-    pub extracted_at: Micros,
+    /// The encounter's date and time, as the record states it.
+    pub observed_at: Micros,
     pub model_call_id: u64,
 }
 
@@ -188,7 +189,7 @@ impl EvidenceInput {
 ///    `vision_description` (reader model), `camera_zone_id` (reader code);
 ///    then per frame, key `frame`, value the SHA-256, observed at the frame
 ///    time, reference `blob:{sha}`, reader code.
-/// 9. `medical_record` (observed at `extracted_at`, reference `blob:{sha256}`):
+/// 9. `medical_record` (observed at the encounter's `observed_at`, reference `blob:{sha256}`):
 ///    `record_patient`, `record_provider`, `record_date_of_service`,
 ///    `record_diagnoses` (joined with `; `), `record_billed_cents` (all reader
 ///    model), then `record_covered_cents` and `record_sha256` (reader code).
@@ -274,7 +275,7 @@ pub fn build_facts(input: &EvidenceInput) -> Vec<Fact> {
     }
 
     if let Some(r) = &input.record {
-        f.group(Source::MedicalRecord, r.extracted_at, format!("blob:{}", r.sha256));
+        f.group(Source::MedicalRecord, r.observed_at, format!("blob:{}", r.sha256));
         f.model("record_patient", &r.patient_name);
         f.model("record_provider", &r.provider_name);
         f.model("record_date_of_service", &r.date_of_service);
@@ -430,7 +431,7 @@ mod tests {
                 diagnoses: vec!["S63.501A Sprain of right wrist".into(), "W19 Unspecified fall".into()],
                 billed_cents: 18000,
                 covered_cents: 18000,
-                extracted_at: at(22, 40, 0),
+                observed_at: at(22, 40, 0),
                 model_call_id: 62,
             }),
             policy: Some(PolicyInfo {
