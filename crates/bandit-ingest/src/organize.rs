@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -66,6 +66,44 @@ pub struct ScheduleLink {
 pub struct Gap {
     pub key: String,
     pub reason: String,
+}
+
+#[derive(Deserialize)]
+struct Answer {
+    run_id: String,
+    organizer: String,
+    model: String,
+    org_rows: Vec<(Value, Value, String)>,
+    org_decisions: HashMap<String, OrgDecision>,
+    prize_decisions: BTreeMap<String, LinkDecision>,
+    person_decisions: BTreeMap<String, LinkDecision>,
+    schedule_decisions: BTreeMap<String, SlotDecision>,
+    gaps: Vec<Gap>,
+}
+
+#[derive(Deserialize)]
+struct OrgDecision {
+    key: String,
+    name: String,
+    facts_key: String,
+    category: String,
+    tags: Vec<String>,
+    description: String,
+    match_method: String,
+    match_reason: String,
+}
+
+#[derive(Deserialize)]
+struct LinkDecision {
+    organization_key: String,
+    reason: String,
+}
+
+#[derive(Deserialize)]
+struct SlotDecision {
+    zone_key: String,
+    organization_key: String,
+    reason: String,
 }
 
 pub fn setup(cfg: &Config) -> Result<()> {
@@ -250,9 +288,9 @@ fn read_bundle(cfg: &Config, run_id: &str, records: &[Record]) -> Result<Organiz
     let started = Instant::now();
     let hits = elastic::search(cfg, BUNDLES, &json!({ "query": { "term": { "run_id": run_id } }, "size": 1 }))?;
     let source = hits["hits"]["hits"][0]["_source"].clone();
-    let mut organized: Organized =
-        serde_json::from_value(source).with_context(|| format!("the {BUNDLES} document of run {run_id} does not have the organized shape"))?;
-    organized.organizations = collapse(std::mem::take(&mut organized.organizations));
+    let answer: Answer =
+        serde_json::from_value(source).with_context(|| format!("the {BUNDLES} document of run {run_id} does not have the workflow's shape"))?;
+    let organized = assemble(answer)?;
     let problems = problems(&organized, records);
     let counts = json!({
         "organizations": organized.organizations.len(),
@@ -269,23 +307,65 @@ fn read_bundle(cfg: &Config, run_id: &str, records: &[Record]) -> Result<Organiz
     Ok(organized)
 }
 
-fn collapse(rows: Vec<Organization>) -> Vec<Organization> {
-    let mut out: Vec<Organization> = Vec::new();
-    for row in rows {
-        let Some(org) = out.iter_mut().find(|o| o.key == row.key) else {
-            out.push(row);
+fn assemble(a: Answer) -> Result<Organized> {
+    let mut organizations: Vec<Organization> = Vec::new();
+    for (members, _, domain) in &a.org_rows {
+        let d = a.org_decisions.get(domain).with_context(|| format!("no organization decision for domain {domain}"))?;
+        let members = strings(members);
+        let Some(org) = organizations.iter_mut().find(|o| o.key == d.key) else {
+            organizations.push(Organization {
+                key: d.key.clone(),
+                name: d.name.clone(),
+                domain: d.key.trim_start_matches("org:").to_string(),
+                member_keys: members,
+                facts_key: d.facts_key.clone(),
+                category: d.category.clone(),
+                tags: d.tags.clone(),
+                description: d.description.clone(),
+                match_method: d.match_method.clone(),
+                match_reason: d.match_reason.clone(),
+            });
             continue;
         };
-        org.member_keys.extend(row.member_keys);
+        org.member_keys.extend(members);
         if org.facts_key.is_empty() {
-            org.facts_key = row.facts_key;
+            org.facts_key = d.facts_key.clone();
         }
-        if row.match_method == "agent" {
-            org.match_method = row.match_method;
-            org.match_reason = row.match_reason;
+        if d.match_method == "agent" {
+            org.match_method = d.match_method.clone();
+            org.match_reason = d.match_reason.clone();
         }
     }
-    out
+    Ok(Organized {
+        run_id: a.run_id,
+        organizer: a.organizer,
+        model: a.model,
+        organizations,
+        prize_links: a
+            .prize_decisions
+            .into_iter()
+            .map(|(prize_key, d)| PrizeLink { prize_key, organization_key: d.organization_key, reason: d.reason })
+            .collect(),
+        person_links: a
+            .person_decisions
+            .into_iter()
+            .map(|(person_key, d)| PersonLink { person_key, organization_key: d.organization_key, reason: d.reason })
+            .collect(),
+        schedule_links: a
+            .schedule_decisions
+            .into_iter()
+            .map(|(slot_key, d)| ScheduleLink { slot_key, zone_key: d.zone_key, organization_key: d.organization_key, reason: d.reason })
+            .collect(),
+        gaps: a.gaps,
+    })
+}
+
+fn strings(v: &Value) -> Vec<String> {
+    match v {
+        Value::Array(items) => items.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+        Value::String(s) => vec![s.clone()],
+        _ => Vec::new(),
+    }
 }
 
 fn problems(o: &Organized, records: &[Record]) -> Vec<String> {

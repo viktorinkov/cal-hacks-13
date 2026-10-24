@@ -17,7 +17,7 @@ struct SqlResult {
 
 fn token_path(cfg: &Config) -> PathBuf {
     let host = cfg.stdb_url.split("://").last().unwrap_or_default().replace([':', '/'], "_");
-    cfg.data_dir.join(format!("../.secrets/{host}-{}.token", cfg.stdb_database))
+    cfg.secrets_dir.join(format!("{host}-{}.token", cfg.stdb_database))
 }
 
 fn token(cfg: &Config, http: &reqwest::blocking::Client) -> Result<String> {
