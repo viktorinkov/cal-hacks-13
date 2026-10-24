@@ -1,76 +1,47 @@
 /*
-  BandIt gateway, v0.1 skeleton. A XIAO ESP32C3 on a USB cable to the laptop.
-  Board: Seeed XIAO ESP32C3   Core: esp32 3.x   No extra libraries.
+  BandIt gateway: a XIAO ESP32C3 with its antenna on a USB cable to the laptop. The code is in gateway.cpp.
+  Build and flash:  ./build.sh gateway /dev/cu.usbmodemXXXX      (fqbn esp32:esp32:XIAO_ESP32C3)
+  Live view:        python3 tools/gateway_monitor.py /dev/cu.usbmodemXXXX
 
-  Radio -> laptop: every packet heard becomes one JSON line on Serial (115200):
-    {"t":12345,"type":1,"id":3,"rssi":-61,"flags":1,"neigh":4,"zone":101,"bat":87,"state":2,"seq":882}
-  Laptop -> radio: one command per line, broadcast 3 times 40 ms apart:
+  Serial at 115200, one JSON object per line, '\n' terminated. If the laptop stops reading, lines are dropped
+  whole, never half written. The radio protocol itself is described at the top of bandit_common.h.
+
+  Radio -> laptop
+    band beacon (type 1, ~10 Hz per band):
+      {"t":12345,"type":1,"id":3,"rssi":-61,"flags":1,"neigh":4,"zone":101,"bat":87,"state":2,"seq":882,"find":0}
+    station beacon (type 2, 5 Hz per station; state = exit colour index):
+      {"t":12345,"type":2,"id":101,"rssi":-48,"flags":0,"neigh":0,"zone":0,"bat":0,"state":1,"seq":77}
+    command heard from another gateway (type 3): same fields as a station line
+    heard list (type 4, 1 Hz per band; [id, smoothed rssi] the band itself measures, strongest first):
+      {"t":12345,"type":4,"id":3,"rssi":-61,"heard":[[5,-48],[101,-60]]}
+    t = gateway uptime in ms, rssi = signal at the gateway, find = the band this band is looking for (0 = nobody).
+    flags: 1 SOS, 2 fall, 4 button pressed in the last second, 8 low battery, 16 has MPU, 32 has motor.
+    state: 0 idle, 1 yellow, 2 guide, 3 SOS, 4 near SOS, 5 pay, 6 paid, 7 connect, 8 identify, 9 off,
+           10 find, 11 found me.
+
+  Other lines
+    boot:            {"gateway":"up","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"1023.2215-ede7124"}
+    "info" typed in: {"info":"gateway","mac":"AC:27:6E:FA:E4:C8","channel":1,"fw":"1023.2215-ede7124"}
+    per command:     {"ack":"cmd","target":3,"cmd":5,"arg":0,"arg2":0}
+    errors:          {"err":"usage: cmd <target> <name> [arg] [arg2]"}  {"err":"unknown cmd"}  {"err":"bad args"}
+                     {"err":"busy"}  {"err":"rx queue full","dropped":12}
+                     {"err":"dup id","id":3,"mac":"AA:..","other":"BB:.."}  (two boards configured with one id)
+
+  Laptop -> radio: one command per line, broadcast 3 times 40 ms apart
     cmd <target> <name> [arg] [arg2]
-      target: band id 1..9, or 0 for everyone
-      name:   state <0..9> [tenths of s]  | exit <1..6> | clear | buzz [1..3] | pay | paid
-              thresh <yellow> <red>      | rssi <neighAbs> <circleAbs>  (e.g. "rssi 62 58")
-              override <0|1>
-    examples:  cmd 0 exit 2      cmd 3 pay      cmd 3 paid      cmd 0 clear      cmd 0 thresh 3 5
-  The dashboard side (SpacetimeDB / web) reads the JSON lines and writes commands. See docs/06_GATEWAY_PROTOCOL.md.
+      target: 0 every band, 1..99 one band, 100 every station, 101..105 one station
+      state <0..11> [tenths]   force a band state (0 = until clear). 7 connect / 8 identify are timed overlays.
+                               stations: 0 breathe, 1 chase, 2 strobe, 9 off
+      exit <1..6>              exit colour: 1 blue 2 magenta 3 cyan 4 white 5 orange 6 violet
+      clear                    release SOS / fall / forced state (stations: back to breathe)
+      buzz [1..3]              haptic 1 short, 2 double, 3 long
+      haptic <0..6>            0 stop 1 short 2 double 3 long 4 SOS 5 raise your hand 6 guide pulse
+      pay | paid               pay prompt (8 s, approve = flag 4 from that band) | confirmed (green 1.5 s)
+      thresh <yellow> <red>    neighbour counts, saved on the bands
+      rssi <neighAbs> <circleAbs>   e.g. "rssi 62 58" = -62 / -58 dBm, saved on the bands
+      override <0|1>           1 = density state machine off (Plan B: drive states with "cmd 0 state")
+      find <friend> [colour]   on the seeker band; friend 0 = stop; colour 0..5 (0 pink)
+      sleep [minutes]          deep sleep, wake on button (plus a timed wake if minutes > 0)
+      lowvis <0|1>             low visibility guidance, saved on the bands
+    examples: cmd 0 exit 2   cmd 3 pay   cmd 3 paid   cmd 0 thresh 3 5   cmd 4 find 7   cmd 102 state 2
 */
-#include <WiFi.h>
-#include <esp_now.h>
-#include <esp_wifi.h>
-#include "bandit_common.h"
-
-#define GATEWAY_ID 200
-
-void onRecv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
-  if (len < (int)sizeof(Pkt)) return;
-  const Pkt* p = (const Pkt*)data;
-  if (p->magic != BANDIT_MAGIC) return;
-  int rssi = info->rx_ctrl ? info->rx_ctrl->rssi : -100;
-  Serial.printf("{\"t\":%lu,\"type\":%u,\"id\":%u,\"rssi\":%d,\"flags\":%u,\"neigh\":%u,\"zone\":%u,\"bat\":%u,\"state\":%u,\"seq\":%u}\n",
-                (unsigned long)millis(), p->type, p->id, rssi, p->flags, p->neigh, p->zone, p->bat, p->state, p->seq);
-}
-
-void sendCmd(uint8_t target, uint8_t cmd, uint8_t arg, uint8_t arg2) {
-  Pkt p = {}; p.magic = BANDIT_MAGIC; p.type = T_CMD; p.id = GATEWAY_ID; p.target = target; p.cmd = cmd; p.arg = arg; p.arg2 = arg2;
-  static uint16_t seq = 0; p.seq = seq++;
-  for (int i = 0; i < 3; i++) { esp_now_send(BCAST_ADDR, (const uint8_t*)&p, sizeof(p)); delay(40); }
-  Serial.printf("{\"ack\":\"cmd\",\"target\":%u,\"cmd\":%u,\"arg\":%u,\"arg2\":%u}\n", target, cmd, arg, arg2);
-}
-
-void handleLine(String line) {
-  line.trim(); if (!line.startsWith("cmd")) return;
-  char name[16] = {0}; int target = 0, a = 0, b = 0;
-  int n = sscanf(line.c_str(), "cmd %d %15s %d %d", &target, name, &a, &b);
-  if (n < 2) { Serial.println("{\"err\":\"usage: cmd <target> <name> [arg] [arg2]\"}"); return; }
-  String s(name);
-  if      (s == "state")    sendCmd(target, CMD_STATE, a, b);
-  else if (s == "exit")     sendCmd(target, CMD_EXIT, a, 0);
-  else if (s == "clear")    sendCmd(target, CMD_CLEAR, 0, 0);
-  else if (s == "buzz")     sendCmd(target, CMD_BUZZ, a ? a : 1, 0);
-  else if (s == "pay")      sendCmd(target, CMD_PAY, 0, 0);
-  else if (s == "paid")     sendCmd(target, CMD_PAID, 0, 0);
-  else if (s == "thresh")   sendCmd(target, CMD_THRESH, a, b);
-  else if (s == "rssi")     sendCmd(target, CMD_RSSI, a, b);
-  else if (s == "override") sendCmd(target, CMD_OVERRIDE, a, 0);
-  else Serial.println("{\"err\":\"unknown cmd\"}");
-}
-
-void setup() {
-  Serial.begin(115200);
-  WiFi.mode(WIFI_STA); WiFi.disconnect();
-  esp_wifi_set_ps(WIFI_PS_NONE);
-  esp_wifi_set_channel(BANDIT_CHANNEL, WIFI_SECOND_CHAN_NONE);
-  esp_wifi_set_max_tx_power(84);                       // full power: the gateway must reach every band
-  if (esp_now_init() != ESP_OK) { Serial.println("{\"err\":\"esp_now_init\"}"); ESP.restart(); }
-  esp_now_peer_info_t peer = {}; memcpy(peer.peer_addr, BCAST_ADDR, 6); peer.channel = 0; peer.encrypt = false; peer.ifidx = WIFI_IF_STA;
-  esp_now_add_peer(&peer);
-  esp_now_register_recv_cb(onRecv);
-  Serial.printf("{\"gateway\":\"up\",\"mac\":\"%s\",\"channel\":%d}\n", WiFi.macAddress().c_str(), BANDIT_CHANNEL);
-}
-
-void loop() {
-  static String buf;
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n') { handleLine(buf); buf = ""; } else if (c != '\r') buf += c;
-  }
-}
