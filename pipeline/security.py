@@ -878,7 +878,8 @@ def web_scene(args, cal, plan, venue_name):
             s = json.load(f)
         if mpp is None:
             origin, mpp = s['plan']['origin'], s['plan']['metres_per_px']
-        elif abs(s['plan']['metres_per_px'] - mpp) > 1e-3 * mpp or list(s['plan']['origin']) != list(origin):
+        elif s['plan']['metres_per_px'] and (abs(s['plan']['metres_per_px'] - mpp) > 1e-3 * mpp
+                                             or list(s['plan']['origin']) != list(origin)):
             say('the splat was aligned with a different plan scale than the anchors: run splat.py align again')
         if s.get('splat') and os.path.exists(os.path.join(args.splat, s['splat'])):
             files['/venue.splat'] = os.path.join(args.splat, s['splat'])
