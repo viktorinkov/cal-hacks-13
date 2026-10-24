@@ -16,9 +16,10 @@ from elastic import DATA, ROOT
 
 USAGE = """3D model of the venue for the security page: a Gaussian splat trained from a walk-through video
 
-  python3 pipeline/splat.py frames walk.mov       the sharpest frames of the walk -> images/
+  python3 pipeline/splat.py frames walk.mov [more.mov ...]   the sharpest frames of the walk -> images/
   python3 pipeline/splat.py poses                 where the phone was for each frame (COLMAP) -> sparse/0, undistorted/
   python3 pipeline/splat.py train                 the splat (Brush, on the Mac's GPU) -> splat.ply
+  python3 pipeline/splat.py level                 stand it level on the floor, in metres from the phone height -> scene.json, venue.splat
   python3 pipeline/splat.py align                 level it on the floor and match it to the plan -> scene.json, venue.splat
   python3 pipeline/splat.py camera --name pit --frame pit.mov   place the security camera in it -> cameras/pit.json
   python3 pipeline/splat.py all walk.mov          frames, poses, train and align in one go
@@ -32,6 +33,10 @@ the middle. Keep the floor in view. frames keeps the sharpest frame of each stre
 
 poses runs COLMAP on the CPU: features, matching (--matcher exhaustive for up to 350 frames, else sequential), the
 global mapper, then undistorted images for training. A few minutes to half an hour.
+
+level needs no plan: it finds the floor, stands the model on it at height 0 and scales it so the phone was
+--phone-height (1.5 m) above the floor, which is right to about 10%. Good for looking at the splat before the stations
+are placed; align replaces it.
 
 train runs Brush for --steps (30000; 7000 gives a quick look) with colour only (no view-dependent shading, which the
 page does not draw) and at most --max-splats.
@@ -96,11 +101,15 @@ def frames(args):
         os.makedirs(d)
     side = args.width
     scale = f"scale='if(gt(iw,ih),{side},-2)':'if(gt(iw,ih),-2,{side})'"
-    run(['ffmpeg', '-loglevel', 'error', '-i', args.video, '-vf', f'fps={args.sample_fps},{scale}', '-q:v', '2',
-         os.path.join(cand, '%05d.jpg')])
-    files = sorted(glob.glob(os.path.join(cand, '*.jpg')))
-    if not files:
-        raise SystemExit(f'no frames came out of {args.video}')
+    files, source = [], []
+    for v, video in enumerate(args.video):
+        run(['ffmpeg', '-loglevel', 'error', '-i', video, '-vf', f'fps={args.sample_fps},{scale}', '-q:v', '2',
+             os.path.join(cand, f'v{v}_%05d.jpg')])
+        got = sorted(glob.glob(os.path.join(cand, f'v{v}_*.jpg')))
+        if not got:
+            raise SystemExit(f'no frames came out of {video}')
+        files += got
+        source += [(os.path.basename(video), i / args.sample_fps) for i in range(len(got))]
     sharp, thumbs = [], []
     for f in files:
         g = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
@@ -125,8 +134,9 @@ def frames(args):
     for k, i in enumerate(kept, 1):
         shutil.copy(files[i], os.path.join(images, f'frame_{k:05d}.jpg'))
     with open(os.path.join(args.work, 'frames.json'), 'w') as f:
-        json.dump({'video': os.path.abspath(args.video), 'frames': {f'frame_{k:05d}.jpg': round(i / args.sample_fps, 3)
-                                                                    for k, i in enumerate(kept, 1)}}, f, indent=1)
+        json.dump({'videos': [os.path.basename(v) for v in args.video], 'sample_fps': args.sample_fps,
+                   'frames': {f'frame_{k:05d}.jpg': {'video': source[i][0], 'time': round(source[i][1], 3)}
+                              for k, i in enumerate(kept, 1)}}, f, indent=1)
     shutil.rmtree(cand)
     s = np.array(sharp)
     ks = s[kept]
@@ -187,23 +197,31 @@ def poses(args):
     say(f'{mapper}: {count} of {n} frames placed in {t:.0f} s')
     if count < 0.8 * n:
         say('fewer than 4 in 5 frames placed: the model may only cover part of the walk')
-    colmap(args.work, 'image_undistorter', '--image_path', images, '--input_path', os.path.join(sparse, '0'),
-           '--output_path', und, '--output_type', 'COLMAP')
-    flat = os.path.join(und, 'sparse')
-    if os.path.exists(os.path.join(flat, 'images.bin')):
-        os.makedirs(os.path.join(flat, '0'))
-        for f in glob.glob(os.path.join(flat, '*.bin')):
-            shutil.move(f, os.path.join(flat, '0'))
+    undistort(args.work)
     cams, imgs, pts = read_model(os.path.join(sparse, '0'), args.work)
     err = np.array([p['error'] for p in pts.values()])
     say(f'model: {len(imgs)} frames, {len(pts)} points, median reprojection error {np.median(err):.2f} px; '
         f'undistorted frames for training in {os.path.relpath(und, ROOT)}')
 
 
+def undistort(work):
+    und = os.path.join(work, 'undistorted')
+    shutil.rmtree(und, ignore_errors=True)
+    colmap(work, 'image_undistorter', '--image_path', os.path.join(work, 'images'), '--input_path',
+           os.path.join(work, 'sparse', '0'), '--output_path', und, '--output_type', 'COLMAP')
+    flat = os.path.join(und, 'sparse')
+    if os.path.exists(os.path.join(flat, 'images.bin')):
+        os.makedirs(os.path.join(flat, '0'))
+        for f in glob.glob(os.path.join(flat, '*.bin')):
+            shutil.move(f, os.path.join(flat, '0'))
+
+
 def train(args):
     data = os.path.join(args.work, 'undistorted')
     if not os.path.exists(os.path.join(data, 'sparse', '0', 'images.bin')):
-        raise SystemExit(f'no undistorted model in {data}: run poses first')
+        if not os.path.exists(os.path.join(args.work, 'sparse', '0', 'images.bin')):
+            raise SystemExit(f'no model in {args.work}: run poses first')
+        undistort(args.work)
     if not os.path.exists(args.brush):
         raise SystemExit(f'no Brush at {args.brush}')
     out = os.path.join(args.work, 'splat.ply')
@@ -574,6 +592,42 @@ def align(args):
     say(f'saved {os.path.relpath(path, ROOT)}')
 
 
+def level(args):
+    model = os.path.join(args.work, 'sparse', '0')
+    if not os.path.exists(os.path.join(model, 'images.bin')):
+        raise SystemExit(f'no model in {model}: run poses first')
+    _, imgs, pts = read_model(model, args.work)
+    centres = np.array([i['centre'] for i in imgs.values()])
+    n, p0, rms, eye, n_floor, n_pts = floor_plane(imgs, pts)
+    L, origin_L = level_frame(n, p0, centres)
+    unit_m = args.phone_height / eye
+    rot = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]]) @ L
+    M = np.eye(4)
+    M[:3, :3] = unit_m * rot
+    M[:3, 3] = -unit_m * rot @ origin_L
+    say(f'floor: {n_floor} of {n_pts} points within {rms * unit_m * 100:.0f} cm of a plane; scaled so the phone was '
+        f'{args.phone_height} m above it (about 10% either way)')
+    xyz, _, _ = model_points(args.work, pts)
+    v = to_venue(M, xyz)
+    lo = np.percentile(v, 1, axis=0) - args.margin
+    hi = np.percentile(v, 99, axis=0) + args.margin
+    bounds = [[float(lo[0]), -0.6, float(lo[2])], [float(hi[0]), args.ceiling, float(hi[2])]]
+    count = write_splat(args.work, M, unit_m, bounds, args.web_splats)
+    cam_v = to_venue(M, centres)
+    scene = {'venue': os.path.relpath(args.venue, ROOT), 'created': iso(time.time()), 'aligned': False,
+             'frame': 'levelled on the floor at y = 0, y up, metres from the phone height; not yet matched to the plan',
+             'model_to_venue': M.tolist(), 'metres_per_model_unit': unit_m,
+             'plan': {'origin': [0.0, 0.0], 'metres_per_px': None, 'scale_from': f'phone {args.phone_height} m up'},
+             'floor': {'rms_m': round(rms * unit_m, 3), 'points': n_floor}, 'phone_height_m': args.phone_height,
+             'bounds': bounds, 'splat': 'venue.splat' if count else None, 'splats': count,
+             'walk': [[round(float(c), 3) for c in p] for p in cam_v[::max(1, len(cam_v) // 120)]]}
+    path = os.path.join(args.work, 'scene.json')
+    with open(path, 'w') as f:
+        json.dump(scene, f, indent=1)
+    say(f'saved {os.path.relpath(path, ROOT)}: {(hi[0] - lo[0]):.0f} x {(hi[2] - lo[2]):.0f} m around the walk; '
+        f'align later puts it on the plan')
+
+
 def click_pairs(top, plan, span):
     left, kl = fit_panel(top)
     right, kr = fit_panel(plan)
@@ -755,8 +809,8 @@ def everything(args):
 
 def main():
     ap = argparse.ArgumentParser(description=USAGE, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('mode', choices=['frames', 'poses', 'train', 'align', 'camera', 'all'])
-    ap.add_argument('video', nargs='?', help='frames, all: the walk-through video')
+    ap.add_argument('mode', choices=['frames', 'poses', 'train', 'level', 'align', 'camera', 'all'])
+    ap.add_argument('video', nargs='*', help='frames, all: the walk-through video, or several of the same place')
     ap.add_argument('--work', default=WORK)
     ap.add_argument('--count', type=int, default=300)
     ap.add_argument('--sample-fps', type=float, default=6.0)
@@ -783,6 +837,7 @@ def main():
     ap.add_argument('--source', default='0', help='camera: the live camera index or stream for a new calibration')
     ap.add_argument('--height', type=float, default=0.9, help='camera: wrist height for the image-to-plan mapping')
     ap.add_argument('--use-pose', action='store_true')
+    ap.add_argument('--phone-height', type=float, default=EYE_M, help='level: metres the phone was held above the floor')
     ap.add_argument('--out', default=SECURITY)
     args = ap.parse_args()
     if args.mode in ('frames', 'all') and not args.video:
@@ -790,7 +845,7 @@ def main():
     if args.mode == 'camera' and not (args.name and args.frame):
         ap.error('camera needs --name and --frame')
     os.makedirs(args.work, exist_ok=True)
-    {'frames': frames, 'poses': poses, 'train': train, 'align': align, 'camera': camera,
+    {'frames': frames, 'poses': poses, 'train': train, 'level': level, 'align': align, 'camera': camera,
      'all': everything}[args.mode](args)
 
 
