@@ -33,4 +33,8 @@ fn every_payload_file_parses() {
     load::<ReviewPayload>(include_str!("../testdata/review-first-aid.json"));
     let payout = load::<PayoutPayload>(include_str!("../testdata/payout.json"));
     assert_eq!((payout.claimant_name.as_str(), payout.payout_cents), ("Maya Chen", 18_000));
+    let wallet = load::<crate::wallet::WalletPayload>(include_str!("../testdata/wallet.json"));
+    assert_eq!(wallet.opening_cents, 20_000);
+    let merch = load::<crate::merch::PurchasePayload>(include_str!("../testdata/merch.json"));
+    assert_eq!((merch.order_id, merch.amount_cents), (900_104, 2_500));
 }

@@ -244,6 +244,8 @@ mod tests {
             source_url: String::new(),
             fetched_at: at(0),
             updated_at: at(0),
+            crunchbase_url: String::new(),
+            funding_summary: String::new(),
         }
     }
 

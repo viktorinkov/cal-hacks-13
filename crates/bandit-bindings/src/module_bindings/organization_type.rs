@@ -28,6 +28,8 @@ pub struct Organization {
     pub source_url: String,
     pub fetched_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
+    pub crunchbase_url: String,
+    pub funding_summary: String,
 }
 
 impl __sdk::InModule for Organization {
@@ -59,6 +61,8 @@ pub struct OrganizationCols {
     pub source_url: __sdk::__query_builder::Col<Organization, String>,
     pub fetched_at: __sdk::__query_builder::Col<Organization, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<Organization, __sdk::Timestamp>,
+    pub crunchbase_url: __sdk::__query_builder::Col<Organization, String>,
+    pub funding_summary: __sdk::__query_builder::Col<Organization, String>,
 }
 
 impl __sdk::__query_builder::HasCols for Organization {
@@ -86,6 +90,8 @@ impl __sdk::__query_builder::HasCols for Organization {
             source_url: __sdk::__query_builder::Col::new(table_name, "source_url"),
             fetched_at: __sdk::__query_builder::Col::new(table_name, "fetched_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            crunchbase_url: __sdk::__query_builder::Col::new(table_name, "crunchbase_url"),
+            funding_summary: __sdk::__query_builder::Col::new(table_name, "funding_summary"),
         }
     }
 }

@@ -23,6 +23,8 @@ pub struct OrganizationIn {
     pub founded_year: u32,
     pub linkedin_url: String,
     pub prizes: Vec<String>,
+    pub crunchbase_url: String,
+    pub funding_summary: String,
     pub source_url: String,
     pub fetched_at: __sdk::Timestamp,
 }

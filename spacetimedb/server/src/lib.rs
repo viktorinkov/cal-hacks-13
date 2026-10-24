@@ -13,6 +13,8 @@ pub mod jobs;
 pub mod safety;
 pub mod vision;
 pub mod web;
+pub mod wallet;
+pub mod merch;
 
 use spacetimedb::{ReducerContext, Table};
 use tables::*;

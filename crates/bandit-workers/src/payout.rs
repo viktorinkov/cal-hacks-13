@@ -12,22 +12,22 @@ use crate::jobs::{Ctx, JobError, JobIn};
 use crate::nessie::{Nessie, split_name};
 use crate::sink::Finish;
 
-/// The Nessie ids made for one claim.
+/// The Nessie ids made for one claim or wallet.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-struct Made {
-    customer_id: String,
-    account_id: String,
+pub(crate) struct Made {
+    pub customer_id: String,
+    pub account_id: String,
 }
 
 fn made_path(data_dir: &Path, claim_id: u64) -> PathBuf {
     data_dir.join("nessie").join(format!("claim-{claim_id}.json"))
 }
 
-fn load_made(path: &Path) -> Made {
+pub(crate) fn load_made(path: &Path) -> Made {
     std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
 }
 
-fn save_made(path: &Path, made: &Made) -> Result<(), JobError> {
+pub(crate) fn save_made(path: &Path, made: &Made) -> Result<(), JobError> {
     let write = || -> std::io::Result<()> {
         std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")))?;
         std::fs::write(path, serde_json::to_vec(made)?)
@@ -69,7 +69,7 @@ async fn account(nessie: &Nessie, data_dir: &Path, p: &PayoutPayload) -> Result<
         save_made(&path, &made)?;
     }
     if made.account_id.is_empty() {
-        made.account_id = nessie.create_wallet(&made.customer_id).await?;
+        made.account_id = nessie.create_wallet(&made.customer_id, 0).await?;
         save_made(&path, &made)?;
     }
     Ok((made.customer_id, made.account_id))

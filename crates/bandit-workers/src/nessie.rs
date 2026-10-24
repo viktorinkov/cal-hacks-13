@@ -1,5 +1,5 @@
 //! A small client for Capital One's Nessie sandbox: customers, checking
-//! accounts and deposits. The API key goes in the `key` query parameter, so
+//! accounts, merchants, purchases and deposits. The API key goes in the `key` query parameter, so
 //! errors never carry a URL.
 
 use std::fmt;
@@ -24,9 +24,9 @@ impl fmt::Debug for Nessie {
     }
 }
 
-/// One deposit as Nessie lists it.
+/// One deposit or purchase as Nessie lists it.
 #[derive(Clone, Debug, Deserialize)]
-pub struct Deposit {
+pub struct Transaction {
     #[serde(rename = "_id")]
     pub id: String,
     #[serde(default)]
@@ -52,6 +52,17 @@ pub fn split_name(name: &str) -> (String, String) {
 pub fn deposit_body(cents: Cents, date: &str, memo: &str) -> String {
     format!(
         r#"{{"medium":"balance","transaction_date":{},"status":"completed","amount":{},"description":{}}}"#,
+        json!(date),
+        dollars(cents),
+        json!(memo)
+    )
+}
+
+/// The purchase body, written like the deposit body.
+pub fn purchase_body(merchant_id: &str, cents: Cents, date: &str, memo: &str) -> String {
+    format!(
+        r#"{{"merchant_id":{},"medium":"balance","purchase_date":{},"status":"completed","amount":{},"description":{}}}"#,
+        json!(merchant_id),
         json!(date),
         dollars(cents),
         json!(memo)
@@ -98,15 +109,38 @@ impl Nessie {
         self.create("customers", body.to_string()).await
     }
 
-    /// Creates the claimant's "BandIt wallet" checking account.
-    pub async fn create_wallet(&self, customer_id: &str) -> Result<String> {
-        let body = json!({ "type": "Checking", "nickname": "BandIt wallet", "rewards": 0, "balance": 0 });
+    /// Creates the "BandIt wallet" checking account with `opening_cents` in whole dollars, the
+    /// sandbox's balance unit. The sandbox never moves this balance afterwards.
+    pub async fn create_wallet(&self, customer_id: &str, opening_cents: Cents) -> Result<String> {
+        let body = json!({ "type": "Checking", "nickname": "BandIt wallet", "rewards": 0, "balance": opening_cents / 100 });
         self.create(&format!("customers/{}/accounts", path_id(customer_id)?), body.to_string()).await
     }
 
-    pub async fn deposits(&self, account_id: &str) -> Result<Vec<Deposit>> {
+    /// Creates the merchant BandIt merch is sold as.
+    pub async fn create_merchant(&self, name: &str) -> Result<String> {
+        let body = json!({
+            "name": name,
+            "category": "Clothing",
+            "address": { "street_number": "1", "street_name": "Festival Way", "city": "San Francisco", "state": "CA", "zip": "94123" },
+            "geocode": { "lat": 37.8029, "lng": -122.4484 }
+        });
+        self.create("merchants", body.to_string()).await
+    }
+
+    pub async fn deposits(&self, account_id: &str) -> Result<Vec<Transaction>> {
         let v = self.call(Method::GET, &format!("accounts/{}/deposits", path_id(account_id)?), None).await?;
         serde_json::from_value(v).context("Nessie deposits are not a list")
+    }
+
+    pub async fn purchases(&self, account_id: &str) -> Result<Vec<Transaction>> {
+        let v = self.call(Method::GET, &format!("accounts/{}/purchases", path_id(account_id)?), None).await?;
+        serde_json::from_value(v).context("Nessie purchases are not a list")
+    }
+
+    /// Records a purchase of `cents` from the account at `merchant_id`, dated `date`, with `memo` as its description.
+    pub async fn purchase(&self, account_id: &str, merchant_id: &str, cents: Cents, date: &str, memo: &str) -> Result<String> {
+        path_id(merchant_id)?;
+        self.create(&format!("accounts/{}/purchases", path_id(account_id)?), purchase_body(merchant_id, cents, date, memo)).await
     }
 
     /// Deposits `cents` dated `date` (`YYYY-MM-DD`) with `memo` as its description.
@@ -147,6 +181,13 @@ mod tests {
         assert_eq!(body, r#"{"medium":"balance","transaction_date":"2026-10-24","status":"completed","amount":180.00,"description":"BandIt claim 7 \"payout\""}"#);
         let v: Value = serde_json::from_str(&body).unwrap();
         assert_eq!(v["amount"].as_f64(), Some(180.0));
+    }
+
+    #[test]
+    fn purchase_body_is_exact() {
+        let body = purchase_body("m-1", 2_500, "2026-10-24", "BandIt merch order 3: SpacetimeDB tee (M)");
+        assert_eq!(body, r#"{"merchant_id":"m-1","medium":"balance","purchase_date":"2026-10-24","status":"completed","amount":25.00,"description":"BandIt merch order 3: SpacetimeDB tee (M)"}"#);
+        assert!(serde_json::from_str::<Value>(&body).is_ok());
     }
 
     #[test]

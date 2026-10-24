@@ -1,6 +1,6 @@
-//! `bandit-workers`: leases insurance jobs from the BandIt SpacetimeDB module,
-//! does the external work (Claude, Elastic, Nessie) and hands each result to
-//! the module's reducer for that job. Claude makes the judgment calls and
+//! `bandit-workers`: leases jobs from the BandIt SpacetimeDB module (insurance
+//! claims, wallets and merch purchases), does the external work (Claude,
+//! Elastic, Nessie) and hands each result to the module's reducer for that job. Claude makes the judgment calls and
 //! writes the words; code decides money.
 //!
 //! ```text
@@ -12,6 +12,7 @@
 mod extract;
 mod jobs;
 mod letters;
+mod merch;
 mod model;
 mod nessie;
 mod payout;
@@ -22,6 +23,7 @@ mod sink;
 #[cfg(test)]
 mod testdata;
 mod verify;
+mod wallet;
 
 use std::sync::Arc;
 
