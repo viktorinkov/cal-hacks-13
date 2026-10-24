@@ -19,7 +19,7 @@ Explicit non-responsibilities:
 
 - No positions. A band knows its zone, never x/y. See [Safety](../6-features/Safety.md) for how zone-level data becomes density and guidance.
 - No pairwise record. A band counts neighbours but does not report who they are.
-- No decisions about exits, incidents or evacuation. Those are made in the `bandit` module ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md)).
+- No decisions about exits, incidents or evacuation. Those are made in the `band1t` module ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md)).
 - No storage. Calibration pushed by command is lost when a band resets; the bridge re-sends it ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
 - No network, no encryption, no deep sleep, no over-the-air update in v0.1.
 - The gateway does not buffer, retry or interpret. It is a transparent radio-to-serial bridge.

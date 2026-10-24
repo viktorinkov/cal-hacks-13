@@ -28,16 +28,16 @@ Explicit non-responsibilities:
 | Interface | Direction | Counterpart | What flows | Transport |
 |---|---|---|---|---|
 | Command line | in | the operator | crowd size (at most 200), then a scenario file or a replay log | local process arguments |
-| `register_band` | out, at start | `bandit` module | one row per virtual band: id from 1000, `simulated` true, the full-band flag on one band in three | SpacetimeDB Rust client SDK, caller role `simulator` |
-| Social.md: `register_sim_owner` | out, at start | `bandit` module | one simulated owner per virtual band: a made-up display name and Meta handles (Instagram, Facebook, Threads) from the simulator's seed file | SDK, role `simulator` |
-| Hyphenate.md: `plant_medic_visit` | out | `bandit` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `simulator` |
+| `register_band` | out, at start | `band1t` module | one row per virtual band: id from 1000, `simulated` true, the full-band flag on one band in three | SpacetimeDB Rust client SDK, caller role `simulator` |
+| Social.md: `register_sim_owner` | out, at start | `band1t` module | one simulated owner per virtual band: a made-up display name and Meta handles (Instagram, Facebook, Threads) from the simulator's seed file | SDK, role `simulator` |
+| Hyphenate.md: `plant_medic_visit` | out | `band1t` module | the medic visit of a planted incident: note text, first-aid cost, planted type, run and round | SDK, role `simulator` |
 | Hyphenate.md: `POST /api/claims/bill` | out | `bandit-api` | a synthetic bill PDF from the simulator's seed folder for a planted incident, with the simulator's own `api_session` token from `open_api_session` | HTTPS ([Hyphenate](../7-integrations/Hyphenate.md)) |
-| `ingest_band_reports` | out, every 250 ms | `bandit` module | batches of at most 50 changed reports with the same fields the bridge sends ([Gateway-Bridge](Gateway-Bridge.md)); `heard_age_ms` 0, no `gateway_rssi` and no `loss_pct` | SDK, one connection |
-| `ack_band_command` | out | `bandit` module | command id and outcome for one-shots addressed to ids 1000 and above | SDK |
-| `heartbeat` | out, every 5 s | `bandit` module | service `simulator`, version, counters: virtual bands, reports per second, active scenario and its clock, replay position | SDK |
-| `zone`, `zone_link`, `exit`, `station`, `zone_state`, `venue_mode` | in, subscription | `bandit` module | the venue graph (areas, walking distances, exits, the station colour at each), zone state and venue mode | SDK |
-| `fleet_config` | in, subscription | `bandit` module | the thresholds real bands use, so virtual colours match real ones | SDK |
-| `band_directive`, `band_command` | in, subscription through `staff_directives` and `staff_commands` | `bandit` module | rows for targets 0 and 1000 and above | SDK |
+| `ingest_band_reports` | out, every 250 ms | `band1t` module | batches of at most 50 changed reports with the same fields the bridge sends ([Gateway-Bridge](Gateway-Bridge.md)); `heard_age_ms` 0, no `gateway_rssi` and no `loss_pct` | SDK, one connection |
+| `ack_band_command` | out | `band1t` module | command id and outcome for one-shots addressed to ids 1000 and above | SDK |
+| `heartbeat` | out, every 5 s | `band1t` module | service `simulator`, version, counters: virtual bands, reports per second, active scenario and its clock, replay position | SDK |
+| `zone`, `zone_link`, `exit`, `station`, `zone_state`, `venue_mode` | in, subscription | `band1t` module | the venue graph (areas, walking distances, exits, the station colour at each), zone state and venue mode | SDK |
+| `fleet_config` | in, subscription | `band1t` module | the thresholds real bands use, so virtual colours match real ones | SDK |
+| `band_directive`, `band_command` | in, subscription through `staff_directives` and `staff_commands` | `band1t` module | rows for targets 0 and 1000 and above | SDK |
 | Scenario file | in | the operator | a list of timed steps (below) | local text file named on the command line |
 | Replay log | in | a bridge run | the bridge's raw `.jsonl` | local file named on the command line |
 
@@ -74,7 +74,7 @@ flowchart TB
     DS -->|"IDLE, YELLOW or GUIDE"| PR
     PR -->|"GUIDE with an exit colour"| MV
     PR -->|"state, flags, neigh, zone"| BT["Batcher: changed reports, 50 per call"]
-    BT -->|"ingest_band_reports, role simulator"| STDB["bandit module"]
+    BT -->|"ingest_band_reports, role simulator"| STDB["band1t module"]
     STDB -->|"band_report, zone_state, incident"| DB["Ops dashboard"]
     STDB -->|"directives written by the venue tick"| DIR
     classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
@@ -96,7 +96,7 @@ How a directive moves the simulated crowd.
 ```mermaid
 sequenceDiagram
     participant O as Ops dashboard
-    participant M as bandit module
+    participant M as band1t module
     participant S as bandit-sim
     O->>M: set_venue_mode evacuate
     M->>M: venue_tick assigns exits, writes band_directive (forced GUIDE, exit colour per zone)
@@ -149,7 +149,7 @@ A planted claim goes through the same path as a real one: a virtual band latches
 | `duplicate_bill` | a new fall whose bill is a re-scan of an earlier planted bill: the same provider and invoice number in a new file |
 | `staff` | a genuine-looking fall on the simulated band whose owner holds a staff role |
 
-The simulator's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one. The seed's role grants give `ops` to the placeholder identity of one simulated band (band 1199, starting value) so the stress test can plant a staff injury; no client can connect as that identity. The accuracy run and the stress test run before the demo, inside the period of Hyphenate.md's accuracy-run policy, so the rules they teach expire before the demo starts. A simulated claimant has no wallet, so Hyphenate.md posts its payout ledger-only.
+The simulator's seed folder holds one synthetic bill PDF per planted claim, each with its own invoice number, so only the `duplicate_bill` case repeats one. The seed's role grants give `ops` to the placeholder identity of one simulated band (band 1199, starting value) so the stress test can plant a staff injury; no client can connect as that identity. The accuracy run and the stress test run before the demo, inside the period of Hyphenate.md's accuracy-run policy, so the rules they teach expire before the demo starts. A simulated claimant has no wallet, so its Hyphenate.md payout opens a Nessie account at payout time ([Payments-Nessie](../7-integrations/Payments-Nessie.md)).
 
 ### Replay mode
 

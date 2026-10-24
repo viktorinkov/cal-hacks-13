@@ -1,6 +1,6 @@
 # Safety
 
-Safety is the set of behaviours that keep a crowd from crushing anyone and get help to a person who falls or calls for it: zone density and risk, exit guidance by colour and vibration, SOS and fall handling with the light circle, incident lifecycle and escalation, medic approach, evacuation, and the manual overrides the team can fall back on. Crowd crushes are preceded by measurable density for minutes before anyone is hurt, and a person on the ground needs the people around them to notice and move before any responder arrives. So the first reaction happens on the band itself, with no server in the loop. The `bandit` module decides only what the bands cannot know alone: which exit, which zone is dangerous, who is coming to help.
+Safety is the set of behaviours that keep a crowd from crushing anyone and get help to a person who falls or calls for it: zone density and risk, exit guidance by colour and vibration, SOS and fall handling with the light circle, incident lifecycle and escalation, medic approach, evacuation, and the manual overrides the team can fall back on. Crowd crushes are preceded by measurable density for minutes before anyone is hurt, and a person on the ground needs the people around them to notice and move before any responder arrives. So the first reaction happens on the band itself, with no server in the loop. The `band1t` module decides only what the bands cannot know alone: which exit, which zone is dangerous, who is coming to help.
 
 ## Role in the system
 
@@ -45,7 +45,7 @@ Non-responsibilities:
 | Layer | Decides | Latency | Keeps working without |
 |---|---|---|---|
 | Band (firmware) | its own density colour (IDLE, YELLOW, GUIDE), SOS strobe and buzz, fall detection, joining the light circle | under one beacon interval, about 100 ms | the laptop, the gateway and the database |
-| `bandit` module (`venue_tick`, `ingest_band_reports`) | density and risk per zone, exit colour per zone, incidents, witnesses, escalation, guidance directives and buzzes | about 0.75 s to the dashboard (one bridge batch plus one tick); about 1 s more back to the bands | the dashboard and every phone |
+| `band1t` module (`venue_tick`, `ingest_band_reports`) | density and risk per zone, exit colour per zone, incidents, witnesses, escalation, guidance directives and buzzes | about 0.75 s to the dashboard (one bridge batch plus one tick); about 1 s more back to the bands | the dashboard and every phone |
 | Staff (dashboard, medic phone) | acknowledge, assign, block an exit, evacuate, override | human | nothing the bands do depends on them |
 
 The band's precedence order matters for everything below. From the firmware: IDENT, then SOS or fall, then PAID, PAY, CONNECT, then the light circle (NEAR_SOS), then any forced state, then the override flag, then the density state. So a forced GUIDE from the server never hides an SOS or a light circle, and the server relies on that without checking. BandIt never sets PAID, PAY or CONNECT.
@@ -190,7 +190,7 @@ sequenceDiagram
   participant N as Nearby bands
   participant G as Gateway
   participant BR as bandit-bridge
-  participant M as bandit module
+  participant M as band1t module
   participant D as Ops dashboard
   participant MD as Medic (attendee app)
   B->>B: hold 3 s or impact then stillness: latch, strobe red, buzz

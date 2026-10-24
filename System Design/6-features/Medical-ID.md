@@ -37,8 +37,8 @@ Non-responsibilities:
 | `medic_open_incident` | in | role `medic` | the band's NFC token | reducer; opens an `sos` incident assigned to the caller |
 | View `my_medical_card` | out | the attendee | own `medical_card` and `medical_document` status | subscription |
 | View `medic_medical_card` | out | role `medic` | the card for which a granted log row exists for the caller and the incident is not resolved | subscription |
-| `medical_card` read by `open_claim` | out | `bandit` module (Hyphenate.md) | card status, emergency contact present, conditions text, logged with `via = claim` | module-internal |
-| Access log | out | Ops dashboard (role `ops`, `owner`) | `medical_access_log` rows | subscription |
+| `medical_card` read by `open_claim` | out | `band1t` module (Hyphenate.md) | card status, emergency contact present, conditions text, logged with `via = claim` | module-internal |
+| Access log | out | Ops dashboard (role `ops`, `organizer`) | `medical_access_log` rows | subscription |
 
 ## Design
 
@@ -57,7 +57,7 @@ sequenceDiagram
   participant A as Attendee app
   participant API as bandit-api
   participant S as Blob store
-  participant M as bandit module
+  participant M as band1t module
   participant W as bandit-workers
   participant C as Claude API
   A->>API: POST /api/medical/document (PDF, api_session token)
@@ -138,11 +138,11 @@ sequenceDiagram
   participant P as Medic's phone
   participant B as Band
   participant A as Attendee app (medic view)
-  participant M as bandit module
+  participant M as band1t module
   P->>B: NFC tap
   B-->>P: NDEF URL https://host/t/BANDIT-07
   P->>A: opens /t/BANDIT-07
-  A->>M: subscribe my_role
+  A->>M: subscribe my_roles
   M-->>A: role medic: show the medic view
   A->>M: request_medical_card (BANDIT-07)
   alt open sos or fall incident

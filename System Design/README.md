@@ -1,6 +1,6 @@
 # BandIt system design
 
-BandIt is the only band you need at a public event. A wristband senses crowd density, raises SOS and fall alerts, and lights and buzzes the bands around someone who needs help. Later, the same band turns the night into a summary, a people graph, merch and settled insurance claims, and one recap email brings each attendee back to their night. This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
+BandIt is the only band you need at a public event. A wristband senses crowd density, raises SOS and fall alerts, and lights and buzzes the bands around someone who needs help. Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims: when the organizer ends the event, every attendee's page becomes their recap. This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
 
 ## Folder map
 
@@ -32,25 +32,25 @@ Core components are what the safety demo needs. Optional components are features
 
 | File | Component | Kind | What it covers | Needs |
 |---|---|---|---|---|
-| [Requirements.md](1-overview/Requirements.md) | Requirements | core | goals, functional requirements F1 to F16, quality targets, scale, constraints, out of scope | none |
+| [Requirements.md](1-overview/Requirements.md) | Requirements | core | goals, functional requirements F1 to F17, quality targets, scale, constraints, out of scope | none |
 | [Architecture.md](1-overview/Architecture.md) | Whole system | core | context, containers, the live loop, data ownership, what each database does best, deployment, prize tracks | all |
 | [Flows.md](1-overview/Flows.md) | Demo flows | core | setup before the demo, the nine demo steps, the index of sequence diagrams | all |
 | [Decisions.md](1-overview/Decisions.md) | Decision log | core | build, deployment, identity and sponsor decisions | none |
-| [SpacetimeDB.md](2-data/SpacetimeDB.md) | `bandit` module | core | tables, reducers, scheduled reducers, roles and views, subscriptions, deployment | none |
+| [SpacetimeDB.md](2-data/SpacetimeDB.md) | `band1t` module | core | tables, reducers, scheduled reducers, roles and views, subscriptions, deployment | none |
 | [Rust-Backend.md](3-services/Rust-Backend.md) | Cargo workspace and services | core | crates, processes and where they run, service identity, config and secrets, `bandit-api` and `bandit-workers` | SpacetimeDB |
 | [Gateway-Bridge.md](3-services/Gateway-Bridge.md) | `bandit-bridge`, `bandit-protocol` | core | serial to SpacetimeDB, batching, directive reconciliation, command delivery, press to confirm, raw logs | Hardware, SpacetimeDB |
 | [Hardware.md](4-devices/Hardware.md) | Bands, gateway, station markers | core | the fleet, radio, packet, on-band logic, state precedence, gateway wire protocol, NFC, power, limits | none |
 | [Safety.md](6-features/Safety.md) | Safety behaviours | core | density and risk, exit colours and vibration, SOS, fall, light circle, incidents, medic approach, evacuation, override | SpacetimeDB, Hardware, Gateway-Bridge |
-| [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the big-screen graph | SpacetimeDB, Safety |
-| [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | tap to join, claim by press, profile and consent, live view, medic view, the recap email and the recap page | SpacetimeDB |
+| [Ops-Dashboard.md](5-apps/Ops-Dashboard.md) | Staff web app | core | venue map, fleet, incidents, controls, calibration, service health, the host portal for the organizer, the big-screen graph | SpacetimeDB, Safety |
+| [Attendee-App.md](5-apps/Attendee-App.md) | Attendee web app | core | sign-in and tap to join, claim by press, profile and consent, live view, medic view, the recap page | SpacetimeDB |
 | [Simulator.md](3-services/Simulator.md) | `bandit-sim` | optional | a simulated crowd with simulated owners through the same reducers, scenarios, log replay | SpacetimeDB, Hardware; uses Social when present |
 | [Vision.md](4-devices/Vision.md) | Vision service (TBD -- LEO) | optional | camera counts, person-down alerts, incident assessments, photo features | SpacetimeDB; uses Anthropic-Agent when present |
 | [Medical-ID.md](6-features/Medical-ID.md) | Medical card | optional | medical PDF to a structured card, the medic access rule, the medic tap flow | Attendee-App; uses Anthropic-Agent when present |
-| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the post-event summary, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
-| [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, orders from the recap page | Social; uses Payments-Nessie when present |
-| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a Nessie sandbox wallet per attendee, merch checkout in the app after the event, claim payouts | Attendee-App |
+| [Social.md](6-features/Social.md) | Memories and the people graph | optional | visits, encounters, the people graph, Meta handles typed at onboarding, photo tagging and tap to share, the recap's social part, share links | SpacetimeDB; uses BrightData, Simulator, Vision, Anthropic-Agent when present |
+| [Merch.md](6-features/Merch.md) | Personalised merch | optional | a few hand-made templates (t-shirt, mug, poster), the attendee's own photo in each template's photo area, suggestions by booth time, one-tap orders from the recap page, paid from the wallet | Social, Payments-Nessie; uses BrightData when present |
+| [Payments-Nessie.md](7-integrations/Payments-Nessie.md) | Wallet and payouts | optional | a $200 Nessie sandbox wallet per attendee with an exact balance kept in the module, one-tap merch checkout after the event, claim payouts | Attendee-App |
 | [Hyphenate.md](7-integrations/Hyphenate.md) | Incident to claim | optional | the live-learning claims demo, evidence packs, bill review, coverage in code, authority matrix, learned rules, ledger, the accuracy scorecard | Safety; uses Medical-ID, Payments-Nessie, Anthropic-Agent, Elastic, Vision, Simulator when present |
-| [Elastic.md](7-integrations/Elastic.md) | Organizer and search | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, search by meaning, the dashed "into the same things" links, Kibana dashboards | uses BrightData and Social when present |
+| [Elastic.md](7-integrations/Elastic.md) | Organizer and recap order | optional | the `bandit-organize` Workflow over scraped records, `bandit-indexer`, the recap's suggestions ordered by meaning, Kibana dashboards | uses BrightData and Social when present |
 | [BrightData.md](7-integrations/BrightData.md) | `bandit-ingest` | optional | the event's organisations, booths, floor plan and schedule through the Bright Data Web MCP, the profile claim, the one-bundle import | Elastic; uses Anthropic-Agent and Social when present |
 | [Anthropic-Agent.md](7-integrations/Anthropic-Agent.md) | Claude use | optional | `claude-client`, every Claude use case, structured outputs, recording and replay, guardrails | Rust-Backend |
 
@@ -70,7 +70,8 @@ flowchart LR
   Sim["Simulator"]
 
   Merch --> Soc
-  Merch -.-> Pay
+  Merch --> Pay
+  Merch -.-> BD
   Hyp -.-> Med
   Hyp -.-> Pay
   Hyp -.-> AI
@@ -104,7 +105,7 @@ Deleting a core file is not intended; the safety demo needs all of them.
 
 ## Conventions
 
-- **Every file has the same sections:** Role in the system, Interfaces, Design, Failure modes and fallbacks, Dependencies, and a closing Decisions table. Every choice is decided; there are no open questions.
+- **Every file has the same sections:** Role in the system, Interfaces, Design, Failure modes and fallbacks, Dependencies, and a closing Decisions table. Every choice is decided.
 - **Rust backend.** The SpacetimeDB module and every service are Rust ([Rust-Backend](3-services/Rust-Backend.md)). Only the two browser apps are TypeScript, using SpacetimeDB's TypeScript client SDK.
 - **Happy paths first.** The design follows a few clear paths. An edge case stays only when it protects a person, a judge will see it, or it wins a sponsor track, such as the insurance cases in [Hyphenate](7-integrations/Hyphenate.md).
 - **Diagrams are Mermaid.** GitHub renders them inline and they diff as text. Every diagram here was rendered and checked before it was committed. Colours mean the same thing in every file:
@@ -115,9 +116,10 @@ Deleting a core file is not intended; the safety demo needs all of them.
 | Red | Rust processes and crates |
 | Indigo | the SpacetimeDB module |
 | Blue | browser apps and people |
-| Teal | outside services (Elastic, Claude, Nessie, Bright Data, Resend) |
+| Teal | outside services (Elastic, Claude, Nessie, Bright Data, SpacetimeAuth) |
 | Grey, dashed | vision, still (TBD -- LEO) |
 
+- **Excalidraw diagrams.** The whole system is also drawn in [bandit-system-design.excalidraw](../diagrams/bandit-system-design.excalidraw), on branch `vik-excalidraw-diagrams`. Open it at excalidraw.com or with the Excalidraw extension for VS Code. The generator that draws it is in `diagrams/generator`. The Mermaid diagrams in these files are the reference.
 - **(TBD -- LEO)** marks anything about cameras or computer vision. Leo owns that part. The sections give Leo's starting defaults and the interface the rest of the system needs.
 - **Starting values.** Thresholds and timings that the firmware does not fix are labelled as starting values, to calibrate at the venue.
 - **Names.** Tables, reducers, roles and job kinds use exact `snake_case` names, defined once in the file that owns them ([SpacetimeDB](2-data/SpacetimeDB.md) for the core).

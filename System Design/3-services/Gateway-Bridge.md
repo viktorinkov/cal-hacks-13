@@ -1,6 +1,6 @@
 # Gateway-Bridge
 
-`bandit-bridge` is the Rust process on the demo laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `bandit` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the simulator and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
+`bandit-bridge` is the Rust process on the demo laptop that joins the radio fleet to SpacetimeDB. It reads the gateway's serial lines, keeps the latest report per band, and every 250 ms sends what changed to the `band1t` module in one `ingest_band_reports` call. In the other direction it subscribes to the server's intent (`band_directive`, `band_command`, `fleet_config`) and turns it into gateway text commands, re-sending until each band reports what the server wants. `bandit-protocol` is the shared Rust crate that mirrors the firmware's packet, flags, states and commands, so the bridge, the simulator and the module agree byte for byte. The bridge exists so that bands never need a database client and so that radio loss, reboots and reconnects are handled in exactly one place.
 
 ## Role in the system
 
@@ -29,14 +29,14 @@ Explicit non-responsibilities:
 |---|---|---|---|---|
 | Gateway uplink | in | Gateway | one JSON object per heard packet (fields in [Hardware](../4-devices/Hardware.md)), plus boot, `ack` and `err` lines | USB serial, nominal 115200 baud |
 | Gateway downlink | out | Gateway | text lines `cmd <target> <name> [arg] [arg2]` | USB serial |
-| `ingest_band_reports` | out, reducer call | `bandit` module | a batch of changed reports (fields below) | SpacetimeDB Rust client SDK, caller role `bridge` |
-| `ack_band_command` | out, reducer call | `bandit` module | command id and outcome (`sent` or `expired`) | SDK |
-| `heartbeat` | out, reducer call every 5 s | `bandit` module | service `bridge`, version, counters: serial lines per second, parse errors, commands sent, rejected commands, per-band loss | SDK |
-| `band_directive` | in, subscription through `staff_directives` | `bandit` module | desired sticky state per target: forced state and hold, exit colour, override flag | SDK |
-| `band_command` | in, subscription through `staff_commands` | `bandit` module | one-shot commands not yet acknowledged: target, name (`buzz`, `clear`), argument, created time | SDK |
-| `fleet_config` | in, subscription | `bandit` module | live calibration: yellow and red counts, neighbour and circle RSSI thresholds, `density_override` | SDK |
+| `ingest_band_reports` | out, reducer call | `band1t` module | a batch of changed reports (fields below) | SpacetimeDB Rust client SDK, caller role `bridge` |
+| `ack_band_command` | out, reducer call | `band1t` module | command id and outcome (`sent` or `expired`) | SDK |
+| `heartbeat` | out, reducer call every 5 s | `band1t` module | service `bridge`, version, counters: serial lines per second, parse errors, commands sent, rejected commands, per-band loss | SDK |
+| `band_directive` | in, subscription through `staff_directives` | `band1t` module | desired sticky state per target: forced state and hold, exit colour, override flag | SDK |
+| `band_command` | in, subscription through `staff_commands` | `band1t` module | one-shot commands not yet acknowledged: target, name (`buzz`, `clear`), argument, created time | SDK |
+| `fleet_config` | in, subscription | `band1t` module | live calibration: yellow and red counts, neighbour and circle RSSI thresholds, `density_override` | SDK |
 | Raw log | out | a JSON-lines file on the laptop; read by [Simulator](Simulator.md) replay and the calibration capture | one JSON object per line, every line in and out | `.jsonl` file, one per run, kept on the laptop |
-| Configuration | in | environment ([Rust-Backend](Rust-Backend.md)) | serial port path, the Maincloud host, database name `bandit`, identity token path, log folder | local |
+| Configuration | in | environment ([Rust-Backend](Rust-Backend.md)) | serial port path, the Maincloud host, database name `band1t`, identity token path, log folder | local |
 
 The report the bridge sends for each band inside `ingest_band_reports`:
 
@@ -67,7 +67,7 @@ flowchart TB
     RD -->|"lines"| PA["Line parser (bandit-protocol)"]
     PA -->|"reports"| FM["Fleet map: latest report per band, liveness, seq gaps"]
     FM -->|"changed reports, every 250 ms"| BT["Batcher"]
-    BT -->|"ingest_band_reports, heartbeat"| STDB["bandit module"]
+    BT -->|"ingest_band_reports, heartbeat"| STDB["band1t module"]
     STDB -->|"band_directive, band_command, fleet_config"| SUB["Subscriptions"]
     SUB -->|"desired state per target"| RC["Reconciler"]
     FM -->|"reported state, reboots"| RC
@@ -128,7 +128,7 @@ sequenceDiagram
     participant B as Band
     participant G as Gateway
     participant R as bandit-bridge
-    participant M as bandit module
+    participant M as band1t module
     participant D as Ops dashboard
     loop every 100 ms per band
         B->>G: beacon (ESP-NOW broadcast)
@@ -162,7 +162,7 @@ How a directive becomes a light, and how the bridge knows it worked.
 
 ```mermaid
 sequenceDiagram
-    participant M as bandit module
+    participant M as band1t module
     participant R as bandit-bridge
     participant G as Gateway
     participant B as Band
@@ -214,11 +214,11 @@ The round trip, the same for both claims.
 ```mermaid
 sequenceDiagram
     participant A as Attendee app
-    participant M as bandit module
+    participant M as band1t module
     participant R as bandit-bridge
     participant G as Gateway
     participant B as Band
-    A->>M: claim_band_start (opens an 8 s window)
+    A->>M: claim_band (opens an 8 s window)
     M->>M: band_directive IDENT, hold 8 s
     M-->>R: band_directive row (subscription)
     R->>G: cmd <id> state 8 80
@@ -231,7 +231,7 @@ sequenceDiagram
     R->>G: cmd <id> state 8 1 (the forced blink expires)
 ```
 
-Two details make this robust. The press flag is accumulated with OR in the fleet map, so it cannot fall between two batches. And the module, not the bridge, decides whether the press was inside the window, so a late or duplicated report cannot confirm anything. If no press arrives, the blink ends on its own after 8 s and the bridge sends nothing. [Attendee-App](../5-apps/Attendee-App.md) owns the band claim; BrightData.md: the profile claim starts with `request_person_claim` instead of `claim_band_start` and ends in `confirm_person_claim`, over the same round trip.
+Two details make this robust. The press flag is accumulated with OR in the fleet map, so it cannot fall between two batches. And the module, not the bridge, decides whether the press was inside the window, so a late or duplicated report cannot confirm anything. If no press arrives, the blink ends on its own after 8 s and the bridge sends nothing. [Attendee-App](../5-apps/Attendee-App.md) owns the band claim; BrightData.md: the profile claim starts with `request_person_claim` instead of `claim_band` and ends in `confirm_person_claim`, over the same round trip.
 
 ### Rate limiting and safety rules on the command line
 

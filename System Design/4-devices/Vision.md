@@ -2,7 +2,7 @@
 
 > (TBD -- LEO) Leo owns vision: the cameras, the models, where they run and how Claude is used. This file fixes what the rest of the system sends in and gets back, and records Leo's defaults below, which Leo may change.
 
-Vision is the camera side of BandIt. The rest of the system needs five things from it: a head count for the pit, as ground truth and as the Plan B density source; person-down alerts that corroborate falls; a Claude judgment on each incident in the pit, with a staff report and an insurance-ready description; property events on property incidents, such as a fallen speaker; and features of photographer photos. Everything flows into the `bandit` module through reducers under the role `vision`, and the module, not vision, decides what happens next. Vision is never in the safety path: bands alert locally within a second, and vision confirms, counts and writes the report seconds later.
+Vision is the camera side of BandIt. The rest of the system needs five things from it: a head count for the pit, as ground truth and as the Plan B density source; person-down alerts that corroborate falls; a Claude judgment on each incident in the pit, with a staff report and an insurance-ready description; property events on property incidents, such as a fallen speaker; and features of photographer photos. Everything flows into the `band1t` module through reducers under the role `vision`, and the module, not vision, decides what happens next. Vision is never in the safety path: bands alert locally within a second, and vision confirms, counts and writes the report seconds later.
 
 ## Role in the system
 
@@ -64,7 +64,7 @@ flowchart LR
     Cam["Overhead phone camera (TBD -- LEO)"] -->|"JPEG, 1 per second, hotspot"| Vis["bandit-vision: YOLO and pose, 10 s ring buffer (TBD -- LEO)"]
     Vis <-->|"incident bundles, photos out; JSON back"| Claude["Claude API"]
     Vis -->|"frames (HTTPS)"| Api["bandit-api, blob store"]
-    subgraph M["bandit module (SpacetimeDB)"]
+    subgraph M["band1t module (SpacetimeDB)"]
         CC["camera_count"]
         GA["ground_alert"]
         VA["vision_assessment"]
@@ -205,7 +205,7 @@ The sequence shows an assessment from the band's alert to the result on the inci
 sequenceDiagram
     participant Band as Band 4
     participant Bridge as bandit-bridge
-    participant Mod as bandit module
+    participant Mod as band1t module
     participant Vis as bandit-vision (TBD -- LEO)
     participant Claude as Claude API
     participant Api as bandit-api
@@ -261,7 +261,6 @@ sequenceDiagram
 - Architecture.md, Requirements.md (F15), Decisions.md and README.md: remove the Vision rows. Hardware.md: remove the overhead camera row and subsection.
 - Rust-Backend.md: remove the `bandit-vision` row from the process table, the Vision node from the workspace diagram, the Vision row from the crate table and the `photo_features` row in the handler registry.
 - Anthropic-Agent.md: remove the two Vision rows (event judgment and `photo_features`) from the use-case table and the Vision bullet from its deletion list.
-- Elastic.md: the `vision` value of `caption_source` goes.
 
 ## Decisions
 

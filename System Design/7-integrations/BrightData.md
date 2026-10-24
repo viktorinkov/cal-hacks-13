@@ -1,6 +1,6 @@
 # Bright Data
 
-`bandit-ingest` is a Rust command-line tool the team runs before the event. It works for any event: it starts from the list of start URLs in the event's seed and fetches the event's public pages and its organisations' pages through the Bright Data Web MCP, saves every fetch as a versioned snapshot kept with the project, has Elastic organize the records into one event bundle (organisations, booths with positions, halls, schedule, unclaimed people profiles), and loads the bundle into SpacetimeDB in one transaction with the `import_event` reducer. Everything downstream (the Ops dashboard map, visits, the profile claim, the search copy) sees ordinary SpacetimeDB rows and never knows a scrape happened. Bright Data owns every step that touches the web, Elastic every step after the raw records land, and SpacetimeDB everything live or exact. The snapshots mean that no demo or rerun depends on a live scrape. Cal Hacks 13.0 is the demo instance.
+`bandit-ingest` is a Rust command-line tool the team runs before the event. It works for any event: it starts from the list of start URLs in the event's seed and fetches the event's public pages and its organisations' pages through the Bright Data Web MCP, saves every fetch as a versioned snapshot kept with the project, has Elastic organize the records into one event bundle (organisations, booths with positions, halls, schedule, unclaimed people profiles), and loads the bundle into SpacetimeDB in one transaction with the `import_event` reducer. Everything downstream (the Ops dashboard map, visits, the profile claim, the Elastic copy) sees ordinary SpacetimeDB rows and never knows a scrape happened. Bright Data owns every step that touches the web, Elastic every step after the raw records land, and SpacetimeDB everything live or exact. The snapshots mean that no demo or rerun depends on a live scrape. Cal Hacks 13.0 is the demo instance.
 
 ## Role in the system
 
@@ -18,7 +18,7 @@ Non-responsibilities:
 - **Never scrapes people.** No person scraper, no social profile, no lookup of a person by name. People come only from what the event itself publishes. Every attendee types their own social handles at onboarding ([Social](../6-features/Social.md) owns `social_handle`). Elastic.md: the organizer's gap-fill tool is held to the same rule and fetches organisation and event pages only.
 - Does not merge facts across sources. That is the organizer's job ([Elastic](Elastic.md)). Page extraction happens once, at fetch time, through Bright Data `extract` with the null rule; Elastic receives JSON records, never page bodies.
 - Does not define zones or exits. The core seed in [SpacetimeDB](../2-data/SpacetimeDB.md) creates the station zones and the exits; the bundle never changes them.
-- Does not scrape merch. [Merch](../6-features/Merch.md) loads its hand-made templates from the event's merch seed.
+- Does not scrape merch. [Merch](../6-features/Merch.md) loads its hand-made templates from `assets/merch/templates.json`.
 - Does not run during the event and is never on the safety path.
 - Does not own `booth`, `schedule_slot` or `venue` ([SpacetimeDB](../2-data/SpacetimeDB.md)); it fills them.
 
@@ -57,7 +57,7 @@ The demo instance is Cal Hacks 13.0, at the Palace of Fine Arts. Its start URLs 
 | `event_pages` | the start URLs: the event's own site (sponsors, speakers, judges, venue, dates), its exhibitor or sponsor list (with tiers when it gives them) and its schedule page | `organization` candidates with tier; `person` candidates; `schedule_slot` records; event and venue facts | `extract` with a schema per page kind | booths and schedule for [Social](../6-features/Social.md), [Elastic](Elastic.md) and the attendee app; people for the profile claim |
 | `exhibitor_pages` | each organisation's public home and about pages, found from the sponsor list or with `search_engine` | description, tags, logo, company social pages, booth number when the page states it | `search_engine`, `extract`; the browser tools for the logo image | booth descriptions for [Elastic](Elastic.md) |
 | `org_facts` | the organisation's LinkedIn company page and Crunchbase company page | industry, headquarters, size range, founding year, short description, funding summary | `web_data_linkedin_company_profile`, `web_data_crunchbase_company` (company pages only) | richer booth documents in [Elastic](Elastic.md) |
-| `floor_plan` | the floor plan image on the start URL of kind map | booth numbers and their positions | `scrape_as_markdown` finds the image link; `scraping_browser_navigate` and `scraping_browser_screenshot` capture the image | booth positions for the Ops map, [Social](../6-features/Social.md) visits and [Elastic](Elastic.md) geo search |
+| `floor_plan` | the floor plan image on the start URL of kind map | booth numbers and their positions | `scrape_as_markdown` finds the image link; `scraping_browser_navigate` and `scraping_browser_screenshot` capture the image | booth positions for the Ops map, [Social](../6-features/Social.md) visits and the Kibana map ([Elastic](Elastic.md)) |
 
 ### The Bright Data Web MCP
 
@@ -109,7 +109,7 @@ flowchart TB
   O -.->|"records out, bundle back"| ES["Elastic Serverless: bandit-organize"]
   O -->|"bundle"| V["validate stage"]
   V -->|"saved as the last good bundle"| L["load stage"]
-  L -->|"import_event, one transaction"| STDB["bandit module"]
+  L -->|"import_event, one transaction"| STDB["band1t module"]
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
@@ -235,7 +235,7 @@ The sequence answers: how does a press on the band confirm "this profile is me"?
 sequenceDiagram
   participant App as Attendee app
   participant API as bandit-api
-  participant Mod as bandit module
+  participant Mod as band1t module
   participant Band as Band and gateway
   App->>App: "Is this you?" lists unclaimed person rows matching the typed name
   App->>API: POST /claim/person (person id, session token)
@@ -258,7 +258,7 @@ sequenceDiagram
   participant ING as bandit-ingest
   participant BD as Bright Data Web MCP
   participant ES as Elastic Serverless
-  participant STDB as bandit module
+  participant STDB as band1t module
   participant IDX as bandit-indexer
   OP->>ING: start a full run for the event
   ING->>BD: extract (exhibitor page URL, schema, nulls for missing)
@@ -308,6 +308,7 @@ sequenceDiagram
 - [Social](../6-features/Social.md): visits are "at booth B", the profile claim sits in its onboarding flow, and the people graph takes its `exhibits` links from `booth.organization_id` and its `works_at` links from claimed profiles.
 - [Attendee-App](../5-apps/Attendee-App.md): the schedule and the "Is this you?" step.
 - [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the hall's floor plan image and the booth fix-up panel.
+- [Merch](../6-features/Merch.md): a sponsor template names organisations, and `load_merch_templates` finds their booths through the imported `organization` rows.
 
 **If you delete this file**
 
@@ -315,7 +316,8 @@ sequenceDiagram
 - Remove `import_event`, `request_person_claim`, `confirm_person_claim`, `hall`, `organization` and `person` from the registry tables in [SpacetimeDB](../2-data/SpacetimeDB.md), the BrightData.md field row on `booth`, the BrightData.md note on the `venue` origin fields, the BrightData.md press consumer in `ingest_band_reports`, and the BrightData.md mentions in its `bandit-ingest` interface row and seed paragraph.
 - Remove the `POST /claim/person` route from [Rust-Backend](../3-services/Rust-Backend.md), the BrightData.md rows from [Attendee-App](../5-apps/Attendee-App.md) and [Social](../6-features/Social.md) (the "Is this you?" step), the booth fix-up panel row, subscription row and `ingest` service card from [Ops-Dashboard](../5-apps/Ops-Dashboard.md), and the BrightData.md row from the README components table.
 - Remove the `floorplan_check` row from [Anthropic-Agent](Anthropic-Agent.md).
-- [Elastic](Elastic.md) loses its organizer and keeps search over hand-entered booths. Booths, schedule slots and the venue row are entered by hand through `upsert_booth`, `upsert_schedule_slot` and the seed. Behaviour elsewhere is unchanged, because everything reads SpacetimeDB rows either way.
+- [Merch](../6-features/Merch.md) loads only its plain templates, because sponsor names have no organisations to match.
+- [Elastic](Elastic.md) loses its organizer and keeps the copy of hand-entered booths. Booths, schedule slots and the venue row are entered by hand through `upsert_booth`, `upsert_schedule_slot` and the seed. Behaviour elsewhere is unchanged, because everything reads SpacetimeDB rows either way.
 
 ## Decisions
 
@@ -324,7 +326,7 @@ sequenceDiagram
 | The floor plan has one path: Bright Data captures the published image, Claude `floorplan_check` reads booth numbers and positions, the hall's real width typed in the seed converts pixels to metres, and ops drags any misplaced booth on the Ops dashboard map | One pipeline to build and rehearse; a wrong position is fixed in seconds by hand, so no second reading method is needed |
 | No exhibitor contact export, no `claim_contact` table, no email; a profile claim is confirmed by a press on the attendee's band | The band press already proves who holds the band, the attendee learned it one step earlier, and it needs no email round trip |
 | The profile claim blinks the band white (IDENT) for 8 s, like the band claim | Same visible prompt and same window as the press the attendee just did |
-| No merch scraping | [Merch](../6-features/Merch.md) loads a few hand-made templates from its own seed |
+| No merch scraping | [Merch](../6-features/Merch.md) loads a few hand-made templates from its own file |
 | Only the Bright Data Web MCP, in Pro mode, with the tools named above | One product and one token to set up; the credits cover the Pro tools |
 | No Claude merge of organisation facts (`scrape_extract` is removed) | The Elastic organizer is the one place facts are merged across sources |
 | Without Elastic.md no scraped bundle loads; booths are entered by hand | The organizer is the only path from records to bundle, so there is no rules path to maintain |
