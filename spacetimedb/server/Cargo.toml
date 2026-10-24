@@ -9,3 +9,6 @@ crate-type = ["cdylib"]
 [dependencies]
 spacetimedb = "2.13"
 log = "0.4"
+
+[dev-dependencies]
+spacetimedb = { version = "2.13", features = ["test-utils"] }
