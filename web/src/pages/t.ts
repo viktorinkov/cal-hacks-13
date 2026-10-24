@@ -7,7 +7,7 @@ import {
   act, api, apiSession, config, connect, finishSignIn, h, idToken, money, mount, playedToken, signIn, signOut,
   signedInEmail, PLATFORMS,
 } from '../lib';
-import { recap, type Recap } from '../recap';
+import { recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 
 const QUERIES = [
@@ -43,8 +43,6 @@ let claimError = '';
 let claimAsked = false;
 let step: Step = 'name';
 let session = '';
-let recapData: Recap | undefined;
-let recapLoading = false;
 
 function go(next: Step) {
   step = next;
@@ -271,19 +269,6 @@ function setup() {
   }
 }
 
-async function loadRecap() {
-  if (recapLoading || recapData) return;
-  recapLoading = true;
-  try {
-    if (!session) session = await apiSession(conn);
-    recapData = await api<Recap>('/api/recap', session);
-  } catch (e: any) {
-    document.getElementById('error')!.textContent = `Recap ranking: ${e?.message ?? e}`;
-  }
-  recapLoading = false;
-  render();
-}
-
 function render() {
   if (!conn) return;
   const mb = conn.db.myBand.iter().next().value;
@@ -292,8 +277,7 @@ function render() {
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'));
   if (mb && mb.bandId === bandId && mb.status === 'claimed') {
     if (ended) {
-      loadRecap();
-      return mount('app', top, recap(conn, recapData));
+      return mount('app', top, recap(conn, render));
     }
     return mount('app', top, setup());
   }
