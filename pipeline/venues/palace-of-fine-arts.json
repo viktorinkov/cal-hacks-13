@@ -1,0 +1,37 @@
+{
+  "name": "Palace of Fine Arts, San Francisco",
+  "plan_image": "pipeline/data/venue/palace-ground-floor.png",
+  "plan_source": "https://palaceoffinearts.com/wp-content/uploads/sites/4/2024/09/Palace-of-Fine-Arts-Venue-Presentation.pdf (layout page, ground floor)",
+  "references": "pipeline/data/reference/index.jsonl",
+  "notes": [
+    "The exhibition hall is one long curved building. The plan shows its ground floor; a mezzanine walkway with railings runs above parts of it.",
+    "North is not marked on the plan. Every reference photo and every new photo carries a compass heading, which fixes orientation.",
+    "The Public Entrance is on the inner, concave side of the curve; the Loading Doors are on the outer side; the Theater and Business Entrance are at the east end; the Pavilion and Green Rooms at the west end.",
+    "The event setup is not on the plan: bleacher steps with large CAL HACKS letters, sponsor booths with black walls, hacking tables, a food line with 'Now boarding' signs, and 'Destination' signs that name areas such as 'Spacetime Singularity'."
+  ],
+  "sections": [
+    {"name": "Pavilion", "kind": "hall"},
+    {"name": "Atrium", "kind": "hall"},
+    {"name": "Broadway 1", "kind": "hall"},
+    {"name": "Broadway 2", "kind": "hall"},
+    {"name": "Broadway 3", "kind": "hall"},
+    {"name": "Breakout 1", "kind": "room"},
+    {"name": "Breakout 2", "kind": "room"},
+    {"name": "Breakout 3", "kind": "room"},
+    {"name": "Breakout 4", "kind": "room"},
+    {"name": "Breakout 5", "kind": "room"},
+    {"name": "Breakout 6", "kind": "room"},
+    {"name": "Breakout 7", "kind": "room"},
+    {"name": "Green Rooms", "kind": "room"},
+    {"name": "Catering Prep", "kind": "service"},
+    {"name": "Palace Games", "kind": "room"},
+    {"name": "Staff Offices", "kind": "service"},
+    {"name": "Available Back of House", "kind": "service"},
+    {"name": "Theater", "kind": "room"},
+    {"name": "Box Office", "kind": "entrance"},
+    {"name": "Public Entrance", "kind": "entrance"},
+    {"name": "Business Entrance", "kind": "entrance"},
+    {"name": "Loading Doors", "kind": "entrance"},
+    {"name": "Mezzanine", "kind": "upper level"}
+  ]
+}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BandIt security</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three@0.180.0/build/three.module.js",
+    "three/addons/": "/vendor/three@0.180.0/examples/jsm/",
+    "@sparkjsdev/spark": "/vendor/@sparkjsdev/spark@2.4.0/dist/spark.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">BandIt <span>security</span></div>
+  <div id="venue" class="venue"></div>
+  <div id="status" class="status"></div>
+  <div id="clock" class="clock">--:--:--</div>
+</header>
+<div id="alarm" class="alarm" hidden>
+  <span class="alarm-mark"></span>
+  <span id="alarm-text"></span>
+  <button id="ack" type="button">Acknowledge <kbd>A</kbd></button>
+</div>
+<main id="main" class="both">
+  <section id="world" class="pane">
+    <div class="pane-head">
+      <span class="title">Venue</span>
+      <span id="world-note" class="note"></span>
+      <div class="tools">
+        <button id="overview" type="button" title="O">Overview</button>
+        <button id="camview" type="button" title="C" hidden>Camera's view</button>
+        <button id="plan-toggle" type="button" title="P">Plan</button>
+      </div>
+    </div>
+    <div id="world-view" class="view">
+      <div class="legend">
+        <span><i class="lg station"></i>station</span>
+        <span><i class="lg band"></i>band</span>
+        <span><i class="lg sos"></i>SOS</span>
+        <span><i class="lg camera"></i>camera</span>
+      </div>
+    </div>
+  </section>
+  <section id="live" class="pane">
+    <div class="pane-head">
+      <span id="cam-title" class="title">Camera</span>
+      <span class="live-dot">LIVE</span>
+      <div class="tools">
+        <button id="lit-toggle" type="button" title="L" hidden>Lit view</button>
+      </div>
+    </div>
+    <div class="view video">
+      <img id="feed" alt="Live camera feed">
+      <img id="lit" alt="The same view with the lights on" hidden>
+      <div id="feed-note" class="feed-note" hidden>waiting for the camera</div>
+    </div>
+    <div id="incidents" class="incidents"></div>
+  </section>
+</main>
+<footer>
+  <span><kbd>1</kbd> venue</span><span><kbd>2</kbd> camera</span><span><kbd>3</kbd> both</span>
+  <span><kbd>A</kbd> acknowledge</span><span><kbd>O</kbd> overview</span><span><kbd>C</kbd> camera's view</span>
+  <span>drag to turn, right-drag to move, scroll to zoom</span>
+</footer>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
