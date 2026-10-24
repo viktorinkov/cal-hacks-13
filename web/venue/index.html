@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Palace of Fine Arts</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #c8effd; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from 'three';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#c8effd');
+      scene.add(new THREE.HemisphereLight('#ffffff', '#a7abb2', 1.6));
+      const sun = new THREE.DirectionalLight('#fff8ee', 2.6);
+      sun.position.set(-40, 90, 60);
+      scene.add(sun);
+
+      const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.5, 2000);
+      const controls = new OrbitControls(camera, renderer.domElement);
+
+      const gltf = await new GLTFLoader().loadAsync('./venue.glb');
+      scene.add(gltf.scene);
+
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3()).length();
+      camera.position.copy(center).add(new THREE.Vector3(0, 0.6, 0.75).multiplyScalar(size));
+      controls.target.copy(center);
+      controls.update();
+      window.venueReady = true;
+
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+      renderer.setAnimationLoop(() => {
+        controls.update();
+        renderer.render(scene, camera);
+      });
+    </script>
+  </body>
+</html>
