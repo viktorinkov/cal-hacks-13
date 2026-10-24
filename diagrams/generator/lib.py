@@ -1,6 +1,11 @@
-"""Tiny Excalidraw scene builder: boxes with bound labels, bound arrows, zones and frames."""
+"""Tiny Excalidraw scene builder: boxes with bound labels, bound arrows, zones, frames and logos."""
+import base64
+import hashlib
 import json
+import pathlib
 import random
+import re
+import struct
 import textwrap
 
 random.seed(13)
@@ -44,6 +49,20 @@ def measure(label, w, fs=20, shape="rectangle"):
     lines = wrap(label, w * (0.62 if shape == "diamond" else 1), fs)
     _, th = text_size(lines, fs)
     return max(64, th * 2 + 50 if shape == "diamond" else th + 34)
+
+
+def aspect(path):
+    """Width over height of an SVG (viewBox) or PNG (header) file."""
+    data = pathlib.Path(path).read_bytes()
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        w, h = struct.unpack(">II", data[16:24])
+        return w / h
+    vb = re.search(rb'viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)', data)
+    return float(vb.group(1)) / float(vb.group(2))
+
+
+GLYPH = 0.5  # rendered glyph width as a share of the font size, for centring an icon column and its text
+ICON = 30  # icon logo height beside a text line (lines are 35 px)
 
 
 def text_size(lines, fs):
@@ -107,6 +126,7 @@ class Scene:
         self.frame_children = []
         self.n = 0
         self.back_ids = []
+        self.files = {}
 
     def uid(self, p):
         self.n += 1
@@ -143,6 +163,20 @@ class Scene:
         el.update(kw)
         self.elements.append(el)
         return el
+
+    def add_file(self, path):
+        data = pathlib.Path(path).read_bytes()
+        fid = hashlib.sha1(data).hexdigest()[:20]
+        mime = "image/png" if str(path).endswith(".png") else "image/svg+xml"
+        self.files.setdefault(fid, {"mimeType": mime, "id": fid, "created": 1792828800000,
+                                    "dataURL": f"data:{mime};base64," + base64.b64encode(data).decode()})
+        return fid
+
+    def image(self, x, y, path, h):
+        """A logo at absolute x, y, h pixels tall, width from its aspect ratio."""
+        w = h * aspect(path)
+        return self.base("image", x, y, w, h, fileId=self.add_file(path), status="saved", scale=[1, 1], crop=None,
+                         strokeColor="transparent")
 
     # frames ---------------------------------------------------------------
     def begin_frame(self, name, x, y, w, h):
@@ -185,11 +219,17 @@ class Scene:
                          originalText=body, fontSize=fs, fontFamily=FONT, textAlign=align,
                          verticalAlign="top", containerId=None, autoResize=True, lineHeight=LINE)
 
-    def zone(self, x, y, w, h, label, kind="plain", fs=22, dashed=False):
+    def zone(self, x, y, w, h, label, kind="plain", fs=22, dashed=False, logo=None):
         fill, stroke = ZONES[kind]
         rect = self.base("rectangle", self.ox + x, self.oy + y, w, h, backgroundColor=fill, strokeColor=stroke,
                          strokeWidth=1, strokeStyle="dashed" if dashed else "solid", roundness={"type": 3}, roughness=0)
-        label_el = self.text(x + 18, y + 12, label, fs=fs, color=stroke, width=w - 20)
+        lx = x + 18
+        if logo:
+            lh = fs * LINE
+            img = self.image(self.ox + lx, self.oy + y + 12, logo, lh)
+            self.back_ids.append(img["id"])
+            lx += img["width"] + 10
+        label_el = self.text(lx, y + 12, label, fs=fs, color=stroke, width=w - 20 - (lx - x - 18))
         self.back_ids += [rect["id"], label_el["id"]]
         return Box(rect)
 
@@ -209,9 +249,13 @@ class Scene:
         self.text(x + 22, y + 24 + th + 14, "\n".join(b_lines), fs=fs, cap=w - 30)
         return Box(rect)
 
-    def box(self, x, y, w, label, kind="stdb", h=None, fs=20, shape="rectangle", dashed=None, cy=None):
-        """x, y local; cy (local centre y) overrides y once the height is known."""
-        fill, stroke = KINDS[kind]
+    def box(self, x, y, w, label, kind="stdb", h=None, fs=20, shape="rectangle", dashed=None, cy=None,
+            icons=None, wordmark=None, mark_h=44, fill=None):
+        """x, y local; cy (local centre y) overrides y once the height is known.
+        icons: {line index: logo or (logo, height)} drawn left of that text line. wordmark: a logo that says the name, drawn above
+        the text, which then sits at the bottom of the box."""
+        fill_k, stroke = KINDS[kind]
+        fill = fill or fill_k
         if dashed is None:
             dashed = kind == "tbd"
         inner_w = w * (0.62 if shape == "diamond" else 1)
@@ -232,9 +276,28 @@ class Scene:
                          boundElements=[{"type": "text", "id": tid}])
         body = "\n".join(lines)
         tw = min(tw, w - 8)
-        self.base("text", self.ox + x + (w - tw) / 2, self.oy + y + (h - th) / 2, tw, th, id=tid,
+        tx, align = x + (w - tw) / 2, "center"
+        ty = y + (h - th) / 2
+        if wordmark:  # centre the logo and the text below it as one group
+            ty = y + (h - mark_h - 8 - th) / 2 + mark_h + 8
+        marks = {}
+        for i, logo in (icons or {}).items():
+            path, ih = logo if isinstance(logo, tuple) else (logo, ICON)
+            marks[i] = (path, ih, ih * aspect(path))
+        if marks:  # a column of icons left of left-aligned text, centred in the box as one group
+            col = max(m[2] for m in marks.values())
+            gx = x + (w - col - 12 - max(len(l) for l in lines) * fs * GLYPH) / 2
+            tx, align = gx + col + 12, "left"
+            tw = x + w - 6 - tx
+            for i, (path, ih, iw) in marks.items():
+                self.image(self.ox + gx + (col - iw) / 2, self.oy + ty + i * fs * LINE + (fs * LINE - ih) / 2, path, ih)
+        self.base("text", self.ox + tx, self.oy + ty, tw, th, id=tid,
                   strokeColor="#1e1e1e", text=body, originalText=body, fontSize=fs, fontFamily=FONT,
-                  textAlign="center", verticalAlign="middle", containerId=rid, autoResize=True, lineHeight=LINE)
+                  textAlign=align, verticalAlign="bottom" if wordmark else "middle", containerId=rid,
+                  autoResize=True, lineHeight=LINE)
+        if wordmark:
+            mw = mark_h * aspect(wordmark)
+            self.image(self.ox + x + (w - mw) / 2, self.oy + ty - 8 - mark_h, wordmark, mark_h)
         return Box(rect)
 
     def arrow(self, a, b, pts, label=None, dashed=False, both=False, color="#343a40", fs=16, head="arrow"):
@@ -302,7 +365,7 @@ class Scene:
             "source": "https://excalidraw.com",
             "elements": self.elements,
             "appState": {"viewBackgroundColor": "#ffffff", "gridSize": None},
-            "files": {},
+            "files": self.files,
         }
 
     def dump(self, path):
