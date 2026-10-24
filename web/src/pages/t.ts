@@ -288,7 +288,11 @@ async function main() {
   const mb = conn.db.myBand.iter().next().value;
   if (!mb || (mb.bandId === bandId && mb.status !== 'claimed')) await tryClaim();
   if (conn.db.myAttendee.iter().next().value?.displayName) step = 'done';
-  setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);
+  // The live view ages the band card every second; the recap only changes with its rows.
+  setInterval(() => {
+    const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+    if (!ended && !(document.activeElement instanceof HTMLInputElement)) render();
+  }, 1000);
 }
 
 main().catch(e => mount('app', h('p', { class: 'error' }, String(e?.message ?? e))));

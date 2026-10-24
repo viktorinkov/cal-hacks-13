@@ -10,7 +10,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use bandit_bindings::{ApiSessionsTableAccess, BandTableAccess, register_blob};
+use bandit_bindings::{ApiSessionsTableAccess, BandTableAccess, EventStateTableAccess, register_blob};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use spacetimedb_sdk::{Identity, Table};
@@ -269,10 +269,13 @@ async fn move_band(State(app): AppState, Path((band, station)): Path<(u8, u8)>) 
 }
 
 /// Demo only: reports every pressed demo band every 2 s, as a worn band would, so it stays online,
-/// keeps its zone visit open and mixes with the simulated crowd.
+/// keeps its zone visit open and mixes with the simulated crowd. The bands go quiet once the event ends.
 pub async fn heartbeat(app: Arc<App>) {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        if app.conn.db.event_state().iter().any(|e| e.ended) {
+            continue;
+        }
         let Ok(token) = sim_token(&app) else { continue };
         let bands: Vec<(u8, u8)> = app.web.demo_bands.lock().unwrap().iter().map(|(b, s)| (*b, *s)).collect();
         for (band, station) in bands {

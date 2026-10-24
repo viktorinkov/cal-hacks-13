@@ -17,6 +17,7 @@ pub mod approve_claim_reducer;
 pub mod assign_medic_reducer;
 pub mod attach_claim_letters_reducer;
 pub mod attach_recovery_letter_reducer;
+pub mod attendee_out_type;
 pub mod attendee_table;
 pub mod attendee_type;
 pub mod authority_limit_row_type;
@@ -31,6 +32,7 @@ pub mod band_type;
 pub mod blob_ref_table;
 pub mod blob_ref_type;
 pub mod board_approvals_table;
+pub mod board_attendees_table;
 pub mod board_authority_table;
 pub mod board_checks_table;
 pub mod board_facts_table;
@@ -94,10 +96,13 @@ pub mod crowd_timer_type;
 pub mod decline_payment_reducer;
 pub mod encounter_table;
 pub mod encounter_type;
+pub mod end_event_reducer;
 pub mod event_bundle_type;
 pub mod event_graph_table;
 pub mod event_kind_type;
 pub mod event_link_type;
+pub mod event_state_table;
+pub mod event_state_type;
 pub mod event_table;
 pub mod event_type;
 pub mod evidence_fact_table;
@@ -222,6 +227,7 @@ pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
 pub mod register_photo_reducer;
 pub mod remove_social_handle_reducer;
+pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
 pub mod report_sim_band_reducer;
 pub mod request_payment_reducer;
@@ -319,6 +325,7 @@ pub use approve_claim_reducer::approve_claim;
 pub use assign_medic_reducer::assign_medic;
 pub use attach_claim_letters_reducer::attach_claim_letters;
 pub use attach_recovery_letter_reducer::attach_recovery_letter;
+pub use attendee_out_type::AttendeeOut;
 pub use attendee_table::*;
 pub use attendee_type::Attendee;
 pub use authority_limit_row_type::AuthorityLimitRow;
@@ -333,6 +340,7 @@ pub use band_type::Band;
 pub use blob_ref_table::*;
 pub use blob_ref_type::BlobRef;
 pub use board_approvals_table::*;
+pub use board_attendees_table::*;
 pub use board_authority_table::*;
 pub use board_checks_table::*;
 pub use board_facts_table::*;
@@ -396,10 +404,13 @@ pub use crowd_timer_type::CrowdTimer;
 pub use decline_payment_reducer::decline_payment;
 pub use encounter_table::*;
 pub use encounter_type::Encounter;
+pub use end_event_reducer::end_event;
 pub use event_bundle_type::EventBundle;
 pub use event_graph_table::*;
 pub use event_kind_type::EventKind;
 pub use event_link_type::EventLink;
+pub use event_state_table::*;
+pub use event_state_type::EventState;
 pub use event_table::*;
 pub use event_type::Event;
 pub use evidence_fact_table::*;
@@ -524,6 +535,7 @@ pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
 pub use register_photo_reducer::register_photo;
 pub use remove_social_handle_reducer::remove_social_handle;
+pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
 pub use report_sim_band_reducer::report_sim_band;
 pub use request_payment_reducer::request_payment;
@@ -690,6 +702,7 @@ pub enum Reducer {
     DeclinePayment {
         payment_id: u64,
     },
+    EndEvent,
     ExtendJobLease {
         job_id: u64,
     },
@@ -797,6 +810,7 @@ pub enum Reducer {
     RemoveSocialHandle {
         platform: String,
     },
+    ReopenEvent,
     ReportPropertyEvent {
         incident_id: u64,
         camera_id: u64,
@@ -1001,6 +1015,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::CreateSummaryLink { .. } => "create_summary_link",
             Reducer::CrowdTick { .. } => "crowd_tick",
             Reducer::DeclinePayment { .. } => "decline_payment",
+            Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
             Reducer::FailJob { .. } => "fail_job",
             Reducer::ForceState { .. } => "force_state",
@@ -1026,6 +1041,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterBridge => "register_bridge",
             Reducer::RegisterPhoto { .. } => "register_photo",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
+            Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportSimBand { .. } => "report_sim_band",
             Reducer::RequestPayment { .. } => "request_payment",
@@ -1195,6 +1211,7 @@ impl __sdk::Reducer for Reducer {
                     payment_id: payment_id.clone(),
                 })
             }
+            Reducer::EndEvent => __sats::bsatn::to_vec(&end_event_reducer::EndEventArgs {}),
             Reducer::ExtendJobLease { job_id } => {
                 __sats::bsatn::to_vec(&extend_job_lease_reducer::ExtendJobLeaseArgs {
                     job_id: job_id.clone(),
@@ -1382,6 +1399,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&remove_social_handle_reducer::RemoveSocialHandleArgs {
                     platform: platform.clone(),
                 })
+            }
+            Reducer::ReopenEvent => {
+                __sats::bsatn::to_vec(&reopen_event_reducer::ReopenEventArgs {})
             }
             Reducer::ReportPropertyEvent {
                 incident_id,
@@ -1714,6 +1734,7 @@ pub struct DbUpdate {
     band_owner: __sdk::TableUpdate<BandOwner>,
     blob_ref: __sdk::TableUpdate<BlobRef>,
     board_approvals: __sdk::TableUpdate<Approval>,
+    board_attendees: __sdk::TableUpdate<AttendeeOut>,
     board_authority: __sdk::TableUpdate<AuthorityLimitRow>,
     board_checks: __sdk::TableUpdate<ClaimCheck>,
     board_facts: __sdk::TableUpdate<EvidenceFact>,
@@ -1748,6 +1769,7 @@ pub struct DbUpdate {
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
     event_graph: __sdk::TableUpdate<EventLink>,
+    event_state: __sdk::TableUpdate<EventState>,
     evidence_fact: __sdk::TableUpdate<EvidenceFact>,
     evidence_pack: __sdk::TableUpdate<EvidencePack>,
     gateway: __sdk::TableUpdate<Gateway>,
@@ -1858,6 +1880,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_approvals" => db_update
                     .board_approvals
                     .append(board_approvals_table::parse_table_update(table_update)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(board_attendees_table::parse_table_update(table_update)?),
                 "board_authority" => db_update
                     .board_authority
                     .append(board_authority_table::parse_table_update(table_update)?),
@@ -1960,6 +1985,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "event_graph" => db_update
                     .event_graph
                     .append(event_graph_table::parse_table_update(table_update)?),
+                "event_state" => db_update
+                    .event_state
+                    .append(event_state_table::parse_table_update(table_update)?),
                 "evidence_fact" => db_update
                     .evidence_fact
                     .append(evidence_fact_table::parse_table_update(table_update)?),
@@ -2271,6 +2299,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.event = cache
             .apply_diff_to_table::<Event>("event", &self.event)
             .with_updates_by_pk(|row| &row.id);
+        diff.event_state = cache
+            .apply_diff_to_table::<EventState>("event_state", &self.event_state)
+            .with_updates_by_pk(|row| &row.id);
         diff.evidence_fact = cache
             .apply_diff_to_table::<EvidenceFact>("evidence_fact", &self.evidence_fact)
             .with_updates_by_pk(|row| &row.id);
@@ -2419,6 +2450,8 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<ApiSession>("api_sessions", &self.api_sessions);
         diff.board_approvals =
             cache.apply_diff_to_table::<Approval>("board_approvals", &self.board_approvals);
+        diff.board_attendees =
+            cache.apply_diff_to_table::<AttendeeOut>("board_attendees", &self.board_attendees);
         diff.board_authority = cache
             .apply_diff_to_table::<AuthorityLimitRow>("board_authority", &self.board_authority)
             .with_updates_by_pk(|row| &row.role);
@@ -2537,6 +2570,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_approvals" => db_update
                     .board_approvals
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_authority" => db_update
                     .board_authority
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2638,6 +2674,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "event_graph" => db_update
                     .event_graph
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "event_state" => db_update
+                    .event_state
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "evidence_fact" => db_update
                     .evidence_fact
@@ -2898,6 +2937,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_approvals" => db_update
                     .board_approvals
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_authority" => db_update
                     .board_authority
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -2999,6 +3041,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "event_graph" => db_update
                     .event_graph
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "event_state" => db_update
+                    .event_state
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "evidence_fact" => db_update
                     .evidence_fact
@@ -3241,6 +3286,7 @@ pub struct AppliedDiff<'r> {
     band_owner: __sdk::TableAppliedDiff<'r, BandOwner>,
     blob_ref: __sdk::TableAppliedDiff<'r, BlobRef>,
     board_approvals: __sdk::TableAppliedDiff<'r, Approval>,
+    board_attendees: __sdk::TableAppliedDiff<'r, AttendeeOut>,
     board_authority: __sdk::TableAppliedDiff<'r, AuthorityLimitRow>,
     board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
     board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
@@ -3275,6 +3321,7 @@ pub struct AppliedDiff<'r> {
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
     event_graph: __sdk::TableAppliedDiff<'r, EventLink>,
+    event_state: __sdk::TableAppliedDiff<'r, EventState>,
     evidence_fact: __sdk::TableAppliedDiff<'r, EvidenceFact>,
     evidence_pack: __sdk::TableAppliedDiff<'r, EvidencePack>,
     gateway: __sdk::TableAppliedDiff<'r, Gateway>,
@@ -3380,6 +3427,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Approval>(
             "board_approvals",
             &self.board_approvals,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<AttendeeOut>(
+            "board_attendees",
+            &self.board_attendees,
             event,
         );
         callbacks.invoke_table_row_callbacks::<AuthorityLimitRow>(
@@ -3496,6 +3548,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
         callbacks.invoke_table_row_callbacks::<EventLink>("event_graph", &self.event_graph, event);
+        callbacks.invoke_table_row_callbacks::<EventState>("event_state", &self.event_state, event);
         callbacks.invoke_table_row_callbacks::<EvidenceFact>(
             "evidence_fact",
             &self.evidence_fact,
@@ -4390,6 +4443,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         band_owner_table::register_table(client_cache);
         blob_ref_table::register_table(client_cache);
         board_approvals_table::register_table(client_cache);
+        board_attendees_table::register_table(client_cache);
         board_authority_table::register_table(client_cache);
         board_checks_table::register_table(client_cache);
         board_facts_table::register_table(client_cache);
@@ -4424,6 +4478,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
         event_graph_table::register_table(client_cache);
+        event_state_table::register_table(client_cache);
         evidence_fact_table::register_table(client_cache);
         evidence_pack_table::register_table(client_cache);
         gateway_table::register_table(client_cache);
@@ -4508,6 +4563,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "band_owner",
         "blob_ref",
         "board_approvals",
+        "board_attendees",
         "board_authority",
         "board_checks",
         "board_facts",
@@ -4537,6 +4593,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "encounter",
         "event",
         "event_graph",
+        "event_state",
         "evidence_fact",
         "evidence_pack",
         "gateway",

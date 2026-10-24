@@ -28,7 +28,7 @@ use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
-const QUERIES: [&str; 13] = [
+const QUERIES: [&str; 14] = [
     "SELECT * FROM zone",
     "SELECT * FROM booth",
     "SELECT * FROM summary_links",
@@ -42,6 +42,7 @@ const QUERIES: [&str; 13] = [
     "SELECT * FROM my_roles",
     "SELECT * FROM api_sessions",
     "SELECT * FROM band",
+    "SELECT * FROM event_state",
 ];
 
 pub struct App {
