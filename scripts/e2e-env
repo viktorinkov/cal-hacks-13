@@ -19,6 +19,8 @@ esac
 export BANDIT_DATA_DIR=".dev/e2e-$E2E_TARGET"
 export BANDIT_API_ADDR="${BANDIT_API_ADDR:-127.0.0.1:8097}"
 DATA="$ROOT/$BANDIT_DATA_DIR"
+# One build folder for the module and the services, without debug info, to save disk.
+export CARGO_TARGET_DIR="$ROOT/target" CARGO_PROFILE_DEV_DEBUG=0
 mkdir -p "$DATA/spacetime"
 # The owner's CLI: a private config for the local server, Viktor's own login for Maincloud.
 if [ "$E2E_TARGET" = local ]; then

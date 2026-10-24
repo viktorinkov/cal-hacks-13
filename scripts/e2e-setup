@@ -6,7 +6,7 @@ set -e
 cd "$ROOT"
 (cd spacetimedb/server && cargo build -q --release --target wasm32-unknown-unknown)
 cargo build -q -p bandit-claims -p bandit-api -p bandit-indexer -p bandit-workers
-WASM=spacetimedb/server/target/wasm32-unknown-unknown/release/band1t.wasm
+WASM=target/wasm32-unknown-unknown/release/band1t.wasm
 DB="$SPACETIMEDB_DATABASE"
 
 if [ "$E2E_TARGET" = local ]; then
@@ -52,5 +52,7 @@ for spec in bandit-api:api:bandit-api bandit-indexer:indexer:bandit-indexer phot
   echo "$name $(echo "$id" | cut -c1-12)  $role"
 done
 
+call start_safety_watch
+call start_job_reaper
 call start_crowd 30
 echo "e2e ready on $E2E_TARGET: run scripts/e2e-services, then open http://$BANDIT_API_ADDR/organizer"

@@ -1,9 +1,11 @@
 //! bandit-api: the HTTP edge. It holds the Elastic key, so browsers never talk to Elastic, and it reads
 //! summary links and social rows from SpacetimeDB by subscription (it needs the `api` role).
-//! It serves the recap behind an attendee's special link, with suggestions ranked by Elastic.
+//! It serves the recap behind an attendee's special link, with suggestions ranked by Elastic,
+//! and the plain web pages (see `web`).
 
 mod search;
 mod summary;
+mod web;
 
 use anyhow::{Context, Result};
 use axum::extract::{Path, State};
@@ -11,21 +13,22 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use bandit_bindings::{
-    BoothTableAccess, DbConnection, MyRolesTableAccess, SocialAttendeesTableAccess,
+    BoothTableAccess, DbConnection, MyRolesTableAccess,
+    SocialAttendeesTableAccess,
     SocialEncountersTableAccess, SocialHandlesTableAccess, SocialPhotoTagsTableAccess,
     SocialPhotosTableAccess, SocialSharedVisitsTableAccess, SocialVisitsTableAccess,
     SummaryLinksTableAccess, ZoneTableAccess, connect,
 };
-use bandit_common::Config;
+use bandit_common::{BlobStore, Config, TokenStore};
 use search::Elastic;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use spacetimedb_sdk::{DbContext, Table};
+use spacetimedb_sdk::{DbContext, Identity, Table};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
-const QUERIES: [&str; 11] = [
+const QUERIES: [&str; 13] = [
     "SELECT * FROM zone",
     "SELECT * FROM booth",
     "SELECT * FROM summary_links",
@@ -37,14 +40,19 @@ const QUERIES: [&str; 11] = [
     "SELECT * FROM social_photos",
     "SELECT * FROM social_photo_tags",
     "SELECT * FROM my_roles",
+    "SELECT * FROM api_sessions",
+    "SELECT * FROM band",
 ];
 
-struct App {
+pub struct App {
     conn: DbConnection,
     es: Elastic,
+    web: web::Web,
+    blobs: BlobStore,
+    tokens: TokenStore,
 }
 
-type AppState = State<Arc<App>>;
+pub type AppState = State<Arc<App>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -83,11 +91,27 @@ async fn main() -> Result<()> {
         .subscribe(QUERIES);
     initial_sync.await?;
 
+    let root = config
+        .env_file
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let web = web::Web {
+        root,
+        spacetimedb_url: config.spacetimedb_url.clone(),
+        database: database.clone(),
+        kibana_url: config.kibana_url.clone().unwrap_or_default(),
+        demo: std::env::var("BANDIT_DEMO").is_ok_and(|v| v == "1"),
+        http: reqwest::Client::new(),
+    };
+    let pages = web::routes(&web);
     let app = Router::new()
         .route("/health", get(health))
         .route("/summary/{token}", get(summary_page))
+        .merge(pages)
         .layer(CorsLayer::permissive())
-        .with_state(Arc::new(App { conn, es }));
+        .with_state(Arc::new(App { conn, es, web, blobs: config.blob_store(), tokens }));
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     eprintln!("bandit-api listening on {addr}, ranking with {prefix}-*");
     axum::serve(listener, app).await?;
@@ -106,19 +130,26 @@ async fn health(State(app): AppState) -> Json<Value> {
 }
 
 /// The special link: the token in the URL is the secret, so the route needs no session.
-/// When Elastic cannot rank, the suggestions keep their minutes order and say so.
 async fn summary_page(
     State(app): AppState,
     Path(token): Path<String>,
 ) -> Result<Json<summary::Summary>, (StatusCode, Json<Value>)> {
     let not_found = || (StatusCode::NOT_FOUND, Json(json!({ "error": "not found" })));
     let hash = token_hash(&token);
-    let db = &app.conn.db;
-    let link = db
+    let link = app
+        .conn
+        .db
         .summary_links()
         .iter()
         .find(|l| l.token_hash == hash)
         .ok_or_else(not_found)?;
+    ranked_summary(&app, link.attendee).await.map(Json).ok_or_else(not_found)
+}
+
+/// The summary of `who` from the subscription cache, with the suggestions in Elastic's order.
+/// When Elastic cannot rank, the suggestions keep their minutes order and say so.
+pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary> {
+    let db = &app.conn.db;
     let rows = summary::Rows {
         zones: db.zone().iter().collect(),
         booths: db.booth().iter().collect(),
@@ -130,16 +161,16 @@ async fn summary_page(
         photos: db.social_photos().iter().collect(),
         photo_tags: db.social_photo_tags().iter().collect(),
     };
-    let mut recap = summary::summary(&rows, link.attendee).ok_or_else(not_found)?;
+    let mut recap = summary::summary(&rows, who)?;
     let people: Vec<u64> = recap.suggested_people.iter().map(|p| p.node_id).collect();
     let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
-    let fallback = summary::visited_text(&rows, link.attendee);
-    let attendee_id = link.attendee.to_hex().to_string();
+    let fallback = summary::visited_text(&rows, who);
+    let attendee_id = who.to_hex().to_string();
     match app.es.rank(&attendee_id, &fallback, &people, &booths).await {
         Ok(ranking) => summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths),
         Err(e) => eprintln!("suggestions left unranked: {e:#}"),
     }
-    Ok(Json(recap))
+    Some(recap)
 }
 
 #[cfg(test)]
