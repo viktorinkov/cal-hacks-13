@@ -35,6 +35,9 @@ const DEMO_ACTORS: &[(&str, &str)] = &[
     ("lee", "Lee Park (attendee, band 93)"),
 ];
 
+/// Demo bands a tester claims from the tap link. 90 to 93 belong to the claims demo's attendees.
+pub const DEMO_BANDS: std::ops::RangeInclusive<u8> = 94..=99;
+
 pub struct Web {
     pub root: PathBuf,
     pub spacetimedb_url: String,
@@ -44,6 +47,8 @@ pub struct Web {
     pub auth_client_id: String,
     pub demo: bool,
     pub http: reqwest::Client,
+    /// The station each pressed demo band reports from, kept alive by `heartbeat`.
+    pub demo_bands: std::sync::Mutex<std::collections::BTreeMap<u8, u8>>,
 }
 
 pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
@@ -64,6 +69,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route("/api/recap", get(recap))
         .route("/api/actors", get(actors))
         .route("/api/dev/press/{band}", post(press))
+        .route("/api/dev/move/{band}/{station}", post(move_band))
 }
 
 fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>) {
@@ -227,17 +233,12 @@ async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Val
     if !app.web.demo {
         return Err(error(StatusCode::NOT_FOUND, "demo press is off"));
     }
-    if !(90..=99).contains(&band) {
-        return Err(error(StatusCode::BAD_REQUEST, "only the simulated bands 90 to 99 can be pressed from here; press a real band's button"));
+    if !DEMO_BANDS.contains(&band) {
+        return Err(error(StatusCode::BAD_REQUEST, "only the demo bands 94 to 99 can be pressed from here; press a real band's button"));
     }
-    let token = app
-        .tokens
-        .load("sim")
-        .ok()
-        .flatten()
-        .context("no simulator identity; run scripts/e2e-setup")
-        .map_err(|e| error(StatusCode::CONFLICT, format!("{e:#}")))?;
+    let token = sim_token(&app)?;
     let station = app.conn.db.band().iter().find(|b| b.id == band && b.zone != 0).map(|b| b.zone).unwrap_or(104);
+    app.web.demo_bands.lock().unwrap().insert(band, station);
     for pressed in [false, true, false] {
         sim_report(&app.web, &token, band, station, pressed)
             .await
@@ -245,4 +246,39 @@ async fn press(State(app): AppState, Path(band): Path<u8>) -> ApiResult<Json<Val
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     }
     Ok(Json(json!({ "pressed": band })))
+}
+
+fn sim_token(app: &App) -> ApiResult<String> {
+    app.tokens
+        .load("sim")
+        .ok()
+        .flatten()
+        .context("no simulator identity; run scripts/e2e-setup")
+        .map_err(|e| error(StatusCode::CONFLICT, format!("{e:#}")))
+}
+
+/// Demo only: walks a demo band to another zone's station.
+async fn move_band(State(app): AppState, Path((band, station)): Path<(u8, u8)>) -> ApiResult<Json<Value>> {
+    if !app.web.demo || !DEMO_BANDS.contains(&band) {
+        return Err(error(StatusCode::NOT_FOUND, "only demo bands move from here"));
+    }
+    let token = sim_token(&app)?;
+    app.web.demo_bands.lock().unwrap().insert(band, station);
+    sim_report(&app.web, &token, band, station, false).await.map_err(|e| error(StatusCode::BAD_GATEWAY, format!("{e:#}")))?;
+    Ok(Json(json!({ "band": band, "station": station })))
+}
+
+/// Demo only: reports every pressed demo band every 2 s, as a worn band would, so it stays online,
+/// keeps its zone visit open and mixes with the simulated crowd.
+pub async fn heartbeat(app: Arc<App>) {
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        let Ok(token) = sim_token(&app) else { continue };
+        let bands: Vec<(u8, u8)> = app.web.demo_bands.lock().unwrap().iter().map(|(b, s)| (*b, *s)).collect();
+        for (band, station) in bands {
+            if let Err(e) = sim_report(&app.web, &token, band, station, false).await {
+                eprintln!("demo band {band} heartbeat: {e:#}");
+            }
+        }
+    }
 }

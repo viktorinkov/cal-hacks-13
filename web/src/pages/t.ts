@@ -87,7 +87,7 @@ function claimScreen(waiting: boolean, expiresAt?: Date) {
     h('h2', {}, `Band ${bandId} is blinking white`),
     h('p', { class: 'big' }, 'Press the button on your band to make it yours.'),
     h('p', { class: 'muted' }, `${left} s left. ${heard ? 'Your band is being heard.' : 'Your band is not heard right now: walk toward the gateway.'}`),
-    demo && bandId >= 90 && h('button', { class: 'demo', onclick: () => act(async () => {
+    demo && bandId >= 94 && h('button', { class: 'demo', onclick: () => act(async () => {
       const res = await fetch(`/api/dev/press/${bandId}`, { method: 'POST' });
       if (!res.ok) throw new Error((await res.json()).error);
     }) }, 'Demo: press the band for me'),
@@ -181,7 +181,13 @@ function bandCard() {
     h('h3', {}, `Band ${bandId}`, h('span', { class: `chip ${stale ? 'grey' : colour}` }, stale ? 'not heard' : say)),
     h('p', {}, zone ? `Near ${zone.name}` : 'No zone yet', band.bat !== 255 ? ` · battery ${band.bat}%` : ''),
     band.state === 3 && claim && h('p', {}, `Claim: ${claim.status.tag}`),
-    settings && h('p', { class: 'muted' }, `Band density limits: busy at ${settings.yellow}, very busy at ${settings.red} people close by.`));
+    settings && h('p', { class: 'muted' }, `Band density limits: busy at ${settings.yellow}, very busy at ${settings.red} people close by.`),
+    demo && bandId >= 94 && h('p', { class: 'demo' }, 'Demo: walk your band to ',
+      [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId).map(z =>
+        h('button', { class: 'demo', disabled: z.stationId === band.zone || undefined, onclick: () => act(async () => {
+          const res = await fetch(`/api/dev/move/${bandId}/${z.stationId}`, { method: 'POST' });
+          if (!res.ok) throw new Error((await res.json()).error);
+        }) }, z.name))));
 }
 
 function venue() {

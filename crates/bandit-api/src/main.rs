@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use bandit_bindings::{
-    BoothTableAccess, DbConnection, MyRolesTableAccess,
+    BandTableAccess, BoothTableAccess, DbConnection, MyRolesTableAccess,
     SocialAttendeesTableAccess,
     SocialEncountersTableAccess, SocialHandlesTableAccess, SocialPhotoTagsTableAccess,
     SocialPhotosTableAccess, SocialSharedVisitsTableAccess, SocialVisitsTableAccess,
@@ -105,14 +105,23 @@ async fn main() -> Result<()> {
         auth_client_id: std::env::var("SPACETIMEAUTH_CLIENT_ID").unwrap_or_default(),
         demo: std::env::var("BANDIT_DEMO").is_ok_and(|v| v == "1"),
         http: reqwest::Client::new(),
+        demo_bands: Default::default(),
     };
     let pages = web::routes(&web);
+    let demo = web.demo;
+    let state = Arc::new(App { conn, es, web, blobs: config.blob_store(), tokens });
+    if demo {
+        // Demo bands a tester pressed before a restart keep reporting.
+        let known: Vec<(u8, u8)> = state.conn.db.band().iter().filter(|b| web::DEMO_BANDS.contains(&b.id)).map(|b| (b.id, b.zone)).collect();
+        state.web.demo_bands.lock().unwrap().extend(known);
+        tokio::spawn(web::heartbeat(state.clone()));
+    }
     let app = Router::new()
         .route("/health", get(health))
         .route("/summary/{token}", get(summary_page))
         .merge(pages)
         .layer(CorsLayer::permissive())
-        .with_state(Arc::new(App { conn, es, web, blobs: config.blob_store(), tokens }));
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     eprintln!("bandit-api listening on {addr}, ranking with {prefix}-*");
     axum::serve(listener, app).await?;
