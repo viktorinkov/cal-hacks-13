@@ -67,3 +67,31 @@ pub fn revoke_role(ctx: &ReducerContext, identity: Identity, role: String) -> Re
 pub fn my_roles(ctx: &ViewContext) -> Vec<StaffRole> {
     ctx.db.staff_role().identity().filter(ctx.sender()).collect()
 }
+
+/// The owner makes another identity an owner too, for example their own browser sign-in, so the
+/// host portal can grant roles from the attendee list.
+#[spacetimedb::reducer]
+pub fn add_owner(ctx: &ReducerContext, identity: Identity) -> Result<(), String> {
+    if !is_owner(ctx) {
+        return Err("only the module owner can add an owner".into());
+    }
+    if ctx.db.owner().identity().find(identity).is_none() {
+        ctx.db.owner().insert(Owner { identity });
+    }
+    Ok(())
+}
+
+/// The caller's own owner row, empty for everyone else, so a page knows to show the owner's controls.
+#[spacetimedb::view(accessor = my_owner, public)]
+pub fn my_owner(ctx: &ViewContext) -> Vec<Owner> {
+    ctx.db.owner().identity().find(ctx.sender()).into_iter().collect()
+}
+
+/// Every staff role, for the owner's grant and revoke controls; empty for everyone else.
+#[spacetimedb::view(accessor = owner_staff_roles, public)]
+pub fn owner_staff_roles(ctx: &ViewContext) -> Vec<StaffRole> {
+    if ctx.db.owner().identity().find(ctx.sender()).is_none() {
+        return Vec::new();
+    }
+    ctx.db.staff_role().identity().filter(Identity::ZERO..).collect()
+}

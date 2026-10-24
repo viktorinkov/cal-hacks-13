@@ -35,6 +35,7 @@ import {
 
 // Import all reducer arg schemas
 import AddIncidentNoteReducer from "./add_incident_note_reducer";
+import AddOwnerReducer from "./add_owner_reducer";
 import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
@@ -164,6 +165,7 @@ import MyMedicalCardRow from "./my_medical_card_table";
 import MyMedicalDocumentsRow from "./my_medical_documents_table";
 import MyMerchOrdersRow from "./my_merch_orders_table";
 import MyMerchSuggestionsRow from "./my_merch_suggestions_table";
+import MyOwnerRow from "./my_owner_table";
 import MyPhotosRow from "./my_photos_table";
 import MyRolesRow from "./my_roles_table";
 import MySharedVisitsRow from "./my_shared_visits_table";
@@ -172,6 +174,7 @@ import MyWalletRow from "./my_wallet_table";
 import MyWalletEntriesRow from "./my_wallet_entries_table";
 import OpenIncidentsRow from "./open_incidents_table";
 import OrganizationRow from "./organization_table";
+import OwnerStaffRolesRow from "./owner_staff_roles_table";
 import PersonRow from "./person_table";
 import ScheduleSlotRow from "./schedule_slot_table";
 import SettingsRow from "./settings_table";
@@ -742,6 +745,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyMerchSuggestionsRow),
+  myOwner: __table({
+    name: 'my_owner',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyOwnerRow),
   myPhotos: __table({
     name: 'my_photos',
     indexes: [
@@ -791,6 +801,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, OpenIncidentsRow),
+  ownerStaffRoles: __table({
+    name: 'owner_staff_roles',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, OwnerStaffRolesRow),
   socialAttendees: __table({
     name: 'social_attendees',
     indexes: [
@@ -852,6 +869,7 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_incident_note", AddIncidentNoteReducer),
+  __reducerSchema("add_owner", AddOwnerReducer),
   __reducerSchema("apply_medical_extract", ApplyMedicalExtractReducer),
   __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
@@ -1020,6 +1038,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_merch_orders": Omit<typeof tablesSchema.schemaType.tables["myMerchOrders"], "accessorName"> & { readonly accessorName: "my_merch_orders" };
     /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
     readonly "my_merch_suggestions": Omit<typeof tablesSchema.schemaType.tables["myMerchSuggestions"], "accessorName"> & { readonly accessorName: "my_merch_suggestions" };
+    /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
+    readonly "my_owner": Omit<typeof tablesSchema.schemaType.tables["myOwner"], "accessorName"> & { readonly accessorName: "my_owner" };
     /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
     readonly "my_photos": Omit<typeof tablesSchema.schemaType.tables["myPhotos"], "accessorName"> & { readonly accessorName: "my_photos" };
     /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -1034,6 +1054,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_wallet_entries": Omit<typeof tablesSchema.schemaType.tables["myWalletEntries"], "accessorName"> & { readonly accessorName: "my_wallet_entries" };
     /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
     readonly "open_incidents": Omit<typeof tablesSchema.schemaType.tables["openIncidents"], "accessorName"> & { readonly accessorName: "open_incidents" };
+    /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
+    readonly "owner_staff_roles": Omit<typeof tablesSchema.schemaType.tables["ownerStaffRoles"], "accessorName"> & { readonly accessorName: "owner_staff_roles" };
     /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
     readonly "social_attendees": Omit<typeof tablesSchema.schemaType.tables["socialAttendees"], "accessorName"> & { readonly accessorName: "social_attendees" };
     /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */
@@ -1110,6 +1132,7 @@ const tableAccessorAliases = {
   "my_medical_documents": "myMedicalDocuments",
   "my_merch_orders": "myMerchOrders",
   "my_merch_suggestions": "myMerchSuggestions",
+  "my_owner": "myOwner",
   "my_photos": "myPhotos",
   "my_roles": "myRoles",
   "my_shared_visits": "mySharedVisits",
@@ -1117,6 +1140,7 @@ const tableAccessorAliases = {
   "my_wallet": "myWallet",
   "my_wallet_entries": "myWalletEntries",
   "open_incidents": "openIncidents",
+  "owner_staff_roles": "ownerStaffRoles",
   "social_attendees": "socialAttendees",
   "social_encounters": "socialEncounters",
   "social_handles": "socialHandles",
@@ -1227,6 +1251,8 @@ export type DbView = __DbViewBase & {
   readonly "my_merch_orders": __DbViewBase["myMerchOrders"];
   /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
   readonly "my_merch_suggestions": __DbViewBase["myMerchSuggestions"];
+  /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
+  readonly "my_owner": __DbViewBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __DbViewBase["myPhotos"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -1241,6 +1267,8 @@ export type DbView = __DbViewBase & {
   readonly "my_wallet_entries": __DbViewBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __DbViewBase["openIncidents"];
+  /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
+  readonly "owner_staff_roles": __DbViewBase["ownerStaffRoles"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
   readonly "social_attendees": __DbViewBase["socialAttendees"];
   /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */
@@ -1343,6 +1371,8 @@ export type Tables = __TablesBase & {
   readonly "my_merch_orders": __TablesBase["myMerchOrders"];
   /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
   readonly "my_merch_suggestions": __TablesBase["myMerchSuggestions"];
+  /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
+  readonly "my_owner": __TablesBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __TablesBase["myPhotos"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
@@ -1357,6 +1387,8 @@ export type Tables = __TablesBase & {
   readonly "my_wallet_entries": __TablesBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __TablesBase["openIncidents"];
+  /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
+  readonly "owner_staff_roles": __TablesBase["ownerStaffRoles"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
   readonly "social_attendees": __TablesBase["socialAttendees"];
   /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */

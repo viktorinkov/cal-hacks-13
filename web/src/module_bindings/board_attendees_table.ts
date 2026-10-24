@@ -16,6 +16,7 @@ import {
 
 export default __t.row({
   nodeId: __t.u64().name("node_id"),
+  identity: __t.identity(),
   displayName: __t.string().name("display_name"),
   bandId: __t.u8().name("band_id"),
   findable: __t.bool(),

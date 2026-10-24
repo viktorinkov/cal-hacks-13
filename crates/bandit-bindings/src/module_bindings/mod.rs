@@ -7,6 +7,7 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 pub mod add_incident_note_reducer;
+pub mod add_owner_reducer;
 pub mod api_session_table;
 pub mod api_session_type;
 pub mod api_sessions_table;
@@ -191,6 +192,7 @@ pub mod my_medical_card_table;
 pub mod my_medical_documents_table;
 pub mod my_merch_orders_table;
 pub mod my_merch_suggestions_table;
+pub mod my_owner_table;
 pub mod my_photo_type;
 pub mod my_photos_table;
 pub mod my_roles_table;
@@ -208,6 +210,7 @@ pub mod open_incidents_table;
 pub mod organization_in_type;
 pub mod organization_table;
 pub mod organization_type;
+pub mod owner_staff_roles_table;
 pub mod owner_table;
 pub mod owner_type;
 pub mod people_link_table;
@@ -322,6 +325,7 @@ pub mod zone_visit_table;
 pub mod zone_visit_type;
 
 pub use add_incident_note_reducer::add_incident_note;
+pub use add_owner_reducer::add_owner;
 pub use api_session_table::*;
 pub use api_session_type::ApiSession;
 pub use api_sessions_table::*;
@@ -506,6 +510,7 @@ pub use my_medical_card_table::*;
 pub use my_medical_documents_table::*;
 pub use my_merch_orders_table::*;
 pub use my_merch_suggestions_table::*;
+pub use my_owner_table::*;
 pub use my_photo_type::MyPhoto;
 pub use my_photos_table::*;
 pub use my_roles_table::*;
@@ -523,6 +528,7 @@ pub use open_incidents_table::*;
 pub use organization_in_type::OrganizationIn;
 pub use organization_table::*;
 pub use organization_type::Organization;
+pub use owner_staff_roles_table::*;
 pub use owner_table::*;
 pub use owner_type::Owner;
 pub use people_link_table::*;
@@ -648,6 +654,9 @@ pub enum Reducer {
         incident_id: u64,
         text: String,
         cost_cents: Option<u64>,
+    },
+    AddOwner {
+        identity: __sdk::Identity,
     },
     ApplyMedicalExtract {
         job_id: u64,
@@ -1014,6 +1023,7 @@ impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
             Reducer::AddIncidentNote { .. } => "add_incident_note",
+            Reducer::AddOwner { .. } => "add_owner",
             Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
             Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveClaim { .. } => "approve_claim",
@@ -1114,6 +1124,11 @@ impl __sdk::Reducer for Reducer {
                 text: text.clone(),
                 cost_cents: cost_cents.clone(),
             }),
+            Reducer::AddOwner { identity } => {
+                __sats::bsatn::to_vec(&add_owner_reducer::AddOwnerArgs {
+                    identity: identity.clone(),
+                })
+            }
             Reducer::ApplyMedicalExtract {
                 job_id,
                 card_json,
@@ -1836,6 +1851,7 @@ pub struct DbUpdate {
     my_medical_documents: __sdk::TableUpdate<MedicalDocument>,
     my_merch_orders: __sdk::TableUpdate<MerchOrder>,
     my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
+    my_owner: __sdk::TableUpdate<Owner>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
     my_roles: __sdk::TableUpdate<StaffRole>,
     my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
@@ -1845,6 +1861,7 @@ pub struct DbUpdate {
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
     owner: __sdk::TableUpdate<Owner>,
+    owner_staff_roles: __sdk::TableUpdate<StaffRole>,
     people_link: __sdk::TableUpdate<PeopleLink>,
     person: __sdk::TableUpdate<Person>,
     person_claim: __sdk::TableUpdate<PersonClaim>,
@@ -2132,6 +2149,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_merch_suggestions" => db_update.my_merch_suggestions.append(
                     my_merch_suggestions_table::parse_table_update(table_update)?,
                 ),
+                "my_owner" => db_update
+                    .my_owner
+                    .append(my_owner_table::parse_table_update(table_update)?),
                 "my_photos" => db_update
                     .my_photos
                     .append(my_photos_table::parse_table_update(table_update)?),
@@ -2159,6 +2179,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "owner" => db_update
                     .owner
                     .append(owner_table::parse_table_update(table_update)?),
+                "owner_staff_roles" => db_update
+                    .owner_staff_roles
+                    .append(owner_staff_roles_table::parse_table_update(table_update)?),
                 "people_link" => db_update
                     .people_link
                     .append(people_link_table::parse_table_update(table_update)?),
@@ -2566,6 +2589,7 @@ impl __sdk::DbUpdate for DbUpdate {
             "my_merch_suggestions",
             &self.my_merch_suggestions,
         );
+        diff.my_owner = cache.apply_diff_to_table::<Owner>("my_owner", &self.my_owner);
         diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
         diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
         diff.my_shared_visits =
@@ -2576,6 +2600,8 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<WalletEntry>("my_wallet_entries", &self.my_wallet_entries);
         diff.open_incidents =
             cache.apply_diff_to_table::<Incident>("open_incidents", &self.open_incidents);
+        diff.owner_staff_roles =
+            cache.apply_diff_to_table::<StaffRole>("owner_staff_roles", &self.owner_staff_roles);
         diff.social_attendees =
             cache.apply_diff_to_table::<Attendee>("social_attendees", &self.social_attendees);
         diff.social_encounters = cache
@@ -2847,6 +2873,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_merch_suggestions" => db_update
                     .my_merch_suggestions
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_owner" => db_update
+                    .my_owner
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2873,6 +2902,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "owner" => db_update
                     .owner
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "owner_staff_roles" => db_update
+                    .owner_staff_roles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
@@ -3226,6 +3258,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_merch_suggestions" => db_update
                     .my_merch_suggestions
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_owner" => db_update
+                    .my_owner
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3252,6 +3287,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "owner" => db_update
                     .owner
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "owner_staff_roles" => db_update
+                    .owner_staff_roles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "people_link" => db_update
                     .people_link
@@ -3441,6 +3479,7 @@ pub struct AppliedDiff<'r> {
     my_medical_documents: __sdk::TableAppliedDiff<'r, MedicalDocument>,
     my_merch_orders: __sdk::TableAppliedDiff<'r, MerchOrder>,
     my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
+    my_owner: __sdk::TableAppliedDiff<'r, Owner>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
     my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
@@ -3450,6 +3489,7 @@ pub struct AppliedDiff<'r> {
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
     owner: __sdk::TableAppliedDiff<'r, Owner>,
+    owner_staff_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     people_link: __sdk::TableAppliedDiff<'r, PeopleLink>,
     person: __sdk::TableAppliedDiff<'r, Person>,
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
@@ -3768,6 +3808,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.my_merch_suggestions,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<Owner>("my_owner", &self.my_owner, event);
         callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
         callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
         callbacks.invoke_table_row_callbacks::<MySharedVisit>(
@@ -3793,6 +3834,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Owner>("owner", &self.owner, event);
+        callbacks.invoke_table_row_callbacks::<StaffRole>(
+            "owner_staff_roles",
+            &self.owner_staff_roles,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<PeopleLink>("people_link", &self.people_link, event);
         callbacks.invoke_table_row_callbacks::<Person>("person", &self.person, event);
         callbacks.invoke_table_row_callbacks::<PersonClaim>(
@@ -4626,6 +4672,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_medical_documents_table::register_table(client_cache);
         my_merch_orders_table::register_table(client_cache);
         my_merch_suggestions_table::register_table(client_cache);
+        my_owner_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
         my_roles_table::register_table(client_cache);
         my_shared_visits_table::register_table(client_cache);
@@ -4635,6 +4682,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
         owner_table::register_table(client_cache);
+        owner_staff_roles_table::register_table(client_cache);
         people_link_table::register_table(client_cache);
         person_table::register_table(client_cache);
         person_claim_table::register_table(client_cache);
@@ -4744,6 +4792,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_medical_documents",
         "my_merch_orders",
         "my_merch_suggestions",
+        "my_owner",
         "my_photos",
         "my_roles",
         "my_shared_visits",
@@ -4753,6 +4802,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "open_incidents",
         "organization",
         "owner",
+        "owner_staff_roles",
         "people_link",
         "person",
         "person_claim",

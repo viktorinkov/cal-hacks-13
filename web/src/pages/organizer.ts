@@ -1,17 +1,20 @@
 // The host portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the import runs, Kibana, and "Event ended".
-// The caller's staff roles decide the tabs: ops gets the whole portal, a medic or an approver only
-// the Claims tab. The module checks every role again, so this is convenience, not security.
+// The caller's staff roles decide the tabs: ops and the module owner get the whole portal, a medic or
+// an approver only the Claims tab. The module checks every role again, so this is convenience, not
+// security. The owner also grants and revokes roles from the attendee list.
 
 import {
   act, actors, config, connect, date, field, h, idToken, money, mount, playedToken, risk, short, signIn,
   signOut, signedInEmail, time, type Actor, type Config, EXIT_COLOURS,
 } from '../lib';
 import type { DbConnection } from '../module_bindings';
-import type { Claim } from '../module_bindings/types';
+import type { AttendeeOut, Claim } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
+  'SELECT * FROM my_owner',
+  'SELECT * FROM owner_staff_roles',
   'SELECT * FROM event_state',
   'SELECT * FROM venue',
   'SELECT * FROM zone',
@@ -54,6 +57,8 @@ let people: Actor[] = [];
 let tab = location.hash.slice(1);
 let openClaim: bigint | undefined;
 
+/** The staff roles the owner grants from the attendee list. */
+const STAFF_ROLES = ['ops', 'medic', 'floor_manager', 'risk_manager', 'adjuster'];
 /** The roles the claims routing names as approvers, in the authority matrix's order. */
 const APPROVERS = ['floor_manager', 'risk_manager', 'adjuster'];
 /** The simulated bands: 90 to 93 belong to the claims story's attendees, 94 to 99 to testers. */
@@ -63,7 +68,13 @@ function roles(): Set<string> {
   return new Set([...conn.db.myRoles.iter()].map(r => r.role));
 }
 
+/** The module owner passes every role check, as in the module. */
+function isOwner(): boolean {
+  return conn.db.myOwner.count() > 0;
+}
+
 function can(...wanted: string[]): boolean {
+  if (isOwner()) return true;
   const mine = roles();
   return wanted.some(r => mine.has(r));
 }
@@ -99,7 +110,7 @@ function bandStatus(bandId: number): string {
 }
 
 function header() {
-  const roleList = [...conn.db.myRoles.iter()].map(r => `${r.role} (${r.label})`);
+  const roleList = [...(isOwner() ? ['owner'] : []), ...[...conn.db.myRoles.iter()].map(r => `${r.role} (${r.label})`)];
   const as = new URLSearchParams(location.search).get('as') ?? '';
   const state = conn.db.eventState.id.find(0);
   const ended = state?.ended ?? false;
@@ -181,20 +192,31 @@ function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName));
   const real = all.filter(a => !a.simulated).length;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const owner = isOwner();
+  const staff = [...conn.db.ownerStaffRoles.iter()];
+  const grant = (a: AttendeeOut) => {
+    const role = field(document.getElementById('app')!, `grant-${a.nodeId}`);
+    return act(() => conn.reducers.grantRole({ identity: a.identity, role, label: a.displayName }));
+  };
   const takeBack = (bandId: number, name: string) =>
     confirm(`Take band ${bandId} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
       && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `Attendees (${real} people, ${all.length - real} simulated)`),
     h('table', {},
-      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined'), owner && h('th', {}, 'Staff role')),
       all.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.simulated && h('span', { class: 'muted' }, ' simulated')),
         h('td', {}, a.bandId ? h('a', { href: `/t/BANDIT-${String(a.bandId).padStart(2, '0')}` }, a.bandId) : ''),
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
           a.bandId > 0 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
-        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
+        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt)),
+        owner && h('td', {},
+          staff.filter(r => r.identity.isEqual(a.identity)).map(r => h('div', {}, r.role, ' ',
+            h('button', { class: 'link', onclick: () => act(() => conn.reducers.revokeRole({ identity: a.identity, role: r.role })) }, 'revoke'))),
+          !a.simulated && [h('select', { name: `grant-${a.nodeId}` }, STAFF_ROLES.map(r => h('option', { value: r }, r))),
+            h('button', { onclick: () => grant(a) }, 'Grant')])))));
 }
 
 // --- Claims ---------------------------------------------------------------------------------

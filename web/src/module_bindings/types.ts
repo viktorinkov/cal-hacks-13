@@ -50,6 +50,7 @@ export type Attendee = __Infer<typeof Attendee>;
 
 export const AttendeeOut = __t.object("AttendeeOut", {
   nodeId: __t.u64(),
+  identity: __t.identity(),
   displayName: __t.string(),
   bandId: __t.u8(),
   findable: __t.bool(),
