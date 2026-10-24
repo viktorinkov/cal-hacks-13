@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// medic's filing to the named approver's decision, the merch templates and orders, the import runs,
-// Kibana, and "Event ended".
+// medic's filing to the named approver's decision, the merch templates and orders, the Kibana
+// dashboards, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -26,7 +26,6 @@ const QUERIES = [
   'SELECT * FROM station',
   'SELECT * FROM gateway',
   'SELECT * FROM settings',
-  'SELECT * FROM import_run',
   'SELECT * FROM open_incidents',
   'SELECT * FROM board_notes',
   'SELECT * FROM board_attendees',
@@ -82,7 +81,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['merch', 'Merch'], ['data', 'Imports and Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['merch', 'Merch'], ['kibana', 'Kibana']];
   return cfg.simulate ? [...all, ['bands', 'Bands']] : all;
 }
 
@@ -480,22 +479,10 @@ function merchTab() {
   ];
 }
 
-// --- Imports and Kibana ---------------------------------------------------------------------
+// --- Kibana ---------------------------------------------------------------------------------
 
-function data() {
-  const runs = [...conn.db.importRun.iter()].sort((a, b) => Number(b.id - a.id));
-  return [
-    h('section', {},
-      h('h3', {}, 'Kibana'),
-      h('ul', {}, cfg.dashboards.map(d => h('li', {}, h('a', { href: d.url, target: '_blank' }, d.title)))),
-      h('p', { class: 'muted' }, 'Live data syncs to Elastic on its own: bandit-indexer copies the booths and attendees within a second of each change, and bandit-workers copy each claim in when they check it.')),
-    h('section', {},
-      h('h3', {}, 'Bright Data scrapes'),
-      h('p', { class: 'muted' }, 'The scrape is the one step that does not sync: bandit-ingest runs it from the command line before the event. Bright Data fetches the event pages, Elastic organizes them, and one import_event loads them here. Nothing on this page starts one.'),
-      h('p', {}, `${conn.db.organization.count()} organizations, ${conn.db.booth.count()} booths, ${conn.db.zone.count()} zones loaded.`),
-      h('table', {}, runs.map(r => h('tr', {}, h('td', {}, r.runId), h('td', {}, date(r.importedAt)), h('td', {}, r.organizer),
-        h('td', {}, r.counts.map(c => `${c.section} +${c.inserted} ~${c.updated}`).join(', ')))))),
-  ];
+function kibana() {
+  return [h('section', {}, h('ul', {}, cfg.dashboards.map(d => h('li', {}, h('a', { href: d.url, target: '_blank' }, d.title)))))];
 }
 
 // The page redraws on every change and every second; holding off while a button is pressed keeps a
@@ -510,7 +497,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'merch' ? merchTab() : tab === 'data' ? data() : tab === 'bands' ? bandsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'merch' ? merchTab() : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
   mount('app', header(), body);
 }
 

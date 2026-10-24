@@ -20,7 +20,7 @@ Pages, on http://127.0.0.1:8097:
 | Page | Who | What |
 |---|---|---|
 | `/t/BANDIT-0n` | attendee | the band's tap link: sign in, claim by press, name, socials, medical history and insurance PDFs, "is this you?", the Capital One wallet, then a thank-you; after "Event ended", the recap |
-| `/organizer` | host and staff | live zones and alerts, low visibility, attendees, incidents, medical cards and claims, learned rules, import runs, Kibana, the Bands tab, "Event ended" |
+| `/organizer` | host and staff | live zones and alerts, low visibility, attendees, incidents, medical cards and claims, learned rules, Kibana links, the Bands tab, "Event ended" |
 | `/photo` | photographer | add a photo taken in a zone; the people whose bands were there are tagged |
 
 ## Happy path to test
