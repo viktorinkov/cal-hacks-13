@@ -832,7 +832,7 @@ pub fn approve_claim(
             requires_corroborated: true,
             ceiling_cents: learned_ceiling(requested_ceiling_cents, claim.payout_cents, None),
             approver: ctx.sender(),
-            approver_name,
+            approver_name: approver_name.clone(),
             approver_role: claim.routed_to_role.clone(),
             approval_id: approval.id,
             version,
@@ -840,7 +840,7 @@ pub fn approve_claim(
             created_at: ctx.timestamp,
         });
     }
-    let claim = save(ctx, Claim { decided_by: "approver".into(), ..claim });
+    let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
     settle(ctx, claim, "approved")
 }
 

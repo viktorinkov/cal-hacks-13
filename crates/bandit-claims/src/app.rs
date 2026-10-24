@@ -22,9 +22,6 @@ pub const STAFF: &[(&str, &str, &str)] = &[
     ("vision", "vision", "bandit-vision"),
     ("ops", "ops", "Ops desk"),
     ("medic", "medic", "Ari Ramos"),
-    ("sam", "floor_manager", "Sam Okafor"),
-    ("dana", "risk_manager", "Dana Ruiz"),
-    ("priya", "adjuster", "Priya Nair, Northwind Mutual"),
 ];
 
 /// Attendees: token name, display name, band.
@@ -35,16 +32,6 @@ pub const ATTENDEES: &[(&str, &str, u8)] =
 pub const MAIN_STAGE: &str = "Main stage";
 pub const SPONSOR_ROW: &str = "Sponsor row";
 pub const HACKING_FLOOR: &str = "Hacking floor";
-
-/// Who acts for each rung of the authority matrix.
-pub fn approver_for_role(role: &str) -> Option<&'static str> {
-    match role {
-        "floor_manager" => Some("sam"),
-        "risk_manager" => Some("dana"),
-        "adjuster" => Some("priya"),
-        _ => None,
-    }
-}
 
 /// Tables the owner connection mirrors (private ones included).
 const TABLES: &[&str] = &[
@@ -74,7 +61,6 @@ const TABLES: &[&str] = &[
     "approval",
     "settlement_rule",
     "ledger_entry",
-    "authority_limit",
     "insurance_policy",
     "coverage_rule",
     "insurance_settings",

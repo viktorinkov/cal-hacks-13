@@ -17,14 +17,14 @@
       "recoverable_cents": 190000,
       "venue_cost_cents": 50000
     },
-    "decision_text": "approved by Dana Ruiz (risk_manager)",
+    "decision_text": "approved by Ops desk (ops)",
     "fact_lines": [
       "[1] incident_kind = property",
       "[2] opened_by = ops",
       "[3] zone_id = 102",
-      "[4] note = floor_manager: line-array speaker knocked off its stand during load-out, cabinet cracked, repair quote from the audio vendor",
+      "[4] note = ops: line-array speaker knocked off its stand during load-out, cabinet cracked, repair quote from the audio vendor",
       "[5] cost_cents = 240000",
-      "[6] note = floor_manager: the Stagecraft Rentals crew was striking the stage when it happened",
+      "[6] note = ops: the Stagecraft Rentals crew was striking the stage when it happened",
       "[7] zone_name = Stage B",
       "[8] zone_kind = stage",
       "[9] zone_area_m2 = 900.0",

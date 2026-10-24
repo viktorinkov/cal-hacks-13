@@ -37,7 +37,7 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     let c = show::wait_for(app, jordan, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, jordan)?;
     if c.status == ClaimStatus::Routed {
-        println!("\nDana's screen is a minute old:");
+        println!("\nThe organizer's screen is a minute old:");
         decide::approve(app, jordan, None, None, true, true, false)?;
         println!();
         decide::approve(app, jordan, None, None, true, false, true)?;

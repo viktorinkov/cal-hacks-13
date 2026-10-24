@@ -1,6 +1,6 @@
 //! Two independent sources must agree on time and zone before a claim can
 //! settle without a person. The rule is deliberately dumb (zone equality and
-//! time windows) so a judge or an adjuster can re-run it by hand.
+//! time windows) so a judge or the organizer can re-run it by hand.
 
 use crate::config::Config;
 use crate::evidence::{EvidenceInput, IncidentInfo, VisionInfo};

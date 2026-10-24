@@ -236,8 +236,8 @@ fn plant(app: &App, sim: &Sim, kind: Kind, source: Option<&Planted>, turns: &mut
 }
 
 /// A station whose zone can take another injury without three falling within
-/// five minutes of each other (the module sends such an occurrence to the
-/// adjuster), waiting while none can.
+/// five minutes of each other (the module turns auto-settle off for such an
+/// occurrence), waiting while none can.
 fn pick_station(app: &App) -> Result<u8> {
     let mut said = false;
     loop {

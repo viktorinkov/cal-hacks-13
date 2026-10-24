@@ -60,7 +60,7 @@ pub struct Witness {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StaffNote {
     pub note_id: u64,
-    /// The author's staff role, for example `medic` or `floor_manager`.
+    /// The author's staff role, for example `medic` or `ops`.
     pub author_role: String,
     pub text: String,
     /// Set on a cost note: the repair or treatment cost the staff member logged.

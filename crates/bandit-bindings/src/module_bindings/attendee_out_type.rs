@@ -10,7 +10,6 @@ use super::handle_out_type::HandleOut;
 #[sats(crate = __lib)]
 pub struct AttendeeOut {
     pub node_id: u64,
-    pub identity: __sdk::Identity,
     pub display_name: String,
     pub band_id: u8,
     pub findable: bool,
@@ -29,7 +28,6 @@ impl __sdk::InModule for AttendeeOut {
 /// Provides typed access to columns for query building.
 pub struct AttendeeOutCols {
     pub node_id: __sdk::__query_builder::Col<AttendeeOut, u64>,
-    pub identity: __sdk::__query_builder::Col<AttendeeOut, __sdk::Identity>,
     pub display_name: __sdk::__query_builder::Col<AttendeeOut, String>,
     pub band_id: __sdk::__query_builder::Col<AttendeeOut, u8>,
     pub findable: __sdk::__query_builder::Col<AttendeeOut, bool>,
@@ -44,7 +42,6 @@ impl __sdk::__query_builder::HasCols for AttendeeOut {
     fn cols(table_name: &'static str) -> Self::Cols {
         AttendeeOutCols {
             node_id: __sdk::__query_builder::Col::new(table_name, "node_id"),
-            identity: __sdk::__query_builder::Col::new(table_name, "identity"),
             display_name: __sdk::__query_builder::Col::new(table_name, "display_name"),
             band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
             findable: __sdk::__query_builder::Col::new(table_name, "findable"),

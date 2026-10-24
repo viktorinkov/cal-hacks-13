@@ -88,7 +88,6 @@ import RespondPhotoTagReducer from "./respond_photo_tag_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
-import SetAuthorityLimitReducer from "./set_authority_limit_reducer";
 import SetExitReducer from "./set_exit_reducer";
 import SetInsuranceSettingsReducer from "./set_insurance_settings_reducer";
 import SetLowVisReducer from "./set_low_vis_reducer";
@@ -122,7 +121,6 @@ import ApiSessionsRow from "./api_sessions_table";
 import BandRow from "./band_table";
 import BoardApprovalsRow from "./board_approvals_table";
 import BoardAttendeesRow from "./board_attendees_table";
-import BoardAuthorityRow from "./board_authority_table";
 import BoardChecksRow from "./board_checks_table";
 import BoardFactsRow from "./board_facts_table";
 import BoardLedgerRow from "./board_ledger_table";
@@ -174,7 +172,6 @@ import MyWalletRow from "./my_wallet_table";
 import MyWalletEntriesRow from "./my_wallet_entries_table";
 import OpenIncidentsRow from "./open_incidents_table";
 import OrganizationRow from "./organization_table";
-import OwnerStaffRolesRow from "./owner_staff_roles_table";
 import PersonRow from "./person_table";
 import ScheduleSlotRow from "./schedule_slot_table";
 import SettingsRow from "./settings_table";
@@ -514,13 +511,6 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardAttendeesRow),
-  boardAuthority: __table({
-    name: 'board_authority',
-    indexes: [
-    ],
-    constraints: [
-    ],
-  }, BoardAuthorityRow),
   boardChecks: __table({
     name: 'board_checks',
     indexes: [
@@ -801,13 +791,6 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, OpenIncidentsRow),
-  ownerStaffRoles: __table({
-    name: 'owner_staff_roles',
-    indexes: [
-    ],
-    constraints: [
-    ],
-  }, OwnerStaffRolesRow),
   socialAttendees: __table({
     name: 'social_attendees',
     indexes: [
@@ -922,7 +905,6 @@ const reducersSchema = __reducers(
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),
-  __reducerSchema("set_authority_limit", SetAuthorityLimitReducer),
   __reducerSchema("set_exit", SetExitReducer),
   __reducerSchema("set_insurance_settings", SetInsuranceSettingsReducer),
   __reducerSchema("set_low_vis", SetLowVisReducer),
@@ -972,8 +954,6 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_approvals": Omit<typeof tablesSchema.schemaType.tables["boardApprovals"], "accessorName"> & { readonly accessorName: "board_approvals" };
     /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
     readonly "board_attendees": Omit<typeof tablesSchema.schemaType.tables["boardAttendees"], "accessorName"> & { readonly accessorName: "board_attendees" };
-    /** @deprecated Use `boardAuthority` instead. This alias will be removed in the next major version. */
-    readonly "board_authority": Omit<typeof tablesSchema.schemaType.tables["boardAuthority"], "accessorName"> & { readonly accessorName: "board_authority" };
     /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
     readonly "board_checks": Omit<typeof tablesSchema.schemaType.tables["boardChecks"], "accessorName"> & { readonly accessorName: "board_checks" };
     /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
@@ -1054,8 +1034,6 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_wallet_entries": Omit<typeof tablesSchema.schemaType.tables["myWalletEntries"], "accessorName"> & { readonly accessorName: "my_wallet_entries" };
     /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
     readonly "open_incidents": Omit<typeof tablesSchema.schemaType.tables["openIncidents"], "accessorName"> & { readonly accessorName: "open_incidents" };
-    /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
-    readonly "owner_staff_roles": Omit<typeof tablesSchema.schemaType.tables["ownerStaffRoles"], "accessorName"> & { readonly accessorName: "owner_staff_roles" };
     /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
     readonly "social_attendees": Omit<typeof tablesSchema.schemaType.tables["socialAttendees"], "accessorName"> & { readonly accessorName: "social_attendees" };
     /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */
@@ -1099,7 +1077,6 @@ const tableAccessorAliases = {
   "api_sessions": "apiSessions",
   "board_approvals": "boardApprovals",
   "board_attendees": "boardAttendees",
-  "board_authority": "boardAuthority",
   "board_checks": "boardChecks",
   "board_facts": "boardFacts",
   "board_ledger": "boardLedger",
@@ -1140,7 +1117,6 @@ const tableAccessorAliases = {
   "my_wallet": "myWallet",
   "my_wallet_entries": "myWalletEntries",
   "open_incidents": "openIncidents",
-  "owner_staff_roles": "ownerStaffRoles",
   "social_attendees": "socialAttendees",
   "social_encounters": "socialEncounters",
   "social_handles": "socialHandles",
@@ -1185,8 +1161,6 @@ export type DbView = __DbViewBase & {
   readonly "board_approvals": __DbViewBase["boardApprovals"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __DbViewBase["boardAttendees"];
-  /** @deprecated Use `boardAuthority` instead. This alias will be removed in the next major version. */
-  readonly "board_authority": __DbViewBase["boardAuthority"];
   /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
   readonly "board_checks": __DbViewBase["boardChecks"];
   /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
@@ -1267,8 +1241,6 @@ export type DbView = __DbViewBase & {
   readonly "my_wallet_entries": __DbViewBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __DbViewBase["openIncidents"];
-  /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
-  readonly "owner_staff_roles": __DbViewBase["ownerStaffRoles"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
   readonly "social_attendees": __DbViewBase["socialAttendees"];
   /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */
@@ -1305,8 +1277,6 @@ export type Tables = __TablesBase & {
   readonly "board_approvals": __TablesBase["boardApprovals"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __TablesBase["boardAttendees"];
-  /** @deprecated Use `boardAuthority` instead. This alias will be removed in the next major version. */
-  readonly "board_authority": __TablesBase["boardAuthority"];
   /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
   readonly "board_checks": __TablesBase["boardChecks"];
   /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
@@ -1387,8 +1357,6 @@ export type Tables = __TablesBase & {
   readonly "my_wallet_entries": __TablesBase["myWalletEntries"];
   /** @deprecated Use `openIncidents` instead. This alias will be removed in the next major version. */
   readonly "open_incidents": __TablesBase["openIncidents"];
-  /** @deprecated Use `ownerStaffRoles` instead. This alias will be removed in the next major version. */
-  readonly "owner_staff_roles": __TablesBase["ownerStaffRoles"];
   /** @deprecated Use `socialAttendees` instead. This alias will be removed in the next major version. */
   readonly "social_attendees": __TablesBase["socialAttendees"];
   /** @deprecated Use `socialEncounters` instead. This alias will be removed in the next major version. */

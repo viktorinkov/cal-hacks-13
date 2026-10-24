@@ -107,7 +107,7 @@ pub struct LetterData {
     /// Local `YYYY-MM-DD HH:MM:SS`.
     pub incident_time: String,
     pub amounts: Amounts,
-    /// `settled automatically under rule v1, approved by Dana Ruiz (risk_manager)`.
+    /// `settled automatically under rule v1, approved by Ops desk (ops)`.
     pub decision_text: String,
     /// `[seq] key = value` lines of the pack.
     pub fact_lines: Vec<String>,
@@ -115,7 +115,7 @@ pub struct LetterData {
     pub counterparty_name: String,
     pub counterparty_contact: String,
     /// Other people hurt in the same occurrence, one line each, for example
-    /// `claim 14: Lee Park, fall, routed to the adjuster`.
+    /// `claim 14: Lee Park, fall, routed to the organizer`.
     #[serde(default)]
     pub related_claims: Vec<String>,
 }
@@ -317,7 +317,7 @@ mod tests {
             zone_name: "Main Stage".to_string(),
             incident_time: "2026-10-24 22:14:05".to_string(),
             amounts: Amounts { cost_cents: 18_000, payout_cents: 18_000, recoverable_cents: 8_000, venue_cost_cents: 10_000 },
-            decision_text: "settled automatically under rule v1, approved by Dana Ruiz (risk_manager)".to_string(),
+            decision_text: "settled automatically under rule v1, approved by Ops desk (ops)".to_string(),
             fact_lines: vec![
                 "[1] incident_kind = fall".to_string(),
                 "[2] fall_flag = 1".to_string(),
