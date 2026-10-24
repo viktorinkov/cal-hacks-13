@@ -88,17 +88,6 @@ pub struct ApiSession {
     pub expires_at: Timestamp,
 }
 
-/// The special link to an attendee's post-event summary. Only the hash of the token in the URL is stored.
-#[spacetimedb::table(accessor = summary_link)]
-#[derive(Clone, Debug, PartialEq)]
-pub struct SummaryLink {
-    #[primary_key]
-    pub token_hash: String,
-    #[index(btree)]
-    pub attendee: Identity,
-    pub created_at: Timestamp,
-}
-
 /// An attendee stayed in one zone long enough to count. Mirrors one band1t `zone_visit` row.
 #[spacetimedb::table(accessor = visit)]
 #[derive(Clone, Debug, PartialEq)]

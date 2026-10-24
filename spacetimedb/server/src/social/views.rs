@@ -206,14 +206,6 @@ pub fn api_sessions(ctx: &ViewContext) -> Vec<ApiSession> {
     ctx.db.api_session().identity().filter(Identity::ZERO..).collect()
 }
 
-#[spacetimedb::view(accessor = summary_links, public)]
-pub fn summary_links(ctx: &ViewContext) -> Vec<SummaryLink> {
-    if !allowed(ctx, &["api"]) {
-        return Vec::new();
-    }
-    ctx.db.summary_link().attendee().filter(Identity::ZERO..).collect()
-}
-
 #[spacetimedb::view(accessor = social_attendees, public)]
 pub fn social_attendees(ctx: &ViewContext) -> Vec<Attendee> {
     if !allowed(ctx, SERVICES) {

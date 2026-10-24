@@ -86,7 +86,6 @@ pub mod command_type;
 pub mod complete_job_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
-pub mod create_summary_link_reducer;
 pub mod crowd_member_table;
 pub mod crowd_member_type;
 pub mod crowd_tick_reducer;
@@ -281,9 +280,6 @@ pub mod submit_claim_checks_reducer;
 pub mod submit_claim_review_reducer;
 pub mod submit_medical_record_reducer;
 pub mod submit_vision_assessment_reducer;
-pub mod summary_link_table;
-pub mod summary_link_type;
-pub mod summary_links_table;
 pub mod sweep_reducer;
 pub mod sweep_timer_table;
 pub mod sweep_timer_type;
@@ -388,7 +384,6 @@ pub use command_type::Command;
 pub use complete_job_reducer::complete_job;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
-pub use create_summary_link_reducer::create_summary_link;
 pub use crowd_member_table::*;
 pub use crowd_member_type::CrowdMember;
 pub use crowd_tick_reducer::crowd_tick;
@@ -583,9 +578,6 @@ pub use submit_claim_checks_reducer::submit_claim_checks;
 pub use submit_claim_review_reducer::submit_claim_review;
 pub use submit_medical_record_reducer::submit_medical_record;
 pub use submit_vision_assessment_reducer::submit_vision_assessment;
-pub use summary_link_table::*;
-pub use summary_link_type::SummaryLink;
-pub use summary_links_table::*;
 pub use sweep_reducer::sweep;
 pub use sweep_timer_table::*;
 pub use sweep_timer_type::SweepTimer;
@@ -676,9 +668,6 @@ pub enum Reducer {
     CompleteJob {
         job_id: u64,
         result: String,
-    },
-    CreateSummaryLink {
-        token_hash: String,
     },
     CrowdTick {
         timer: CrowdTimer,
@@ -987,7 +976,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClientDisconnected => "client_disconnected",
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
-            Reducer::CreateSummaryLink { .. } => "create_summary_link",
             Reducer::CrowdTick { .. } => "crowd_tick",
             Reducer::EndEvent => "end_event",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
@@ -1160,11 +1148,6 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&complete_job_reducer::CompleteJobArgs {
                     job_id: job_id.clone(),
                     result: result.clone(),
-                })
-            }
-            Reducer::CreateSummaryLink { token_hash } => {
-                __sats::bsatn::to_vec(&create_summary_link_reducer::CreateSummaryLinkArgs {
-                    token_hash: token_hash.clone(),
                 })
             }
             Reducer::CrowdTick { timer } => {
@@ -1783,8 +1766,6 @@ pub struct DbUpdate {
     social_visits: __sdk::TableUpdate<Visit>,
     staff_role: __sdk::TableUpdate<StaffRole>,
     station: __sdk::TableUpdate<Station>,
-    summary_link: __sdk::TableUpdate<SummaryLink>,
-    summary_links: __sdk::TableUpdate<SummaryLink>,
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     venue: __sdk::TableUpdate<Venue>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
@@ -2122,12 +2103,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "station" => db_update
                     .station
                     .append(station_table::parse_table_update(table_update)?),
-                "summary_link" => db_update
-                    .summary_link
-                    .append(summary_link_table::parse_table_update(table_update)?),
-                "summary_links" => db_update
-                    .summary_links
-                    .append(summary_links_table::parse_table_update(table_update)?),
                 "sweep_timer" => db_update
                     .sweep_timer
                     .append(sweep_timer_table::parse_table_update(table_update)?),
@@ -2367,9 +2342,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.station = cache
             .apply_diff_to_table::<Station>("station", &self.station)
             .with_updates_by_pk(|row| &row.id);
-        diff.summary_link = cache
-            .apply_diff_to_table::<SummaryLink>("summary_link", &self.summary_link)
-            .with_updates_by_pk(|row| &row.token_hash);
         diff.sweep_timer = cache
             .apply_diff_to_table::<SweepTimer>("sweep_timer", &self.sweep_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
@@ -2475,8 +2447,6 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<SharedVisit>("social_shared_visits", &self.social_shared_visits);
         diff.social_visits =
             cache.apply_diff_to_table::<Visit>("social_visits", &self.social_visits);
-        diff.summary_links =
-            cache.apply_diff_to_table::<SummaryLink>("summary_links", &self.summary_links);
         diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
@@ -2805,12 +2775,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "station" => db_update
                     .station
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "summary_link" => db_update
-                    .summary_link
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "summary_links" => db_update
-                    .summary_links
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "sweep_timer" => db_update
                     .sweep_timer
@@ -3170,12 +3134,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "station" => db_update
                     .station
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "summary_link" => db_update
-                    .summary_link
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "summary_links" => db_update
-                    .summary_links
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "sweep_timer" => db_update
                     .sweep_timer
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3322,8 +3280,6 @@ pub struct AppliedDiff<'r> {
     social_visits: __sdk::TableAppliedDiff<'r, Visit>,
     staff_role: __sdk::TableAppliedDiff<'r, StaffRole>,
     station: __sdk::TableAppliedDiff<'r, Station>,
-    summary_link: __sdk::TableAppliedDiff<'r, SummaryLink>,
-    summary_links: __sdk::TableAppliedDiff<'r, SummaryLink>,
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
@@ -3684,16 +3640,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Visit>("social_visits", &self.social_visits, event);
         callbacks.invoke_table_row_callbacks::<StaffRole>("staff_role", &self.staff_role, event);
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
-        callbacks.invoke_table_row_callbacks::<SummaryLink>(
-            "summary_link",
-            &self.summary_link,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<SummaryLink>(
-            "summary_links",
-            &self.summary_links,
-            event,
-        );
         callbacks.invoke_table_row_callbacks::<SweepTimer>("sweep_timer", &self.sweep_timer, event);
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
@@ -4477,8 +4423,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         social_visits_table::register_table(client_cache);
         staff_role_table::register_table(client_cache);
         station_table::register_table(client_cache);
-        summary_link_table::register_table(client_cache);
-        summary_links_table::register_table(client_cache);
         sweep_timer_table::register_table(client_cache);
         venue_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
@@ -4590,8 +4534,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "social_visits",
         "staff_role",
         "station",
-        "summary_link",
-        "summary_links",
         "sweep_timer",
         "venue",
         "vision_assessment",

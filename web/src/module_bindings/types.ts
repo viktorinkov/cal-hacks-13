@@ -1217,13 +1217,6 @@ export const Station = __t.object("Station", {
 });
 export type Station = __Infer<typeof Station>;
 
-export const SummaryLink = __t.object("SummaryLink", {
-  tokenHash: __t.string(),
-  attendee: __t.identity(),
-  createdAt: __t.timestamp(),
-});
-export type SummaryLink = __Infer<typeof SummaryLink>;
-
 export const SweepTimer = __t.object("SweepTimer", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),

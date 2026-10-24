@@ -47,7 +47,6 @@ import ClaimPersonReducer from "./claim_person_reducer";
 import ClearReducer from "./clear_reducer";
 import CommandSentReducer from "./command_sent_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
-import CreateSummaryLinkReducer from "./create_summary_link_reducer";
 import EndEventReducer from "./end_event_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
@@ -174,7 +173,6 @@ import SocialPhotosRow from "./social_photos_table";
 import SocialSharedVisitsRow from "./social_shared_visits_table";
 import SocialVisitsRow from "./social_visits_table";
 import StationRow from "./station_table";
-import SummaryLinksRow from "./summary_links_table";
 import VenueRow from "./venue_table";
 import WorkerJobsRow from "./worker_jobs_table";
 import ZoneRow from "./zone_table";
@@ -804,13 +802,6 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, SocialVisitsRow),
-  summaryLinks: __table({
-    name: 'summary_links',
-    indexes: [
-    ],
-    constraints: [
-    ],
-  }, SummaryLinksRow),
   workerJobs: __table({
     name: 'worker_jobs',
     indexes: [
@@ -835,7 +826,6 @@ const reducersSchema = __reducers(
   __reducerSchema("clear", ClearReducer),
   __reducerSchema("command_sent", CommandSentReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
-  __reducerSchema("create_summary_link", CreateSummaryLinkReducer),
   __reducerSchema("end_event", EndEventReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),
@@ -1006,8 +996,6 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "social_shared_visits": Omit<typeof tablesSchema.schemaType.tables["socialSharedVisits"], "accessorName"> & { readonly accessorName: "social_shared_visits" };
     /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
     readonly "social_visits": Omit<typeof tablesSchema.schemaType.tables["socialVisits"], "accessorName"> & { readonly accessorName: "social_visits" };
-    /** @deprecated Use `summaryLinks` instead. This alias will be removed in the next major version. */
-    readonly "summary_links": Omit<typeof tablesSchema.schemaType.tables["summaryLinks"], "accessorName"> & { readonly accessorName: "summary_links" };
     /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
     readonly "worker_jobs": Omit<typeof tablesSchema.schemaType.tables["workerJobs"], "accessorName"> & { readonly accessorName: "worker_jobs" };
   };
@@ -1080,7 +1068,6 @@ const tableAccessorAliases = {
   "social_photos": "socialPhotos",
   "social_shared_visits": "socialSharedVisits",
   "social_visits": "socialVisits",
-  "summary_links": "summaryLinks",
   "worker_jobs": "workerJobs",
 } as const;
 
@@ -1204,8 +1191,6 @@ export type DbView = __DbViewBase & {
   readonly "social_shared_visits": __DbViewBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __DbViewBase["socialVisits"];
-  /** @deprecated Use `summaryLinks` instead. This alias will be removed in the next major version. */
-  readonly "summary_links": __DbViewBase["summaryLinks"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __DbViewBase["workerJobs"];
 };
@@ -1314,8 +1299,6 @@ export type Tables = __TablesBase & {
   readonly "social_shared_visits": __TablesBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __TablesBase["socialVisits"];
-  /** @deprecated Use `summaryLinks` instead. This alias will be removed in the next major version. */
-  readonly "summary_links": __TablesBase["summaryLinks"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __TablesBase["workerJobs"];
 };
