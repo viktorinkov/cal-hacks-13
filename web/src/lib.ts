@@ -4,6 +4,7 @@
 
 import { Identity, Timestamp } from 'spacetimedb';
 import { DbConnection } from './module_bindings';
+import type { MedicCard } from './module_bindings/types';
 
 export type Config = {
   spacetimedb_url: string;
@@ -112,6 +113,15 @@ export async function actors(): Promise<Actor[]> {
   return res.ok ? res.json() : [];
 }
 
+/** The "Test as" switcher: reloads the page as the chosen person (`?as=name`). */
+export function testAs(people: Actor[]): HTMLElement {
+  const as = new URLSearchParams(location.search).get('as') ?? '';
+  return h('label', { class: 'check' }, 'Test as',
+    h('select', { onchange: (e: Event) => { const v = (e.target as HTMLSelectElement).value; location.search = v ? `?as=${v}` : ''; } },
+      h('option', { value: '' }, 'myself'),
+      people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label))));
+}
+
 /** The token of the person this browser plays (`?as=name`), when the switcher is on. */
 export async function playedToken(): Promise<string | undefined> {
   const as = new URLSearchParams(location.search).get('as');
@@ -199,6 +209,20 @@ export async function api<T>(path: string, session: string, init: RequestInit = 
   const body = await res.json();
   if (!res.ok) throw new Error(body.error ?? res.statusText);
   return body;
+}
+
+/** The medical card a medic opened by tapping the band, from the module's `medic_medical_cards`. */
+export function medicalCard(m: MedicCard): HTMLElement {
+  const c = m.card;
+  if (!c) return h('section', { class: 'alert' }, h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`), h('p', {}, 'No medical card on file.'));
+  const list = (label: string, items: string[]) => items.length > 0 && h('p', {}, h('b', {}, `${label}: `), items.join('; '));
+  return h('section', { class: 'alert' },
+    h('h4', {}, `Medical card: ${m.name}, band ${m.bandId}`, c.status !== 'confirmed' ? ' (not yet confirmed by the wearer)' : ''),
+    c.bloodType && h('p', {}, h('b', {}, 'Blood type: '), c.bloodType),
+    list('Allergies', c.allergies), list('Conditions', c.conditions), list('Medications', c.medications),
+    c.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), c.emergencyContact),
+    c.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${c.insurer} ${c.plan}, member ${c.memberId}, group ${c.groupNumber}${c.insurerPhone ? `, ${c.insurerPhone}` : ''}`),
+    c.notes && h('p', {}, c.notes));
 }
 
 // --- Formatting and DOM ---------------------------------------------------------------------

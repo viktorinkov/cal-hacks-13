@@ -1,7 +1,8 @@
 //! Medical-ID: at sign-up the attendee uploads a medical history PDF and their health insurance card.
 //! `medical_extract` has Claude read each into the attendee's `medical_card`, which the attendee
 //! confirms. A medic sees a card only by tapping the band of someone with an open SOS or fall
-//! incident, and every tap is written to `medical_access_log`.
+//! incident, and every tap is written to `medical_access_log`. A medic who reaches someone before
+//! any incident opens one from the tap with `medic_open_incident`.
 
 use crate::jobs::{self, *};
 use crate::roles::*;
@@ -213,17 +214,20 @@ pub fn confirm_medical_card(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+fn open_sos_or_fall(ctx: &ReducerContext, band_id: u8) -> Option<Incident> {
+    ctx.db
+        .incident()
+        .subject_band()
+        .filter(band_id)
+        .find(|i| !i.resolved && matches!(i.kind, IncidentKind::Sos | IncidentKind::Fall))
+}
+
 /// A medic taps a band. The card shows only while that band has an open SOS or fall incident.
 #[spacetimedb::reducer]
 pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), String> {
     require_role(ctx, &["medic"])?;
     let owner = ctx.db.band_owner().band_id().find(band_id).ok_or("nobody wears that band")?;
-    let open = ctx
-        .db
-        .incident()
-        .subject_band()
-        .filter(band_id)
-        .find(|i| !i.resolved && matches!(i.kind, IncidentKind::Sos | IncidentKind::Fall));
+    let open = open_sos_or_fall(ctx, band_id);
     let (granted, reason, incident_id) = match &open {
         Some(i) => (true, format!("open {:?} incident {}", i.kind, i.id).to_lowercase(), i.id),
         None => (false, "no open SOS or fall incident for this band".to_string(), 0),
@@ -239,6 +243,21 @@ pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), Str
         read_at: ctx.timestamp,
     });
     if granted { Ok(()) } else { Err(reason) }
+}
+
+/// The medic reached the wearer before any band flag: opens an SOS for the tapped band, already
+/// taken by this medic, so the next `request_medical_card` passes.
+#[spacetimedb::reducer]
+pub fn medic_open_incident(ctx: &ReducerContext, band_id: u8) -> Result<(), String> {
+    require_role(ctx, &["medic"])?;
+    ctx.db.band_owner().band_id().find(band_id).ok_or("nobody wears that band")?;
+    if open_sos_or_fall(ctx, band_id).is_some() {
+        return Err("this band already has an open SOS or fall incident".into());
+    }
+    let station = ctx.db.band().id().find(band_id).map(|b| b.zone).unwrap_or(0);
+    let incident = open(ctx, IncidentKind::Sos, zone_id_for_station(ctx, station), station, band_id, "medic");
+    ctx.db.incident().id().update(Incident { status: IncidentStatus::Responding, assigned_medic: Some(ctx.sender()), ..incident });
+    Ok(())
 }
 
 #[spacetimedb::view(accessor = my_medical_card, public)]
