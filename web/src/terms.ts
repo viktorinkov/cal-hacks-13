@@ -5,8 +5,9 @@
 
 import { h } from './lib';
 
-/** Earlier entries win where two match at the same place, so longer phrases come first. */
-const TERMS: [RegExp, string][] = [
+/** Earlier entries win where two match at the same place, so longer phrases come first. A selector,
+ * when given, is where the term counts: "Venue" is a column of amounts in a header, a cost center in a row. */
+const TERMS: [RegExp, string, string?][] = [
   // The accounts the claims post to, and the ones the costs tab adds next to them.
   [/\bclaims_expense\b/, 'Expense account: what claims cost the venue once the insurer\'s share is taken off.'],
   [/\bclaims_reserve\b/, 'Liability account: payouts the venue expects to make and has not paid yet.'],
@@ -15,7 +16,7 @@ const TERMS: [RegExp, string][] = [
   [/\baccounts_payable\b/, 'Liability account: vendor bills the venue has approved and not paid yet.'],
   [/\baccrued_liabilities\b/, 'Liability account: work done for the event that no bill covers yet.'],
   [/\bmerch_revenue\b/, 'Revenue account: what merch sales brought in.'],
-  [/^cash$/i, 'Asset account: the venue\'s money, paid out to claimants and received from the insurer.'],
+  [/^cash$|(?<=[DC]r )cash\b/, 'Asset account: the venue\'s money, paid out to claimants and received from the insurer.'],
 
   // The claims' journals.
   [/\bJ1r(?: reserve reversal)?\b/, 'Journal entry that releases a reserve when its claim is refused.'],
@@ -30,10 +31,15 @@ const TERMS: [RegExp, string][] = [
   [/\bgeneral ledger\b|\bGL account\b/i, 'The venue\'s accounts and every amount posted to them.'],
   [/\bchart of accounts\b/i, 'The list of accounts the venue posts to.'],
   [/\bsubledger\b/i, 'A detailed list, such as every vendor bill, whose total ties to one ledger account.'],
-  [/^journals?$/i, 'The journal entries, in the order they were posted.'],
+  [/^journals?\b/i, 'The journal entries, in the order they were posted.'],
   [/\bledger\b/i, 'Every journal entry, kept by account.'],
-  [/^debits?$|\bDr(?= \$)/i, 'The left side of an entry: it raises an asset or expense and lowers a liability.'],
-  [/^credits?$|\bCr(?= \$)/i, 'The right side of an entry: it lowers an asset or expense and raises a liability.'],
+  [/^debits?$/i, 'The left side of an entry: it raises an asset or expense and lowers a liability.'],
+  [/\bDr(?= (?:[a-z_]+ )?\$)/, 'Debit, the left side of an entry: it raises an asset or expense and lowers a liability.'],
+  [/^credits?$/i, 'The right side of an entry: it lowers an asset or expense and raises a liability.'],
+  [/\bCr(?= (?:[a-z_]+ )?\$)/, 'Credit, the right side of an entry: it lowers an asset or expense and raises a liability.'],
+  [/^account$/i, 'A ledger account that amounts are posted to.', 'th'],
+  [/^entry$/i, 'One journal entry: amounts moved between accounts, with equal debits and credits.', 'th'],
+  [/^lines$/i, 'The entry\'s debits (Dr) and credits (Cr), account by account.', 'th'],
   [/^balance$/i, 'The account\'s debits minus its credits.'],
   [/^balanced$/i, 'Total debits equal total credits, so the books add up.'],
   [/^off by\b/i, 'Total debits and credits differ by this much, so something was posted wrong.'],
@@ -78,12 +84,17 @@ const TERMS: [RegExp, string][] = [
   [/\brecovery letters?\b/i, 'A letter asking whoever damaged the venue\'s equipment to pay for the repair.'],
   [/\brecoverable\b|\bpays back\b/i, 'The insurer\'s share of the payout, which it pays back to the venue under the policy.'],
   [/\brecover(?:y|ies)(?= posted)|^recover(?:y|ies)$|\brecoveries\b/i, 'Money the venue gets back from its insurer, or from whoever caused the loss.'],
+  [/\bnot recovered\b/i, 'Reserved payouts whose insurer share is not booked as owed yet.'],
   [/\breceivables?\b|\binsurer owes\b|\bstill owes\b/i, 'Money owed to the venue, here by the insurer, and not paid yet.'],
-  [/\b(?:insurer )?short pa(?:y|ys|id|yments?)\b|\bshort-paid\b|\bpaid less than recoverable\b/i, 'When the insurer pays less than it owes; the venue carries the difference.'],
-  [/\bpaid more than recoverable\b/i, 'When the insurer pays more than it owes; the venue\'s cost drops by the difference.'],
+  [/\b(?:insurer )?short pa(?:y|ys|id|yments?)\b|\bshort-paid\b|\b(?:insurer )?paid less than recoverable\b/i, 'When the insurer pays less than it owes; the venue carries the difference.'],
+  [/\b(?:insurer )?paid more than recoverable\b/i, 'When the insurer pays more than it owes; the venue\'s cost drops by the difference.'],
   [/\binsurer paid\b|\bpaid back\b/i, 'What the insurer has paid back so far.'],
   [/\bpaid out\b|^paid\b/i, 'Paid to the claimant or the repair vendor.'],
   [/\bvenue'?s cost\b|\bvenue carries\b/i, 'What the claim costs the venue after the insurer\'s share: its deductible and any short payment.'],
+  [/^venue$/i, 'What the claims cost the venue itself, after the insurer\'s share.', 'th'],
+  [/^insurer$/i, 'What the venue\'s insurer pays back on the claims, paid and still owed.', 'th'],
+  [/^attendees$/i, 'What Medical claims did not cover, left to attendees or their health plans.', 'th'],
+  [/^unpaid$/i, 'Reserves accrued and not paid out yet.', 'th'],
   [/\breconcil(?:ed|iation|e)\b/i, 'Matched the insurer\'s payment to what it owed and posted any difference.'],
   [/^settled\b/i, 'Paid out to the claimant; the insurer may still owe its share.'],
   [/\bsettlements?\b/i, 'Paying a claim and recording who pays what on it.'],
@@ -96,17 +107,26 @@ const TERMS: [RegExp, string][] = [
 /** Text in these is never wrapped: controls and anything already defined. */
 const SKIP = 'abbr, button, input, option, select, textarea, script, style';
 
+/** The same terms, searchable from any place in a text: ^ and $ still mean the whole text. */
+const SEARCH = TERMS.map(([re, title, where]) => [new RegExp(re.source, `${re.flags}g`), title, where] as const);
+
 function wrap(text: Text) {
-  let best: { at: number; length: number; title: string } | undefined;
-  for (const [re, title] of TERMS) {
-    const m = re.exec(text.data);
-    if (m && m[0] && (!best || m.index < best.at)) best = { at: m.index, length: m[0].length, title };
+  const s = text.data;
+  const parts: (string | HTMLElement)[] = [];
+  let at = 0;
+  for (;;) {
+    let best: { from: number; to: number; title: string } | undefined;
+    for (const [re, title, where] of SEARCH) {
+      if (where && !text.parentElement?.closest(where)) continue;
+      re.lastIndex = at;
+      const m = re.exec(s);
+      if (m && m[0] && (!best || m.index < best.from)) best = { from: m.index, to: m.index + m[0].length, title };
+    }
+    if (!best) break;
+    parts.push(s.slice(at, best.from), h('abbr', { title: best.title }, s.slice(best.from, best.to)));
+    at = best.to;
   }
-  if (!best) return;
-  const term = text.splitText(best.at);
-  const rest = term.splitText(best.length);
-  term.replaceWith(h('abbr', { title: best.title }, term.data));
-  wrap(rest);
+  if (parts.length) text.replaceWith(...parts, s.slice(at));
 }
 
 /** Wraps every finance term under `root` in an <abbr> that defines it on hover. */
