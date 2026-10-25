@@ -1263,6 +1263,8 @@ function render() {
   const busy = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLSelectElement;
   if (!conn || pressing || busy || Date.now() - reading < 10_000) return;
   const open = tabs();
+  // The Live tab uses the window's whole width.
+  document.body.classList.toggle('wide', tab === 'live' && !viewing());
   mount('head', header());
   const list = document.getElementById('people')!;
   if (!open.length) {
