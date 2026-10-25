@@ -1,8 +1,8 @@
 // The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
 // resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
-// the Venue setup tab, placing our bands with a click on the floor, and the decision history. Clicking a person
-// opens them on the portal; hovering a person, an incident's pole or a zone's circle on the floor says what it is.
-// The module runs everything; this page only shows it.
+// the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. Clicking a
+// person opens them beside the view; hovering a person, an incident's pole or a zone's circle on the floor says
+// what it is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
 import { act, h, money, time } from './lib';
@@ -10,6 +10,7 @@ import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
 import { ZoneCircles, zoneWords } from './zones-3d';
 import { present } from './venue-map';
+import { matches, searchWords, searchable } from './table-search';
 import { venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { Band, IncidentMarker, LiveRun } from './module_bindings/types';
@@ -17,9 +18,9 @@ import type { Band, IncidentMarker, LiveRun } from './module_bindings/types';
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
 const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
+const HISTORY_ROWS = 60;
 /** A click moves the pointer less than this; more is a drag of the camera. */
 const CLICK_PX = 5;
-const HISTORY_ROWS = 60;
 /** A pole is picked this far off the pointer's ray per metre from the camera, as a person is. */
 const PICK_RADIANS = 0.006;
 const LIGHTS = ['Calm around them', 'Busy around them', 'Very busy around them'];
@@ -28,14 +29,24 @@ let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
 let zones: ZoneCircles;
-let placing: { bandId: number; label: string } | undefined;
-let hint = '';
 /** What the portal does with a person clicked in the view, and the band of the person it has open. */
 let pick: Picking | undefined;
 let tip: HTMLElement;
 /** A dark ring on the floor under the opened person. */
 const mark = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.15, 40).rotateX(-Math.PI / 2),
   new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.DoubleSide, depthWrite: false }));
+/** A band to put on the floor: from the panel, with the name typed there, or one already placed. */
+type Placing = { bandId: number; label: string; fromPanel: boolean };
+/** The band being dragged, with the tag that follows the pointer. */
+let dragging: (Placing & { tag: HTMLElement }) | undefined;
+/** The band the panel's marker drags; it follows the band list. */
+let chosenBand: number | undefined;
+let hint = '';
+/** A blue pin and ring on the floor where the dragged band lands if let go, big enough to see from afar. */
+const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.DoubleSide });
+const dropPin = new THREE.Group().add(
+  new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
+  new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
 /** A red pole over each open incident. */
 const poles = new Map<bigint, THREE.Mesh>();
 const poleShape = new THREE.CylinderGeometry(0.35, 0.35, 3.6, 12).translate(0, 1.8, 0);
@@ -49,6 +60,16 @@ function setUp(c: DbConnection) {
   conn.db.band.onInsert((_ctx, b) => crowd.upsert(b));
   conn.db.band.onUpdate((_ctx, _old, b) => crowd.upsert(b));
   conn.db.band.onDelete((_ctx, b) => crowd.remove(b.id));
+  // The crowd's walks, and the run's pause, which holds everyone where they are. The walks have their own
+  // subscription, so a module without them leaves the rest of the page working.
+  conn.subscriptionBuilder().onError(() => console.warn('no crowd walks: the crowd walks to its spots')).subscribe(['SELECT * FROM crowd_walk']);
+  conn.db.crowdWalk.onInsert((_ctx, w) => crowd.walk(w));
+  conn.db.crowdWalk.onUpdate((_ctx, _old, w) => crowd.walk(w));
+  conn.db.crowdWalk.onDelete((_ctx, w) => crowd.unwalk(w.bandId));
+  const pause = () => crowd.setPaused(conn.db.livePause.id.find(0)?.pausedAt.toDate().getTime());
+  conn.db.livePause.onInsert(pause);
+  conn.db.livePause.onDelete(pause);
+  pause();
   zones = new ZoneCircles(v.layer);
   mark.renderOrder = 3;
   v.layer.add(mark);
@@ -63,36 +84,89 @@ function setUp(c: DbConnection) {
   });
   let down: { x: number; y: number } | undefined;
   v.canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+  v.canvas.addEventListener('pointerup', e => {
+    if (dragging || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_PX) return;
+    const b = crowd.pick(v!.rayAt(e));
+    if (b) pick?.open(b.id);
+  });
   let moved: PointerEvent | undefined;
   v.canvas.addEventListener('pointermove', e => {
     if (!moved) requestAnimationFrame(() => { hover(moved!); moved = undefined; });
     moved = e;
   });
   v.canvas.addEventListener('pointerleave', () => { tip.hidden = true; zones.hover(undefined); });
-  v.canvas.addEventListener('pointerup', e => {
-    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_PX) return;
-    if (!placing) {
-      const b = crowd.pick(v!.rayAt(e));
-      if (b) pick?.open(b.id);
-      return;
-    }
-    const at = v!.floorAt(e);
-    if (!at) {
-      hint = 'That is not the venue floor. Click inside the hall.';
-      return;
-    }
-    const p = placing;
-    placing = undefined;
-    hint = '';
-    act(() => conn.reducers.placeBand({ bandId: p.bandId, xM: at.x, yM: at.z, label: p.label }));
-  });
+  dropPin.visible = false;
+  v.layer.add(dropPin);
+  window.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', drop);
+  window.addEventListener('pointercancel', () => endDrag());
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') endDrag(); });
 }
+
+// --- Dragging a band onto the floor -------------------------------------------------------------
+
+/** The spot of the floor under the pointer, if the pointer is over the 3D view and inside the hall. */
+function spotUnder(e: PointerEvent) {
+  return document.elementFromPoint(e.clientX, e.clientY) === v!.canvas ? v!.floorAt(e) : undefined;
+}
+
+function startDrag(e: PointerEvent, p: Placing) {
+  e.preventDefault();
+  // A focused list holds the page's redraws, so it lets go first.
+  (document.activeElement as HTMLElement | null)?.blur();
+  endDrag();
+  const tag = h('span', { class: 'chip blue drag-tag' });
+  document.body.append(tag);
+  dragging = { ...p, tag };
+  moveDrag(e);
+}
+
+function moveDrag(e: PointerEvent) {
+  if (!dragging) return;
+  const at = spotUnder(e);
+  const who = dragging.label || bandCode(dragging.bandId);
+  dragging.tag.textContent = at ? who : `${who}: drop it on the floor`;
+  dragging.tag.style.left = `${e.clientX + 14}px`;
+  dragging.tag.style.top = `${e.clientY + 14}px`;
+  dropPin.visible = !!at;
+  if (at) dropPin.position.set(at.x, 0, at.z);
+}
+
+function endDrag() {
+  dragging?.tag.remove();
+  dragging = undefined;
+  dropPin.visible = false;
+}
+
+/** Letting go over the floor puts the band there. */
+function drop(e: PointerEvent) {
+  const d = dragging;
+  if (!d) return;
+  const at = spotUnder(e);
+  endDrag();
+  if (!at) {
+    hint = 'Drop the band on the floor inside the hall.';
+    return;
+  }
+  hint = '';
+  // The typed name goes with the band it was typed for.
+  const typed = document.querySelector('[name="place_label"]') as HTMLInputElement | null;
+  if (d.fromPanel && typed) typed.value = '';
+  act(() => conn.reducers.placeBand({ bandId: d.bandId, xM: at.x, yM: at.z, label: d.label }));
+}
+
+/** A band to drag onto the floor, blue like our bands in the 3D view. */
+function marker(text: Node | string, take: () => Placing, title: string) {
+  return h('span', { class: 'chip blue drag-band', title, onpointerdown: (e: PointerEvent) => startDrag(e, take()) }, '● ', text);
+}
+
+// --- Hovering and clicking ---------------------------------------------------------------------
 
 /** What is under the pointer, nearest first: a person, an open incident's pole, then a zone's circle. */
 function hover(e: PointerEvent) {
   tip.hidden = true;
   v!.canvas.style.cursor = '';
-  if (e.buttons) return zones.hover(undefined);
+  if (e.buttons || dragging) return zones.hover(undefined);
   const ray = v!.rayAt(e);
   const b = crowd.pick(ray);
   const pole = b ? undefined : poleAt(ray);
@@ -254,43 +328,41 @@ function ourBands(): number[] {
 
 function placeBands() {
   const placed = [...conn.db.bandPlace.iter()].sort((a, b) => a.bandId - b.bandId);
-  const begin = (e: Event) => {
-    e.preventDefault();
-    const f = e.target as HTMLFormElement;
-    const bandId = Number((f.querySelector('[name="place_band"]') as HTMLSelectElement).value);
-    const label = (f.querySelector('[name="place_label"]') as HTMLInputElement).value.trim();
-    placing = { bandId, label };
-    hint = `Click the floor where ${label || bandCode(bandId)} stands.`;
-    (f.querySelector('[name="place_label"]') as HTMLInputElement).value = '';
+  const ids = ourBands();
+  if (chosenBand === undefined || !ids.includes(chosenBand)) chosenBand = ids[0];
+  const code = h('span', {}, bandCode(chosenBand));
+  const choose = (e: Event) => {
+    chosenBand = Number((e.target as HTMLSelectElement).value);
+    code.textContent = bandCode(chosenBand);
   };
+  const label = () => (document.querySelector('[name="place_label"]') as HTMLInputElement | null)?.value.trim() ?? '';
   return h('section', {},
     h('h4', {}, 'Put one of our real bands on the map'),
-    h('p', { class: 'muted' }, 'For showing the run with a band someone is wearing: pick the band, type who wears it, press Place and click the floor where they stand. It stands there among the crowd, the crowd near it meets it, and its SOS and falls show like anyone else\'s.'),
-    h('form', { onsubmit: begin },
-      h('select', { name: 'place_band' }, ourBands().map(id => h('option', { value: id }, bandCode(id)))), ' ',
-      h('input', { name: 'place_label', placeholder: 'Name, e.g. the presenter', maxlength: 40 }), ' ',
-      h('button', {}, 'Place'),
-      placing && [' ', h('button', { type: 'button', onclick: () => { placing = undefined; hint = ''; } }, 'Cancel')]),
+    h('label', {}, 'Band ', h('select', { name: 'place_band', onchange: choose }, ids.map(id => h('option', { value: id, selected: id === chosenBand }, bandCode(id))))),
+    h('label', {}, 'Who wears it ', h('input', { name: 'place_label', placeholder: 'Name, e.g. the presenter', maxlength: 40 })),
+    h('p', {}, marker(code, () => ({ bandId: chosenBand!, label: label(), fromPanel: true }), 'Drag onto the floor of the 3D view')),
     hint && h('p', {}, h('b', {}, hint)),
     placed.length > 0 && h('ul', {}, placed.map(p => h('li', {},
-      `${bandCode(p.bandId)}${p.label ? ` (${p.label})` : ''} at ${p.xM.toFixed(1)}, ${p.yM.toFixed(1)} m `,
+      marker(`${bandCode(p.bandId)}${p.label ? ` (${p.label})` : ''}`, () => ({ bandId: p.bandId, label: p.label, fromPanel: false }), 'Drag to move it'),
+      ` at ${p.xM.toFixed(1)}, ${p.yM.toFixed(1)} m `,
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
 }
 
 function history() {
-  const rows = [...conn.db.decision.iter()].sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
+  const all = [...conn.db.decision.iter()];
+  const words = searchWords('decisions');
+  const hits = words.length ? all.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : all;
+  const rows = hits.sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
   return h('section', {},
     h('h4', {}, 'Decision history'),
-    rows.length === 0
+    all.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
-      : h('table', {},
-        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Incident'), h('th', {}, 'Who'), h('th', {}, 'Decided'), h('th', {}, 'Why')),
+      : searchable('decisions', h('table', {},
+        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Who'), h('th', {}, 'Decided')),
         rows.map(d => h('tr', {},
-          h('td', {}, time(d.at)),
-          h('td', {}, d.incidentId ? String(d.incidentId) : ''),
+          h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
           h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
-          h('td', {}, d.what),
-          h('td', {}, d.why)))));
+          h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)])))), rows.length < all.length));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -308,28 +380,50 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
     h('h4', {}, `Incidents (${list.length})`),
     list.length === 0
       ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
-      : h('table', {},
+      : searchable('incidents', h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
         list.map(m => {
           const c = claims.get(m.claimId);
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
-            h('td', {}, time(m.openedAt)),
-            h('td', {}, `${m.incidentId}: ${m.kind}${m.person ? `, ${m.person}` : ''}${m.place ? ` at ${m.place}` : ''}`),
-            h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status),
-            h('td', {}, m.claimId ? `${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : ''),
+            h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${m.kind}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
+            h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
+              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : ''),
             h('td', {},
               h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
               waiting && [' ', h('button', {
                 onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
               }, 'Approve and teach a rule')]));
-        })));
+        }))));
 }
 
-/** A person clicked in the 3D view opens with `open`; `selected` is the band of the person open now, or 0. */
-export type Picking = { open(bandId: number): void; selected: number };
+/** What the colours in the 3D view mean: the band light states of the Hardware doc. */
+const LEGEND: [string, string][] = [
+  ['#2fd27a', 'Calm'],
+  ['#ffb020', 'Busy'],
+  ['#ff5a2a', 'Very busy'],
+  ['#ff1030', 'SOS or a fall: red strobe; someone who fell lies down'],
+  ['#2f6bff', 'The light circle around them: blue pulse'],
+  ['#3d8bff', 'Our hardware and test bands'],
+  ['#e00020', 'Pole: an open incident'],
+  ['#2fd27a', 'Circle on the floor: a zone, coloured by how crowded it is now (green, amber, red). Hover it for its risk'],
+  ['#111111', 'Dark ring: the person open beside the view. Click anyone to open them'],
+];
 
-/** The Live tab's run section: the 3D view, our bands, the incidents and the decision history. */
+function legend() {
+  return h('section', {},
+    h('h4', {}, 'Legend'),
+    h('table', {}, LEGEND.map(([colour, meaning]) => h('tr', {},
+      h('td', { style: `background: ${colour}; width: 24px` }),
+      h('td', {}, meaning)))));
+}
+
+/** A person clicked in the 3D view opens with `open`; `selected` is the band of the person open now, or 0, and
+ *  `panel` shows them at the top of the right side. */
+export type Picking = { open(bandId: number): void; selected: number; panel: HTMLElement | null };
+
+/** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the opened person, the
+ * decisions and our bands on the right. */
 export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picking) {
   pick = picking;
   if (!v) setUp(c);
@@ -337,12 +431,8 @@ export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picki
   crowd.recheck();
   const r = run();
   syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
-  return [
-    h('section', {},
-      v!.view, v!.note,
-      h('p', { class: 'muted' }, "Each person shows their band's light: green calm, amber busy, red very busy, a red strobe on SOS or a fall (someone who fell lies down), and a blue pulse in the light circle around them. Our hardware and test bands are blue. A red pole marks each open incident. Circles on the floor are the zones, coloured by how crowded they are now. Hover anything to see what it is; click a person to open them."),
-      canRun && placeBands()),
-    incidents(r, canRun),
-    history(),
-  ];
+  return h('div', { class: 'live' },
+    h('div', {}, incidents(r, canRun), legend()),
+    h('div', {}, h('section', {}, v!.view, v!.note)),
+    h('div', {}, picking?.panel, history(), canRun && placeBands()));
 }

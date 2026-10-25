@@ -523,8 +523,8 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
 
 /// Claude's investigation and decision. Code validates the decision again,
 /// then holds it to its limits (`decision::guard`): Claude pays inside the
-/// authority a learned rule gives and refuses on failed checks; anything else
-/// goes to the organizer. An invalid decision is set aside and the claim is
+/// authority a learned rule gives and refuses on failed checks; anything else,
+/// and every claim with a gap or mismatch in the policies, goes to the organizer. An invalid decision is set aside and the claim is
 /// decided as if Claude were unavailable.
 #[spacetimedb::reducer]
 pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: String, call: ModelCallIn) -> Result<(), String> {
@@ -892,6 +892,9 @@ pub fn approve_claim(
     let claim = claim_by_id(ctx, claim_id)?;
     approver_check(ctx, &claim, &pack_hash_seen)?;
     let now = current_amounts(ctx, &claim).ok_or("no cover for this claim")?;
+    if claim.payout_cents == 0 {
+        return Err("there is nothing to pay: the policy covers none of this claim, so refuse it with the reason".into());
+    }
     if now.payout_cents != claim.payout_cents || amount_seen_cents != claim.payout_cents {
         return Err(format!("stale: the payout is now {}", bandit_insurance::money::format_cents(now.payout_cents)));
     }

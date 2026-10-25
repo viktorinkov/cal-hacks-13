@@ -111,6 +111,8 @@ The search box above the list matches every word typed against the name, what th
 
 "Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
 
+Every other place that picks a person uses the same search bar: the View as tab, the Merch tab's "Buy as an attendee" (over the attendees with a wallet, each with its balance) and the Settlements tab's "File a claim as someone" (over the attendees with a band). The bar lists its first 12 matches under it, each with what the person is and their band code. A click, or Enter for the first match, picks one.
+
 | Action | For | Calls |
 |---|---|---|
 | "Their pages": "Their band page now", "Medical card" and "Recap and merch" for an attendee with a band, the portal for an organizer or medic, the photo page for a photographer; the page shows in the View as frame under the person, read-only, until "Hide their page" | the owner | `view_as` |
@@ -300,6 +302,8 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 With no claims the tab reads "No claims yet."
 
 The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
+
+Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, each account and the journals J1 to J4. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
 
 ### Event graph (Social.md)
 
