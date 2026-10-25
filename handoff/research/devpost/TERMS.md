@@ -43,6 +43,10 @@ Viktor's standing rule: write short paragraphs, never long ones.
 
 For Devpost only, use ordinary exact words and natural connected sentences; explain technical terms once, remove repeated explanations and mechanical first/second enumerations, and keep important facts. Preserve sponsor quotations, use one live-site URL in Try it out, and keep the closing disclosure brief. This writing preference does not override the diagram guide below.
 
+Put “What it does” before “How it works.” Use product images and visuals in the first section, then technical diagrams and API suitability in the second. Keep the enclosure design in the technical hardware section.
+
+Give sponsors detail in proportion to their substantive contribution, especially Elastic and SpacetimeDB. Explain the important technical insights without repeating earlier explanations or adding “this addresses the challenge” filler.
+
 For the Devpost narrative, introduce sign-up in the opening and group the recap around people, photos and personal shopping. Order the product story as safety, social, shopping, then financial management. This does not change the established sponsor ranking or the board’s organization.
 
 Name the final product section “Financial management for large events.” Keep its scope to the existing claims, charges, receipts, ledgers and merch booth accounting.

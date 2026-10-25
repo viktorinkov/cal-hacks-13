@@ -174,6 +174,8 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 
 ### The Devpost
 
+- Put “What it does” before “How it works”: product images and visuals first, technical diagrams and API suitability second. Keep the enclosure design in the technical hardware section.
+- Give sponsor explanations space in proportion to their substantive contribution, especially Elastic and SpacetimeDB. Focus on important technical insights; remove repeated explanations and “this addresses the challenge” filler. Sponsor ranking stays unchanged.
 - Devpost product/story order is safety, social, shopping, financial management. This writing order is separate from the established sponsor ranking; do not reorder sponsor-track sections or the main diagram board from this preference.
 - Introduce sign-up in the Devpost opening. Group the recap around people, photos and personal shopping. Name the final product section “Financial management for large events,” limited to the existing claims, charges, receipts, ledgers and merch booth accounting.
 - `diagrams/band-enclosure-design.png` is an unchanged copy of Leo’s `bandit_hardware_handoff/renders/bandit_v2_preview.png`. Caption it as an enclosure design.
