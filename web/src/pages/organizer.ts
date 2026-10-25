@@ -12,7 +12,7 @@ import {
 import { bandCode } from '../band-code';
 import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
-import { MAP_LEGEND, present, venueMap } from '../venue-map';
+import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -27,7 +27,6 @@ const QUERIES = [
   'SELECT * FROM booth',
   'SELECT * FROM organization',
   'SELECT * FROM band',
-  'SELECT * FROM venue_plan',
   'SELECT * FROM station',
   'SELECT * FROM gateway',
   'SELECT * FROM settings',
@@ -189,12 +188,8 @@ function live() {
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
           h('a', { href: '#claims' }, 'open in Claims'))))),
     h('section', {},
-      h('h3', {}, 'Venue'),
-      h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands. Every dot is a band row in SpacetimeDB, moving as the module writes it.`),
-      venueMap(conn),
-      h('p', { class: 'legend' }, MAP_LEGEND.map(([c, label]) => h('span', {}, h('i', { class: 'dot', style: `background:${c}` }), label)))),
-    h('section', {},
       h('h3', {}, 'Zones'),
+      h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands.`),
       h('p', {}, settings?.lowVis
         ? [h('b', {}, 'Low visibility is on: every band guides its wearer to the exit colour of its zone. '), h('button', { onclick: () => act(() => conn.reducers.setLowVis({ on: false })) }, 'Turn it off')]
         : h('button', { onclick: () => confirm('Fire or smoke? Every band starts guiding its wearer to the exit.') && act(() => conn.reducers.setLowVis({ on: true })) }, 'Low visibility: guide everyone to the exits')),
@@ -911,15 +906,28 @@ function render() {
   const busy = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLSelectElement;
   if (!conn || pressing || busy) return;
   const open = tabs();
-  if (!open.length) return mount('app', header(), noRole());
+  mount('head', header());
+  if (!open.length) {
+    showLive3d(false);
+    return mount('app', noRole());
+  }
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
+  showLive3d(tab === 'live');
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : live();
-  mount('app', header(), body);
+  mount('app', body);
   if (scrollToClaim) {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
   }
+}
+
+/** The 3D venue on the Live tab loads the first time the tab shows, then stays loaded while hidden. */
+function showLive3d(on: boolean) {
+  const box = document.getElementById('live3d')!;
+  box.hidden = !on;
+  const frame = box.querySelector('iframe')!;
+  if (on && !frame.getAttribute('src')) frame.src = '/live' + location.search;
 }
 
 async function main() {
