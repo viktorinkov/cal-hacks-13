@@ -25,8 +25,9 @@ export type Line = {
   deductibles: bigint;
   shortPaid: bigint;
   unrecovered: bigint;
-  /** What the person responsible was charged (J5 less J5r), and the venue's part of it: on its own equipment, up to
-   * what it carried itself. The rest repays the insurer, and a belonging's charge goes to its owner and their insurer. */
+  /** What the person responsible was charged (J5 less J5r), and the venue's part of it: the `recoveries` share of a
+   * charge on its own equipment. J5 credits the insurer's share to `insurer_payable`, and on a belonging the rest is
+   * the owner's deductible, which J7 returns to them. */
   charged: bigint;
   recovered: bigint;
 };
@@ -65,8 +66,7 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
   // Approval posts J2, which leaves the deductible on the venue's books.
   const deductibles = decided ? c.venueCostCents : 0n;
   const notCovered = c.status.tag === 'Refused' ? bill : decided && bill > c.payoutCents ? bill - c.payoutCents : 0n;
-  const charged = -balance('recoveries');
-  const carried = venueCost + notCovered;
+  const charged = sum('J5 ', 'attendee_receivable', 'debitCents') - sum('J5r', 'attendee_receivable', 'creditCents');
   return {
     claims: 1,
     billed: bill,
@@ -80,7 +80,7 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
     shortPaid,
     unrecovered: venueCost - deductibles - shortPaid,
     charged,
-    recovered: c.coverKind === 'property' ? (charged < carried ? charged : carried) : 0n,
+    recovered: c.coverKind === 'property' ? -balance('recoveries') : 0n,
   };
 }
 

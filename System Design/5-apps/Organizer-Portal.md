@@ -286,14 +286,14 @@ It sums the double-entry `ledger_entry` journals that the claims and charges pos
 
 Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), property cover goes to Venue (the venue's own equipment), and personal property cover goes to Belongings (an attendee's stolen or broken belonging, paid from their own policy). A claim counts once, in one cost center.
 
-The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible, and J6 charge payment is its cash application.
+The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible: the insurer's share goes to `insurer_payable` and the deductible to `recoveries`. J6 charge payment is its cash application, and J7 returns an owner's deductible to their wallet.
 
 "Net cost" is one row, the bottom line:
 
 | Column | From |
 |---|---|
 | Claims | what the claims cost the venue, the Venue column of "Who pays" |
-| Recovered | the venue's part of the charges: on a Venue claim, the charge up to what the venue itself carried; the rest repays the insurer, and a Belongings charge goes to the owner and their insurer |
+| Recovered | the venue's part of the charges: the `recoveries` balance on Venue claims, the deductible it carried; the insurer's share sits in `insurer_payable`, and a Belongings deductible goes back to the owner |
 | Merch margin | the Margin total of "Merch" |
 | Net cost | Claims less Recovered less Merch margin |
 
@@ -310,7 +310,7 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 | Venue | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
 | Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
 
-"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical and Belongings did not cover; the people responsible, for what they were charged (the `recoveries` balance: J5 less J5r); and what is unpaid.
+"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical and Belongings did not cover; the people responsible, for what they were charged (the `attendee_receivable` debits of J5 less J5r); and what is unpaid.
 
 "Merch" has one row per product that sold and a total row: its orders, sales, print cost, what it owes the booths and the event's margin.
 
