@@ -52,7 +52,7 @@ Always pass the document's SHA-256 from the task. Read every page, from 1 to the
 
 - Fill every part of the record from what the report prints. A field the report does not print is an empty string (0 for units), never a guess.
 - Each part carries the `quote` it is copied from and that quote's `page`: the patient's name line, the provider's name line, the line that prints the date of service, each diagnosis row, each bill row, the invoice number line and the total line. The value must appear inside its quote exactly as printed.
-- `document_kind` is `first_aid_record`, `urgent_care_record` or `emergency_record` by what the report says it is, and `other` for anything else, such as a hospital report that names none of these.
+- `document_kind` is what the report says it is, by its title or the provider that wrote it: `first_aid_record` for an event's first-aid station, `urgent_care_record` for an urgent care clinic, such as a provider or title that says urgent care, and `emergency_record` for a hospital emergency department. Use `other` only when the report says it is none of these.
 - `reason_for_visit` is the chief complaint or reason for visit as printed. `history` is the whole history of present illness, word for word, from its first word to its last, even when it runs over several lines.
 - `diagnoses`: every ICD-10-CM code in the assessment, in printed order, including external-cause and place-of-occurrence codes, each with its description as printed.
 - `services`: every row of the itemized bill, in printed order: the CPT or HCPCS code, the description, the date as `YYYY-MM-DD`, the units and the charge for the row as printed, such as `$385.00`. The quote is the whole row.

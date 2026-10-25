@@ -222,7 +222,7 @@ mod tests {
     fn prints_the_note_then_the_bill() {
         let pages = printed_pages(&record("2026-10-24", "Slipped near the stage."));
         assert_eq!(pages.len(), 2);
-        assert!(pages[0].starts_with("Wrenfield Urgent Care") && pages[0].contains("HOSPITAL REPORT") && pages[0].contains("S63.501A"), "{}", pages[0]);
+        assert!(pages[0].starts_with("Wrenfield Urgent Care") && pages[0].contains("URGENT CARE VISIT NOTE") && pages[0].contains("S63.501A"), "{}", pages[0]);
         assert!(pages[1].contains("99213") && pages[1].contains("Total billed: $180.00") && !pages[1].contains("Patient"), "{}", pages[1]);
     }
 }
