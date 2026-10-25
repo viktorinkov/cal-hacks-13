@@ -13,6 +13,7 @@ import { bandCode } from '../band-code';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
+import { Identity } from 'spacetimedb';
 import type { DbConnection } from '../module_bindings';
 import type { Claim } from '../module_bindings/types';
 
@@ -91,7 +92,8 @@ function can(...wanted: string[]): boolean {
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
   const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
-  return cfg.test_mode ? [...all, ['bands', 'Bands']] : all;
+  const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff']] : all;
+  return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
 
 function zoneName(id: bigint) {
@@ -124,6 +126,7 @@ function header() {
     h('p', {},
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
+    roles().has('medic') && h('p', {}, 'Tap a band with this phone to open the wearer\'s medical card.'),
     can('ops') && h('p', {},
       ended
         ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
@@ -138,7 +141,8 @@ function noRole() {
   return h('section', {},
     h('h3', {}, 'This account has no staff role'),
     h('p', {}, 'The organizer portal is for the event\'s organizer and medics. To get access, send this code to the organizer:'),
-    h('p', {}, h('code', {}, conn.identity!.toHexString())));
+    h('p', {}, h('code', {}, conn.identity!.toHexString())),
+    h('p', {}, 'Once you are a medic, tapping a band with this phone opens the wearer\'s medical card.'));
 }
 
 /** The first screen: staff sign in before they see anything. */
@@ -226,6 +230,40 @@ function attendees() {
           a.bandId > 0 && a.bandId < 100 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
         h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
+}
+
+// --- Staff ----------------------------------------------------------------------------------
+
+/** Who the owner added since the page loaded, so the tab confirms each one. */
+const staffAdded: string[] = [];
+
+/** The owner makes a signed-in account a medic or an organizer, by the code that account's portal shows. */
+function staffTab() {
+  const add = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const name = field(f, 'staff-name');
+    const role = field(f, 'staff-role');
+    const code = field(f, 'staff-code').replace(/^0x/, '');
+    const done = await act(async () => {
+      if (!/^[0-9a-f]{64}$/i.test(code)) throw new Error('The code is the 64-character line the person sees on this portal.');
+      await conn.reducers.grantRole({ identity: Identity.fromString(code), role, label: name });
+    });
+    if (done) {
+      staffAdded.push(`${name} as ${role === 'medic' ? 'a medic' : 'an organizer'}`);
+      f.reset();
+      render();
+    }
+  };
+  return h('section', {},
+    h('h3', {}, 'Staff'),
+    h('p', {}, 'A medic or organizer signs in on this portal with their email, and it shows them a code. Add them with that code. A medic who then taps a band with the same phone gets the wearer\'s medical card.'),
+    h('form', { onsubmit: add },
+      h('label', {}, 'Name', h('input', { name: 'staff-name', required: true })),
+      h('label', {}, 'Code from their portal', h('input', { name: 'staff-code', required: true })),
+      h('label', {}, 'Role', h('select', { name: 'staff-role' }, h('option', { value: 'medic' }, 'Medic'), h('option', { value: 'ops' }, 'Organizer'))),
+      h('button', {}, 'Add')),
+    staffAdded.length > 0 && h('p', { class: 'pass' }, `Added ${staffAdded.join(', ')}. They reload the portal to see their tabs.`));
 }
 
 // --- Claims ---------------------------------------------------------------------------------
@@ -553,7 +591,7 @@ function render() {
   if (!open.length) return mount('app', header(), noRole());
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : live();
   mount('app', header(), body);
 }
 
