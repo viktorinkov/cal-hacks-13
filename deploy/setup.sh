@@ -89,7 +89,7 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 		rewrite * /home.html
 		file_server
 	}
-	@desk path /organizer /organizer/ /payments /payments/ /venue /venue/ /attendees /attendees/ /bands /bands/ /photos /photos/ /photo /photo/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/ /wallet /wallet/ /t/*
+	@desk path /organizer /organizer/ /payments /payments/ /venue /venue/ /attendees /attendees/ /bands /bands/ /photos /photos/ /cameras /cameras/ /photo /photo/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/ /wallet /wallet/ /t/*
 	handle @desk {
 		root * /srv/bandit-desk
 		try_files {path} /index.html
