@@ -8,10 +8,10 @@
 // decides the claims afterwards.
 
 import {
-  act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
+  act, capital, config, connect, date, field, h, idToken, isLoss, kindWords, medicalCard, money, mount, risk, signIn,
   signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
-import { bandCode } from '../band-code';
+import { bandCode, bandFromCode } from '../band-code';
 import { costsTab } from '../costs';
 import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
@@ -21,7 +21,7 @@ import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
-import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
+import type { AttendeeOut, BoardMerchPick, BoardWallet, Charge, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
@@ -46,7 +46,8 @@ const QUERIES = [
   'SELECT * FROM board_lines',
   'SELECT * FROM board_reviews',
   'SELECT * FROM decision',
-  'SELECT * FROM board_precedents',
+  'SELECT * FROM board_charges',
+  'SELECT * FROM board_attendee_policies',
   'SELECT * FROM board_records',
   'SELECT * FROM board_approvals',
   'SELECT * FROM board_ledger',
@@ -196,7 +197,7 @@ function live() {
           const z = zones.find(z => z.stationId === b.zone);
           return h('li', {}, h('b', {}, b.fall ? 'Fall' : 'SOS'), ` on band ${bandCode(b.id)}${wearer(b.id)} in ${z?.name ?? 'no zone'}: the bands around it show the light circle.`);
         }),
-        incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
+        incidents.map(i => h('li', {}, `Incident ${i.id}: ${kindWords(i.kind.tag)} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
           h('a', { href: '#claims' }, 'open in Settlements'))))),
     h('section', {},
       h('h3', {}, 'Zones'),
@@ -448,7 +449,7 @@ function theirClaims(p: Person) {
   const mine = claimsOf(p);
   return mine.length > 0 && [h('h4', {}, 'Their claims'), h('ul', {}, mine.map(c => h('li', {},
     h('button', { class: 'link', onclick: () => toClaim(c.id) }, `#${c.id}`),
-    ` ${c.incidentKind} in ${c.zoneName}: ${statusOf(c)}${c.payoutCents ? `, ${money(c.payoutCents)} to ${payee(c)}` : ''}`)))];
+    ` ${kindWords(c.incidentKind)} in ${c.zoneName}: ${statusOf(c)}${c.payoutCents ? `, ${money(c.payoutCents)} to ${payee(c)}` : ''}`)))];
 }
 
 /** Their shop, as the Merch tab's "Buy as an attendee" shows it. */
@@ -565,16 +566,20 @@ function showViewAs(on: boolean) {
 
 // --- Claims ---------------------------------------------------------------------------------
 
-/** Open incidents: the medic takes one, opens the medical card, notes the cost and resolves it. */
+/** Open incidents: the medic takes one, opens the medical card, notes the cost and resolves it. For something
+ *  broken or stolen, staff note what it is and its value, and name who did it by their band. */
 function incidentDesk() {
   const incidents = [...conn.db.openIncidents.iter()].sort((a, b) => Number(a.id - b.id));
   const notes = [...conn.db.boardNotes.iter()];
+  const charges = new Map([...conn.db.boardCharges.iter()].map(c => [c.incidentId, c]));
   const names = wearers();
   const medic = can('medic');
   return h('section', {},
     h('h3', {}, 'Open incidents'),
-    !incidents.length && h('p', { class: 'muted' }, 'None. A fall or SOS on a band opens one here.'),
+    !incidents.length && h('p', { class: 'muted' }, 'None. A fall or SOS on a band opens one here, and so does a report of something broken or stolen below.'),
     incidents.map(i => {
+      const kind = i.kind.tag.toLowerCase();
+      const loss = isLoss(kind);
       const mine = notes.filter(n => n.incidentId === i.id);
       const note = async (e: Event) => {
         e.preventDefault();
@@ -585,19 +590,76 @@ function incidentDesk() {
         }));
         if (ok) f.reset();
       };
-      const who = i.subjectBand ? `band ${bandCode(i.subjectBand)}${names.has(i.subjectBand) ? ` (${names.get(i.subjectBand) || 'no name yet'})` : ''}` : 'no band';
+      const band = i.subjectBand ? `band ${bandCode(i.subjectBand)}${names.has(i.subjectBand) ? ` (${names.get(i.subjectBand) || 'no name yet'})` : ''}` : 'no band';
+      const who = loss && kind !== 'property' && i.subjectBand ? `the owner's ${band}` : band;
       return h('div', { class: 'incident' },
-        h('p', {}, h('b', {}, `Incident ${i.id}: ${i.kind.tag}`), ` in ${zoneName(i.zoneId)}, ${who}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
+        h('p', {}, h('b', {}, `Incident ${i.id}: ${capital(kindWords(kind))}`), ` in ${zoneName(i.zoneId)}, ${who}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
         h('ul', {}, mine.map(n => h('li', {}, `${time(n.createdAt)} ${n.authorRole}: ${n.text}${n.costCents !== undefined ? ` (${money(n.costCents)})` : ''}`))),
         medic && i.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: i.id })) }, 'Take it'),
-        medic && i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${bandCode(i.subjectBand)} for the medical card`),
+        medic && !loss && i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${bandCode(i.subjectBand)} for the medical card`),
         medicCard(i.id),
         h('form', { onsubmit: note },
-          h('input', { name: `text-${i.id}`, placeholder: 'Treatment note', required: true }),
-          h('input', { name: `cost-${i.id}`, placeholder: 'Cost in dollars (optional)', inputmode: 'decimal' }),
+          h('input', { name: `text-${i.id}`, placeholder: loss ? 'Note: what it is, what you saw' : 'Treatment note', required: true }),
+          h('input', { name: `cost-${i.id}`, placeholder: loss ? 'Value or repair cost in dollars' : 'Cost in dollars (optional)', inputmode: 'decimal' }),
           h('button', {}, 'Add note')),
-        can('ops', 'medic') && h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: 'treated on site' })) }, 'Resolve'));
-    }));
+        loss && can('ops', 'medic') && nameWhoDidIt(i.id, charges.get(i.id)),
+        can('ops', 'medic') && h('button', { onclick: () => act(() => conn.reducers.resolveIncident({ incidentId: i.id, resolution: loss ? 'reported by staff' : 'treated on site' })) }, 'Resolve'));
+    }),
+    can('ops', 'medic') && reportLoss());
+}
+
+/** Staff name the attendee who broke or took it, by their band code; the module checks the band against the
+ *  zone, the bands at the spot and the cameras, and proposes a charge for the organizer. */
+function nameWhoDidIt(incidentId: bigint, charge: Charge | undefined) {
+  const name = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const code = field(f, `culprit-${incidentId}`);
+    const bandId = bandFromCode(code);
+    const ok = await act(async () => {
+      if (!bandId) throw new Error(`${code} is not a band code. A band code looks like ${bandCode(94)}.`);
+      await conn.reducers.nameResponsibleBand({ incidentId, bandId, note: field(f, `culprit-note-${incidentId}`) });
+    });
+    if (ok) f.reset();
+  };
+  return [
+    charge && h('p', {}, `Named ${charge.attendeeName}, band ${bandCode(charge.bandId)}, by ${charge.namedByName}: the charge is ${charge.status}.`),
+    (!charge || charge.status === 'proposed') && h('form', { onsubmit: name },
+      h('input', { name: `culprit-${incidentId}`, placeholder: `Band code of who did it, e.g. ${bandCode(94)}`, required: true }),
+      h('input', { name: `culprit-note-${incidentId}`, placeholder: 'What you saw' }),
+      h('button', {}, charge ? 'Name someone else' : 'Name who did it')),
+  ];
+}
+
+/** What staff can report by hand: the venue's equipment, or an attendee's own belonging. */
+const LOSS_KINDS: [string, string][] = [
+  ['property', 'Venue equipment broken'],
+  ['theft', "An attendee's belonging stolen"],
+  ['breakage', "An attendee's belonging broken by someone else"],
+];
+
+/** Staff report something broken or stolen: the kind, the zone, the owner's band for a belonging, and a note. */
+function reportLoss() {
+  const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
+  const report = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const kind = field(f, 'report-kind');
+    const code = field(f, 'report-band');
+    const bandId = kind === 'property' || !code ? 0 : bandFromCode(code);
+    const ok = await act(async () => {
+      if (kind !== 'property' && !bandId) throw new Error(code ? `${code} is not a band code.` : 'Give the band code of the attendee whose belonging it is.');
+      await conn.reducers.openIncident({ kind, zoneId: BigInt(field(f, 'report-zone')), bandId, note: field(f, 'report-note') });
+    });
+    if (ok) f.reset();
+  };
+  return h('form', { onsubmit: report },
+    h('h4', {}, 'Report something broken or stolen'),
+    h('label', {}, 'What happened', h('select', { name: 'report-kind' }, LOSS_KINDS.map(([value, label]) => h('option', { value }, label)))),
+    h('label', {}, 'Where', h('select', { name: 'report-zone' }, zones.map(z => h('option', { value: String(z.id) }, z.name)))),
+    h('label', {}, "The owner's band code, for an attendee's belonging", h('input', { name: 'report-band', placeholder: bandCode(94) })),
+    h('label', {}, 'Note', h('input', { name: 'report-note', placeholder: 'What it is and what it is worth, e.g. a phone, $899' })),
+    h('button', {}, 'Report it'));
 }
 
 /** The medical card a medic opened by tapping the band, while the incident is open. */
@@ -753,11 +815,23 @@ function payee(c: Claim): string {
   return c.coverKind === 'property' ? 'the repair vendor' : `${c.claimantName || 'the claimant'}'s wallet`;
 }
 
-const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property' };
+const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property', personal_property: 'personal property' };
 
-/** Who pays what on a claim: the payout, what the insurer pays back under which policy, the venue's share and what is not covered. */
+const INJURIES = ['sos', 'fall'];
+
+/** Who pays what on a claim: the payout, what the insurer pays back under which policy, the venue's share and what is not covered.
+ *  A stolen or broken belonging is paid from the attendee's own policy, and the attendee carries its deductible. */
 function whoPays(c: Claim) {
   if (!c.costCents && !c.payoutCents) return null;
+  const name = c.claimantName || 'the attendee';
+  if (c.coverKind === 'personal_property') {
+    const own = [...conn.db.boardAttendeePolicies.iter()].find(p => p.id === c.policyId);
+    const insurer = own ? `${own.insurerName} pays back, ${name}'s own policy ${own.policyNumber}, personal property cover` : `${name}'s own insurer pays back`;
+    const rows: [string, bigint][] = [['Cost', c.costCents], [`Paid to ${payee(c)}`, c.payoutCents], [insurer, c.recoverableCents]];
+    if (c.costCents > c.payoutCents) rows.push([`${name} carries (their deductible, and anything over their limit)`, c.costCents - c.payoutCents]);
+    return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents))))),
+      !own && h('p', { class: 'muted' }, `${name} has no policy of their own on file, so nothing pays on its own: the venue's policy excludes guests' property.`)];
+  }
   const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
   const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${COVER_WORDS[c.coverKind] ?? c.coverKind} cover` : 'The insurer pays back';
   const rows: [string, bigint][] = [
@@ -779,7 +853,7 @@ function myQueue() {
     !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Payments a learned rule covers go out on their own.'),
     h('ul', {}, mine.map(c => h('li', {},
       h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`),
-      ` ${money(c.payoutCents)} to ${payee(c)}, ${c.incidentKind} in ${c.zoneName}: ${c.statusNote}`))));
+      ` ${money(c.payoutCents)} to ${payee(c)}, ${kindWords(c.incidentKind)} in ${c.zoneName}: ${c.statusNote}`))));
 }
 
 function claimList() {
@@ -791,7 +865,7 @@ function claimList() {
       h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Insurer pays back'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
-        h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
+        h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '(none)')), h('td', {}, `${kindWords(c.incidentKind)} in ${c.zoneName}`),
         h('td', {}, money(c.costCents)), h('td', {}, money(c.payoutCents)), h('td', {}, money(c.recoverableCents)), h('td', {}, money(c.venueCostCents)),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
         h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : '')))));
@@ -852,7 +926,9 @@ function payoutFailed(c: Claim): boolean {
 function waiting(c: Claim, hospital: boolean): string {
   const name = c.claimantName || 'the claimant';
   switch (c.status.tag) {
-    case 'AwaitingRecord': return hospital ? 'Waiting for the hospital report.' : 'Waiting for the medical record: upload the clinic\'s report below.';
+    case 'AwaitingRecord':
+      if (!INJURIES.includes(c.incidentKind)) return 'Waiting for the evidence to be gathered.';
+      return hospital ? 'Waiting for the hospital report.' : 'Waiting for the medical record: upload the clinic\'s report below.';
     case 'ReadingRecord': return `Waiting for Claude to read the ${hospital ? 'hospital report' : 'medical record'}.`;
     case 'Verifying': return 'Waiting for the Elastic checks.';
     case 'Reviewing': return 'Waiting for the claims agent\'s review.';
@@ -926,14 +1002,13 @@ function claimDetail(id: bigint) {
   const hospital = byId([...conn.db.boardClinicReports.iter()].filter(r => r.claimId === id)).pop();
   const lines = [...conn.db.boardLines.iter()].filter(l => l.claimId === id).sort((a, b) => a.lineNo - b.lineNo);
   const review = byId([...conn.db.boardReviews.iter()].filter(r => r.claimId === id)).pop();
-  const precedents = [...conn.db.boardPrecedents.iter()].filter(p => p.claimId === id && p.packVersion === v);
   const approvals = [...conn.db.boardApprovals.iter()].filter(a => a.claimId === id);
   const ledger = [...conn.db.boardLedger.iter()].filter(l => l.claimId === id);
   const rule = c.settlementRuleId ? [...conn.db.boardRules.iter()].find(r => r.id === c.settlementRuleId) : undefined;
   const open = hospital ? 'Open the report' : 'Open the PDF';
   const verdict = (x: string) => x.replace('_', ' ');
   return h('section', { id: 'claim-detail' },
-    h('h3', {}, `Claim #${c.id}: ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}`, ' ', h('button', { class: 'link', onclick: () => { openClaim = undefined; render(); } }, 'close')),
+    h('h3', {}, `Claim #${c.id}: ${c.claimantName || (c.coverKind === 'property' ? 'the venue' : 'no claimant')}, ${kindWords(c.incidentKind)} in ${c.zoneName}`, ' ', h('button', { class: 'link', onclick: () => { openClaim = undefined; render(); } }, 'close')),
     h('p', { class: 'big' }, h('b', {}, statusOf(c)), c.statusNote && `: ${c.statusNote}`),
     h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claude decided: ${verdict(review.verdict)}.`),
     whoPays(c),
@@ -944,7 +1019,7 @@ function claimDetail(id: bigint) {
       hospital.status === 'received' && h('p', {}, `Hospital report from ${hospital.providerName}, visit ${hospital.visitDate}. `, h('a', { href: `/blobs/${hospital.fileHash}`, target: '_blank' }, 'Open the report')),
       hospital.status === 'failed' && h('p', { class: 'fail' }, `The hospital report failed: ${hospital.problems.join('; ')}`)],
     // Claims the scripted claims run files have no hospital report: staff upload the clinic's PDF.
-    !hospital && c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
+    !hospital && c.status.tag === 'AwaitingRecord' && INJURIES.includes(c.incidentKind) && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
       h('h4', {}, 'Upload the clinic\'s report'),
       h('label', {}, 'Clinic report PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.test_mode && h('label', {}, 'or a test report, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
@@ -974,13 +1049,99 @@ function claimDetail(id: bigint) {
       h('tr', {}, h('th', {}, 'Code'), h('th', {}, 'Service'), h('th', {}, 'Billed'), h('th', {}, 'Allowed'), h('th', {}, 'Covered'), h('th', {}, 'Outcome')),
       lines.map(l => h('tr', {}, h('td', {}, l.code), h('td', {}, l.description), h('td', {}, money(l.billedCents)), h('td', {}, money(l.allowedCents)),
         h('td', {}, money(l.coveredCents)), h('td', { class: l.outcome === 'excluded' ? 'fail' : '' }, `${l.outcome}${l.reason ? `: ${l.reason}` : ''}`))))],
-    precedents.length > 0 && [h('h4', {}, 'Similar past claims (Elastic)'),
-      h('ul', {}, precedents.map(p => h('li', {}, `${p.reference}: ${p.outcome}, ${money(p.payoutCents)}, score ${p.score.toFixed(2)}. ${p.narrative}`)))],
+    clauses(c),
     h('h4', {}, 'Evidence facts'),
     h('table', {}, facts.map(f => h('tr', {}, h('td', {}, `[${f.seq}]`), h('td', {}, f.key), h('td', {}, f.value), h('td', { class: 'muted' }, `${f.source}, ${f.reader}`)))),
     approvals.length > 0 && [h('h4', {}, 'Decisions'), h('ul', {}, approvals.map(a => h('li', {}, `${date(a.decidedAt)} ${a.approverName} (${a.approverRole}) ${a.decision} at ${money(a.amountSeenCents)}${a.learn ? ', learned a rule' : ''}${a.reason ? `: ${a.reason}` : ''}`)))],
     ledger.length > 0 && [h('h4', {}, 'Ledger'), h('table', {}, ledger.map(l => h('tr', {}, h('td', {}, l.journal), h('td', {}, l.account),
       h('td', {}, l.debitCents ? `Dr ${money(l.debitCents)}` : ''), h('td', {}, l.creditCents ? `Cr ${money(l.creditCents)}` : ''), h('td', { class: 'muted' }, l.memo))))]);
+}
+
+/** The claims whose policy clauses this page subscribed to: `claim_clauses` takes the claim's id. */
+const clauseClaims = new Set<bigint>();
+
+/** The policy clauses the Evidence Engine found for the claim's latest evidence pack, best match first. */
+function clauses(c: Claim) {
+  if (!clauseClaims.has(c.id)) {
+    clauseClaims.add(c.id);
+    conn.subscriptionBuilder()
+      .onApplied(() => render())
+      .onError(ctx => console.warn(`claim ${c.id} clauses`, (ctx as any).event))
+      .subscribe([`SELECT * FROM claim_clauses(${c.id})`]);
+  }
+  const all = [...conn.db.claimClauses.iter()].filter(k => k.claimId === c.id);
+  const latest = Math.max(0, ...all.map(k => k.packVersion));
+  const rows = all.filter(k => k.packVersion === latest).sort((a, b) => b.score - a.score);
+  if (!rows.length) return null;
+  return [h('h4', {}, 'Policy clauses that bear on it (Elastic)'), h('table', {},
+    h('tr', {}, h('th', {}, 'Policy'), h('th', {}, 'Section'), h('th', {}, 'Page'), h('th', {}, 'Clause'), h('th', {}, 'Match')),
+    rows.map(k => h('tr', {},
+      h('td', {}, k.policy === 'attendee' ? "The attendee's own" : "The venue's"),
+      h('td', {}, k.section.replace(/_/g, ' ')), h('td', {}, k.page),
+      h('td', {}, `"${k.text}"`, h('div', { class: 'muted' }, k.clauseId)),
+      h('td', { class: 'muted' }, k.score.toFixed(2)))))];
+}
+
+const CHARGE_STATUS: Record<string, string> = {
+  proposed: 'proposed: waits for the organizer',
+  approved: 'approved: on their tap page to pay or dispute',
+  paying: 'paying from their wallet',
+  paid: 'paid',
+  disputed: 'disputed: waits for the organizer again',
+  waived: 'waived',
+};
+
+/** The incident kind a charge is for, from its claim or its incident. */
+function chargeKind(c: Charge): string {
+  const claim = c.claimId ? [...conn.db.claimsBoard.iter()].find(x => x.id === c.claimId) : undefined;
+  if (claim) return claim.incidentKind;
+  const open = [...conn.db.openIncidents.iter()].find(i => i.id === c.incidentId);
+  if (open) return open.kind.tag.toLowerCase();
+  return [...conn.db.incidentMarker.iter()].find(m => m.incidentId === c.incidentId)?.kind ?? '';
+}
+
+/** Every charge to an attendee who broke or took something: who staff named, the band's checks, the
+ *  recommendation, and the organizer's approve or waive. Nothing is taken until the attendee presses pay. */
+function chargeList() {
+  const rows = [...conn.db.boardCharges.iter()].sort((a, b) => Number(b.id - a.id));
+  const ops = can('ops');
+  const waive = (c: Charge) => {
+    const reason = prompt(`Why waive the ${money(c.amountCents)} charge to ${c.attendeeName}?`)?.trim();
+    if (reason) act(() => conn.reducers.waiveCharge({ chargeId: c.id, reason }));
+  };
+  const check = (line: string) => {
+    const [name, result, ...detail] = line.split(': ');
+    return h('div', { class: result }, `${result} ${name.replace(/_/g, ' ')}: ${detail.join(': ')}`);
+  };
+  return h('section', {},
+    h('h3', {}, `Charges (${rows.length})`),
+    !rows.length && h('p', { class: 'muted' }, 'None. Staff name who broke or took something on the open incident, and its charge shows here for the organizer.'),
+    rows.length > 0 && h('table', {},
+      h('tr', {}, h('th', {}, 'Charge'), h('th', {}, 'Attendee'), h('th', {}, 'Amount'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, "The band's checks"), h('th', {}, 'Recommendation'), h('th', {})),
+      rows.map(c => {
+        const deciding = c.status === 'proposed' || c.status === 'disputed';
+        return h('tr', { class: ops && deciding ? 'alert' : '' },
+          h('td', {}, `#${c.id}`),
+          h('td', {}, `${c.attendeeName}, band ${bandCode(c.bandId)}`,
+            h('div', { class: 'muted' }, `named by ${c.namedByName} (${c.namedByRole})${c.note ? `: ${c.note}` : ''}`)),
+          h('td', {}, c.amountCents ? money(c.amountCents) : h('span', { class: 'muted' }, "waits for the claim's cost")),
+          h('td', {}, `${capital(kindWords(chargeKind(c)))}, incident ${c.incidentId}`,
+            c.claimId !== 0n && h('div', {}, h('button', { class: 'link', onclick: () => showClaim(c.claimId) }, `claim #${c.claimId}`))),
+          h('td', {}, CHARGE_STATUS[c.status] ?? c.status,
+            c.approvedByName && h('div', { class: 'muted' }, `approved by ${c.approvedByName}`),
+            c.disputeText && h('div', {}, `They said: "${c.disputeText}"`),
+            c.waiveReason && h('div', { class: 'muted' }, `waived: ${c.waiveReason}`),
+            c.paymentReference && h('div', { class: 'muted' }, c.paymentReference)),
+          h('td', {}, c.checks.map(check), !c.checksPassed && h('div', { class: 'fail' }, 'A check failed: waive it or name the band again.')),
+          h('td', {}, c.recommendation ? h('b', {}, c.recommendation === 'charge' ? 'Charge' : 'No charge') : h('span', { class: 'muted' }, 'not yet: comes with the claim\'s decision'),
+            c.recommendationReason && h('div', {}, c.recommendationReason),
+            c.clauseIds.length > 0 && h('div', { class: 'muted' }, `clauses ${c.clauseIds.join(', ')}`)),
+          h('td', {},
+            ops && deciding && c.amountCents > 0n && h('button', {
+              onclick: () => act(() => conn.reducers.approveCharge({ chargeId: c.id, amountSeenCents: c.amountCents, packHashSeen: c.packHash })),
+            }, `Approve charge of ${money(c.amountCents)}`),
+            ops && (deciding || c.status === 'approved') && h('button', { onclick: () => waive(c) }, 'Waive')));
+      })));
 }
 
 function rules() {
@@ -989,7 +1150,7 @@ function rules() {
   return h('section', {},
     h('h3', {}, 'Learned payment rules'),
     !rows.length && h('p', { class: 'muted' }, 'None yet. An approval with "learn" checked creates one.'),
-    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${COVER_WORDS[r.coverKind] ?? r.coverKind} cover`),
+    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${kindWords(r.incidentKind)} under ${COVER_WORDS[r.coverKind] ?? r.coverKind} cover`),
       h('td', {}, `pays up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
       h('td', {}, `from ${r.approverName} (${r.approverRole})`), h('td', {}, r.status)))),
     policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
@@ -1003,7 +1164,7 @@ function claimsTab() {
     openClaim = filed.id;
     scrollToClaim = true;
   }
-  return [incidentDesk(), injuriesWithoutClaim(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+  return [incidentDesk(), injuriesWithoutClaim(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), chargeList(), rules()];
 }
 
 // --- Photos -------------------------------------------------------------------------------
@@ -1210,7 +1371,7 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
   },
   {
     job: 'Claims: checking the evidence',
-    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the most similar past claims. Both come back to the claim as checks on the Claims tab; they never change an amount.',
+    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the clauses of the venue\'s policy, and of the attendee\'s own policy for a stolen or broken belonging, that bear on that kind of claim. Both come back to the claim on the Settlements tab, as checks and as its policy clauses; they never change an amount.',
     views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
   },
 ];

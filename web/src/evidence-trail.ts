@@ -34,7 +34,9 @@ function groups(facts: EvidenceFact[]): Group[] {
 }
 
 const OPENED_BY: Record<string, string> = { band: 'the band', ops: 'the organizer', medic: 'a medic', vision: 'the venue camera' };
-const KIND: Record<string, string> = { fall: 'Fall', sos: 'SOS', property: 'Property damage' };
+const KIND: Record<string, string> = {
+  fall: 'Fall', sos: 'SOS', property: 'Property damage', theft: "Theft of an attendee's belonging", breakage: "An attendee's belonging broken",
+};
 
 /** Where the evidence for `claim` came from, as a timeline. */
 export function evidenceTrail(conn: DbConnection, claim: Claim): HTMLElement {
@@ -110,8 +112,13 @@ export function evidenceTrail(conn: DbConnection, claim: Claim): HTMLElement {
         break;
       }
       case 'policy':
-        add(g.at, 'Policy', `${v('policy_number')} with ${v('insurer')}: ${v('cover_kind').replace('_', ' ')}, up to ${money(BigInt(v('per_claim_limit_cents') || 0))} a claim, deductible ${money(BigInt(v('deductible_cents') || 0))}, ${money(BigInt(v('aggregate_remaining_cents') || 0))} left`);
+        add(g.at, 'Policy', `${v('cover_kind') === 'personal_property' ? "The attendee's own policy " : ''}${v('policy_number')} with ${v('insurer')}: ${v('cover_kind').replace('_', ' ')}, up to ${money(BigInt(v('per_claim_limit_cents') || 0))} a claim, deductible ${money(BigInt(v('deductible_cents') || 0))}, ${money(BigInt(v('aggregate_remaining_cents') || 0))} left`);
         break;
+      case 'responsible_party': {
+        const checked = [v('band_in_zone') === 'yes' && 'was in the zone', v('band_at_spot') === 'yes' && 'was at the spot'].filter(Boolean).join(' and ');
+        add(g.at, 'Named', `The ${v('named_by') === 'medic' ? 'medic' : 'organizer'} named ${v('responsible_name')}, band ${band(Number(v('responsible_band')))}, as who did it${checked ? `; the band ${checked}` : ''}${v('naming_note') ? `: ${v('naming_note')}` : ''}`);
+        break;
+      }
       // The medical record's facts are shown from the record itself, below.
     }
   }

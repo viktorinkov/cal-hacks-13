@@ -4,13 +4,13 @@
 // runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, money, time } from './lib';
+import { act, h, isLoss, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
 import { venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
-import type { IncidentMarker, LiveRun } from './module_bindings/types';
+import type { Charge, IncidentMarker, LiveRun } from './module_bindings/types';
 
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
@@ -24,10 +24,18 @@ let v: LiveView | undefined;
 let crowd: Crowd;
 let placing: { bandId: number; label: string } | undefined;
 let hint = '';
-/** A red pole over each open incident. */
+/** A pole over each open incident: red for someone hurt, amber for something broken or stolen. */
 const poles = new Map<bigint, THREE.Mesh>();
 const poleShape = new THREE.CylinderGeometry(0.35, 0.35, 3.6, 12).translate(0, 1.8, 0);
 const poleColour = new THREE.MeshBasicMaterial({ color: '#e00020' });
+const lossColour = new THREE.MeshBasicMaterial({ color: '#f0a000' });
+
+/** Each incident kind in a word or two, for the tables. */
+const SHORT: Record<string, string> = { sos: 'SOS', fall: 'fall', property: 'equipment broken', theft: 'belonging stolen', breakage: 'belonging broken' };
+
+function short(kind: string): string {
+  return SHORT[kind] ?? kind;
+}
 
 function setUp(c: DbConnection) {
   conn = c;
@@ -74,7 +82,7 @@ function syncPoles(open: IncidentMarker[]) {
   for (const m of open) {
     let pole = poles.get(m.incidentId);
     if (!pole) {
-      pole = new THREE.Mesh(poleShape, poleColour);
+      pole = new THREE.Mesh(poleShape, isLoss(m.kind) ? lossColour : poleColour);
       poles.set(m.incidentId, pole);
       v!.layer.add(pole);
     }
@@ -103,12 +111,24 @@ function status(r: LiveRun | undefined, list: IncidentMarker[]) {
   // The first incident comes a minute in, once the crowd has reached its tables.
   const secs = Math.max(0, Math.round((Number(r.nextIncidentAt.microsSinceUnixEpoch / 1000n) - now) / 1000));
   const next = r.phase.tag === 'Running' && !conn.db.livePause.id.find(0) ? `, next in ${secs} s` : '';
+  const ids = new Set(list.map(m => m.incidentId));
+  const charges = [...conn.db.boardCharges.iter()].filter(c => ids.has(c.incidentId));
+  const charged = (...s: string[]) => charges.filter(c => s.includes(c.status)).length;
   return h('table', {},
     row('Event run', `${phaseWords(r)}: started ${time(r.startedAt)}, ends ${time(r.endsAt)}, ${r.pace}× speed`),
     row('People', `${people.toLocaleString()} of ${r.crowd.toLocaleString()}`),
     row('Incidents', `${list.length}, ${open} open${next}`),
     row('Claims', `${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`),
+    charges.length > 0 && row('Charges', `${charges.length} named: ${charged('proposed', 'disputed')} waiting for the organizer, ${charged('approved', 'paying')} to pay, ${charged('paid')} paid, ${charged('waived')} waived`),
     row('Seed', String(r.seed)));
+}
+
+const CHARGE_WORDS: Record<string, string> = {
+  proposed: 'waits for the organizer', approved: 'to pay', paying: 'paying', paid: 'paid', disputed: 'disputed', waived: 'waived',
+};
+
+function chargeWords(c: Charge | undefined): string {
+  return c ? `charge to ${c.attendeeName}: ${CHARGE_WORDS[c.status] ?? c.status}${c.amountCents ? `, ${money(c.amountCents)}` : ''}` : '';
 }
 
 function controls(r: LiveRun | undefined) {
@@ -182,20 +202,31 @@ function placeBands() {
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
 }
 
+/** A decision about a charge rather than the claim: staff naming who did it, the recommendation, the
+ *  organizer's approve or waive, the attendee's dispute and their payment. */
+const CHARGE_ROW = /charg|^Named /i;
+
 function history() {
   const rows = [...conn.db.decision.iter()].sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
+  const kinds = new Map([...conn.db.incidentMarker.iter()].map(m => [m.incidentId, m.kind]));
+  const charges = new Map([...conn.db.boardCharges.iter()].map(c => [c.incidentId, c]));
   return h('section', {},
     h('h4', {}, 'Decision history'),
     rows.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
       : h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Incident'), h('th', {}, 'Who'), h('th', {}, 'Decided'), h('th', {}, 'Why')),
-        rows.map(d => h('tr', {},
-          h('td', {}, time(d.at)),
-          h('td', {}, d.incidentId ? String(d.incidentId) : ''),
-          h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
-          h('td', {}, d.what),
-          h('td', {}, d.why)))));
+        rows.map(d => {
+          const charge = CHARGE_ROW.test(d.what) ? charges.get(d.incidentId) : undefined;
+          const kind = kinds.get(d.incidentId);
+          return h('tr', {},
+            h('td', {}, time(d.at)),
+            h('td', {}, d.incidentId ? String(d.incidentId) : '',
+              (kind || charge) && h('div', { class: 'muted' }, [kind && short(kind), charge && `charge #${charge.id}`].filter(Boolean).join(' · '))),
+            h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
+            h('td', {}, d.what),
+            h('td', {}, d.why));
+        })));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -209,6 +240,7 @@ export function runBar(c: DbConnection, canRun: boolean) {
 function incidents(r: LiveRun | undefined, canRun: boolean) {
   const list = markers(r).sort((a, b) => Number(b.incidentId - a.incidentId));
   const claims = new Map([...conn.db.claimsBoard.iter()].map(c => [c.id, c]));
+  const charges = new Map([...conn.db.boardCharges.iter()].map(c => [c.incidentId, c]));
   return h('section', {},
     h('h4', {}, `Incidents (${list.length})`),
     list.length === 0
@@ -220,9 +252,10 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
             h('td', {}, time(m.openedAt)),
-            h('td', {}, `${m.incidentId}: ${m.kind}${m.person ? `, ${m.person}` : ''}${m.place ? ` at ${m.place}` : ''}`),
+            h('td', {}, `${m.incidentId}: ${short(m.kind)}${m.person ? `, ${m.person}` : ''}${m.place ? ` at ${m.place}` : ''}`),
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status),
-            h('td', {}, m.claimId ? `${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : ''),
+            h('td', {}, m.claimId ? `${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : '',
+              charges.has(m.incidentId) && h('div', { class: 'muted' }, chargeWords(charges.get(m.incidentId)))),
             h('td', {},
               h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
               waiting && [' ', h('button', {
@@ -241,7 +274,7 @@ export function liveRunSection(c: DbConnection, canRun: boolean) {
   return [
     h('section', {},
       v!.view, v!.note,
-      h('p', { class: 'muted' }, "Each person shows their band's light: green calm, amber busy, red very busy, a red strobe on SOS or a fall (someone who fell lies down), and a blue pulse in the light circle around them. Our hardware and test bands are blue. A red pole marks each open incident."),
+      h('p', { class: 'muted' }, "Each person shows their band's light: green calm, amber busy, red very busy, a red strobe on SOS or a fall (someone who fell lies down), and a blue pulse in the light circle around them. Our hardware and test bands are blue. A pole marks each open incident: red for someone hurt, amber for something broken or stolen."),
       canRun && placeBands()),
     incidents(r, canRun),
     history(),

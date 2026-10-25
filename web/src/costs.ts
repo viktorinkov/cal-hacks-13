@@ -6,7 +6,7 @@ import { date, h, money } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { Claim, LedgerEntry, MedicalRecord } from './module_bindings/types';
 
-const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue' };
+const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue', personal_property: 'Belongings' };
 
 /** One claim's or one cost center's amounts, in cents. */
 export type Line = {
@@ -134,7 +134,7 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
       scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Venue'), h('th', {}, 'Deductibles'), h('th', {}, 'Short payments'), h('th', {}, 'Not recovered yet'), h('th', {}, 'Insurer'), h('th', {}, 'Attendees'), h('th', {}, 'Unpaid')),
         h('tr', {}, td(total.venueCost + venueUncovered), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
-          td(total.insurerPaid + total.insurerOwes), td(centers.get('Medical')?.notCovered ?? 0n), td(total.accrued))))),
+          td(total.insurerPaid + total.insurerOwes), td((centers.get('Medical')?.notCovered ?? 0n) + (centers.get('Belongings')?.notCovered ?? 0n)), td(total.accrued))))),
     h('section', {},
       h('h3', {}, `Claims (${claims.length})`),
       scroll(h('table', {},

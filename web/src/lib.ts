@@ -273,6 +273,29 @@ export function date(t: Timestamp | undefined): string {
   return t ? t.toDate().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+/** Each incident kind in a few words, for staff screens. */
+const KIND_WORDS: Record<string, string> = {
+  sos: 'SOS',
+  fall: 'fall',
+  property: 'venue equipment broken',
+  theft: "an attendee's belonging stolen",
+  breakage: "an attendee's belonging broken",
+};
+
+/** An incident kind (`theft`, or an enum tag like `Theft`) in words. */
+export function kindWords(kind: string): string {
+  return KIND_WORDS[kind.toLowerCase()] ?? kind;
+}
+
+/** Something was broken or taken: staff can name who did it, and that attendee can be charged. */
+export function isLoss(kind: string): boolean {
+  return ['property', 'theft', 'breakage'].includes(kind.toLowerCase());
+}
+
+export function capital(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export function short(id: Identity | string): string {
   const hex = typeof id === 'string' ? id : id.toHexString();
   return hex.slice(0, 10);
