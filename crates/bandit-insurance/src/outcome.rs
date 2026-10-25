@@ -1,8 +1,7 @@
 //! The three outcomes: auto-settle under a learned rule, route to a named
-//! person, or refuse and show what was checked. `decide` is the code-only
-//! decision, used when Claude's answer could not be used.
+//! person, or refuse and show what was checked.
 
-use crate::complications::{ClaimState, Complication, complications, reason};
+use crate::complications::{ClaimState, complications, reason};
 use crate::coverage::Amounts;
 use crate::rules::SettlementRule;
 use crate::{Check, CheckResult, Corroboration};
@@ -32,8 +31,6 @@ pub struct DecisionInput<'a> {
     pub review_required: bool,
     /// From `rules::matching_rule` for the claim's shape.
     pub rule: Option<&'a SettlementRule>,
-    /// Set when several people were hurt in one occurrence.
-    pub mass_occurrence: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -43,41 +40,62 @@ pub enum Decision {
     Route { reason: String },
 }
 
-/// The code-only decision:
-/// 1. no cover -> `Refuse("no active cover for this incident kind")`;
-/// 2. payout 0 while the sources agree -> `Refuse("payout is zero after limits")`;
-/// 3. any complication, including a missing or doubtful review when
-///    `review_required` -> `Route("Complications: " + every complication)`;
-/// 4. otherwise `AutoSettle` under the learned rule.
+/// First match wins:
+/// 1. a complication (no cover, a bill over the policy's limit, a service the
+///    fee schedule does not list) -> `Route("Complication: " + every one)`;
+/// 2. `Disputed` -> `Refuse("evidence disputed: " + names of failed checks, comma-joined)`;
+/// 3. payout 0 -> `Refuse("payout is zero after limits")`;
+/// 4. any check with result `Fail` -> `Route("failed checks: " + names)`;
+/// 5. `review_required` and the review is not `Consistent` ->
+///    `Route("claims agent: " + concerns text)` or `Route("claims agent review unavailable")`;
+/// 6. not `Corroborated` -> `Route("evidence uncorroborated")`;
+/// 7. no rule -> `Route("no learned rule for this kind of claim yet")`;
+/// 8. rule requires corroboration (always true today) and payout above its
+///    ceiling -> `Route("payout above the rule's ceiling")`;
+/// 9. otherwise `AutoSettle` under the rule.
 ///
-/// Disputed evidence is never refused here: the sources disagree, so a person
-/// decides. A rule settles only at or under the ceiling its approver gave it,
-/// whatever `requires_corroborated` says.
+/// Rule 8 compares the ceiling for every rule, whatever `requires_corroborated`
+/// says, so no rule can settle above the ceiling its approver gave it.
 pub fn decide(input: &DecisionInput) -> Decision {
-    if !input.has_cover {
-        return Decision::Refuse { reason: "no active cover for this incident kind".into() };
+    let refuse = |reason: String| Decision::Refuse { reason };
+    let route = |reason: String| Decision::Route { reason };
+    let payout = input.amounts.payout_cents;
+
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    if !found.is_empty() {
+        return route(reason("", &found));
     }
-    if input.amounts.payout_cents == 0 && input.corroboration != Corroboration::Disputed {
-        return Decision::Refuse { reason: "payout is zero after limits".into() };
+    if input.corroboration == Corroboration::Disputed {
+        let failed = failed_check_names(input.checks);
+        if failed.is_empty() {
+            return refuse("evidence disputed".into());
+        }
+        return refuse(format!("evidence disputed: {}", failed.join(", ")));
     }
-    let mut found = complications(&ClaimState {
-        corroboration: input.corroboration,
-        amounts: input.amounts,
-        checks: input.checks,
-        rule: input.rule,
-        mass_occurrence: input.mass_occurrence.as_deref(),
-    });
+    if payout == 0 {
+        return refuse("payout is zero after limits".into());
+    }
+    let failed = failed_check_names(input.checks);
+    if !failed.is_empty() {
+        return route(format!("failed checks: {}", failed.join(", ")));
+    }
     if input.review_required {
         match &input.review {
             ReviewGate::Consistent => {}
-            ReviewGate::Concerns(text) => found.insert(0, Complication::ClaudeConcerns(text.clone())),
-            ReviewGate::Missing => found.insert(0, Complication::ReviewMissing),
+            ReviewGate::Concerns(text) => return route(format!("claims agent: {text}")),
+            ReviewGate::Missing => return route("claims agent review unavailable".into()),
         }
     }
-    match input.rule {
-        Some(rule) if found.is_empty() => Decision::AutoSettle { rule_id: rule.rule_id, rule_version: rule.version },
-        _ => Decision::Route { reason: reason("", &found) },
+    if input.corroboration != Corroboration::Corroborated {
+        return route("evidence uncorroborated".into());
     }
+    let Some(rule) = input.rule else {
+        return route("no learned rule for this kind of claim yet".into());
+    };
+    if payout > rule.ceiling_cents {
+        return route("payout above the rule's ceiling".into());
+    }
+    Decision::AutoSettle { rule_id: rule.rule_id, rule_version: rule.version }
 }
 
 /// Names of the checks that failed, in order.
@@ -117,10 +135,10 @@ mod tests {
     }
 
     fn amounts(payout: u64) -> Amounts {
-        Amounts { cost_cents: payout.max(18000), payout_cents: payout, recoverable_cents: payout, venue_cost_cents: 0 }
+        Amounts { cost_cents: payout, payout_cents: payout, recoverable_cents: payout, venue_cost_cents: 0 }
     }
 
-    /// The small fall: every gate open, a v2 rule with a 25000 ceiling.
+    /// The hero claim: every gate open, a v2 rule with a 25000 ceiling.
     fn happy<'a>(checks: &'a [Check], rule: &'a SettlementRule) -> DecisionInput<'a> {
         DecisionInput {
             has_cover: true,
@@ -130,7 +148,6 @@ mod tests {
             review: ReviewGate::Consistent,
             review_required: true,
             rule: Some(rule),
-            mass_occurrence: None,
         }
     }
 
@@ -143,109 +160,92 @@ mod tests {
     }
 
     #[test]
-    fn a_simple_claim_auto_settles() {
+    fn happy_path_auto_settles() {
         let (checks, rule) = (passing(), rule());
         assert_eq!(decide(&happy(&checks, &rule)), Decision::AutoSettle { rule_id: 7, rule_version: 2 });
     }
 
     #[test]
-    fn no_cover_refuses_first() {
+    fn rule_1_a_gap_in_the_policy_goes_to_a_person_first() {
         let (checks, rule) = (failing(), rule());
         let input = DecisionInput { has_cover: false, corroboration: Corroboration::Disputed, amounts: amounts(0), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), refused("no active cover for this incident kind"));
+        assert_eq!(decide(&input), routed("Complication: no cover in the venue's policy pays for this kind of incident"));
+        let capped = DecisionInput { amounts: Amounts { cost_cents: 30000, ..amounts(18000) }, ..happy(&checks, &rule) };
+        assert_eq!(decide(&capped), routed("Complication: the covered cost $300.00 is over the policy's limit, which pays at most $180.00"));
     }
 
     #[test]
-    fn disputed_evidence_goes_to_a_person_not_a_refusal() {
+    fn rule_2_disputed_refuses_even_with_a_rule() {
         let (checks, rule) = (failing(), rule());
-        let input = DecisionInput { corroboration: Corroboration::Disputed, amounts: amounts(0), review: ReviewGate::Missing, ..happy(&checks, &rule) };
-        assert_eq!(
-            decide(&input),
-            routed(
-                "Complications: Claude's answer could not be used; the sources disagree on where or when it happened; \
-                 failed checks: witness_zone, vision_zone"
-            )
-        );
+        let input = DecisionInput { corroboration: Corroboration::Disputed, amounts: amounts(0), ..happy(&checks, &rule) };
+        assert_eq!(decide(&input), refused("evidence disputed: witness_zone, vision_zone"));
+
+        let checks = passing();
+        let input = DecisionInput { corroboration: Corroboration::Disputed, ..happy(&checks, &rule) };
+        assert_eq!(decide(&input), refused("evidence disputed"));
     }
 
     #[test]
-    fn zero_payout_refuses() {
+    fn rule_3_zero_payout_refuses() {
         let (checks, rule) = (failing(), rule());
         let input = DecisionInput { amounts: amounts(0), corroboration: Corroboration::Uncorroborated, ..happy(&checks, &rule) };
         assert_eq!(decide(&input), refused("payout is zero after limits"));
     }
 
     #[test]
-    fn a_failed_check_routes_even_when_a_rule_matches() {
+    fn rule_4_failed_check_routes_even_when_a_rule_matches() {
         let (checks, rule) = (failing(), rule());
         let input = DecisionInput { review: ReviewGate::Missing, ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: Claude's answer could not be used; failed checks: witness_zone, vision_zone"));
+        assert_eq!(decide(&input), routed("failed checks: witness_zone, vision_zone"));
     }
 
     #[test]
-    fn the_review_gate() {
+    fn rule_5_review_gate() {
         let (checks, rule) = (passing(), rule());
-        let concerns = ReviewGate::Concerns("causation: the record says the injury happened at home".into());
+        let concerns = ReviewGate::Concerns("needs_human: causation: the record says the injury happened at home".into());
         let input = DecisionInput { review: concerns.clone(), corroboration: Corroboration::Uncorroborated, ..happy(&checks, &rule) };
-        assert_eq!(
-            decide(&input),
-            routed(
-                "Complications: Claude: causation: the record says the injury happened at home; \
-                 no second source confirms where and when it happened"
-            )
-        );
+        assert_eq!(decide(&input), routed("claims agent: needs_human: causation: the record says the injury happened at home"));
+
+        let input = DecisionInput { review: concerns.clone(), ..happy(&checks, &rule) };
+        assert_eq!(decide(&input), routed("claims agent: needs_human: causation: the record says the injury happened at home"));
 
         let input = DecisionInput { review: ReviewGate::Missing, ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: Claude's answer could not be used"));
+        assert_eq!(decide(&input), routed("claims agent review unavailable"));
 
         let input = DecisionInput { review: concerns, review_required: false, ..happy(&checks, &rule) };
         assert_eq!(decide(&input), Decision::AutoSettle { rule_id: 7, rule_version: 2 });
     }
 
     #[test]
-    fn missing_evidence_routes() {
+    fn rule_6_uncorroborated_routes() {
         let (checks, rule) = (passing(), rule());
         let input = DecisionInput { corroboration: Corroboration::Uncorroborated, ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: no second source confirms where and when it happened"));
+        assert_eq!(decide(&input), routed("evidence uncorroborated"));
     }
 
     #[test]
-    fn no_rule_routes() {
+    fn rule_7_no_rule_routes() {
         let (checks, rule) = (passing(), rule());
         let input = DecisionInput { rule: None, amounts: amounts(900000), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: no approval covers this kind of claim yet"));
+        assert_eq!(decide(&input), routed("no learned rule for this kind of claim yet"));
     }
 
     #[test]
-    fn above_the_ceiling_routes() {
+    fn rule_8_above_ceiling_routes() {
         let (checks, rule) = (passing(), rule());
         let input = DecisionInput { amounts: amounts(25001), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: $250.01 is above the $250.00 ceiling of rule v2"));
+        assert_eq!(decide(&input), routed("payout above the rule's ceiling"));
 
         let input = DecisionInput { amounts: amounts(25000), ..happy(&checks, &rule) };
         assert_eq!(decide(&input), Decision::AutoSettle { rule_id: 7, rule_version: 2 });
 
         let retired = SettlementRule { ceiling_cents: 0, version: 3, ..rule.clone() };
         let input = DecisionInput { rule: Some(&retired), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: $180.00 is above the $0.00 ceiling of rule v3"));
+        assert_eq!(decide(&input), routed("payout above the rule's ceiling"));
 
         let loose = SettlementRule { requires_corroborated: false, ..rule.clone() };
         let input = DecisionInput { rule: Some(&loose), amounts: amounts(90000), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), routed("Complications: $900.00 is above the $250.00 ceiling of rule v2"));
-    }
-
-    #[test]
-    fn a_bill_over_the_limit_and_a_mass_occurrence_route() {
-        let (checks, rule) = (passing(), rule());
-        let capped = Amounts { cost_cents: 30000, ..amounts(18000) };
-        let input = DecisionInput { amounts: capped, mass_occurrence: Some("3 people hurt in Main stage within 5 minutes".into()), ..happy(&checks, &rule) };
-        assert_eq!(
-            decide(&input),
-            routed(
-                "Complications: the covered cost $300.00 is over the policy's limit, so the payout is capped at $180.00; \
-                 3 people hurt in Main stage within 5 minutes"
-            )
-        );
+        assert_eq!(decide(&input), routed("payout above the rule's ceiling"));
     }
 
     #[test]

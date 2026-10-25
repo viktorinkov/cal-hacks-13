@@ -193,7 +193,7 @@ pub enum Corroboration {
     Corroborated,
     /// No second source. Routed to a person, never auto-settled.
     Uncorroborated,
-    /// A second source disagrees. Never settled or refused alone: the organizer decides.
+    /// A second source disagrees. Refused, with every comparison listed.
     Disputed,
 }
 

@@ -64,11 +64,6 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     step(pause, "4. Lee Park's band reports a fall at Main stage, but the light circle forms on Sponsor row")?;
     let note = "on scene: says they fell; no visible injury, giving an ice pack";
     let lee = injury(app, &test_bands, 93, MAIN_STAGE, &[95, 96, 97], SPONSOR_ROW, note)?;
-    let c = show::wait_for(app, lee, FLOW_SECS, |c| !in_pipeline(c.status))?;
-    if c.status == ClaimStatus::Routed {
-        println!("\nThe sources disagree, so Claude's refusal waits for the organizer:");
-        decide::refuse(app, lee, None, "the light circle formed on Sponsor row, not Main stage", true)?;
-    }
     show::summary(app, lee)?;
 
     step(pause, "5. A speaker falls off its stand at Main stage; the overhead camera sees it")?;

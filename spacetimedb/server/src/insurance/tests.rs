@@ -336,7 +336,7 @@ fn approve_larger_fall(w: &World) -> Claim {
     w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
-    assert!(c.status_note.starts_with("Claude would pay $895.00"), "{}", c.status_note);
+    assert_eq!(c.status_note, "Complication: the policy's fee schedule does not list 90715. Claude would pay $895.00");
     assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
     let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
@@ -419,7 +419,7 @@ fn claude_flags_an_injury_that_happened_at_home_for_a_person() {
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "every check passed, so a refusal on Claude's judgment goes to a person");
     assert!(c.status_note.starts_with("Claude recommends refusing: causation: the record says"), "{}", c.status_note);
-    assert!(c.status_note.ends_with("Complications: every check passed"), "{}", c.status_note);
+    assert!(c.status_note.ends_with("Every check passed, so a person decides"), "{}", c.status_note);
     assert_eq!(c.routed_to_name, "Organizer");
 }
 
@@ -439,14 +439,8 @@ fn a_circle_in_another_zone_disputes_the_fall() {
         d
     });
     let c = w.claim(claim.id);
-    assert_eq!(c.status, ClaimStatus::Routed, "the sources disagree, so Claude's refusal waits for a person");
-    assert!(c.status_note.starts_with("Claude recommends refusing on failed witness_zone"), "{}", c.status_note);
-    assert!(c.status_note.ends_with("Complications: the sources disagree on where or when it happened"), "{}", c.status_note);
-    let nothing = w.try_as("ops", |ctx| approve_claim(ctx, c.id, 0, c.pack_hash.clone(), None, true));
-    assert!(nothing.unwrap_err().starts_with("there is nothing to pay"));
-    w.as_("ops", |ctx| refuse_claim(ctx, c.id, c.pack_hash.clone(), "the light circle formed on Sponsor row".into()));
-    let c = w.claim(claim.id);
-    assert_eq!((c.status, c.decided_by.as_str()), (ClaimStatus::Refused, "approver"), "{}", c.status_note);
+    assert_eq!((c.status, c.decided_by.as_str()), (ClaimStatus::Refused, "claude"), "{}", c.status_note);
+    assert!(c.refusal_reason.starts_with("Claude refused: failed witness_zone"), "{}", c.refusal_reason);
     assert!(w.ledger(claim.id).is_empty());
 }
 
@@ -462,11 +456,7 @@ fn claude_cannot_pay_a_disputed_fall() {
     });
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
-    assert!(
-        c.status_note.starts_with("Claude would pay $0.00. Complications: the sources disagree on where or when it happened; failed checks: witness_zone"),
-        "{}",
-        c.status_note
-    );
+    assert!(c.status_note.starts_with("Claude would pay $0.00, but checks failed: witness_zone"), "{}", c.status_note);
 }
 
 #[test]
@@ -575,7 +565,7 @@ fn a_dead_review_job_sends_the_claim_to_a_person() {
     }
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
-    assert_eq!(c.status_note, "Complications: Claude's answer could not be used");
+    assert_eq!(c.status_note, "claims agent review unavailable");
 }
 
 #[test]
@@ -605,7 +595,7 @@ fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     w.claude_pays(first.id);
     let claim = w.claim(first.id);
     assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
-    assert!(claim.status_note.starts_with("Claude would pay $180.00. Complications: 3 people hurt in Main stage"), "{}", claim.status_note);
+    assert!(claim.status_note.starts_with("3 people hurt in Main stage"), "{}", claim.status_note);
     w.as_("ops", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone(), None, false));
     w.pay(claim.id);
     let p: DraftPayload = serde_json::from_str(&w.open_job(KIND_DRAFT, claim.id).payload).unwrap();
