@@ -111,6 +111,8 @@ pub enum TermStatus {
     Flagged,
     /// The policy does not state it: the default is in effect.
     Default,
+    /// The organizer typed it from the declarations page of a policy found by its forms.
+    Typed,
 }
 
 impl TermStatus {
@@ -119,6 +121,7 @@ impl TermStatus {
             TermStatus::Read => "read",
             TermStatus::Flagged => "flagged",
             TermStatus::Default => "default",
+            TermStatus::Typed => "typed",
         }
     }
 }
@@ -529,6 +532,85 @@ fn fit_period(terms: &mut [CheckedTerm]) {
     }
 }
 
+/// What the organizer typed from the declarations page of a policy found by its forms: the policy's
+/// own numbers, which a public coverage form never prints. Dates are `YYYY-MM-DD`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Declarations {
+    pub insurer_name: String,
+    pub policy_number: String,
+    pub fnol_contact: String,
+    pub period_start: String,
+    pub period_end: String,
+    /// The liability form's medical expense limit for any one person, and its general aggregate.
+    pub medical_limit_cents: Cents,
+    pub medical_aggregate_cents: Cents,
+    /// The property form's limit of insurance, which is also its aggregate, and its deductible.
+    pub property_limit_cents: Cents,
+    pub property_deductible_cents: Cents,
+}
+
+impl Declarations {
+    /// Each typed term as (cover, name, value in code's form).
+    fn terms(&self) -> Vec<(&'static str, &'static str, String)> {
+        let (m, p) = (CoverKind::MedicalPayments.as_str(), CoverKind::Property.as_str());
+        vec![
+            ("", "insurer_name", self.insurer_name.clone()),
+            ("", "policy_number", self.policy_number.clone()),
+            ("", "fnol_contact", self.fnol_contact.clone()),
+            ("", "period_start", self.period_start.clone()),
+            ("", "period_end", self.period_end.clone()),
+            (m, "per_claim_limit", self.medical_limit_cents.to_string()),
+            (m, "aggregate_limit", self.medical_aggregate_cents.to_string()),
+            (p, "per_claim_limit", self.property_limit_cents.to_string()),
+            (p, "aggregate_limit", self.property_limit_cents.to_string()),
+            (p, "deductible", self.property_deductible_cents.to_string()),
+        ]
+    }
+
+    /// Why these numbers cannot be a policy's, or `None` when they fit.
+    pub fn problem(&self) -> Option<String> {
+        let empty = [("insurer", &self.insurer_name), ("policy number", &self.policy_number), ("claims contact", &self.fnol_contact)];
+        if let Some((what, _)) = empty.iter().find(|(_, v)| v.trim().is_empty()) {
+            return Some(format!("type the {what} from the declarations page"));
+        }
+        let (Some(start), Some(end)) = (parse_date(&self.period_start), parse_date(&self.period_end)) else {
+            return Some("type the policy period as two dates".into());
+        };
+        if end <= start {
+            return Some("the policy period must end after it starts".into());
+        }
+        if self.medical_limit_cents == 0 {
+            return Some("type the medical expense limit".into());
+        }
+        if self.medical_limit_cents > self.medical_aggregate_cents {
+            return Some("the medical expense limit must be at most the general aggregate".into());
+        }
+        if self.property_limit_cents == 0 {
+            return Some("type the property limit".into());
+        }
+        if self.property_deductible_cents >= self.property_limit_cents {
+            return Some("the property deductible must be below the property limit".into());
+        }
+        None
+    }
+}
+
+/// Puts the typed declarations over the checked terms they name: each becomes `typed`, whatever the
+/// forms gave for it. The forms point at "the Declarations" for these numbers and never print them.
+pub fn apply_declarations(terms: &mut [CheckedTerm], d: &Declarations) {
+    for (cover, name, value) in d.terms() {
+        let Some(t) = terms.iter_mut().find(|t| t.cover == cover && t.name == name) else { continue };
+        t.shown = shown(name, &value);
+        t.read_value = t.shown.clone();
+        t.value = value;
+        t.quote = String::new();
+        t.page = 0;
+        t.clause = 0;
+        t.status = TermStatus::Typed;
+        t.problem = String::new();
+    }
+}
+
 /// The policy in effect from checked terms: each term's `value`, which is the
 /// default when the term was flagged or not stated.
 pub fn effective(terms: &[CheckedTerm]) -> EffectivePolicy {
@@ -719,6 +801,47 @@ mod tests {
         assert_eq!(p.fee_schedule.len(), 2, "a stated schedule replaces the default one");
         assert_eq!(p.fee_schedule[1], FeeLine { code: "73110".into(), description: "X-ray wrist, three or more views".into(), max_allowed_cents: 16_500 });
         assert_eq!(p.exclusions, ["staff"]);
+    }
+
+    fn declarations() -> Declarations {
+        Declarations {
+            insurer_name: "Harborline Casualty".into(),
+            policy_number: "HCP-2026-7781".into(),
+            fnol_contact: "claims@harborline.test".into(),
+            period_start: "2026-09-01".into(),
+            period_end: "2027-08-31".into(),
+            medical_limit_cents: 1_000_000,
+            medical_aggregate_cents: 200_000_000,
+            property_limit_cents: 25_000_000,
+            property_deductible_cents: 100_000,
+        }
+    }
+
+    #[test]
+    fn typed_declarations_stand_over_what_the_forms_gave() {
+        let mut c = check_policy(&read(), &pages());
+        apply_declarations(&mut c.terms, &declarations());
+        let per = find(&c, "medical_payments", "per_claim_limit");
+        assert_eq!((per.status, per.value.as_str(), per.shown.as_str(), per.quote.as_str(), per.page), (TermStatus::Typed, "1000000", "$10,000.00", "", 0));
+        assert_eq!(find(&c, "property", "aggregate_limit").value, "25000000", "the property limit is its aggregate too");
+        assert_eq!(find(&c, "medical_payments", "minimum_payout").status, TermStatus::Read, "what no declaration names stays as read");
+        let p = effective(&c.terms);
+        assert_eq!((p.insurer_name.as_str(), p.policy_number.as_str(), p.period_end.as_str()), ("Harborline Casualty", "HCP-2026-7781", "2027-08-31"));
+        assert_eq!((p.covers[1].per_claim_limit_cents, p.covers[1].deductible_cents), (25_000_000, 100_000));
+        assert_eq!(p.covers[0].service_window_days, 365);
+    }
+
+    #[test]
+    fn declarations_must_fit_together() {
+        assert_eq!(declarations().problem(), None);
+        let d = Declarations { period_end: "2026-08-31".into(), ..declarations() };
+        assert_eq!(d.problem().unwrap(), "the policy period must end after it starts");
+        let d = Declarations { medical_aggregate_cents: 5_000, ..declarations() };
+        assert!(d.problem().unwrap().contains("general aggregate"));
+        let d = Declarations { property_deductible_cents: 25_000_000, ..declarations() };
+        assert!(d.problem().unwrap().contains("property deductible"));
+        let d = Declarations { fnol_contact: " ".into(), ..declarations() };
+        assert_eq!(d.problem().unwrap(), "type the claims contact from the declarations page");
     }
 
     #[test]

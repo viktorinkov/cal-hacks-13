@@ -26,6 +26,7 @@ pub enum Finish {
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
     PlanLookup { result: PlanLookupResult },
+    VenuePolicyLookup { result: VenuePolicyLookupResult },
     ClinicReport { record_json: String, file_hash: String },
     PhotoFeatures { people_count: u32, caption: String },
     MerchPicks { picks: Vec<MerchPickIn> },
@@ -155,6 +156,7 @@ impl Sink {
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
             Finish::PlanLookup { result } => reduce!(conn, finish_plan_lookup_then(job_id, result, last)),
+            Finish::VenuePolicyLookup { result } => reduce!(conn, finish_venue_policy_lookup_then(job_id, result, last)),
             Finish::ClinicReport { record_json, file_hash } => reduce!(conn, file_clinic_report_then(job_id, record_json, file_hash, required())),
             Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
             Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
@@ -252,6 +254,14 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
             json!({
                 "status": r.status, "source_url": r.source_url, "printed_insurer": r.printed_insurer, "printed_plan": r.printed_plan,
                 "plan_year": r.plan_year, "file_hash": r.file_hash, "size_bytes": r.size_bytes, "page_count": r.page_count, "note": r.note, "call": call,
+            }),
+        ),
+        Finish::VenuePolicyLookup { result: r } => (
+            "finish_venue_policy_lookup",
+            json!({
+                "status": r.status,
+                "forms": r.forms.iter().map(|f| json!({"part": f.part, "url": f.url, "form_number": f.form_number, "title": f.title, "first_page": f.first_page, "page_count": f.page_count})).collect::<Vec<_>>(),
+                "file_hash": r.file_hash, "size_bytes": r.size_bytes, "page_count": r.page_count, "note": r.note, "call": call,
             }),
         ),
         Finish::PhotoFeatures { people_count, caption } => ("submit_photo_features", json!({"people_count": people_count, "caption": caption, "call": call})),

@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 use crate::model::{Claude, Failed};
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{charge, clinic, document, extract, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, verify, wallet};
+use crate::{charge, clinic, document, extract, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, venue_policy, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -104,7 +104,7 @@ impl Ctx {
 
 /// Kinds this worker runs.
 pub fn handles(kind: &str) -> bool {
-    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND || kind == photo::KIND || kind == shop::KIND || kind == propose::KIND || kind == plan::KIND || kind == KIND_DOCUMENT_READ
+    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND || kind == photo::KIND || kind == shop::KIND || kind == propose::KIND || kind == plan::KIND || kind == venue_policy::KIND || kind == KIND_DOCUMENT_READ
 }
 
 /// Runs one job to its result reducer. On `Err` the caller reports `fail_job`.
@@ -123,6 +123,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
         medical::KIND => medical::run(ctx, job, job.payload()?).await,
         venue::KIND => venue::run(ctx, job, job.payload()?).await,
         plan::KIND => plan::run(ctx, job, job.payload()?).await,
+        venue_policy::KIND => venue_policy::run(ctx, job, job.payload()?).await,
         photo::KIND => photo::run(ctx, job, job.payload()?).await,
         shop::KIND => shop::run(ctx, job, job.payload()?).await,
         propose::KIND => propose::run(ctx, job, job.payload()?).await,

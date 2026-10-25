@@ -72,6 +72,7 @@ pub mod board_reviews_table;
 pub mod board_rule_proposals_table;
 pub mod board_rules_table;
 pub mod board_staff_table;
+pub mod board_venue_policy_lookups_table;
 pub mod board_wallet_type;
 pub mod board_wallets_table;
 pub mod booth_in_type;
@@ -143,9 +144,10 @@ pub mod crowd_walk_table;
 pub mod crowd_walk_type;
 pub mod decision_table;
 pub mod decision_type;
-pub mod dispute_charge_reducer;
+pub mod declarations_in_type;
 pub mod departure_table;
 pub mod departure_type;
+pub mod dispute_charge_reducer;
 pub mod encounter_table;
 pub mod encounter_type;
 pub mod end_event_reducer;
@@ -171,6 +173,7 @@ pub mod file_claim_for_wearer_reducer;
 pub mod file_claim_reducer;
 pub mod file_clinic_report_reducer;
 pub mod finish_plan_lookup_reducer;
+pub mod finish_venue_policy_lookup_reducer;
 pub mod finish_venue_setup_reducer;
 pub mod force_state_reducer;
 pub mod gateway_table;
@@ -233,6 +236,7 @@ pub mod load_merch_templates_reducer;
 pub mod load_venue_floor_reducer;
 pub mod load_venue_spots_reducer;
 pub mod look_up_plan_reducer;
+pub mod look_up_venue_policy_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
 pub mod medical_access_log_table;
@@ -323,6 +327,7 @@ pub mod plan_lookup_table;
 pub mod plan_lookup_type;
 pub mod policy_document_table;
 pub mod policy_document_type;
+pub mod policy_form_type;
 pub mod policy_term_table;
 pub mod policy_term_type;
 pub mod property_event_table;
@@ -429,6 +434,9 @@ pub mod venue_floor_table;
 pub mod venue_floor_type;
 pub mod venue_in_type;
 pub mod venue_plan_table;
+pub mod venue_policy_lookup_result_type;
+pub mod venue_policy_lookup_table;
+pub mod venue_policy_lookup_type;
 pub mod venue_setup_result_type;
 pub mod venue_setup_step_table;
 pub mod venue_setup_step_type;
@@ -525,6 +533,7 @@ pub use board_reviews_table::*;
 pub use board_rule_proposals_table::*;
 pub use board_rules_table::*;
 pub use board_staff_table::*;
+pub use board_venue_policy_lookups_table::*;
 pub use board_wallet_type::BoardWallet;
 pub use board_wallets_table::*;
 pub use booth_in_type::BoothIn;
@@ -596,9 +605,10 @@ pub use crowd_walk_table::*;
 pub use crowd_walk_type::CrowdWalk;
 pub use decision_table::*;
 pub use decision_type::Decision;
-pub use dispute_charge_reducer::dispute_charge;
+pub use declarations_in_type::DeclarationsIn;
 pub use departure_table::*;
 pub use departure_type::Departure;
+pub use dispute_charge_reducer::dispute_charge;
 pub use encounter_table::*;
 pub use encounter_type::Encounter;
 pub use end_event_reducer::end_event;
@@ -624,6 +634,7 @@ pub use file_claim_for_wearer_reducer::file_claim_for_wearer;
 pub use file_claim_reducer::file_claim;
 pub use file_clinic_report_reducer::file_clinic_report;
 pub use finish_plan_lookup_reducer::finish_plan_lookup;
+pub use finish_venue_policy_lookup_reducer::finish_venue_policy_lookup;
 pub use finish_venue_setup_reducer::finish_venue_setup;
 pub use force_state_reducer::force_state;
 pub use gateway_table::*;
@@ -686,6 +697,7 @@ pub use load_merch_templates_reducer::load_merch_templates;
 pub use load_venue_floor_reducer::load_venue_floor;
 pub use load_venue_spots_reducer::load_venue_spots;
 pub use look_up_plan_reducer::look_up_plan;
+pub use look_up_venue_policy_reducer::look_up_venue_policy;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
 pub use medical_access_log_table::*;
@@ -776,6 +788,7 @@ pub use plan_lookup_table::*;
 pub use plan_lookup_type::PlanLookup;
 pub use policy_document_table::*;
 pub use policy_document_type::PolicyDocument;
+pub use policy_form_type::PolicyForm;
 pub use policy_term_table::*;
 pub use policy_term_type::PolicyTerm;
 pub use property_event_table::*;
@@ -882,6 +895,9 @@ pub use venue_floor_table::*;
 pub use venue_floor_type::VenueFloor;
 pub use venue_in_type::VenueIn;
 pub use venue_plan_table::*;
+pub use venue_policy_lookup_result_type::VenuePolicyLookupResult;
+pub use venue_policy_lookup_table::*;
+pub use venue_policy_lookup_type::VenuePolicyLookup;
 pub use venue_setup_result_type::VenueSetupResult;
 pub use venue_setup_step_table::*;
 pub use venue_setup_step_type::VenueSetupStep;
@@ -1059,6 +1075,11 @@ pub enum Reducer {
         result: PlanLookupResult,
         call: Option<ModelCallIn>,
     },
+    FinishVenuePolicyLookup {
+        job_id: u64,
+        result: VenuePolicyLookupResult,
+        call: Option<ModelCallIn>,
+    },
     FinishVenueSetup {
         job_id: u64,
         result: VenueSetupResult,
@@ -1127,6 +1148,13 @@ pub enum Reducer {
         state: String,
         limit_cents: u64,
         deductible_cents: u64,
+    },
+    LookUpVenuePolicy {
+        insurer: String,
+        state: String,
+        liability_form: String,
+        property_form: String,
+        declarations: DeclarationsIn,
     },
     NameResponsibleBand {
         incident_id: u64,
@@ -1501,6 +1529,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FileClaimForWearer { .. } => "file_claim_for_wearer",
             Reducer::FileClinicReport { .. } => "file_clinic_report",
             Reducer::FinishPlanLookup { .. } => "finish_plan_lookup",
+            Reducer::FinishVenuePolicyLookup { .. } => "finish_venue_policy_lookup",
             Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
@@ -1519,6 +1548,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LoadVenueFloor { .. } => "load_venue_floor",
             Reducer::LoadVenueSpots { .. } => "load_venue_spots",
             Reducer::LookUpPlan { .. } => "look_up_plan",
+            Reducer::LookUpVenuePolicy { .. } => "look_up_venue_policy",
             Reducer::NameResponsibleBand { .. } => "name_responsible_band",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
@@ -1839,6 +1869,17 @@ impl __sdk::Reducer for Reducer {
                 result: result.clone(),
                 call: call.clone(),
             }),
+            Reducer::FinishVenuePolicyLookup {
+                job_id,
+                result,
+                call,
+            } => __sats::bsatn::to_vec(
+                &finish_venue_policy_lookup_reducer::FinishVenuePolicyLookupArgs {
+                    job_id: job_id.clone(),
+                    result: result.clone(),
+                    call: call.clone(),
+                },
+            ),
             Reducer::FinishVenueSetup { job_id, result } => {
                 __sats::bsatn::to_vec(&finish_venue_setup_reducer::FinishVenueSetupArgs {
                     job_id: job_id.clone(),
@@ -1954,6 +1995,19 @@ impl __sdk::Reducer for Reducer {
                 state: state.clone(),
                 limit_cents: limit_cents.clone(),
                 deductible_cents: deductible_cents.clone(),
+            }),
+            Reducer::LookUpVenuePolicy {
+                insurer,
+                state,
+                liability_form,
+                property_form,
+                declarations,
+            } => __sats::bsatn::to_vec(&look_up_venue_policy_reducer::LookUpVenuePolicyArgs {
+                insurer: insurer.clone(),
+                state: state.clone(),
+                liability_form: liability_form.clone(),
+                property_form: property_form.clone(),
+                declarations: declarations.clone(),
             }),
             Reducer::NameResponsibleBand {
                 incident_id,
@@ -2592,6 +2646,7 @@ pub struct DbUpdate {
     board_rule_proposals: __sdk::TableUpdate<RuleProposal>,
     board_rules: __sdk::TableUpdate<SettlementRuleRow>,
     board_staff: __sdk::TableUpdate<StaffMember>,
+    board_venue_policy_lookups: __sdk::TableUpdate<VenuePolicyLookup>,
     board_wallets: __sdk::TableUpdate<BoardWallet>,
     booth: __sdk::TableUpdate<Booth>,
     bridge: __sdk::TableUpdate<Bridge>,
@@ -2717,6 +2772,7 @@ pub struct DbUpdate {
     venue: __sdk::TableUpdate<Venue>,
     venue_floor: __sdk::TableUpdate<VenueFloor>,
     venue_plan: __sdk::TableUpdate<PlanArea>,
+    venue_policy_lookup: __sdk::TableUpdate<VenuePolicyLookup>,
     venue_setup: __sdk::TableUpdate<VenueSetup>,
     venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
     venue_spot: __sdk::TableUpdate<VenueSpot>,
@@ -2850,6 +2906,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_staff" => db_update
                     .board_staff
                     .append(board_staff_table::parse_table_update(table_update)?),
+                "board_venue_policy_lookups" => db_update.board_venue_policy_lookups.append(
+                    board_venue_policy_lookups_table::parse_table_update(table_update)?,
+                ),
                 "board_wallets" => db_update
                     .board_wallets
                     .append(board_wallets_table::parse_table_update(table_update)?),
@@ -3225,6 +3284,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue_plan" => db_update
                     .venue_plan
                     .append(venue_plan_table::parse_table_update(table_update)?),
+                "venue_policy_lookup" => db_update
+                    .venue_policy_lookup
+                    .append(venue_policy_lookup_table::parse_table_update(table_update)?),
                 "venue_setup" => db_update
                     .venue_setup
                     .append(venue_setup_table::parse_table_update(table_update)?),
@@ -3566,6 +3628,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.venue_floor = cache
             .apply_diff_to_table::<VenueFloor>("venue_floor", &self.venue_floor)
             .with_updates_by_pk(|row| &row.id);
+        diff.venue_policy_lookup = cache
+            .apply_diff_to_table::<VenuePolicyLookup>(
+                "venue_policy_lookup",
+                &self.venue_policy_lookup,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.venue_setup = cache
             .apply_diff_to_table::<VenueSetup>("venue_setup", &self.venue_setup)
             .with_updates_by_pk(|row| &row.id);
@@ -3668,6 +3736,12 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.board_staff = cache
             .apply_diff_to_table::<StaffMember>("board_staff", &self.board_staff)
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_venue_policy_lookups = cache
+            .apply_diff_to_table::<VenuePolicyLookup>(
+                "board_venue_policy_lookups",
+                &self.board_venue_policy_lookups,
+            )
             .with_updates_by_pk(|row| &row.id);
         diff.board_wallets =
             cache.apply_diff_to_table::<BoardWallet>("board_wallets", &self.board_wallets);
@@ -3872,6 +3946,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_staff" => db_update
                     .board_staff
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_venue_policy_lookups" => db_update
+                    .board_venue_policy_lookups
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_wallets" => db_update
                     .board_wallets
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4246,6 +4323,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_policy_lookup" => db_update
+                    .venue_policy_lookup
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_setup" => db_update
                     .venue_setup
@@ -4407,6 +4487,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_staff" => db_update
                     .board_staff
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_venue_policy_lookups" => db_update
+                    .board_venue_policy_lookups
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_wallets" => db_update
                     .board_wallets
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4782,6 +4865,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue_plan" => db_update
                     .venue_plan
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_policy_lookup" => db_update
+                    .venue_policy_lookup
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue_setup" => db_update
                     .venue_setup
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4868,6 +4954,7 @@ pub struct AppliedDiff<'r> {
     board_rule_proposals: __sdk::TableAppliedDiff<'r, RuleProposal>,
     board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
     board_staff: __sdk::TableAppliedDiff<'r, StaffMember>,
+    board_venue_policy_lookups: __sdk::TableAppliedDiff<'r, VenuePolicyLookup>,
     board_wallets: __sdk::TableAppliedDiff<'r, BoardWallet>,
     booth: __sdk::TableAppliedDiff<'r, Booth>,
     bridge: __sdk::TableAppliedDiff<'r, Bridge>,
@@ -4993,6 +5080,7 @@ pub struct AppliedDiff<'r> {
     venue: __sdk::TableAppliedDiff<'r, Venue>,
     venue_floor: __sdk::TableAppliedDiff<'r, VenueFloor>,
     venue_plan: __sdk::TableAppliedDiff<'r, PlanArea>,
+    venue_policy_lookup: __sdk::TableAppliedDiff<'r, VenuePolicyLookup>,
     venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
     venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
     venue_spot: __sdk::TableAppliedDiff<'r, VenueSpot>,
@@ -5165,6 +5253,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<StaffMember>(
             "board_staff",
             &self.board_staff,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<VenuePolicyLookup>(
+            "board_venue_policy_lookups",
+            &self.board_venue_policy_lookups,
             event,
         );
         callbacks.invoke_table_row_callbacks::<BoardWallet>(
@@ -5560,6 +5653,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
         callbacks.invoke_table_row_callbacks::<VenueFloor>("venue_floor", &self.venue_floor, event);
         callbacks.invoke_table_row_callbacks::<PlanArea>("venue_plan", &self.venue_plan, event);
+        callbacks.invoke_table_row_callbacks::<VenuePolicyLookup>(
+            "venue_policy_lookup",
+            &self.venue_policy_lookup,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<VenueSetup>("venue_setup", &self.venue_setup, event);
         callbacks.invoke_table_row_callbacks::<VenueSetupStep>(
             "venue_setup_step",
@@ -6285,6 +6383,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_rule_proposals_table::register_table(client_cache);
         board_rules_table::register_table(client_cache);
         board_staff_table::register_table(client_cache);
+        board_venue_policy_lookups_table::register_table(client_cache);
         board_wallets_table::register_table(client_cache);
         booth_table::register_table(client_cache);
         bridge_table::register_table(client_cache);
@@ -6410,6 +6509,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         venue_table::register_table(client_cache);
         venue_floor_table::register_table(client_cache);
         venue_plan_table::register_table(client_cache);
+        venue_policy_lookup_table::register_table(client_cache);
         venue_setup_table::register_table(client_cache);
         venue_setup_step_table::register_table(client_cache);
         venue_spot_table::register_table(client_cache);
@@ -6461,6 +6561,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_rule_proposals",
         "board_rules",
         "board_staff",
+        "board_venue_policy_lookups",
         "board_wallets",
         "booth",
         "bridge",
@@ -6579,6 +6680,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "venue",
         "venue_floor",
         "venue_plan",
+        "venue_policy_lookup",
         "venue_setup",
         "venue_setup_step",
         "venue_spot",

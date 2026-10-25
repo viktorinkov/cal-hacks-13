@@ -2,15 +2,16 @@
 // event's site, its venue and any public 3D map of it, then saves the venue's model; each step shows here
 // as it happens. The organizer picks the venue the portal shows. The Cal Hacks 13.0 model at the Palace of
 // Fine Arts ships with the app and is the default. The Live tab shows the same 3D view with the hall cut open
-// and the crowd in it. The organizer also uploads the venue's insurance policy here: each term read from it
-// shows with its quote and page, and once confirmed it sets the claims' limits.
+// and the crowd in it. The organizer also uploads the venue's insurance policy here, or names its two forms and
+// types its declarations so the forms are found online: each term read from it shows with its quote and page,
+// or as typed, and once confirmed it sets the claims' limits.
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { act, date, field, h, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
-import type { PolicyDocument, PolicyTerm, VenueSetup } from './module_bindings/types';
+import type { PolicyDocument, PolicyTerm, VenuePolicyLookup, VenueSetup } from './module_bindings/types';
 import { VenueNames, type Spot } from './venue-names';
 
 /** Setup 0: the venue that ships with the app. */
@@ -478,11 +479,73 @@ async function uploadPolicy(form: HTMLFormElement) {
   input.value = '';
 }
 
+/** How the policy PDF came in: uploaded, or found online from its forms. */
+function cameIn(d: PolicyDocument) {
+  return d.source === 'policy_lookup' ? `found online ${date(d.uploadedAt)}` : `uploaded ${date(d.uploadedAt)}`;
+}
+
+const LOOKUP_STATUS: Record<string, string> = { searching: 'Searching', found: 'Found', not_found: 'Not found', wrong_form: 'Wrong form', failed: 'Failed' };
+
+const dollars = (f: HTMLFormElement, name: string) => BigInt(Math.round(Number(field(f, name) || 0) * 100));
+
+async function lookUpPolicy(form: HTMLFormElement) {
+  await conn.reducers.lookUpVenuePolicy({
+    insurer: field(form, 'insurer'),
+    state: field(form, 'state'),
+    liabilityForm: field(form, 'liability_form'),
+    propertyForm: field(form, 'property_form'),
+    declarations: {
+      policyNumber: field(form, 'policy_number'),
+      fnolContact: field(form, 'fnol_contact'),
+      periodStart: field(form, 'period_start'),
+      periodEnd: field(form, 'period_end'),
+      medicalLimitCents: dollars(form, 'medical_limit'),
+      medicalAggregateCents: dollars(form, 'medical_aggregate'),
+      propertyLimitCents: dollars(form, 'property_limit'),
+      propertyDeductibleCents: dollars(form, 'property_deductible'),
+    },
+  });
+}
+
+function lookupForm() {
+  const input = (name: string, label: string, attrs: Record<string, unknown> = {}) =>
+    h('tr', {}, h('th', {}, label), h('td', {}, h('input', { name, required: true, ...attrs })));
+  return h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => lookUpPolicy(e.target as HTMLFormElement)); } },
+    h('table', {},
+      input('insurer', 'Insurer', { placeholder: 'Harborline Casualty', maxlength: 80 }),
+      input('state', "Venue's state", { placeholder: 'CA', maxlength: 2, size: 2 }),
+      input('liability_form', 'Liability form number', { placeholder: 'CG 00 01 04 13', maxlength: 24 }),
+      input('property_form', 'Property form number', { placeholder: 'CP 00 10 10 12', maxlength: 24 }),
+      h('tr', {}, h('th', { colspan: 2 }, 'From the declarations page')),
+      input('policy_number', 'Policy number', { placeholder: 'HCP-2026-7781', maxlength: 60 }),
+      input('period_start', 'Policy period starts', { type: 'date' }),
+      input('period_end', 'Policy period ends', { type: 'date' }),
+      input('fnol_contact', 'Report claims to', { placeholder: 'claims@harborline.example', maxlength: 120 }),
+      input('medical_limit', 'Medical expense limit, any one person ($)', { type: 'number', min: 1, step: '0.01', placeholder: '10000' }),
+      input('medical_aggregate', 'General aggregate limit ($)', { type: 'number', min: 1, step: '0.01', placeholder: '2000000' }),
+      input('property_limit', 'Property limit of insurance ($)', { type: 'number', min: 1, step: '0.01', placeholder: '250000' }),
+      input('property_deductible', 'Property deductible ($)', { type: 'number', min: 0, step: '0.01', placeholder: '1000' })),
+    h('button', {}, 'Find the policy online'));
+}
+
+function lookupRow(l: VenuePolicyLookup) {
+  const cls = l.status === 'found' ? 'pass' : l.status === 'searching' ? '' : 'fail';
+  const nothing = l.status === 'not_found' || l.status === 'wrong_form';
+  return h('li', {},
+    h('b', {}, `${l.insurer}, ${l.liabilityForm} and ${l.propertyForm}`), `, policy ${l.policyNumber}, asked ${date(l.createdAt)} `,
+    h('span', { class: cls }, `· ${LOOKUP_STATUS[l.status] ?? l.status}`),
+    l.forms.length > 0 && h('ul', {}, l.forms.map(f => h('li', {},
+      `${f.part === 'liability' ? 'Liability' : 'Property'} form `, h('b', {}, f.formNumber), f.title && ` ${f.title}`,
+      `, pages ${f.firstPage} to ${f.firstPage + f.pageCount - 1}, from `, link(f.url)))),
+    nothing && h('p', { class: 'fail' }, "We couldn't find the policy's forms online. Upload the policy instead."),
+    l.note && h('p', { class: 'muted' }, l.note));
+}
+
 function policyDoc(d: PolicyDocument) {
   const cls = d.status === 'confirmed' ? 'pass' : d.status === 'failed' ? 'fail' : '';
   return h('li', {},
     h('a', { href: `/blobs/${d.fileHash}`, target: '_blank', rel: 'noreferrer' }, `Policy PDF, ${d.pageCount} pages`),
-    `, uploaded ${date(d.uploadedAt)} `, h('span', { class: cls }, `· ${DOC_STATUS[d.status] ?? d.status}`),
+    `, ${cameIn(d)} `, h('span', { class: cls }, `· ${DOC_STATUS[d.status] ?? d.status}`),
     d.status !== 'reading' && d.status !== 'failed' && `. ${d.clauseCount} clauses checked word for word on their pages`,
     d.confirmedAt && `. Confirmed ${date(d.confirmedAt)}`,
     d.error && h('p', { class: 'fail' }, d.error),
@@ -490,7 +553,7 @@ function policyDoc(d: PolicyDocument) {
 }
 
 function termRow(t: PolicyTerm) {
-  const cls = t.status === 'read' ? 'pass' : t.status === 'flagged' ? 'fail' : 'muted';
+  const cls = t.status === 'read' || t.status === 'typed' ? 'pass' : t.status === 'flagged' ? 'fail' : 'muted';
   return h('tr', {},
     h('td', {}, termLabel(t)),
     h('td', {}, t.shown),
@@ -505,8 +568,8 @@ function termsTable(d: PolicyDocument) {
   const terms = [...conn.db.boardPolicyTerms.iter()].filter(t => t.documentId === d.id).sort((a, b) => Number(a.id - b.id));
   const flagged = terms.filter(t => t.status === 'flagged').length;
   return [
-    h('h4', {}, `Terms read from the policy uploaded ${date(d.uploadedAt)}`),
-    h('p', { class: 'muted' }, `${terms.length} terms, ${flagged} flagged. "read": read from the policy and checked. "flagged": a check failed, so the default stays. "default": the policy does not state it.`),
+    h('h4', {}, `Terms read from the policy ${cameIn(d)}`),
+    h('p', { class: 'muted' }, `${terms.length} terms, ${flagged} flagged. "read": read from the policy and checked. "flagged": a check failed, so the default stays. "default": the policy does not state it. "typed": you typed it from the declarations page.`),
     h('table', {},
       h('tr', {}, ['Term', 'In effect', 'Read from the policy', 'Quote', 'Page', 'Status', 'Problem'].map(c => h('th', {}, c))),
       TERM_GROUPS.map(([group, inGroup]) => {
@@ -548,6 +611,7 @@ function inEffect() {
 /** Shown to the organizer only. */
 function policySection() {
   const docs = policyDocs();
+  const lookups = [...conn.db.boardVenuePolicyLookups.iter()].sort((a, b) => Number(b.id - a.id));
   const shownDoc = docs.find(d => d.status === 'read' || d.status === 'confirmed');
   return h('section', {},
     h('h3', {}, 'Insurance policy'),
@@ -555,7 +619,11 @@ function policySection() {
     h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => uploadPolicy(e.target as HTMLFormElement)); } },
       h('input', { type: 'file', name: 'policy-pdf', accept: 'application/pdf' }), ' ',
       h('button', {}, 'Upload and read')),
-    docs.length > 0 && [h('h4', {}, `Uploaded (${docs.length})`), h('ul', {}, docs.map(policyDoc))],
+    h('h4', {}, 'Or find the policy online'),
+    h('p', { class: 'muted' }, "No PDF at hand? Name the insurer and the two forms listed on the declarations page, the liability form and the property form, and type the declarations. We find both forms online and read them like an upload, with your numbers in place of the ones only the declarations print."),
+    lookupForm(),
+    lookups.length > 0 && [h('h4', {}, `Looked up (${lookups.length})`), h('ul', {}, lookups.map(lookupRow))],
+    docs.length > 0 && [h('h4', {}, `Policy PDFs (${docs.length})`), h('ul', {}, docs.map(policyDoc))],
     shownDoc && termsTable(shownDoc),
     inEffect());
 }

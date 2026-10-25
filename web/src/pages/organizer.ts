@@ -62,6 +62,7 @@ const QUERIES = [
   'SELECT * FROM board_covers',
   'SELECT * FROM board_policy_documents',
   'SELECT * FROM board_policy_terms',
+  'SELECT * FROM board_venue_policy_lookups',
   'SELECT * FROM board_fee_schedule',
   'SELECT * FROM medic_medical_cards',
   'SELECT * FROM event_graph',

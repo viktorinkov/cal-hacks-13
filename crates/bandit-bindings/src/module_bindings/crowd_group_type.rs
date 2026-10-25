@@ -17,6 +17,7 @@ pub struct CrowdGroup {
     pub x_m: f32,
     pub y_m: f32,
     pub next_move_at: __sdk::Timestamp,
+    pub role: String,
 }
 
 impl __sdk::InModule for CrowdGroup {
@@ -37,6 +38,7 @@ pub struct CrowdGroupCols {
     pub x_m: __sdk::__query_builder::Col<CrowdGroup, f32>,
     pub y_m: __sdk::__query_builder::Col<CrowdGroup, f32>,
     pub next_move_at: __sdk::__query_builder::Col<CrowdGroup, __sdk::Timestamp>,
+    pub role: __sdk::__query_builder::Col<CrowdGroup, String>,
 }
 
 impl __sdk::__query_builder::HasCols for CrowdGroup {
@@ -53,6 +55,7 @@ impl __sdk::__query_builder::HasCols for CrowdGroup {
             x_m: __sdk::__query_builder::Col::new(table_name, "x_m"),
             y_m: __sdk::__query_builder::Col::new(table_name, "y_m"),
             next_move_at: __sdk::__query_builder::Col::new(table_name, "next_move_at"),
+            role: __sdk::__query_builder::Col::new(table_name, "role"),
         }
     }
 }

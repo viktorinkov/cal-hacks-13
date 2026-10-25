@@ -577,6 +577,18 @@ export const Decision = __t.object("Decision", {
 });
 export type Decision = __Infer<typeof Decision>;
 
+export const DeclarationsIn = __t.object("DeclarationsIn", {
+  policyNumber: __t.string(),
+  fnolContact: __t.string(),
+  periodStart: __t.string(),
+  periodEnd: __t.string(),
+  medicalLimitCents: __t.u64(),
+  medicalAggregateCents: __t.u64(),
+  propertyLimitCents: __t.u64(),
+  propertyDeductibleCents: __t.u64(),
+});
+export type DeclarationsIn = __Infer<typeof DeclarationsIn>;
+
 export const Departure = __t.object("Departure", {
   attendee: __t.identity(),
   nodeId: __t.u64(),
@@ -1567,6 +1579,16 @@ export const PolicyDocument = __t.object("PolicyDocument", {
 });
 export type PolicyDocument = __Infer<typeof PolicyDocument>;
 
+export const PolicyForm = __t.object("PolicyForm", {
+  part: __t.string(),
+  url: __t.string(),
+  formNumber: __t.string(),
+  title: __t.string(),
+  firstPage: __t.u32(),
+  pageCount: __t.u32(),
+});
+export type PolicyForm = __Infer<typeof PolicyForm>;
+
 export const PolicyTerm = __t.object("PolicyTerm", {
   id: __t.u64(),
   documentId: __t.u64(),
@@ -1848,6 +1870,47 @@ export const VenueIn = __t.object("VenueIn", {
   fetchedAt: __t.timestamp(),
 });
 export type VenueIn = __Infer<typeof VenueIn>;
+
+export const VenuePolicyLookup = __t.object("VenuePolicyLookup", {
+  id: __t.u64(),
+  insurer: __t.string(),
+  state: __t.string(),
+  liabilityForm: __t.string(),
+  propertyForm: __t.string(),
+  policyNumber: __t.string(),
+  fnolContact: __t.string(),
+  periodStart: __t.string(),
+  periodEnd: __t.string(),
+  medicalLimitCents: __t.u64(),
+  medicalAggregateCents: __t.u64(),
+  propertyLimitCents: __t.u64(),
+  propertyDeductibleCents: __t.u64(),
+  status: __t.string(),
+  get forms() {
+    return __t.array(PolicyForm);
+  },
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  documentId: __t.u64(),
+  jobId: __t.u64(),
+  note: __t.string(),
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type VenuePolicyLookup = __Infer<typeof VenuePolicyLookup>;
+
+export const VenuePolicyLookupResult = __t.object("VenuePolicyLookupResult", {
+  status: __t.string(),
+  get forms() {
+    return __t.array(PolicyForm);
+  },
+  fileHash: __t.string(),
+  sizeBytes: __t.u64(),
+  pageCount: __t.u32(),
+  note: __t.string(),
+});
+export type VenuePolicyLookupResult = __Infer<typeof VenuePolicyLookupResult>;
 
 export const VenueSetup = __t.object("VenueSetup", {
   id: __t.u64(),

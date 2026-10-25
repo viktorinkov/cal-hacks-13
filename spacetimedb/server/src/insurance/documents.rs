@@ -39,9 +39,9 @@ pub struct PolicyDocument {
     pub error: String,
     /// The `insurance_policy` row the confirmed terms set; 0 until then.
     pub policy_id: u64,
-    /// `upload` or `plan_lookup`.
+    /// `upload`, `plan_lookup` or `policy_lookup`.
     pub source: String,
-    /// Where a looked-up plan document came from; empty for an upload.
+    /// Where a looked-up plan document or the venue's liability form came from; empty for an upload.
     pub source_url: String,
     pub uploaded_by: Identity,
     pub uploaded_at: Timestamp,
@@ -167,7 +167,11 @@ pub fn apply_document_terms(ctx: &ReducerContext, job_id: u64, read_json: String
     let job = jobs::leased_by_caller(ctx, job_id)?;
     let doc = ctx.db.policy_document().id().find(job.subject_id).ok_or("no policy document for this job")?;
     let read: PolicyRead = serde_json::from_str(&read_json).map_err(|e| format!("the reader's answer is not a policy read: {e}"))?;
-    let checked = check_policy(&read, &pages);
+    let mut checked = check_policy(&read, &pages);
+    // A policy found by its forms takes the organizer's typed declarations over the terms they name.
+    if let Some(d) = super::venue_policy_lookup::declarations_for(ctx, &doc) {
+        bandit_insurance::policy::apply_declarations(&mut checked.terms, &d);
+    }
     for old in ctx.db.policy_term().document_id().filter(doc.id) {
         ctx.db.policy_term().id().delete(old.id);
     }
@@ -217,6 +221,7 @@ fn checked_term(t: &PolicyTerm) -> CheckedTerm {
         status: match t.status.as_str() {
             "read" => TermStatus::Read,
             "flagged" => TermStatus::Flagged,
+            "typed" => TermStatus::Typed,
             _ => TermStatus::Default,
         },
         problem: t.problem.clone(),

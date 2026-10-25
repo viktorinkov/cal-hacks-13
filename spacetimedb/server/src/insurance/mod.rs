@@ -21,6 +21,7 @@ pub mod plan_lookup;
 pub mod proposals;
 pub mod setup;
 pub mod tables;
+pub mod venue_policy_lookup;
 pub mod views;
 
 #[cfg(test)]

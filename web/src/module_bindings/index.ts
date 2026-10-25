@@ -68,6 +68,7 @@ import FileClaimReducer from "./file_claim_reducer";
 import FileClaimForWearerReducer from "./file_claim_for_wearer_reducer";
 import FileClinicReportReducer from "./file_clinic_report_reducer";
 import FinishPlanLookupReducer from "./finish_plan_lookup_reducer";
+import FinishVenuePolicyLookupReducer from "./finish_venue_policy_lookup_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
 import ForceStateReducer from "./force_state_reducer";
 import GatewayUpReducer from "./gateway_up_reducer";
@@ -84,6 +85,7 @@ import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
 import LoadVenueFloorReducer from "./load_venue_floor_reducer";
 import LoadVenueSpotsReducer from "./load_venue_spots_reducer";
 import LookUpPlanReducer from "./look_up_plan_reducer";
+import LookUpVenuePolicyReducer from "./look_up_venue_policy_reducer";
 import NameResponsibleBandReducer from "./name_responsible_band_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
@@ -187,6 +189,7 @@ import BoardReviewsRow from "./board_reviews_table";
 import BoardRuleProposalsRow from "./board_rule_proposals_table";
 import BoardRulesRow from "./board_rules_table";
 import BoardStaffRow from "./board_staff_table";
+import BoardVenuePolicyLookupsRow from "./board_venue_policy_lookups_table";
 import BoardWalletsRow from "./board_wallets_table";
 import BoothRow from "./booth_table";
 import CameraRow from "./camera_table";
@@ -917,6 +920,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardStaffRow),
+  boardVenuePolicyLookups: __table({
+    name: 'board_venue_policy_lookups',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardVenuePolicyLookupsRow),
   boardWallets: __table({
     name: 'board_wallets',
     indexes: [
@@ -1284,6 +1294,7 @@ const reducersSchema = __reducers(
   __reducerSchema("file_claim_for_wearer", FileClaimForWearerReducer),
   __reducerSchema("file_clinic_report", FileClinicReportReducer),
   __reducerSchema("finish_plan_lookup", FinishPlanLookupReducer),
+  __reducerSchema("finish_venue_policy_lookup", FinishVenuePolicyLookupReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
   __reducerSchema("force_state", ForceStateReducer),
   __reducerSchema("gateway_up", GatewayUpReducer),
@@ -1300,6 +1311,7 @@ const reducersSchema = __reducers(
   __reducerSchema("load_venue_floor", LoadVenueFloorReducer),
   __reducerSchema("load_venue_spots", LoadVenueSpotsReducer),
   __reducerSchema("look_up_plan", LookUpPlanReducer),
+  __reducerSchema("look_up_venue_policy", LookUpVenuePolicyReducer),
   __reducerSchema("name_responsible_band", NameResponsibleBandReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
@@ -1462,6 +1474,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
     /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
     readonly "board_staff": Omit<typeof tablesSchema.schemaType.tables["boardStaff"], "accessorName"> & { readonly accessorName: "board_staff" };
+    /** @deprecated Use `boardVenuePolicyLookups` instead. This alias will be removed in the next major version. */
+    readonly "board_venue_policy_lookups": Omit<typeof tablesSchema.schemaType.tables["boardVenuePolicyLookups"], "accessorName"> & { readonly accessorName: "board_venue_policy_lookups" };
     /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
     readonly "board_wallets": Omit<typeof tablesSchema.schemaType.tables["boardWallets"], "accessorName"> & { readonly accessorName: "board_wallets" };
     /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
@@ -1617,6 +1631,7 @@ const tableAccessorAliases = {
   "board_rule_proposals": "boardRuleProposals",
   "board_rules": "boardRules",
   "board_staff": "boardStaff",
+  "board_venue_policy_lookups": "boardVenuePolicyLookups",
   "board_wallets": "boardWallets",
   "claim_checks": "claimChecks",
   "claim_clauses": "claimClauses",
@@ -1768,6 +1783,8 @@ export type DbView = __DbViewBase & {
   readonly "board_rules": __DbViewBase["boardRules"];
   /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
   readonly "board_staff": __DbViewBase["boardStaff"];
+  /** @deprecated Use `boardVenuePolicyLookups` instead. This alias will be removed in the next major version. */
+  readonly "board_venue_policy_lookups": __DbViewBase["boardVenuePolicyLookups"];
   /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
   readonly "board_wallets": __DbViewBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
@@ -1950,6 +1967,8 @@ export type Tables = __TablesBase & {
   readonly "board_rules": __TablesBase["boardRules"];
   /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
   readonly "board_staff": __TablesBase["boardStaff"];
+  /** @deprecated Use `boardVenuePolicyLookups` instead. This alias will be removed in the next major version. */
+  readonly "board_venue_policy_lookups": __TablesBase["boardVenuePolicyLookups"];
   /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
   readonly "board_wallets": __TablesBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */

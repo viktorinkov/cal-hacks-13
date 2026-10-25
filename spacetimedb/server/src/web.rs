@@ -188,6 +188,12 @@ pub fn board_policy_documents(ctx: &ViewContext) -> RawQuery<PolicyDocument> {
     staff_query(ctx, "policy_document")
 }
 
+/// The organizer's lookups of the venue's policy by its forms.
+#[spacetimedb::view(accessor = board_venue_policy_lookups, public)]
+pub fn board_venue_policy_lookups(ctx: &ViewContext) -> RawQuery<venue_policy_lookup::VenuePolicyLookup> {
+    staff_query(ctx, "venue_policy_lookup")
+}
+
 /// Every term read from a venue policy, with its quote, page and checks.
 #[spacetimedb::view(accessor = board_policy_terms, public)]
 pub fn board_policy_terms(ctx: &ViewContext) -> RawQuery<PolicyTerm> {

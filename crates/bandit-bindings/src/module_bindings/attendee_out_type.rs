@@ -17,6 +17,7 @@ pub struct AttendeeOut {
     pub organization: String,
     pub handles: Vec<HandleOut>,
     pub created_at: __sdk::Timestamp,
+    pub role: String,
 }
 
 impl __sdk::InModule for AttendeeOut {
@@ -35,6 +36,7 @@ pub struct AttendeeOutCols {
     pub organization: __sdk::__query_builder::Col<AttendeeOut, String>,
     pub handles: __sdk::__query_builder::Col<AttendeeOut, Vec<HandleOut>>,
     pub created_at: __sdk::__query_builder::Col<AttendeeOut, __sdk::Timestamp>,
+    pub role: __sdk::__query_builder::Col<AttendeeOut, String>,
 }
 
 impl __sdk::__query_builder::HasCols for AttendeeOut {
@@ -49,6 +51,7 @@ impl __sdk::__query_builder::HasCols for AttendeeOut {
             organization: __sdk::__query_builder::Col::new(table_name, "organization"),
             handles: __sdk::__query_builder::Col::new(table_name, "handles"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            role: __sdk::__query_builder::Col::new(table_name, "role"),
         }
     }
 }

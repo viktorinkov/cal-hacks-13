@@ -102,6 +102,66 @@ pub fn split_pages(pdf: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
         .collect()
 }
 
+/// The pages of `pdf` as `split_pages` will find them; the page objects counted when it does not load.
+pub fn page_count(pdf: &[u8]) -> u32 {
+    lopdf::Document::load_mem(pdf).map(|d| d.get_pages().len() as u32).unwrap_or_else(|_| bandit_common::count_pages(pdf)).max(1)
+}
+
+/// Keys a page takes from the page tree above it when it does not set them itself.
+const INHERITED: [&[u8]; 4] = [b"Resources", b"MediaBox", b"CropBox", b"Rotate"];
+
+/// The PDFs one after another as one PDF: every page of the first, then every page of the next.
+pub fn join_pdfs(parts: &[&[u8]]) -> anyhow::Result<Vec<u8>> {
+    use lopdf::{Document, Object};
+    let (first, rest) = parts.split_first().context("no PDF to join")?;
+    let mut doc = Document::load_mem(first)?;
+    let root = doc.trailer.get(b"Root")?.as_reference()?;
+    let tree = doc.get_object(root)?.as_dict()?.get(b"Pages")?.as_reference()?;
+    let mut total = doc.get_pages().len();
+    for (i, bytes) in rest.iter().enumerate() {
+        let mut next = Document::load_mem(bytes).with_context(|| format!("loading PDF {}", i + 2))?;
+        next.renumber_objects_with(doc.max_id + 1);
+        let pages: Vec<_> = next.get_pages().into_values().collect();
+        // Each page keeps what it took from its own page tree, then hangs off the first PDF's tree.
+        for &page in &pages {
+            let mut found = Vec::new();
+            let mut parent = next.get_object(page)?.as_dict()?.get(b"Parent").and_then(Object::as_reference).ok();
+            while let Some(at) = parent {
+                let node = next.get_object(at)?.as_dict()?;
+                for key in INHERITED {
+                    if let Ok(v) = node.get(key) {
+                        found.push((key, v.clone()));
+                    }
+                }
+                parent = node.get(b"Parent").and_then(Object::as_reference).ok();
+            }
+            let dict = next.get_object_mut(page)?.as_dict_mut()?;
+            for (key, v) in found {
+                if !dict.has(key) {
+                    dict.set(key, v);
+                }
+            }
+            dict.set("Parent", tree);
+        }
+        doc.max_id = next.max_id;
+        doc.objects.extend(next.objects);
+        let kids = doc.get_object_mut(tree)?.as_dict_mut()?;
+        let mut all = kids.get(b"Kids")?.as_array()?.clone();
+        all.extend(pages.iter().map(|&p| Object::Reference(p)));
+        total += pages.len();
+        kids.set("Kids", all);
+        kids.set("Count", total as i64);
+    }
+    doc.prune_objects();
+    let mut out = Vec::new();
+    doc.save_to(&mut out).context("writing the joined PDF")?;
+    let pages = Document::load_mem(&out)?.get_pages().len();
+    if pages != total {
+        bail!("the joined PDF has {pages} pages, not {total}");
+    }
+    Ok(out)
+}
+
 /// The text of pages 1 to `page_count`, one string per page.
 fn page_texts(stored: &[StoredPage], page_count: u32) -> anyhow::Result<Vec<String>> {
     (1..=page_count)
@@ -203,6 +263,20 @@ mod tests {
             assert!(text.contains(line), "{text:?} does not hold {line:?}");
         }
         assert!(split_pages(b"not a pdf").is_err());
+    }
+
+    #[test]
+    fn joins_pdfs_page_after_page() {
+        let liability = pdf(&["COMMERCIAL GENERAL LIABILITY COVERAGE FORM CG 00 01 04 13", "COVERAGE C MEDICAL PAYMENTS"]);
+        let property = pdf(&["BUILDING AND PERSONAL PROPERTY COVERAGE FORM CP 00 10 10 12"]);
+        let joined = join_pdfs(&[&liability, &property]).unwrap();
+        assert_eq!((page_count(&joined), page_count(&liability)), (3, 2));
+        let pages = split_pages(&joined).unwrap();
+        let text = |n: usize| Document::load_mem(&pages[n]).unwrap().extract_text(&[1]).unwrap();
+        assert!(text(1).contains("COVERAGE C"), "{:?}", text(1));
+        assert!(text(2).contains("CP 00 10 10 12"), "{:?}", text(2));
+        assert!(join_pdfs(&[&liability, b"not a pdf"]).is_err());
+        assert_eq!(page_count(b"%PDF-1.7 <</Type /Page>>"), 1);
     }
 
     fn payload(kind: &str) -> DocumentReadPayload {

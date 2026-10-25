@@ -32,6 +32,7 @@ mod sink;
 #[cfg(test)]
 mod testdata;
 mod venue;
+mod venue_policy;
 mod verify;
 mod wallet;
 
