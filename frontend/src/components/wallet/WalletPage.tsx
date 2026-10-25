@@ -240,7 +240,7 @@ function PickCard({ pick, onBuy }: { pick: MerchPick; onBuy: () => void }) {
           <p className="truncate text-[15px] font-medium text-ink">{pick.title}</p>
           <span className="flex-none text-[15px] tabular-nums text-ink">{formatCents(pick.priceCents)}</span>
         </div>
-        <p className="mt-1 text-[13px] leading-5 text-[var(--signup-muted)]">{pick.reason || pick.line || 'From tonight’s photos of you.'}</p>
+        {(pick.reason || pick.line) && <p className="mt-1 text-[13px] leading-5 text-[var(--signup-muted)]">{pick.reason || pick.line}</p>}
         {friends.length > 0 && <p className="mt-1 truncate text-[13px] text-[var(--signup-muted)]">With {friends.length > 2 ? `${friends.slice(0, 2).join(', ')} and ${friends.length - 2} more` : friends.join(' and ')}</p>}
         <button type="button" onClick={onBuy} className="signup-primary mt-3 text-[14px]">Buy with my band</button>
       </div>
@@ -315,7 +315,7 @@ function Wallet({ bandId, fixture, recap = false, notice, onRetry }: { bandId: n
         <div className="signup-intro">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="signup-title">
-              {ready ? (summary.paidCents ? `${formatCents(summary.paidCents)} paid tonight.` : 'Nothing paid yet tonight.') : 'Your band’s wallet.'}
+              {ready ? (summary.paidCents ? `${formatCents(summary.paidCents)} paid.` : 'No payments yet.') : 'Your wallet.'}
             </h1>
             {fixture && <SourceChip tag="sim" />}
           </div>
@@ -384,11 +384,10 @@ function Wallet({ bandId, fixture, recap = false, notice, onRetry }: { bandId: n
               {pickAgain.busy ? 'Picking…' : 'Pick again'}
             </button>
           </div>
-          <p className="text-[13px] text-[var(--signup-muted)]">From tonight’s photos of you, printed on the piece.</p>
           {views.picks.state === 'ready' && picks.length ? (
             <ul className="mt-3 grid gap-3">{picks.map((pick) => <PickCard key={pick.key} pick={pick} onBuy={() => setBuying(pick)} />)}</ul>
           ) : (
-            <Note view={views.picks} loading="Looking through tonight’s photos…" empty="No picks yet. They come from tonight’s photos of you." />
+            <Note view={views.picks} loading="Loading suggestions…" empty="No suggestions yet." />
           )}
         </section>
       </div>

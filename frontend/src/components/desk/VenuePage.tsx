@@ -136,7 +136,7 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
     <div className="grid gap-x-10 gap-y-6 lg:grid-cols-12">
       <form onSubmit={(event) => void submit(event)} noValidate className="min-w-0 lg:col-span-7">
         <label htmlFor="venue-event" className="mb-2 block text-[13px] font-medium text-ink">
-          Find a venue by its event's name
+          Event name
         </label>
         <div className="flex gap-2">
           <input
@@ -144,7 +144,6 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
             value={name}
             maxLength={200}
             autoComplete="off"
-            placeholder="For example, Cal Hacks 13.0"
             aria-invalid={startError ? true : undefined}
             aria-describedby={startError ? 'venue-event-error' : 'venue-event-help'}
             onChange={(event) => setName(event.target.value)}
@@ -163,9 +162,9 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
           <p id="venue-event-help" className="mt-2 text-[13px] text-ink-dim">
             {live
               ? importsThis
-                ? "Starts the Bright Data import of this event's venue, zones, sponsors and schedule, and searches for its public 3D map. Takes a few minutes."
-                : "Searches the web, reads the event's pages and saves its venue's public 3D map. Takes a few minutes."
-              : 'Connecting to the desk.'}
+                ? 'Imports event details and finds a public 3D venue map.'
+                : 'Finds a public 3D venue map.'
+              : 'Connecting…'}
           </p>
         )}
         {latestImport && (
@@ -193,12 +192,12 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
             <span className="text-signal">{`Couldn't load the searches: ${error}`}</span>
           ) : !ready ? (
             <>
-              <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Loading the searches run on this desk.
+              <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Loading searches…
             </>
           ) : count === 0 ? (
-            'No searches run on this desk yet. The Palace replay is always here.'
+            'No new searches yet.'
           ) : (
-            `${count} search${count === 1 ? '' : 'es'} run on this desk, and the Palace replay.`
+            `${count} saved search${count === 1 ? '' : 'es'}.`
           )}
         </p>
       </div>
@@ -325,7 +324,7 @@ function StepsPanel({ frame }: { frame: RunFrame }) {
   return (
     <Panel title="What it did" aside={<span className="text-[13px] tabular-nums text-ink-muted">{`${frame.steps.length} step${frame.steps.length === 1 ? '' : 's'}`}</span>}>
       {frame.steps.length === 0 ? (
-        <p className="text-[13px] text-ink-muted">The first step shows here as soon as the worker picks the search up.</p>
+        <p className="text-[13px] text-ink-muted">Waiting for the search to start.</p>
       ) : (
         <ol className="-my-3 divide-y divide-line">
           {frame.steps.map((step) => {
@@ -399,14 +398,14 @@ function ModelPanel({ run, frame }: { run: Run; frame: RunFrame }) {
         <div className="max-w-[44ch]">
           <p className="flex items-center justify-center gap-2 text-[14px] text-ink">
             <LoaderCircle size={14} className="animate-spin text-ink-dim motion-reduce:animate-none" aria-hidden="true" />
-            Capturing the 3D map in a remote browser
+            Capturing the 3D map
           </p>
           <p className="mt-1.5 truncate text-[13px] text-ink-dim">{short(frame.current.detail)}</p>
           <p className="mt-1 text-[12px] tabular-nums text-ink-muted">{`${TOOL_LABEL.browser} · ${clock(frame.t - frame.current.offset)} so far`}</p>
         </div>
       )
     }
-    return <p className="max-w-[36ch] text-[14px] text-ink-dim">The venue's model shows here once its public 3D map is captured.</p>
+    return <p className="max-w-[36ch] text-[14px] text-ink-dim">Waiting for the 3D map.</p>
   })()
   return (
     <Panel

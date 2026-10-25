@@ -40,7 +40,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
   if (!host) {
     return (
       <GateCopy>
-        <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
+        <span className="font-display text-[34px] leading-none text-ink">Band1t</span>
         <p className="text-[15px] text-ink-dim" role="status">
           {photographer ? 'Opening the photographer…' : 'Opening the organizer…'}
         </p>
@@ -52,13 +52,8 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     const here = window.location.hostname === 'band1t.vip'
     return (
       <GateCopy>
-        <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
-        <h1 className="font-display text-[28px] leading-none text-ink">{photographer ? 'Photographer' : 'Organizer'}</h1>
-        <p className="text-[15px] leading-relaxed text-ink-dim">
-          {photographer
-            ? 'Sign in with your staff email. Frames you file land on the organizer photos page.'
-            : 'Sign in with your staff email. This desk uses the same database as the live organizer portal.'}
-        </p>
+        <span className="font-display text-[34px] leading-none text-ink">Band1t</span>
+        <h1 className="font-display text-[28px] leading-none text-ink">Sign in</h1>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
           type="button"
@@ -102,7 +97,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
       staffQueries['SELECT * FROM my_roles'] === 'open' && staffQueries['SELECT * FROM my_owner'] === 'open') {
     return (
       <GateCopy>
-        <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
+        <span className="font-display text-[34px] leading-none text-ink">Band1t</span>
         <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">You can run the event with this account.</p>
         <a className={gateButton} href="/organizer-access?next=%2Forganizer">Continue as organizer</a>
@@ -137,7 +132,7 @@ export function SignInCallback() {
 
   return (
     <GateCopy>
-      <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
+      <span className="font-display text-[34px] leading-none text-ink">Band1t</span>
       {error ? (
         <>
           <p className="text-[15px] text-ink">Sign-in did not complete.</p>

@@ -104,7 +104,7 @@ function ChargeDecision({ charge, band }: { charge: Charge; band: string }) {
             {busy === 'approve' ? 'Approving…' : <>Approve <span className="tabular-nums">{formatCents(seen.amount)}</span></>}
           </button>
           <button type="button" disabled={busy != null} onClick={() => setWaiving(true)} className={QUIET}>Waive…</button>
-          <span className="text-[12px] text-ink-muted">Paid from {band}’s wallet · Nessie sandbox</span>
+          <span className="text-[12px] text-ink-muted">The attendee pays after approval.</span>
         </div>
       )}
     </div>
@@ -251,7 +251,7 @@ export function BuyForBand({ pick, nodeId, band, disabled }: { pick: MerchPick; 
       <MerchThumb kind={pick.kind} title={pick.title} imageUrl={pick.imageUrl} photoUrl={pick.photoUrl} area={pick.area} decorative />
       <div className="min-w-0">
         <p className="truncate text-[14px] text-ink">{pick.title} <span className="tabular-nums text-ink-dim">{formatCents(pick.priceCents)}</span></p>
-        <p className="truncate text-[12px] text-ink-muted">{pick.reason || pick.line || 'Picked from tonight’s photos'}</p>
+        {(pick.reason || pick.line) && <p className="truncate text-[12px] text-ink-muted">{pick.reason || pick.line}</p>}
         {error && <p className="mt-0.5 text-[12px] text-caution">{error.message}</p>}
       </div>
       {confirming ? (

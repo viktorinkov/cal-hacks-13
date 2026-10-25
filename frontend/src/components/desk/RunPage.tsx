@@ -34,7 +34,6 @@ export function RunPage() {
     <DeskFrame
       motif="run"
       title="Event run"
-      sentence="Start the night on the floor, follow its incidents and claims as they happen, and put our real bands among the crowd."
       figures={
         <>
           <Figure lead label="People" value={summary.people.toLocaleString('en-US')} note={idle ? 'bands in the crowd now' : `of ${summary.crowd.toLocaleString('en-US')} expected`} />
@@ -44,7 +43,7 @@ export function RunPage() {
         </>
       }
     >
-      {!linked && <p className="text-[14px] text-ink-dim">Waiting for the database. The run shows here once the session is connected.</p>}
+      {!linked && <p className="text-[14px] text-ink-dim">Loading the event…</p>}
       <RunControls summary={summary} ops={ops} />
       <RunAlerts now={now} />
       <div className="mt-14 grid gap-x-10 gap-y-14 xl:grid-cols-2">
@@ -57,7 +56,7 @@ export function RunPage() {
       </div>
       <RunZones now={now} ops={ops} />
       <BandPlacement now={now} ops={ops} />
-      {refused.length > 0 && <p className="mt-12 text-[13px] text-ink-muted">The database did not share {refused.join(', ')} with this sign-in.</p>}
+      {refused.length > 0 && <p className="mt-12 text-[13px] text-ink-muted">This account cannot access {refused.join(', ')}.</p>}
     </DeskFrame>
   )
 }

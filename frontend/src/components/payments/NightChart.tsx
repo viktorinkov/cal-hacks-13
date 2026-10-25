@@ -46,7 +46,7 @@ export function NightChart({ bins }: { bins: Bin[] }) {
         <svg width={width} height={height} aria-hidden="true">
           <line x1={LEFT} x2={LEFT + plotW} y1={LANE + PLOT + 0.5} y2={LANE + PLOT + 0.5} stroke="var(--nc-line-strong)" />
         </svg>
-        <p className="absolute left-[52px] top-[60px] text-[13px] text-ink-dim">Nothing has been paid yet tonight.</p>
+        <p className="absolute left-[52px] top-[60px] text-[13px] text-ink-dim">No payments yet.</p>
       </div>
     )
   }

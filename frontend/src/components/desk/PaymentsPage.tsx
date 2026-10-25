@@ -42,7 +42,7 @@ function useBlockStates(fixture: boolean, floorOrders: number): { payments: Bloc
 function BlockNote({ state, empty }: { state: BlockState; empty: string }) {
   const error = useSession((s) => s.error)
   const staffError = useSession((s) => s.staffError)
-  if (state === 'loading') return <p role="status" className="py-3 text-[13px] text-ink-dim">Waiting for the host to send tonight’s payments.</p>
+  if (state === 'loading') return <p role="status" className="py-3 text-[13px] text-ink-dim">Loading payments…</p>
   if (state === 'refused') return <p className="py-3 text-[13px] text-ink-dim">This sign-in can’t see payments.{staffError ? ` ${staffError}` : ''}</p>
   if (state === 'error') return <p className="py-3 text-[13px] text-ink-dim">Couldn’t reach the host.{error ? ` ${error}` : ''}</p>
   return <p className="py-3 text-[13px] text-ink-dim">{empty}</p>
@@ -82,7 +82,7 @@ function NeedsYou({ rows, state, sim, onOpen }: { rows: Payment[]; state: BlockS
     <section aria-labelledby="needs-you">
       <SectionHead id="needs-you" title={state === 'ready' ? `Needs you · ${rows.length}` : 'Needs you'} aside="Charges to decide, disputes and failed payments, oldest first" sim={sim} />
       {state !== 'ready' || !rows.length ? (
-        <BlockNote state={state} empty="Nothing needs you. Every charge is decided and nothing has failed." />
+        <BlockNote state={state} empty="No payments need review." />
       ) : (
         <ul className="mt-2">
           {shown.map((payment) => (
@@ -124,7 +124,7 @@ function Booths({ payments, state, sim }: { payments: Payment[]; state: BlockSta
     <section aria-labelledby="by-booth" className="min-w-0">
       <SectionHead id="by-booth" title="Where it came in" aside={state === 'ready' && ranking.length ? `${formatCents(total)} paid merch` : undefined} sim={sim} />
       {state !== 'ready' || !ranking.length ? (
-        <BlockNote state={state} empty="No merch has been paid at a booth yet." />
+        <BlockNote state={state} empty="No paid merch orders." />
       ) : (
         <ol className="mt-2">
           {shown.map((booth, index) => (
@@ -156,7 +156,7 @@ function WalletCard({ pinned, desk, payments, sim }: { pinned: PinnedWallet; des
   const paid = payments.filter((payment) => payment.bandId === pinned.bandId && payment.status === 'paid').reduce((sum, payment) => sum + payment.amountCents, 0)
   const picks = desk.picks.filter((pick) => pick.nodeId && pick.nodeId === pinned.nodeId).sort((a, b) => a.rank - b.rank).slice(0, 3)
   if (!pinned.nodeId) {
-    return <div className="mt-3 rounded-[6px] bg-panel px-4 py-3 text-[13px] text-ink-dim">No one is registered on {band.toLowerCase()} tonight.</div>
+    return <div className="mt-3 rounded-[6px] bg-panel px-4 py-3 text-[13px] text-ink-dim">No one is registered to {band.toLowerCase()}.</div>
   }
   return (
     <div aria-label={`${band} wallet`} className="desk-card mt-3 grid gap-x-8 gap-y-4 px-4 py-4 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
@@ -165,7 +165,7 @@ function WalletCard({ pinned, desk, payments, sim }: { pinned: PinnedWallet; des
         {pinned.wallet ? (
           <>
             <p className="mt-1 text-[24px] leading-tight tabular-nums text-ink">{formatCents(pinned.wallet.balanceCents)}</p>
-            <p className="mt-1 truncate text-[13px] text-ink-dim">{pinned.name} · {formatCents(paid)} paid tonight</p>
+            <p className="mt-1 truncate text-[13px] text-ink-dim">{pinned.name} · {formatCents(paid)} paid</p>
             <div className="mt-2 flex items-center gap-2 text-[12px] text-ink-muted">Account <CopyId value={pinned.wallet.accountId} label="Account id" /></div>
           </>
         ) : (
@@ -280,7 +280,7 @@ function PaymentsTable({ payments, desk, state, partial, sim, onOpen, openId }: 
             {!shown.length && (
               <tr className="block border-t border-line lg:table-row">
                 <td colSpan={7} className="block py-3 text-[13px] text-ink-dim lg:table-cell">
-                  {query ? `No payments match “${query.trim()}”${filter === 'all' ? '' : ` under ${labelOf(filter).toLowerCase()}`}.` : `No payments are ${labelOf(filter).toLowerCase()} tonight.`}
+                  {query ? `No payments match “${query.trim()}”${filter === 'all' ? '' : ` under ${labelOf(filter).toLowerCase()}`}.` : filter === 'all' ? 'No payments yet.' : 'No payments in this view.'}
                 </td>
               </tr>
             )}
@@ -330,7 +330,7 @@ export function PaymentsPage() {
           <Figure label="Failed" chip={chip} value={value(String(figures.failedCount))}
             note={ready ? (figures.failedCount ? `${formatCents(figures.failedCents)} didn’t go through` : 'Nothing failed') : 'payments'} />
           <Figure label="Wallets open" chip={chip} value={value(String(figures.walletsOpen), states.wallets)}
-            note={states.wallets === 'ready' ? `of ${registered} registered bands · Nessie sandbox` : 'Nessie sandbox accounts'} />
+            note={states.wallets === 'ready' ? `of ${registered} registered attendees` : 'attendee accounts'} />
         </>
       }
     >
@@ -338,7 +338,7 @@ export function PaymentsPage() {
         <NeedsYou rows={needs} state={states.payments} sim={fixture} onOpen={setOpenId} />
         <div className="grid grid-cols-1 gap-x-10 gap-y-9 lg:grid-cols-3">
           <section aria-labelledby="over-the-night" className="min-w-0 lg:col-span-2">
-            <SectionHead id="over-the-night" title="Money over the night" aside="Paid, per 15 minutes" sim={fixture} />
+            <SectionHead id="over-the-night" title="Payments over time" aside="Paid, per 15 minutes" sim={fixture} />
             <div className="mt-2">{ready ? <NightChart bins={bins} /> : <BlockNote state={states.payments} empty="" />}</div>
           </section>
           <Booths payments={payments} state={states.payments} sim={fixture} />

@@ -59,7 +59,7 @@ describe('the wallet', () => {
     renderWallet()
     const hero = screen.getByLabelText('Band 07 wallet')
     expect(within(hero).getByText('$60.00')).toHaveClass('wallet-balance')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('$40.00 paid tonight.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('$40.00 paid.')
   })
 
   it('says the wallet is opening before my_wallet arrives, never $0.00', () => {
@@ -84,9 +84,9 @@ describe('the wallet', () => {
     renderWallet()
     expect(screen.getByText('Nothing has been charged to your band.')).toBeInTheDocument()
     expect(screen.getByText('Nothing has moved through your wallet yet.')).toBeInTheDocument()
-    expect(screen.getByText('No picks yet. They come from tonight’s photos of you.')).toBeInTheDocument()
+    expect(screen.getByText('No suggestions yet.')).toBeInTheDocument()
     expect(screen.getByText('No photograph of you yet.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Nothing paid yet tonight.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('No payments yet.')
   })
 
   it('shows a view’s refusal where that view would be', () => {

@@ -16,8 +16,7 @@ const dot: Record<Source['status'], string> = {
 }
 
 /**
- * Mode and feed health. The mode chip is always visible; the feed list folds behind one button
- * whose dot summarises it, and opens on its own when something is wrong with the link.
+ * Connection health and source details, with a visible label for locally generated data.
  */
 export function SourceStatus() {
   const [open, setOpen] = useState(false)
@@ -57,13 +56,14 @@ export function SourceStatus() {
     <div className="pointer-events-auto relative flex items-start gap-2">
       <button
         type="button"
+        aria-label="Connection status"
+        title="Connection status"
         aria-expanded={open}
         aria-controls="feeds"
         onClick={() => setOpen(!open)}
         className="nc-panel inline-flex h-7 items-center gap-2 px-2.5 text-[12px] text-ink-dim hover:text-ink"
       >
         <span aria-hidden className={cn('size-[7px] rounded-full', dot[worst], worst !== 'ok' && 'animate-blink')} />
-        Feeds
         <ChevronDown aria-hidden className={cn('size-3.5 transition-transform', open && 'rotate-180')} />
       </button>
       <ModeChip mode={mode} />
@@ -102,21 +102,14 @@ export function SourceStatus() {
 function ModeChip({ mode }: { mode: 'simulation' | 'live' | 'hybrid' }) {
   const plan = useVenuePlan((s) => s.plan)
   if (plan === 'calhacks' && mode === 'simulation') return null
-  if (mode === 'live') {
-    return (
-      <span className="inline-flex h-7 items-center gap-2 rounded-[3px] bg-[rgba(111,183,173,0.12)] px-2.5 text-[12px] font-semibold text-teal shadow-[inset_0_0_0_1px_rgba(111,183,173,0.5)]">
-        <span aria-hidden className="size-[7px] rounded-full bg-teal animate-breath" />
-        Live
-      </span>
-    )
-  }
+  if (mode === 'live') return null
   return (
     <span
       className="inline-flex h-7 items-center gap-2 overflow-hidden whitespace-nowrap rounded-[3px] bg-[rgba(184,166,255,0.1)] pr-2.5 text-[12px] font-semibold text-[#d9d0ff] shadow-[inset_0_0_0_1px_rgba(184,166,255,0.55)]"
-      title={mode === 'hybrid' ? 'Bands and incidents are live; the crowd is walking locally' : 'Everything on this screen is simulated'}
+      title={mode === 'hybrid' ? 'Live bands and incidents; locally generated crowd' : 'Locally generated event data'}
     >
       <span aria-hidden className="nc-sim-bar h-full w-3" />
-      {mode === 'hybrid' ? 'Live bands · simulated crowd' : 'Simulation'}
+      {mode === 'hybrid' ? 'Live bands · local crowd' : 'Local event'}
     </span>
   )
 }
