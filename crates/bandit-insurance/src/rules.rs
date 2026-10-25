@@ -1,4 +1,4 @@
-//! Payment rules. Claude proposes one from approved precedents of one shape;
+//! Payment rules. The Decision Engine proposes one from approved precedents of one shape;
 //! only the organizer's approval of the proposal creates it, and it never
 //! overwrites: a new rule for the same shape writes version n+1.
 
@@ -34,17 +34,40 @@ pub fn matching_rule(
         .max_by_key(|r| (r.zone_id != 0, r.version))
 }
 
-/// Approved simple precedents of one shape it takes before Claude proposes a rule.
+/// The exact authority shown for approval. Clinical details belong only in the rationale;
+/// they are not predicates. Keep this wording stable: older free-text approvals need review.
+pub fn approval_scope(kind: IncidentKind, cover: CoverKind, zone_id: u64, requires_corroborated: bool, ceiling_cents: Cents) -> String {
+    let kind = match kind {
+        IncidentKind::Fall => "fall",
+        IncidentKind::Sos => "SOS",
+        IncidentKind::Property => "venue property damage",
+        IncidentKind::Theft => "venue theft",
+        IncidentKind::Breakage => "venue breakage",
+    };
+    let cover = match cover {
+        CoverKind::MedicalPayments => "medical payments",
+        CoverKind::Property => "property",
+    };
+    let zone = if zone_id == 0 { "all zones".into() } else { format!("zone #{zone_id}") };
+    let evidence = if requires_corroborated { ", corroborated evidence required" } else { "" };
+    format!(
+        "Automatic payment scope: {kind} claims under {cover} cover; {zone}; up to {}{evidence}. Policy, amount and evidence checks must pass; complications and mass occurrences require individual review. Diagnosis and treatment do not restrict this rule.",
+        crate::money::format_cents(ceiling_cents)
+    )
+}
+
+/// Approved simple precedents of one shape it takes before the Decision Engine proposes a rule.
 pub const RULE_PRECEDENTS: usize = 3;
 
-/// Claude's answer to `rule_proposal`.
+/// The agent's answer to `rule_proposal`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProposedRule {
     /// false when the precedents share no pattern worth a rule.
     pub propose: bool,
     pub precedent_claim_ids: Vec<u64>,
     pub ceiling_cents: Cents,
-    /// The rule in one sentence.
+    /// Compatibility field; code replaces model wording with the enforced approval scope.
+    #[serde(default)]
     pub rule: String,
     /// Why, citing the claims.
     pub summary: String,
@@ -60,9 +83,6 @@ pub fn check_proposal(p: &ProposedRule, offered: &[(u64, Cents)], limit_cents: C
     }
     if !p.propose {
         return if problems.is_empty() { Ok(()) } else { Err(problems) };
-    }
-    if p.rule.trim().is_empty() {
-        problems.push("the rule must be one sentence".to_string());
     }
     let mut seen = Vec::new();
     for id in &p.precedent_claim_ids {
@@ -124,6 +144,19 @@ mod tests {
 
     const FALL: IncidentKind = IncidentKind::Fall;
     const MED: CoverKind = CoverKind::MedicalPayments;
+
+    #[test]
+    fn approval_text_names_only_executable_scope_and_its_limits() {
+        let any = approval_scope(FALL, MED, 0, true, 18_000);
+        assert!(any.starts_with("Automatic payment scope: fall claims under medical payments cover; all zones; up to $180.00, corroborated evidence required."));
+        assert!(any.contains("Diagnosis and treatment do not restrict this rule."));
+        assert!(any.contains("complications and mass occurrences require individual review"));
+        let zone = approval_scope(IncidentKind::Theft, CoverKind::Property, 102, false, 12_345);
+        assert!(zone.contains("venue theft claims under property cover; zone #102; up to $123.45."));
+        assert!(!zone.contains("corroborated evidence required"));
+        assert_ne!(any, approval_scope(FALL, MED, 102, true, 18_000));
+        assert_ne!(any, approval_scope(FALL, MED, 0, true, 18_001));
+    }
 
     #[test]
     fn highest_active_version_wins() {

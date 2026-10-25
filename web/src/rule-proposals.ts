@@ -27,8 +27,10 @@ export function decideProposal(conn: DbConnection, p: RuleProposal) {
     act(() => conn.reducers.rejectRuleProposal({ proposalId: p.id, reason: field(e.target as HTMLFormElement, 'reason') }));
   };
   return h('div', {},
+    h('p', {}, h('strong', {}, 'Scope to approve: '), p.rule),
+    h('p', { class: 'muted' }, 'Diagnosis and treatment in the rationale do not narrow this scope.'),
     h('button', { onclick: (e: Event) => { e.stopPropagation(); act(() => conn.reducers.approveRuleProposal({ proposalId: p.id, ceilingSeenCents: p.ceilingCents })); } },
-      `Approve: pays up to ${money(p.ceilingCents)}`),
+      `Approve this scope: up to ${money(p.ceilingCents)}`),
     h('form', { onsubmit: reject },
       h('input', { name: 'reason', placeholder: 'Reason for rejecting', required: true }),
       h('button', {}, 'Reject')));
@@ -49,7 +51,7 @@ function proposed(conn: DbConnection, canDecide: boolean, open: (id: bigint) => 
     h('h3', {}, `Proposed rules (${rows.length})`),
     !rows.length && h('p', { class: 'muted' }, 'None right now.'),
     rows.length > 0 && h('table', {},
-      h('tr', {}, h('th', {}, 'Proposal'), h('th', {}, 'Precedents'), h('th', {}, 'Rule'), h('th', {}, 'Ceiling'), h('th', {}, 'Why'), h('th', {}, '')),
+      h('tr', {}, h('th', {}, 'Proposal'), h('th', {}, 'Precedents'), h('th', {}, 'Rule'), h('th', {}, 'Ceiling'), h('th', {}, 'Rationale only'), h('th', {}, '')),
       rows.map(p => h('tr', {},
         h('td', {}, `#${p.id} ${shapeWords(p.incidentKind, p.coverKind)}`, h('div', { class: 'muted' }, date(p.createdAt))),
         h('td', {}, claimLinks(conn, p.claimIds, open)),
@@ -74,7 +76,7 @@ function rules(conn: DbConnection, open: (id: bigint) => void) {
           h('td', {}, `v${r.version}`), h('td', {}, shapeWords(r.incidentKind, r.coverKind)),
           h('td', {}, `${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
           h('td', {}, p ? claimLinks(conn, p.claimIds, open) : ''),
-          h('td', {}, `${r.approverName} (${r.approverRole}), ${date(r.createdAt)}`), h('td', {}, r.status));
+          h('td', {}, `${r.approverName} (${r.approverRole}), ${date(r.createdAt)}`), h('td', {}, r.status === 'review_required' ? 'Needs scope review; automatic payments withheld' : r.status));
       })),
     policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
 }
@@ -108,7 +110,7 @@ function earlier(conn: DbConnection, open: (id: bigint) => void) {
         h('td', {}, claimLinks(conn, p.claimIds, open)),
         h('td', {}, p.rule, p.summary && h('div', { class: 'muted' }, p.summary)),
         h('td', {}, p.ceilingCents ? money(p.ceilingCents) : ''),
-        h('td', {}, p.status === 'approved' ? `approved by ${p.decidedByName} as rule v${p.ruleVersion}` : p.status === 'rejected' ? `rejected by ${p.decidedByName}: ${p.reason}` : p.status === 'declined' ? 'no rule proposed' : p.status)))));
+        h('td', {}, p.status === 'approved' ? `approved by ${p.decidedByName} as rule v${p.ruleVersion}` : p.status === 'rejected' ? `rejected by ${p.decidedByName}: ${p.reason}` : p.status === 'declined' ? 'no rule proposed' : p.status === 'scope_review' ? 'Needs scope review; replacement approval required' : p.status)))));
 }
 
 /** The Proposed rules tab. `open` shows a claim on the Settlements tab. */

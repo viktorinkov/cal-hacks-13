@@ -14,7 +14,7 @@ use bandit_insurance::complications::Complication;
 use bandit_insurance::money::format_cents;
 use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
 use bandit_insurance::payloads::*;
-use bandit_insurance::rules::{ProposedRule, RULE_PRECEDENTS, check_proposal, matching_rule, next_version};
+use bandit_insurance::rules::{ProposedRule, RULE_PRECEDENTS, approval_scope, check_proposal, matching_rule, next_version};
 use bandit_insurance::{CoverKind, IncidentKind};
 use spacetimedb::{Identity, ReducerContext, Table};
 
@@ -80,7 +80,7 @@ fn uncited(ctx: &ReducerContext, incident_kind: &str, cover_kind: &str) -> Vec<O
 }
 
 fn active_rule(ctx: &ReducerContext, incident_kind: &str, cover_kind: &str) -> Option<SettlementRuleRow> {
-    ctx.db.settlement_rule().iter().filter(|r| r.status == "active" && r.incident_kind == incident_kind && r.cover_kind == cover_kind && r.zone_id == 0).max_by_key(|r| r.version)
+    ctx.db.settlement_rule().iter().filter(|r| rule_scope_approved(ctx, r) && r.incident_kind == incident_kind && r.cover_kind == cover_kind && r.zone_id == 0).max_by_key(|r| r.version)
 }
 
 /// After an approval of a simple claim: opens a proposal once enough precedents of its shape agree, and says
@@ -235,7 +235,9 @@ pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: St
             let mut claim_ids = p.precedent_claim_ids.clone();
             claim_ids.sort();
             let summary = p.summary.trim().to_string();
-            let rule = p.rule.trim().to_string();
+            let kind = IncidentKind::parse(&base.incident_kind).ok_or("unknown proposal incident kind")?;
+            let cover = CoverKind::parse(&base.cover_kind).ok_or("unknown proposal cover kind")?;
+            let rule = approval_scope(kind, cover, 0, true, p.ceiling_cents);
             ctx.db.rule_proposal().id().update(RuleProposal { status: "proposed".into(), ceiling_cents: p.ceiling_cents, claim_ids: claim_ids.clone(), rule: rule.clone(), summary: summary.clone(), ..base });
             jobs::finish(ctx, job, "rule proposed");
             crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "Decision Engine", format!("Proposed a rule: {rule}"), format!("{summary} From {}; waits for the organizer.", claims_words(&claim_ids)));
@@ -263,12 +265,16 @@ pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_see
         (Some(k), Some(c)) => (k, c),
         _ => return Err("the proposal's shape is unknown".into()),
     };
-    let limit = super::documents::current_policy(ctx).and_then(|pol| policy_rule(ctx, pol.id, cover)).map(|r| r.per_claim_limit_cents).unwrap_or(0);
+    if p.rule != approval_scope(kind, cover, 0, true, p.ceiling_cents) {
+        return Err("scope review required: this proposal's wording is not the code-enforced scope; refresh after rule scope review".into());
+    }
+    let limit = current_limit(ctx, cover);
+    validate_precedents(ctx, &p, limit)?;
     if p.ceiling_cents > limit {
         return Err(format!("the policy's per-claim limit is now {}, under the proposed {}", format_cents(limit), format_cents(p.ceiling_cents)));
     }
     let version = next_version(&core_rules(ctx), kind, cover, 0);
-    for old in ctx.db.settlement_rule().iter().filter(|r| r.status == "active" && r.incident_kind == p.incident_kind && r.cover_kind == p.cover_kind && r.zone_id == 0) {
+    for old in ctx.db.settlement_rule().iter().filter(|r| ["active", "review_required"].contains(&r.status.as_str()) && r.incident_kind == p.incident_kind && r.cover_kind == p.cover_kind && r.zone_id == 0) {
         ctx.db.settlement_rule().id().update(SettlementRuleRow { status: "superseded".into(), ..old });
     }
     let name = organizer_name(ctx);
@@ -303,6 +309,83 @@ pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_see
     crate::live::record(ctx, incident_id, claim_id, "organizer", &name, format!("Approved rule v{version}: {shape} up to {}", format_cents(rule.ceiling_cents)), format!("from {claims}, proposed by the Decision Engine"));
     pay_waiting(ctx, kind, cover);
     Ok(())
+}
+
+/// Only an exact, reciprocally linked approval can authorize automatic payments. This gate runs
+/// even before the post-publish review pass, so legacy prose is never silently reinterpreted.
+pub(super) fn rule_scope_approved(ctx: &ReducerContext, r: &SettlementRuleRow) -> bool {
+    if r.status != "active" || r.proposal_id == 0 {
+        return false;
+    }
+    let (Some(kind), Some(cover)) = (IncidentKind::parse(&r.incident_kind), CoverKind::parse(&r.cover_kind)) else { return false };
+    ctx.db.rule_proposal().id().find(r.proposal_id).is_some_and(|p| {
+        p.status == "approved" && p.settlement_rule_id == r.id && p.rule_version == r.version
+            && p.incident_kind == r.incident_kind && p.cover_kind == r.cover_kind
+            && p.ceiling_cents == r.ceiling_cents && p.decided_by == r.approver
+            && p.rule == approval_scope(kind, cover, r.zone_id, r.requires_corroborated, r.ceiling_cents)
+    })
+}
+
+fn current_limit(ctx: &ReducerContext, cover: CoverKind) -> u64 {
+    super::documents::current_policy(ctx).and_then(|pol| policy_rule(ctx, pol.id, cover)).filter(|r| r.active).map(|r| r.per_claim_limit_cents).unwrap_or(0)
+}
+
+/// Approval and review both recheck stored evidence, not just the worker's earlier payload.
+fn validate_precedents(ctx: &ReducerContext, p: &RuleProposal, limit: u64) -> Result<(), String> {
+    let offered: Vec<_> = ctx.db.organizer_precedent().iter()
+        .filter(|a| a.decision == "approve" && a.complications.is_empty()
+            && a.incident_kind == p.incident_kind && a.cover_kind == p.cover_kind)
+        .map(|a| (a.claim_id, a.payout_cents)).collect();
+    check_proposal(&ProposedRule {
+        propose: true, precedent_claim_ids: p.claim_ids.clone(), ceiling_cents: p.ceiling_cents,
+        rule: String::new(), summary: p.summary.clone(),
+    }, &offered, limit).map_err(|e| format!("the proposal needs review: {}", e.join("; ")))
+}
+
+/// Quarantine legacy authority and offer the code-enforced scope for a fresh human decision.
+/// Run once after publishing; safe to repeat. Historical approval wording stays unchanged.
+#[spacetimedb::reducer]
+pub fn review_rule_scopes(ctx: &ReducerContext) -> Result<(), String> {
+    require_role(ctx, &["ops", "worker"])?;
+    for r in ctx.db.settlement_rule().iter().filter(|r| r.status == "active").collect::<Vec<_>>() {
+        if rule_scope_approved(ctx, &r) { continue; }
+        ctx.db.settlement_rule().id().update(SettlementRuleRow { status: "review_required".into(), ..r.clone() });
+        let old = ctx.db.rule_proposal().id().find(r.proposal_id);
+        let (incident, claim) = old.as_ref().map(|p| anchor(ctx, p)).unwrap_or((0, 0));
+        crate::live::record(ctx, incident, claim, "Decision Engine", "code",
+            format!("Rule v{} needs scope review", r.version),
+            "Future automatic decisions withheld: the earlier approval does not confirm the code-enforced scope. New and waiting claims require individual review until a new scope is approved.".into());
+        // RuleProposal has no zone field. Never broaden a zone-specific legacy rule during review.
+        if r.zone_id == 0 && r.requires_corroborated {
+            if let Some(p) = old.filter(|p| p.status == "approved" && p.settlement_rule_id == r.id
+                && p.incident_kind == r.incident_kind && p.cover_kind == r.cover_kind && p.ceiling_cents == r.ceiling_cents) {
+                offer_scope_review(ctx, &p);
+            }
+        }
+    }
+    for p in ctx.db.rule_proposal().iter().filter(|p| p.status == "proposed").collect::<Vec<_>>() {
+        let (Some(kind), Some(cover)) = (IncidentKind::parse(&p.incident_kind), CoverKind::parse(&p.cover_kind)) else { continue };
+        if p.rule == approval_scope(kind, cover, 0, true, p.ceiling_cents) { continue; }
+        ctx.db.rule_proposal().id().update(RuleProposal { status: "scope_review".into(), ..p.clone() });
+        offer_scope_review(ctx, &p);
+    }
+    Ok(())
+}
+
+fn offer_scope_review(ctx: &ReducerContext, old: &RuleProposal) {
+    let (Some(kind), Some(cover)) = (IncidentKind::parse(&old.incident_kind), CoverKind::parse(&old.cover_kind)) else { return };
+    let limit = current_limit(ctx, cover);
+    if validate_precedents(ctx, old, limit).is_err() { return; }
+    let scope = approval_scope(kind, cover, 0, true, old.ceiling_cents);
+    if ctx.db.rule_proposal().iter().any(|p| OPEN.contains(&p.status.as_str())
+        && p.incident_kind == old.incident_kind && p.cover_kind == old.cover_kind && p.rule == scope) { return; }
+    ctx.db.rule_proposal().insert(RuleProposal {
+        id: 0, status: "proposed".into(), rule: scope, limit_cents: limit,
+        summary: format!("Scope review of proposal #{}. Earlier wording: {} Rationale only: {}", old.id, old.rule, old.summary),
+        decided_by: Identity::ZERO, decided_by_name: String::new(), reason: String::new(),
+        settlement_rule_id: 0, rule_version: 0, created_at: ctx.timestamp, decided_at: None,
+        ..old.clone()
+    });
 }
 
 /// The organizer rejects the Decision Engine's proposal. Its precedents stay cited, so the next three approvals of the
