@@ -219,7 +219,7 @@ Insurance.md: the insurance Decision Engine is the Anthropic Claude API plus the
 5. The Evidence Engine validates the de-identified copy and finds the clauses of both policies that bear on it (`claim_verify`, then `submit_claim_checks`).
 6. The Anthropic Claude API investigates with tools, one evidence source at a time, searches the policies' clauses, and decides: pay, refuse or ask the organizer (`claim_review`, then `submit_claim_review`). Code rejects an answer that cites a fact or clause not on the claim, or a figure code did not compute.
 7. Code's guard lets a pay through only inside an approved rule's ceiling with every check passed, and a refusal only on a failed check. Everything else goes to the organizer.
-8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, Claude proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
+8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, the Evidence Engine's agent `bandit-rule-proposer` counts them in `bandit-claims` with Elastic ES|QL and proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
 
 Each step, what Claude reads and answers, and five worked claims are in [Insurance: How the insurance Decision Engine decides](../6-features/Insurance.md#how-the-insurance-decision-engine-decides).
 
