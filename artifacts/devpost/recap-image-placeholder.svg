@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="420" viewBox="0 0 1440 420" role="img" aria-labelledby="title desc">
+  <title id="title">Recap image pending</title>
+  <desc id="desc">Placeholder for an attendee recap showing people, photos and personal merch suggestions.</desc>
+  <rect x="2" y="2" width="1436" height="416" rx="24" fill="#f3f5f7" stroke="#ccd5df" stroke-width="2"/>
+  <text x="720" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="44" font-weight="600" fill="#263747">Recap image pending</text>
+  <text x="720" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#516578">People, shared photos and personal merch</text>
+</svg>
