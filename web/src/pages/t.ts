@@ -197,8 +197,9 @@ function planLookup(next: Step) {
   const l = latestLookup();
   const status = !l ? null
     : l.status === 'searching' ? h('p', { class: 'muted' }, 'Looking up your plan…')
-    : l.status === 'found' ? h('p', {}, h('b', {}, 'Plan found: '),
-        `${l.printedInsurer} ${l.printedPlan}${l.planYear ? ` (${l.planYear})` : ''} `, h('a', { href: l.sourceUrl, target: '_blank' }, 'read it'))
+    : l.status === 'found' ? [h('p', {}, h('b', {}, 'Plan found: '),
+        `${l.printedInsurer} ${l.printedPlan}${l.planYear ? ` (${l.planYear})` : ''} `, h('a', { href: l.sourceUrl, target: '_blank' }, 'read it')),
+        l.matchedChunk && h('blockquote', { class: 'muted' }, `Page ${l.matchedChunk.page}: “${l.matchedChunk.text}”`)]
     : h('p', { class: 'error' }, "We couldn't find your plan's documents online. Upload your insurance card instead.");
   const look = async (e: Event) => {
     e.preventDefault();

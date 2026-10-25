@@ -9,6 +9,10 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
+import {
+  ChunkMatch,
+} from "./types";
+
 
 export default __t.row({
   id: __t.u64(),
@@ -30,4 +34,7 @@ export default __t.row({
   note: __t.string(),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  get matchedChunk() {
+    return __t.option(ChunkMatch).name("matched_chunk");
+  },
 });

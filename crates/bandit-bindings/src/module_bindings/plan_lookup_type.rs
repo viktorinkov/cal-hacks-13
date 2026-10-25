@@ -4,6 +4,8 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::chunk_match_type::ChunkMatch;
+
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct PlanLookup {
@@ -26,6 +28,7 @@ pub struct PlanLookup {
     pub note: String,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
+    pub matched_chunk: Option<ChunkMatch>,
 }
 
 impl __sdk::InModule for PlanLookup {
@@ -55,6 +58,7 @@ pub struct PlanLookupCols {
     pub note: __sdk::__query_builder::Col<PlanLookup, String>,
     pub created_at: __sdk::__query_builder::Col<PlanLookup, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<PlanLookup, __sdk::Timestamp>,
+    pub matched_chunk: __sdk::__query_builder::Col<PlanLookup, Option<ChunkMatch>>,
 }
 
 impl __sdk::__query_builder::HasCols for PlanLookup {
@@ -80,6 +84,7 @@ impl __sdk::__query_builder::HasCols for PlanLookup {
             note: __sdk::__query_builder::Col::new(table_name, "note"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            matched_chunk: __sdk::__query_builder::Col::new(table_name, "matched_chunk"),
         }
     }
 }

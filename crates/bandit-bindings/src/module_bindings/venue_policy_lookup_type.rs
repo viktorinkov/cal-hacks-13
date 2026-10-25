@@ -4,6 +4,7 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::chunk_match_type::ChunkMatch;
 use super::policy_form_type::PolicyForm;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
@@ -32,6 +33,8 @@ pub struct VenuePolicyLookup {
     pub requested_by: __sdk::Identity,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
+    pub liability_chunk: Option<ChunkMatch>,
+    pub property_chunk: Option<ChunkMatch>,
 }
 
 impl __sdk::InModule for VenuePolicyLookup {
@@ -65,6 +68,8 @@ pub struct VenuePolicyLookupCols {
     pub requested_by: __sdk::__query_builder::Col<VenuePolicyLookup, __sdk::Identity>,
     pub created_at: __sdk::__query_builder::Col<VenuePolicyLookup, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<VenuePolicyLookup, __sdk::Timestamp>,
+    pub liability_chunk: __sdk::__query_builder::Col<VenuePolicyLookup, Option<ChunkMatch>>,
+    pub property_chunk: __sdk::__query_builder::Col<VenuePolicyLookup, Option<ChunkMatch>>,
 }
 
 impl __sdk::__query_builder::HasCols for VenuePolicyLookup {
@@ -106,6 +111,8 @@ impl __sdk::__query_builder::HasCols for VenuePolicyLookup {
             requested_by: __sdk::__query_builder::Col::new(table_name, "requested_by"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            liability_chunk: __sdk::__query_builder::Col::new(table_name, "liability_chunk"),
+            property_chunk: __sdk::__query_builder::Col::new(table_name, "property_chunk"),
         }
     }
 }

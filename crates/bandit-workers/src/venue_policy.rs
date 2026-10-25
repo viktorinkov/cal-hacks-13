@@ -6,16 +6,20 @@
 //! only addresses the search gave, only real PDFs, and only a form whose number is on its own pages and
 //! holds the one typed. A form inside a longer PDF, such as a specimen policy, is cut out by those
 //! pages. The forms are joined into one PDF, the liability form first, which goes to the blob store,
-//! and the module files it as the venue's policy. The fetched PDFs leave Elastic when the job ends.
+//! and the module files it as the venue's policy. Each fetched PDF is cut into chunks in the clause
+//! index first, so its wording is searchable by meaning at once, and each form's check cites the chunk
+//! Elastic finds with the typed form number; the joined PDF gets its own chunks, and the citations move
+//! onto them. The fetched PDFs leave Elastic when the job ends.
 
-use bandit_bindings::{ModelCallIn, PolicyForm, VenuePolicyLookupResult};
+use bandit_bindings::{ChunkMatch, ModelCallIn, PolicyForm, VenuePolicyLookupResult};
 use bandit_common::sha256_hex;
 use bandit_insurance::printed::{COVERAGE_FORM, FormPrinted, checked_forms};
+use claims_elastic::{ClauseHit, PolicyClause, chunk_docs};
 use claude_client::{Effort, MessageRequest};
 use serde::Deserialize;
 
 use crate::brightdata::{BrightData, err, urls_in};
-use crate::document::{self, MAX_CHECK_PAGES, join_pdfs, page_count, pdf_pages, split_pages};
+use crate::document::{self, MAX_CHECK_PAGES, VENUE, join_pdfs, page_count, pdf_pages, split_pages};
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::ask_twice;
 use crate::plan::{MAX_PDF_BYTES, MAX_SEARCH_CHARS, check_find, find_schema, short};
@@ -49,6 +53,11 @@ struct Part<'a> {
 impl Part<'_> {
     fn title(&self) -> &'static str {
         if self.name == LIABILITY { "commercial general liability coverage form" } else { "commercial property coverage form" }
+    }
+
+    /// What was typed, as the query that finds where the PDF prints the form's number.
+    fn cite_query(&self) -> String {
+        format!("{} {}", self.form, self.title())
     }
 
     /// What the Evidence Engine must call the form.
@@ -144,10 +153,20 @@ fn pick(part: Part, forms: &[FormPrinted], dropped: &[String]) -> Result<Printed
 
 // --- The run ---------------------------------------------------------------------------------
 
-/// The Evidence Engine reads which coverage forms one fetched PDF holds, and code picks the typed one.
-/// The PDF's hash goes into `checked`, so it leaves Elastic when the job ends; until then a PDF that
-/// holds both forms is read once.
-async fn check_pdf(ctx: &Ctx, job: &JobIn, part: Part<'_>, pdf: &[u8], checked: &mut Vec<String>, calls: &mut Vec<ModelCallIn>) -> Result<Printed, String> {
+/// A form a fetched PDF holds, as the check found it.
+struct Checked {
+    printed: Printed,
+    /// The text of the form's own pages.
+    texts: Vec<String>,
+    /// The chunk the check cites, on its page in the fetched PDF.
+    cited: Option<ClauseHit>,
+}
+
+/// The Evidence Engine reads which coverage forms one fetched PDF holds, and code picks the typed one;
+/// the PDF's chunks go into the clause index first, and the check cites the chunk of the form's own
+/// pages that best matches the typed form number. The PDF's hash goes into `checked`, so it leaves
+/// Elastic when the job ends; until then a PDF that holds both forms is read and chunked once.
+async fn check_pdf(ctx: &Ctx, job: &JobIn, part: Part<'_>, pdf: &[u8], checked: &mut Vec<String>, calls: &mut Vec<ModelCallIn>) -> Result<Checked, String> {
     let pages = split_pages(pdf).map_err(|e| format!("its pages could not be split ({e:#})"))?;
     if pages.len() > MAX_CHECK_PAGES {
         return Err(format!("it has {} pages, and the check reads at most {MAX_CHECK_PAGES}", pages.len()));
@@ -156,17 +175,30 @@ async fn check_pdf(ctx: &Ctx, job: &JobIn, part: Part<'_>, pdf: &[u8], checked: 
     if !checked.contains(&hash) {
         checked.push(hash.clone());
     }
-    let read = document::read_pdf(ctx, job, &hash, COVERAGE_FORM, &pages, calls).await.map_err(|e| format!("could not be read: {e:#}"))?;
+    let read = document::read_pdf(ctx, job, &hash, COVERAGE_FORM, &pages, Some(VENUE), calls).await.map_err(|e| format!("could not be read: {e:#}"))?;
     let (forms, dropped) = checked_forms(&read.answer["read"], &read.texts);
-    pick(part, &forms, &dropped)
+    let printed = pick(part, &forms, &dropped)?;
+    let texts = read.texts[printed.first_page as usize - 1..printed.last_page as usize].to_vec();
+    let cited = document::cite_chunk(ctx, &hash, &part.cite_query(), Some((printed.first_page, printed.last_page)), &printed.form_number).await;
+    Ok(Checked { printed, texts, cited })
 }
 
-/// One form found: where, what it prints, and its own pages.
+/// One form found: where, what it prints, and its own pages with their text and the chunk its check cites.
 struct Found {
     part: &'static str,
     url: String,
     printed: Printed,
     pdf: Vec<u8>,
+    texts: Vec<String>,
+    cited: Option<ClauseHit>,
+}
+
+impl Found {
+    /// The cited chunk on its page in a PDF where the form starts on `first_page`.
+    fn cited_at(&self, first_page: u32) -> Option<ClauseHit> {
+        let hit = self.cited.as_ref()?;
+        Some(ClauseHit { page: (first_page + hit.page).saturating_sub(self.printed.first_page), ..hit.clone() })
+    }
 }
 
 /// The form's own pages: the whole PDF, or the pages cut out of a longer one, which is noted.
@@ -250,8 +282,8 @@ async fn look_for(ctx: &Ctx, job: &JobIn, bd: &BrightData, p: &Payload, part: Pa
             }
         };
         looked.pdfs += 1;
-        let printed = match check_pdf(ctx, job, part, &pdf, checked, calls).await {
-            Ok(printed) => printed,
+        let Checked { printed, texts, cited } = match check_pdf(ctx, job, part, &pdf, checked, calls).await {
+            Ok(c) => c,
             Err(why) => {
                 looked.notes.push(format!("{}: {why}", short(url)));
                 continue;
@@ -260,7 +292,7 @@ async fn look_for(ctx: &Ctx, job: &JobIn, bd: &BrightData, p: &Payload, part: Pa
         let mut cut = Vec::new();
         match form_pages(pdf, &printed, url, &mut cut) {
             Ok(pdf) => {
-                looked.found = Some(Found { part: part.name, url: url.clone(), printed, pdf });
+                looked.found = Some(Found { part: part.name, url: url.clone(), printed, pdf, texts, cited });
                 looked.notes = cut;
                 return Ok(looked);
             }
@@ -270,9 +302,20 @@ async fn look_for(ctx: &Ctx, job: &JobIn, bd: &BrightData, p: &Payload, part: Pa
     Ok(looked)
 }
 
+/// The forms as one PDF, the liability form first.
+struct Package {
+    pdf: Vec<u8>,
+    /// Each form with its first page in the PDF.
+    forms: Vec<PolicyForm>,
+    /// The text of each page of the PDF.
+    texts: Vec<String>,
+    /// The chunk each form's check cites, by part, on its page in the PDF.
+    cited: Vec<(&'static str, ClauseHit)>,
+}
+
 /// The forms as one PDF, the liability form first, with each form's first page. A property form that
 /// cannot be joined, or that takes the PDF over 50 pages, is left out and noted.
-fn package(found: Vec<Found>, notes: &mut Vec<String>) -> (Vec<u8>, Vec<PolicyForm>) {
+fn package(found: Vec<Found>, notes: &mut Vec<String>) -> Package {
     let form = |f: &Found, first_page: u32| PolicyForm {
         part: f.part.into(),
         url: f.url.clone(),
@@ -285,7 +328,8 @@ fn package(found: Vec<Found>, notes: &mut Vec<String>) -> (Vec<u8>, Vec<PolicyFo
     let first = found.next().expect("at least one form");
     let one = |first: Found| {
         let f = form(&first, 1);
-        (first.pdf, vec![f])
+        let cited = first.cited_at(1).map(|c| (first.part, c)).into_iter().collect();
+        Package { forms: vec![f], texts: first.texts, cited, pdf: first.pdf }
     };
     let Some(second) = found.next() else { return one(first) };
     let (a, b) = (form(&first, 1), form(&second, page_count(&first.pdf) + 1));
@@ -294,7 +338,10 @@ fn package(found: Vec<Found>, notes: &mut Vec<String>) -> (Vec<u8>, Vec<PolicyFo
         return one(first);
     }
     match join_pdfs(&[&first.pdf, &second.pdf]) {
-        Ok(pdf) => (pdf, vec![a, b]),
+        Ok(pdf) => {
+            let cited = [first.cited_at(1).map(|c| (first.part, c)), second.cited_at(b.first_page).map(|c| (second.part, c))].into_iter().flatten().collect();
+            Package { pdf, forms: vec![a, b], texts: [first.texts, second.texts].concat(), cited }
+        }
         Err(e) => {
             notes.push(format!("The property form {} is left out: it could not be joined ({e:#}).", b.form_number));
             one(first)
@@ -307,7 +354,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
     let mut calls = Vec::new();
     let result = lookup(ctx, job, &p, &mut checked, &mut calls).await;
     // The PDF filed is the joined one, so every fetched PDF leaves Elastic, found or not, before the
-    // module files it: a form that is a whole PDF has the same hash as the PDF filed.
+    // module files it, unless it is the PDF filed: a form that is a whole PDF has the same hash.
     for hash in &checked {
         document::forget(ctx, hash).await;
     }
@@ -340,8 +387,16 @@ async fn lookup(ctx: &Ctx, job: &JobIn, p: &Payload, checked: &mut Vec<String>, 
         tracing::info!(job_id = job.id, lookup_id = p.lookup_id, status, notes = %notes.join(" "), "no policy form");
         return Ok(VenuePolicyLookupResult { status: status.into(), note: notes.join(" ").chars().take(1000).collect(), ..empty() });
     }
-    let (pdf, forms) = package(found, &mut notes);
+    let Package { pdf, forms, texts, cited } = package(found, &mut notes);
     let blob = ctx.blobs.put(&pdf).map_err(|e| err("storing the policy PDF", e))?;
+    // The joined PDF is the venue's policy: its chunks make it searchable by meaning before it is read.
+    let chunks = chunk_docs(VENUE, &blob.sha256, &texts);
+    if let Some(es) = &ctx.elastic
+        && let Err(e) = es.index_chunks(&blob.sha256, &chunks).await
+    {
+        tracing::warn!(job_id = job.id, document = %blob.sha256, error = %format!("{e:#}"), "could not index the joined policy's chunks");
+    }
+    let [liability_chunk, property_chunk] = [LIABILITY, PROPERTY].map(|part| matched(&cited, part, &chunks));
     Ok(VenuePolicyLookupResult {
         status: "found".into(),
         forms,
@@ -349,11 +404,29 @@ async fn lookup(ctx: &Ctx, job: &JobIn, p: &Payload, checked: &mut Vec<String>, 
         size_bytes: blob.size_bytes,
         page_count: page_count(&pdf),
         note: notes.join(" ").chars().take(1000).collect(),
+        liability_chunk,
+        property_chunk,
     })
 }
 
+/// The chunk of the joined PDF that holds what `part`'s check cited: the same text on the same page.
+fn matched(cited: &[(&str, ClauseHit)], part: &str, chunks: &[PolicyClause]) -> Option<ChunkMatch> {
+    let (_, hit) = cited.iter().find(|(p, _)| *p == part)?;
+    let chunk = chunks.iter().find(|c| c.page == hit.page && c.text == hit.text)?;
+    Some(ChunkMatch { chunk_id: chunk.clause_id.clone(), page: chunk.page, text: chunk.text.clone(), score: hit.score })
+}
+
 fn empty() -> VenuePolicyLookupResult {
-    VenuePolicyLookupResult { status: String::new(), forms: Vec::new(), file_hash: String::new(), size_bytes: 0, page_count: 0, note: String::new() }
+    VenuePolicyLookupResult {
+        status: String::new(),
+        forms: Vec::new(),
+        file_hash: String::new(),
+        size_bytes: 0,
+        page_count: 0,
+        note: String::new(),
+        liability_chunk: None,
+        property_chunk: None,
+    }
 }
 
 #[cfg(test)]
@@ -395,6 +468,22 @@ mod tests {
         let why = pick(liability, &[], &["form 1: it prints no form number".into()]).unwrap_err();
         assert_eq!(why, "it holds no commercial general liability coverage form (form 1: it prints no form number)");
         assert!(pick(liability, &[form("liability_form", "CG 00 01 04 13", 1, 70)], &[]).unwrap_err().contains("runs 70 pages"));
+    }
+
+    #[test]
+    fn the_cited_chunk_moves_onto_the_joined_pdf() {
+        let texts: Vec<String> = ["SECTION I COVERAGES", "COMMERCIAL GENERAL LIABILITY COVERAGE FORM\nCG 00 01 04 13 Page 2 of 16", "COVERAGE C MEDICAL PAYMENTS"].map(String::from).to_vec();
+        let hit = ClauseHit { clause_id: "f-p5-k1".into(), page: 5, text: texts[1].clone(), score: 0.7, ..Default::default() };
+        let printed = Printed { document: "liability_form".into(), form_number: "CG 00 01 04 13".into(), title: String::new(), first_page: 4, last_page: 6 };
+        let found = Found { part: LIABILITY, url: "https://forms.test/specimen.pdf".into(), printed, pdf: Vec::new(), texts: texts.clone(), cited: Some(hit) };
+        let pkg = package(vec![found], &mut Vec::new());
+        assert_eq!((pkg.texts.clone(), pkg.forms.len()), (texts, 1));
+        assert_eq!(pkg.cited[0].1.page, 2, "page 5 of the specimen is page 2 of the form");
+        let chunks = chunk_docs(VENUE, "j", &pkg.texts);
+        let m = matched(&pkg.cited, LIABILITY, &chunks).unwrap();
+        assert_eq!((m.chunk_id.as_str(), m.page, m.score), ("j-p2-k1", 2, 0.7));
+        assert!(matched(&pkg.cited, PROPERTY, &chunks).is_none());
+        assert_eq!(parts(&payload())[0].cite_query(), "CG 00 01 commercial general liability coverage form");
     }
 
     #[test]

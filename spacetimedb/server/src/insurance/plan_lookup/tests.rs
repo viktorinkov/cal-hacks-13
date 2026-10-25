@@ -61,6 +61,12 @@ fn found() -> PlanLookupResult {
         size_bytes: 412_000,
         page_count: 8,
         note: String::new(),
+        matched_chunk: Some(ChunkMatch {
+            chunk_id: format!("{}-p1-k1", "c".repeat(64)),
+            page: 1,
+            text: "  Blue Shield of California: Silver 70 PPO 2500/55 Coverage Period: 01/01/2026 - 12/31/2026  ".into(),
+            score: 0.81,
+        }),
     }
 }
 
@@ -82,6 +88,8 @@ fn a_found_health_plan_lands_on_the_medical_card() {
 
     let l = w.lookup();
     assert_eq!((l.status.as_str(), l.file_hash.as_str(), l.page_count), (FOUND, "c".repeat(64).as_str(), 8));
+    let cited = l.matched_chunk.expect("the found plan keeps the chunk its check cites");
+    assert_eq!((cited.page, cited.text.as_str()), (1, "Blue Shield of California: Silver 70 PPO 2500/55 Coverage Period: 01/01/2026 - 12/31/2026"));
     let blob = w.t.db.blob_ref().hash().find("c".repeat(64)).unwrap();
     assert_eq!((blob.owner, blob.access.as_str(), blob.purpose.as_str()), (Some(id("alex")), "owner_only", PLAN_WORDING));
     let card = w.t.db.medical_card().attendee().find(id("alex")).unwrap();
@@ -116,4 +124,15 @@ fn a_lookup_that_keeps_failing_ends_failed() {
     }
     let l = w.lookup();
     assert_eq!((l.status.as_str(), l.note.as_str()), (FAILED, "search failed 3"));
+}
+
+#[test]
+fn a_cited_chunk_is_checked() {
+    let chunk = |id: &str| ChunkMatch { chunk_id: id.into(), page: 2, text: "Coverage Period: 01/01/2026".into(), score: f32::NAN };
+    assert_eq!(checked_match(Some(chunk("ab-p2-k1"))).unwrap().unwrap().score, 0.0, "a score that is not a number is 0");
+    assert!(checked_match(Some(chunk("../x"))).is_err());
+    assert!(checked_match(Some(ChunkMatch { page: 0, ..chunk("ab-p2-k1") })).is_err());
+    let long = ChunkMatch { text: "x".repeat(5000), ..chunk("ab-p2-k1") };
+    assert_eq!(checked_match(Some(long)).unwrap().unwrap().text.len(), 1000);
+    assert_eq!(checked_match(None).unwrap(), None);
 }

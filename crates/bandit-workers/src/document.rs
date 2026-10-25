@@ -4,14 +4,16 @@
 //! the terms and clauses, and code checks every quote against its page before
 //! the clauses are indexed and the module gets the answer. The plan and venue
 //! policy lookups read each PDF they fetch the same way (`read_pdf`), to check
-//! what it prints about itself before they keep it.
+//! what it prints about itself before they keep it, and first cut its pages into
+//! chunks in the clause index, so it is searchable by meaning the moment it
+//! arrives and the check can cite the chunk that matched (`cite_chunk`).
 
 use std::time::Duration;
 
 use anyhow::{Context, anyhow, bail};
-use bandit_bindings::ModelCallIn;
+use bandit_bindings::{ChunkMatch, ModelCallIn};
 use bandit_insurance::policy::{CheckedPolicy, DocumentReadPayload, PolicyRead, VENUE_POLICY, check_policy, document_schema};
-use claims_elastic::{PolicyClause, StoredPage, reader};
+use claims_elastic::{CLAUSE, ClauseHit, PolicyClause, StoredPage, chunk_docs, reader};
 use claude_client::{Effort, MessageRequest};
 use serde_json::{Value, json};
 
@@ -23,6 +25,11 @@ const POLL_EVERY: Duration = Duration::from_secs(5);
 const WORKFLOW_LIMIT: Duration = Duration::from_secs(10 * 60);
 /// Most pages of a PDF a lookup fetched that the Evidence Engine reads to check it.
 pub const MAX_CHECK_PAGES: usize = claims_elastic::MAX_DOCUMENT_PAGES;
+/// Chunks a check's search returns, best first, to find the one it cites.
+const CITE_K: usize = 5;
+/// Whose policy a fetched PDF's chunks are.
+pub const ATTENDEE: &str = "attendee";
+pub const VENUE: &str = "venue";
 
 const TRANSCRIBE_SYSTEM: &str = "You transcribe one scanned page of an insurance document. \
 Write out every word printed on the page exactly as printed, in reading order, one printed line per line, \
@@ -36,7 +43,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
         return Err(JobError::msg(format!("the PDF has {} pages, not {}", pages.len(), p.page_count)));
     }
     let mut calls = Vec::new();
-    let Read { answer, texts } = read_pdf(ctx, job, &p.file_hash, &p.kind, &pages, &mut calls).await.map_err(keep(&mut calls))?;
+    let Read { answer, texts } = read_pdf(ctx, job, &p.file_hash, &p.kind, &pages, None, &mut calls).await.map_err(keep(&mut calls))?;
     let read = policy_read(&answer).map_err(keep(&mut calls))?;
     let (es, _) = ctx.reader().await.map_err(|e| JobError { calls: std::mem::take(&mut calls), ..e })?;
 
@@ -76,8 +83,11 @@ pub struct Read {
 /// first written out word for word by the Claude API), then the
 /// `bandit-read-document` workflow reads it. An answer the same reader saved for
 /// this PDF and kind is used as it is, so a PDF a plan lookup checked is not read
-/// again when the module files it. The Claude calls made go into `calls`.
-pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[Vec<u8>], calls: &mut Vec<ModelCallIn>) -> anyhow::Result<Read> {
+/// again when the module files it. With `chunks`, the policy (`attendee` or
+/// `venue`) of a PDF a lookup fetched, the page texts are cut into chunks in the
+/// clause index before the reader runs, once per PDF. The Claude calls made go
+/// into `calls`.
+pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[Vec<u8>], chunks: Option<&str>, calls: &mut Vec<ModelCallIn>) -> anyhow::Result<Read> {
     let (es, kibana) = ctx.reader().await.map_err(|e| anyhow!(e.error))?;
     let page_count = pages.len() as u32;
     let stored = es.document_pages(hash).await?;
@@ -94,6 +104,12 @@ pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[V
         }
     }
     let texts = page_texts(&es.document_pages(hash).await?, page_count)?;
+    if let Some(policy) = chunks {
+        let docs = chunk_docs(policy, hash, &texts);
+        if es.index_chunks(hash, &docs).await? {
+            tracing::info!(job_id = job.id, document = hash, chunks = docs.len(), "fetched PDF chunked for search by meaning");
+        }
+    }
 
     let schema = document_schema(kind).to_string();
     let version = reader::version(&schema);
@@ -125,12 +141,43 @@ fn same_reading(saved: &Value, kind: &str, version: &str) -> bool {
     saved["kind"] == kind && saved["reader"] == version && saved["read"].is_object()
 }
 
-/// Deletes a PDF a lookup only checked from Elastic: its pages and its answer.
+/// Deletes a PDF a lookup only checked from Elastic: its pages, its answer and
+/// its chunks. A PDF the blob store holds was kept, by this lookup or by
+/// another one that fetched the same PDF, such as a second attendee's plan
+/// lookup, so it stays.
 pub async fn forget(ctx: &Ctx, hash: &str) {
     let Some(es) = &ctx.elastic else { return };
+    if ctx.blobs.path(hash).is_ok_and(|p| p.is_file()) {
+        tracing::info!(document = hash, "a checked PDF stays in Elastic: a lookup kept it");
+        return;
+    }
     if let Err(e) = es.delete_document(hash).await {
         tracing::warn!(document = hash, error = %format!("{e:#}"), "could not delete a checked PDF from Elastic");
     }
+    if let Err(e) = es.delete_chunks(hash).await {
+        tracing::warn!(document = hash, error = %format!("{e:#}"), "could not delete a checked PDF's chunks from Elastic");
+    }
+}
+
+/// The chunk of a fetched PDF a check cites: Elastic searches the PDF's chunks,
+/// from pages `first` to `last` when given, by meaning with `query`, what was
+/// typed, and code keeps the first of the top 5 that holds `printed`, the name
+/// the check matched, else the first. None when the search fails or finds none;
+/// a check never fails on its citation.
+pub async fn cite_chunk(ctx: &Ctx, hash: &str, query: &str, pages: Option<(u32, u32)>, printed: &str) -> Option<ClauseHit> {
+    let es = ctx.elastic.as_ref()?;
+    match es.search_chunks(query, hash, pages, CITE_K).await {
+        Ok(hits) => claims_elastic::cite(&hits, printed).cloned(),
+        Err(e) => {
+            tracing::warn!(document = hash, error = %format!("{e:#}"), "the chunk search failed; the check cites no chunk");
+            None
+        }
+    }
+}
+
+/// A cited chunk as the module keeps it.
+pub fn chunk_match(hit: &ClauseHit) -> ChunkMatch {
+    ChunkMatch { chunk_id: hit.clause_id.clone(), page: hit.page, text: hit.text.clone(), score: hit.score }
 }
 
 /// Each page of `pdf` as a PDF of its own, in page order.
@@ -252,6 +299,7 @@ pub fn clause_docs(p: &DocumentReadPayload, checked: &CheckedPolicy) -> Vec<Poli
         .enumerate()
         .map(|(i, c)| PolicyClause {
             clause_id: format!("{}-c{}", p.file_hash, i + 1),
+            kind: CLAUSE.into(),
             policy: policy.into(),
             document_hash: p.file_hash.clone(),
             section: c.section.clone(),
@@ -398,6 +446,7 @@ mod tests {
         let staff = checked.terms.iter().find(|t| t.code == "staff").unwrap();
         assert_eq!(docs[staff.clause as usize - 1].section, "exclusions");
         assert!(clause_docs(&payload(HEALTH_PLAN), &checked).iter().all(|c| c.policy == "attendee"), "a health plan's clauses are the attendee's");
+        assert!(docs.iter().all(|c| c.kind == CLAUSE), "a checked clause is never a chunk");
     }
 
     #[test]

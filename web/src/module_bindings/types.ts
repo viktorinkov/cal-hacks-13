@@ -307,6 +307,14 @@ export const ChosenVenue = __t.object("ChosenVenue", {
 });
 export type ChosenVenue = __Infer<typeof ChosenVenue>;
 
+export const ChunkMatch = __t.object("ChunkMatch", {
+  chunkId: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ChunkMatch = __Infer<typeof ChunkMatch>;
+
 export const Claim = __t.object("Claim", {
   id: __t.u64(),
   incidentId: __t.u64(),
@@ -1526,6 +1534,9 @@ export const PlanLookup = __t.object("PlanLookup", {
   note: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  get matchedChunk() {
+    return __t.option(ChunkMatch);
+  },
 });
 export type PlanLookup = __Infer<typeof PlanLookup>;
 
@@ -1539,6 +1550,9 @@ export const PlanLookupResult = __t.object("PlanLookupResult", {
   sizeBytes: __t.u64(),
   pageCount: __t.u32(),
   note: __t.string(),
+  get matchedChunk() {
+    return __t.option(ChunkMatch);
+  },
 });
 export type PlanLookupResult = __Infer<typeof PlanLookupResult>;
 
@@ -1882,6 +1896,12 @@ export const VenuePolicyLookup = __t.object("VenuePolicyLookup", {
   requestedBy: __t.identity(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  get liabilityChunk() {
+    return __t.option(ChunkMatch);
+  },
+  get propertyChunk() {
+    return __t.option(ChunkMatch);
+  },
 });
 export type VenuePolicyLookup = __Infer<typeof VenuePolicyLookup>;
 
@@ -1894,6 +1914,12 @@ export const VenuePolicyLookupResult = __t.object("VenuePolicyLookupResult", {
   sizeBytes: __t.u64(),
   pageCount: __t.u32(),
   note: __t.string(),
+  get liabilityChunk() {
+    return __t.option(ChunkMatch);
+  },
+  get propertyChunk() {
+    return __t.option(ChunkMatch);
+  },
 });
 export type VenuePolicyLookupResult = __Infer<typeof VenuePolicyLookupResult>;
 

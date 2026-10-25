@@ -3,12 +3,14 @@
 //! (`plan_find`), the Web Unlocker fetches it, and the Evidence Engine reads it like an upload,
 //! together with the insurer, plan and year it prints. Code keeps only addresses the search gave,
 //! only real PDFs, and only a PDF whose printed insurer and plan are on their pages and hold most of
-//! the words the attendee typed. The PDF goes to the blob store, and the module lands it like an
-//! upload; its reading is already saved, so it is read once.
+//! the words the attendee typed. Each fetched PDF is cut into chunks in the clause index first, so
+//! its wording is searchable by meaning at once, and the check cites the chunk Elastic finds with what
+//! the attendee typed. The PDF goes to the blob store, and the module lands it like an upload; its
+//! reading is already saved, so it is read once.
 
 use std::collections::HashSet;
 
-use bandit_bindings::{ModelCallIn, PlanLookupResult};
+use bandit_bindings::{ChunkMatch, ModelCallIn, PlanLookupResult};
 use bandit_common::sha256_hex;
 use bandit_insurance::policy::HEALTH_PLAN;
 use bandit_insurance::printed::PlanPrinted;
@@ -17,7 +19,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::brightdata::{BrightData, err, urls_in};
-use crate::document::{self, MAX_CHECK_PAGES};
+use crate::document::{self, ATTENDEE, MAX_CHECK_PAGES};
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::ask_twice;
 use crate::sink::Finish;
@@ -161,6 +163,11 @@ fn mismatch(p: &Payload, d: &Printed) -> Option<String> {
     None
 }
 
+/// What the attendee typed, as the query that finds where the PDF names its plan.
+fn cite_query(p: &Payload) -> String {
+    format!("{} {} summary of benefits and coverage", p.insurer, p.plan)
+}
+
 /// An address without its scheme, for the note the attendee may read.
 pub(crate) fn short(url: &str) -> &str {
     url.split_once("://").map_or(url, |(_, rest)| rest)
@@ -177,22 +184,30 @@ fn judge(p: &Payload, read: &Value, texts: &[String]) -> Result<Printed, String>
     }
 }
 
-/// The Evidence Engine reads one fetched PDF as the attendee's plan, and code checks what it prints.
-/// A PDF that is not the plan leaves Elastic again; the plan's own reading stays for `document_read`.
-async fn check_pdf(ctx: &Ctx, job: &JobIn, p: &Payload, pdf: &[u8], calls: &mut Vec<ModelCallIn>) -> Result<Printed, String> {
+/// The Evidence Engine reads one fetched PDF as the attendee's plan, and code checks what it prints;
+/// the PDF's chunks go into the clause index first. For the plan, it cites the chunk that best
+/// matches what the attendee typed. A PDF that is not the plan leaves Elastic again, unless a lookup
+/// kept it; the plan's own reading and chunks stay for `document_read` and the claims.
+async fn check_pdf(ctx: &Ctx, job: &JobIn, p: &Payload, pdf: &[u8], calls: &mut Vec<ModelCallIn>) -> Result<(Printed, Option<ChunkMatch>), String> {
     let pages = document::split_pages(pdf).map_err(|e| format!("its pages could not be split ({e:#})"))?;
     if pages.len() > MAX_CHECK_PAGES {
         return Err(format!("it has {} pages, and the check reads at most {MAX_CHECK_PAGES}", pages.len()));
     }
     let hash = sha256_hex(pdf);
-    let checked = match document::read_pdf(ctx, job, &hash, HEALTH_PLAN, &pages, calls).await {
+    let checked = match document::read_pdf(ctx, job, &hash, HEALTH_PLAN, &pages, Some(ATTENDEE), calls).await {
         Ok(read) => judge(p, &read.answer["read"], &read.texts),
         Err(e) => Err(format!("could not be read: {e:#}")),
     };
-    if checked.is_err() {
-        document::forget(ctx, &hash).await;
+    match checked {
+        Ok(printed) => {
+            let cited = document::cite_chunk(ctx, &hash, &cite_query(p), None, &printed.plan).await;
+            Ok((printed, cited.as_ref().map(document::chunk_match)))
+        }
+        Err(why) => {
+            document::forget(ctx, &hash).await;
+            Err(why)
+        }
     }
-    checked
 }
 
 pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
@@ -248,7 +263,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
         };
         pdfs += 1;
         match check_pdf(ctx, job, &p, &pdf, &mut calls).await {
-            Ok(printed) => {
+            Ok((printed, matched_chunk)) => {
                 let blob = ctx.blobs.put(&pdf).map_err(|e| err("storing the PDF", e))?;
                 tracing::info!(job_id = job.id, lookup_id = p.lookup_id, %url, insurer = %printed.insurer, plan = %printed.plan, "plan found");
                 let result = PlanLookupResult {
@@ -261,6 +276,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
                     size_bytes: blob.size_bytes,
                     page_count: document::page_count(&pdf),
                     note: String::new(),
+                    matched_chunk,
                 };
                 ctx.sink.finish(job.id, Finish::PlanLookup { result }, calls).await?;
                 return Ok(());
@@ -285,6 +301,7 @@ fn empty() -> PlanLookupResult {
         size_bytes: 0,
         page_count: 0,
         note: String::new(),
+        matched_chunk: None,
     }
 }
 
@@ -302,6 +319,7 @@ mod tests {
         assert_eq!(q[0], "Blue Shield of California Silver 70 PPO CA 2026 summary of benefits and coverage pdf");
         assert_eq!(q[1], "Blue Shield of California Silver 70 PPO SBC 2026");
         assert!((2025..2100).contains(&current_year()));
+        assert_eq!(cite_query(&payload("Kaiser Permanente", "Bronze 60 HMO")), "Kaiser Permanente Bronze 60 HMO summary of benefits and coverage");
     }
 
     #[test]

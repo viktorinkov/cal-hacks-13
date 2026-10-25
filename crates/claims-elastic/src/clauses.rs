@@ -1,26 +1,33 @@
 //! Every clause of the policies BandIt reads, one document each in
 //! `<prefix>-policy-clauses` (`bandit-policy-clauses` live), so a claim can be
 //! matched against the contract's own words. Only clauses code found word for
-//! word on their page are written here.
+//! word on their page are written here. The same index holds the chunks of
+//! every PDF a lookup fetched (`kind` `chunk`, `chunks.rs`).
 
 use anyhow::{Context, Result};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{ClaimsIndex, INFERENCE_ID, check_id};
+use crate::{CHUNK, ClaimsIndex, INFERENCE_ID, check_id};
+
+/// `kind` of a clause code checked; a fetched PDF's chunk is [`CHUNK`].
+pub const CLAUSE: &str = "clause";
 
 /// One clause of a checked policy.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PolicyClause {
-    /// `<document_hash>-c<n>`, n the clause's 1-based position among the checked clauses.
+    /// `<document_hash>-c<n>`, n the clause's 1-based position among the checked clauses;
+    /// `<document_hash>-p<page>-k<n>` for a chunk.
     pub clause_id: String,
+    /// [`CLAUSE`] or [`CHUNK`].
+    pub kind: String,
     /// `venue`, or `attendee` for an attendee's health plan.
     pub policy: String,
     /// SHA-256 of the policy PDF.
     pub document_hash: String,
-    /// A `bandit_insurance::policy::SECTIONS` name, such as `exclusions`.
+    /// A `bandit_insurance::policy::SECTIONS` name, such as `exclusions`; empty for a chunk.
     pub section: String,
     /// 1-based page the clause is printed on.
     pub page: u32,
@@ -55,9 +62,13 @@ impl ClaimsIndex {
         self.bulk("refresh=wait_for", docs).await.context("indexing policy clauses")
     }
 
-    /// Deletes every clause of one document, before its clauses are written again. Returns how many there were.
+    /// Deletes every clause of one document, before its clauses are written again; its chunks stay.
+    /// Returns how many there were.
     pub async fn delete_policy_clauses(&self, document_hash: &str) -> Result<u64> {
-        let body = json!({ "query": { "term": { "document_hash": document_hash } } });
+        let body = json!({ "query": { "bool": {
+            "filter": [{ "term": { "document_hash": document_hash } }],
+            "must_not": [{ "term": { "kind": CHUNK } }]
+        }}});
         let path = format!("{}/_delete_by_query?refresh=true", self.clauses_index());
         let v = self.call(Method::POST, &path, Some(body)).await?;
         Ok(v["deleted"].as_u64().unwrap_or(0))
@@ -69,7 +80,7 @@ fn clause_mappings() -> Value {
     json!({
         "dynamic": false,
         "properties": {
-            "clause_id": kw, "policy": kw, "document_hash": kw, "section": kw,
+            "clause_id": kw, "kind": kw, "policy": kw, "document_hash": kw, "section": kw,
             "page": { "type": "integer" },
             "text": { "type": "semantic_text", "inference_id": INFERENCE_ID }
         }
@@ -84,6 +95,7 @@ mod tests {
     fn a_clause_serializes_with_mapping_names() {
         let c = PolicyClause {
             clause_id: "ab12-c1".into(),
+            kind: CLAUSE.into(),
             policy: "venue".into(),
             document_hash: "ab12".into(),
             section: "exclusions".into(),

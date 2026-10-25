@@ -2,7 +2,7 @@
 //! worker searches for the plan's public document through Bright Data, Claude picks it among the
 //! results and reads what it prints, and the worker keeps the PDF only when the printed insurer and
 //! plan match what the attendee typed. Here the PDF lands like an upload and fills the medical
-//! card's insurer and plan.
+//! card's insurer and plan, with the chunk of the PDF the check cites.
 
 use super::documents::{DocumentIn, queue_document_read};
 use crate::jobs::{self, *};
@@ -26,6 +26,32 @@ pub const FAILED: &str = "failed";
 
 /// The blob purpose of a plan's public PDF.
 pub const PLAN_WORDING: &str = "plan_wording";
+/// The longest chunk text a lookup keeps.
+const MAX_MATCH_CHARS: usize = 1000;
+
+/// The chunk of a fetched PDF that a lookup's check cites: the Evidence Engine found it by meaning
+/// among the PDF's chunks with what was typed, and it holds the name the check matched.
+#[derive(SpacetimeType, Clone, Debug, Default, PartialEq)]
+pub struct ChunkMatch {
+    /// `<sha256>-p<page>-k<n>` in the clause index.
+    pub chunk_id: String,
+    pub page: u32,
+    pub text: String,
+    /// How close in meaning to what was typed.
+    pub score: f32,
+}
+
+/// The cited chunk a worker sent, its text cut to 1,000 characters; none when it sent none.
+pub fn checked_match(m: Option<ChunkMatch>) -> Result<Option<ChunkMatch>, String> {
+    let Some(m) = m else { return Ok(None) };
+    let id_ok = !m.chunk_id.is_empty() && m.chunk_id.len() <= 200 && m.chunk_id.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
+    if !id_ok || m.page == 0 || m.text.trim().is_empty() {
+        return Err("a cited chunk has an id, a page and its text".into());
+    }
+    let text = m.text.trim().chars().take(MAX_MATCH_CHARS).collect();
+    let score = if m.score.is_finite() { m.score.max(0.0) } else { 0.0 };
+    Ok(Some(ChunkMatch { text, score, ..m }))
+}
 
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = plan_lookup)]
@@ -58,6 +84,9 @@ pub struct PlanLookup {
     pub note: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    /// The chunk of the PDF the check cites; none until `found`.
+    #[default(None)]
+    pub matched_chunk: Option<ChunkMatch>,
 }
 
 /// What the worker found. `file_hash` is the PDF it stored; empty unless `status` is `found`.
@@ -73,6 +102,8 @@ pub struct PlanLookupResult {
     pub size_bytes: u64,
     pub page_count: u32,
     pub note: String,
+    /// The chunk the check cites.
+    pub matched_chunk: Option<ChunkMatch>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -130,6 +161,7 @@ pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: 
         note: String::new(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+        matched_chunk: None,
     });
     let payload = serde_json::to_string(&LookupPayload { lookup_id: row.id, kind, insurer, plan, state }).map_err(|e| e.to_string())?;
     let job_id = jobs::enqueue(ctx, KIND_PLAN_LOOKUP, payload, "plan_lookup", row.id);
@@ -168,6 +200,7 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
     if !is_hash(&result.file_hash) {
         return Err("the PDF's hash must be a hex SHA-256".into());
     }
+    let matched_chunk = checked_match(result.matched_chunk)?;
     let file_hash = result.file_hash.to_lowercase();
     if ctx.db.blob_ref().hash().find(&file_hash).is_none() {
         ctx.db.blob_ref().insert(BlobRef {
@@ -192,6 +225,7 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
         page_count: result.page_count.max(1),
         note: String::new(),
         updated_at: ctx.timestamp,
+        matched_chunk,
         ..lookup
     };
     land_health_plan(ctx, &found);

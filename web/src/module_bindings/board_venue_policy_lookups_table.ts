@@ -11,6 +11,7 @@ import {
 } from "spacetimedb";
 import {
   PolicyForm,
+  ChunkMatch,
 } from "./types";
 
 
@@ -40,4 +41,10 @@ export default __t.row({
   requestedBy: __t.identity().name("requested_by"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  get liabilityChunk() {
+    return __t.option(ChunkMatch).name("liability_chunk");
+  },
+  get propertyChunk() {
+    return __t.option(ChunkMatch).name("property_chunk");
+  },
 });

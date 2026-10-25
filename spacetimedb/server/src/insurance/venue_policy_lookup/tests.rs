@@ -81,6 +81,13 @@ fn found() -> VenuePolicyLookupResult {
         size_bytes: 300_000,
         page_count: 2,
         note: String::new(),
+        liability_chunk: Some(ChunkMatch {
+            chunk_id: format!("{}-p1-k1", "d".repeat(64)),
+            page: 1,
+            text: "COMMERCIAL GENERAL LIABILITY COVERAGE FORM CG 00 01 04 13".into(),
+            score: 0.74,
+        }),
+        property_chunk: None,
     }
 }
 
@@ -132,6 +139,7 @@ fn a_found_policy_is_read_with_the_typed_declarations_and_confirmed() {
 
     let l = w.lookup();
     assert_eq!((l.status.as_str(), l.forms.len(), l.page_count), (FOUND, 2, 2));
+    assert_eq!((l.liability_chunk.as_ref().map(|c| c.page), l.property_chunk.as_ref()), (Some(1), None), "each form keeps the chunk its check cites");
     let blob = w.t.db.blob_ref().hash().find("d".repeat(64)).unwrap();
     assert_eq!((blob.owner, blob.access.as_str(), blob.purpose.as_str()), (None, "staff", "policy"));
     let doc = w.t.db.policy_document().id().find(l.document_id).expect("the joined forms go to the reading");

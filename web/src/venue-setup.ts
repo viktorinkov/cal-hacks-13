@@ -534,9 +534,13 @@ function lookupRow(l: VenuePolicyLookup) {
   return h('li', {},
     h('b', {}, `${l.insurer}, ${l.liabilityForm} and ${l.propertyForm}`), `, policy ${l.policyNumber}, asked ${date(l.createdAt)} `,
     h('span', { class: cls }, `· ${LOOKUP_STATUS[l.status] ?? l.status}`),
-    l.forms.length > 0 && h('ul', {}, l.forms.map(f => h('li', {},
-      `${f.part === 'liability' ? 'Liability' : 'Property'} form `, h('b', {}, f.formNumber), f.title && ` ${f.title}`,
-      `, pages ${f.firstPage} to ${f.firstPage + f.pageCount - 1}, from `, link(f.url)))),
+    l.forms.length > 0 && h('ul', {}, l.forms.map(f => {
+      const cited = f.part === 'liability' ? l.liabilityChunk : l.propertyChunk;
+      return h('li', {},
+        `${f.part === 'liability' ? 'Liability' : 'Property'} form `, h('b', {}, f.formNumber), f.title && ` ${f.title}`,
+        `, pages ${f.firstPage} to ${f.firstPage + f.pageCount - 1}, from `, link(f.url),
+        cited && h('blockquote', { class: 'muted' }, `Matched on page ${cited.page} (score ${cited.score.toFixed(2)}): “${cited.text}”`));
+    })),
     nothing && h('p', { class: 'fail' }, "We couldn't find the policy's forms online. Upload the policy instead."),
     l.note && h('p', { class: 'muted' }, l.note));
 }

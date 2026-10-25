@@ -18,13 +18,15 @@ use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+mod chunks;
 mod clause_search;
 mod clauses;
 mod documents;
 pub mod proposer;
 pub mod reader;
 pub use clause_search::{CLAUSE_SECTIONS, ClauseHit, sections_for_kind};
-pub use clauses::PolicyClause;
+pub use chunks::{CHUNK, MAX_CHUNK_WORDS, chunk_docs, chunk_id, chunk_page, cite};
+pub use clauses::{CLAUSE, PolicyClause};
 pub use documents::{MAX_DOCUMENT_PAGES, StoredPage};
 pub use proposer::ClaimCopy;
 pub use reader::Kibana;

@@ -7,6 +7,7 @@
 //! over the terms they name, since no public form prints a policy's own limits.
 
 use super::documents::{DocumentIn, PolicyDocument, queue_document_read};
+use super::plan_lookup::{ChunkMatch, checked_match};
 use crate::jobs::{self, *};
 use crate::roles::*;
 use bandit_insurance::policy::{Declarations, VENUE_POLICY};
@@ -78,6 +79,11 @@ pub struct VenuePolicyLookup {
     pub requested_by: Identity,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    /// The chunk each form's check cites, in the joined PDF; none until `found`.
+    #[default(None)]
+    pub liability_chunk: Option<ChunkMatch>,
+    #[default(None)]
+    pub property_chunk: Option<ChunkMatch>,
 }
 
 /// What the worker found. `file_hash` is the joined PDF it stored; empty unless `status` is `found`.
@@ -90,6 +96,9 @@ pub struct VenuePolicyLookupResult {
     pub size_bytes: u64,
     pub page_count: u32,
     pub note: String,
+    /// The chunk each form's check cites, in the joined PDF.
+    pub liability_chunk: Option<ChunkMatch>,
+    pub property_chunk: Option<ChunkMatch>,
 }
 
 /// What the organizer types from the declarations page.
@@ -196,6 +205,8 @@ pub fn look_up_venue_policy(
         requested_by: ctx.sender(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+        liability_chunk: None,
+        property_chunk: None,
     };
     if let Some(problem) = row.declarations().problem() {
         return Err(problem);
@@ -239,6 +250,8 @@ pub fn finish_venue_policy_lookup(ctx: &ReducerContext, job_id: u64, result: Ven
     if result.forms.is_empty() || result.forms.iter().any(|f| f.part != LIABILITY && f.part != PROPERTY) {
         return Err("a found policy names its forms, each liability or property".into());
     }
+    let liability_chunk = checked_match(result.liability_chunk)?;
+    let property_chunk = checked_match(result.property_chunk)?;
     let file_hash = result.file_hash.to_lowercase();
     if ctx.db.blob_ref().hash().find(&file_hash).is_none() {
         ctx.db.blob_ref().insert(BlobRef {
@@ -276,6 +289,8 @@ pub fn finish_venue_policy_lookup(ctx: &ReducerContext, job_id: u64, result: Ven
         document_id,
         note,
         updated_at: ctx.timestamp,
+        liability_chunk,
+        property_chunk,
         ..lookup
     });
     jobs::finish(ctx, job, FOUND);

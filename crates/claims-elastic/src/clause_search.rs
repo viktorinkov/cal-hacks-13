@@ -12,7 +12,7 @@ use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{ClaimsIndex, hits, short};
+use crate::{CHUNK, ClaimsIndex, hits, short};
 
 /// Every section a clause can be filed under.
 pub const CLAUSE_SECTIONS: [&str; 8] =
@@ -55,16 +55,17 @@ pub struct ClauseHit {
 }
 
 /// Fields a search returns.
-const SOURCE: [&str; 6] = ["clause_id", "policy", "document_hash", "section", "page", "text"];
+pub(crate) const SOURCE: [&str; 6] = ["clause_id", "policy", "document_hash", "section", "page", "text"];
 
 /// A filter to one policy's clauses: `venue` (its document, when given) or
-/// `attendee` (only that document).
+/// `attendee` (only that document). A fetched PDF's chunks never match: a claim
+/// is decided on clauses code checked.
 fn policy_filter(policy: &str, document_hash: Option<&str>) -> Value {
     let mut filter = vec![json!({ "term": { "policy": policy } })];
     if let Some(h) = document_hash.filter(|h| !h.trim().is_empty()) {
         filter.push(json!({ "term": { "document_hash": h.trim() } }));
     }
-    json!({ "bool": { "filter": filter } })
+    json!({ "bool": { "filter": filter, "must_not": [{ "term": { "kind": CHUNK } }] } })
 }
 
 /// The search body: `query` by meaning, inside any of `policies`, in `sections` (any when empty).
@@ -84,7 +85,7 @@ fn search_body(query: &str, policies: Vec<Value>, sections: &[&str], k: usize) -
     })
 }
 
-fn clause_of(hit: &Value) -> Result<ClauseHit> {
+pub(crate) fn clause_of(hit: &Value) -> Result<ClauseHit> {
     let mut c: ClauseHit = serde_json::from_value(hit["_source"].clone())?;
     if c.clause_id.is_empty() {
         c.clause_id = hit["_id"].as_str().unwrap_or_default().to_string();
@@ -180,7 +181,7 @@ impl ClaimsIndex {
     }
 
     /// Runs a search on the clause index; `None` when the index does not exist yet.
-    async fn clause_query(&self, body: Value) -> Result<Option<Value>> {
+    pub(crate) async fn clause_query(&self, body: Value) -> Result<Option<Value>> {
         let path = format!("{}/_search", self.clause_search_index());
         let (status, v) = self.send(self.req(Method::POST, &path).json(&body)).await?;
         if status == StatusCode::NOT_FOUND || v["error"]["type"] == "index_not_found_exception" {
@@ -230,8 +231,9 @@ mod tests {
         let filter = &body["query"]["bool"]["filter"];
         let should = &filter[0]["bool"]["should"];
         assert_eq!(filter[0]["bool"]["minimum_should_match"], 1);
-        assert_eq!(should[0], json!({ "bool": { "filter": [{ "term": { "policy": "venue" } }] } }));
-        assert_eq!(should[1], json!({ "bool": { "filter": [{ "term": { "policy": "attendee" } }, { "term": { "document_hash": "ab12" } }] } }));
+        let no_chunks = json!([{ "term": { "kind": "chunk" } }]);
+        assert_eq!(should[0], json!({ "bool": { "filter": [{ "term": { "policy": "venue" } }], "must_not": no_chunks } }));
+        assert_eq!(should[1], json!({ "bool": { "filter": [{ "term": { "policy": "attendee" } }, { "term": { "document_hash": "ab12" } }], "must_not": no_chunks } }));
         assert_eq!(filter[1], json!({ "terms": { "section": ["exclusions", "other_insurance"] } }));
         let theft = search_body("theft of merchandise from a booth", vec![policy_filter("venue", None)], sections_for_kind("theft"), 5);
         assert_eq!(theft["query"]["bool"]["filter"][0]["bool"]["should"].as_array().unwrap().len(), 1, "a theft searches the venue's policy only");

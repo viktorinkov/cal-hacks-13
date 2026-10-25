@@ -4,6 +4,7 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+use super::chunk_match_type::ChunkMatch;
 use super::policy_form_type::PolicyForm;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
@@ -15,6 +16,8 @@ pub struct VenuePolicyLookupResult {
     pub size_bytes: u64,
     pub page_count: u32,
     pub note: String,
+    pub liability_chunk: Option<ChunkMatch>,
+    pub property_chunk: Option<ChunkMatch>,
 }
 
 impl __sdk::InModule for VenuePolicyLookupResult {
