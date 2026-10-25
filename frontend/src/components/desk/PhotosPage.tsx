@@ -23,8 +23,8 @@ export function PhotosPage() {
       }
     >
       <div className={photos.length === 0 ? 'mb-8 flex items-baseline justify-between gap-4' : 'mb-8 flex justify-end'}>
-        {photos.length === 0 && <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>}
-        <button type="button" onClick={() => go('/photo')} className="text-[14px] text-ink">Add frames</button>
+        {photos.length === 0 && <p className="text-[15px] text-ink-dim">No photos to show.</p>}
+        <button type="button" onClick={() => go('/photo')} className="text-[14px] text-ink">Add photos</button>
       </div>
       {photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4">

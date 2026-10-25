@@ -19,13 +19,13 @@ export function MerchPage() {
         <>
           <Figure lead label="Pieces" value={String(merch.length)} note="in the case" />
           <Figure label="Orders" value={String(orders.length)} note="visible to this desk" />
-          <Figure label="Taken" value={formatCents(sold)} note="across those orders" />
+          <Figure label="Order value" value={formatCents(sold)} note="all order statuses" />
           <Figure label="Waiting" value={String(orders.filter((order) => order.status && order.status !== 'paid' && order.status !== 'complete').length)} note="not finished" />
         </>
       }
     >
       {merch.length === 0 ? (
-        <p className="text-[15px] text-ink-dim">No merch has arrived from the live host yet.</p>
+        <p className="text-[15px] text-ink-dim">No merch to show.</p>
       ) : (
         <ul className="grid gap-8 md:grid-cols-2">
           {merch.map((piece) => (

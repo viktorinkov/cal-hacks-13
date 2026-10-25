@@ -80,10 +80,10 @@ export function JoinPage() {
             <p className="mt-4 text-[14px] leading-6 text-ink">
               {related
                 ? `${related.id} · ${statusLabel(related.status)} · ${formatCents(related.payoutCents)} payable.`
-                : 'No claim on this band tonight.'}
+                : 'No claims for this band.'}
             </p>
             <button type="button" onClick={() => go('/claims')} className="mt-2 text-[14px] text-ink-dim hover:text-ink">
-              See tonight's claims
+              View claims
             </button>
           </div>
         </div>
