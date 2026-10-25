@@ -5,6 +5,7 @@ import { CoverSlip } from '@/components/cover/CoverSlip'
 import { MOCK_BANDS, type MockBand } from '@/mock/bands'
 import { blankRegistration, getSavedRegistration, saveRegistration, type Registration } from '@/cover/registry'
 import { useRoute } from '@/cover/route'
+import { bandIdFromSearch, rememberBand } from '@/cover/tapLink'
 import { useSession, type MedicalCardView } from '@/stdb/session'
 import { validateMedicalFile, type MedicalDocumentKind } from '@/stdb/uploads'
 
@@ -384,6 +385,10 @@ export function RegisterPage() {
   const [lights, setLights] = useState(true)
   const { search } = useRoute()
   const band = bandFromLocation(search)
+  const fromLink = bandIdFromSearch(search)
+  useEffect(() => {
+    if (fromLink != null) rememberBand(fromLink)
+  }, [fromLink])
   return (
     <div data-page data-motif="signup" data-lights={lights ? 'on' : 'off'} className="desk-night signup-page h-full overflow-y-auto bg-ground text-ink">
       <ConcertLights enabled={lights} />

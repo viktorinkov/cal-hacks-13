@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Waves } from 'lucide-react'
 import { SourceChip } from '@/components/dashboard/SourceChip'
 import { useAction } from '@/components/payments/action'
@@ -7,6 +7,7 @@ import { MerchThumb } from '@/components/payments/MerchThumb'
 import { Sheet, Timeline } from '@/components/payments/Sheet'
 import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
+import { bandIdFromSearch, rememberedBand, rememberBand } from '@/cover/tapLink'
 import { cn } from '@/lib/utils'
 import { FIXTURE_BAND } from '@/payments/fixture'
 import {
@@ -298,17 +299,17 @@ function Balance({ fixture }: { fixture: boolean }) {
   )
 }
 
-function TapYourBand() {
+function HoldYourPhone() {
   return (
     <div className="signup-tap">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--signup-raised)]"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
-      <h1 className="signup-title mt-8">Tap your band to see your wallet.</h1>
-      <p className="mt-5 text-[16px] leading-7 text-ink-dim">Your wallet belongs to the band you registered. Tap it with this phone and the wallet opens here.</p>
+      <h1 className="signup-title mt-8">Hold your phone to your band.</h1>
+      <p className="mt-5 text-[16px] leading-7 text-ink-dim">The tag on the band opens this wallet. It connects to that band on its own.</p>
     </div>
   )
 }
 
-function Wallet({ bandId, fixture }: { bandId: number; fixture: boolean }) {
+function Wallet({ bandId, fixture, notice, onRetry }: { bandId: number; fixture: boolean; notice?: string | null; onRetry?: () => void }) {
   const { data } = useWalletData()
   const views = useViewStates(fixture)
   const actions = usePaymentActions()
@@ -333,6 +334,12 @@ function Wallet({ bandId, fixture }: { bandId: number; fixture: boolean }) {
           {fixture && <SourceChip tag="sim" />}
         </div>
         <p>{ready ? walletFinding(summary) : 'Checking what’s on your band…'}</p>
+        {notice && (
+          <p role="alert" className="mt-4 text-[14px] leading-6 text-signal">
+            {notice}
+            {onRetry && <button type="button" onClick={onRetry} className="ml-3 underline">Try again</button>}
+          </p>
+        )}
       </div>
 
       <section aria-label={`${band} wallet`} className="wallet-hero">
@@ -390,21 +397,65 @@ function Wallet({ bandId, fixture }: { bandId: number; fixture: boolean }) {
 }
 
 /** The attendee's wallet: what the band paid tonight, what's charged to it, and picks to buy with it. */
+function bandOnThisPhone(band: { bandId: number; status: string } | null): number | null {
+  if (!band) return null
+  return band.status === 'claimed' || band.status === 'waiting_for_press' ? band.bandId : null
+}
+
 export function WalletPage() {
   const fixture = usePaymentsFixture()
-  const { go } = useRoute()
+  const { go, search } = useRoute()
   const phase = useSession((s) => s.phase)
   const error = useSession((s) => s.error)
   const myBand = useSession((s) => s.myBand)
   const myBandReady = useSession((s) => s.myBandReady)
-  const bandId = fixture ? FIXTURE_BAND : myBand?.status === 'claimed' ? myBand.bandId : null
+  const wallet = useSession((s) => s.wallet)
+  const claimBand = useSession((s) => s.claimBand)
+  const connectWallet = useSession((s) => s.connectWallet)
+  const fromUrl = bandIdFromSearch(search)
+  const linked = fromUrl ?? rememberedBand()
+  const attached = bandOnThisPhone(myBand)
+  const bandId = fixture ? FIXTURE_BAND : attached ?? linked
   const label = bandId == null ? '' : bandDigits(bandId)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const attempt = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (fromUrl != null) rememberBand(fromUrl)
+  }, [fromUrl])
+
+  useEffect(() => {
+    if (fixture || phase !== 'live' || !myBandReady || linked == null) return
+    const mine = bandOnThisPhone(myBand)
+    if (mine != null && mine !== linked) return
+    if (mine != null && wallet) return
+    if (attempt.current === linked) return
+    attempt.current = linked
+    const token = `BANDIT-${bandDigits(linked)}`
+    void (async () => {
+      if (mine == null) await claimBand(token)
+      if (!useSession.getState().wallet) await connectWallet()
+    })().catch((caught: unknown) => {
+      const message = caught instanceof Error ? caught.message : 'This band didn’t connect.'
+      setNotice(/add your name first/i.test(message)
+        ? 'Add your name on your band’s page. The account opens once it has a name.'
+        : message)
+    })
+  }, [fixture, phase, myBandReady, linked, myBand, wallet, claimBand, connectWallet, retry])
 
   let body
-  if (bandId != null) body = <Wallet bandId={bandId} fixture={fixture} />
+  if (bandId != null && phase !== 'error') body = (
+    <Wallet
+      bandId={bandId}
+      fixture={fixture}
+      notice={notice}
+      onRetry={notice && !/your name/i.test(notice) ? () => { attempt.current = null; setNotice(null); setRetry((n) => n + 1) } : undefined}
+    />
+  )
   else if (phase === 'error') body = <div className="signup-tap"><h1 className="signup-title">Your wallet can’t load right now.</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">{error ?? 'The host didn’t answer.'}</p></div>
   else if (phase !== 'live' || !myBandReady) body = <div className="signup-tap" role="status"><h1 className="signup-title">Opening your wallet…</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">Checking which band is yours.</p></div>
-  else body = <TapYourBand />
+  else body = <HoldYourPhone />
 
   return (
     <div data-page data-lights="off" data-motif="pass" className="desk-night signup-page h-full overflow-y-auto bg-ground text-ink">

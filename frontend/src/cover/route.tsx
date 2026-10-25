@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { tapTarget } from './tapLink'
+import { bandIdFromSearch, rememberBand, tapTarget } from './tapLink'
 
 export interface RouteApi {
   path: string
@@ -22,6 +22,8 @@ export function currentPath() {
 function arrival() {
   const tap = tapTarget(window.location.pathname)
   if (tap) window.history.replaceState(null, '', tap)
+  const bandId = bandIdFromSearch(window.location.search)
+  if (bandId != null) rememberBand(bandId)
   return { path: currentPath(), search: window.location.search }
 }
 

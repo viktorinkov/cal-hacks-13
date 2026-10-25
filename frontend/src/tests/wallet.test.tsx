@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WalletPage } from '@/components/wallet/WalletPage'
@@ -6,12 +6,14 @@ import { RouteProvider } from '@/cover/route'
 import { FIXTURE_WALLET } from '@/payments/fixture'
 import { EMPTY_WALLET, type WalletData } from '@/payments/rows'
 import { usePayments } from '@/payments/store'
+import { rememberBand } from '@/cover/tapLink'
 import { seedSession, useSession } from '@/stdb/session'
 
 const initialSession = useSession.getState()
 const disputeCharge = vi.fn<(id: string, text: string) => Promise<void>>()
 const buyMerch = vi.fn<(templateId: string, photoId: string, size: string) => Promise<void>>()
 const connectWallet = vi.fn<() => Promise<void>>()
+const claimBand = vi.fn<(token: string) => Promise<unknown>>()
 const rerunShoppingAgent = vi.fn<() => Promise<void>>()
 
 const allReady = { walletEntriesReady: true, chargesReady: true, suggestionsReady: true, merchOrdersReady: true }
@@ -28,9 +30,10 @@ function withWallet(wallet: WalletData) {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  for (const action of [disputeCharge, buyMerch, connectWallet, rerunShoppingAgent]) action.mockResolvedValue(undefined)
+  sessionStorage.clear()
+  for (const action of [disputeCharge, buyMerch, connectWallet, rerunShoppingAgent, claimBand]) action.mockResolvedValue(undefined)
   seedSession([], { myBand, myBandReady: true, wallet: { accountId: 'acct-0007', balanceCents: 6_000 }, ...allReady })
-  useSession.setState({ disputeCharge, buyMerch, connectWallet, rerunShoppingAgent })
+  useSession.setState({ disputeCharge, buyMerch, connectWallet, rerunShoppingAgent, claimBand })
   withWallet(FIXTURE_WALLET)
 })
 
@@ -38,6 +41,7 @@ afterEach(() => {
   cleanup()
   useSession.setState(initialSession, true)
   usePayments.setState({ wallet: EMPTY_WALLET })
+  sessionStorage.clear()
   window.history.replaceState(null, '', '/')
 })
 
@@ -81,10 +85,38 @@ describe('the wallet', () => {
     expect(screen.getByText(/This can’t load right now\. Not allowed\./)).toBeInTheDocument()
   })
 
-  it('asks for the band when this identity has none', () => {
+  it('asks the phone to read a band when this identity has none', () => {
     seedSession([], { myBand: null, myBandReady: true })
     renderWallet()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tap your band to see your wallet.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hold your phone to your band.')
+    expect(claimBand).not.toHaveBeenCalled()
+  })
+
+  it('connects the wallet to the band the phone opened', async () => {
+    seedSession([], { myBand: null, myBandReady: true, wallet: null })
+    useSession.setState({ claimBand, connectWallet })
+    renderWallet('/wallet?band=band-12')
+    expect(screen.getByLabelText('Band 12 wallet')).toBeInTheDocument()
+    await waitFor(() => expect(claimBand).toHaveBeenCalledWith('BANDIT-12'))
+    await waitFor(() => expect(connectWallet).toHaveBeenCalled())
+  })
+
+  it('opens the account when this phone already holds that band', async () => {
+    seedSession([], { myBand: { bandId: 12, status: 'waiting_for_press', expiresAt: null }, myBandReady: true, wallet: null })
+    useSession.setState({ claimBand, connectWallet })
+    renderWallet('/wallet?band=band-12')
+    expect(screen.getByLabelText('Band 12 wallet')).toBeInTheDocument()
+    await waitFor(() => expect(connectWallet).toHaveBeenCalled())
+    expect(claimBand).not.toHaveBeenCalled()
+  })
+
+  it('uses the band the phone opened earlier', async () => {
+    rememberBand(8)
+    seedSession([], { myBand: null, myBandReady: true, wallet: null })
+    useSession.setState({ claimBand, connectWallet })
+    renderWallet('/wallet')
+    expect(screen.getByLabelText('Band 08 wallet')).toBeInTheDocument()
+    await waitFor(() => expect(claimBand).toHaveBeenCalledWith('BANDIT-08'))
   })
 
   it('sends a dispute with its text, and not without one', async () => {

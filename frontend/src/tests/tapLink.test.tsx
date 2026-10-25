@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { RouteProvider, useRoute } from '@/cover/route'
-import { tapTarget } from '@/cover/tapLink'
+import { rememberedBand, tapTarget } from '@/cover/tapLink'
 
 function Where() {
   const { path, search } = useRoute()
@@ -10,6 +10,7 @@ function Where() {
 
 afterEach(() => {
   cleanup()
+  sessionStorage.clear()
   window.history.replaceState(null, '', '/')
 })
 
@@ -37,5 +38,6 @@ describe('band tag links', () => {
     expect(screen.getByText('/register?band=band-03')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/register')
     expect(window.location.search).toBe('?band=band-03')
+    expect(rememberedBand()).toBe(3)
   })
 })
