@@ -97,6 +97,14 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
   };
 }
 
+/** Receipt cash is separate from the claim's expected insurer recovery. */
+export function insurerReceiptStatus(c: Claim, ledger: LedgerEntry[]): string {
+  const hasReceipt = ledger.some(l => l.claimId === c.id && l.journal.startsWith('J4') && l.account === 'cash');
+  if (!hasReceipt) return 'Closed: the insurer payment is recorded. Nothing is waiting.';
+  const received = claimLine(c, ledger, []).insurerPaid;
+  return `Closed: the insurer paid ${money(received)} back. Nothing is waiting.`;
+}
+
 /** Every claim's line, and the sum per cost center. */
 export function rollUp(claims: Claim[], ledger: LedgerEntry[], records: MedicalRecord[]) {
   const lines = claims.map(c => ({ claim: c, line: claimLine(c, ledger, records) }));
