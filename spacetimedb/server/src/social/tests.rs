@@ -1,4 +1,4 @@
-//! A photo in an in-memory module: the bands in its zone are tagged, Claude's count cuts the tags to the
+//! A photo in an in-memory module: the bands in its zone are tagged, Claude's count sets the tags to the
 //! people who stood together when it was taken, and its caption fills in for the photographer's.
 
 use super::photos::*;
@@ -113,6 +113,25 @@ impl World {
         World { t, zone }
     }
 
+    /// Crowd attendees arrived before the four claimed bands, but still rank after them.
+    fn add_crowd(&self, band_id: u32) {
+        let name = format!("Crowd {band_id}");
+        let at = Timestamp::from_micros_since_unix_epoch(self.t.clock.now().to_micros_since_unix_epoch() - 600_000_000);
+        self.t.db.band().insert(Band { id: band_id, ..band(1) });
+        self.t.db.crowd_member().insert(CrowdMember {
+            band_id, identity: id(&name), joined_at: at, group_id: 1,
+            dx_m: 0.0, dy_m: 0.0, interests: Vec::new(), chat: 0,
+        });
+        self.t.db.attendee().insert(Attendee {
+            identity: id(&name), node_id: 0, display_name: name, photo_url: String::new(),
+            findable: true, person_id: 0, organization_id: 0, crowd: true,
+            created_at: at, updated_at: at,
+        });
+        self.t.db.zone_visit().insert(ZoneVisit {
+            id: 0, band_id, zone: STATION, entered: at, left: None, booth_id: 0, open: true,
+        });
+    }
+
     fn as_<T>(&self, who: &str, f: impl FnOnce(&ReducerContext) -> Result<T, String>) -> T {
         self.t.with_reducer_tx(auth(who), f).unwrap()
     }
@@ -179,4 +198,38 @@ fn the_photographers_caption_stays_and_a_photo_without_people_has_no_tags() {
     let photo = w.t.db.photo().id().find(job.subject_id).unwrap();
     assert_eq!(photo.caption, "At the Elastic booth");
     assert!(w.tagged(photo.id).is_empty());
+}
+
+#[test]
+fn photo_count_above_twenty_keeps_claimed_priority_and_only_eligible_candidates() {
+    for people_count in [25, u32::MAX] {
+        let w = World::new();
+        for band_id in 1000..1030 {
+            w.add_crowd(band_id);
+        }
+        let hidden = w.t.db.attendee().identity().find(id("Crowd 1000")).unwrap();
+        w.t.db.attendee().identity().update(Attendee { findable: false, ..hidden });
+        let elsewhere = w.t.db.zone_visit().band_id().filter(1001u32).next().unwrap();
+        w.t.db.zone_visit().id().update(ZoneVisit { zone: STATION + 1, ..elsewhere });
+        let left = w.t.db.zone_visit().band_id().filter(1002u32).next().unwrap();
+        let before = Timestamp::from_micros_since_unix_epoch(w.t.clock.now().to_micros_since_unix_epoch() - 1);
+        w.t.db.zone_visit().id().update(ZoneVisit { left: Some(before), open: false, ..left });
+        // A band without a wearer is not a candidate even when its stay covers the photo.
+        w.t.db.crowd_member().band_id().delete(1003);
+
+        let at = w.t.clock.now();
+        w.as_("ops", |ctx| register_photo(ctx, format!("/blobs/{HASH}"), at, w.zone, String::new()));
+        let job = w.t.db.job().kind().filter(KIND_PHOTO_FEATURES).next().unwrap();
+        assert_eq!(w.tagged(job.subject_id).len(), 8, "the provisional count stays unchanged");
+        w.as_("worker", |ctx| claim_job(ctx, job.id));
+        w.as_("worker", |ctx| submit_photo_features(ctx, job.id, people_count, String::new(), ModelCallIn::default()));
+
+        let expected: Vec<String> = ["Ana", "Ben", "Cleo", "Dev"].into_iter().map(str::to_string)
+            .chain((1004..1030).map(|band_id| format!("Crowd {band_id}")))
+            .take(people_count as usize).collect();
+        assert_eq!(w.tagged(job.subject_id), expected, "count {people_count}: claimed bands rank first; unavailable candidates never become tags");
+        assert_eq!(expected.len(), if people_count == 25 { 25 } else { 30 });
+        assert_eq!(w.t.db.photo().id().find(job.subject_id).unwrap().people_count, people_count);
+        assert_eq!(w.t.db.job().id().find(job.id).unwrap().status, JobStatus::Done);
+    }
 }
