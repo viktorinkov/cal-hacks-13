@@ -172,7 +172,10 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 
 ### The Devpost
 
-- Devpost product/story order is safety, social, shopping, insurance. This writing order is separate from the established sponsor ranking; do not reorder sponsor-track sections or the main diagram board from this preference.
+- Devpost product/story order is safety, social, shopping, financial management. This writing order is separate from the established sponsor ranking; do not reorder sponsor-track sections or the main diagram board from this preference.
+- Introduce sign-up in the Devpost opening. Group the recap around people, photos and personal shopping. Name the final product section “Financial management for large events,” limited to the existing claims, charges, receipts, ledgers and merch booth accounting.
+- `diagrams/band-enclosure-design.png` is an unchanged copy of Leo’s `bandit_hardware_handoff/renders/bandit_v2_preview.png`. Caption it as an enclosure design.
+- State actual actors and actions positively in Devpost prose. Remove unprompted explanations of what does not happen; retain necessary limits and consent boundaries as enforced behavior.
 - Devpost writing only: use ordinary, exact words and natural, connected sentences. Explain each technical term once; remove repeated explanations and mechanical first/second enumerations while keeping important facts. Keep one live-site URL in "Try it out" and a brief closing disclosure. Preserve sponsor quotations. This preference does not replace the diagram guide.
 - The Devpost may describe things that are not built yet, as long as the rest of the rules hold.
 - Lean heavily on Meta for connecting people. The social part and the interests need detailed diagrams and their own detailed section.

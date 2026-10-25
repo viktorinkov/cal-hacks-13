@@ -43,7 +43,11 @@ Viktor's standing rule: write short paragraphs, never long ones.
 
 For Devpost only, use ordinary exact words and natural connected sentences; explain technical terms once, remove repeated explanations and mechanical first/second enumerations, and keep important facts. Preserve sponsor quotations, use one live-site URL in Try it out, and keep the closing disclosure brief. This writing preference does not override the diagram guide below.
 
-For the Devpost narrative, order the product story as safety, social, shopping, then insurance. This does not change the established sponsor ranking or the board’s organization.
+For the Devpost narrative, introduce sign-up in the opening and group the recap around people, photos and personal shopping. Order the product story as safety, social, shopping, then financial management. This does not change the established sponsor ranking or the board’s organization.
+
+Name the final product section “Financial management for large events.” Keep its scope to the existing claims, charges, receipts, ledgers and merch booth accounting.
+
+State the actual actor and action positively. Remove unprompted explanations of what does not happen when readers would already assume it. Keep necessary limits and consent boundaries, preferably as the behavior the system enforces.
 
 1. At most 3 sentences per paragraph.
 2. One idea per paragraph.
