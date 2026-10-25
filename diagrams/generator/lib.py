@@ -58,6 +58,14 @@ def aspect(path):
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         w, h = struct.unpack(">II", data[16:24])
         return w / h
+    if data[:2] == b"\xff\xd8":  # JPEG: walk the segments to the frame header
+        i = 2
+        while data[i] == 0xFF:
+            marker, size = data[i + 1], struct.unpack(">H", data[i + 2:i + 4])[0]
+            if 0xC0 <= marker <= 0xC3:
+                h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                return w / h
+            i += 2 + size
     vb = re.search(rb'viewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)', data)
     return float(vb.group(1)) / float(vb.group(2))
 
@@ -168,7 +176,7 @@ class Scene:
     def add_file(self, path):
         data = pathlib.Path(path).read_bytes()
         fid = hashlib.sha1(data).hexdigest()[:20]
-        mime = "image/png" if str(path).endswith(".png") else "image/svg+xml"
+        mime = {".png": "image/png", ".jpg": "image/jpeg"}.get(pathlib.Path(path).suffix, "image/svg+xml")
         self.files.setdefault(fid, {"mimeType": mime, "id": fid, "created": 1792828800000,
                                     "dataURL": f"data:{mime};base64," + base64.b64encode(data).decode()})
         return fid
@@ -220,11 +228,12 @@ class Scene:
                          originalText=body, fontSize=fs, fontFamily=FONT, textAlign=align,
                          verticalAlign="top", containerId=None, autoResize=True, lineHeight=LINE)
 
-    def zone(self, x, y, w, h, label, kind="plain", fs=22, dashed=False, logo=None):
+    def zone(self, x, y, w, h, label, kind="plain", fs=22, dashed=False, logo=None, indent=0):
+        """indent moves the label right, to clear a step badge on the corner."""
         fill, stroke = ZONES[kind]
         rect = self.base("rectangle", self.ox + x, self.oy + y, w, h, backgroundColor=fill, strokeColor=stroke,
                          strokeWidth=1, strokeStyle="dashed" if dashed else "solid", roundness={"type": 3}, roughness=0)
-        lx = x + 18
+        lx = x + 18 + indent
         if logo:
             lh = fs * LINE
             img = self.image(self.ox + lx, self.oy + y + 12, logo, lh)

@@ -136,15 +136,23 @@ pub fn station_centre(spots: &[VenueSpot], station_id: u8) -> Option<(f32, f32)>
         .map(|s| (s.x_m, s.y_m))
 }
 
-/// The station of the zone spot nearest to a point, 0 when there are no spots.
-pub fn nearest_station(ctx: &ReducerContext, x: f32, y: f32) -> u8 {
+/// The zone spot nearest to a point: a table, a sponsor table, the stage, the food line or a door.
+fn nearest_zone_spot(ctx: &ReducerContext, x: f32, y: f32) -> Option<VenueSpot> {
     ctx.db
         .venue_spot()
         .iter()
         .filter(|s| s.station_id != 0)
         .min_by(|a, b| ((a.x_m - x).powi(2) + (a.y_m - y).powi(2)).total_cmp(&((b.x_m - x).powi(2) + (b.y_m - y).powi(2))))
-        .map(|s| s.station_id)
-        .unwrap_or(0)
+}
+
+/// The station of the zone spot nearest to a point, 0 when there are no spots.
+pub fn nearest_station(ctx: &ReducerContext, x: f32, y: f32) -> u8 {
+    nearest_zone_spot(ctx, x, y).map(|s| s.station_id).unwrap_or(0)
+}
+
+/// The booth at a point: the booth of its sponsor table when the zone spot nearest to it is one, else 0.
+pub fn nearest_booth(ctx: &ReducerContext, x: f32, y: f32) -> u64 {
+    nearest_zone_spot(ctx, x, y).filter(|s| s.kind == "sponsor_table").map(|s| s.booth_id).unwrap_or(0)
 }
 
 /// The labelled spot nearest to a point, for saying where something happened: "table 112", "the Anthropic

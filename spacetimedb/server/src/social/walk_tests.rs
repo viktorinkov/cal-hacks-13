@@ -343,3 +343,26 @@ fn everyone_at_the_event_wears_a_band_but_the_medics() {
         assert_eq!(role_of(&w.t.db.crowd_group().id().find(m.group_id).unwrap()), HACKER, "incident {} happened to a hacker", i.id);
     }
 }
+
+#[test]
+fn a_band_placed_at_a_sponsor_table_stands_at_its_booth() {
+    let w = World::new();
+    let sponsor_tables: Vec<VenueSpot> = w.t.db.venue_spot().iter().filter(|s| s.kind == "sponsor_table" && s.booth_id != 0).collect();
+    let first = sponsor_tables[0].clone();
+    let other = sponsor_tables.iter().find(|s| s.booth_id != first.booth_id).unwrap().clone();
+    let table = w.t.db.venue_spot().iter().find(|s| s.kind == "table").unwrap();
+    let open = || w.t.db.zone_visit().band_id().filter(95u32).filter(|v| v.open).map(|v| (v.zone, v.booth_id)).collect::<Vec<_>>();
+
+    w.as_("ops", |ctx| place_band(ctx, 95, first.x_m, first.y_m, "Ana".into()));
+    assert_eq!(w.t.db.band().id().find(95).unwrap().booth_id, first.booth_id);
+    assert_eq!(open(), vec![(first.station_id, first.booth_id)], "the stay names the table's booth");
+
+    w.t.clock.advance(TimeDuration::from_micros(60_000_000));
+    w.as_("ops", |ctx| place_band(ctx, 95, other.x_m, other.y_m, "Ana".into()));
+    assert_eq!(open(), vec![(other.station_id, other.booth_id)], "another table in the same zone starts a new stay");
+    assert_eq!(w.t.db.zone_visit().band_id().filter(95u32).count(), 2);
+
+    w.as_("ops", |ctx| place_band(ctx, 95, table.x_m, table.y_m, "Ana".into()));
+    assert_eq!(open(), vec![(table.station_id, 0)], "a hacker table names no booth");
+    assert_eq!(w.t.db.band().id().find(95).unwrap().booth_id, 0);
+}
