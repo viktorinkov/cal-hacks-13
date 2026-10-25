@@ -299,8 +299,8 @@ const KIND_WORDS: Record<string, string> = {
   sos: 'SOS',
   fall: 'fall',
   property: 'venue equipment broken',
-  theft: "an attendee's belonging stolen",
-  breakage: "an attendee's belonging broken",
+  theft: 'stolen from the venue',
+  breakage: 'venue equipment broken',
 };
 
 /** An incident kind (`theft`, or an enum tag like `Theft`) in words. */
@@ -308,7 +308,8 @@ export function kindWords(kind: string): string {
   return KIND_WORDS[kind.toLowerCase()] ?? kind;
 }
 
-/** Something was broken or taken: staff can name who did it, and that attendee can be charged. */
+/** The venue's loss, its equipment broken or something stolen from it: the venue's property policy pays it, staff
+ *  can name who did it, and that attendee can be charged. */
 export function isLoss(kind: string): boolean {
   return ['property', 'theft', 'breakage'].includes(kind.toLowerCase());
 }

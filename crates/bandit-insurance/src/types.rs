@@ -13,9 +13,9 @@ pub enum IncidentKind {
     Fall,
     /// The venue's own equipment was broken.
     Property,
-    /// An attendee's own belonging was stolen.
+    /// Someone stole from the venue: its equipment, merch or a sponsor's gear at its booth.
     Theft,
-    /// An attendee's own belonging was broken by someone else.
+    /// Kept from an earlier design; nothing opens it, and it is answered like `property`.
     Breakage,
 }
 
@@ -57,8 +57,6 @@ impl IncidentKind {
 pub enum CoverKind {
     MedicalPayments,
     Property,
-    /// The attendee's own policy: their own belongings stolen or broken.
-    PersonalProperty,
 }
 
 impl CoverKind {
@@ -66,7 +64,6 @@ impl CoverKind {
         match self {
             CoverKind::MedicalPayments => "medical_payments",
             CoverKind::Property => "property",
-            CoverKind::PersonalProperty => "personal_property",
         }
     }
 
@@ -74,26 +71,14 @@ impl CoverKind {
         match s {
             "medical_payments" => Some(CoverKind::MedicalPayments),
             "property" => Some(CoverKind::Property),
-            "personal_property" => Some(CoverKind::PersonalProperty),
             _ => None,
         }
     }
 
-    /// The venue's general liability pays injuries from medical-payments cover,
-    /// and the venue's property policy pays for its own equipment. Both exclude
-    /// guests' property, so a theft or a breakage of an attendee's belonging is
-    /// paid from the attendee's own policy, its personal property cover.
+    /// The venue's general liability pays injuries from medical-payments cover;
+    /// the venue's property policy pays for its own equipment, broken or stolen.
     pub fn for_incident(kind: IncidentKind) -> Self {
-        match kind {
-            IncidentKind::Sos | IncidentKind::Fall => CoverKind::MedicalPayments,
-            IncidentKind::Property => CoverKind::Property,
-            IncidentKind::Theft | IncidentKind::Breakage => CoverKind::PersonalProperty,
-        }
-    }
-
-    /// True for the attendee's own policy, false for the venue's.
-    pub fn is_attendee_policy(self) -> bool {
-        self == CoverKind::PersonalProperty
+        if kind.is_injury() { CoverKind::MedicalPayments } else { CoverKind::Property }
     }
 }
 

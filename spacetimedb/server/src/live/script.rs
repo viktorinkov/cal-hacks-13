@@ -65,21 +65,21 @@ const BEATS: &[Beat] = &[
     loss(
         IncidentKind::Theft,
         "sponsor",
-        "an attendee's phone was taken from the sponsor table while they talked to the sponsor; $899.00 to replace",
-        "security reviewed the footage; the owner's own policy answers it",
-        89_900,
-        "the sponsor-tables camera shows this guest pocketing the phone and walking to the food line",
+        "a sponsor's display laptop is gone from its table at the sponsor booths; the sponsor's receipt puts it at $1,299.00",
+        "security reviewed the footage; the venue's property policy answers it",
+        129_900,
+        "the sponsor-tables camera shows this guest lifting the laptop off the table and walking to the food line",
         true,
     ),
     fall("floor", "first-aid-wrist", "at the tables: slipped on a spilled drink between the rows, right wrist sprain; ice and a wrap at first aid"),
     fall("stage", "urgent-care-wrist", "in the crowd in front of the stage: fell when the crowd surged, left wrist swelling; referring to urgent care"),
     loss(
-        IncidentKind::Breakage,
+        IncidentKind::Property,
         "floor",
-        "an attendee's laptop was knocked off their table by someone squeezing past; the screen is cracked, $1,199.00 to replace",
-        "security took both names; the owner's own policy answers it",
-        119_900,
-        "the guest next to the table says this attendee's bag swept the laptop off; the floor camera agrees",
+        "a venue monitor was knocked off a hacker table by someone squeezing past; the screen is cracked, $280.00 to replace",
+        "monitor swapped from the spares; the broken one goes for repair",
+        28_000,
+        "the floor camera shows this guest's bag sweeping the monitor off the table",
         true,
     ),
     fall("floor", "urgent-care-ankle-home", "at the tables: right ankle pain and swelling after a stumble; splinting it, referring to urgent care"),
@@ -87,9 +87,9 @@ const BEATS: &[Beat] = &[
     loss(
         IncidentKind::Theft,
         "food",
-        "an attendee's backpack is gone from under their seat in the food line: headphones and a charger inside, $340.00",
-        "security walked the area; no camera covers the seats",
-        34_000,
+        "four hoodies are gone from the merch table by the food line; $160.00 at cost",
+        "security walked the area; no camera covers the merch table",
+        16_000,
         "",
         false,
     ),
@@ -110,8 +110,7 @@ pub fn stage(ctx: &ReducerContext, step: u16, rng: &mut StdRng) {
         return;
     };
     match beat.kind {
-        IncidentKind::Property => property(ctx, beat, &zone, rng),
-        IncidentKind::Theft | IncidentKind::Breakage => belonging(ctx, beat, &zone, rng),
+        IncidentKind::Property | IncidentKind::Theft | IncidentKind::Breakage => property(ctx, beat, &zone, rng),
         IncidentKind::Sos | IncidentKind::Fall => person(ctx, beat, &zone, rng),
     }
 }
@@ -143,26 +142,6 @@ fn culprit(ctx: &ReducerContext, beat: &Beat, station: u8, x: f32, y: f32, not: 
         .map(|b| b.id)
         .collect();
     if near.is_empty() { 0 } else { near[rng.gen_range(0..near.len())] }
-}
-
-/// An attendee's own belonging is stolen or broken: they tell staff where they stand, and staff report it
-/// for them. Whoever did it is drawn from the bands around them.
-fn belonging(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
-    let mut pool = hackers(ctx, Some(zone.station_id));
-    if pool.is_empty() {
-        pool = hackers(ctx, None);
-    }
-    if pool.is_empty() {
-        return;
-    }
-    let owner = &pool[rng.gen_range(0..pool.len())];
-    let by = culprit(ctx, beat, owner.zone, owner.x_m, owner.y_m, owner.id, rng);
-    let incident = safety::open(ctx, beat.kind, zone.id, owner.zone, owner.id, "ops", Some((owner.x_m, owner.y_m)));
-    plan(ctx, &incident, beat, by);
-    let who = wearer(ctx, owner.id).map(|(_, n)| n).unwrap_or_else(|| "an attendee".into());
-    let place = place_name(ctx, owner.x_m, owner.y_m);
-    let what = if beat.kind == IncidentKind::Theft { "something of theirs stolen" } else { "something of theirs broken" };
-    record(ctx, incident.id, 0, "organizer", "Security", format!("{who} reports {what} at {place}"), beat.note.into());
 }
 
 /// Someone in the zone falls or presses SOS: their band goes down where they stand and raises it. The crowd
@@ -229,7 +208,8 @@ pub fn send_someone_home(ctx: &ReducerContext, rng: &mut StdRng) {
     let _ = crate::departure::depart(ctx, who, "live run");
 }
 
-/// Equipment breaks where a camera sees it. Whoever did it is drawn from the bands at the spot.
+/// Equipment breaks, or something is stolen from the venue, at one of the zone's spots. Whoever did it is
+/// drawn from the bands at the spot.
 fn property(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
     let spots: Vec<(f32, f32)> = ctx
         .db
@@ -241,10 +221,15 @@ fn property(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &
     let at = if spots.is_empty() { None } else { Some(spots[rng.gen_range(0..spots.len())]) };
     let (x, y) = at.unwrap_or_else(|| crate::venue::station_spot(ctx, zone.station_id));
     let by = culprit(ctx, beat, zone.station_id, x, y, 0, rng);
-    let incident = safety::open(ctx, IncidentKind::Property, zone.id, zone.station_id, 0, "vision", Some((x, y)));
+    let theft = beat.kind == IncidentKind::Theft;
+    let incident = safety::open(ctx, beat.kind, zone.id, zone.station_id, 0, if theft { "ops" } else { "vision" }, Some((x, y)));
     plan(ctx, &incident, beat, by);
     let place = place_name(ctx, x, y);
-    record(ctx, incident.id, 0, "camera", "Overhead camera", format!("Equipment down at {place}"), beat.note.into());
+    if theft {
+        record(ctx, incident.id, 0, "organizer", "Security", format!("Theft from the venue at {place}"), beat.note.into());
+    } else {
+        record(ctx, incident.id, 0, "camera", "Overhead camera", format!("Equipment down at {place}"), beat.note.into());
+    }
 }
 
 fn plan(ctx: &ReducerContext, incident: &safety::Incident, beat: &Beat, culprit_band: u32) {

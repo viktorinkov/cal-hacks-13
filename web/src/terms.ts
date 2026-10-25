@@ -29,7 +29,6 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bJ5r(?: charge waived)?\b/, 'Journal entry that cancels a charge the organizer waived or the attendee disputed.'],
   [/\bJ5(?: charge)?\b/, 'Journal entry that books an approved charge as owed by the person responsible: the insurer\'s share and the deductible.'],
   [/\bJ6(?: charge payment)?\b/, 'Journal entry for cash application: the person responsible paid their charge from their wallet.'],
-  [/\bJ7(?: deductible returned)?\b/, 'Journal entry that gives the owner their deductible back into their wallet from a paid charge.'],
 
   // Bookkeeping.
   [/\btrial balance\b/i, 'Every account\'s total debits and credits; the two totals must match.'],
@@ -87,21 +86,21 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bowed to booth\b/i, 'What the event pays the booth: its sales less the print cost and the event\'s fee.'],
   [/^booths$/i, 'What the event owes the sponsor booths for the products that name them.', 'th'],
   [/^loss$/i, 'What the incidents at the booth\'s table cost before anyone paid.', 'th'],
-  [/^charged$/i, 'What the people responsible were charged: it repays the insurer\'s share, and the deductible goes to the venue or back to the owner.', 'th'],
-  [/^recovered$/i, 'The venue\'s part of the charges: the deductible it carried on its own equipment.', 'th'],
+  [/^charged$/i, 'What the people responsible were charged: it repays the insurer\'s share, and the deductible goes to the venue.', 'th'],
+  [/^recovered$/i, 'The venue\'s part of the charges: the deductible it carried on its own equipment, broken or stolen.', 'th'],
 
   // Insurance.
   [/\bdeductibles?\b/i, 'The part of each covered loss the venue pays itself before the insurer pays.'],
   [/\bper[- ]claim limit\b|\bup to \$[\d,]+(?:\.\d\d)? a claim\b/i, 'The most the policy pays on any one claim.'],
   [/\baggregate(?: limit)?\b|\$[\d,]+(?:\.\d\d)? left\b/i, 'The most the policy pays across all claims at the event, and what is left of it.'],
   [/\bmedical payments(?: cover)?\b/i, 'Cover that pays an injured attendee\'s medical bills, whoever was at fault.'],
-  [/\bproperty cover\b/i, 'The venue\'s property policy: it pays to repair or replace the venue\'s own equipment, above its deductible.'],
+  [/\bproperty cover\b/i, 'The venue\'s property policy: it pays to repair the venue\'s own equipment, or replace what was stolen from it, above its deductible.'],
   [/\bfirst notice of loss\b/i, 'The first report of a claim, sent to the insurer.'],
   [/\bclaimants?\b/i, 'The person a claim pays.'],
   [/\bpayouts?\b/i, 'What the venue pays the claimant, or the repair vendor, on a claim.'],
   [/\breserves?\b|^reserved\b/i, 'Money set aside for a payout the venue expects to make.'],
   [/\bstill to pay\b/i, 'Reserves accrued and not paid yet.'],
-  [/\brecovery letters?\b/i, 'A letter asking whoever damaged the venue\'s equipment to pay for the repair.'],
+  [/\brecovery letters?\b/i, 'A letter asking whoever damaged or took the venue\'s equipment to pay for it.'],
   [/\brecoverable\b|\bpays back\b/i, 'The insurer\'s share of the payout, which it pays back to the venue under the policy.'],
   [/\brecover(?:y|ies)(?= posted)|^recover(?:y|ies)$|\brecoveries\b/i, 'Money the venue gets back from its insurer, or from whoever caused the loss.'],
   [/\bnot recovered\b/i, 'Reserved payouts whose insurer share is not booked as owed yet.'],

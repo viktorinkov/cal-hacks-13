@@ -1039,7 +1039,7 @@ fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
     let p: ChargePaymentPayload = serde_json::from_str(&job.payload).unwrap();
     assert_eq!((p.amount_cents, p.account_id.as_str()), (240_000, "acct-Jordan Alvarez"));
     w.as_("worker", |ctx| claim_job(ctx, job.id));
-    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "cust".into(), "acct".into(), "purchase-1".into(), String::new(), String::new(), String::new()));
+    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "cust".into(), "acct".into(), "purchase-1".into()));
     assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "paid");
     assert_eq!(crate::wallet::my_wallet(&w.view("Jordan Alvarez")).unwrap().balance_cents, 80_000);
     let journals: Vec<String> = w.ledger(claim.id).into_iter().map(|e| e.0).collect();
@@ -1051,97 +1051,17 @@ fn a_band_that_was_not_at_the_spot_cannot_be_named() {
     let w = World::new();
     let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
     w.set_band(8, |b| b.zone = 102);
-    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 3, "Maya's phone is gone from her table".into()));
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 0, "a sponsor's display laptop is gone from its table".into()));
     let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
     let err = w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 8, "looked like them".into())).unwrap_err();
     assert!(err.contains("neither in the zone nor at the spot"), "{err}");
-    assert!(w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 3, "her own band".into())).is_err());
-    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "her phone, $899.00 to replace".into(), Some(89_900)));
-    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "security walked the area".into()));
+    w.as_("ops", |ctx| name_responsible_band(ctx, incident.id, 3, "the camera shows her lifting it".into()));
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "the sponsor's receipt: $1,299.00".into(), Some(129_900)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "the sponsor filed the loss".into()));
     let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
-    // A theft of an attendee's belonging is their claim on their own policy; with none on file it pays nothing yet.
-    assert_eq!((claim.cover_kind.as_str(), claim.claimant_name.as_str(), claim.policy_id), ("personal_property", "Maya Chen", 0));
-}
-
-#[test]
-fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
-    let w = World::new();
-    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
-    w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Maya Chen"), "Golden Gate Mutual".into(), "PP-000123".into(), 150_000, 600_000, 25_000, "document".into(), "AB".repeat(32)));
-    w.as_("ops", |ctx| open_incident(ctx, "breakage".into(), zone, 3, "Maya's laptop was knocked off her table".into()));
-    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Breakage).unwrap();
-    w.as_("ops", |ctx| name_responsible_band(ctx, incident.id, 7, "his bag swept it off the table".into()));
-    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "cracked screen, $1,199.00 to replace".into(), Some(119_900)));
-    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "both names taken".into()));
-    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
-    assert_eq!((claim.cover_kind.as_str(), claim.claimant_name.as_str()), ("personal_property", "Maya Chen"));
-    // Her own policy pays the value less her $250.00 deductible; the venue carries nothing.
-    assert_eq!((claim.cost_cents, claim.payout_cents, claim.recoverable_cents, claim.venue_cost_cents), (119_900, 94_900, 94_900, 0));
-    let job = w.open_job(KIND_VERIFY, claim.id);
-    let p: VerifyPayload = serde_json::from_str(&job.payload).unwrap();
-    assert_eq!((p.attendee_policy_hash.as_str(), p.responsible_named, p.cost_cents), ("ab".repeat(32).as_str(), true, 119_900));
-    w.verify(claim.id);
-    w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
-    let c = w.claim(claim.id);
-    assert_eq!(c.status, ClaimStatus::Routed);
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
-    w.pay(c.id);
-    assert_eq!(w.claim(c.id).status, ClaimStatus::Settled);
-    assert_eq!(w.t.db.attendee_policy().holder().find(id("Maya Chen")).unwrap().used_cents, 94_900);
-    let charge = w.t.db.charge().incident_id().find(incident.id).unwrap();
-    assert_eq!((charge.attendee_name.as_str(), charge.amount_cents), ("Jordan Alvarez", 119_900));
-    // Jordan's charge repays Maya's insurer $949.00 and gives Maya her $250.00 deductible back.
-    let c = w.claim(c.id);
-    w.as_("ops", |ctx| approve_charge(ctx, charge.id, 119_900, c.pack_hash.clone()));
-    let charge = w.t.db.charge().id().find(charge.id).unwrap();
-    assert_eq!((charge.insurer_cents, charge.refund_cents), (94_900, 25_000));
-    wallet_with(&w, "Jordan Alvarez", 200_000);
-    w.as_("Jordan Alvarez", |ctx| pay_charge(ctx, charge.id));
-    let job = w.t.db.job().iter().find(|j| j.kind == KIND_CHARGE_PAYMENT && j.subject_id == charge.id).unwrap();
-    let p: ChargePaymentPayload = serde_json::from_str(&job.payload).unwrap();
-    assert_eq!((p.refund_name.as_str(), p.refund_cents), ("Maya Chen", 25_000));
-    w.as_("worker", |ctx| claim_job(ctx, job.id));
-    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "c1".into(), "a1".into(), "p1".into(), "c2".into(), "a2".into(), "d2".into()));
-    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "paid");
-    assert!(w.t.db.wallet_entry().identity().filter(id("Maya Chen")).any(|e| e.kind == "refund" && e.amount_cents == 25_000));
-    let journals: Vec<String> = w.ledger(c.id).into_iter().map(|e| e.0).collect();
-    assert!(journals.contains(&"J7 deductible returned".to_string()), "{journals:?}");
-}
-
-#[test]
-fn a_stolen_bag_with_no_policy_on_file_goes_to_the_organizer() {
-    let w = World::new();
-    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
-    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 6, "Lee's backpack is gone".into()));
-    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
-    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "headphones and a charger, $340.00".into(), Some(34_000)));
-    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "no camera covers the seats".into()));
-    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
-    assert_eq!((claim.policy_id, claim.cost_cents, claim.payout_cents), (0, 34_000, 0));
-    w.verify(claim.id);
-    w.investigate(claim.id, &["camera", "policy"], |p| decision(p, "pay"));
-    let c = w.claim(claim.id);
-    assert_eq!(c.status, ClaimStatus::Routed);
-    assert!(c.status_note.contains("no policy of their own on file"), "{}", c.status_note);
-}
-
-#[test]
-fn a_pay_on_a_policy_found_online_goes_to_the_organizer() {
-    use bandit_insurance::outcome::Decision;
-    let w = World::new();
-    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
-    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 6, "Lee's backpack is gone".into()));
-    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
-    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "headphones and a charger, $340.00".into(), Some(34_000)));
-    w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Lee Park"), "Lemonade".into(), "Renters".into(), 100_000, 100_000, 25_000, "document".into(), "AB".repeat(32)));
-    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "no camera covers the seats".into()));
-    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
-    // A pay on a policy read from the attendee's own document stands; on one found online from its name it goes to the organizer.
-    for (source, routed) in [("document", false), ("plan_lookup", true)] {
-        w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Lee Park"), "Lemonade".into(), "Renters".into(), 100_000, 100_000, 25_000, source.into(), "AB".repeat(32)));
-        let d = w.as_("ops", |ctx| Ok(typed_policy(ctx, &claim, Decision::AutoSettle { rule_id: 1, rule_version: 1 })));
-        assert_eq!(matches!(d, Decision::Route { .. }), routed, "{source}: {d:?}");
-    }
+    // A theft from the venue is the venue's claim on its property policy, above the $500 deductible.
+    assert_eq!((claim.cover_kind.as_str(), claim.claimant, claim.payout_cents, claim.recoverable_cents), ("property", None, 129_900, 79_900));
+    assert_eq!(w.t.db.charge().incident_id().find(incident.id).unwrap().attendee_name, "Maya Chen");
 }
 
 /// The text layer of the venue's policy, one string per page.

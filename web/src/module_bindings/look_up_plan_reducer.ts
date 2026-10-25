@@ -11,10 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  kind: __t.string(),
   insurer: __t.string(),
   plan: __t.string(),
   state: __t.string(),
-  limitCents: __t.u64(),
-  deductibleCents: __t.u64(),
 };
