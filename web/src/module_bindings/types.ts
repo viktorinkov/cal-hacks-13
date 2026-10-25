@@ -315,6 +315,7 @@ export const Claim = __t.object("Claim", {
   settledAt: __t.option(__t.timestamp()),
   reconciledAt: __t.option(__t.timestamp()),
   updatedAt: __t.timestamp(),
+  statement: __t.string(),
 });
 export type Claim = __Infer<typeof Claim>;
 
@@ -403,6 +404,24 @@ export const ClaimedPerson = __t.object("ClaimedPerson", {
   personId: __t.u64(),
 });
 export type ClaimedPerson = __Infer<typeof ClaimedPerson>;
+
+export const ClinicReport = __t.object("ClinicReport", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  scenario: __t.string(),
+  choice: __t.string(),
+  visitDate: __t.string(),
+  status: __t.string(),
+  jobId: __t.u64(),
+  providerName: __t.string(),
+  fileHash: __t.string(),
+  problems: __t.array(__t.string()),
+  modelCallId: __t.u64(),
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  receivedAt: __t.option(__t.timestamp()),
+});
+export type ClinicReport = __Infer<typeof ClinicReport>;
 
 export const Command = __t.object("Command", {
   id: __t.u64(),
@@ -1108,6 +1127,8 @@ export const MyClaim = __t.object("MyClaim", {
   payoutReference: __t.string(),
   openedAt: __t.timestamp(),
   settledAt: __t.option(__t.timestamp()),
+  incidentId: __t.u64(),
+  statement: __t.string(),
 });
 export type MyClaim = __Infer<typeof MyClaim>;
 
@@ -1123,6 +1144,18 @@ export const MyEncounter = __t.object("MyEncounter", {
   },
 });
 export type MyEncounter = __Infer<typeof MyEncounter>;
+
+export const MyIncident = __t.object("MyIncident", {
+  incidentId: __t.u64(),
+  kind: __t.string(),
+  zoneName: __t.string(),
+  openedAt: __t.timestamp(),
+  resolved: __t.bool(),
+  resolvedAt: __t.option(__t.timestamp()),
+  resolution: __t.string(),
+  claimId: __t.u64(),
+});
+export type MyIncident = __Infer<typeof MyIncident>;
 
 export const MyPhoto = __t.object("MyPhoto", {
   photoId: __t.u64(),
@@ -1495,6 +1528,18 @@ export const SweepTimer = __t.object("SweepTimer", {
   scheduledAt: __t.scheduleAt(),
 });
 export type SweepTimer = __Infer<typeof SweepTimer>;
+
+export const UnclaimedInjury = __t.object("UnclaimedInjury", {
+  incidentId: __t.u64(),
+  kind: __t.string(),
+  zoneName: __t.string(),
+  bandId: __t.u32(),
+  wearerName: __t.string(),
+  openedAt: __t.timestamp(),
+  resolvedAt: __t.option(__t.timestamp()),
+  notes: __t.array(__t.string()),
+});
+export type UnclaimedInjury = __Infer<typeof UnclaimedInjury>;
 
 export const Venue = __t.object("Venue", {
   id: __t.u64(),

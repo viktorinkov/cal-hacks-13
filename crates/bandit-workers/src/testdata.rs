@@ -12,6 +12,11 @@ pub fn review_payload() -> ReviewPayload {
     load(include_str!("../testdata/review-wrist.json"))
 }
 
+/// The hospital report for Jordan Alvarez's fall, drawn to match the incident.
+pub fn clinic_payload() -> ClinicPayload {
+    load(include_str!("../testdata/clinic.json"))
+}
+
 pub fn verify_payload() -> VerifyPayload {
     load(include_str!("../testdata/verify.json"))
 }

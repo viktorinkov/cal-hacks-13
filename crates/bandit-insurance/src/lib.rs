@@ -8,6 +8,7 @@
 //! The model reads documents and writes words; this crate decides money,
 //! coverage and routing.
 
+pub mod clinic;
 pub mod config;
 pub mod corroboration;
 pub mod coverage;

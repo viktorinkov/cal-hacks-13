@@ -19,8 +19,10 @@ pub const KIND_DRAFT: &str = "claim_draft";
 pub const KIND_RECOVERY: &str = "recovery_letter";
 /// Deposits an injury claim's payout into the claimant's Nessie account.
 pub const KIND_PAYOUT: &str = "claim_payout";
+/// The hospital sends its report for an injury claim, written for the case the module drew.
+pub const KIND_CLINIC: &str = "clinic_report";
 
-pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT];
+pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RecordExtractPayload {
@@ -92,6 +94,9 @@ pub struct ReviewPayload {
     pub precedents: Vec<Precedent>,
     /// What the cover pays for and what it excludes, in a few lines.
     pub policy_summary: String,
+    /// What the attendee wrote when they filed the claim, in their own words.
+    #[serde(default)]
+    pub claimant_statement: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -120,4 +125,26 @@ pub struct PayoutPayload {
     pub account_id: String,
     pub payout_cents: Cents,
     pub memo: String,
+}
+
+/// Input of `clinic_report`: everything the hospital's report is written from.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClinicPayload {
+    pub claim_id: u64,
+    pub report_id: u64,
+    /// `clinic::Scenario::as_str`, drawn by the module.
+    pub scenario: String,
+    /// `YYYY-MM-DD`, set by the module for the scenario.
+    pub visit_date: String,
+    /// The incident's local `YYYY-MM-DD` and `HH:MM`.
+    pub incident_date: String,
+    pub incident_time: String,
+    pub incident_kind: String,
+    pub venue_name: String,
+    pub zone_name: String,
+    pub claimant_name: String,
+    /// The attendee's own words from filing the claim.
+    pub statement: String,
+    /// The staff notes on the incident, oldest first.
+    pub medic_notes: Vec<String>,
 }
