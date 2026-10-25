@@ -38,7 +38,7 @@ pub struct Line {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Journal {
-    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`.
+    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`, `J5 recovery`.
     pub name: String,
     pub lines: Vec<Line>,
 }
@@ -91,6 +91,21 @@ pub fn insurer_payment(received_cents: Cents, recoverable_cents: Cents) -> Journ
         lines.push(line(Account::ClaimsExpense, 0, received_cents - recoverable_cents, "insurer paid more than recoverable"));
     }
     Journal { name: "J4 reconciliation".to_string(), lines }
+}
+
+/// J5 when the person responsible pays the charge: debit `cash` the whole
+/// charge, credit `insurer_receivable` the part that repays the insurer and
+/// `claims_expense` the venue's own share (its deductible). An attendee's
+/// deductible goes straight back to them, so it is not part of `cash`.
+pub fn recovery(insurer_share_cents: Cents, venue_share_cents: Cents) -> Journal {
+    Journal {
+        name: "J5 recovery".to_string(),
+        lines: vec![
+            line(Account::Cash, insurer_share_cents + venue_share_cents, 0, "charge paid by the person responsible"),
+            line(Account::InsurerReceivable, 0, insurer_share_cents, "repays the insurer"),
+            line(Account::ClaimsExpense, 0, venue_share_cents, "repays the venue's deductible"),
+        ],
+    }
 }
 
 fn line(account: Account, debit_cents: Cents, credit_cents: Cents, memo: &str) -> Line {

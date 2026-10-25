@@ -66,13 +66,21 @@ The corroboration rule is the one in [Insurance](Insurance.md): a camera sightin
 
 The Evidence Engine handles every type explicitly. Its de-identified claim document carries the type, the cover, the kind of item (`laptop`, `phone`, `speaker`), its value and whether a person was named at the spot. It never carries a name.
 
+| Type | Clauses it should match |
+|---|---|
+| `fall`, `sos` | the venue policy's medical payments clause; its employee exclusion |
+| `property` | the venue policy's property clause, its deductible |
+| `theft` | the venue policy's guest property exclusion; the attendee policy's theft clause, its deductible |
+| `breakage` | the venue policy's guest property exclusion; the attendee policy's accidental damage clause, its deductible |
+
 1. Validation. The `bandit-claims-validate` pipeline knows the five types and refuses nothing: a theft or a breakage with no item or no value fails validation.
-2. Similar past claims. Past claims from earlier events include thefts at the hacker tables, phones broken in the food line and equipment knocked over at the stage, so a theft finds other thefts.
-3. Value check. An ES|QL query over past claims of the same type and item gives the median value. A claimed value far above it is flagged for the Decision Engine and the organizer.
+2. Policy clauses. The Evidence Engine matches the claim to the clauses of both policies, the venue's and the attendee's own, by meaning. Each clause is a document in the `bandit-policy-clauses` index: the policy, the clause, the cover it belongs to and whether it grants or excludes.
+
+   A theft finds the venue policy's exclusion of guests' property and the attendee policy's theft clause. A broken speaker finds the venue policy's property clause and its deductible. The matched clauses go into the claim's checks, so Claude and the organizer read the wording that decides it.
 
 ## The Decision Engine
 
-Claude reads the type's evidence before it decides: for `theft` and `breakage` the attendee's report, the security cameras and the person named; for `property` the security cameras.
+Claude reads the type's evidence before it decides: for `theft` and `breakage` the attendee's report, the security cameras, the person named and the matched policy clauses; for `property` the security cameras and the clauses.
 
 Code holds Claude to the same limits for every type: Claude never sets an amount, pays only inside a rule an organizer approved, and refuses on its own only on a failed check.
 
