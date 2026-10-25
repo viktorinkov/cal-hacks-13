@@ -22,8 +22,6 @@ The venue's policy never pays for an attendee's own belongings. A general liabil
 
 Each attendee has their own policy, an `attendee_policy` row: the insurer, the policy number, the personal property cover's per-claim limit, its yearly limit and its deductible. The policy terms come from the attendee's policy PDF, which the Evidence Engine reads.
 
-An attendee without the PDF names their insurer and policy instead, and Bright Data finds the policy's public form (a plan lookup, [Bright-Data](../7-integrations/Bright-Data.md)). The form has no limit or deductible, so the attendee types both, and the row's `source` is `plan_lookup`. Every pay on such a policy goes to the organizer.
-
 The crowd of the live run has no PDFs. Each crowd attendee's terms are drawn once from a generator seeded with their identity, so the same attendee always has the same policy.
 
 Amounts, all in code:
