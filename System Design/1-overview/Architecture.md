@@ -34,14 +34,14 @@ Every connection in the system. Names match the component docs.
 | Organizer portal, tap page | SpacetimeDB SpacetimeAuth | the magic-link email sign-in; an ID token that SpacetimeDB checks on connect | HTTPS, OpenID Connect |
 | Organizer portal, tap page | `bandit-api` | the app files, uploads and downloads, and the feature endpoints listed in [Rust-Backend](../3-services/Rust-Backend.md) | HTTPS, same origin |
 | `bandit-workers` | `band1t` module | claim jobs, submit results | SpacetimeDB Rust client SDK |
-| Anthropic-Claude-API.md, Capital-One-Nessie.md: `bandit-workers` | Anthropic Claude API, Capital One Nessie API | AI calls, bank calls | HTTPS |
+| Elastic.md, Anthropic-Claude-API.md, Capital-One-Nessie.md: `bandit-workers` | Elastic Workflows and Agent Builder, Capital One Nessie API | model execution and bank calls | HTTPS |
 | Elastic.md: `bandit-indexer` | `band1t` module, Elastic Serverless | subscription in, bulk index writes out | SDK in, HTTPS out |
 | Elastic.md: `bandit-api` | Elastic Serverless | `GET /api/recap`: hybrid searches with a reranker that order the recap's people and booths, over candidates SpacetimeDB listed | HTTPS |
 | Bright-Data.md: `bandit-ingest` | Bright Data Web MCP, `band1t` module | page fetches (`scrape_as_markdown`) and company datasets (`run_scraper`); `import_event` | HTTPS; SpacetimeDB HTTP API |
 | Bright-Data.md: `pipeline/venue_model.py`, run by hand before the event | Bright Data Browser API | the Cal Hacks venue map opened in a remote browser; its 3D scene back as the file `web/venue/venue.glb` | CDP over WebSocket, through Playwright |
-| Bright-Data.md: `bandit-workers`, job `venue_setup` | Bright Data Web MCP, Bright Data Web Unlocker API, Anthropic Claude API, Bright Data Browser API | a venue set up from the event's name on the organizer portal: search, pages, the picks `venue_find` and `venue_map`, and the model exported by `pipeline/venue_model.py` | HTTPS; CDP over WebSocket, through Playwright |
+| Bright-Data.md: `bandit-workers`, job `venue_setup` | Bright Data Web MCP, Web Unlocker and Browser API; Elastic Workflows | fetch pages, select the venue and map with bounded `venue_find` and `venue_map` tasks, then export with `pipeline/venue_model.py` | HTTPS; CDP over WebSocket through Playwright |
 | Elastic.md: `bandit-ingest` | Elastic Serverless | parsed JSON records in; the bundle back from `bandit-organize` in Elastic Workflows | HTTPS |
-| Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | every insurance PDF, read into terms and clauses by `bandit-read-document` (next to build); a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`, with the clauses of both policies that bear on it back, written through `submit_claim_checks` | HTTPS; SDK |
+| Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | every insurance PDF, read into terms and clauses by `bandit-read-document`; a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`, with the clauses of both policies that bear on it back, written through `submit_claim_checks` | HTTPS; SDK |
 | Vision.md (TBD -- LEO): `bandit-vision` | `band1t` module, `bandit-api`, Anthropic Claude API | zone counts, ground alerts, camera sightings, property events, photo features; frames stored as blobs; frames to the Anthropic Claude API | reducer calls; HTTPS |
 
 ## Design
@@ -51,7 +51,7 @@ Every connection in the system. Names match the component docs.
 1. **Safety never waits.** Density colours, SOS, fall detection and the light circle run on the bands themselves. The module adds the incident record, the staff screens and the commands organizers send, but the bands stay useful if the venue laptop, the network or the cloud is gone.
 2. **One source of truth.** The SpacetimeDB module `band1t` holds all live state. Every change is a reducer call, so it happens completely or not at all, and every screen sees the same committed state through subscriptions.
 3. **Copies flow one way.** Any other store holds only files or a copy of committed rows. Results come back as SpacetimeDB ids, and acting on them is again a reducer call.
-4. **Slow and outside work goes through a queue.** A feature's slow or outside work, such as reading a PDF, deciding a claim or paying, is a `job` row that `bandit-workers` leases. [Queues](#queues) names every queue and every job kind. Code decides money, coverage, safety and access; the Anthropic Claude API reads documents, makes judgments and writes words.
+4. **Slow and outside work goes through a queue.** A feature's slow or outside work, such as reading a PDF, deciding a claim or paying, is a `job` row that `bandit-workers` leases. [Queues](#queues) names every queue and every job kind. Code computes amounts and enforces coverage, safety and access. Elastic Workflows runs the document, writing and decision tasks; the Decision Engine investigates claims through Agent Builder.
 5. **Every feature can be deleted.** Core components are enough for the safety features. Each optional feature owns its tables, reducers and jobs, so removing its doc and code removes it cleanly.
 6. **The module and services are Rust.** The module, every service and every shared library are Rust. Only the two browser apps are TypeScript.
 
@@ -60,8 +60,8 @@ Every connection in the system. Names match the component docs.
 Four rules decide which part does what:
 
 - **SpacetimeDB owns live and exact state.** Every write is a reducer call in the module on SpacetimeDB Maincloud, and every screen and service reads the result by subscription.
-- **The Evidence Engine (Elastic) reads, validates, organizes and ranks by meaning.** It gets copies, raw records and every insurance PDF, and gives back checks, ids, scores, and the policy terms and clauses a claim is held to (next to build). Acting on any of them is again a reducer call.
-- **The Anthropic Claude API judges and writes; code computes every amount.** Inside the insurance Decision Engine it investigates each claim and decides pay, refuse or ask the organizer, and code's guard holds that decision to the policy terms and the checks. Code checks every answer before the module uses it.
+- **The Evidence Engine (Elastic) reads, validates, organizes and ranks by meaning.** It gets copies, raw records and every insurance PDF, and gives back checks, ids, scores, and the policy terms and clauses a claim is held to. Acting on any of them is again a reducer call.
+- **The Decision Engine investigates; code computes every amount.** Elastic Agent Builder chooses which evidence and policy clauses to read, then proposes pay, refuse or ask the organizer. Rust runs the bounded tool loop and the module holds the answer to the policy terms, corroboration and organizer-approved rules. Fixed writing and selection tasks use `bandit-run-task` (`ai.prompt`), not an autonomous agent.
 - **Random outcomes come from a seeded RNG in code, never from the Anthropic Claude API.** Insurance.md: in the live run, who falls, where and when comes from a generator seeded with `live_run.seed`, so a run can be played again exactly.
 
 The question this diagram answers: which part talks to which, and what flows along each arrow.
@@ -95,7 +95,7 @@ flowchart LR
   end
   subgraph Outside["Outside services"]
     Auth["SpacetimeDB SpacetimeAuth"]
-    Claude["Anthropic Claude API: reads and judges"]
+    Claude["Configured model connector<br/>may run Claude"]
     Elastic["Elastic, The Evidence Engine: validates, organizes, ranks"]
     Nessie["Capital One Nessie API"]
     Bright["Bright Data"]
@@ -126,7 +126,8 @@ flowchart LR
   API -->|"hybrid search, ids + scores back"| Elastic
   STDB -->|"job rows, worker_jobs"| Workers
   Workers -->|"lease + result, submit_claim_review"| STDB
-  Workers -->|"claims to investigate, decisions back"| Claude
+  Elastic -->|"model execution"| Claude
+  Workers -->|"claim investigation, bounded text and image tasks"| Elastic
   Workers -->|"insurance PDFs + claim copy, terms + clauses back"| Elastic
   Workers -->|"wallet, purchase, deposit"| Nessie
   Workers -->|"venue search + pages, venue_setup"| Bright
@@ -171,7 +172,7 @@ One row per arrow above, in the same order. Call names are spelled as the code s
 | Tap page | SpacetimeDB SpacetimeAuth | the magic-link email sign-in | OpenID Connect at `auth.spacetimedb.com/oidc` | HTTPS | a judge signs in on their own phone |
 | SpacetimeDB SpacetimeAuth | the module | the ID token, which each page passes when it connects | none | OpenID Connect | one identity per person, the same on every device |
 | the module | Organizer portal | live rows: bands, zones, incidents; Insurance.md: claims | subscriptions such as `band`, `open_incidents`, `board_notes`; Insurance.md: `claims_board` | SpacetimeDB TypeScript client SDK (WebSocket) | every change is pushed; nothing polls |
-| Organizer portal | the module | staff actions | `resolve_incident`, `add_incident_note`, `set_low_vis`, `end_event`; Insurance.md: `file_claim_for_wearer`, `submit_medical_record`, `approve_claim`, `refuse_claim`, and at setup `submit_policy_document` and `confirm_policy_terms` (next to build) | the same WebSocket | each action is one transaction, checked against `staff_role` |
+| Organizer portal | the module | staff actions | `resolve_incident`, `add_incident_note`, `set_low_vis`, `end_event`; Insurance.md: `file_claim_for_wearer`, `submit_medical_record`, `approve_claim`, `refuse_claim`, and at setup `submit_policy_document` and `confirm_policy_terms` | the same WebSocket | each action is one transaction, checked against `staff_role` |
 | the module | Tap page | the attendee's own rows | views such as `my_band` and `my_attendee` | SpacetimeDB TypeScript client SDK (WebSocket) | views scope every row to the caller |
 | Tap page | the module | attendee actions | `claim_band`, `update_profile`; Insurance.md: `file_claim` | the same WebSocket | the module checks who may do what |
 | Organizer portal | `bandit-api` | the app files; Insurance.md: the venue's policy PDF and a hospital report PDF | `POST /api/blobs` | HTTPS, same origin | big files stay out of rows; the module keeps the access class |
@@ -180,8 +181,8 @@ One row per arrow above, in the same order. Call names are spelled as the code s
 | Elastic.md: `bandit-api` | Elastic | a hybrid search with a reranker over the candidates; ids and scores back | `_search` on `bandit-people` and `bandit-booths` | HTTPS, 10 s timeout | Elastic only orders the ids it is given |
 | the module | `bandit-workers` | queued and leased jobs | subscription to the view `worker_jobs` | SpacetimeDB Rust client SDK | slow and outside work never runs inside a transaction |
 | `bandit-workers` | the module | leases, then one result per job | `claim_job`, `extend_job_lease`, `fail_job` and each kind's result reducer; Insurance.md: such as `submit_claim_checks` and `submit_claim_review` | the same WebSocket | the module checks the lease and applies the result in one transaction |
-| Anthropic-Claude-API.md: `bandit-workers` | Anthropic Claude API | claims to investigate with tools, hospital reports to write for a drawn case, medical history PDFs, letters; JSON in a fixed schema back | jobs `claim_review`, `clinic_report`, `claim_draft`, `recovery_letter`, `medical_extract`, `venue_setup` | HTTPS through `claude-client` | the Anthropic Claude API judges and writes; code checks every answer and holds every claim decision to its limits |
-| Elastic.md, Insurance.md: `bandit-workers` | Elastic | every insurance PDF, read into terms and clauses, and each hospital report into its record (the insurance card next to build); a de-identified copy of each claim, and later its outcome; the validation and the matching policy clauses back | jobs `document_read` (`bandit-documents-extract`, `bandit-read-document`) and `claim_verify` (pipeline `bandit-claims-validate`, a semantic query on `bandit-policy-clauses`) | HTTPS through `claims-elastic` | the venue's own contract decides what a claim is covered for |
+| Elastic.md: `bandit-workers` | Elastic Workflows and Agent Builder | scoped claim-investigation turns; supplied-text writing and selection; temporary image reads | `bandit-investigate-claim`, `bandit-run-task`, `bandit-read-image` | HTTPS through `claims-elastic` | agents choose investigative steps; fixed `ai.prompt` tasks return one answer; reducers apply only checked results |
+| Elastic.md, Insurance.md: `bandit-workers` | Elastic | policy and hospital-report pages, checked terms, searchable clauses; de-identified claim copies and validation | `document_read`, `claim_verify`, `rule_proposal` | HTTPS through `claims-elastic` | the contract sets the terms; code checks quoted evidence and every amount |
 | Capital-One-Nessie.md: `bandit-workers` | Capital One Nessie API | wallets, merch purchases, claim payouts | jobs `wallet_open`, `merch_purchase`, `claim_payout` | HTTPS | the bank keeps the records; the module keeps the balance |
 | Bright-Data.md: `bandit-workers` | Bright Data | a venue set up from the event's name: search, pages and the 3D map | job `venue_setup`: Bright Data Web MCP `search_engine`, Bright Data Web Unlocker API, Bright Data Browser API through `pipeline/venue_model.py` | HTTPS; CDP over WebSocket | any event's venue from its name alone |
 | Elastic.md: the module | `bandit-indexer` | venue and social rows | subscription to `zone`, `organization`, `booth`, `schedule_slot`, `social_attendees`, `social_visits` | SpacetimeDB Rust client SDK | a one-way copy; nothing flows back |
@@ -189,39 +190,39 @@ One row per arrow above, in the same order. Call names are spelled as the code s
 
 ### Who decides what
 
-Each kind of decision has one maker, with a guardrail in code around it. The Anthropic Claude API judges what a document or a claim says, Elastic orders by meaning, and code computes every amount and every route.
+Each kind of decision has one maker, with a guardrail in code around it. Elastic Workflows executes the reading and writing tasks, Agent Builder investigates claims, Elastic search orders by meaning, and code computes every amount and every route.
 
 | Decision | Made by | Input | Guardrail |
 |---|---|---|---|
 | Zone and density | code on the band | the signal of the station markers and bands it heard in the last few seconds | hysteresis stops a count at a threshold from flapping; an organizer can override it with `set_override` and `force_state` |
 | The light circle | code on the band | an SOS or fall beacon heard at -58 dBm or stronger (`circle_rssi`) | it takes no command and ranks above a forced state; the module only records the witnesses |
 | An incident opening | code in the module (`watch_bands`, every 500 ms); a person with `open_incident` | a band's SOS or fall flag; a staff report of damage, or of an injury no band flagged | one open incident per band, and a flag within 10 s of a resolve does not reopen it; the snapshot is frozen in the same transaction |
-| Insurance.md: the venue's policy terms (next to build) | The Evidence Engine reads them from the policy PDF; the organizer confirms them (`confirm_policy_terms`) | the venue's uploaded policy PDF | every term quotes its clause and page; code checks each quote word for word and the limits against each other before the organizer sees them |
+| Insurance.md: the venue's policy terms | The Evidence Engine reads them from the policy PDF; the organizer confirms them (`confirm_policy_terms`) | the venue's uploaded policy PDF | every term quotes its clause and page; code checks each quote word for word and the limits against each other before the organizer sees them |
 | Insurance.md: whether there is a claim | the attendee who wore the band (`file_claim`), or staff for them (`file_claim_for_wearer`); code opens a property claim when the incident resolves | the attendee's own words | one claim per incident, and the claimant must have worn the band at the time |
-| Insurance.md: which hospital report comes back | code in the module: one roll of its seeded generator (`Scenario::pick`) | the incident and the attendee's own words | 3 in 6 match the incident; the Anthropic Claude API only writes the report for the drawn case (`clinic_report`) |
-| Insurance.md: a claim's amount | code in the module (`cover_lines` and `compute_amounts` in `bandit-insurance`) | the bill lines read from the hospital report; the fee schedule and the cover's limits, from the venue's confirmed policy terms (next to build; seeded today) | `check_report_read` drops a line whose quote is not word for word on its page, and `validate_record` a line whose page is not in the PDF; a decision that names a figure code did not compute is rejected; every ledger journal must balance |
-| Insurance.md: pay, refuse or ask the organizer | the Anthropic Claude API, investigating with tools (`claim_review`) | the evidence sources it chooses to read, the checks, the amounts, the attendee's own words, and the clauses of the venue's and the attendee's policies (next to build) | `validate_decision` rejects a cited fact or clause that is not on the claim, a figure code did not compute, and a pay made without reading the evidence |
-| Insurance.md: whether that decision goes through | code in the module: the guard (`decision::guard` in `bandit-insurance`) | Claude's decision, the cover, the corroboration, the failed checks and the learned `settlement_rule` rows | a pay goes through only under a rule an organizer taught, at or below its ceiling, with every check passed and corroborated evidence; a refusal only on a failed check; anything else, and every claim when 3 or more people are hurt in one zone within 5 minutes, goes to the organizer |
-| Insurance.md: a claim sent to a person | the organizer, with `approve_claim` or `refuse_claim` | the evidence pack, Claude's decision and the clauses it cited, on the organizer portal | it fails closed when the amount or the pack's fingerprint on screen is stale; a refusal needs a reason |
+| Insurance.md: which hospital report comes back | code in the module: one roll of its seeded generator (`Scenario::pick`) | the incident and the attendee's own words | 3 in 6 match the incident; a bounded Elastic Workflow only writes the report for the drawn case (`clinic_report`) |
+| Insurance.md: a claim's amount | code in the module (`cover_lines` and `compute_amounts` in `bandit-insurance`) | the bill lines read from the hospital report; the fee schedule and the cover's limits, from the venue's confirmed policy terms (with seeded defaults until confirmed) | `check_report_read` drops a line whose quote is not word for word on its page, and `validate_record` a line whose page is not in the PDF; a decision that names a figure code did not compute is rejected; every ledger journal must balance |
+| Insurance.md: pay, refuse or ask the organizer | the Decision Engine, through Elastic Agent Builder (`claim_review`) | the evidence sources it chooses to read, the checks, the amounts, the attendee's own words, and the clauses of the venue's and the attendee's policies | `validate_decision` rejects a cited fact or clause that is not on the claim, a figure code did not compute, and a pay made without reading the evidence |
+| Insurance.md: whether that decision goes through | code in the module: the guard (`decision::guard` in `bandit-insurance`) | the Decision Engine's decision, the cover, the corroboration, the failed checks and the learned `settlement_rule` rows | a pay goes through only under a rule an organizer taught, at or below its ceiling, with every check passed and corroborated evidence; a refusal only on a failed check; anything else, and every claim when 3 or more people are hurt in one zone within 5 minutes, goes to the organizer |
+| Insurance.md: a claim sent to a person | the organizer, with `approve_claim` or `refuse_claim` | the evidence pack, the Decision Engine's decision and the clauses it cited, on the organizer portal | it fails closed when the amount or the pack's fingerprint on screen is stale; a refusal needs a reason |
 | Elastic.md: the order of recap suggestions | Elastic (`bandit-people`, `bandit-booths`) | the people and booths SpacetimeDB listed for the attendee, and the attendee's interests | Elastic only orders the ids it is given; without it the lists go by minutes |
-| Elastic.md, Insurance.md: which policy clauses bear on a claim (next to build) | Elastic (`bandit-policy-clauses`) | the de-identified copy's narrative, built by code, and Claude's own queries | only the venue's policy and this attendee's card are searched; a clause matters only when Claude cites it and code checks it |
+| Elastic.md, Insurance.md: which policy clauses bear on a claim | Elastic (`bandit-policy-clauses`) | the de-identified copy's narrative, built by code, and the Decision Engine's own queries | only the venue's policy and this attendee's health-plan wording are searched; a clause matters only when the Decision Engine cites it and code checks it |
 | Insurance.md: who falls, where and when in the live run | code in the module: a generator seeded with `live_run.seed` (`live/script.rs`) | the script's beats: the incident kind, the zone kind, the medic's note and the hospital report that follows | never the Anthropic Claude API; a run can be played again exactly, and no zone gets three injuries within five minutes |
 | Bright-Data.md, Elastic.md: the event setup bundle | Elastic: the Elastic Agent Builder agent `bandit-organizer`, run by `bandit-organize` in Elastic Workflows | the raw records Bright Data fetched | Elastic ES\|QL `LOOKUP JOIN` makes the exact joins first, and the agent gives a reason for each decision; `bandit-ingest` checks the bundle and `import_event` loads it in one transaction |
 | Merch.md: a merch order | a person: the attendee, from the recap (`buy_merch`) | a template and a photo the attendee is tagged in | code checks that the event has ended and the wallet covers the price; a failed purchase frees the money |
 
-Insurance.md: the insurance Decision Engine is the Anthropic Claude API plus the Rust code that decides each claim, and The Evidence Engine reads every document it needs. It runs in this order, and steps 0, 2, 3, 5 and 6 leave the module as jobs:
+Insurance.md: the insurance Decision Engine is Elastic Agent Builder plus the Rust code that validates and applies each claim decision, and The Evidence Engine reads every document it needs. It runs in this order, and steps 0, 2, 3, 5 and 6 leave the module as jobs:
 
-0. At setup, the organizer uploads the venue's policy PDF. The Evidence Engine reads it into terms that quote their clauses, code checks them, and the organizer confirms them. They set every limit and gate below (next to build).
+0. At setup, the organizer uploads the venue's policy PDF. The Evidence Engine reads it into terms that quote their clauses, code checks them, and the organizer confirms them. They set every limit and gate below.
 1. The attendee files a claim in their own words (`file_claim`), or staff file it for them (`file_claim_for_wearer`).
-2. Code draws which hospital report comes back from the module's seeded generator (`Scenario::pick`), and the Anthropic Claude API writes the report for that case (`clinic_report`).
-3. The Evidence Engine reads the hospital report PDF (`document_read`, kind `hospital_report`) and the attendee's insurance card (next to build), and code checks every quote on its page and validates what it read.
-4. Code prices each line against the fee schedule and the cover's limits, checks the band, the light-circle witnesses, the staff notes, the camera and the report against each other, and posts the reserve. It refuses a staff claimant, a claim with no cover and a $0 payout before Claude sees them.
+2. Code draws which hospital report comes back from the module's seeded generator (`Scenario::pick`), and a bounded Elastic Workflow writes the report for that case (`clinic_report`).
+3. The Evidence Engine reads the hospital report PDF (`document_read`, kind `hospital_report`) and the attendee's health-plan wording, and code checks every quote on its page and validates what it read.
+4. Code prices each line against the fee schedule and the cover's limits, checks the band, the light-circle witnesses, the staff notes, the camera and the report against each other, and posts the reserve. It refuses a staff claimant, a claim with no cover and a $0 payout before the Decision Engine sees them.
 5. The Evidence Engine validates the de-identified copy and finds the clauses of both policies that bear on it (`claim_verify`, then `submit_claim_checks`).
-6. The Anthropic Claude API investigates with tools, one evidence source at a time, searches the policies' clauses, and decides: pay, refuse or ask the organizer (`claim_review`, then `submit_claim_review`). Code rejects an answer that cites a fact or clause not on the claim, or a figure code did not compute.
+6. The Decision Engine investigates through Elastic Agent Builder, one evidence source at a time, searches the policies' clauses, and decides: pay, refuse or ask the organizer (`claim_review`, then `submit_claim_review`). Code rejects an answer that cites a fact or clause not on the claim, or a figure code did not compute.
 7. Code's guard lets a pay through only inside an approved rule's ceiling with every check passed, and a refusal only on a failed check. Everything else goes to the organizer.
 8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, the Evidence Engine's agent `bandit-rule-proposer` counts them in `bandit-claims` with Elastic ES|QL and proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
 
-Each step, what Claude reads and answers, and five worked claims are in [Insurance: How the insurance Decision Engine decides](../6-features/Insurance.md#how-the-insurance-decision-engine-decides).
+Each step, what the Decision Engine reads and answers, and five worked claims are in [Insurance: How the insurance Decision Engine decides](../6-features/Insurance.md#how-the-insurance-decision-engine-decides).
 
 ### System context
 
@@ -247,7 +248,8 @@ flowchart LR
   Staff -->|"signs in by magic link"| Auth
   Auth -->|"ID token, one identity per person"| BandIt
   BandIt -->|"records to organize, copies to rank, insurance PDFs to read"| Elastic
-  BandIt -->|"claims to decide, letters to write"| AnthropicAPI
+  Elastic -->|"configured model connector may use"| AnthropicAPI
+  BandIt -->|"claim investigation and bounded writing tasks"| Elastic
   BandIt -->|"accounts, merch purchases, payouts"| NessieAPI
   BandIt -->|"event pages, venue setup"| Bright
   Vision -->|"counts, alerts, photo features"| BandIt
@@ -325,7 +327,7 @@ flowchart LR
   end
   Features -->|"jobs::enqueue"| Job
   Job -->|claim_job| Workers["bandit-workers"]
-  Workers -->|asks| Claude["Anthropic Claude API"]
+  Workers -->|"workflow execution"| Workflows["Elastic Workflows and Agent Builder"]
   Workers -->|reads, checks| Elastic["Elastic (Evidence Engine)"]
   Workers -->|scrapes| BrightData["Bright Data"]
   Workers -->|pays| Nessie["Capital One Nessie"]
@@ -354,23 +356,25 @@ These are the 17 job kinds in the code (`KIND` constants in `spacetimedb/server/
 
 | Job kind | Queued by | What the worker does | Outside service | Result reducer |
 |---|---|---|---|---|
-| `medical_extract` | `submit_medical_document`, when an attendee uploads a medical PDF | reads the PDF into the fields of their medical card | Anthropic Claude API | `apply_medical_extract` |
-| `clinic_report` | `file_claim` and `file_claim_for_wearer`, when an injury claim is filed | writes the hospital's report for the case code drew, which BandIt prints as a PDF | Anthropic Claude API | `file_clinic_report` |
+| `medical_extract` | `submit_medical_document` | extract fields from private medical-history or insurance-card page text; validate cited pages | Elastic Workflows, `bandit-run-task` | `apply_medical_extract` |
+| `clinic_report` | `file_claim` and `file_claim_for_wearer` | write the report for the case code drew, validate it and render a PDF | Elastic Workflows, `bandit-run-task` | `file_clinic_report` |
 | `document_read` | `submit_policy_document`, `finish_plan_lookup`, `look_up_plan` (a plan already found) and `finish_venue_policy_lookup` for a policy; `submit_medical_record` (staff file a hospital report PDF) and `file_clinic_report` for a hospital report | reads the terms and clauses of a policy PDF, or the record of a hospital report, with the Elastic Workflow `bandit-read-document` | Elastic | `apply_document_terms`, or `apply_hospital_report` for a hospital report |
 | `claim_verify` | the claim's evidence pack is built: when a claim opens with nothing to wait for, or when its hospital report is read (`apply_hospital_report`) | validates the de-identified claim and finds the policy clauses that bear on it | Elastic | `submit_claim_checks` |
-| `claim_review` | `submit_claim_checks` | investigates the claim with tools and decides pay, refuse or ask the organizer; each step goes to `report_claim_step` | Anthropic Claude API, with Elastic for the clauses | `submit_claim_review` |
+| `claim_review` | `submit_claim_checks` | Agent Builder chooses scoped evidence reads and policy searches; Rust runs the bounded loop, validates the decision and reports each step | Elastic Agent Builder, `bandit-investigate-claim` | `submit_claim_review` |
 | `claim_payout` | a pay that the guard lets through, `approve_claim`, `retry_claim_payout` | deposits the payout into the claimant's account | Capital One Nessie | `record_claim_payout` |
-| `claim_draft` | `record_claim_payout`, once the payout is in; a property claim queues it when it is paid | drafts the claim's letters | Anthropic Claude API | `attach_claim_letters` |
-| `recovery_letter` | `request_recovery_letter` (the organizer) | drafts the letter to the person responsible | Anthropic Claude API | `attach_recovery_letter` |
+| `claim_draft` | completed payout | draft letters from supplied settled facts; validate every figure and use templates after failed correction | Elastic Workflows, `bandit-run-task` | `attach_claim_letters` |
+| `recovery_letter` | `request_recovery_letter` | draft a query to the person responsible; validate its figures and wording | Elastic Workflows, `bandit-run-task` | `attach_recovery_letter` |
 | `rule_proposal` | `approve_claim`, once 3 approved claims of one shape agree | counts those claims' copies in `bandit-claims` with the Elastic Workflow `bandit-propose-rule` and its agent `bandit-rule-proposer`, which proposes the payment rule they share | Elastic | `submit_rule_proposal` |
 | `charge_payment` | `pay_charge`, when the charged attendee pays | pays the charge from their wallet to the venue | Capital One Nessie | `record_charge_payment` |
 | `wallet_open` | `connect_wallet`, at the wallet step of setup | opens the attendee's wallet with $200 | Capital One Nessie | `record_wallet` |
 | `merch_purchase` | `buy_merch` and `buy_merch_as` | records the order as a purchase from the wallet | Capital One Nessie | `settle_merch_order` |
-| `merch_picks` | `leave_event` and `leave_early`, when an attendee leaves; the end of the event (`end_event`, or the live run's end); `rerun_shopping_agent` | picks the three products the attendee would most want | Anthropic Claude API | `submit_merch_picks` |
-| `photo_features` | `register_photo` | counts the people in an event photo and writes a caption | Anthropic Claude API | `submit_photo_features` |
-| `venue_setup` | `start_venue_setup` (the organizer) | finds the venue and its 3D map from the event's name; Claude picks with `venue_find` and `venue_map` | Bright Data, with the Anthropic Claude API | `report_venue_setup_step` for each step, then `finish_venue_setup` |
-| `plan_lookup` | `look_up_plan` (the attendee), unless a lookup already found the same plan | finds the PDF of the insurance plan the attendee named; Claude picks with `plan_find`, and the Evidence Engine reads the PDF with `bandit-read-document`, whose insurer, plan and year code checks against what was typed | Bright Data, with the Anthropic Claude API and Elastic | `finish_plan_lookup` |
-| `venue_policy_lookup` | `look_up_venue_policy` (the organizer) | finds the venue's two policy forms by their form numbers; Claude picks with `venue_policy_find`, and the Evidence Engine reads which coverage forms each PDF holds (`bandit-read-document`, kind `coverage_form`), whose form number code checks against what was typed | Bright Data, with the Anthropic Claude API and Elastic | `finish_venue_policy_lookup` |
+| `merch_picks` | attendee departure, event end, `rerun_shopping_agent` | choose three products and photos from the supplied eligible lists; validate every id and length | Elastic Workflows, `bandit-run-task` | `submit_merch_picks` |
+| `photo_features` | `register_photo` | count people and caption one temporarily uploaded image; validate and delete the upload | Elastic Agent Builder, `bandit-read-image` | `submit_photo_features` |
+| `venue_setup` | `start_venue_setup` | Bright Data fetches; bounded `venue_find` and `venue_map` select supplied results; code exports the model | Bright Data and Elastic Workflows | `report_venue_setup_step`, `finish_venue_setup` |
+| `attendee_policy_lookup` | `look_up_plan`, unless the same plan was already found | Bright Data fetches candidates; bounded `plan_find` selects supplied URLs; `bandit-read-document` checks the health-plan wording | Bright Data and Elastic Workflows | `finish_plan_lookup` |
+| `venue_policy_lookup` | `look_up_venue_policy` | Bright Data fetches; bounded `venue_policy_find` selects supplied URLs; `bandit-read-document` checks the printed forms | Bright Data and Elastic Workflows | `finish_venue_policy_lookup` |
+
+`attendee_policy_lookup` is the canonical job kind. Workers and completion/dead-job handling still accept already queued `plan_lookup` jobs; the `plan_lookup` table, payload and public reducer names stay unchanged. A connector may run Claude underneath Elastic; execution ownership and model identity are separate.
 
 #### The command queue
 
@@ -383,11 +387,11 @@ A `command` row is one command for the bands, such as `state`, `exit`, `clear` o
 
 #### The organizer queue
 
-This is the human in the loop. Code and Claude settle what they can, and everything else waits here for the organizer, on the organizer portal.
+This is the human in the loop. Code and the Decision Engine settle what they can, and everything else waits here for the organizer, on the organizer portal.
 
 | Row | Gets here when | The organizer decides with |
 |---|---|---|
-| `claim` in `Routed` | the guard does not let Claude's decision through, or Claude asks the organizer | `approve_claim` or `refuse_claim` |
+| `claim` in `Routed` | the guard does not let the Decision Engine's decision through, or the Decision Engine asks the organizer | `approve_claim` or `refuse_claim` |
 | `rule_proposal` in `proposed` | the Evidence Engine's agent has proposed a payment rule (`submit_rule_proposal`) | `approve_rule_proposal`, which writes a `settlement_rule`, or `reject_rule_proposal` |
 | `charge` in `proposed` | staff named the band responsible for damage (`name_responsible_band`) | `approve_charge` or `waive_charge` |
 
@@ -416,7 +420,7 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Incidents, snapshots, witnesses, notes | `band1t` module | `watch_bands`, organizers, medics | none |
 | Stays and encounters | `band1t` module (`zone_visit`, `encounter`) | `ingest_band`, `ingest_heard`, `sweep`; Test-Bands.md: `report_test_band` and `crowd_tick` | none; Social.md: `social_tick` turns them into `visit` and `social_encounter`; Elastic.md: `bandit-indexer` turns findable attendees' visits into their interests in `bandit-people` |
 | Social.md: the people graph | `band1t` module (`people_link`) | `social_tick`; `exhibits` links from the import | none; Elastic.md: `bandit-people` holds each findable attendee's interests, never the links |
-| Medical-Card.md, Insurance.md: medical card (with the attendee's own health insurance), the venue's insurance policy | `band1t` module, private tables | tap page, workers | never copied; Elastic.md: the policy PDFs and an attendee's card and hospital report are read in Elastic under their SHA-256, and an attendee's are deleted once the claim is decided (next to build) |
+| Medical-Card.md, Insurance.md: medical card and insurance wording | `band1t` module | attendee, organizer and checked worker results | private medical-history and card text goes to a bounded workflow without a shared search index; policy wording and hospital reports use the document indices |
 | Capital-One-Nessie.md, Insurance.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Capital One Nessie ids | Capital One Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used to validate the claim and as the query for its policy clauses |
 | Files: photos, PDFs, letters | the blob store, a folder in `/var/lib/bandit` on the Vultr VM | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
 | Bright-Data.md: raw fetch snapshots | versioned files kept with the project | `bandit-ingest` | loaded into the module through `import_event` |
@@ -449,7 +453,7 @@ Elastic.md: live state never lives in Elastic. What only Elastic does here:
 | Ordering by meaning | `semantic_text` fields on `.jina-embeddings-v5-text-small`, fused with a keyword search and reranked by `.jina-reranker-v3`: `GET /api/recap` puts the people an attendee met and the booths they visited in order of how close they are to what the attendee was into ([Elastic](../7-integrations/Elastic.md)) | two people who visited different booths can still care about the same things; SpacetimeDB filters by exact values and has no relevance ranking or vectors |
 | An agent that resolves messy records | the Elastic Agent Builder agent `bandit-organizer` on the Elastic Managed LLM, run by `bandit-organize` in Elastic Workflows with a JSON schema per section, searching candidates and giving a reason per merge | one company spelled three ways becomes one organisation before anything reaches the module |
 | Bulk joins where raw data lands | Elastic ES\|QL `LOOKUP JOIN` steps match booth numbers, domains and stage names across thousands of raw records | the messy raw records never enter the module; only the checked bundle does |
-| Reading documents into searchable clauses (next to build) | the Elastic Workflow `bandit-read-document` and the agent `bandit-document-reader` read every insurance PDF into terms that quote their clauses; `bandit-policy-clauses` holds each clause of the venue's and the attendee's policy for search by meaning | a claim is decided by what the contract says, and every limit traces to a clause the organizer saw |
+| Reading documents into searchable clauses | the Elastic Workflow `bandit-read-document` and the agent `bandit-document-reader` read every insurance PDF into terms that quote their clauses; `bandit-policy-clauses` holds each clause of the venue's and the attendee's policy for search by meaning | a claim is decided by what the contract says, and every limit traces to a clause the organizer saw |
 | Analysis you can see | Elastic Kibana, Elastic's web interface: the Elastic Workflows execution view, Elastic Agent Builder, and the dashboards "BandIt · Cal Hacks 13.0 · scrape pipeline" and "BandIt · Cal Hacks 13.0 · sponsors and prizes"; Insurance.md: the "BandIt claims evidence" dashboard | the team shows how the data was organized and what the scrape found about the event, without touching the live screens |
 
 The diagram shows where the two meet and which way data flows at each meeting point.
@@ -490,7 +494,7 @@ The line is drawn by the question: exact, live or transactional questions go to 
 | Consent and access: who may see a card, a tag, a memory | SpacetimeDB views and reducers | enforced by the module on every read; an app or index bug cannot widen it |
 | Elastic.md: organizing scraped data before the import | Elastic (raw indices, fixed `LOOKUP JOIN` steps, the Elastic Agent Builder agent, `bandit-bundles`) | exact joins and fuzzy entity resolution across messy sources are search work; the result is still loaded by a reducer |
 | Elastic.md: "of the people I hung out with, who is most into the same things as me" | Elastic (`bandit-people`, `bandit-booths`) through `GET /api/recap` | ordering by meaning over candidates SpacetimeDB listed; there is no typed search |
-| Elastic.md, Insurance.md: "what do the venue's and the attendee's policies say about this claim" | Elastic (`bandit-policy-clauses`, next to build) | search by meaning over the policies' own wording; the clauses come back through a reducer or to Claude's tools and never set an amount |
+| Elastic.md, Insurance.md: "what do the venue's and the attendee's policies say about this claim" | Elastic (`bandit-policy-clauses`) | search by meaning over the policies' own wording; the clauses come back through a reducer or to the Decision Engine’s scoped tools and never set an amount |
 | Files: photos, PDFs, letters | the blob store in `/var/lib/bandit`, with a `blob_ref` row | big bytes stay out of rows and subscriptions; the access class is still decided in the module |
 
 ### Deployment
@@ -589,7 +593,7 @@ The failures that can happen during the event, and the one answer to each. The f
 | A band reboots | It keeps its saved thresholds, RSSI and low visibility, but forgets its exit colour (back to blue), the override and any forced state | An organizer sends the exit colour again with `set_exit` from the SpacetimeDB command line ([Safety](../6-features/Safety.md)). |
 | A sign-in email is slow | A judge waits on the sign-in screen | The screen offers "Send again"; a judge already signed in on their phone stays signed in ([Tap-Page](../5-apps/Tap-Page.md)). |
 | Elastic.md: Elastic is unreachable during the event | The recap's suggestions are not ordered by meaning | The recap shows both lists by minutes together; Insurance.md: claims carry no validation check or clauses, and a decision that would rest on a clause goes to the organizer; nothing live reads Elastic ([Elastic](../7-integrations/Elastic.md)). |
-| Anthropic-Claude-API.md: the Anthropic Claude API is slow or refuses | A letter or card is late; Insurance.md: a claim is not investigated | Each feature falls back without AI as its doc describes; Medical-Card.md: the card step shows "Check later" and setup goes on without a card; Insurance.md: code decides the claim alone, so anything that needs judgment goes to a person; nothing live waits on the Anthropic Claude API ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). |
+| Elastic.md: a workflow or its configured model is unavailable | affected document, writing or investigation jobs fail or retry | feature-specific fallbacks apply: letters have templates, missing medical-card extraction leaves setup usable, and an exhausted investigation cannot authorize a payment outside the code guard |
 | Capital-One-Nessie.md: the Capital One Nessie API is down | A wallet cannot open, and a merch order or a payout cannot settle | Each job retries without paying twice; a dead purchase fails the order and frees its money, so the attendee can buy again; a dead payout waits for `retry_claim_payout`; nothing else waits on the Capital One Nessie API ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)). |
 
 ## Dependencies

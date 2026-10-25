@@ -1,6 +1,6 @@
 //! `document_read`: the Evidence Engine reads an insurance PDF or a hospital
 //! report. Each page goes through the `<prefix>-documents-extract` pipeline (a
-//! scan is first written out word for word by the Claude API), the
+//! scan is first transcribed through a private Elastic image workflow), the
 //! `bandit-read-document` workflow reads the terms and clauses, or the report's
 //! record, and code checks every quote against its page before the clauses are
 //! indexed and the module gets the answer. The plan and venue policy lookups
@@ -16,15 +16,18 @@ use bandit_bindings::{ChunkMatch, ModelCallIn};
 use bandit_insurance::policy::{CheckedPolicy, DocumentReadPayload, PolicyRead, VENUE_POLICY, check_policy, document_schema};
 use bandit_insurance::report::{self, HOSPITAL_REPORT, ReportRead, check_report_read};
 use claims_elastic::{CLAUSE, ClauseHit, PolicyClause, StoredPage, chunk_docs, reader};
-use claude_client::{Effort, MessageRequest};
+use claude_client::{Effort, ImageType, MessageRequest};
 use serde_json::{Value, json};
 
 use crate::jobs::{Ctx, JobError, JobIn};
-use crate::model::Model;
+use crate::model::{Model, ask_twice};
+use tokio::io::AsyncWriteExt;
 use crate::sink::Finish;
 
 const POLL_EVERY: Duration = Duration::from_secs(5);
 const WORKFLOW_LIMIT: Duration = Duration::from_secs(10 * 60);
+const PAGE_RENDER_LIMIT: Duration = Duration::from_secs(30);
+const PAGE_IMAGE_SIDE: &str = "2400";
 /// Most pages of a PDF a lookup fetched that the Evidence Engine reads to check it.
 pub const MAX_CHECK_PAGES: usize = claims_elastic::MAX_DOCUMENT_PAGES;
 /// Chunks a check's search returns, best first, to find the one it cites.
@@ -33,7 +36,7 @@ const CITE_K: usize = 5;
 pub const ATTENDEE: &str = "attendee";
 pub const VENUE: &str = "venue";
 
-const TRANSCRIBE_SYSTEM: &str = "You transcribe one scanned page of an insurance document or a hospital report. \
+const TRANSCRIBE_SYSTEM: &str = "You transcribe one page of a medical history, health insurance card, insurance document or hospital report. \
 Write out every word printed on the page exactly as printed, in reading order, one printed line per line, \
 with the same numbers, signs and spelling. Keep table rows on one line. \
 Do not summarize, correct, explain or pick anything out, and add nothing that is not printed.";
@@ -85,7 +88,7 @@ async fn finish_report(ctx: &Ctx, job: &JobIn, answer: &Value, pages: Vec<String
     Ok(())
 }
 
-/// An error that carries the Claude calls made before it, so they are recorded.
+/// An error that carries the model calls made before it, so they are recorded.
 fn keep(calls: &mut Vec<ModelCallIn>) -> impl FnOnce(anyhow::Error) -> JobError + '_ {
     move |e| JobError { error: format!("{e:#}"), calls: std::mem::take(calls) }
 }
@@ -100,12 +103,12 @@ pub struct Read {
 
 /// Reads one PDF, given as its pages, in the Evidence Engine as `kind`. Each page
 /// goes through the extract pipeline unless all are stored already (a scan is
-/// first written out word for word by the Claude API), then the
+/// first transcribed through a private Elastic image workflow), then the
 /// `bandit-read-document` workflow reads it. An answer the same reader saved for
 /// this PDF and kind is used as it is, so a PDF a plan lookup checked is not read
 /// again when the module files it. With `chunks`, the policy (`attendee` or
 /// `venue`) of a PDF a lookup fetched, the page texts are cut into chunks in the
-/// clause index before the reader runs, once per PDF. The Claude calls made go
+/// clause index before the reader runs, once per PDF. The model calls made go
 /// into `calls`.
 pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[Vec<u8>], chunks: Option<&str>, calls: &mut Vec<ModelCallIn>) -> anyhow::Result<Read> {
     let (es, kibana) = ctx.reader().await.map_err(|e| anyhow!(e.error))?;
@@ -116,7 +119,8 @@ pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[V
         let scans: Vec<u32> = es.document_pages(hash).await?.iter().filter(|s| s.needs_transcription).map(|s| s.page).collect();
         for n in scans {
             let page = pages.get(n as usize - 1).with_context(|| format!("page {n} is not in the PDF"))?;
-            let text = transcribe(&ctx.claude, page, calls).await?;
+            let model = ctx.elastic_image_model().await.map_err(|e| anyhow!(e.error))?;
+            let text = transcribe(&model, page, calls).await?;
             es.put_page(hash, kind, n, page, Some(&text)).await?;
             tracing::info!(job_id = job.id, page = n, chars = text.len(), "scanned page transcribed");
         }
@@ -213,6 +217,31 @@ pub fn split_pages(pdf: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
             Ok(out)
         })
         .collect()
+}
+
+/// Page-numbered medical text for one private extraction request. This path does not write
+/// document pages, terms or chunks to Elastic. Image-bearing pages are transcribed in full:
+/// a scan can share a page with a selectable heading, so a nonempty text layer is insufficient.
+pub async fn private_page_texts<M: Model>(model: &M, pdf: &[u8], expected_pages: u32, calls: &mut Vec<ModelCallIn>) -> anyhow::Result<Vec<String>> {
+    let pages = split_pages(pdf)?;
+    if pages.is_empty() || pages.len() != expected_pages as usize {
+        bail!("the PDF has {} pages, not {expected_pages}", pages.len());
+    }
+    let mut texts = Vec::with_capacity(pages.len());
+    for page in pages {
+        let doc = lopdf::Document::load_mem(&page)?;
+        let text = doc.extract_text(&[1]).unwrap_or_default();
+        let contains_image = doc.objects.values().any(|object| {
+            object.as_stream().is_ok_and(|stream| stream.dict.get(b"Subtype").and_then(lopdf::Object::as_name).is_ok_and(|name| name == b"Image"))
+        });
+        let text = if contains_image || text.trim().is_empty() || text.contains('\u{fffd}') {
+            transcribe(model, &page, calls).await?
+        } else {
+            text.trim().to_string()
+        };
+        texts.push(text);
+    }
+    Ok(texts)
 }
 
 /// Pages `first` to `last` of `pdf`, 1-based and inclusive, as a PDF of their own.
@@ -327,24 +356,76 @@ pub fn clause_docs(p: &DocumentReadPayload, checked: &CheckedPolicy) -> Vec<Poli
         .collect()
 }
 
-/// The Claude API writes out one scanned page word for word. Every call, failed or not, goes into `calls`.
+/// Render one page locally without writing a private PDF or page image to disk. Poppler reads
+/// the PDF from stdin and writes one JPEG to stdout; cancellation kills the renderer.
+async fn page_image(page: &[u8]) -> anyhow::Result<Vec<u8>> {
+    if lopdf::Document::load_mem(page)?.get_pages().len() != 1 {
+        bail!("page transcription requires exactly one PDF page");
+    }
+    let mut child = tokio::process::Command::new("pdftoppm")
+        .args(["-f", "1", "-singlefile", "-scale-to", PAGE_IMAGE_SIDE, "-jpeg", "-jpegopt", "quality=95", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .context("starting PDF page renderer; install Poppler (pdftoppm)")?;
+    let mut input = child.stdin.take().context("PDF renderer has no input pipe")?;
+    let output = tokio::time::timeout(PAGE_RENDER_LIMIT, async {
+        let (_, output) = tokio::try_join!(
+            async move { input.write_all(page).await?; input.shutdown().await?; drop(input); Ok::<_, std::io::Error>(()) },
+            child.wait_with_output(),
+        )?;
+        Ok::<_, std::io::Error>(output)
+    }).await.context("PDF page rendering exceeded 30 seconds")??;
+    if !output.status.success() {
+        bail!("PDF page renderer failed: {}", String::from_utf8_lossy(&output.stderr).trim());
+    }
+    if output.stdout.is_empty() {
+        bail!("PDF page renderer produced no image");
+    }
+    bounded_jpeg(output.stdout)
+}
+
+/// Noisy scans can exceed the attachment byte limit even at a bounded page size. Reduce JPEG
+/// quality only when necessary, retaining the rendered dimensions and the whole page.
+fn bounded_jpeg(bytes: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+    if bytes.len() <= claims_elastic::images::MAX_IMAGE_BYTES {
+        return Ok(bytes);
+    }
+    let image = image::load_from_memory(&bytes).context("decoding the rendered page")?.into_rgb8();
+    for quality in [85, 70, 55, 40, 25] {
+        let mut smaller = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut smaller, quality).encode_image(&image).context("compressing the rendered page")?;
+        if smaller.len() <= claims_elastic::images::MAX_IMAGE_BYTES {
+            return Ok(smaller);
+        }
+    }
+    bail!("rendered page exceeds the Elastic image attachment limit after compression")
+}
+
+/// Elastic's private image workflow writes out one page word for word. Its temporary image is
+/// deleted by the adapter. Every attempt, including validation retries, goes into `calls`.
 async fn transcribe<M: Model>(model: &M, page: &[u8], calls: &mut Vec<ModelCallIn>) -> anyhow::Result<String> {
+    let jpeg = page_image(page).await?;
     let schema = json!({
         "type": "object",
         "properties": {"text": {"type": "string", "description": "every word on the page, as printed"}},
         "required": ["text"],
         "additionalProperties": false
     });
-    let request = MessageRequest::new().system(TRANSCRIBE_SYSTEM).pdf(page).text("Write out this page.").json_schema(schema);
-    let answer = match model.ask("document_transcribe", Effort::Low, request).await {
-        Ok(a) => a,
-        Err(f) => {
-            calls.push(f.call);
-            bail!("transcribing a scanned page: {}", f.error);
+    let request = || MessageRequest::new().system(TRANSCRIBE_SYSTEM).image(ImageType::Jpeg, &jpeg).text("Write out this page.").json_schema(schema.clone());
+    let tries = match ask_twice(model, "document_transcribe", Effort::Low, request, |v| {
+        v["text"].as_str().map(|text| text.trim().to_string()).ok_or_else(|| vec!["text must contain the page transcription as a string".into()])
+    }).await {
+        Ok(tries) => tries,
+        Err(mut error) => {
+            calls.append(&mut error.calls);
+            bail!("transcribing a scanned page: {}", error.error);
         }
     };
-    calls.push(answer.call);
-    Ok(answer.json["text"].as_str().unwrap_or_default().trim().to_string())
+    calls.extend(tries.calls);
+    tries.checked.map_err(|problems| anyhow!("transcribing a scanned page: {}", problems.join("; ")))
 }
 
 #[cfg(test)]
@@ -495,13 +576,111 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn private_text_pages_do_not_call_the_transcriber() {
+        let model = FakeModel::default();
+        let mut calls = Vec::new();
+        let texts = private_page_texts(&model, &pdf(&["Blood type: O+", "Allergies: none"]), 2, &mut calls).await.unwrap();
+        assert_eq!(texts, ["Blood type: O+", "Allergies: none"]);
+        assert!(calls.is_empty());
+        assert_eq!(model.calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn private_empty_page_uses_transcription_and_keeps_its_page_position() {
+        let model = FakeModel::new(vec![Ok(json!({"text": "Medication: loratadine 10 mg"}))]);
+        let mut calls = Vec::new();
+        let texts = private_page_texts(&model, &pdf(&["Blood type: O+", ""]), 2, &mut calls).await.unwrap();
+        assert_eq!(texts, ["Blood type: O+", "Medication: loratadine 10 mg"]);
+        assert_eq!(calls.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn private_image_page_is_transcribed_even_with_a_text_heading() {
+        let mut doc = Document::load_mem(&pdf(&["HEALTH RECORD"])).unwrap();
+        let image = doc.add_object(Stream::new(dictionary! {
+            "Type" => "XObject", "Subtype" => "Image", "Width" => 1, "Height" => 1,
+            "BitsPerComponent" => 8, "ColorSpace" => "DeviceGray",
+        }, vec![0]));
+        let page = *doc.get_pages().values().next().unwrap();
+        let inherited = doc.get_page_resources(page).unwrap().1;
+        let resources = inherited[0];
+        doc.get_object_mut(resources).unwrap().as_dict_mut().unwrap().set("XObject", dictionary! {"Scan" => image});
+        let mut bytes = Vec::new();
+        doc.save_to(&mut bytes).unwrap();
+        let model = FakeModel::new(vec![Ok(json!({"text": "HEALTH RECORD\nBlood type: O+"}))]);
+        let mut calls = Vec::new();
+        let texts = private_page_texts(&model, &bytes, 1, &mut calls).await.unwrap();
+        assert_eq!(texts, ["HEALTH RECORD\nBlood type: O+"]);
+        assert_eq!(calls.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn private_transcription_failure_keeps_the_call_record() {
+        let model = FakeModel::new(vec![Err("transcription unavailable".into())]);
+        let mut calls = Vec::new();
+        let error = private_page_texts(&model, &pdf(&[""]), 1, &mut calls).await.unwrap_err();
+        assert!(error.to_string().contains("transcription unavailable"));
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].kind, "document_transcribe");
+        assert_eq!(calls[0].status, "error");
+    }
+
+    #[tokio::test]
+    async fn private_page_count_is_checked_before_transcription() {
+        let model = FakeModel::default();
+        let mut calls = Vec::new();
+        assert!(private_page_texts(&model, &pdf(&[""]), 2, &mut calls).await.unwrap_err().to_string().contains("not 2"));
+        assert_eq!(model.calls(), 0);
+        assert!(calls.is_empty());
+    }
+
+    #[tokio::test]
+    async fn renders_one_pdf_page_as_a_bounded_jpeg() {
+        let jpeg = page_image(&pdf(&["Allergy: penicillin; reaction: hives"])).await.unwrap();
+        let image = image::load_from_memory(&jpeg).unwrap();
+        assert!(jpeg.starts_with(&[0xff, 0xd8]));
+        assert_eq!(image.width().max(image.height()), 2400);
+        assert!(jpeg.len() <= claims_elastic::images::MAX_IMAGE_BYTES);
+        assert!(page_image(&pdf(&["one", "two"])).await.unwrap_err().to_string().contains("exactly one"));
+    }
+
+    #[test]
+    fn compresses_a_noisy_page_to_the_attachment_limit_without_cropping() {
+        let mut state = 17_u32;
+        let image = image::RgbImage::from_fn(2400, 2400, |_, _| {
+            let mut next = || { state = state.wrapping_mul(1664525).wrapping_add(1013904223); (state >> 24) as u8 };
+            image::Rgb([next(), next(), next()])
+        });
+        let mut large = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut large, 100).encode_image(&image).unwrap();
+        assert!(large.len() > claims_elastic::images::MAX_IMAGE_BYTES);
+        let jpeg = bounded_jpeg(large).unwrap();
+        assert!(jpeg.len() <= claims_elastic::images::MAX_IMAGE_BYTES);
+        let decoded = image::load_from_memory(&jpeg).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (2400, 2400));
+        assert_eq!(bounded_jpeg(jpeg.clone()).unwrap(), jpeg, "normal pages keep their original encoding");
+    }
+
+    #[tokio::test]
+    async fn malformed_transcription_retries_and_records_both_attempts() {
+        let model = FakeModel::new(vec![Ok(json!({"text": 14})), Ok(json!({"text": "Member ID: A100"}))]);
+        let mut calls = Vec::new();
+        let text = transcribe(&model, &pdf(&["Member ID: A100"]), &mut calls).await.unwrap();
+        assert_eq!(text, "Member ID: A100");
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[1].kind, "document_transcribe_retry");
+        assert!(model.text_of(1).contains("text must contain the page transcription as a string"));
+    }
+
+    #[tokio::test]
     async fn a_scan_is_written_out_by_the_model() {
         let model = FakeModel::new(vec![Ok(json!({"text": "  EXCLUSIONS\nThis insurance does not apply.  "}))]);
         let mut calls = Vec::new();
-        let text = transcribe(&model, b"%PDF-1.5", &mut calls).await.unwrap();
+        let text = transcribe(&model, &pdf(&["EXCLUSIONS"]), &mut calls).await.unwrap();
         assert_eq!(text, "EXCLUSIONS\nThis insurance does not apply.");
         assert_eq!((calls.len(), calls[0].kind.as_str()), (1, "document_transcribe"));
         let body = model.body(0);
-        assert_eq!(body["messages"][0]["content"][0]["type"], "document");
+        assert_eq!(body["messages"][0]["content"][0]["type"], "image");
+        assert_eq!(body["messages"][0]["content"][0]["source"]["media_type"], "image/jpeg");
     }
 }

@@ -1,7 +1,7 @@
-//! `photo_features`: Claude looks at an event photo and reports how many people it shows and a one-line
+//! `photo_features`: Elastic runs visual extraction on an event photo and reports a person count and a one-line
 //! caption. The module cuts the photo's tags to that many people, the ones the bands put closest together,
 //! and uses the caption when the photographer gave none. Who is in the photo always comes from the bands:
-//! Claude counts people and never says who anyone is.
+//! The model counts people and never says who anyone is.
 
 use claude_client::{Effort, ImageType, MessageRequest};
 use image::ImageReader;
@@ -14,7 +14,7 @@ use crate::prompts::escape;
 use crate::sink::Finish;
 
 pub const KIND: &str = "photo_features";
-/// Longest side of the image sent to Claude.
+/// Longest side of the image sent for visual extraction.
 const MAX_SIDE: u32 = 1568;
 const CAPTION_CHARS: usize = 120;
 const MAX_PEOPLE: u64 = 200;
@@ -111,8 +111,9 @@ pub async fn read<M: Model>(model: &M, jpeg: &[u8], p: &Payload) -> Result<Tries
 pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
     let bytes = ctx.blobs.get(&p.blob_hash).map_err(|e| JobError::msg(format!("reading photo {}: {e}", p.blob_hash)))?;
     let jpeg = shrink(&bytes)?;
-    let tries = read(&ctx.claude, &jpeg, &p).await?;
-    let (people_count, caption) = tries.checked.map_err(|e| JobError::msg(e.join("; ")))?;
+    let model = ctx.elastic_image_model().await?;
+    let tries = read(&model, &jpeg, &p).await?;
+    let (people_count, caption) = tries.checked.map_err(|e| JobError { error: e.join("; "), calls: tries.calls.clone() })?;
     tracing::info!(job_id = job.id, photo_id = p.photo_id, people_count, %caption, "photo read");
     ctx.sink.finish(job.id, Finish::PhotoFeatures { people_count, caption }, tries.calls).await?;
     Ok(())
@@ -150,6 +151,8 @@ mod tests {
     #[test]
     fn counts_out_of_range_are_rejected() {
         assert!(check(&json!({"people_count": -1, "caption": "A booth"})).is_err());
+        assert!(check(&json!({"people_count": 201, "caption": "A crowd"})).is_err());
+        assert_eq!(check(&json!({"people_count": 200, "caption": "A crowd"})), Ok((200, "A crowd".into())));
         assert!(check(&json!({"people_count": 4, "caption": ""})).is_err());
         assert_eq!(check(&json!({"people_count": 0, "caption": "An empty booth"})), Ok((0, "An empty booth".into())));
     }

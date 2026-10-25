@@ -4,6 +4,14 @@ One branch (`vik-e2e`) with the pipeline, insurance, social and merch work and t
 
 ## Start
 
+Scanned PDFs use Poppler's `pdftoppm` to render page images for the Evidence Engine. Install it before starting local workers:
+
+```sh
+brew install poppler
+```
+
+The Debian deployment installs `poppler-utils` and checks `pdftoppm` before restarting workers.
+
 `scripts/run` does it all in one command: it sets up the database the first time, starts the services and opens the host portal and band 94's tap link (Maincloud by default, `E2E_TARGET=local` for the private server). The pieces:
 
 ```sh

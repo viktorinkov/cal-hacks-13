@@ -1,6 +1,6 @@
 //! Bright Data for the jobs that start from a name: the Web MCP's search and the Web Unlocker's raw
 //! answers (a page's HTML, or a file's bytes). Used by `venue_setup`, `venue_policy_lookup` and
-//! `plan_lookup` (an attendee's health plan only).
+//! `attendee_policy_lookup` (an attendee's health plan only).
 
 use std::collections::HashSet;
 use std::sync::LazyLock;

@@ -1,4 +1,4 @@
-//! `claim_draft` and `recovery_letter`: Claude drafts, code checks every
+//! `claim_draft` and `recovery_letter`: Elastic Workflows draft, code checks every
 //! figure, fact id and heading, and a template stands in for any letter that
 //! still fails after one retry.
 
@@ -33,14 +33,11 @@ impl Letters {
 }
 
 pub async fn run_draft(ctx: &Ctx, job: &JobIn, p: DraftPayload) -> Result<(), JobError> {
-    let letters = match draft_letters(&ctx.claude, &p.letter).await {
-        Ok(l) => l,
-        Err(e) if job.last_attempt() => {
-            tracing::warn!(job_id = job.id, error = %e.error, "Claude unavailable on the last attempt, using the templates");
-            Letters::templates(&p.letter, e.calls)
-        }
-        Err(e) => return Err(e),
-    };
+    let result = async {
+        let model = ctx.elastic_model().await?;
+        draft_letters(&model, &p.letter).await
+    }.await;
+    let letters = draft_attempt(result, job, &p.letter)?;
     tracing::info!(
         job_id = job.id,
         from_model = ?letters.from_model,
@@ -64,18 +61,40 @@ pub async fn run_draft(ctx: &Ctx, job: &JobIn, p: DraftPayload) -> Result<(), Jo
 }
 
 pub async fn run_recovery(ctx: &Ctx, job: &JobIn, p: RecoveryPayload) -> Result<(), JobError> {
-    let (text, from_model, calls) = match recovery_letter(&ctx.claude, &p.letter).await {
-        Ok(r) => r,
-        Err(e) if job.last_attempt() => {
-            tracing::warn!(job_id = job.id, error = %e.error, "Claude unavailable on the last attempt, using the template");
-            (recovery_template(&p.letter), false, e.calls)
-        }
-        Err(e) => return Err(e),
-    };
+    let result = async {
+        let model = ctx.elastic_model().await?;
+        recovery_letter(&model, &p.letter).await
+    }.await;
+    let (text, from_model, calls) = recovery_attempt(result, job, &p.letter)?;
     tracing::info!(job_id = job.id, from_model, first_line = first_line(&text), "recovery letter drafted");
     let hash = store(ctx, &text).await?;
     ctx.sink.finish(job.id, Finish::RecoveryLetter { hash }, calls).await?;
     Ok(())
+}
+
+// Setup failures follow the same job retry and final-attempt fallback as failed calls.
+fn draft_attempt(result: Result<Letters, JobError>, job: &JobIn, d: &LetterData) -> Result<Letters, JobError> {
+    match result {
+        Ok(letters) => Ok(letters),
+        Err(e) if job.last_attempt() => {
+            tracing::warn!(job_id = job.id, error = %e.error, "Elastic unavailable on the last attempt, using the templates");
+            Ok(Letters::templates(d, e.calls))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+type RecoveryDraft = (String, bool, Vec<ModelCallIn>);
+
+fn recovery_attempt(result: Result<RecoveryDraft, JobError>, job: &JobIn, d: &LetterData) -> Result<RecoveryDraft, JobError> {
+    match result {
+        Ok(letter) => Ok(letter),
+        Err(e) if job.last_attempt() => {
+            tracing::warn!(job_id = job.id, error = %e.error, "Elastic unavailable on the last attempt, using the template");
+            Ok((recovery_template(d), false, e.calls))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Stores a letter as a UTF-8 text blob and registers it with the module.
@@ -188,7 +207,7 @@ fn recovery_problems(r: &RecoveryLetter, d: &LetterData) -> Vec<String> {
 
 /// Drafts the recovery letter; returns its text, whether the model's text
 /// was kept, and the calls.
-pub async fn recovery_letter<M: Model>(model: &M, d: &LetterData) -> Result<(String, bool, Vec<ModelCallIn>), JobError> {
+pub async fn recovery_letter<M: Model>(model: &M, d: &LetterData) -> Result<RecoveryDraft, JobError> {
     let system = prompts::recovery_system();
     let prompt = prompts::recovery_prompt(d);
     let request = || MessageRequest::new().system(system.clone()).text(prompt.clone()).json_schema(recovery_letter_schema());
@@ -271,6 +290,74 @@ mod tests {
         let l = draft_letters(&model, &d).await.unwrap();
         assert_eq!(l.from_model, [false; 3]);
         assert!(model.text_of(1).contains("cited fact 404 is not in the pack"));
+    }
+
+    fn job(attempts: u8) -> JobIn {
+        JobIn { id: 42, kind: "claim_draft".into(), payload: String::new(), attempts, max_attempts: 3 }
+    }
+
+    #[tokio::test]
+    async fn unavailable_drafting_retries_until_the_last_job_attempt() {
+        let d = testdata::letter_data();
+        let model = FakeModel::new(vec![Err("workflow unavailable".into())]);
+        let result = draft_letters(&model, &d).await;
+        let error = draft_attempt(result, &job(2), &d).unwrap_err();
+        assert_eq!(error.calls.len(), 1);
+        assert_eq!(error.calls[0].status, "error");
+        assert!(error.error.contains("workflow unavailable"));
+
+        let model = FakeModel::new(vec![Err("workflow unavailable".into())]);
+        let result = draft_letters(&model, &d).await;
+        let letters = draft_attempt(result, &job(3), &d).unwrap();
+        assert_eq!(letters.from_model, [false; 3]);
+        assert_eq!(letters.fnol, fnol_template(&d));
+        assert_eq!(letters.summary, summary_template(&d));
+        assert_eq!(letters.determination, determination_template(&d));
+        assert_eq!(letters.calls.len(), 1);
+        assert_eq!(letters.calls[0].status, "error");
+
+        let setup_error = JobError::msg("KIBANA_URL is not set");
+        assert_eq!(draft_attempt(Err(setup_error), &job(3), &d).unwrap().from_model, [false; 3]);
+    }
+
+    #[tokio::test]
+    async fn failed_correction_keeps_both_audit_calls_in_final_fallback() {
+        let d = testdata::letter_data();
+        let mut bad = good(&d);
+        bad["cited_fact_ids"] = json!([404]);
+        let model = FakeModel::new(vec![Ok(bad), Err("workflow timed out".into())]);
+        let result = draft_letters(&model, &d).await;
+        let letters = draft_attempt(result, &job(3), &d).unwrap();
+        assert_eq!(letters.from_model, [false; 3]);
+        assert_eq!(letters.calls.len(), 2);
+        assert_eq!(letters.calls[1].kind, "claim_draft_retry");
+        assert_eq!(letters.calls[1].status, "error");
+    }
+
+    #[tokio::test]
+    async fn recovery_rejects_unknown_citations_and_unavailable_execution() {
+        let d = testdata::recovery_data();
+        let bad = json!({"stance": "query", "subject": "Claim 900104", "body": "Was your team at Stage B?", "cited_fact_ids": [404]});
+        let model = FakeModel::new(vec![Ok(bad.clone()), Ok(bad)]);
+        let (text, from_model, calls) = recovery_letter(&model, &d).await.unwrap();
+        assert!(!from_model);
+        assert_eq!(text, recovery_template(&d));
+        assert_eq!(calls.len(), 2);
+        assert!(model.text_of(1).contains("cited fact 404 is not in the pack"));
+
+        let model = FakeModel::new(vec![Err("workflow unavailable".into())]);
+        let result = recovery_letter(&model, &d).await;
+        let error = recovery_attempt(result, &job(1), &d).unwrap_err();
+        assert_eq!(error.calls.len(), 1);
+
+        let model = FakeModel::new(vec![Err("workflow unavailable".into())]);
+        let result = recovery_letter(&model, &d).await;
+        let (text, from_model, calls) = recovery_attempt(result, &job(3), &d).unwrap();
+        assert!(!from_model);
+        assert_eq!(text, recovery_template(&d));
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].status, "error");
+        assert!(!recovery_attempt(Err(JobError::msg("KIBANA_URL is not set")), &job(3), &d).unwrap().1);
     }
 
     #[tokio::test]

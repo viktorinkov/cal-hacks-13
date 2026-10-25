@@ -1,6 +1,8 @@
 # Medical card
 
-The medical card is the attendee's own health information, the "Wrist assured" card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker sends each to the Anthropic Claude API, which returns the card fields with the page each item came from. In the design, The Evidence Engine reads the insurance card instead, like every insurance document, because the attendee's own policy is the other insurance on their claim (next to build, [Insurance](Insurance.md#reading-the-insurance-documents-next-to-build)).
+The medical card is the attendee's own health information, the "Wrist assured" card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker extracts each PDF's page text and sends it to an Elastic Workflow, which returns the card fields with the page each item came from.
+
+Both kinds use the Evidence Engine for structured extraction. Pages containing images, missing text or unreadable characters first go through Elastic's private image workflow for transcription so scanned content is preserved.
 
 Code checks the answer and writes it into the attendee's one `medical_card`, which the attendee checks once before setup ends. A medic sees the card by tapping the attendee's band with their phone, or from the incident desk in the organizer portal (/organizer), and every tap is written to `medical_access_log`.
 
@@ -23,8 +25,8 @@ Non-responsibilities:
 - The setup screens, their order and the tap's landing route: [Tap-Page](../5-apps/Tap-Page.md). This file defines what the upload, document and card steps and the medic view call and show.
 - The incident desk and its layout: [Organizer-Portal](../5-apps/Organizer-Portal.md). This file defines what the medical card part calls and shows.
 - The blob store and the upload route: [Rust-Backend](../3-services/Rust-Backend.md).
-- The venue's insurance policy and claims: [Insurance](Insurance.md). The health insurance on the card is the attendee's own policy. A claim the attendee filed uses its insurer, member id, copays and clauses, read by The Evidence Engine (next to build); Insurance never reads the medical history.
-- Calling the Anthropic Claude API, `ask_twice`, recording in `model_call`: [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md).
+- The venue's insurance policy and claims: [Insurance](Insurance.md). A claim uses the insurer and member id from the card. The Evidence Engine reads copays and coverage clauses from the attendee's separate health plan document; Insurance never reads the medical history.
+- The Elastic Workflow executions for image transcription and structured extraction: [Elastic](../7-integrations/Elastic.md). Each attempt has a `model_call` audit record.
 
 ## Interfaces
 
@@ -34,7 +36,8 @@ Non-responsibilities:
 | `register_blob` (core) | out | `bandit-api` (role `api`) | the SHA-256, owner = the attendee, access class `owner_only`, purpose `history` or `insurance`, content type, size | SpacetimeDB reducer ([SpacetimeDB](../2-data/SpacetimeDB.md)) |
 | `submit_medical_document` | in | the attendee (own identity) | kind (`history` or `insurance`), the file hash, the page count | reducer; writes `medical_document`, enqueues `medical_extract` |
 | Job `medical_extract` | out | `bandit-workers` | payload: document id, kind, file hash, page count | `job` table |
-| Anthropic Claude API (Messages) | out | `bandit-workers` through `claude-client` | the PDF, the prompt naming the kind and the page count, one JSON schema; the answer back | HTTPS ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)) |
+| Elastic Workflow `bandit-run-task` | out | `bandit-workers` through its Elastic adapter | private page-numbered text, the document kind and one JSON schema; structured card fields back | HTTPS to Kibana |
+| Elastic image workflow | out | `bandit-workers`, only when a page needs transcription | one page rendered as JPEG and a word-for-word transcription schema; page text back, temporary image deleted | HTTPS to Kibana |
 | `apply_medical_extract` | in | role `worker` | job id, the checked card as JSON, the model call | reducer; refuses a job the caller does not hold |
 | `confirm_medical_card` | in | the attendee (own identity), in setup | nothing | reducer |
 | View `my_medical_documents` | out | the attendee, the card step of setup | own `medical_document` rows | subscription |
@@ -74,7 +77,8 @@ sequenceDiagram
   participant S as Blob store
   participant M as band1t module
   participant W as bandit-workers
-  participant C as Anthropic Claude API
+  participant C as Elastic image workflow
+  participant E as Elastic Workflow
   A->>API: POST /api/blobs?purpose=history (PDF, x-bandit-session)
   API->>S: write PDF
   API->>M: register_blob (owner_only, owner = attendee)
@@ -83,15 +87,27 @@ sequenceDiagram
   M->>M: medical_document reading, job medical_extract
   W->>M: claim_job (medical_extract)
   W->>S: read PDF by hash
-  W->>C: PDF, prompt with the kind, one JSON schema, effort low
-  C-->>W: card fields, each item with its page
+  W->>W: split PDF, verify page count, read text layers
+  opt Page contains images or has no readable text
+    W->>W: render page as JPEG through Poppler
+    W->>C: page image, transcribe word for word
+    C-->>W: page text
+  end
+  W->>E: page-numbered text, document kind, card schema
+  E-->>W: card fields, each item with its page
   W->>W: check in code, items without a page go to dropped
   W->>M: apply_medical_extract (card JSON, model call)
   M->>M: history fields on the card, card extracted, document read
   M-->>A: my_medical_card, my_medical_documents
 ```
 
-The worker gets the PDF from the blob store by its hash and asks the Anthropic Claude API with the default model in `claude-client`, effort low, the PDF, and one JSON schema for both kinds. The prompt says which kind it is and how many pages the document has.
+The worker gets the PDF from the blob store by its hash, splits it into pages and verifies the recorded page count. It reads selectable text locally. A page with an image, missing text or unreadable characters is rendered locally through Poppler and sent to Elastic's private image workflow for word-for-word transcription, including pages with both a selectable heading and a scan.
+
+Poppler reads the PDF and returns a JPEG through pipes; the worker creates no temporary local document or image file. The image keeps the full page at a maximum side of 2400 pixels. An image over the attachment byte limit is recompressed at the same dimensions before upload.
+
+The worker sends all pages, each with its original 1-based page number, to the Elastic Workflow `bandit-run-task`. Its `ai.prompt` step receives one JSON schema for both kinds, with the kind in the prompt. Both workflows use the configured Elastic model connector. The worker makes no direct Anthropic API call in either path. Elastic may use an Anthropic model behind that connector, and the audit records the connector actually reported.
+
+These private pages are passed only to their workflow executions. The image workflow runs with private access and deletes each temporary uploaded image after its attempt, including failed attempts and validation retries. This path never indexes medical history or card text in the shared policy pages, terms or searchable clause corpus. Kibana retains the workflow execution according to its configured retention; the attendee and medic access rules below still control the application card.
 
 The system prompt says to copy only what is printed, to cite the page of every item, and to leave a field empty rather than guess. The schema asks for:
 
@@ -107,13 +123,14 @@ The system prompt says to copy only what is printed, to cite the page of every i
 
 Code then checks the answer and turns it into card fields:
 
+- Required lists, text fields and nested objects must have the expected shape. An empty object cannot clear the existing card.
 - Blood type outside the list becomes `unknown`.
 - Each list keeps at most 20 items. Each item becomes one text line that ends with its page, such as "Penicillin: hives (p. 1)". An item whose page is not between 1 and the page count goes to `dropped` instead, as "allergies: Latex: rash (no page on the document)".
 - The emergency contact needs a page. It becomes one line, "Ana Minchev (mother), +18055550142", with the phone cut to digits and the plus sign.
 - The insurance needs a page, or its fields stay empty. Its phone becomes `insurer_phone`.
 - Notes are cut to 1000 characters.
 
-The check runs through `ask_twice` ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)): when it rejects the answer, the worker asks the Anthropic Claude API once more with the first answer and the problems. A failed Anthropic Claude API call fails the attempt, and the job queue tries again up to its last attempt.
+The check runs through `ask_twice`: when it rejects the answer, the worker starts one more Elastic Workflow execution with the first answer and the problems. A failed extraction or transcription fails the attempt, and the job queue tries again up to its last attempt. Both failed and successful calls remain in the job audit.
 
 `apply_medical_extract` (role `worker`, the job must be leased by the caller) records the model call. It merges the fields of the document's kind into the attendee's card, creating the card when there is none.
 
@@ -179,7 +196,7 @@ flowchart TD
 
 | Table | One row is | Fields |
 |---|---|---|
-| `medical_document` | one uploaded PDF | `id`, `attendee`, `kind` (`history`, `insurance`), `file_hash`, `page_count`, `status` (`reading`, `read`, `failed`), `job_id`, `model_call_id`, `dropped` (the items the Anthropic Claude API returned without a page on the document), `uploaded_at` |
+| `medical_document` | one uploaded PDF | `id`, `attendee`, `kind` (`history`, `insurance`), `file_hash`, `page_count`, `status` (`reading`, `read`, `failed`), `job_id`, `model_call_id`, `dropped` (the items the reader returned without a page on the document), `uploaded_at` |
 | `medical_card` | one attendee's card, keyed by `attendee` | `attendee`, `blood_type`, `allergies`, `conditions`, `medications` (each a list of text lines ending with their page), `emergency_contact` (one line), `insurer`, `plan`, `member_id`, `group_number`, `insurer_phone`, `notes`, `status` (`extracted`, `confirmed`), `updated_at` |
 | `medical_access_log` | one medic tap | `id`, `reader`, `attendee`, `band_id`, `incident_id`, `granted`, `reason`, `read_at` |
 
@@ -201,7 +218,7 @@ flowchart TD
 | Failure | Effect | Design answer |
 |---|---|---|
 | Model invents an item | wrong data on a medic's screen | every item needs a page on the document or it goes to `dropped`; the attendee checks the card before "Looks right" |
-| An Anthropic Claude API call fails | no reading | the job queue tries again; after its last attempt the document stays `reading`, the card step shows "Check later", and setup goes on to the wallet |
+| An Elastic Workflow execution or page transcription fails | no reading | the job queue tries again; after its last attempt the document stays `reading`, the card step shows "Check later", and setup goes on to the wallet |
 | Answer is not readable card JSON | no reading for that document | the document is `failed`; the card step shows what the other document gave and "One document could not be read." |
 | Attendee never confirms | card not checked by the attendee | the medic still sees it, labelled "not yet confirmed by the wearer", because a card with a caveat beats no card in an emergency |
 | A medic taps a band nobody wears | nothing to show | the reducer refuses "nobody wears that band"; the medic view shows "Nobody wears band <band code>." with "Tap again" |
@@ -215,7 +232,8 @@ flowchart TD
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `band_owner`, `attendee`, `staff_role`, `owner`, `job`, `blob_ref` with access classes, `register_blob`, `api_session`, views keyed on the caller.
 - [Safety](Safety.md): `incident` kinds and whether it is resolved, `open_incidents`, `assign_medic`.
 - [Rust-Backend](../3-services/Rust-Backend.md): `POST /api/blobs` with the purposes `history` and `insurance`, the `/test-records` route, the blob store, and the `bandit-workers` shell.
-- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, `ask_twice`, `model_call`. Without it no document is read and there is no card.
+- [Elastic](../7-integrations/Elastic.md): the structured extraction workflow and configured model connector. Without it neither document kind can be extracted.
+- Poppler (`pdftoppm`): local PDF-page rendering for image transcription. The VM installs `poppler-utils`; text-only pages bypass rendering and image upload.
 - [Tap-Page](../5-apps/Tap-Page.md): the document steps and the card step of setup, and the landing route that sends a medic's tap to the medic view.
 - [Organizer-Portal](../5-apps/Organizer-Portal.md): the incident desk in the Claims tab, where the medic view's link leads.
 
@@ -229,7 +247,7 @@ flowchart TD
 - Drop `medical_document`, `medical_card`, `medical_access_log`, the reducers and views above, the job kind `medical_extract`, and the purposes `history` and `insurance` of `POST /api/blobs` and of `blob_ref` in SpacetimeDB.md.
 - Remove the Medical-Card.md rows in Tap-Page.md: the two document steps, the card step, the medic view line, node and decision, and the interface row. Setup goes from the socials to "Are you one of these?" and then the wallet, and a medic's tap is like anyone's.
 - Remove the Medical-Card.md rows in Organizer-Portal.md: the medical card in the incident desk and the "Medical access log (Medical-Card.md)" panel row.
-- Remove the medical card use case from Anthropic-Claude-API.md.
+- Remove the medical card extraction and page transcription use cases from Elastic.md.
 - Remove the Medical-Card.md rows from the route and handler registries and the `/test-records` row in Rust-Backend.md, the Medical-Card.md rows from the registry tables in SpacetimeDB.md, the Medical-Card.md rows in Safety.md, the Medical-Card.md steps and the medic's Medical-Card.md line in Flows.md, the Medical-Card.md line in Hardware.md, the Medical-Card.md rows in Requirements.md and Architecture.md, and the Medical-Card row and node in README.md.
 
 ## Decisions
@@ -247,4 +265,7 @@ flowchart TD
 | The attendee sees the card only on the card step in setup | during the event the tap page is the thank-you screen; the card is for medics |
 | There is no manual form | the PDF is the source; when it cannot be read the attendee goes on without a card |
 | An unconfirmed card is still shown to a medic, labelled | a card with a caveat beats no card in an emergency |
-| Effort low for the reading | it copies printed fields; there is nothing to reason about |
+| Elastic owns both document kinds' structured extraction | the same page-to-schema workflow, validation and execution history apply to medical history and insurance cards |
+| Elastic also transcribes pages that need visual reading | the verified image workflow accepts a locally rendered page, so scans use the same controlled workflow system as text extraction |
+| Code renders one page at a time through pipes and preserves its page number | mixed text and scanned PDFs keep their original order without leaving temporary medical files on disk |
+| Medical text is passed to one workflow execution without shared indexing | extraction needs only this attendee's document; policy search must never retrieve another person's medical history |

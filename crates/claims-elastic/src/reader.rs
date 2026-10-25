@@ -61,18 +61,42 @@ impl Kibana {
     }
 
     /// Polls an execution every `every` until it is done, for at most `limit`.
+    /// A local timeout or polling failure requests cancellation of this exact
+    /// execution before returning, so a job retry does not abandon model work.
     pub async fn wait_for(&self, execution_id: &str, every: Duration, limit: Duration) -> Result<Value> {
         let path = format!("api/workflows/executions/{execution_id}?includeOutput=true");
         let deadline = Instant::now() + limit;
         loop {
-            let execution = self.call(Method::GET, &path, None).await?;
+            let execution = match self.call(Method::GET, &path, None).await {
+                Ok(execution) => execution,
+                Err(error) => return Err(self.cancel_after_error(execution_id, error).await),
+            };
             if execution["status"].as_str().is_some_and(|s| DONE.contains(&s)) {
                 return Ok(execution);
             }
             if Instant::now() > deadline {
-                bail!("workflow execution {execution_id} is still {} after {} s", execution["status"], limit.as_secs());
+                let error = anyhow::anyhow!("workflow execution {execution_id} is still {} after {} s", execution["status"], limit.as_secs());
+                return Err(self.cancel_after_error(execution_id, error).await);
             }
             tokio::time::sleep(every).await;
+        }
+    }
+
+    /// Requests cancellation through the documented workflow execution API.
+    /// Acceptance is not a claim that the underlying model stopped immediately.
+    pub async fn cancel_workflow(&self, execution_id: &str) -> Result<()> {
+        let response = self.req(Method::POST, &format!("api/workflows/executions/{execution_id}/cancel"))
+            .timeout(Duration::from_secs(10)).send().await.context("requesting workflow cancellation")?;
+        if !response.status().is_success() {
+            bail!("cancelling workflow execution {execution_id} returned {}", response.status());
+        }
+        Ok(())
+    }
+
+    async fn cancel_after_error(&self, execution_id: &str, error: anyhow::Error) -> anyhow::Error {
+        match self.cancel_workflow(execution_id).await {
+            Ok(()) => error.context(format!("cancellation requested for workflow execution {execution_id}")),
+            Err(cancel) => error.context(format!("workflow execution {execution_id} cancellation was not confirmed: {cancel:#}")),
         }
     }
 
@@ -103,7 +127,27 @@ impl Kibana {
         Ok(())
     }
 
-    fn req(&self, method: Method, path: &str) -> RequestBuilder {
+    /// Installs a workflow containing per-person inputs and restricts its
+    /// execution history to the owning API identity. The Files/Workflows
+    /// access-control endpoint currently requires Kibana's internal header.
+    pub(crate) async fn ensure_private_workflow(&self, id: &str, yaml: &str) -> Result<()> {
+        self.ensure_workflow(id, yaml).await?;
+        let response = self.req(Method::PUT, &format!("internal/workflows/{id}/access_control"))
+            .header("x-elastic-internal-origin", "Kibana")
+            .json(&json!({"access_mode": "private", "entries": []}))
+            .send().await.context("restricting workflow access")?;
+        let status = response.status();
+        if !status.is_success() {
+            bail!("restricting workflow {id} access returned {status}");
+        }
+        let value: Value = response.json().await.context("reading workflow access confirmation")?;
+        if value["access_control"]["access_mode"] != "private" {
+            bail!("workflow {id} did not confirm private access");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn req(&self, method: Method, path: &str) -> RequestBuilder {
         self.http.request(method, format!("{}/{path}", self.url)).header(AUTHORIZATION, self.auth.clone()).header("kbn-xsrf", "true")
     }
 
@@ -116,7 +160,7 @@ impl Kibana {
         }
     }
 
-    async fn call(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value> {
+    pub(crate) async fn call(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value> {
         let mut req = self.req(method.clone(), path);
         if let Some(b) = &body {
             req = req.json(b);
@@ -195,6 +239,67 @@ mod tests {
             {"stepId": "read", "error": "agent timed out"}
         ]});
         assert_eq!(failure(&e), "ended failed: read: \"agent timed out\"");
+    }
+
+    fn polling_server(responses: Vec<(u16, Value)>) -> (Kibana, std::thread::JoinHandle<Vec<String>>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, body) in responses {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock && Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
+                        Err(error) => panic!("expected workflow request: {error}"),
+                    }
+                };
+                stream.set_nonblocking(false).unwrap();
+                stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                let mut bytes = Vec::new();
+                while !bytes.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                    let mut chunk = [0_u8; 4096];
+                    let n = stream.read(&mut chunk).unwrap();
+                    assert!(n > 0);
+                    bytes.extend_from_slice(&chunk[..n]);
+                }
+                requests.push(String::from_utf8(bytes).unwrap().lines().next().unwrap().to_string());
+                let body = body.to_string();
+                write!(stream, "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+            requests
+        });
+        (Kibana::new(&url, "test-key").unwrap(), server)
+    }
+
+    #[tokio::test]
+    async fn timeout_cancels_only_the_execution_being_polled() {
+        let (kibana, server) = polling_server(vec![(200, json!({"status": "running"})), (200, json!({}))]);
+        let error = kibana.wait_for("owned-execution", Duration::ZERO, Duration::ZERO).await.unwrap_err();
+        assert!(format!("{error:#}").contains("cancellation requested"));
+        assert_eq!(server.join().unwrap(), [
+            "GET /api/workflows/executions/owned-execution?includeOutput=true HTTP/1.1",
+            "POST /api/workflows/executions/owned-execution/cancel HTTP/1.1",
+        ]);
+    }
+
+    #[tokio::test]
+    async fn polling_failure_preserves_error_and_reports_rejected_cancellation() {
+        let (kibana, server) = polling_server(vec![(500, json!({"message": "poll failed"})), (403, json!({}))]);
+        let error = kibana.wait_for("owned-execution", Duration::ZERO, Duration::from_secs(5)).await.unwrap_err();
+        let message = format!("{error:#}");
+        assert!(message.contains("500") && message.contains("403") && message.contains("not confirmed"), "{message}");
+        assert_eq!(server.join().unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn finished_execution_does_not_request_cancellation() {
+        let (kibana, server) = polling_server(vec![(200, json!({"status": "completed"}))]);
+        assert_eq!(kibana.wait_for("owned-execution", Duration::ZERO, Duration::from_secs(5)).await.unwrap()["status"], "completed");
+        assert_eq!(server.join().unwrap().len(), 1);
     }
 
     #[test]

@@ -1,7 +1,6 @@
 //! A plan lookup inside an in-memory module: the attendee names their plan, the worker finds its PDF
-//! or nothing, a found health plan lands on the medical card and a found belongings policy becomes their
-//! own policy, a plan already found is found at once for the next attendee, and a lookup that keeps
-//! failing ends failed.
+//! or nothing, a found health plan lands on the medical card, a plan already found is found at once
+//! for the next attendee, and a lookup that keeps failing ends failed.
 
 use super::*;
 use crate::insurance::documents::*;
@@ -41,7 +40,7 @@ impl World {
     }
 
     fn lease(&self) -> Job {
-        let job = self.t.db.job().iter().filter(|j| j.kind == KIND_PLAN_LOOKUP && j.status == JobStatus::Queued).max_by_key(|j| j.id).expect("a queued plan lookup");
+        let job = self.t.db.job().iter().filter(|j| is_lookup_kind(&j.kind) && j.status == JobStatus::Queued).max_by_key(|j| j.id).expect("a queued plan lookup");
         self.as_("worker", |ctx| claim_job(ctx, job.id));
         job
     }
@@ -82,6 +81,7 @@ fn a_found_health_plan_lands_on_the_medical_card() {
     assert_eq!(health("alex").unwrap_err(), "already looking up your plan");
 
     let job = w.lease();
+    assert_eq!(job.kind, "attendee_policy_lookup");
     let payload: serde_json::Value = serde_json::from_str(&job.payload).unwrap();
     assert_eq!((payload["kind"].as_str(), payload["plan"].as_str()), (Some(HEALTH), Some("Silver 70 PPO")));
     assert!(w.try_as("alex", |ctx| finish_plan_lookup(ctx, job.id, found(), None)).is_err(), "only the worker finishes a lookup");
@@ -97,7 +97,7 @@ fn a_found_health_plan_lands_on_the_medical_card() {
     assert_eq!((card.insurer.as_str(), card.plan.as_str()), ("Blue Shield of California", "Silver 70 PPO 2500/55"));
     assert_eq!(w.t.db.job().id().find(job.id).unwrap().status, JobStatus::Done);
     let doc = w.t.db.policy_document().iter().next().expect("the found plan goes to the reading");
-    assert_eq!((doc.kind.as_str(), doc.attendee, doc.source.as_str(), doc.page_count), (HEALTH_PLAN, Some(id("alex")), KIND_PLAN_LOOKUP, 8));
+    assert_eq!((doc.kind.as_str(), doc.attendee, doc.source.as_str(), doc.page_count), (HEALTH_PLAN, Some(id("alex")), KIND_ATTENDEE_POLICY_LOOKUP, 8));
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn a_plan_already_found_is_found_at_once() {
     for (band, who) in [(8, "sam"), (9, "jo"), (10, "kim")] {
         w.t.db.band_owner().insert(BandOwner { band_id: band, owner: id(who), claimed_at: w.t.clock.now() });
     }
-    let jobs = || w.t.db.job().iter().filter(|j| j.kind == KIND_PLAN_LOOKUP).count();
+    let jobs = || w.t.db.job().iter().filter(|j| j.kind == KIND_ATTENDEE_POLICY_LOOKUP).count();
     let look = |who: &str, insurer: &str, plan: &str, state: &str| w.as_(who, |ctx| look_up_plan(ctx, insurer.into(), plan.into(), state.into()));
     look("alex", "Blue Shield of California", "Silver 70 PPO", "CA");
     let job = w.lease();
@@ -124,7 +124,7 @@ fn a_plan_already_found_is_found_at_once() {
     let card = w.t.db.medical_card().attendee().find(id("sam")).unwrap();
     assert_eq!((card.insurer.as_str(), card.plan.as_str()), ("Blue Shield of California", "Silver 70 PPO 2500/55"));
     let doc = w.t.db.policy_document().iter().find(|d| d.attendee == Some(id("sam"))).expect("the same PDF goes to the reading for sam");
-    assert_eq!((doc.file_hash.as_str(), doc.source.as_str(), doc.page_count), (first.file_hash.as_str(), KIND_PLAN_LOOKUP, 8));
+    assert_eq!((doc.file_hash.as_str(), doc.source.as_str(), doc.page_count), (first.file_hash.as_str(), KIND_ATTENDEE_POLICY_LOOKUP, 8));
     assert_eq!(w.t.db.blob_ref().hash().find(&first.file_hash).unwrap().owner, Some(id("alex")), "one blob, still alex's");
 
     look("jo", "Blue Shield of California", "Silver 70 PPO 2500/55", "CA");
@@ -180,4 +180,38 @@ fn a_cited_chunk_is_checked() {
     let long = ChunkMatch { text: "x".repeat(5000), ..chunk("ab-p2-k1") };
     assert_eq!(checked_match(Some(long)).unwrap().unwrap().text.len(), 1000);
     assert_eq!(checked_match(None).unwrap(), None);
+}
+
+#[test]
+fn a_legacy_queued_lookup_can_finish_and_fail() {
+    for succeeds in [true, false] {
+        let w = World::new();
+        w.as_("alex", |ctx| look_up_plan(ctx, "Kaiser Permanente".into(), "Bronze 60 HMO".into(), "CA".into()));
+        let job = w.t.db.job().id().find(w.lookup().job_id).unwrap();
+        w.t.db.job().id().update(Job { kind: LEGACY_KIND_PLAN_LOOKUP.into(), ..job });
+        if succeeds {
+            let job = w.lease();
+            w.as_("worker", |ctx| finish_plan_lookup(ctx, job.id, found(), None));
+            assert_eq!(w.lookup().status, FOUND);
+        } else {
+            for attempt in 1..=MAX_ATTEMPTS {
+                let job = w.lease();
+                w.as_("worker", |ctx| fail_job(ctx, job.id, format!("search failed {attempt}"), None));
+                let ready = w.t.db.job().id().find(job.id).unwrap().not_before.unwrap_or(w.t.clock.now());
+                w.t.clock.set(ready);
+            }
+            assert_eq!(w.lookup().status, FAILED);
+        }
+    }
+}
+
+#[test]
+fn an_unrelated_job_cannot_finish_an_attendee_policy_lookup() {
+    let w = World::new();
+    w.as_("alex", |ctx| look_up_plan(ctx, "Kaiser Permanente".into(), "Bronze 60 HMO".into(), "CA".into()));
+    let job = w.lease();
+    let leased = w.t.db.job().id().find(job.id).unwrap();
+    w.t.db.job().id().update(Job { kind: "venue_policy_lookup".into(), ..leased });
+    assert_eq!(w.try_as("worker", |ctx| finish_plan_lookup(ctx, job.id, found(), None)).unwrap_err(), "not an attendee policy lookup job");
+    assert_eq!(w.lookup().status, SEARCHING);
 }

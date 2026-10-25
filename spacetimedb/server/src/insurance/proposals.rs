@@ -1,5 +1,5 @@
 //! Rules from precedents (Hyphenate track). Every organizer decision on a claim is kept as a precedent.
-//! Once three approved simple claims of one shape (incident kind and cover) agree, Claude proposes a
+//! Once three approved simple claims of one shape (incident kind and cover) agree, the Decision Engine proposes a
 //! payment rule from them; code holds the proposal to those claims and the policy, and only the organizer
 //! approves it, never whoever proposed it. The approved rule then pays the claims of that shape waiting
 //! for the organizer, and every later one, on its own. A complicated claim gets no proposal: a gap in
@@ -18,7 +18,7 @@ use bandit_insurance::rules::{ProposedRule, RULE_PRECEDENTS, check_proposal, mat
 use bandit_insurance::{CoverKind, IncidentKind};
 use spacetimedb::{Identity, ReducerContext, Table};
 
-/// Proposals still open: Claude is writing one, or it waits for the organizer.
+/// Proposals still open: the Decision Engine is writing one, or it waits for the organizer.
 const OPEN: [&str; 2] = ["proposing", "proposed"];
 
 /// "falls under medical payments cover".
@@ -100,10 +100,10 @@ pub(super) fn after_approval(ctx: &ReducerContext, claim: &Claim) -> String {
         return format!("kept as a precedent; rule v{} already pays {shape} up to {}", r.version, format_cents(r.ceiling_cents));
     }
     open_proposal(ctx, claim, pool, rule);
-    format!("precedent {RULE_PRECEDENTS} of {RULE_PRECEDENTS}: Claude proposes a rule on {shape}")
+    format!("precedent {RULE_PRECEDENTS} of {RULE_PRECEDENTS}: the Decision Engine proposes a rule on {shape}")
 }
 
-/// Opens a proposal citing `pool` and asks Claude for the rule.
+/// Opens a proposal citing `pool` and asks the Decision Engine for the rule.
 fn open_proposal(ctx: &ReducerContext, claim: &Claim, pool: Vec<OrganizerPrecedent>, rule: Option<SettlementRuleRow>) {
     let s = settings(ctx);
     let cover = cover_of(claim);
@@ -199,7 +199,7 @@ fn anchor(ctx: &ReducerContext, p: &RuleProposal) -> (u64, u64) {
     p.claim_ids.iter().max().and_then(|id| ctx.db.claim().id().find(*id)).map(|c| (c.incident_id, c.id)).unwrap_or((0, 0))
 }
 
-/// Claude's proposal. Code checks it again: it cites at least three of the approved precedents it was
+/// The Decision Engine's proposal. Code checks it again: it cites at least three of the approved precedents it was
 /// offered, its ceiling is the highest payout among them, and that is within the policy's per-claim limit.
 #[spacetimedb::reducer]
 pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: String, call: ModelCallIn) -> Result<(), String> {
@@ -223,12 +223,12 @@ pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: St
             release(ctx, base.id, &[]);
             ctx.db.rule_proposal().id().update(RuleProposal { status: "failed".into(), summary: problems.join("; "), ..base });
             jobs::finish(ctx, job, "proposal set aside");
-            crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "code", "Set Claude's proposed rule aside".into(), problems.join("; "));
+            crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "code", "Set the Decision Engine's proposed rule aside".into(), problems.join("; "));
         }
         Ok(p) if !p.propose => {
             ctx.db.rule_proposal().id().update(RuleProposal { status: "declined".into(), summary: p.summary.trim().into(), ..base });
             jobs::finish(ctx, job, "no rule proposed");
-            crate::live::record(ctx, incident_id, claim_id, "Claude", "Claude", "Proposed no rule".into(), p.summary.trim().into());
+            crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "Decision Engine", "Proposed no rule".into(), p.summary.trim().into());
         }
         Ok(p) => {
             release(ctx, base.id, &p.precedent_claim_ids);
@@ -238,13 +238,13 @@ pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: St
             let rule = p.rule.trim().to_string();
             ctx.db.rule_proposal().id().update(RuleProposal { status: "proposed".into(), ceiling_cents: p.ceiling_cents, claim_ids: claim_ids.clone(), rule: rule.clone(), summary: summary.clone(), ..base });
             jobs::finish(ctx, job, "rule proposed");
-            crate::live::record(ctx, incident_id, claim_id, "Claude", "Claude", format!("Proposed a rule: {rule}"), format!("{summary} From {}; waits for the organizer.", claims_words(&claim_ids)));
+            crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "Decision Engine", format!("Proposed a rule: {rule}"), format!("{summary} From {}; waits for the organizer.", claims_words(&claim_ids)));
         }
     }
     Ok(())
 }
 
-/// The organizer approves Claude's proposal: it becomes the next version of the shape's payment rule,
+/// The organizer approves the Decision Engine's proposal: it becomes the next version of the shape's payment rule,
 /// with the proposal's precedents as its evidence. Whoever proposed a rule can never approve it.
 #[spacetimedb::reducer]
 pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_seen_cents: u64) -> Result<(), String> {
@@ -300,12 +300,12 @@ pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_see
         decided_at: Some(ctx.timestamp),
         ..p
     });
-    crate::live::record(ctx, incident_id, claim_id, "organizer", &name, format!("Approved rule v{version}: {shape} up to {}", format_cents(rule.ceiling_cents)), format!("from {claims}, proposed by Claude"));
+    crate::live::record(ctx, incident_id, claim_id, "organizer", &name, format!("Approved rule v{version}: {shape} up to {}", format_cents(rule.ceiling_cents)), format!("from {claims}, proposed by the Decision Engine"));
     pay_waiting(ctx, kind, cover);
     Ok(())
 }
 
-/// The organizer rejects Claude's proposal. Its precedents stay cited, so the next three approvals of the
+/// The organizer rejects the Decision Engine's proposal. Its precedents stay cited, so the next three approvals of the
 /// shape can start a new one.
 #[spacetimedb::reducer]
 pub fn reject_rule_proposal(ctx: &ReducerContext, proposal_id: u64, reason: String) -> Result<(), String> {
@@ -331,9 +331,9 @@ pub fn reject_rule_proposal(ctx: &ReducerContext, proposal_id: u64, reason: Stri
     Ok(())
 }
 
-/// Claims of the shape waiting for the organizer that Claude decided to pay: each one the new rule covers
+/// Claims of the shape waiting for the organizer that the Decision Engine decided to pay: each one the new rule covers
 /// (no complication, no mass occurrence, every check passed, corroborated, at or under the ceiling) is
-/// paid on Claude's decision inside the rule, with nobody involved.
+/// paid on the Decision Engine's decision inside the rule, with nobody involved.
 fn pay_waiting(ctx: &ReducerContext, kind: IncidentKind, cover: CoverKind) {
     let rules = core_rules(ctx);
     let waiting: Vec<Claim> = ctx
@@ -384,5 +384,5 @@ pub fn on_job_dead(ctx: &ReducerContext, dead: &Job) {
     release(ctx, p.id, &[]);
     let (incident_id, claim_id) = anchor(ctx, &p);
     ctx.db.rule_proposal().id().update(RuleProposal { status: "failed".into(), summary: dead.error.clone(), decided_at: Some(ctx.timestamp), ..p });
-    crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "code", "No rule was proposed".into(), format!("Claude was unavailable: {}", dead.error));
+    crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "code", "No rule was proposed".into(), format!("The rule proposer was unavailable: {}", dead.error));
 }

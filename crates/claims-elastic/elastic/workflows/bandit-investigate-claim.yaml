@@ -1,0 +1,28 @@
+version: "1"
+name: bandit-investigate-claim
+description: Runs one bounded claim-investigation turn. The worker supplies this claim's transcript and executes only scoped tool requests; this workflow never writes business state or indexes evidence.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: task
+        type: string
+        required: true
+        description: Instructions, allowed tools and this claim's transcript.
+      - name: schema
+        type: string
+        required: true
+        description: The tool-request or decision envelope's JSON schema.
+steps:
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+
+  - name: investigate
+    type: ai.agent
+    agent-id: bandit-claim-investigator
+    create-conversation: false
+    with:
+      message: "{{ inputs.task }}"
+      schema: "${{ steps.schema.output }}"

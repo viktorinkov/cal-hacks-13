@@ -1,7 +1,7 @@
-//! `clinic_report`: Claude writes the hospital's report for the case the module
-//! drew, code checks it against the case, and the hospital prints it as a PDF:
-//! the clinical note on page 1, the itemized bill on page 2. The module then has
-//! the Evidence Engine read that PDF like any hospital report.
+//! `clinic_report`: an Elastic Workflow writes the hospital's report for the
+//! case the module drew. Code checks it against that case and prints a PDF:
+//! the clinical note on page 1, the itemized bill on page 2. Filing it queues a
+//! separate `document_read` job, which reads the PDF through the Evidence Engine.
 
 use bandit_insurance::clinic::{REPORT_PAGES, Scenario, check_report, printed_pages};
 use bandit_insurance::medical::{ExtractedRecord, validate_record};
@@ -16,7 +16,8 @@ use crate::prompts;
 use crate::sink::Finish;
 
 pub async fn run(ctx: &Ctx, job: &JobIn, p: ClinicPayload) -> Result<(), JobError> {
-    let Tries { checked, calls, .. } = write_report(&ctx.claude, &p).await?;
+    let model = ctx.elastic_model().await?;
+    let Tries { checked, calls, .. } = write_report(&model, &p).await?;
     let record = match checked {
         Ok(r) => r,
         Err(problems) => return Err(JobError { error: format!("hospital report still off its case: {}", problems.join("; ")), calls }),
@@ -78,4 +79,43 @@ mod tests {
         let note = lopdf::Document::load_mem(&pdf).unwrap().extract_text(&[1]).unwrap();
         assert!(note.contains("Patient: Jordan Alvarez"), "{note}");
     }
+
+    #[tokio::test]
+    async fn an_unknown_case_never_reaches_the_writer() {
+        let mut p = testdata::clinic_payload();
+        p.scenario = "unrecognized".into();
+        let model = FakeModel::default();
+        let error = write_report(&model, &p).await.err().unwrap();
+        assert!(error.error.contains("unknown hospital report case unrecognized"));
+        assert!(error.calls.is_empty());
+        assert_eq!(model.calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_writer_cannot_replace_the_seeded_case_with_a_matching_report() {
+        let mut p = testdata::clinic_payload();
+        p.scenario = "hurt_at_home".into();
+        let model = FakeModel::new(vec![Ok(report(&p.visit_date)), Ok(report(&p.visit_date))]);
+        let tries = write_report(&model, &p).await.ok().unwrap();
+        let problems = tries.checked.unwrap_err();
+        assert!(problems.iter().any(|p| p.contains("history must say the injury happened at home")), "{problems:?}");
+        assert_eq!(tries.calls.len(), 2);
+        assert_eq!(tries.calls[0].kind, "clinic_report");
+        assert_eq!(tries.calls[1].kind, "clinic_report_retry");
+        assert!(model.text_of(0).contains("The patient was hurt at home"));
+        assert!(model.text_of(1).contains("history must say the injury happened at home"));
+    }
+
+    #[tokio::test]
+    async fn a_retry_failure_keeps_both_call_records() {
+        let p = testdata::clinic_payload();
+        let model = FakeModel::new(vec![Ok(report("2026-10-23")), Err("workflow timed out".into())]);
+        let error = write_report(&model, &p).await.err().unwrap();
+        assert_eq!(error.error, "workflow timed out");
+        assert_eq!(error.calls.len(), 2);
+        assert_eq!(error.calls[0].kind, "clinic_report");
+        assert_eq!(error.calls[1].kind, "clinic_report_retry");
+        assert_eq!(error.calls[1].status, "error");
+    }
+
 }

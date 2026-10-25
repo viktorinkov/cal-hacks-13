@@ -1,6 +1,6 @@
 // How the evidence for one claim was gathered and weighed, oldest first: the band's flag, the bands
 // around it, the staff notes, the camera, the attendee's own words, the hospital report, the code and
-// Elastic checks, each step of Claude's investigation (what it read, what the Evidence Engine found,
+// Elastic checks, each step of the Decision Engine's investigation (what it read, what the Evidence Engine found,
 // how it weighed each source), the decision and the limit code held it to, the organizer, the payout
 // and the insurer's payment. Built from the current evidence pack's facts (see
 // crates/bandit-insurance/src/evidence.rs for their sources and keys), the decision history and the
@@ -154,26 +154,26 @@ export function evidenceTrail(conn: DbConnection, claim: Claim): HTMLElement {
     add(last.createdAt, label, `${mine.length} ${mine.length === 1 ? 'check' : 'checks'}: ${passed} passed, ${failed.length} failed${failed.length ? ` (${failed.map(x => `${x.name}: ${x.detail}`).join('; ')})` : ''}${corroboration}`);
   }
 
-  // Claude's investigation, step by step, as the decision history recorded it after the checks.
+  // The Decision Engine's investigation, step by step, as the decision history recorded it after the checks.
   const checked = checks.reduce((m, x) => (micros(x.createdAt) > m ? micros(x.createdAt) : m), 0n);
   const steps = [...conn.db.decision.iter()]
-    .filter(d => d.claimId === id && (d.actor === 'Claude' || d.actor === 'Evidence Engine') && micros(d.at) > checked)
+    .filter(d => d.claimId === id && (d.actor === 'Claude' || d.actor === 'Evidence Engine' || (d.actor === 'Decision Engine' && d.who === 'Investigator')) && micros(d.at) > checked)
     .sort((a, b) => Number(a.id - b.id));
-  for (const d of steps) add(d.at, d.actor, d.why ? `${d.what}: ${d.why}` : d.what);
+  for (const d of steps) add(d.at, d.actor === 'Claude' ? 'Decision Engine' : d.actor, d.why ? `${d.what}: ${d.why}` : d.what);
   const review = [...conn.db.boardReviews.iter()].filter(r => r.claimId === id).sort((a, b) => Number(a.id - b.id)).pop();
-  if (review && !steps.length) add(review.createdAt, 'Claude', `${review.verdict.replace('_', ' ')}: ${review.summary}`);
-  if (review?.rejected.length) add(review.createdAt, 'Code', `Set Claude's decision aside: ${review.rejected.join('; ')}`);
+  if (review && !steps.length) add(review.createdAt, 'Decision Engine', `${review.verdict.replace('_', ' ')}: ${review.summary}`);
+  if (review?.rejected.length) add(review.createdAt, 'Code', `Set the agent's decision aside: ${review.rejected.join('; ')}`);
 
   for (const a of [...conn.db.boardApprovals.iter()].filter(a => a.claimId === id)) {
     add(a.decidedAt, 'Decision', `${a.approverName} (${a.approverRole}) ${a.decision === 'approve' ? 'approved' : 'refused'} at ${money(a.amountSeenCents)}${a.learn ? ', learned a rule' : ''}${a.reason ? `: ${a.reason}` : ''}`);
   }
   const rule = [...conn.db.boardRules.iter()].find(r => r.id === claim.settlementRuleId);
   if (claim.decidedBy === 'claude' && claim.settlementRuleId) {
-    add(claim.decidedAt, 'Decision', `Paid on Claude's decision, inside the ${rule ? money(rule.ceilingCents) : ''} authority of rule v${claim.settlementRuleVersion}${rule ? ` from ${rule.approverName}` : ''}`);
+    add(claim.decidedAt, 'Decision', `Paid on the Decision Engine's decision, inside the ${rule ? money(rule.ceilingCents) : ''} authority of rule v${claim.settlementRuleVersion}${rule ? ` from ${rule.approverName}` : ''}`);
   } else if (claim.decidedBy === 'rule') {
     add(claim.decidedAt, 'Decision', `Settled on its own under rule v${claim.settlementRuleVersion}${rule ? `, learned from ${rule.approverName}` : ''}`);
   } else if (claim.decidedBy === 'claude') {
-    add(claim.decidedAt, 'Decision', `Refused on Claude's decision, which rests on a failed check: ${claim.refusalReason}`);
+    add(claim.decidedAt, 'Decision', `Refused on the Decision Engine's decision, which rests on a failed check: ${claim.refusalReason}`);
   } else if (claim.decidedBy && claim.decidedBy !== 'approver') {
     add(claim.decidedAt, 'Decision', `Refused by ${claim.decidedBy}: ${claim.refusalReason || claim.statusNote}`);
   } else if (claim.status.tag === 'Routed') {
