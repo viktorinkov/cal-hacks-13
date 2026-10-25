@@ -66,6 +66,12 @@ let liveHeight = 0;
 /** The Live tab's names on the floor and tags over our bands. */
 const names = new VenueNames();
 let spotsAsked = false;
+let coloursAt = -Infinity;
+
+/** The colour an exit marker glows: what its station marker reports, else its zone's exit colour, else blue. */
+function exitColour(station: number): number {
+  return conn.db.station.id.find(station)?.exitColour || [...conn.db.zone.iter()].find(z => z.stationId === station)?.exitColour || 1;
+}
 
 function makeView() {
   view = h('div', { class: 'venue-3d' });
@@ -82,6 +88,7 @@ function makeView() {
   const sun = new THREE.DirectionalLight('#fff8ee', 2.6);
   scene.add(sun);
   liveLayer.visible = false;
+  liveLayer.add(names.markers);
   scene.add(liveLayer);
   camera = new THREE.PerspectiveCamera(35, 16 / 9, 0.5, 2000);
   controls = new OrbitControls(camera, renderer.domElement);
@@ -147,6 +154,10 @@ function makeView() {
     controls.update();
     const now = performance.now();
     for (const f of frames) f(now);
+    if (liveLayer.visible && now - coloursAt > 1000) {
+      coloursAt = now;
+      names.setExitColours(exitColour);
+    }
     // The spots are the default model's, so another venue's model shows only our bands' tags.
     names.draw(camera, controls.target, liveLayer.visible && shownUrl === DEFAULT.modelUrl, liveLayer.visible);
     renderer.render(scene, camera);
@@ -283,7 +294,7 @@ export function venueView(c: DbConnection): LiveView {
   showLive(true);
   if (!spotsAsked) {
     spotsAsked = true;
-    spots().then(s => names.setSpots(s));
+    spots().then(s => { names.setSpots(s); coloursAt = -Infinity; });
   }
   return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, camera, names, onFrame: f => frames.push(f), floorAt, rayAt, lookAt, overview: () => overview() };
 }
@@ -291,10 +302,10 @@ export function venueView(c: DbConnection): LiveView {
 /** The floor's named spots: the `venue_spot` rows, or the venue's spots file when there are none. */
 async function spots(): Promise<Spot[]> {
   const rows = [...conn.db.venueSpot.iter()];
-  if (rows.length) return rows.map(s => ({ kind: s.kind, name: s.name, x: s.xM, z: s.yM }));
+  if (rows.length) return rows.map(s => ({ kind: s.kind, name: s.name, x: s.xM, z: s.yM, station: s.stationId }));
   try {
     const file: Spot[] = await (await fetch('/venue/spots.json')).json();
-    return file.map(s => ({ kind: s.kind, name: s.name, x: s.x, z: s.z }));
+    return file.map(s => ({ kind: s.kind, name: s.name, x: s.x, z: s.z, station: 0 }));
   } catch {
     return [];
   }
