@@ -28,6 +28,7 @@ USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK, G
     logo(f"icon-{n}.svg") for n in (
         "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
         "footprints", "graph-3d"))
+SHIELD = logo("icon-shield-check.svg")
 SOCIALS = [logo(n + ".svg") for n in ("instagram", "facebook", "threads")]
 
 
@@ -340,13 +341,17 @@ def insurance(y0):
     S.text(40, 28, "Insurance Decision Engine", fs=64)
     C = [60, 820, 1580, 2340, 3100, 3900]
     SH, LH = 190, 300  # evidence card height, bill lane card height
-    lane = [270, 490, 710, 930, 1190]  # centre y of each evidence lane
+    lane = [490, 710, 930, 1150, 1410]  # centre y of each evidence lane
+    pol_y = 270  # the venue's insurance policy, entered at event setup
     mk = dict(fill=WHITE)
 
     def card(x, cy, label, kind, mark, mark_h=100, w=420, h=SH):
         return B(x, 0, label, kind, w=w, h=h, wordmark=mark, mark_h=mark_h, cy=cy, **mk)
 
     # 1. evidence: every source is its own card, checked on its own
+    venue = card(C[0], pol_y, "venue policy", "stdb", SHIELD)
+    terms = card(C[1], pol_y, "covers, per-claim limit\nevent limit, deductible", "stdb", STDB,
+                 mark_h=MARK_H[STDB], w=520)
     band = card(C[0], lane[0], "band", "device", WATCH)
     circle = card(C[0], lane[1], "light circle", "device", RADIO)
     medic = card(C[0], lane[2], "medic", "web", USER)
@@ -362,8 +367,9 @@ def insurance(y0):
                wordmark=RUST, mark_h=70, cy=lane[4])
     price = B(C[3], 0, "prices bill\nfee schedule\n$1,308 billed\n$895 covered", "rust", w=520, h=LH,
               wordmark=RUST, mark_h=70, cy=lane[4])
-    pack = B(C[4], lane[0] - SH / 2, "evidence pack\nnumbered facts\neach fact\nnames its source", "stdb",
-             w=520, h=lane[4] + LH / 2 - lane[0] + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
+    pack = B(C[4], pol_y - SH / 2, "evidence pack\nnumbered facts\neach fact\nnames its source", "stdb",
+             w=520, h=lane[4] + LH / 2 - pol_y + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
+    H(venue, terms, "event setup")
     H(band, incident, "SOS or fall")
     H(circle, witness, "witness bands")
     H(medic, note, "note")
@@ -371,7 +377,7 @@ def insurance(y0):
     H(report, extract, "PDF", y=S.oy + lane[4])
     H(extract, checks, "bill lines")
     H(checks, price, "valid lines")
-    for box, label in ((incident, "incident"), (witness, "witnesses"), (note, "medic note"),
+    for box, label in ((terms, "policy terms"), (incident, "incident"), (witness, "witnesses"), (note, "medic note"),
                        (flash, "camera sighting"), (price, "priced bill")):
         H(box, pack, label, y=box.cy)
 
@@ -383,7 +389,7 @@ def insurance(y0):
     r2 = lane[4] + LH / 2 + 220
     CH, CG, CF = 80, 18, 26  # chip height, gap, font
     ins = [("incident", WATCH), ("witness bands", RADIO), ("medic note", USER), ("camera sighting", CAMERA),
-           ("priced bill", FILE), ("top 3 past claims", GRAPH3D), ("policy", FILE)]
+           ("priced bill", FILE), ("top 3 past claims", GRAPH3D), ("policy terms", SHIELD)]
     outs = ["verdict", "causation", "concerns", "innocent explanations", "missing evidence", "cited facts"]
 
     def chips(x, w, items, title_, kind):
@@ -422,7 +428,7 @@ def insurance(y0):
     mass_d = B(X[4], top, "mass\noccurrence", "rust", w=DW, **d)
     rule_d = B(X[5], top, "rule\nmatch", "stdb", w=DW, **d)
     settle = B(X[6], 0, "auto-settle", "good", w=360, cy=refuse_d.cy - S.oy)
-    payout = B(X[6] + 560, 0, "payout\nup to $5,000\nevent limit $25,000\ndouble-entry journals", "rust", w=560,
+    payout = B(X[6] + 560, 0, "payout\nup to per-claim limit\nwithin event limit\ndouble-entry journals", "rust", w=560,
                h=280, wordmark=RUST, mark_h=60, cy=refuse_d.cy - S.oy)
     nessie = B(payout.right - S.ox + 220, 0, "deposit\n(wallet)", "ext", w=400, h=220, wordmark=CAPONE,
                mark_h=MARK_H[CAPONE], cy=refuse_d.cy - S.oy, **mk)
