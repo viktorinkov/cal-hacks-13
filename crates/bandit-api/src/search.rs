@@ -6,6 +6,7 @@
 //! The people and booths indices and their fields are written by bandit-indexer.
 
 use anyhow::{Result, bail};
+use futures_util::{StreamExt, TryStreamExt, stream};
 use reqwest::{Client, Method};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -146,6 +147,49 @@ impl Elastic {
         Ok(closest_hits(&found))
     }
 
+    /// Ranks the caller's already-grounded encounter evidence without storing personal history
+    /// in an index. Returned positions can refer only to the supplied documents.
+    pub async fn rank_evidence(&self, query: &str, documents: &[String]) -> Result<Vec<(usize, f64)>> {
+        if documents.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Every eligible person is searched. Bound each provider request and concurrency instead
+        // of cutting off people whose wording has no exact match before semantic ranking.
+        let mut requests = Vec::new();
+        for (batch, chunk) in documents.chunks(100).enumerate() {
+            let input = chunk.to_vec();
+            requests.push(async move {
+                self.rank_evidence_batch(query, &input).await.map(|scores| {
+                    scores.into_iter().map(|(index, score)| (batch * 100 + index, score)).collect::<Vec<_>>()
+                })
+            });
+        }
+        let batches = stream::iter(requests).buffer_unordered(3).try_collect::<Vec<_>>();
+        let mut scores: Vec<_> = tokio::time::timeout(Duration::from_secs(25), batches)
+            .await??
+            .into_iter()
+            .flatten()
+            .collect();
+        scores.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        Ok(scores)
+    }
+
+    async fn rank_evidence_batch(&self, query: &str, documents: &[String]) -> Result<Vec<(usize, f64)>> {
+        let response = self
+            .http
+            .post(format!("{}/_inference/rerank/{RERANK_ID}", self.url))
+            .header("Authorization", format!("ApiKey {}", self.api_key))
+            .json(&json!({ "query": query, "input": documents }))
+            .send()
+            .await?;
+        let status = response.status();
+        let body: Value = response.json().await?;
+        if !status.is_success() {
+            bail!("encounter rerank answered {status}: {body}");
+        }
+        evidence_scores(&body, documents.len())
+    }
+
     /// The candidates `ids` ranked by [`rank_query`], best first, with their scores. No call when
     /// there are no `ids`.
     async fn ranked(
@@ -284,9 +328,105 @@ pub fn scores(response: &Value, id_field: &str) -> Vec<(u64, f64)> {
         .collect()
 }
 
+/// Inference providers can encode their positions and scores as JSON numbers or strings.
+/// Reject malformed positions instead of letting a provider select another attendee.
+fn evidence_scores(response: &Value, count: usize) -> Result<Vec<(usize, f64)>> {
+    let Some(ranked) = response["rerank"].as_array() else {
+        bail!("encounter rerank omitted its results");
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::with_capacity(ranked.len());
+    for item in ranked {
+        let index = item["index"]
+            .as_u64()
+            .or_else(|| item["index"].as_str()?.parse().ok())
+            .and_then(|n| usize::try_from(n).ok());
+        let score = item["relevance_score"]
+            .as_f64()
+            .or_else(|| item["relevance_score"].as_str()?.parse().ok());
+        match (index, score) {
+            (Some(index), Some(score)) if index < count && score.is_finite() && seen.insert(index) => {
+                out.push((index, score));
+            }
+            _ => bail!("encounter rerank returned an invalid or repeated position"),
+        }
+    }
+    out.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn evidence_server() -> (String, tokio::task::JoinHandle<()>) {
+        let app = axum::Router::new().route(
+            "/_inference/rerank/.jina-reranker-v3",
+            axum::routing::post(|axum::Json(body): axum::Json<Value>| async move {
+                let documents = body["input"].as_array().unwrap();
+                assert!(documents.len() <= 100);
+                if documents.first().is_some_and(|value| value == "slow first batch") {
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                }
+                if documents.iter().any(|value| value == "invalid response") {
+                    return axum::Json(json!({"rerank":[{"index":9999,"relevance_score":1.0}]}));
+                }
+                let ranked: Vec<_> = documents.iter().enumerate().map(|(index, text)| {
+                    json!({"index":index,"relevance_score":if text == "remembered connection" { 0.9 } else { 0.1 }})
+                }).collect();
+                axum::Json(json!({"rerank":ranked}))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (format!("http://{address}"), task)
+    }
+
+    #[tokio::test]
+    async fn semantic_ranking_includes_connections_beyond_first_batch() {
+        let (url, server) = evidence_server().await;
+        let es = Elastic::new(&url, "test-key", "test-prefix").unwrap();
+        let mut documents = vec!["recorded connection".to_string(); 205];
+        documents[0] = "slow first batch".into();
+        documents[150] = "remembered connection".into();
+        let ranked = es.rank_evidence("virtual reality", &documents).await.unwrap();
+        server.abort();
+        assert_eq!(ranked.len(), 205);
+        assert_eq!(ranked[0], (150, 0.9));
+        let positions: std::collections::BTreeSet<_> = ranked.iter().map(|(index, _)| *index).collect();
+        assert_eq!(positions.len(), 205);
+        assert!(positions.contains(&204));
+    }
+
+    #[tokio::test]
+    async fn one_failed_batch_does_not_claim_partial_semantic_success() {
+        let (url, server) = evidence_server().await;
+        let es = Elastic::new(&url, "test-key", "test-prefix").unwrap();
+        let mut documents = vec!["recorded connection".to_string(); 101];
+        documents[100] = "invalid response".into();
+        let answer = es.rank_evidence("Meta", &documents).await;
+        server.abort();
+        assert!(answer.is_err());
+    }
+
+    #[test]
+    fn encounter_scores_keep_only_supplied_positions() {
+        let body = json!({"rerank": [
+            {"index": 0, "relevance_score": 0.2},
+            {"index": "1", "relevance_score": "0.9"}
+        ]});
+        assert_eq!(evidence_scores(&body, 2).unwrap(), vec![(1, 0.9), (0, 0.2)]);
+        for body in [
+            json!({}),
+            json!({"rerank":[{"index":2,"relevance_score":1.0}]}),
+            json!({"rerank":[{"index":0,"relevance_score":1.0},{"index":0,"relevance_score":0.2}]}),
+            json!({"rerank":[{"index":0,"relevance_score":"NaN"}]}),
+            json!({"rerank":[{"index":-1,"relevance_score":1.0}]})
+        ] {
+            assert!(evidence_scores(&body, 2).is_err());
+        }
+    }
 
     #[test]
     fn own_interests_by_document_id() {

@@ -242,6 +242,14 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 **Can change** the order of the three lists, and which pair of booths a card's "why" line names when two people share none. **Cannot** add a person or a booth (every query is filtered to the candidates), decide who is findable, or hold up the recap: after 10 s, or on any error, the lists stay in minutes order. Detail: [Part two](#part-two-the-one-way-copy-downstream-of-spacetimedb) and [Part three](#part-three-ordering-the-recaps-suggestions).
 
+#### Find a friend from a remembered moment
+
+`GET /api/friends?q=...` differs from automatic recap ranking: its query is the attendee's own description, not their saved interests. SpacetimeDB's subscribed rows determine which findable people the caller actually met and which booth or zone visits overlapped. Exact named places are enforced in code before semantic ranking.
+
+The API sends bounded, request-scoped evidence documents to [Elastic's rerank inference API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-inference-rerank), using the existing `.jina-reranker-v3` endpoint. It does not create a new personal-history index. Returned positions can only reorder the supplied candidates; names, handles and factual reasons come from the application's rows.
+
+The search ranks every eligible candidate after exact evidence filtering, in batches of up to 100 documents with at most three requests in flight and a 25-second overall deadline. It displays the closest 20 recorded connections with factual reasons; a ranking is not proof that an unsupported detail is true. If inference is unavailable, the response explicitly marks exact text/place matching rather than claiming semantic ranking succeeded.
+
 #### Read every insurance document
 
 The document reader handles `venue_policy`, `health_plan`, `coverage_form` and `hospital_report`. Attendee insurance cards use `medical_extract` with kind `insurance`, private page text and `bandit-run-task`; they are not an `insurance_card` kind in this indexed workflow.

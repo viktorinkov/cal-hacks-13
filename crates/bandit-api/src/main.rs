@@ -3,6 +3,7 @@
 //! It ranks the recap's suggestions with Elastic for the signed-in attendee and serves the plain
 //! web pages (see `web`).
 
+mod friends;
 mod search;
 mod summary;
 mod web;
@@ -157,18 +158,7 @@ async fn health(State(app): AppState) -> Json<Value> {
 /// each person who shares no booth with `who`, the closest pair of booths by meaning. When Elastic
 /// cannot rank, the suggestions keep their minutes order and say so.
 pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary> {
-    let db = &app.conn.db;
-    let rows = summary::Rows {
-        zones: db.zone().iter().collect(),
-        booths: db.booth().iter().collect(),
-        attendees: db.social_attendees().iter().collect(),
-        handles: db.social_handles().iter().collect(),
-        visits: db.social_visits().iter().collect(),
-        encounters: db.social_encounters().iter().collect(),
-        shared_visits: db.social_shared_visits().iter().collect(),
-        photos: db.social_photos().iter().collect(),
-        photo_tags: db.social_photo_tags().iter().collect(),
-    };
+    let rows = social_rows(app);
     let mut recap = summary::summary(&rows, who)?;
     let people: Vec<u64> = recap
         .suggested_people
@@ -213,6 +203,36 @@ pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary
         Err(e) => eprintln!("suggestions left unranked: {e:#}"),
     }
     Some(recap)
+}
+
+/// Copy the current subscribed evidence before awaiting an external search.
+fn social_rows(app: &App) -> summary::Rows {
+    let db = &app.conn.db;
+    summary::Rows {
+        zones: db.zone().iter().collect(),
+        booths: db.booth().iter().collect(),
+        attendees: db.social_attendees().iter().collect(),
+        handles: db.social_handles().iter().collect(),
+        visits: db.social_visits().iter().collect(),
+        encounters: db.social_encounters().iter().collect(),
+        shared_visits: db.social_shared_visits().iter().collect(),
+        photos: db.social_photos().iter().collect(),
+        photo_tags: db.social_photo_tags().iter().collect(),
+    }
+}
+
+/// Search the caller's actual encounter history. Stored interests never establish eligibility.
+pub async fn searched_friends(app: &App, who: Identity, query: &str) -> Option<friends::FriendSearch> {
+    let rows = social_rows(app);
+    let prepared = friends::prepare(&rows, who, query)?;
+    let documents: Vec<String> = prepared.candidates.iter().map(|c| c.text.clone()).collect();
+    match app.es.rank_evidence(query, &documents).await {
+        Ok(scores) => Some(friends::finish(query.to_string(), prepared, Some(&scores))),
+        Err(e) => {
+            eprintln!("encounter semantic ranking unavailable: {e:#}");
+            Some(friends::finish(query.to_string(), prepared, None))
+        }
+    }
 }
 
 #[cfg(test)]

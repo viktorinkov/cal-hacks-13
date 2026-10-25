@@ -2,7 +2,7 @@
 //! settings, file uploads into the blob store, the Elastic-ranked recap for a signed-in attendee,
 //! and, with `BANDIT_TEST_MODE=1`, the test identities and the test bands' buttons.
 
-use crate::{App, AppState, ranked_summary};
+use crate::{App, AppState, ranked_summary, searched_friends};
 use anyhow::{Context, Result};
 use axum::Json;
 use axum::body::Bytes;
@@ -56,6 +56,8 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/callback", file("t.html"))
         .route_service("/organizer", file("organizer.html"))
         .route_service("/photo", file("photo.html"))
+        .route_service("/friends", file("friends.html"))
+        .route_service("/friends/", file("friends.html"))
         .route_service("/style.css", file("style.css"))
         .nest_service("/js", ServeDir::new(web.root.join("web/dist")))
         .nest_service("/assets/merch", ServeDir::new(web.root.join("assets/merch")))
@@ -65,6 +67,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route("/api/blobs", post(upload))
         .route("/blobs/{hash}", get(blob))
         .route("/api/recap", get(recap))
+        .route("/api/friends", get(friends))
         .route("/api/actors", get(actors))
         .route("/api/dev/press/{band}", post(press))
         .route("/api/dev/move/{band}/{station}", post(move_band))
@@ -116,6 +119,40 @@ async fn recap(State(app): AppState, headers: HeaderMap) -> ApiResult<Json<crate
         .await
         .map(Json)
         .ok_or_else(|| error(StatusCode::NOT_FOUND, "no recap for this attendee yet"))
+}
+
+#[derive(Deserialize)]
+struct FriendQuery {
+    #[serde(default)]
+    q: String,
+}
+
+fn friend_query(q: &str) -> Result<&str, &'static str> {
+    let q = q.trim();
+    if q.is_empty() {
+        return Err("describe the person or place you remember");
+    }
+    if q.chars().count() > 500 {
+        return Err("keep your search to 500 characters");
+    }
+    if q.chars().any(char::is_control) {
+        return Err("use a single line for your search");
+    }
+    Ok(q)
+}
+
+/// Natural-language search over the signed-in attendee's recorded encounters and visits.
+async fn friends(
+    State(app): AppState,
+    headers: HeaderMap,
+    Query(query): Query<FriendQuery>,
+) -> ApiResult<Json<crate::friends::FriendSearch>> {
+    let who = session_identity(&app, &headers)?;
+    let q = friend_query(&query.q).map_err(|message| error(StatusCode::BAD_REQUEST, message))?;
+    searched_friends(&app, who, q)
+        .await
+        .map(Json)
+        .ok_or_else(|| error(StatusCode::NOT_FOUND, "no attendee profile for this sign-in yet"))
 }
 
 #[derive(Deserialize)]
@@ -339,4 +376,19 @@ async fn property(State(app): AppState, Path(station): Path<u8>) -> ApiResult<Js
     let zone = app.conn.db.zone().iter().find(|z| z.station_id == station).map(|z| z.name).ok_or_else(|| error(StatusCode::BAD_REQUEST, "no zone has that station"))?;
     let out = claims_cli(&app, &["property", "--zone", &zone, "--note", "a speaker was knocked off its stand and cracked", "--cost", "2400.00", "--camera"]).await?;
     Ok(Json(json!({ "opened": out })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn friend_search_query_is_bounded_and_single_line() {
+        assert_eq!(friend_query("  person I met at Meta  ").unwrap(), "person I met at Meta");
+        assert!(friend_query("   ").is_err());
+        assert!(friend_query("person\nat Meta").is_err());
+        assert!(friend_query(&"人".repeat(500)).is_ok());
+        assert!(friend_query(&"人".repeat(501)).is_err());
+        assert!(friend_query("Meta\0booth").is_err());
+    }
 }

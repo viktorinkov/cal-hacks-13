@@ -292,6 +292,16 @@ Staff see each photo as soon as it is registered: `board_photos` puts it on the 
 
 On a phone with no share sheet, the page saves the photo and copies the caption. BandIt has no Instagram or Meta login; the attendee posts the photo themselves.
 
+### Find someone from a remembered moment
+
+The recap and `/friends` accept a description such as “the person I met at the Meta booth.” `GET /api/friends?q=...` resolves the caller from their existing API session and considers only findable people with a recorded met encounter with that caller. It does not search unrelated attendees or use shared interests as proof of meeting.
+
+The API joins the pair's actual visits to find overlapping booth and zone stays, including crowd attendees who have no `shared_visit` rows. A booth match requires the same nonzero booth ID and overlapping visit times; an encounter's starting zone does not establish where all their accumulated close time occurred. Result reasons distinguish the recorded meeting from any separate overlapping stay.
+
+Exact named places constrain the evidence before Elastic ranks the remembered wording. The API sends request-scoped evidence text to Elastic's configured rerank endpoint, checks returned positions against the supplied candidates, and builds names, socials and reasons from its SpacetimeDB rows. Existing interest-based suggestions remain a separate part of the recap.
+
+The standalone `/friends` page reuses the attendee identity already kept by the registration flow and opens an API session as that identity. It does not claim a band, create an attendee, or require a second account. The route is served on the main and dev hosts without changing the command-center frontend.
+
 ### The recap's social part
 
 After the event these views are the social part of the recap ([Tap-Page](../5-apps/Tap-Page.md)). When the organizer (`ops`) runs `end_event`, the recap appears live on every open tap page; later the attendee reopens it from their tap link `/t/{token}`, signed in with SpacetimeDB SpacetimeAuth, on any device. During the event the tap page shows none of them: after setup it is the thank-you screen.

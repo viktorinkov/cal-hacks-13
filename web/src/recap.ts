@@ -6,6 +6,7 @@
 import { act, api, apiSession, date, field, h, handleLinks, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { MerchSuggestion, MyPhoto } from './module_bindings/types';
+import { friendSearch } from './friend-search';
 
 type Person = { node_id: number; name: string; photo_url: string; handles: Record<string, string> };
 
@@ -427,6 +428,7 @@ export function recap(conn: DbConnection, rerender: () => void) {
     h('h2', {}, `Your ${event}`),
     h('p', {}, `Thanks for coming, ${me?.displayName ?? ''}. Here is your night.`),
     h('section', {}, h('h3', {}, 'Where you were'), spaceTime(conn)),
+    friendSearch(conn),
     h('section', {}, h('h3', {}, 'People you spent time with'), people()),
     h('section', {}, h('h3', {}, 'Also there with you'), alsoThere()),
     h('section', {}, h('h3', {}, 'Booths you spent time at'), booths()),

@@ -51,7 +51,8 @@ Not responsible for:
 
 | Route | Who sees it | Purpose |
 |---|---|---|
-| `/t/{token}` | anyone | The only URL written on the tags, and the attendee's only route; the token is the band's code. Decides the screen from the sign-in, the band and the caller: band setup, then the thank-you screen during the event; the recap for the band's signed-in owner after the event, on any device. |
+| `/t/{token}` | anyone | The URL written on the tags; the token is the band's code. In the plain dev-host flow, decides the screen from the sign-in, the band and the caller: band setup, then the thank-you screen during the event; the recap for the band's signed-in owner after the event. The main host serves the separate registration frontend. |
+| Social.md: `/friends` | registered attendee | Find someone from a remembered name, place or moment, using the attendee's existing identity and API session. Available on the main and dev hosts, with the same search also in the plain recap. It never claims a band or creates an attendee. |
 | Social.md: `/photo` | role `photographer` | The photographer page, served by `bandit-api` beside the tap page: upload a photo through `POST /api/blobs` and call `register_photo`. Content in [Social](../6-features/Social.md). |
 
 `/t/{token}` shows the same thing to every attendee who taps: setup, the thank-you screen or the recap, for the caller's own band. Staff tools live in the [organizer portal](Organizer-Portal.md).
