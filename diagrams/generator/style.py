@@ -48,22 +48,25 @@ def _color_cards(children):
 
 FRAME_NAMES = (
     ("Architecture", "Band1t", "Overview"),
-    ("SpacetimeDB", "SpacetimeDB live loop", "Live views"),
+    ("SpacetimeDB live updates", "SpacetimeDB", "SpacetimeDB live loop", "Live views"),
+    ("SpacetimeDB subscriptions",),
     ("Elastic evidence", "Evidence Engine", "The Evidence Engine"),
     ("Elastic claim investigation", "Elastic execution", "Elastic workflows", "Claude", "Claude jobs"),
-    ("Find policy documents", "Bright Data"),
+    ("Find public sources", "Find policy documents", "Bright Data"),
     ("Capital One Nessie", "Nessie wallet"),
     ("Jobs", "Queues"),
     ("Prepare the event", "Event data", "Event data pipeline"),
-    ("Capture a public venue map",),
     ("Find people again",),
     ("Memories engine", "Photos and Memories", "Social"),
     ("Settle a claim", "Decision Engine", "Claim Settlement"),
     ("Policy amounts",),
     ("Approve a reusable rule",),
+    ("Review and pay a charge",),
+    ("Record insurer payment",),
+    ("Event operating costs",),
     ("Respond to an incident", "Medic routing"),
     ("Medic route display", "Routes and clear space", "Medic walk"),
-    ("Crowd clearance", "Light circle"),
+    ("Make space for help", "Crowd clearance", "Light circle"),
     ("Fire evacuation",),
     ("How your photos find you",),
     ("Your photo on your merch",),
@@ -423,4 +426,7 @@ def style_scene(scene, start_number=1):
         output.append(frame)
         y = frame["y"] + frame["height"] + FRAME_GAP
     result["elements"] = untouched + output
+    if any(re.sub(r"^\d+ · ", "", frame.get("name", "")) == "Band firmware" for frame in frames):
+        from firmware_palette import apply_firmware_palette
+        apply_firmware_palette(result)
     return result

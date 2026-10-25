@@ -3170,7 +3170,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "21 \u00b7 Band data flow",
+   "name": "24 \u00b7 Band data flow",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -7873,7 +7873,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "22 \u00b7 Band wiring",
+   "name": "25 \u00b7 Band wiring",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -11283,7 +11283,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "23 \u00b7 Exit markers and gateway",
+   "name": "26 \u00b7 Exit markers and gateway",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -11297,7 +11297,7 @@
    "height": 774.0,
    "angle": 0,
    "strokeColor": "#b5bfca",
-   "backgroundColor": "#ffe8cc",
+   "backgroundColor": "#e9edf2",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11401,8 +11401,8 @@
    "width": 7056.0,
    "height": 1404.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
-   "backgroundColor": "#fff4e6",
+   "strokeColor": "#c5ccd4",
+   "backgroundColor": "#f1f3f5",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11430,7 +11430,7 @@
    "width": 1447.84,
    "height": 60.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
+   "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
    "fillStyle": "solid",
    "strokeWidth": 2,
@@ -11466,8 +11466,8 @@
    "width": 2268.0,
    "height": 612.0,
    "angle": 0,
-   "strokeColor": "#b5bfca",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11576,8 +11576,8 @@
    "width": 1368.0,
    "height": 1170.0,
    "angle": 0,
-   "strokeColor": "#b5bfca",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11644,8 +11644,8 @@
    "width": 1170.0,
    "height": 702.0,
    "angle": 0,
-   "strokeColor": "#b5bfca",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11721,8 +11721,8 @@
    "width": 7056.0,
    "height": 792.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
-   "backgroundColor": "#fff4e6",
+   "strokeColor": "#c5ccd4",
+   "backgroundColor": "#f1f3f5",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11750,7 +11750,7 @@
    "width": 1540.0,
    "height": 60.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
+   "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
    "fillStyle": "solid",
    "strokeWidth": 2,
@@ -11786,8 +11786,8 @@
    "width": 7056.0,
    "height": 1260.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
-   "backgroundColor": "#fff4e6",
+   "strokeColor": "#c5ccd4",
+   "backgroundColor": "#f1f3f5",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -11815,7 +11815,7 @@
    "width": 1478.56,
    "height": 60.0,
    "angle": 0,
-   "strokeColor": "#d9480f",
+   "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
    "fillStyle": "solid",
    "strokeWidth": 2,
@@ -11851,8 +11851,8 @@
    "width": 1944.0,
    "height": 252.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#f5f7ff",
+   "strokeColor": "#b7c8d4",
+   "backgroundColor": "#f8fafc",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -11881,8 +11881,8 @@
    "customData": {
     "diagramParentComponent": "re272",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#f5f7ff"
+     "stroke": "#b7c8d4",
+     "fill": "#f8fafc"
     }
    }
   },
@@ -11932,8 +11932,8 @@
    "width": 2160.0,
    "height": 252.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#f5f7ff",
+   "strokeColor": "#b7c8d4",
+   "backgroundColor": "#f8fafc",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -11962,8 +11962,8 @@
    "customData": {
     "diagramParentComponent": "re272",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#f5f7ff"
+     "stroke": "#b7c8d4",
+     "fill": "#f8fafc"
     }
    }
   },
@@ -12013,8 +12013,8 @@
    "width": 1980.0,
    "height": 252.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#f5f7ff",
+   "strokeColor": "#b7c8d4",
+   "backgroundColor": "#f8fafc",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -12043,8 +12043,8 @@
    "customData": {
     "diagramParentComponent": "re272",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#f5f7ff"
+     "stroke": "#b7c8d4",
+     "fill": "#f8fafc"
     }
    }
   },
@@ -12094,8 +12094,8 @@
    "width": 2124.0,
    "height": 162.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#f5f7ff",
+   "strokeColor": "#b7c8d4",
+   "backgroundColor": "#f8fafc",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -12124,8 +12124,8 @@
    "customData": {
     "diagramParentComponent": "re283",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#f5f7ff"
+     "stroke": "#b7c8d4",
+     "fill": "#f8fafc"
     }
    }
   },
@@ -12175,8 +12175,8 @@
    "width": 1080.0,
    "height": 252.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#fff4e6",
+   "strokeColor": "#d8b68e",
+   "backgroundColor": "#ffd8a8",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -12213,8 +12213,8 @@
    "customData": {
     "diagramParentComponent": "re288",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#fff4e6"
+     "stroke": "#d8b68e",
+     "fill": "#ffd8a8"
     }
    }
   },
@@ -12264,8 +12264,8 @@
    "width": 1080.0,
    "height": 252.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#ffe3e3",
+   "strokeColor": "#d4a3a3",
+   "backgroundColor": "#ffc9c9",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -12302,8 +12302,8 @@
    "customData": {
     "diagramParentComponent": "re288",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#ffe3e3"
+     "stroke": "#d4a3a3",
+     "fill": "#ffc9c9"
     }
    }
   },
@@ -12353,8 +12353,8 @@
    "width": 1026.0,
    "height": 198.0,
    "angle": 0,
-   "strokeColor": "#c0cbe4",
-   "backgroundColor": "#f5f7ff",
+   "strokeColor": "#b7c8d4",
+   "backgroundColor": "#f8fafc",
    "fillStyle": "solid",
    "strokeWidth": 2,
    "strokeStyle": "solid",
@@ -12383,8 +12383,8 @@
    "customData": {
     "diagramParentComponent": "re294",
     "diagramSourceColor": {
-     "stroke": "#c0cbe4",
-     "fill": "#f5f7ff"
+     "stroke": "#b7c8d4",
+     "fill": "#f8fafc"
     }
    }
   },
@@ -12434,8 +12434,8 @@
    "width": 972.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -12467,8 +12467,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -12518,8 +12518,8 @@
    "width": 972.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -12555,8 +12555,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -12606,8 +12606,8 @@
    "width": 972.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -12643,8 +12643,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -13258,8 +13258,8 @@
    "width": 1188.0,
    "height": 612.0,
    "angle": 0,
-   "strokeColor": "#d8b68e",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -13291,8 +13291,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#d9480f",
-     "fill": "#ffd8a8"
+     "stroke": "#9cbfd9",
+     "fill": "#d0ebff"
     }
    }
   },
@@ -13469,8 +13469,8 @@
    "width": 1188.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -13506,8 +13506,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -13557,8 +13557,8 @@
    "width": 1170.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d8b68e",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -13590,8 +13590,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#d9480f",
-     "fill": "#ffd8a8"
+     "stroke": "#9cbfd9",
+     "fill": "#d0ebff"
     }
    }
   },
@@ -13923,8 +13923,8 @@
    "width": 1080.0,
    "height": 612.0,
    "angle": 0,
-   "strokeColor": "#d8b68e",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -13956,8 +13956,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#d9480f",
-     "fill": "#ffd8a8"
+     "stroke": "#9cbfd9",
+     "fill": "#d0ebff"
     }
    }
   },
@@ -14134,8 +14134,8 @@
    "width": 1170.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -14171,8 +14171,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -14222,8 +14222,8 @@
    "width": 1278.0,
    "height": 396.0,
    "angle": 0,
-   "strokeColor": "#d8b68e",
-   "backgroundColor": "#ffe8cc",
+   "strokeColor": "#9cbfd9",
+   "backgroundColor": "#d0ebff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -14267,8 +14267,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#d9480f",
-     "fill": "#ffd8a8"
+     "stroke": "#9cbfd9",
+     "fill": "#d0ebff"
     }
    }
   },
@@ -14318,8 +14318,8 @@
    "width": 504.0,
    "height": 216.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -14351,8 +14351,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -14402,8 +14402,8 @@
    "width": 504.0,
    "height": 216.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -14435,8 +14435,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -14486,8 +14486,8 @@
    "width": 504.0,
    "height": 216.0,
    "angle": 0,
-   "strokeColor": "#d4c38b",
-   "backgroundColor": "#fff3bf",
+   "strokeColor": "#c4b5db",
+   "backgroundColor": "#e5dbff",
    "fillStyle": "solid",
    "strokeWidth": 1,
    "strokeStyle": "solid",
@@ -14519,8 +14519,8 @@
    "locked": false,
    "customData": {
     "diagramSourceColor": {
-     "stroke": "#e67700",
-     "fill": "#fff3bf"
+     "stroke": "#c4b5db",
+     "fill": "#e5dbff"
     }
    }
   },
@@ -15039,7 +15039,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "24 \u00b7 Band firmware",
+   "name": "27 \u00b7 Band firmware",
    "customData": {
     "diagramStyleVersion": 1
    }

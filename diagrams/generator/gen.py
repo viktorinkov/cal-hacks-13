@@ -176,43 +176,38 @@ def architecture(y0):
 
 
 def spacetimedb(y0):
-    S.begin_frame("SpacetimeDB", 0, y0, 3670, 1940)
-    call = B(60, 170, "SDK reducer call", "web", w=720, h=300, wordmark=TS, mark_h=100)
-    reducer = B(990, 170, "Rust reducer", "rust", w=720, h=300, wordmark=RUST, mark_h=100)
-    commit = SV(1920, 170, STDB, "atomic commit", kind="stdb", w=720, h=300)
-    query = B(2850, 170, "SQL subscription", "web", w=720, h=300, wordmark=MONITOR, mark_h=100)
-    for card in (call, reducer, commit, query):
-        card.el.setdefault("customData", {}).update(diagramArtworkHeight=260, diagramArtworkMaxWidth=800)
-    H(call, reducer, "invokes")
-    H(reducer, commit, "writes together")
-    H(query, commit, "selects rows")
-    audiences = [
-      (60, 660, "attendee", "my_band", "identity filter", PHONE, "web"),
-      (990, 660, "medic", "medic_medical_cards", "granted reader", HEART, "web"),
-      (1920, 660, "staff desk", "claims_board", "staff role", MONITOR, "web"),
-      (2850, 660, "API + indexer", "social_visits", "service role", RUST, "rust"),
-      (60, 1260, "workers", "worker_jobs", "worker role", RUST, "rust"),
-      (990, 1260, "shared graph", "event_graph", "public projection", GRAPH3D, "web"),
-      (1920, 1260, "radio bridge", "pending command rows", "client query", RADIO, "rust"),
-      (2850, 1260, "public venue tables", "floor rows", "client-selected rows", GRAPH3D, "web"),
-    ]
-    feeds = Z(20, 570, 3590, 1310, "subscription results", "stdb")
-    for x, y, who, view_name, scope, art, kind in audiences:
-        first = len(S.elements)
-        parent = Z(x, y, 720, 520, who, kind, art)
-        parent.el.update(backgroundColor="#e9edf2" if kind == "rust" else "#d0ebff", strokeColor="#b5bfca")
-        parent.el.setdefault("customData", {}).update(diagramComponent=True, diagramCenteredHeader=True,
-                                                     diagramHeaderArtworkHeight=260)
-        for element in S.elements[first:]:
-            if element["type"] == "text":
-                element["strokeColor"] = "#1e1e1e"
-        for dy, label in ((220, view_name), (360, scope)):
-            cell = B(x + 40, y + dy, label, "stdb", w=640, h=100)
-            cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
-            cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
-    S.link(commit, "b", feeds, "t", fa=.5, fb=(commit.cx-feeds.x)/feeds.w,
-           label="pushes committed changes", fs=AFS)
-    return S.end_frame()
+    """Reuse readable live-update and subscription diagrams with stable IDs."""
+    import copy
+    import random
+
+    source_names = (
+        "spacetimedb-live-updates-source.excalidraw",
+        "spacetimedb-subscriptions-source.excalidraw",
+    )
+    offset = y0
+    existing_ids = {element["id"] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(element for element in source["elements"] if element["type"] == "frame")
+        assert not existing_ids.intersection(element["id"] for element in source["elements"]), filename
+        for original in source["elements"]:
+            element = copy.deepcopy(original)
+            element["y"] += offset - frame["y"]
+            S.elements.append(element)
+            existing_ids.add(element["id"])
+        for file_id, record in source.get("files", {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]["dataURL"] == record["dataURL"]
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame["height"] + GAP
+
+    # Original SpacetimeDB reserves IDs 90 through 168 and 158 random draws.
+    # Preserve downstream IDs and random metadata despite adding two native IDs.
+    S.n = max(S.n + 79, 168)
+    for _ in range(158):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
 
 
 def jobs(y0):
@@ -281,34 +276,34 @@ def respond_incident(y0):
 
 
 def routes_space(y0):
-    """Append the two reviewed native flows while retaining their existing IDs."""
+    """Keep the native medic route and replace the clearance presentation only."""
     import copy
     import random
 
     source_names = (
-        "medic-route-display-source.excalidraw",
-        "crowd-clearance-source.excalidraw",
+        'medic-route-display-source.excalidraw',
+        'make-space-for-help-source.excalidraw',
     )
     offset = y0
-    existing_ids = {element["id"] for element in S.elements}
+    existing_ids = {element['id'] for element in S.elements}
     for filename in source_names:
         source = json.loads((LOGOS.parent / filename).read_text())
-        frame = next(element for element in source["elements"] if element["type"] == "frame")
-        assert not existing_ids.intersection(element["id"] for element in source["elements"]), filename
-        for original in source["elements"]:
+        frame = next(element for element in source['elements'] if element['type'] == 'frame')
+        assert not existing_ids.intersection(element['id'] for element in source['elements']), filename
+        for original in source['elements']:
             element = copy.deepcopy(original)
-            element["y"] += offset - frame["y"]
+            element['y'] += offset - frame['y']
             S.elements.append(element)
-            existing_ids.add(element["id"])
-        for file_id, record in source.get("files", {}).items():
+            existing_ids.add(element['id'])
+        for file_id, record in source.get('files', {}).items():
             if file_id in S.files:
-                assert S.files[file_id]["dataURL"] == record["dataURL"]
+                assert S.files[file_id]['dataURL'] == record['dataURL']
             else:
                 S.files[file_id] = copy.deepcopy(record)
-        offset += frame["height"] + GAP
+        offset += frame['height'] + GAP
 
-    # The original combined function reserved numeric IDs 931 through 1018.
-    # Keep the following generated hardware IDs and random metadata unchanged.
+    # Reserve the original combined route allocation exactly once.
+    # Importing either native scene consumes no new IDs or random draws.
     S.n = max(S.n + 88, 1018)
     for _ in range(176):
         random.randint(1, 2**31 - 1)
@@ -465,8 +460,8 @@ def _import_acquisition_frame(y0, filename, prefix, frame_id=None, reserve_ids=0
 
 
 def bright_data(y0):
-    return _import_acquisition_frame(y0, "policy-discovery-source.excalidraw",
-                                     "policy_lookup_", frame_id="frame296", reserve_ids=55)
+    return _import_acquisition_frame(y0, "public-source-acquisition-source.excalidraw",
+                                     "public_source_", frame_id="frame296", reserve_ids=55)
 
 
 def capture_venue_map(y0):
@@ -597,56 +592,7 @@ def photo_memories(y0):
 
 
 def settle_claim(y0):
-    """A current claim's decision and distinct financial outcomes."""
-    S.begin_frame("Settle a claim", 0, y0, 3520, 1770)
-    injury = B(60, 160, "attendee injury", "device", w=500, h=240,
-               wordmark=HEART, mark_h=96)
-    property_ = B(60, 510, "venue property loss", "device", w=500, h=240,
-                  wordmark=HAMMER, mark_h=96)
-    evidence_ = SV(760, 335, ELASTIC, "Evidence Engine\ncited evidence", w=560, h=300)
-    decision = SV(1460, 335, ELASTIC, "Decision Engine\nrecommendation", w=560, h=300)
-    guard = SV(2160, 335, STDB, "settlement guard\nchecks authority", kind="stdb", w=560, h=300)
-    injury_paid = SV(2860, 160, CAPONE, "Nessie\ninjury deposit", w=560, h=240)
-    property_paid = B(2860, 510, "venue or repair vendor\nproperty booking", "good", w=560, h=240,
-                      wordmark=HAMMER, mark_h=96)
-    amounts = SV(760, 930, STDB, "Policy amounts\nfixed by code", kind="stdb", w=560, h=240)
-    organizer = B(2160, 930, "organizer\nindividual decision", "web", w=560, h=240,
-                  wordmark=USER, mark_h=96)
-    refused = B(2860, 930, "refused claim\nreason retained", "bad", w=560, h=240,
-                wordmark=SHIELD, mark_h=96)
-
-    D(injury, "r", .5, evidence_, "l", .25, "medical evidence")
-    D(property_, "r", .5, evidence_, "l", .75, "loss evidence")
-    H(evidence_, decision, "checked facts")
-    R(amounts, "r", decision, "l", [S.P(1390, 1050), S.P(1390, 485)], "fixed figures", seg=1)
-    H(decision, guard, "proposes decision")
-    D(guard, "r", .25, injury_paid, "l", .5, "authorized injury")
-    D(guard, "r", .75, property_paid, "l", .5, "authorized property")
-    V(guard, organizer, "needs review", x=guard.x + 140)
-    V(organizer, guard, "approves", x=guard.x + 420)
-    D(guard, "r", .9, refused, "l", .2, "checked refusal")
-    H(organizer, refused, "refuses")
-
-    responsibility = B(60, 1450, "organizer names\nresponsible attendee", "web", w=500, h=240,
-                       wordmark=USER, mark_h=96)
-    charge = B(760, 1450, "proposed charge\nlogged loss", "stdb", w=560, h=240,
-               wordmark=FILE, mark_h=96)
-    decided = B(1460, 930, "claim decided", "stdb", w=560, h=240,
-                wordmark=SHIELD, mark_h=96)
-    approval = B(1460, 1450, "organizer\napproves charge", "web", w=560, h=240,
-                 wordmark=USER, mark_h=96)
-    payer = B(2160, 1450, "attendee\npays charge", "web", w=560, h=240,
-              wordmark=USER, mark_h=96)
-    charged = SV(2860, 1450, CAPONE, "Nessie\ncharge purchase", w=560, h=240)
-    V(property_, responsibility, "records responsibility", x=property_.x + 140)
-    H(responsibility, charge, "proposes")
-    R(guard, "l", decided, "t", [S.P(2090, 545), S.P(2090, 850), S.P(1740, 850)],
-      "records outcome", seg=2, fa=.7)
-    V(decided, approval, "required first")
-    H(charge, approval, "awaits approval")
-    H(approval, payer, "approved charge")
-    H(payer, charged, "confirms payment")
-    return S.end_frame()
+    return import_claim_settlement(S, y0, LOGOS.parent / "claim-settlement-source.excalidraw")
 
 
 def policy_amounts(y0):
@@ -1060,6 +1006,93 @@ def merch_product_flow(y0):
 
 
 
+"""Import the reviewed settlement parent while preserving later generated IDs and seeds."""
+import copy
+import json
+import random
+
+
+def import_claim_settlement(scene_builder, y0, source_path):
+    """Replacement body for settle_claim; source is already styled and reviewed.
+
+    The original function allocated frame663 through lb747: 85 IDs and
+    170 calls to random.randint. Reserve the same allocation so policy amounts
+    still starts at frame748 and every later generated seed stays unchanged.
+    """
+    source=json.loads(source_path.read_text())
+    frame=next(e for e in source["elements"] if e["type"]=="frame")
+    assert frame["id"]=="frame663" and "Settle a claim" in frame["name"]
+    assert len(source["elements"])==58
+    ids={e["id"] for e in source["elements"]}
+    assert len(ids)==len(source["elements"])
+    assert not (ids&{e["id"] for e in scene_builder.elements})
+    imported=copy.deepcopy(source["elements"])
+    for e in imported:
+        e["x"]-=frame["x"]
+        e["y"]+=y0-frame["y"]
+        if e["type"]=="frame":
+            e.setdefault("customData",{}).update(
+                diagramStyleVersion=1,
+                diagramImportedSource="diagrams/claim-settlement-source.excalidraw")
+    for fid,record in source["files"].items():
+        if fid in scene_builder.files:
+            assert scene_builder.files[fid]==record, f"Different saved asset {fid}"
+        else:
+            scene_builder.files[fid]=copy.deepcopy(record)
+    scene_builder.elements.extend(imported)
+    scene_builder.n+=85
+    for _ in range(170):
+        random.randint(1,2**31-1)
+    return frame["height"]
+
+
+
+"""Import the approved charge scene without consuming the generator's IDs or RNG."""
+import copy
+import json
+
+
+def _import_finance_frame(scene_builder, y0, source_path, prefix="charge_flow_"):
+    source=json.loads(source_path.read_text())
+    frame=next(e for e in source["elements"] if e["type"]=="frame")
+    ids={e["id"]:prefix+e["id"] for e in source["elements"]}
+
+    def remap(value,key=None):
+        if isinstance(value,dict): return {k:remap(v,k) for k,v in value.items()}
+        if isinstance(value,list):
+            if key=="groupIds": return [prefix+g for g in value]
+            return [remap(v) for v in value]
+        if isinstance(value,str) and key in {"id","frameId","containerId","elementId","diagramParentComponent"}:
+            return ids.get(value,value)
+        return value
+
+    imported=remap(copy.deepcopy(source["elements"]))
+    assert not ({e["id"] for e in imported}&{e["id"] for e in scene_builder.elements})
+    for e in imported:
+        e["x"]-=frame["x"]
+        e["y"]+=y0-frame["y"]
+        if e["type"]=="frame":
+            e.setdefault("customData",{})["diagramStyleVersion"]=1
+    scene_builder.elements.extend(imported)
+    for fid,record in source["files"].items():
+        if fid in scene_builder.files: assert scene_builder.files[fid]==record
+        else: scene_builder.files[fid]=record
+    return frame["height"]
+
+
+def review_charge(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "charge-review-source.excalidraw", "charge_flow_")
+
+
+def record_insurer_payment(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "insurer-receipt-source.excalidraw", "receipt_flow_")
+
+
+def event_operating_costs(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "event-operating-costs-source.excalidraw", "event_costs_")
+
+
+
 def nessie(y0):
     """One provider, its operations and references, then local wallet accounting."""
     S.begin_frame("Capital One Nessie", 0, y0, 4480, 1770)
@@ -1311,8 +1344,8 @@ def band_firmware(y0):
 
 
 FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
-          nessie, jobs, prepare_event, capture_venue_map, find_people, photo_memories,
-          settle_claim, policy_amounts, approve_rule, respond_incident,
+          nessie, jobs, prepare_event, find_people, photo_memories,
+          settle_claim, policy_amounts, approve_rule, review_charge, record_insurer_payment, event_operating_costs, respond_incident,
           routes_space, fire_evacuation, photo_product_flow, merch_product_flow, hardware, band_wiring, exit_markers_gateway,
           band_firmware, vision, venue_reconstruction)
 
