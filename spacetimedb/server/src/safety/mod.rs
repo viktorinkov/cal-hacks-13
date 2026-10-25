@@ -31,9 +31,9 @@ pub enum IncidentKind {
     Fall,
     /// The venue's own equipment broken.
     Property,
-    /// An attendee's own belonging stolen.
+    /// Someone stole from the venue: its equipment, merch or a sponsor's gear at its booth.
     Theft,
-    /// An attendee's own belonging broken by someone else.
+    /// Kept from an earlier design; nothing opens it, and it is answered like `Property`.
     Breakage,
 }
 
@@ -441,8 +441,8 @@ pub fn open_incident(ctx: &ReducerContext, kind: String, zone_id: u64, band_id: 
     let incident = open(ctx, kind, zone.id, zone.station_id, band_id, "ops", None);
     let what = match kind {
         IncidentKind::Property => format!("Damage reported in {}", zone.name),
-        IncidentKind::Theft => format!("Theft of an attendee's belonging reported in {}", zone.name),
-        IncidentKind::Breakage => format!("An attendee's belonging reported broken in {}", zone.name),
+        IncidentKind::Theft => format!("Theft from the venue reported in {}", zone.name),
+        IncidentKind::Breakage => format!("Damage reported in {}", zone.name),
         _ => format!("Injury reported in {}", zone.name),
     };
     crate::live::record(ctx, incident.id, 0, "organizer", &caller_name(ctx), what, note.clone());
