@@ -25,6 +25,8 @@ const FLIGHT_MS = 1300;
 /** Stacked tags keep this gap between them, and climb at most this many places. */
 const STACK_GAP_PX = 3;
 const MAX_LIFT = 8;
+/** Sponsors' names climb only with the camera this close: from the overview a climbed name would sit over another sponsor's tables. */
+const CLIMB_WITHIN_M = 150;
 /** The hall's outline before the model loads: its bounding box at the floor and at the cut. */
 const BOX_OUTLINE = [-107, 107].flatMap(x => [-45, 51].flatMap(z => [0, CUT_M].map(y => new THREE.Vector3(x, y, z))));
 
@@ -226,7 +228,8 @@ export class Venue {
 
   /**
    * Sorts out the tags as the camera sees them now: a stacked tag that would cover one placed before it moves up
-   * above it, and a floor name that would cover anything is hidden.
+   * above it, close up a sponsor's name climbs a place or two above a name it would cover, and any other floor
+   * name that would cover anything is hidden.
    */
   private tidy(now: number) {
     this.tidiedAt = now;
@@ -262,11 +265,18 @@ export class Venue {
       s.center.set(0.5 - shift / (pw * zoom), -lift * (1 + STACK_GAP_PX / (ph * zoom)));
       placed.push(r);
     }
+    const near = (r: [number, number, number, number]) => covers([r[0] - 4, r[1] - 1, r[2] + 4, r[3] + 1]);
+    const close = this.camera.position.distanceTo(this.controls.target) < CLIMB_WITHIN_M;
     for (const s of this.names) {
-      const r = rect(s, 0);
-      const free = !!r && !covers([r[0] - 4, r[1] - 1, r[2] + 4, r[3] + 1]);
+      const climb = close ? s.userData.climb ?? 0 : 0;
+      let lift = 0;
+      let r = rect(s, 0);
+      while (r && near(r) && lift < climb) r = rect(s, ++lift);
+      const free = !!r && !near(r);
       s.visible = free;
-      if (free) placed.push(r!);
+      if (!free) continue;
+      s.center.set(0.5, -lift * (1 + STACK_GAP_PX / (s.userData.px as [number, number])[1]));
+      placed.push(r!);
     }
   }
 
@@ -289,7 +299,7 @@ export class Venue {
     return hit ? { x: hit.point.x, z: hit.point.z } : undefined;
   }
 
-  /** Names on the floor: the areas, the named places and the doors, each name once. */
+  /** Names on the floor: the areas, the sponsors at their tables, the named places and the doors, each name once. */
   addFloorNames(spots: Spot[]) {
     const group = new THREE.Group();
     const named: Spot[] = [];
@@ -298,20 +308,38 @@ export class Venue {
       named.push(s);
     };
     spots.filter(s => s.kind === 'area').forEach(add);
+    sponsors(spots).forEach(add);
     spots.filter(s => s.kind === 'place').forEach(add);
     spots.filter(s => s.kind === 'exit').forEach(add);
     for (const s of named) {
       const area = s.kind === 'area';
-      const tag = tagSprite({
-        lines: [{ text: area ? s.name.toUpperCase() : s.name, px: area ? 13 : 11, bold: area, color: area ? 'rgba(235, 241, 250, 0.82)' : s.kind === 'exit' ? 'rgba(130, 220, 255, 0.85)' : 'rgba(205, 213, 225, 0.72)' }],
-      }, 1);
-      tag.position.set(s.x, area ? 3.2 : 2.6, s.z);
+      const sponsor = s.kind === 'sponsor_table';
+      const color = area ? 'rgba(235, 241, 250, 0.82)' : sponsor ? 'rgba(255, 200, 100, 0.95)' : s.kind === 'exit' ? 'rgba(130, 220, 255, 0.85)' : 'rgba(205, 213, 225, 0.72)';
+      const tag = tagSprite({ lines: [{ text: area ? s.name.toUpperCase() : s.name, px: area ? 13 : 11, bold: area || sponsor, color }] }, 1);
+      tag.position.set(s.x, area ? 3.2 : sponsor ? 1.6 : 2.6, s.z);
+      if (sponsor) tag.userData.climb = SPONSOR_CLIMB;
       group.add(tag);
       this.names.push(tag);
     }
     this.scene.add(group);
     return group;
   }
+}
+
+/** Tables of the same sponsor that stand side by side, at most this far apart, share one name. */
+const SPONSOR_GAP_M = 4;
+/** A sponsor's name climbs at most this many places above the names next to it, so neighbouring tables all show theirs. */
+const SPONSOR_CLIMB = 2;
+
+/** One spot per sponsor's row of tables, at the middle of the row. */
+function sponsors(spots: Spot[]): Spot[] {
+  const rows: Spot[][] = [];
+  for (const s of spots.filter(s => s.kind === 'sponsor_table')) {
+    const row = rows.find(r => r[0].name === s.name && r.some(t => Math.hypot(t.x - s.x, t.z - s.z) <= SPONSOR_GAP_M));
+    if (row) row.push(s);
+    else rows.push([s]);
+  }
+  return rows.map(r => ({ kind: 'sponsor_table', name: r[0].name, x: r.reduce((a, t) => a + t.x, 0) / r.length, z: r.reduce((a, t) => a + t.z, 0) / r.length }));
 }
 
 /** The corners of the venue's floor slab, the widest flat mesh of the model, at the floor and at the cut. */
