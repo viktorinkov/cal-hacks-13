@@ -380,20 +380,43 @@ def insurance(y0):
     H(corro, pack, "corroborated\nor disputed", y=lane[2])
     H(price, pack, "priced lines", y=lane[4])
 
-    # 2. past claims and Claude's review
-    ee = B(C[5], lane[0] - SH / 2, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=520, h=300,
-           wordmark=ELASTIC, mark_h=MARK_H[ELASTIC], **mk)
-    review = B(C[5], 0, "Claude\nverdict, causation\ncited fact ids\n(claim_review)", "claude", w=520, h=380,
-               wordmark=CLAUDE, mark_h=110, cy=lane[2] + 120, **mk)
-    vcheck = B(C[5], 0, "validate_review\ncites exist\nno new $ figures", "rust", w=520, h=210, icons={0: RUST},
-               cy=lane[4] + 70)
+    # 2. past claims and Claude's review: the whole case fans in, the structured answer fans out
+    ee = B(C[5], 0, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=560, h=320,
+           wordmark=ELASTIC, mark_h=60, cy=lane[2], **mk)
     H(pack, ee, "claim, no names\n(claim_verify)", y=ee.cy)
-    H(pack, review, "whole pack", y=review.cy)
-    V(ee, review, "top 3 + scores\n(submit_claim_checks)")
-    V(review, vcheck, "answer\n(submit_claim_review)")
+    r2 = 1330
+    CH, CG, CF = 76, 16, 24  # chip height, gap, font
+    ins = ["numbered facts", "code + Elastic checks", "amounts, priced lines", "hospital report history",
+           "top 3 past claims", "policy summary"]
+    outs = ["verdict: consistent,\nneeds_human, inconsistent", "causation: supported,\nunsupported, unclear",
+            "summary", "concerns + fact ids", "innocent explanations", "missing evidence", "cited fact ids"]
+
+    def chips(x, w, labels, title_, kind):
+        hs = [CH + (26 if "\n" in s else 0) for s in labels]
+        zh = 70 + sum(hs) + CG * (len(hs) - 1) + 24
+        zone = Z(x, r2, w, zh, title_, kind)
+        y, boxes = r2 + 70, []
+        for s, h in zip(labels, hs):
+            boxes.append(S.box(x + 24, y, w - 48, s, kind, h=h, fs=CF, fill=WHITE))
+            y += h + CG
+        return zone, boxes
+
+    zin, cin = chips(pack.cx - S.ox - 330, 660, ins, "whole case", "stdb")
+    zout, cout = chips(780, 640, outs, "answer (submit_claim_review)", "ext")
+    review = B(1700, r2, "Claude\n(claim_review)\nhigh effort", "claude", w=640, h=max(zin.h, zout.h),
+               wordmark=CLAUDE, mark_h=220, **mk)
+    vcheck = B(60, 0, "validate_review\ncited ids exist\n$ = code amounts\nconsistent:\nno concerns\none retry",
+               "rust", w=480, h=420, wordmark=RUST, mark_h=70, cy=review.cy - S.oy)
+    V(pack, zin, "pack + SHA-256", x=pack.cx)
+    R(ee, "b", cin[4], "r", [(ee.cx, cin[4].cy)], label="top 3 + scores\n(submit_claim_checks)", seg=0)
+    for i, c in enumerate(cin):
+        S.link(c, "l", review, "r", fb=0.12 + 0.76 * i / (len(cin) - 1), color="#d97757")
+    for i, c in enumerate(cout):
+        S.link(review, "l", c, "r", fa=0.1 + 0.8 * i / (len(cout) - 1), color="#d97757")
+    H(zout, vcheck, "checks answer", y=vcheck.cy)
 
     # 3. code decides, in order
-    top = 1430
+    top = review.bottom - S.oy + 200
     DW, DH, G = 380, 240, 170
     X = [60 + i * (DW + G) for i in range(7)]
     d = dict(shape="diamond", h=DH)
@@ -409,8 +432,7 @@ def insurance(y0):
                cy=refuse_d.cy - S.oy)
     nessie = B(payout.right - S.ox + 260, 0, "deposit\n(wallet)", "ext", w=400, h=200, wordmark=CAPONE,
                mark_h=MARK_H[CAPONE], cy=refuse_d.cy - S.oy, **mk)
-    R(vcheck, "b", refuse_d, "t", [(vcheck.cx, top + S.oy - 110), (refuse_d.cx, top + S.oy - 110)],
-      label="checked review + pack", seg=1)
+    D(vcheck, "b", 0.3, refuse_d, "t", 0.5, "checked review")
     H(refuse_d, checks_d, "covered")
     H(checks_d, verdict_d, "all pass")
     H(verdict_d, second_d, "consistent")
@@ -444,7 +466,7 @@ def insurance(y0):
     D(stale, "t", 0.5, payout, "b", 0.15, "unchanged")
     V(nessie, letters, "paid\n(claim_draft)")
     for box, n in ((extract, 1), (checks, 2), (price, 3), (corro, 4), (pack, 5), (ee, 6), (review, 7),
-                   (refuse_d, 8), (org, 9), (payout, 10), (letters, 11)):
+                   (vcheck, 8), (refuse_d, 9), (org, 10), (payout, 11), (letters, 12)):
         badge(box, n)
     return S.end_frame()
 
