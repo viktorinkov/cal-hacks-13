@@ -81,12 +81,13 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 	@desk path /organizer /organizer/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/
 	handle @desk {
 		root * /srv/bandit-desk
-		rewrite * /index.html
+		try_files {path} /index.html
 		file_server
 	}
-	handle /portal /portal/ {
+	@portal path /portal /portal/
+	handle @portal {
 		root * $APP/web
-		rewrite * /organizer.html
+		try_files {path} /organizer.html
 		file_server
 	}
 	handle {
@@ -105,5 +106,6 @@ dev.$BANDIT_HOST {
 }
 CADDY
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl reload-or-restart caddy
 printf '%s %s deployed at %s\n' "$BANDIT_BRANCH" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > /srv/bandit-deploy/status.txt
