@@ -18,6 +18,9 @@ pub mod photos;
 pub mod tables;
 pub mod tick;
 pub mod views;
+pub mod walks;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod walk_tests;

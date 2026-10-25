@@ -46,6 +46,16 @@ function setUp(c: DbConnection) {
   conn.db.band.onInsert((_ctx, b) => crowd.upsert(b));
   conn.db.band.onUpdate((_ctx, _old, b) => crowd.upsert(b));
   conn.db.band.onDelete((_ctx, b) => crowd.remove(b.id));
+  // The crowd's walks, and the run's pause, which holds everyone where they are. The walks have their own
+  // subscription, so a module without them leaves the rest of the page working.
+  conn.subscriptionBuilder().onError(() => console.warn('no crowd walks: the crowd walks to its spots')).subscribe(['SELECT * FROM crowd_walk']);
+  conn.db.crowdWalk.onInsert((_ctx, w) => crowd.walk(w));
+  conn.db.crowdWalk.onUpdate((_ctx, _old, w) => crowd.walk(w));
+  conn.db.crowdWalk.onDelete((_ctx, w) => crowd.unwalk(w.bandId));
+  const pause = () => crowd.setPaused(conn.db.livePause.id.find(0)?.pausedAt.toDate().getTime());
+  conn.db.livePause.onInsert(pause);
+  conn.db.livePause.onDelete(pause);
+  pause();
   v.onFrame(now => crowd.frame(now));
   dropPin.visible = false;
   v.layer.add(dropPin);
@@ -227,7 +237,6 @@ function placeBands() {
   const label = () => (document.querySelector('[name="place_label"]') as HTMLInputElement | null)?.value.trim() ?? '';
   return h('section', {},
     h('h4', {}, 'Put one of our real bands on the map'),
-    h('p', { class: 'muted' }, 'For showing the run with a band someone is wearing: pick the band, type who wears it and drag the blue band onto the floor where they stand. It stands there among the crowd, the crowd near it meets it, and its SOS and falls show like anyone else\'s. Drag a placed band again to move it.'),
     h('label', {}, 'Band ', h('select', { name: 'place_band', onchange: choose }, ids.map(id => h('option', { value: id, selected: id === chosenBand }, bandCode(id))))),
     h('label', {}, 'Who wears it ', h('input', { name: 'place_label', placeholder: 'Name, e.g. the presenter', maxlength: 40 })),
     h('p', {}, marker(code, () => ({ bandId: chosenBand!, label: label(), fromPanel: true }), 'Drag onto the floor of the 3D view')),
@@ -248,13 +257,11 @@ function history() {
     all.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
       : searchable('decisions', h('table', {},
-        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Incident'), h('th', {}, 'Who'), h('th', {}, 'Decided'), h('th', {}, 'Why')),
+        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Who'), h('th', {}, 'Decided')),
         rows.map(d => h('tr', {},
-          h('td', {}, time(d.at)),
-          h('td', {}, d.incidentId ? String(d.incidentId) : ''),
+          h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
           h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
-          h('td', {}, d.what),
-          h('td', {}, d.why)))), rows.length < all.length));
+          h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)])))), rows.length < all.length));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -273,36 +280,50 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
     list.length === 0
       ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
       : searchable('incidents', h('table', {},
-        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
+        h('tr', {}, h('th', {}, 'Incident'), h('th', {}, 'Status'), h('th', {}, '')),
         list.map(m => {
           const c = claims.get(m.claimId);
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
-            h('td', {}, time(m.openedAt)),
-            h('td', {}, `${m.incidentId}: ${m.kind}${m.person ? `, ${m.person}` : ''}${m.place ? ` at ${m.place}` : ''}`),
-            h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status),
-            h('td', {}, m.claimId ? `${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : ''),
-            h('td', {},
-              h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
-              waiting && [' ', h('button', {
+            h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${m.kind}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
+            h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
+              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
+              waiting && [h('br'), h('button', {
                 onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]));
+              }, 'Approve and teach a rule')]),
+            h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
         }))));
 }
 
-/** The Live tab's run section: the 3D view, our bands, the incidents and the decision history. */
+/** What the colours in the 3D view mean: the band light states of the Hardware doc. */
+const LEGEND: [string, string][] = [
+  ['#2fd27a', 'Calm'],
+  ['#ffb020', 'Busy'],
+  ['#ff5a2a', 'Very busy'],
+  ['#ff1030', 'SOS or a fall: red strobe; someone who fell lies down'],
+  ['#2f6bff', 'The light circle around them: blue pulse'],
+  ['#3d8bff', 'Our hardware and test bands'],
+  ['#e00020', 'Pole: an open incident'],
+];
+
+function legend() {
+  return h('section', {},
+    h('h4', {}, 'Legend'),
+    h('table', {}, LEGEND.map(([colour, meaning]) => h('tr', {},
+      h('td', { style: `background: ${colour}; width: 24px` }),
+      h('td', {}, meaning)))));
+}
+
+/** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the decisions and our
+ * bands on the right. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
   syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
-  return [
-    h('section', {},
-      v!.view, v!.note,
-      h('p', { class: 'muted' }, "Each person shows their band's light: green calm, amber busy, red very busy, a red strobe on SOS or a fall (someone who fell lies down), and a blue pulse in the light circle around them. Our hardware and test bands are blue. A red pole marks each open incident."),
-      canRun && placeBands()),
-    incidents(r, canRun),
-    history(),
-  ];
+  return h('div', { class: 'live' },
+    h('div', {}, incidents(r, canRun), legend()),
+    h('div', {}, h('section', {}, v!.view, v!.note)),
+    h('div', {}, history(), canRun && placeBands()));
 }

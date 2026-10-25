@@ -98,7 +98,8 @@ function makeView() {
   renderer.setAnimationLoop(() => {
     if (!view!.isConnected) return;
     const w = view!.clientWidth;
-    const hgt = Math.round(w * 9 / 16);
+    // On the Live tab the venue fills most of the window's height, so it is easy to explore.
+    const hgt = liveLayer.visible ? Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
     if (w && (renderer.domElement.width !== Math.round(w * renderer.getPixelRatio()) || camera.aspect !== w / hgt)) {
       renderer.setSize(w, hgt);
       camera.aspect = w / hgt;
@@ -125,7 +126,15 @@ export type LiveView = {
   lookAt(x: number, z: number): void;
 };
 
+/** The Live tab's view is taller than wide, so the first time it shows the camera steps back to keep the whole hall in sight. */
+let steppedBack = false;
+
 function showLive(on: boolean) {
+  if (on && model && !steppedBack) {
+    steppedBack = true;
+    camera.position.sub(controls.target).multiplyScalar(1.35).add(controls.target);
+    controls.update();
+  }
   liveLayer.visible = on;
   renderer.clippingPlanes = on ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT_M)] : [];
 }

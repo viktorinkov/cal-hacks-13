@@ -71,5 +71,12 @@ ul.results button:hover, ul.results button.on { background: #eef3ff; }
 #viewas iframe { display: block; width: 100%; height: calc(100vh - 160px); min-height: 560px; border: 2px solid #888; border-radius: 12px; background: #fff; }
 /* A page in the View as frame is read-only: its controls show but cannot be used. */
 body.viewing button, body.viewing input, body.viewing select, body.viewing textarea { pointer-events: none; opacity: .55; }
+/* Tables scroll by themselves instead of stretching the page. */
+#app table { display: block; max-height: 60vh; overflow: auto; }
+/* The Live tab: incidents and the legend, the 3D venue, the decisions, side by side across the window. */
+body.wide main { max-width: none; }
+.live { display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+.live section { margin-top: 0; }
+@media (max-width: 1100px) { .live { grid-template-columns: 1fr; } }
 .drag-band { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .drag-tag { position: fixed; z-index: 10; margin: 0; pointer-events: none; white-space: nowrap; }

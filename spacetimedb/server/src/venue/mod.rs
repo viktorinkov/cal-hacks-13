@@ -1,3 +1,4 @@
+pub mod floor;
 pub mod import;
 pub mod setup;
 pub mod spots;
