@@ -557,7 +557,6 @@ def insurance(y0):
 # ---------------------------------------------------------------- Queues
 CLAUDE_JOBS = [  # job kind, result reducer, what Claude does
     ("medical_extract", "apply_medical_extract", "reads medical PDF"),
-    ("claim_record_extract", "apply_medical_record", "reads hospital report"),
     ("clinic_report", "file_clinic_report", "writes hospital report"),
     ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
     ("claim_draft", "attach_claim_letters", "drafts letters"),

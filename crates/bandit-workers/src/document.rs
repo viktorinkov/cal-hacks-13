@@ -1,16 +1,18 @@
-//! `document_read`: the Evidence Engine reads an insurance PDF. Each page goes
-//! through the `<prefix>-documents-extract` pipeline (a scan is first written out
-//! word for word by the Claude API), the `bandit-read-document` workflow reads
-//! the terms and clauses, and code checks every quote against its page before
-//! the clauses are indexed and the module gets the answer. The plan and venue
-//! policy lookups read each PDF they fetch the same way (`read_pdf`), to check
-//! what it prints about itself before they keep it.
+//! `document_read`: the Evidence Engine reads an insurance PDF or a hospital
+//! report. Each page goes through the `<prefix>-documents-extract` pipeline (a
+//! scan is first written out word for word by the Claude API), the
+//! `bandit-read-document` workflow reads the terms and clauses, or the report's
+//! record, and code checks every quote against its page before the clauses are
+//! indexed and the module gets the answer. The plan and venue policy lookups
+//! read each PDF they fetch the same way (`read_pdf`), to check what it prints
+//! about itself before they keep it.
 
 use std::time::Duration;
 
 use anyhow::{Context, anyhow, bail};
 use bandit_bindings::ModelCallIn;
 use bandit_insurance::policy::{CheckedPolicy, DocumentReadPayload, PolicyRead, VENUE_POLICY, check_policy, document_schema};
+use bandit_insurance::report::{self, HOSPITAL_REPORT, ReportRead, check_report_read};
 use claims_elastic::{PolicyClause, StoredPage, reader};
 use claude_client::{Effort, MessageRequest};
 use serde_json::{Value, json};
@@ -24,7 +26,7 @@ const WORKFLOW_LIMIT: Duration = Duration::from_secs(10 * 60);
 /// Most pages of a PDF a lookup fetched that the Evidence Engine reads to check it.
 pub const MAX_CHECK_PAGES: usize = claims_elastic::MAX_DOCUMENT_PAGES;
 
-const TRANSCRIBE_SYSTEM: &str = "You transcribe one scanned page of an insurance document. \
+const TRANSCRIBE_SYSTEM: &str = "You transcribe one scanned page of an insurance document or a hospital report. \
 Write out every word printed on the page exactly as printed, in reading order, one printed line per line, \
 with the same numbers, signs and spelling. Keep table rows on one line. \
 Do not summarize, correct, explain or pick anything out, and add nothing that is not printed.";
@@ -37,6 +39,9 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
     }
     let mut calls = Vec::new();
     let Read { answer, texts } = read_pdf(ctx, job, &p.file_hash, &p.kind, &pages, &mut calls).await.map_err(keep(&mut calls))?;
+    if p.kind == HOSPITAL_REPORT {
+        return finish_report(ctx, job, &answer, texts, calls).await;
+    }
     let read = policy_read(&answer).map_err(keep(&mut calls))?;
     let (es, _) = ctx.reader().await.map_err(|e| JobError { calls: std::mem::take(&mut calls), ..e })?;
 
@@ -55,6 +60,21 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
     );
     let read_json = serde_json::to_string(&read).map_err(|e| JobError { error: format!("encoding the read: {e}"), calls: calls.clone() })?;
     ctx.sink.finish(job.id, Finish::DocumentTerms { read_json, pages: texts }, calls).await?;
+    Ok(())
+}
+
+/// A hospital report goes to the module as read; it is checked there and no clause of it is indexed.
+async fn finish_report(ctx: &Ctx, job: &JobIn, answer: &Value, pages: Vec<String>, calls: Vec<ModelCallIn>) -> Result<(), JobError> {
+    let read: ReportRead = match serde_json::from_value(answer["read"].clone()) {
+        Ok(r) => r,
+        Err(e) => return Err(JobError { error: format!("the reader's answer is not a hospital report: {e}"), calls }),
+    };
+    match check_report_read(&read, &pages) {
+        Ok(c) => tracing::info!(job_id = job.id, quoted = c.quoted, dropped = c.dropped.len(), "hospital report read: {}", report::summary(&c)),
+        Err(e) => tracing::warn!(job_id = job.id, problems = %e.join("; "), "hospital report read off its pages, the module will route it"),
+    }
+    let read_json = answer["read"].to_string();
+    ctx.sink.finish(job.id, Finish::HospitalReport { read_json, pages }, calls).await?;
     Ok(())
 }
 

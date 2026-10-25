@@ -79,7 +79,7 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | The venue's terms: limits, deductible, minimum payout, service window, fee schedule, exclusions, which insurance pays first | The Evidence Engine reads them from the policy PDF; code checks every term against its quoted clause; the organizer confirms them | every limit and gate below (next to build) |
 | Is there a claim? | the attendee who wore the band, `file_claim`, or staff for them, `file_claim_for_wearer`; code opens a property claim on resolve | one claim per incident |
 | Which hospital report comes back? | code: one roll of the module's seeded generator, `Scenario::pick` | 3 in 6 match the incident; 1 in 6 each are hurt at home, a different injury, or a visit before the event |
-| What do the hospital report and the insurance card say? | The Evidence Engine reads each PDF; code validates what it read (`validate_record`) | nothing yet: code prices it next |
+| What do the hospital report and the insurance card say? | The Evidence Engine reads each PDF; code checks every quote on its page and validates what it read (`check_report_read`, `validate_record`) | nothing yet: code prices it next |
 | What each billed line pays, and every amount | code, `cover_lines` and `compute_amounts`, under the policy terms | the payout |
 | Do the sources agree on time and zone? | code, `corroborate` | a pay needs `corroborated` |
 | Is the copy valid, and what do the two policies say about this claim? | The Evidence Engine, `claim_verify`, then Claude's policy searches (next to build) | a failed validation is a failed check; the clauses are what Claude cites |
@@ -396,7 +396,7 @@ Maya runs after Jordan in the script, and one approval proposes no rule, so her 
 
 Each time someone or something decides about an incident or its claim, the module writes one `decision` row: who acted, their name, what they decided and why. The `actor` is one of `band`, `camera`, `medic`, `organizer`, `Claude`, `Evidence Engine`, `Decision Engine`, `wallet` or `venue`.
 
-The rows come from the claim itself and from each step of Claude's investigation: a status change on every save, the report read ("Read the clinic record: $1,308.00 billed, $895.00 covered"), the checks ("Flagged: record lines"), each source Claude read, each clause it found (next to build), its decision, and the approval ("precedent 2 of 3 for falls under medical payments"). Each step of a proposed rule writes its own row (see Proposed rules).
+The rows come from the claim itself and from each step of Claude's investigation: a status change on every save, the report read by The Evidence Engine ("Read the hospital report: $1,308.00 billed, $895.00 covered", with the provider, the date, the first diagnosis and the facts quoted from their pages), the checks ("Flagged: record lines"), each source Claude read, each clause it found (next to build), its decision, and the approval ("precedent 2 of 3 for falls under medical payments"). Each step of a proposed rule writes its own row (see Proposed rules).
 
 The 3D venue page (`/live`, the organizer portal's Live tab) lists them live in its "Decision history" panel, coloured by actor. A claim waiting for the organizer there gets the "Approve" button for staff, and a proposed rule waiting for the organizer shows above the decision history with "Approve" and "Reject".
 
@@ -409,7 +409,7 @@ Every document in a claim is a PDF, and The Evidence Engine reads all of them th
 | The venue's insurance policy | the organizer, on the Venue setup tab, when the event is set up (`POST /api/blobs` purpose `policy`, then `submit_policy_document`); or the organizer names the insurer and the policy's two forms and types its declarations, and the forms are found on the web (`look_up_venue_policy`, [Bright-Data](../7-integrations/Bright-Data.md)) | insurer, policy number, period, FNOL contact; each cover with its incident kinds, limits, deductible, minimum payout and service window; the schedule of benefits (code and cap); exclusions; which insurance pays first | `policy_term` rows, then `insurance_policy`, `coverage_rule` and `fee_schedule_line` once confirmed; every clause into `bandit-policy-clauses` |
 | The attendee's health insurance card | the attendee, in band setup ("Your health insurance", [Medical-Card](Medical-Card.md)) | insurer, plan, member name, member id, group number, the copays printed on it for urgent care and the emergency room, and its coverage wording | the attendee's `medical_card`; its clauses into `bandit-policy-clauses`; a claim reads it when the attendee files |
 | The attendee's health plan: its Summary of Benefits and Coverage (`health_plan`) | found on the web when the attendee names their insurer and plan in band setup (`look_up_plan`, kind `health`) | insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | an empty insurer and plan on the attendee's `medical_card`; its clauses into `bandit-policy-clauses` as the attendee's policy |
-| The hospital report | written for the drawn case and rendered as a PDF, or filed by staff (`submit_medical_record`) | the same fields as today's record: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | `medical_record` and `claim_line` |
+| The hospital report | written by the Anthropic Claude API for the drawn case and rendered as a 2-page PDF (`file_clinic_report`), or filed by staff (`submit_medical_record`) | document kind, patient, provider, encounter, diagnoses, service lines, invoice number and printed total, each with the printed line it was read from and its page (kind `hospital_report`) | `medical_record` and `claim_line`, through `apply_hospital_report`; no clauses |
 
 **An attendee's plan by name.** Most attendees know their insurer and plan but carry no PDF. They type the insurer, the plan and their state, and a plan lookup finds the plan's public document and fetches its PDF through Bright Data ([Bright-Data](../7-integrations/Bright-Data.md)). The module files it with `queue_document_read`, source `plan_lookup` and the address it came from, and from there it is read like an upload.
 
@@ -434,7 +434,7 @@ A term that fails keeps its default and is flagged. The organizer sees every ter
 
 **The other insurance.** When the venue's medical payments cover is `primary`, the venue pays the covered amount, and the notice of loss names the attendee's insurer as the other insurance. When it is `excess`, the venue pays only what the attendee's own plan leaves to them: the copay on their card for that kind of visit, at most the covered amount. A first-aid visit has no copay, so the venue pays the covered amount.
 
-The hospital report and the card are the attendee's medical and insurance data. They are indexed in `bandit-documents` and `bandit-policy-clauses` under their file's SHA-256 with no name in the document id, readable only with the workers' own Elastic API key, shown on no dashboard, and deleted from Elastic once the claim is decided. The venue's policy clauses stay for the event.
+The hospital report and the card are the attendee's medical and insurance data. They are indexed in `bandit-documents`, and the card's clauses in `bandit-policy-clauses`, under their file's SHA-256 with no name in the document id, readable only with the workers' own Elastic API key, shown on no dashboard, and deleted from Elastic once the claim is decided. The venue's policy clauses stay for the event.
 
 ## Charges to an attendee (next to build)
 
@@ -453,7 +453,7 @@ A charge is what the person responsible owes. [Incident-Types](Incident-Types.md
 Responsibilities:
 
 - Open one claim per incident: the attendee files an injury claim in their own words (`file_claim`), or staff file it for them (`file_claim_for_wearer`); a `property` or `theft` incident with a cost note opens the venue's claim on resolve.
-- Get the hospital report: draw its case with the module's seeded generator and have the Anthropic Claude API write it (`clinic_report`), or take a filed PDF; check what was read in code and price every line against the fee schedule.
+- Get the hospital report: draw its case with the module's seeded generator and have the Anthropic Claude API write it as a 2-page PDF (`clinic_report`), or take a filed PDF; have the Evidence Engine read the PDF (`document_read`), check what was read in code and price every line against the fee schedule.
 - Read the venue's policy, the attendee's insurance card and every hospital report PDF through The Evidence Engine, check every term in code, and have the organizer confirm the venue's terms (next to build).
 - Build and hash the evidence pack from rows that Safety, Vision and the record already wrote; never from new sensing.
 - Check corroboration and every record check in code.
@@ -483,12 +483,12 @@ Non-responsibilities:
 |---|---|---|---|---|
 | `file_claim` | in | the attendee who wore the band, from the tap page ("Hurt at the event?") | incident id, their statement | reducer; opens the claim, draws the hospital report's case, enqueues `clinic_report` |
 | `file_claim_for_wearer` | in | `ops`, `medic`, from "Injuries without a claim" on the organizer portal; the `bandit-claims` tool | incident id, the statement in the wearer's words, the report choice (`matches`, `mismatch`, `random`, `pdf`) | reducer; the same, or waits for a PDF with `pdf` |
-| `file_clinic_report` | in | `worker` | job id, the written report as record JSON, its blob hash, the `model_call` | reducer; checks the report against its case, applies it as the record |
+| `file_clinic_report` | in | `worker` | job id, the written report as record JSON, the blob hash of its 2-page PDF, the `model_call` | reducer; checks the report against its case, writes `medical_record` in `reading`, enqueues `document_read` with kind `hospital_report` |
 | Hook in `resolve_incident` | in | `band1t` module ([Safety](Safety.md)) | a resolved `property` or `theft` incident with a cost note | same transaction, `on_incident_resolved` |
 | `open_claim` | in | `ops` | an incident id; opens a claim by hand for a resolved incident with no claim | reducer |
 | `POST /api/blobs` with purpose `medical` | in | organizer portal "File the medical record", for `medic` and `ops`; the `bandit-claims` tool | the record PDF; back come its SHA-256 and page count | HTTPS to `bandit-api` ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| `submit_medical_record` | in | `medic`, `ops` | claim id, the file's SHA-256, page count; the claim must be `AwaitingRecord` | reducer; writes `medical_record`, enqueues `claim_record_extract` |
-| `apply_medical_record` | in | `worker` | job id, the record JSON, the `model_call` | reducer; validates again, prices the lines, rebuilds the pack |
+| `submit_medical_record` | in | `medic`, `ops` | claim id, the file's SHA-256, page count; the claim must be `AwaitingRecord` | reducer; writes `medical_record` in `reading`, enqueues `document_read` with kind `hospital_report` |
+| `apply_hospital_report` | in | `worker` | job id, The Evidence Engine's read of the report as JSON, the page texts | reducer; checks every quote again (`check_report_read`), validates the record, prices the lines, rebuilds the pack |
 | `submit_claim_checks` | in | `worker` | job id, the Elastic checks, and the policy clauses that bear on the claim (next to build) | reducer; writes `claim_check` and `claim_clause` (next to build), enqueues `claim_review` |
 | `report_claim_step` | in | `worker` | job id, actor, what, why: one step of Claude's investigation | reducer; writes a `decision` row live |
 | `submit_claim_review` | in | `worker` | job id, Claude's decision JSON, the `model_call` | reducer; validates again, then the guard decides whether it goes through |
@@ -504,7 +504,7 @@ Non-responsibilities:
 | `record_insurer_payment` | in | `ops` | claim id, amount received, insurer reference | reducer; J4, `Reconciled` |
 | `request_recovery_letter` | in | `ops` | a settled property claim, the counterparty's name and contact | reducer; enqueues `recovery_letter` |
 | `attach_claim_letters`, `attach_recovery_letter` | in | `worker` | the letters' blob hashes | reducer |
-| Jobs `clinic_report`, `claim_record_extract`, `claim_verify`, `claim_review`, `rule_proposal`, `claim_payout`, `claim_draft`, `recovery_letter`; `document_read` (next to build) | out | `bandit-workers` | the payloads in `crates/bandit-insurance/src/payloads.rs` | `job` table |
+| Jobs `clinic_report`, `document_read`, `claim_verify`, `claim_review`, `rule_proposal`, `claim_payout`, `claim_draft`, `recovery_letter` | out | `bandit-workers` | the payloads in `crates/bandit-insurance/src/payloads.rs` | `job` table |
 | Staff views `claims_board`, `board_facts`, `board_checks`, `board_lines`, `board_reviews`, `board_precedents`, `board_records`, `board_clinic_reports`, `board_approvals`, `board_ledger`, `board_rules`, `board_rule_proposals`, `board_organizer_precedents`, `board_policies`, `unclaimed_injuries` | out | organizer portal | everything the Claims and Proposed rules tabs show, with "How the evidence was gathered" (`web/src/evidence-trail.ts`) | SpacetimeDB subscription |
 | Attendee views `my_incidents`, `my_claims` | out | tap page | the attendee's own resolved injuries and their claim's status | SpacetimeDB subscription |
 | `decision` | out | the 3D venue page | the decision history | SpacetimeDB subscription |
@@ -528,9 +528,9 @@ A `property` or `theft` incident needs no filing. `on_incident_resolved` opens t
 
 The claim takes the newest policy and the cover kind for its incident kind: `medical_payments` for `sos` and `fall`, `property` for `property`. The statement becomes the pack's `claimant_statement` fact.
 
-### The hospital report: drawn by code, written or read by the Anthropic Claude API, priced by code
+### The hospital report: drawn by code, written by the Anthropic Claude API, read by The Evidence Engine, priced by code
 
-A hospital report reaches the claim one of two ways. Either way it ends as a validated `medical_record` with priced `claim_line` rows.
+A hospital report reaches the claim one of two ways, and both end as a PDF that The Evidence Engine reads. Either way it ends as a validated `medical_record` with priced `claim_line` rows.
 
 **The seeded draw.** Filing requests the report at once (an attendee's own filing always uses `random`). `request_report` takes one roll of the module's seeded generator (`ctx.rng()`) and `Scenario::pick` turns it into a case:
 
@@ -542,17 +542,21 @@ A hospital report reaches the claim one of two ways. Either way it ends as a val
 
 The module stores a `clinic_report` row in `requested` and enqueues `clinic_report` with the case, the visit date (1 to 3 days early for `visit_before_event`), the incident, the claimant, their statement and the medic's notes. The worker asks the Anthropic Claude API to write the hospital's report for that case, as structured output in the same schema as a read record.
 
-Code rejects a report that is off its case (`check_report`): it must validate as a 2-page record with nothing dropped, be made out to the claimant, carry the visit date on the encounter and every service, add up to its printed total, and say "home" for `hurt_at_home` or name the venue for `matches`. One retry, then `file_clinic_report` stores it and applies it as the claim's record.
+Code rejects a report that is off its case (`check_report`): it must validate as a 2-page record with nothing dropped, be made out to the claimant, carry the visit date on the encounter and every service, add up to its printed total, and say "home" for `hurt_at_home` or name the venue for `matches`. One retry. The worker then renders the report as a 2-page PDF, page 1 the clinical note and page 2 the itemized bill, stores it in the blob store and registers it (purpose `hospital_report`, `application/pdf`, `staff` access). `file_clinic_report` checks the report against its case, stores a `medical_record` in `reading` and enqueues `document_read` for the PDF, exactly like a filed report.
 
-The Anthropic Claude API never picks the case. It only writes the report the roll chose, and Claude then has to find out from the report itself whether it fits the incident.
+The Anthropic Claude API never picks the case. It only writes the report the roll chose, and Claude then has to find out from the report itself whether it fits the incident. The record the claim uses comes from the PDF, never from the written JSON.
 
-**A PDF.** With `pdf`, staff file the report's PDF from the claim ("File the medical record" on the organizer portal). `submit_medical_record` stores a `medical_record` in `reading` and enqueues `claim_record_extract`.
+**A PDF.** With `pdf`, staff file the report's PDF from the claim ("File the medical record" on the organizer portal). `submit_medical_record` stores a `medical_record` in `reading`, moves the claim to `ReadingRecord` with the note "reading the hospital report", and enqueues `document_read` with kind `hospital_report`.
 
-The worker sends the PDF to the Anthropic Claude API (effort `medium`) with "Copy, never infer" rules, and gets back structured output: document kind, patient, provider, encounter, diagnoses (ICD-10-CM), services (CPT or HCPCS, units, charge in cents, page), invoice number and printed total.
+**The read.** The worker `document_read` splits the PDF into pages and writes them to `bandit-documents` through `bandit-documents-extract`. A scanned page is first transcribed word for word by the Anthropic Claude API, which extracts nothing from it. The Elastic Workflow `bandit-read-document` reads the pages with the `hospital_report` schema, and the worker reads the answer back from `bandit-document-terms` ([Elastic](../7-integrations/Elastic.md)).
 
-Code validates it twice, in the worker and in the module (`validate_record`). It drops a diagnosis or service on a page outside the record, with a bad code shape, an unreadable date or 0 units, and lists each in `dropped`. It rejects the whole record when the patient or encounter page is out of range, the date does not parse, or no valid diagnosis or service remains.
+The answer is the record: document kind, patient, provider, encounter (date of service, time, reason for visit, history), diagnoses (ICD-10-CM), service lines (CPT or HCPCS, description, date, units, charge as printed), invoice number and total billed as printed. The patient, the provider, the encounter, each diagnosis, each service line, the invoice number and the total each carry the printed line or row they were read from, copied word for word, and its page. The worker hands the answer and the page texts to `apply_hospital_report`.
 
-A rejected record is asked once more. A second rejection marks it `failed` and routes the claim: `medical record rejected: {reasons}`.
+Code checks the read in the worker, for its log, and again in the module before anything is stored (`check_report_read`). Every quote must be on its page word for word, and each value must be inside its quote: the patient's name, the encounter date, each diagnosis code, each service's code, date and printed charge, the invoice number and the total. The reason for visit and the history must be printed word for word in the report. Code parses every amount, so `$385.00` becomes 38500 cents. A diagnosis or service line that fails is dropped with a reason, a patient or encounter that fails rejects the read, and any other field that fails is left empty, with a line in `dropped`.
+
+Then `validate_record` runs as before. It drops a diagnosis or service on a page outside the record, with a bad code shape, an unreadable date or 0 units, and lists each in `dropped`. It rejects the whole record when the patient or encounter page is out of range, the date does not parse, or no valid diagnosis or service remains.
+
+A rejected read marks the `medical_record` `failed` and routes the claim to the organizer: `the hospital report could not be read: {reasons}`. A `document_read` that runs out of attempts does the same: `the hospital report could not be read; a person must enter it`.
 
 Code then prices each line (`cover_lines`):
 
@@ -652,11 +656,11 @@ stateDiagram-v2
   AwaitingRecord --> Refused: staff claimant
   AwaitingRecord --> Refused: close_claim_without_injury
   AwaitingRecord --> Verifying: disputed, Claude decides at once
-  AwaitingRecord --> Verifying: file_clinic_report
+  AwaitingRecord --> ReadingRecord: file_clinic_report
   AwaitingRecord --> Routed: report off its case or never arrived
   AwaitingRecord --> ReadingRecord: submit_medical_record
-  ReadingRecord --> Routed: record rejected or unreadable
-  ReadingRecord --> Verifying: apply_medical_record
+  ReadingRecord --> Routed: read rejected or unreadable
+  ReadingRecord --> Verifying: apply_hospital_report
   Verifying --> Reviewing: submit_claim_checks
   Reviewing --> Refused: payout 0, or Claude refuses on a failed check
   Reviewing --> Routed: a complication, ask, or the guard holds the decision
@@ -729,7 +733,10 @@ sequenceDiagram
   M->>M: claim opens, pack v1, seeded draw of the report's case
   W->>C: clinic_report (the case, the incident, the statement)
   C-->>W: the hospital report as structured output
-  W->>M: file_clinic_report: checked, lines priced, pack v2, J1
+  W->>M: file_clinic_report: checked against its case, the 2-page PDF filed
+  W->>E: document_read: the PDF's pages, bandit-read-document
+  E-->>W: the record, every fact quoted with its page
+  W->>M: apply_hospital_report: quotes checked, lines priced, pack v2, J1
   W->>E: claim_verify: index the copy, search both policies
   E-->>W: validation, the matching clauses
   W->>M: submit_claim_checks
@@ -764,7 +771,7 @@ The injuries are spread so no zone has three, which would hand the whole occurre
 
 1. **Jordan falls.** Band 90 falls in the Main stage pit, and bands 94, 95 and 96 light the circle. The medic notes "left wrist pain and swelling after the crowd surged" and resolves the incident. The organizer files Jordan's claim in his words with the `pdf` choice, and the run files his urgent-care record.
 
-   The Anthropic Claude API reads it, and code covers $895 of the $1,308 billed. Six lines are cut to their caps and the Tdap shot (`90715`) is excluded, so `record_lines` fails and the claim waits for the organizer.
+   The Evidence Engine reads it, and code covers $895 of the $1,308 billed. Six lines are cut to their caps and the Tdap shot (`90715`) is excluded, so `record_lines` fails and the claim waits for the organizer.
 
    The first approval carries an amount from a screen a minute old, so `approve_claim` fails as stale and nothing moves. The second carries $895 and the current SHA-256: J2 posts, $895 lands in Jordan's wallet and J3 posts. The approval is kept as precedent 1 of 3 for (`fall`, `medical_payments`).
 2. **Maya falls the same way.** Band 91 slips near the stage, and bands 97 and 98 light the circle. Her first-aid report is $180, every check passes and Claude pays. No rule for falls exists yet, so the guard sends it to the organizer with Claude's pay on top.
@@ -827,7 +834,7 @@ erDiagram
 | `insurance_policy` | the venue's policy | `policy_number`, `insurer_name`, `fnol_contact`, `period_start`, `period_end`, `medical_used_cents`, `property_used_cents` |
 | `coverage_rule` | one cover under the policy | `cover_kind`, `incident_kinds`, `per_claim_limit_cents`, `aggregate_limit_cents`, `deductible_cents`, `service_window_days`, `active` |
 | `insurance_settings` | the starting values, one row | `venue_name`, `photo_window_secs`, `note_window_secs`, `min_witnesses`, `tz_offset_minutes`, `review_required` |
-| `clinic_report` | one hospital report requested for a claim | `scenario` (the drawn case), `choice`, `visit_date`, `status` (`requested`, `received`, `failed`), `job_id`, `provider_name`, `file_hash` (the report's text), `problems`, `model_call_id` |
+| `clinic_report` | one hospital report requested for a claim | `scenario` (the drawn case), `choice`, `visit_date`, `status` (`requested`, `received`, `failed`), `job_id`, `provider_name`, `file_hash` (the report's 2-page PDF), `problems`, `model_call_id` |
 | `claim` | one claim for one incident | `incident_id` (unique), `statement` (the attendee's own words), `cover_kind`, `claimant`, `band_id`, `zone_id`, `status`, `status_note`, `pack_version`, `pack_hash`, `corroboration`, the four amounts, `reserved`, `review_verdict`, `decided_by` (`rule`, `approver`, `code`), `settlement_rule_id` and version, `routed_to_role`, `routed_to_name`, `refusal_reason`, `payout_reference`, the four letter hashes, timestamps |
 | `evidence_fact` | one fact in one pack version | `seq`, `source`, `key`, `value`, `observed_at`, `reader`, `reference` |
 | `evidence_pack` | one hashed build of a claim's facts | `version`, `fact_count`, `hash`, `corroboration`, `checks` |
@@ -857,10 +864,10 @@ erDiagram
 |---|---|---|
 | `file_claim` | the attendee who wore the band | opens their injury claim with their statement and requests the hospital report |
 | `file_claim_for_wearer` | `ops`, `medic` | the same for the wearer, with a report choice |
-| `file_clinic_report` | `worker` | checks the written report against its case and applies it as the record |
+| `file_clinic_report` | `worker` | checks the written report against its case, files its PDF as a `medical_record` in `reading`, enqueues `document_read` with kind `hospital_report` |
 | `open_claim` | `ops` | opens a claim by hand for a resolved incident with none |
-| `submit_medical_record` | `medic`, `ops` | files the record, enqueues `claim_record_extract` |
-| `apply_medical_record` | `worker` | validates the record, prices the lines, rebuilds the pack, J1, enqueues `claim_verify` |
+| `submit_medical_record` | `medic`, `ops` | files the record, enqueues `document_read` with kind `hospital_report` |
+| `apply_hospital_report` | `worker` | checks every quote of The Evidence Engine's read on its page (`check_report_read`), validates the record, prices the lines, rebuilds the pack, J1, enqueues `claim_verify` |
 | `submit_claim_checks` | `worker` | stores the Elastic checks and the matching clauses (similar past claims today), enqueues `claim_review` |
 | `report_claim_step` | `worker` | one step of Claude's investigation into `decision` |
 | `submit_claim_review` | `worker` | validates Claude's decision, then the guard lets it through or sends it to the organizer |
@@ -885,7 +892,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Failure | Effect | Design answer |
 |---|---|---|
 | The written hospital report is off its case twice, or the `clinic_report` job dies | no record | the claim routes: `the hospital report could not be read: ...` or `the hospital report did not arrive; a person must file the record` |
-| A PDF record cannot be read: rejected twice, refused, or the job dies | no priced lines | the claim routes: `medical record rejected: ...` or `the medical record could not be read; a person must enter it` |
+| A hospital report PDF cannot be read: code rejects the read, or `document_read` runs out of attempts | no priced lines | the `medical_record` is `failed`, and the claim routes to the organizer: `the hospital report could not be read: ...` or `the hospital report could not be read; a person must enter it` |
 | The Evidence Engine is unavailable | no validation, no policy clauses | an `info` check `elastic`; Claude investigates without them, its policy tools answer empty, and a decision that would rest on a clause goes to the organizer |
 | Claude's answer fails `validate_decision` twice, or the job dies | no usable decision | the answer is set aside and code decides alone; nothing is paid on it |
 | A policy term cannot be read, or code rejects it (next to build) | that term is unknown | it keeps its default and is flagged for the organizer before they confirm |
@@ -904,7 +911,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `job`, `blob_ref`, `staff_role`, `attendee`, roles and the hook inside `resolve_incident`.
 - [Safety](Safety.md): `incident`, `incident_snapshot`, `incident_band`, `incident_note` with `cost_cents`, `resolve_incident`.
-- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, `model_call`, the prompts and schemas of `claim_record_extract`, `claim_review`, `rule_proposal`, `claim_draft` and `recovery_letter`.
+- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, `model_call`, the prompts and schemas of `clinic_report`, `claim_review`, `rule_proposal`, `claim_draft` and `recovery_letter`.
 - [Elastic](../7-integrations/Elastic.md): `bandit-claims` and `bandit-claims-validate`; `bandit-documents`, `bandit-documents-extract`, `bandit-policy-clauses`, the workflow `bandit-read-document` and the agent `bandit-document-reader` (next to build).
 - [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md): the `claim_payout` deposit and the wallet.
 - [Vision](../4-devices/Vision.md) (TBD -- LEO): `vision_assessment` and camera frames.
@@ -931,7 +938,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Each of the four incident types has its own claimant and paying policy, and BandIt opens no claim for an attendee's own belongings (next to build) | the venue's policy excludes guests' property, and the attendee's own insurer pays them; what is stolen from the venue is the venue's claim on its property policy |
 | An exclusion clause refuses only together with the failed check that tests it (next to build) | a wrong refusal hurts an injured attendee most, so it needs both the contract and evidence anyone can re-run |
 | The attendee files their own injury claim, in their own words; resolving the incident no longer opens it | the claim is the attendee's, and their account of what happened is evidence Claude compares with the report |
-| The hospital report's case comes from the module's seeded generator; the Anthropic Claude API only writes the report for it | BandIt has no hospital connection, a run can be played again exactly, and a model never picks an outcome |
+| The hospital report's case comes from the module's seeded generator; the Anthropic Claude API only writes the report for it, and The Evidence Engine reads it back from its PDF like a filed report | BandIt has no hospital connection, a run can be played again exactly, a model never picks an outcome, and the record a claim uses always comes from a printed page |
 | Claude investigates with tools and decides pay, refuse or ask the organizer | the judgment of whether a story hangs together belongs to the part that can read every source and weigh them |
 | The guard lets a pay through only inside an approved rule's ceiling with every check passed and the evidence corroborated, and a refusal only on a failed check | Claude decides, but it never pays outside what an organizer approved, and never refuses on something no one can re-run |
 | Code computes every amount; Claude never sets a figure | a model must never decide a payable |

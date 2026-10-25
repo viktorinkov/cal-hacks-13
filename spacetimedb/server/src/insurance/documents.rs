@@ -165,6 +165,9 @@ pub fn submit_policy_document(ctx: &ReducerContext, file_hash: String, page_coun
 #[spacetimedb::reducer]
 pub fn apply_document_terms(ctx: &ReducerContext, job_id: u64, read_json: String, pages: Vec<String>) -> Result<(), String> {
     let job = jobs::leased_by_caller(ctx, job_id)?;
+    if job.subject_table != "policy_document" {
+        return Err("this job is not about a policy document".into());
+    }
     let doc = ctx.db.policy_document().id().find(job.subject_id).ok_or("no policy document for this job")?;
     let read: PolicyRead = serde_json::from_str(&read_json).map_err(|e| format!("the reader's answer is not a policy read: {e}"))?;
     let mut checked = check_policy(&read, &pages);
@@ -376,10 +379,13 @@ pub fn in_period(ctx: &ReducerContext, policy_id: u64, at: Timestamp) -> bool {
     ctx.db.insurance_policy().id().find(policy_id).is_none_or(|p| !p.period_checked || (p.period_start <= at && at < p.period_end))
 }
 
-/// A dead `document_read` marks its document failed.
+/// A dead `document_read` marks its document failed; a hospital report's goes to a person.
 pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
     if job.kind != KIND_DOCUMENT_READ {
         return;
+    }
+    if job.subject_table == super::flow::REPORT_SUBJECT {
+        return super::flow::on_report_read_dead(ctx, job);
     }
     if let Some(doc) = ctx.db.policy_document().id().find(job.subject_id).filter(|d| d.status == "reading") {
         ctx.db.policy_document().id().update(PolicyDocument { status: "failed".into(), error: job.error.clone(), ..doc });
