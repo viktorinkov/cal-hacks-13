@@ -15,7 +15,6 @@ import sys
 import threading
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import cv2
@@ -40,10 +39,11 @@ floor at y = 0. Poses here are in those units: x and z across the floor, y up.
 map renders the splat with the GPU through headless Chrome (Spark, the same renderer as the security page) from
 standing height all over the floor: every --spacing units (3) where the floor is open, eight directions each, a
 colour view and a depth view. The depth view comes from the splat itself: each Gaussian is coloured by its distance
-in three linear ranges, so the blended pixel is the depth the colour view shows there. Every SIFT feature of every
-colour view is lifted to the 3D point it shows: a point cloud in which each point carries the look of the venue
-around it, like the output of photogrammetry, but taken from the splat. About 20 minutes, into
-pipeline/data/venue/photo_map.
+in three linear ranges, so the blended pixel is the depth the colour view shows there. Every SuperPoint feature of
+every colour view is lifted to the 3D point it shows: a point cloud in which each point carries the look of the venue
+around it, like the output of photogrammetry, but taken from the splat. About 25 minutes, into
+pipeline/data/venue/photo_map. Features and matching are SuperPoint and LightGlue (github.com/cvg/LightGlue, on the
+GPU through Metal), which match a sharp photo to the softer splat many times better than SIFT does.
 
 align finds the 2D similarity that puts the splat's walls on the outline of the venue map's floor (web/venue/floor.json)
 by trying every rotation and a range of scales, the shift for each found by FFT correlation. Walls alone slide along a
@@ -52,10 +52,10 @@ and mezzanine) by trimmed ICP from 75 starts. It says what share of the splat's 
 how close the splat ends to the model, and draws both in align.png to check by eye. The scale is the size of one
 splat unit in metres (0.86 for hall.spz). --pairs takes hand-picked point pairs instead.
 
-locate scores every map view against the photo on the GPU (torch with Metal): how many photo features have a clear,
-mutual best match among the view's, with a strict ratio test inside each view so repeated chairs and lights do not
-count. From each of the best few views, spread out, it renders the splat with the photo's own lens, matches the
-photo to the render, solves the camera from the 2D to 3D matches (RANSAC on four-point samples, then
+locate scores every map view against the photo on the GPU: how many photo features have a clear, mutual best match
+among the view's. LightGlue then matches the photo to each of the best 30 views, spread out, and PnP on the matched
+map points ranks them. From each of the best few it renders the splat with the photo's own lens, matches the photo
+to the render with LightGlue, solves the camera from the 2D to 3D matches (RANSAC on four-point samples, then
 Levenberg-Marquardt) and renders again from there, until the camera stops moving. The guess that converges with the
 most agreeing features wins. The lens comes from the photo's EXIF (35 mm equivalent focal length), else it is solved
 with the pose. Each photo gets a record (its camera, how many features agree, their error in pixels) and an overlay:
@@ -284,6 +284,8 @@ class Chrome:
         if ready != 'ready':
             self.close()
             sys.exit(f'the render page did not load the splat: {ready} {self.errors[:3]}')
+        for _ in range(3):
+            self.render(look_at(np.array([0.0, EYE_M, 0.0]), 0, 0), 500, 640, 480, depth_scale=0.5, frames=20)
 
     def call(self, method, params=None, session=None):
         i = next(self.ids)
@@ -363,66 +365,36 @@ def lift(pts, d, K, c2w_gl):
     return (cam @ c2w[:3, :3].T + c2w[:3, 3]).astype(np.float32)
 
 
-SIFT = None
+class Net:
 
-
-def features(gray, n=4000, mask=None):
-    global SIFT
-    if SIFT is None:
-        SIFT = cv2.SIFT_create(nfeatures=0, contrastThreshold=0.015, edgeThreshold=12)
-    kps, desc = SIFT.detectAndCompute(gray, mask)
-    if desc is None or not len(kps):
-        return np.zeros((0, 2), np.float32), np.zeros((0, 128), np.float32)
-    order = np.argsort([-k.response for k in kps])[:n]
-    pts = np.array([kps[i].pt for i in order], np.float32)
-    desc = desc[order]
-    desc = np.sqrt(desc / np.maximum(desc.sum(1, keepdims=True), 1e-7))
-    return pts, desc.astype(np.float32)
-
-
-class Matcher:
-
-    def __init__(self):
+    def __init__(self, keypoints=4096):
         import torch
+        from lightglue import LightGlue, SuperPoint
+        if not os.environ.get('SSL_CERT_FILE'):
+            import certifi
+            os.environ['SSL_CERT_FILE'] = certifi.where()
         self.torch = torch
         self.dev = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+        self.sp = SuperPoint(max_num_keypoints=keypoints).eval().to(self.dev)
+        self.lg = LightGlue(features='superpoint').eval().to(self.dev)
 
-    def put(self, desc):
-        t = self.torch.from_numpy(np.ascontiguousarray(desc))
-        return t.to(self.dev, self.torch.float16) if self.dev.type != 'cpu' else t.float()
-
-    def top2(self, q, db, chunk=200_000):
+    def extract(self, bgr):
         torch = self.torch
-        qt = self.put(q)
-        best = torch.full((len(q), 2), -2.0, device=self.dev)
-        idx = torch.zeros((len(q), 2), dtype=torch.long, device=self.dev)
-        for s in range(0, db.shape[0], chunk):
-            sim = (qt @ db[s:s + chunk].T).float()
-            v, i = sim.topk(min(2, sim.shape[1]), dim=1)
-            if v.shape[1] == 1:
-                v, i = torch.cat([v, v - 1], 1), torch.cat([i, i], 1)
-            allv, alli = torch.cat([best, v], 1), torch.cat([idx, i + s], 1)
-            top, pick = allv.topk(2, dim=1)
-            best, idx = top, alli.gather(1, pick)
-        dist = torch.sqrt(torch.clamp(2 - 2 * best, min=0))
-        return idx.cpu().numpy(), dist.cpu().numpy()
+        img = torch.from_numpy(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float().div(255).to(self.dev)
+        with torch.no_grad():
+            f = self.sp.extract(img)
+        return f['keypoints'][0].cpu().numpy(), f['descriptors'][0].cpu().numpy(), f
 
+    def feats(self, kp, desc, size):
+        t = self.torch
+        return {'keypoints': t.from_numpy(np.ascontiguousarray(kp, np.float32))[None].to(self.dev),
+                'descriptors': t.from_numpy(np.ascontiguousarray(desc, np.float32))[None].to(self.dev),
+                'image_size': t.tensor([[float(size[0]), float(size[1])]], device=self.dev)}
 
-def ratio_matches(matcher, qd, dd, ratio):
-    if not len(qd) or not len(dd):
-        return np.zeros((0, 2), int)
-    db = matcher.put(dd)
-    idx, dist = matcher.top2(qd, db)
-    keep = dist[:, 0] < ratio * dist[:, 1]
-    return np.c_[np.nonzero(keep)[0], idx[keep, 0]]
-
-
-def mutual_matches(matcher, ad, bd, ratio=0.85):
-    ab = ratio_matches(matcher, ad, bd, ratio)
-    if not len(ab):
-        return ab
-    ba_idx, _ = matcher.top2(bd, matcher.put(ad))
-    return ab[ba_idx[ab[:, 1], 0] == ab[:, 0]]
+    def match(self, fa, fb):
+        with self.torch.no_grad():
+            out = self.lg({'image0': fa, 'image1': fb})
+        return out['matches'][0].cpu().numpy()
 
 
 def open_floor(splat, cell=1.0):
@@ -472,50 +444,39 @@ def build_map(args):
     if args.limit:
         views = views[:args.limit]
     say(f'{len(splat["xyz"]) / 1e6:.2f} M Gaussians; {len(views) // 8} standing points, {len(views)} views to render')
+    net = Net(keypoints=args.features)
     srv = serve(args.port, splat['matrix'])
     chrome = Chrome(f'http://127.0.0.1:{args.port}/render.html', args.chrome)
     f = (MAP_W / 2) / math.tan(math.radians(MAP_HFOV / 2))
     K = intrinsics(f, MAP_W, MAP_H)
     thumbs = os.path.join(WORK, 'views')
     os.makedirs(thumbs, exist_ok=True)
-    all_desc, all_xyz, all_view, meta = [], [], [], []
-    pool = ThreadPoolExecutor(4)
-
-    def process(i, v, c2w, colour, depth):
-        gray = cv2.cvtColor(colour, cv2.COLOR_BGR2GRAY)
-        pts, desc = features(gray, n=args.features)
-        d = sample_depth(depth, pts, depth.shape[1] / MAP_W)
-        keep = np.isfinite(d) & (d < 60)
-        xyz = lift(pts[keep], d[keep], K, c2w)
-        cv2.imwrite(os.path.join(thumbs, f'{i:05d}.jpg'), cv2.resize(colour, (320, 240), interpolation=cv2.INTER_AREA),
-                    [cv2.IMWRITE_JPEG_QUALITY, 80])
-        return i, desc[keep], xyz, int(keep.sum()), len(pts)
-
-    futures = []
+    all_kp, all_desc, all_xyz, all_view, meta = [], [], [], [], []
     t0 = time.time()
     try:
         for i, v in enumerate(views):
             c2w = look_at(np.array(v['pos']), v['yaw'], v['pitch'])
             colour, depth = chrome.render(c2w, f, MAP_W, MAP_H)
-            futures.append(pool.submit(process, i, v, c2w, colour, depth))
-            meta.append({'pos': v['pos'], 'yaw': v['yaw'], 'pitch': v['pitch'], 'c2w': c2w.tolist()})
+            kp, desc, _ = net.extract(colour)
+            d = sample_depth(depth, kp, depth.shape[1] / MAP_W)
+            keep = np.isfinite(d) & (d < 60)
+            all_kp.append(kp[keep].astype(np.float32))
+            all_desc.append(desc[keep].astype(np.float16))
+            all_xyz.append(lift(kp[keep], d[keep], K, c2w))
+            all_view.append(np.full(int(keep.sum()), i, np.int32))
+            cv2.imwrite(os.path.join(thumbs, f'{i:05d}.jpg'), cv2.resize(colour, (320, 240), interpolation=cv2.INTER_AREA),
+                        [cv2.IMWRITE_JPEG_QUALITY, 80])
+            meta.append({'pos': v['pos'], 'yaw': v['yaw'], 'pitch': v['pitch'], 'c2w': c2w.tolist(), 'points': int(keep.sum())})
             if (i + 1) % 80 == 0:
                 rate = (time.time() - t0) / (i + 1)
                 say(f'{i + 1} of {len(views)} views, {rate:.2f} s each, {(len(views) - i - 1) * rate / 60:.0f} min left')
-        for fut in futures:
-            i, desc, xyz, kept, found = fut.result()
-            meta[i]['points'] = kept
-            all_desc.append((desc * 255).round().astype(np.uint8))
-            all_xyz.append(xyz)
-            all_view.append(np.full(len(xyz), i, np.int32))
     finally:
         chrome.close()
         srv.shutdown()
-    desc = np.concatenate(all_desc)
     xyz = np.concatenate(all_xyz)
-    view = np.concatenate(all_view)
-    np.savez(os.path.join(WORK, 'map.npz'), desc=desc, xyz=xyz, view=view)
-    json.dump({'views': meta, 'K': K.tolist(), 'size': [MAP_W, MAP_H], 'spacing': args.spacing,
+    np.savez(os.path.join(WORK, 'map.npz'), desc=np.concatenate(all_desc), kp=np.concatenate(all_kp), xyz=xyz,
+             view=np.concatenate(all_view))
+    json.dump({'views': meta, 'K': K.tolist(), 'size': [MAP_W, MAP_H], 'spacing': args.spacing, 'features': 'superpoint',
                'splat': os.path.relpath(SPLAT, ROOT), 'built': datetime.now(timezone.utc).isoformat(timespec='seconds')},
               open(os.path.join(WORK, 'views.json'), 'w'))
     say(f'map: {len(xyz)} 3D features from {len(views)} views in {(time.time() - t0) / 60:.1f} min -> {WORK}')
@@ -523,38 +484,40 @@ def build_map(args):
 
 class Map:
 
-    def __init__(self, matcher, per_view=1000):
+    def __init__(self, net, per_view=1024):
         path = os.path.join(WORK, 'map.npz')
         if not os.path.exists(path):
             sys.exit(f'no map in {WORK}: run "photo_place.py map" first')
         z = np.load(path)
-        desc, self.xyz, view = z['desc'], z['xyz'], z['view']
+        if 'kp' not in z:
+            sys.exit(f'the map in {WORK} has the older SIFT features: run "photo_place.py map" again')
+        self.desc, self.kp, self.xyz, view = z['desc'], z['kp'], z['xyz'], z['view']
         self.meta = json.load(open(os.path.join(WORK, 'views.json')))
         self.views = self.meta['views']
+        self.net = net
         n = len(self.views)
         starts = np.searchsorted(view, np.arange(n))
         ends = np.minimum(np.searchsorted(view, np.arange(n), side='right'), starts + per_view)
-        packed = np.zeros((n, per_view, 128), np.float16)
+        packed = np.zeros((n, per_view, self.desc.shape[1]), np.float16)
         self.index = np.full((n, per_view), -1, np.int64)
         for v in range(n):
             k = ends[v] - starts[v]
-            packed[v, :k] = desc[starts[v]:ends[v]] / 255.0
+            packed[v, :k] = self.desc[starts[v]:ends[v]]
             self.index[v, :k] = np.arange(starts[v], ends[v])
-        self.count = ends - starts
-        torch = matcher.torch
-        self.torch, self.dev = torch, matcher.dev
-        self.desc = torch.from_numpy(packed).to(self.dev)
+        torch = net.torch
+        self.torch, self.dev = torch, net.dev
+        self.packed = torch.from_numpy(packed).to(self.dev)
         self.valid = torch.from_numpy(self.index >= 0).to(self.dev)
         self.pos = np.array([v['pos'] for v in self.views], np.float32)
         self.yaw = np.array([v['yaw'] for v in self.views], np.float32)
 
-    def score(self, qdesc, ratio=0.75, batch=24):
+    def score(self, qdesc, ratio=0.9, batch=16):
         torch = self.torch
-        q = torch.from_numpy(qdesc).to(self.dev, torch.float16)
+        q = torch.from_numpy(np.ascontiguousarray(qdesc)).to(self.dev, torch.float16)
         out = torch.zeros(len(self.views), device=self.dev)
         rows = torch.arange(q.shape[0], device=self.dev)[None, :]
         for s in range(0, len(self.views), batch):
-            sim = torch.einsum('nd,bmd->bnm', q, self.desc[s:s + batch]).float()
+            sim = torch.einsum('nd,bmd->bnm', q, self.packed[s:s + batch]).float()
             sim = sim.masked_fill(~self.valid[s:s + batch][:, None, :], -2)
             top, ti = sim.topk(2, dim=2)
             d = torch.sqrt(torch.clamp(2 - 2 * top, min=0))
@@ -562,18 +525,9 @@ class Map:
             out[s:s + batch] = ((d[..., 0] < ratio * d[..., 1]) & mutual).sum(1).float()
         return out.cpu().numpy()
 
-    def pairs(self, qdesc, v, ratio=0.8):
-        torch = self.torch
-        n = int(self.count[v])
-        if n < 2:
-            return np.zeros(0, int), np.zeros(0, int)
-        q = torch.from_numpy(qdesc).to(self.dev, torch.float16)
-        sim = (q @ self.desc[v, :n].T).float()
-        top, ti = sim.topk(2, dim=1)
-        d = torch.sqrt(torch.clamp(2 - 2 * top, min=0))
-        good = (d[:, 0] < ratio * d[:, 1]) & (sim.argmax(0)[ti[:, 0]] == torch.arange(q.shape[0], device=self.dev))
-        qi = torch.nonzero(good)[:, 0].cpu().numpy()
-        return qi, self.index[v, ti[good, 0].cpu().numpy()]
+    def feats(self, v):
+        idx = self.index[v][self.index[v] >= 0]
+        return self.net.feats(self.kp[idx], self.desc[idx], self.meta['size']), idx
 
 
 def photo_focal(path, w, h):
@@ -636,41 +590,46 @@ class Locator:
     WIDTH = 1024
 
     def __init__(self, chrome):
-        self.matcher = Matcher()
-        self.map = Map(self.matcher)
+        self.net = Net()
+        self.map = Map(self.net)
         self.chrome = chrome
 
-    def candidates(self, desc, keep=16):
+    def candidates(self, fphoto, desc, pts, K, w, shortlist=30, keep=6):
         m = self.map
         score = m.score(desc)
-        picked = []
+        shortlisted = []
         for v in np.argsort(-score):
-            if score[v] < 8 or len(picked) >= keep:
+            if len(shortlisted) >= shortlist:
                 break
             if all(np.linalg.norm(m.pos[v] - m.pos[p]) > 2.5 or abs((m.yaw[v] - m.yaw[p] + 180) % 360 - 180) > 40
-                   for p in picked):
-                picked.append(int(v))
-        return picked, score
+                   for p in shortlisted):
+                shortlisted.append(int(v))
+        checked = []
+        for v in shortlisted:
+            fv, idx = m.feats(v)
+            mm = self.net.match(fphoto, fv)
+            sol = solve_pnp(pts[mm[:, 0]], m.xyz[idx[mm[:, 1]]], K, 8.0 * w / 1024, iterations=20000) if len(mm) >= 12 else None
+            checked.append((len(sol[2]) if sol else 0, len(mm), v, sol))
+        checked.sort(key=lambda c: (-c[0], -c[1]))
+        return checked[:keep], score
 
-    def step(self, pts, desc, K, c2w, w, h):
+    def step(self, fphoto, pts, K, c2w, w, h, thresh):
         colour, depth = self.chrome.render(c2w, K[0, 0], w, h, depth_scale=0.5)
-        rp, rd = features(cv2.cvtColor(colour, cv2.COLOR_BGR2GRAY), n=6000)
-        pairs = mutual_matches(self.matcher, desc, rd, 0.9)
-        if len(pairs) < 12:
+        rp, _, frender = self.net.extract(colour)
+        mm = self.net.match(fphoto, frender)
+        if len(mm) < 12:
             return None
-        d = sample_depth(depth, rp[pairs[:, 1]], depth.shape[1] / w)
+        d = sample_depth(depth, rp[mm[:, 1]], depth.shape[1] / w)
         ok = np.isfinite(d)
-        p2, p3 = pts[pairs[ok, 0]], lift(rp[pairs[ok, 1]], d[ok], K, c2w)
-        sol = solve_pnp(p2, p3, K, 8.0 * w / 1024)
-        if not sol:
-            return None
-        return sol + (p2, p3)
+        p2, p3 = pts[mm[ok, 0]], lift(rp[mm[ok, 1]], d[ok], K, c2w)
+        sol = solve_pnp(p2, p3, K, thresh)
+        return sol + (p2, p3) if sol else None
 
-    def converge(self, pts, desc, K, c2w, w, h, rounds=8):
+    def converge(self, fphoto, pts, K, c2w, w, h, rounds=8):
         history = []
         for k in range(rounds):
-            sol = self.step(pts, desc, K, c2w, w, h)
-            if not sol or (k >= 1 and len(sol[2]) < 10):
+            sol = self.step(fphoto, pts, K, c2w, w, h, (8.0 if k < 2 else 4.0) * w / 1024)
+            if not sol or (k >= 1 and len(sol[2]) < 15):
                 return None, history
             rvec, tvec, inl, p2, p3 = sol
             new = c2w_from(rvec, tvec)
@@ -678,7 +637,7 @@ class Locator:
             err = reproj_error(p2[inl], p3[inl], K, rvec, tvec)
             history.append({'inliers': int(len(inl)), 'error_px': round(float(np.median(err)), 2), 'moved': round(moved, 3)})
             c2w = new
-            if k >= 2 and moved < 0.03:
+            if k >= 2 and moved < 0.02:
                 break
         return (c2w, inl, p2, p3), history
 
@@ -693,31 +652,28 @@ class Locator:
         f_exif = photo_focal(path, w0, h0)
         f = (focal or f_exif or 0.8 * max(w0, h0)) * s
         K = intrinsics(f, w, h)
-        pts, desc = features(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), n=6000)
+        pts, desc, fphoto = self.net.extract(img)
         rec = {'photo': os.path.abspath(path), 'size': [w0, h0], 'features': int(len(pts)),
                'focal_exif_px': round(f_exif, 1) if f_exif else None}
-        picked, score = self.candidates(desc)
-        tries = []
-        best = None
-        for v in picked:
+        checked, score = self.candidates(fphoto, desc, pts, K, w)
+        tries, best = [], None
+        for inl_count, matches, v, sol in checked:
             start = np.array(self.map.views[v]['c2w'])
-            qi, mi = self.map.pairs(desc, v)
-            sol = solve_pnp(pts[qi], self.map.xyz[mi], K, 8.0 * w / 1024, iterations=20000) if len(qi) >= 10 else None
-            if sol and len(sol[2]) >= 10 and np.linalg.norm(c2w_from(sol[0], sol[1])[:3, 3] - start[:3, 3]) < 8:
+            if sol and inl_count >= 10 and np.linalg.norm(c2w_from(sol[0], sol[1])[:3, 3] - start[:3, 3]) < 8:
                 start = c2w_from(sol[0], sol[1])
-            result, history = self.converge(pts, desc, K, start, w, h)
-            tries.append({'view': v, 'score': int(score[v]), 'inliers': history[-1]['inliers'] if history else 0,
-                          'converged': result is not None})
+            result, history = self.converge(fphoto, pts, K, start, w, h)
+            tries.append({'view': v, 'score': int(score[v]), 'matches': int(matches), 'map_inliers': int(inl_count),
+                          'inliers': history[-1]['inliers'] if history else 0, 'converged': result is not None})
             if result and (best is None or len(result[1]) > len(best[0][1])):
                 best = (result, history, v)
-            if best and len(best[0][1]) >= 80:
+            if best and len(best[0][1]) >= 300:
                 break
         rec['tries'] = tries
         if not best:
             rec['error'] = 'no guess converged on the splat'
             return rec
         (c2w, inl, p2, p3), history, view = best
-        if len(inl) >= 30 and not focal and not f_exif:
+        if len(inl) >= 40 and not focal and not f_exif:
             rvec, tvec = rt_from(c2w)
             rvec, tvec, f2 = refine_with_focal(p2[inl], p3[inl].astype(np.float64), K, rvec, tvec)
             if 0.4 * w < f2 < 2.5 * w:
@@ -727,7 +683,7 @@ class Locator:
         rec.update({'c2w': np.round(c2w, 6).tolist(), 'focal_px': round(K[0, 0] / s, 1),
                     'hfov_deg': round(math.degrees(2 * math.atan(w / 2 / K[0, 0])), 1), 'inliers': last['inliers'],
                     'error_px': last['error_px'], 'start_view': view, 'refine': history})
-        rec['confident'] = bool(last['inliers'] >= 30 and last['error_px'] < 3.0 and last['moved'] < 0.15)
+        rec['confident'] = bool(last['inliers'] >= 60 and last['error_px'] < 3.0 and last['moved'] < 0.15)
         if out_dir:
             rec['overlay'] = self.overlay(img, c2w, K, out_dir, os.path.splitext(os.path.basename(path))[0])
         return rec
@@ -1215,15 +1171,19 @@ def place_cmd(args):
         else:
             bands = []
         p = place_photo(rec, venue, depth, bands, photographer=args.photographer)
+        if not rec['confident']:
+            p['send_to'] = []
         p.update({'id': name, 'photo': rec['photo'], 'taken': when.isoformat() if when else None, 'c2w': rec['c2w'],
                   'size': rec['size'], 'focal_px': rec['focal_px'], 'hfov_deg': rec['hfov_deg'], 'inliers': rec['inliers'],
                   'error_px': rec['error_px'], 'confident': rec['confident'], 'test_bands': bool(args.test_bands and positions is None)})
         out.append(p)
-        say(f'{name}: {p["where"]}; send to {p["send_to"] or "nobody"}'
-            + (f' (photographer {p["photographer"]})' if p['photographer'] else ''))
+        say(f'{name}: {p["where"]}; ' + (f'send to {p["send_to"] or "nobody"}' + (f' (photographer {p["photographer"]})'
+                                                                                 if p['photographer'] else '')
+                                        if rec['confident'] else 'unsure, held back until someone checks it'))
     json.dump({'photos': out, 'landmarks': venue.landmarks, 'align': json.load(open(os.path.join(WORK, 'align.json')))},
               open(os.path.join(WORK, 'places.json'), 'w'), indent=1)
-    say(f'{len(out)} photos placed -> {os.path.join(WORK, "places.json")}')
+    say(f'{len(out)} photos placed, {sum(1 for p in out if p["confident"])} surely enough to send -> '
+        f'{os.path.join(WORK, "places.json")}')
 
 
 def view_cmd(args):
@@ -1331,7 +1291,7 @@ def main():
     sub = ap.add_subparsers(dest='mode', required=True)
     m = sub.add_parser('map')
     m.add_argument('--spacing', type=float, default=3.0, help='metres between standing points')
-    m.add_argument('--features', type=int, default=1500, help='features kept per view')
+    m.add_argument('--features', type=int, default=1024, help='SuperPoint features per view')
     m.add_argument('--limit', type=int, default=0, help='render only this many views (a quick look)')
     lo = sub.add_parser('locate')
     lo.add_argument('photos', nargs='+', help='photos or folders of photos')
