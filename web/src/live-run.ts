@@ -9,7 +9,8 @@ import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
-import { venueView, type LiveView } from './venue-setup';
+import { dragBar, dragged } from './resize';
+import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { IncidentMarker, LiveRun } from './module_bindings/types';
 
@@ -314,16 +315,35 @@ function legend() {
       h('td', {}, meaning)))));
 }
 
+/** The side panels' widths until their bars are dragged. */
+const SIDES = { left: 300, right: 340 };
+/** The 3D view keeps at least this much of the window's width between the side panels. */
+const MIN_VIEW = 320;
+
+/** The bar between a side panel and the 3D view, which drags the panel wider or narrower. */
+function sideBar(side: 'left' | 'right') {
+  const other = side === 'left' ? 'right' : 'left';
+  const width = (s: 'left' | 'right') => dragged(`live ${s}`) ?? SIDES[s];
+  return dragBar(`live ${side}`, 'x', side === 'left' ? 1 : -1, () => width(side),
+    px => (document.querySelector('.live') as HTMLElement | null)?.style.setProperty(`--${side}`, `${px}px`),
+    180, () => innerWidth - width(other) - MIN_VIEW);
+}
+
 /** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the decisions and our
- * bands on the right. */
+ * bands on the right. The bars between them and under the view resize them. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
   syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
-  return h('div', { class: 'live' },
+  const height = dragged('live height');
+  if (height) setLiveHeight(height);
+  const sides = (['left', 'right'] as const).map(s => `--${s}: ${dragged(`live ${s}`) ?? SIDES[s]}px`).join('; ');
+  return h('div', { class: 'live', style: sides },
     h('div', {}, incidents(r, canRun), legend()),
-    h('div', {}, h('section', {}, v!.view, v!.note)),
+    sideBar('left'),
+    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240), v!.note)),
+    sideBar('right'),
     h('div', {}, history(), canRun && placeBands()));
 }

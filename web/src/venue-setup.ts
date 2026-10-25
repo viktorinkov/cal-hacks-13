@@ -43,6 +43,8 @@ let controls: OrbitControls;
 /** What the Live tab adds: the crowd and the incidents, shown only there. */
 const liveLayer = new THREE.Group();
 const frames: ((now: number) => void)[] = [];
+/** The Live tab's view height in pixels once the bar under it is dragged; until then most of the window's height. */
+let liveHeight = 0;
 
 function makeView() {
   view = h('div', { class: 'venue-3d' });
@@ -99,7 +101,7 @@ function makeView() {
     if (!view!.isConnected) return;
     const w = view!.clientWidth;
     // On the Live tab the venue fills most of the window's height, so it is easy to explore.
-    const hgt = liveLayer.visible ? Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
+    const hgt = liveLayer.visible ? liveHeight || Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
     if (w && (renderer.domElement.width !== Math.round(w * renderer.getPixelRatio()) || camera.aspect !== w / hgt)) {
       renderer.setSize(w, hgt);
       camera.aspect = w / hgt;
@@ -153,6 +155,11 @@ function floorAt(e: MouseEvent) {
   if (!p || !model) return undefined;
   const box = new THREE.Box3().setFromObject(model);
   return p.x >= box.min.x && p.x <= box.max.x && p.z >= box.min.z && p.z <= box.max.z ? { x: p.x, z: p.z } : undefined;
+}
+
+/** Sets the Live tab's view height, in pixels. */
+export function setLiveHeight(px: number) {
+  liveHeight = px;
 }
 
 export function venueView(c: DbConnection): LiveView {
