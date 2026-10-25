@@ -1,6 +1,8 @@
-//! bandit-api's Elastic side: it ranks the recap's suggestions by meaning, finds the closest booths of
-//! people who share none with the attendee, and keeps each attendee's
-//! latest ranking in `<prefix>-recap-rankings` for the Kibana recap dashboard.
+//! bandit-api's Elastic side: it ranks the recap's suggestions, finds the closest booths of people who
+//! share none with the attendee, and keeps each attendee's latest ranking in
+//! `<prefix>-recap-rankings` for the Kibana recap dashboard. Every ranking is a hybrid search: a
+//! keyword match on the `words` subfield and a semantic query, fused with RRF, then reordered by a
+//! reranker.
 //! The people and booths indices and their fields are written by bandit-indexer.
 
 use anyhow::{Result, bail};
@@ -10,6 +12,8 @@ use std::time::Duration;
 
 /// An Elastic call that takes longer fails, and the recap falls back to minutes.
 const TIMEOUT: Duration = Duration::from_secs(10);
+/// Rerank endpoint that reads the attendee's interests next to each fused candidate.
+const RERANK_ID: &str = ".jina-reranker-v3";
 
 pub struct Elastic {
     http: Client,
@@ -28,7 +32,7 @@ pub struct Ranking {
     pub interests: String,
 }
 
-/// A booth Elastic matched by meaning, with its tags: the booth's own, then its organisation's.
+/// A booth Elastic matched to the interests, with its tags: the booth's own, then its organisation's.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Closest {
     pub booth_id: u64,
@@ -117,30 +121,67 @@ impl Elastic {
         if interests.trim().is_empty() {
             bail!("nothing to rank by: no interests and no visits");
         }
-        let people_query = rank_query("interests", "node_id", interests, people);
-        let booths_query = rank_query("description", "booth_id", interests, booths);
         let (people, booths, theirs) = tokio::try_join!(
-            self.search("people", &people_query),
-            self.search("booths", &booths_query),
+            self.ranked("people", "interests", "node_id", interests, people),
+            self.ranked("booths", "description", "booth_id", interests, booths),
             self.closest(interests, theirs),
         )?;
         Ok(Ranking {
-            people: scores(&people, "node_id"),
-            booths: scores(&booths, "booth_id"),
+            people,
+            booths,
             theirs,
             interests: interests.to_string(),
         })
     }
 
-    /// The booths among `ids` closest by meaning to `text`, best first, with their tags. No call when
+    /// The booths among `ids` that best match `text`, best first, with their tags. No call when
     /// there are no `ids`.
     pub async fn closest(&self, text: &str, ids: &[u64]) -> Result<Vec<Closest>> {
         if ids.is_empty() || text.trim().is_empty() {
             return Ok(Vec::new());
         }
-        let found = self.search("booths", &closest_query(text, ids)).await?;
+        let found = self
+            .reranked("booths", |rerank| closest_query(text, ids, rerank))
+            .await?;
         Ok(closest_hits(&found))
     }
+
+    /// The candidates `ids` ranked by [`rank_query`], best first, with their scores. No call when
+    /// there are no `ids`.
+    async fn ranked(
+        &self,
+        index: &str,
+        field: &str,
+        id_field: &str,
+        text: &str,
+        ids: &[u64],
+    ) -> Result<Vec<(u64, f64)>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let found = self
+            .reranked(index, |rerank| rank_query(field, id_field, text, ids, rerank))
+            .await?;
+        Ok(scores(&found, id_field))
+    }
+
+    /// Runs `query(true)`, the reranked search; when Elastic answers it with an error, runs
+    /// `query(false)`, the same search without the reranker.
+    async fn reranked(&self, index: &str, query: impl Fn(bool) -> Value) -> Result<Value> {
+        match self.search(index, &query(true)).await {
+            Err(e) if !timed_out(&e) => {
+                eprintln!("{index} rerank failed, keeping the fused order: {e:#}");
+                self.search(index, &query(false)).await
+            }
+            found => found,
+        }
+    }
+}
+
+/// A call that ran into [`TIMEOUT`]; it is not tried again, so the recap waits at most once.
+fn timed_out(e: &anyhow::Error) -> bool {
+    e.downcast_ref::<reqwest::Error>()
+        .is_some_and(reqwest::Error::is_timeout)
 }
 
 /// One document per attendee: who, the places their interests text names, and the order Elastic
@@ -176,21 +217,41 @@ pub fn own_interests_query(attendee_id: &str) -> Value {
     })
 }
 
-/// The candidates `ids` (values of `id_field`), ranked by the meaning of `semantic_field` against `text`.
-pub fn rank_query(semantic_field: &str, id_field: &str, text: &str, ids: &[u64]) -> Value {
+/// The candidates `ids` (values of `id_field`), ranked against `text` by a keyword match on
+/// `<field>.words` and a semantic query on `field`, fused with RRF and, with `rerank`, reordered by
+/// the reranker reading `field`. Every candidate fits in the window, so none is cut.
+pub fn rank_query(field: &str, id_field: &str, text: &str, ids: &[u64], rerank: bool) -> Value {
+    let filter = json!({ "terms": { id_field: ids } });
+    let half = |q: Value| json!({ "standard": { "query": { "bool": { "must": q, "filter": filter } } } });
+    let window = ids.len().max(1);
+    let fused = json!({ "rrf": {
+        "retrievers": [
+            half(json!({ "match": { format!("{field}.words"): text } })),
+            half(json!({ "semantic": { "field": field, "query": text } })),
+        ],
+        "rank_window_size": window,
+    } });
+    let retriever = if rerank {
+        json!({ "text_similarity_reranker": {
+            "retriever": fused,
+            "field": field,
+            "inference_id": RERANK_ID,
+            "inference_text": text,
+            "rank_window_size": window,
+        } })
+    } else {
+        fused
+    };
     json!({
         "size": ids.len(),
         "_source": [id_field],
-        "query": { "bool": {
-            "must": { "semantic": { "field": semantic_field, "query": text } },
-            "filter": { "terms": { id_field: ids } },
-        } },
+        "retriever": retriever,
     })
 }
 
-/// The booths `ids` ranked by the meaning of their `description` against `text`, with their tags.
-pub fn closest_query(text: &str, ids: &[u64]) -> Value {
-    let mut query = rank_query("description", "booth_id", text, ids);
+/// The booths `ids` ranked against `text` like [`rank_query`] on their `description`, with their tags.
+pub fn closest_query(text: &str, ids: &[u64], rerank: bool) -> Value {
+    let mut query = rank_query("description", "booth_id", text, ids, rerank);
     query["_source"] = json!(["booth_id", "tags"]);
     query
 }
@@ -236,32 +297,53 @@ mod tests {
 
     #[test]
     fn rank_stays_inside_the_candidates() {
-        let q = rank_query("interests", "node_id", "drones and robot arms", &[4, 9]);
+        let text = "drones and robot arms";
+        let q = rank_query("interests", "node_id", text, &[4, 9], true);
         assert_eq!(q["size"], 2);
+        let rerank = &q["retriever"]["text_similarity_reranker"];
+        assert_eq!(rerank["field"], "interests");
+        assert_eq!(rerank["inference_id"], RERANK_ID);
+        assert_eq!(rerank["inference_text"], text);
+        assert_eq!(rerank["rank_window_size"], 2);
+        let halves = &rerank["retriever"]["rrf"]["retrievers"];
+        assert_eq!(rerank["retriever"]["rrf"]["rank_window_size"], 2);
+        for half in halves.as_array().unwrap() {
+            assert_eq!(
+                half["standard"]["query"]["bool"]["filter"],
+                json!({ "terms": { "node_id": [4, 9] } })
+            );
+        }
         assert_eq!(
-            q["query"]["bool"]["filter"],
-            json!({ "terms": { "node_id": [4, 9] } })
+            halves[0]["standard"]["query"]["bool"]["must"],
+            json!({ "match": { "interests.words": text } })
         );
         assert_eq!(
-            q["query"]["bool"]["must"],
-            json!({ "semantic": { "field": "interests", "query": "drones and robot arms" } })
+            halves[1]["standard"]["query"]["bool"]["must"],
+            json!({ "semantic": { "field": "interests", "query": text } })
         );
-        let booths = rank_query("description", "booth_id", "robots", &[5]);
+        let booths = rank_query("description", "booth_id", "robots", &[5], false);
+        assert!(booths["retriever"].get("text_similarity_reranker").is_none());
+        let halves = &booths["retriever"]["rrf"]["retrievers"];
         assert_eq!(
-            booths["query"]["bool"]["filter"],
+            halves[0]["standard"]["query"]["bool"]["filter"],
             json!({ "terms": { "booth_id": [5] } })
         );
         assert_eq!(
-            booths["query"]["bool"]["must"]["semantic"]["field"],
+            halves[0]["standard"]["query"]["bool"]["must"]["match"]["description.words"],
+            "robots"
+        );
+        assert_eq!(
+            halves[1]["standard"]["query"]["bool"]["must"]["semantic"]["field"],
             "description"
         );
     }
 
     #[test]
     fn closest_brings_back_the_tags() {
-        let q = closest_query("drones", &[3, 4]);
+        let q = closest_query("drones", &[3, 4], true);
         assert_eq!(q["_source"], json!(["booth_id", "tags"]));
-        assert_eq!(q["query"]["bool"]["filter"], json!({ "terms": { "booth_id": [3, 4] } }));
+        let fused = &q["retriever"]["text_similarity_reranker"]["retriever"]["rrf"];
+        assert_eq!(fused["retrievers"][1]["standard"]["query"]["bool"]["filter"], json!({ "terms": { "booth_id": [3, 4] } }));
         let response = json!({ "hits": { "hits": [
             { "_score": 0.7, "_source": { "booth_id": 4, "tags": ["drones", "robotics"] } },
             { "_score": 0.2, "_source": { "booth_id": 3 } },

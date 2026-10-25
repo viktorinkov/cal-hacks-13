@@ -2,17 +2,21 @@
 //! injury, of the attendee's health plan that bear on a claim, from
 //! `<prefix>-policy-clauses`.
 //!
-//! One `semantic` query on `text` (embedded by Elastic with
-//! `.jina-embeddings-v5-text-small`), filtered to the claim's policies and,
-//! when given, to the sections that can decide its kind of incident. The
-//! search fails soft: a missing index or no hits is an empty list.
+//! One hybrid search, filtered to the claim's policies and, when given, to
+//! the sections that can decide its kind of incident: a keyword `match` on
+//! `text.words` finds the policy's exact words ("employee", "pre-existing"), a
+//! `semantic` query on `text` (embedded by Elastic with
+//! `.jina-embeddings-v5-text-small`) finds the same idea in other words, `rrf`
+//! fuses the two lists, and `.jina-reranker-v3` reads the query next to each
+//! fused clause and reorders them. When the reranker fails the fused order is
+//! kept. The search fails soft: a missing index or no hits is an empty list.
 
 use anyhow::{Result, bail};
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::{ClaimsIndex, hits, short};
+use crate::{ClaimsIndex, RERANK_ID, hits, short};
 
 /// Every section a clause can be filed under.
 pub const CLAUSE_SECTIONS: [&str; 8] =
@@ -50,7 +54,8 @@ pub struct ClauseHit {
     pub section: String,
     pub page: u32,
     pub text: String,
-    /// How close in meaning to the query; 0 for a clause read by id.
+    /// The reranker's relevance to the query (the fused rank score when the
+    /// reranker failed); 0 for a clause read by id.
     pub score: f32,
 }
 
@@ -67,21 +72,32 @@ fn policy_filter(policy: &str, document_hash: Option<&str>) -> Value {
     json!({ "bool": { "filter": filter } })
 }
 
-/// The search body: `query` by meaning, inside any of `policies`, in `sections` (any when empty).
-fn search_body(query: &str, policies: Vec<Value>, sections: &[&str], k: usize) -> Value {
+/// The search body: `query` by its words and by meaning, inside any of
+/// `policies`, in `sections` (any when empty), fused and, with `rerank`,
+/// reordered by the reranker.
+fn search_body(query: &str, policies: Vec<Value>, sections: &[&str], k: usize, rerank: bool) -> Value {
     let mut filter = vec![json!({ "bool": { "should": policies, "minimum_should_match": 1 } })];
     if !sections.is_empty() {
         filter.push(json!({ "terms": { "section": sections } }));
     }
-    json!({
-        // Over-fetch so the filters cannot starve the vector candidates.
-        "size": (k * 4).max(20),
-        "query": { "bool": {
-            "must": { "semantic": { "field": "text", "query": query } },
-            "filter": filter
-        }},
-        "_source": SOURCE
-    })
+    let half = |q: Value| json!({ "standard": { "query": { "bool": { "must": q, "filter": filter } } } });
+    // Over-fetch so the filters cannot starve either list, and the reranker reads more than it keeps.
+    let window = (k * 4).max(20);
+    let fused = json!({ "rrf": {
+        "retrievers": [
+            half(json!({ "match": { "text.words": query } })),
+            half(json!({ "semantic": { "field": "text", "query": query } })),
+        ],
+        "rank_window_size": window
+    }});
+    let retriever = if rerank {
+        json!({ "text_similarity_reranker": {
+            "retriever": fused, "field": "text", "inference_id": RERANK_ID, "inference_text": query, "rank_window_size": window
+        }})
+    } else {
+        fused
+    };
+    json!({ "size": k, "retriever": retriever, "_source": SOURCE })
 }
 
 fn clause_of(hit: &Value) -> Result<ClauseHit> {
@@ -105,7 +121,7 @@ impl ClaimsIndex {
         format!("{prefix}-policy-clauses")
     }
 
-    /// The clauses of a claim's policies closest in meaning to `query`, best
+    /// The clauses of a claim's policies that best match `query`, best
     /// first, at most `k`: the venue's (`policy` `venue`, and its document when
     /// `venue_hash` is given) and, only when `attendee_hash` is given, the
     /// attendee's health plan (`policy` `attendee` with that `document_hash`). With
@@ -127,7 +143,7 @@ impl ClaimsIndex {
         self.run_clause_search(query, policies, sections, k).await
     }
 
-    /// The clauses of one policy closest in meaning to `query`, best first, at
+    /// The clauses of one policy that best match `query`, best first, at
     /// most `k`: `venue` (its document when `document_hash` is given), or
     /// `attendee`, which needs the attendee's health plan document. Fails soft like
     /// [`ClaimsIndex::search_clauses`].
@@ -173,7 +189,15 @@ impl ClaimsIndex {
         if query.is_empty() || k == 0 {
             return Ok(Vec::new());
         }
-        let Some(v) = self.clause_query(search_body(query, policies, sections, k)).await? else {
+        let reranked = self.clause_query(search_body(query, policies.clone(), sections, k, true)).await;
+        let found = match reranked {
+            Ok(found) => found,
+            Err(e) => {
+                eprintln!("clause rerank failed, keeping the fused order: {e:#}");
+                self.clause_query(search_body(query, policies, sections, k, false)).await?
+            }
+        };
+        let Some(v) = found else {
             return Ok(Vec::new());
         };
         hits(&v).take(k).map(clause_of).collect()
@@ -224,20 +248,30 @@ mod tests {
     #[test]
     fn the_search_is_filtered_to_the_claims_policies() {
         let policies = vec![policy_filter("venue", None), policy_filter("attendee", Some("ab12"))];
-        let body = search_body("injury that began before the event", policies, &["exclusions", "other_insurance"], 5);
-        assert_eq!(body["size"], 20);
-        assert_eq!(body["query"]["bool"]["must"]["semantic"], json!({ "field": "text", "query": "injury that began before the event" }));
-        let filter = &body["query"]["bool"]["filter"];
+        let q = "injury that began before the event";
+        let body = search_body(q, policies, &["exclusions", "other_insurance"], 5, true);
+        assert_eq!(body["size"], 5);
+        let rerank = &body["retriever"]["text_similarity_reranker"];
+        assert_eq!((&rerank["field"], &rerank["inference_id"], &rerank["inference_text"]), (&json!("text"), &json!(RERANK_ID), &json!(q)));
+        assert_eq!(rerank["rank_window_size"], 20);
+        let halves = &rerank["retriever"]["rrf"]["retrievers"];
+        assert_eq!(halves[0]["standard"]["query"]["bool"]["must"], json!({ "match": { "text.words": q } }));
+        assert_eq!(halves[1]["standard"]["query"]["bool"]["must"], json!({ "semantic": { "field": "text", "query": q } }));
+        assert_eq!(halves[0]["standard"]["query"]["bool"]["filter"], halves[1]["standard"]["query"]["bool"]["filter"], "both halves keep the filters");
+        let filter = &halves[1]["standard"]["query"]["bool"]["filter"];
         let should = &filter[0]["bool"]["should"];
         assert_eq!(filter[0]["bool"]["minimum_should_match"], 1);
         assert_eq!(should[0], json!({ "bool": { "filter": [{ "term": { "policy": "venue" } }] } }));
         assert_eq!(should[1], json!({ "bool": { "filter": [{ "term": { "policy": "attendee" } }, { "term": { "document_hash": "ab12" } }] } }));
         assert_eq!(filter[1], json!({ "terms": { "section": ["exclusions", "other_insurance"] } }));
-        let theft = search_body("theft of merchandise from a booth", vec![policy_filter("venue", None)], sections_for_kind("theft"), 5);
-        assert_eq!(theft["query"]["bool"]["filter"][0]["bool"]["should"].as_array().unwrap().len(), 1, "a theft searches the venue's policy only");
-        let any = search_body("q", vec![policy_filter("venue", Some(" "))], &[], 3);
-        assert_eq!(any["query"]["bool"]["filter"].as_array().unwrap().len(), 1, "no section filter");
-        assert_eq!(any["query"]["bool"]["filter"][0]["bool"]["should"][0]["bool"]["filter"].as_array().unwrap().len(), 1, "a blank hash filters nothing");
+        let theft = search_body("theft of merchandise from a booth", vec![policy_filter("venue", None)], sections_for_kind("theft"), 5, true);
+        let theft_filter = &theft["retriever"]["text_similarity_reranker"]["retriever"]["rrf"]["retrievers"][0]["standard"]["query"]["bool"]["filter"];
+        assert_eq!(theft_filter[0]["bool"]["should"].as_array().unwrap().len(), 1, "a theft searches the venue's policy only");
+        let any = search_body("q", vec![policy_filter("venue", Some(" "))], &[], 3, false);
+        let filter = &any["retriever"]["rrf"]["retrievers"][0]["standard"]["query"]["bool"]["filter"];
+        assert_eq!(filter.as_array().unwrap().len(), 1, "no section filter");
+        assert_eq!(filter[0]["bool"]["should"][0]["bool"]["filter"].as_array().unwrap().len(), 1, "a blank hash filters nothing");
+        assert!(any["retriever"].get("text_similarity_reranker").is_none(), "no reranker");
     }
 
     #[test]
