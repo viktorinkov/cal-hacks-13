@@ -10,63 +10,66 @@ function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContex
 }
 
 /**
- * A standing person, shaped like an i: a short narrow stem with a sphere on top.
- * Fills stay light so the crowd tint colors them. The head carries the bright spot;
- * the stem stays a shade darker so it does not read as a white block. The outline is
- * painted first and the fills cover the join, so the stroke follows the outer
- * silhouette and does not cut across the neck. Anchored at the bottom.
+ * A standing person in the shape of a lowercase i: a round dot above a narrower straight stem.
+ * A gap keeps the dot a circle instead of the cap of a column. Fills stay light so the crowd
+ * tint colors them, and the dot is shaded so it reads as a ball. Anchored at the bottom.
  */
 export function personTexture(): Texture {
-  const w = 56
-  const h = 48
+  const w = 52
+  const h = 100
   const [cv, g] = canvas(w, h)
-  const edge = 1.6
-  const body = { x: 23, y: 27, w: 10, h: 16, r: 3 }
-  const head = { x: 28, y: 16, r: 13 }
+  const edge = 2.2
+  // The dot is wider than the stem. The stem's corners stay tight so the sides are straight.
+  const body = { x: 16, y: 40, w: 20, h: 52, r: 3 }
+  const head = { x: 26, y: 16, r: 13 }
 
-  const capsule = (extra: number) => {
+  const stem = (extra: number) => {
     g.beginPath()
     g.roundRect(body.x - extra, body.y - extra, body.w + extra * 2, body.h + extra * 2, body.r + extra)
     g.fill()
   }
-  const sphere = (extra: number) => {
+  const dot = (extra: number) => {
     g.beginPath()
     g.arc(head.x, head.y, head.r + extra, 0, Math.PI * 2)
     g.fill()
   }
 
   g.fillStyle = '#24262b'
-  capsule(edge)
-  sphere(edge)
+  stem(edge)
+  dot(edge)
 
   const barrel = g.createLinearGradient(body.x, 0, body.x + body.w, 0)
   barrel.addColorStop(0, '#b4b4b4')
-  barrel.addColorStop(0.38, '#d8d8d8')
-  barrel.addColorStop(1, '#a6a6a6')
+  barrel.addColorStop(0.42, '#e6e6e6')
+  barrel.addColorStop(1, '#a8a8a8')
   g.fillStyle = barrel
-  capsule(0)
+  stem(0)
 
-  const ball = g.createRadialGradient(head.x - 3, head.y - 5, 1, head.x + 1, head.y + 2, head.r)
+  const ball = g.createRadialGradient(head.x - 4, head.y - 5, 1, head.x + 1, head.y + 2, head.r)
   ball.addColorStop(0, '#ffffff')
-  ball.addColorStop(0.38, '#f2f2f2')
-  ball.addColorStop(0.72, '#c0c0c0')
-  ball.addColorStop(1, '#8e8e8e')
+  ball.addColorStop(0.34, '#f3f3f3')
+  ball.addColorStop(0.68, '#c4c4c4')
+  ball.addColorStop(1, '#8a8a8a')
   g.fillStyle = ball
-  sphere(0)
+  dot(0)
 
   return Texture.from(cv)
 }
 
-export function dotTexture(size = 16, radius = 6): Texture {
+/**
+ * A soft white puff for a walking trail. No solid core, so overlapping steps stay a wisp
+ * instead of a painted stripe. The crowd tints this white.
+ */
+export function trailTexture(size = 32): Texture {
   const [cv, g] = canvas(size, size)
-  const gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius)
-  gr.addColorStop(0, 'rgba(255,255,255,1)')
-  gr.addColorStop(0.7, 'rgba(255,255,255,1)')
+  const c = size / 2
+  const gr = g.createRadialGradient(c, c, 0, c, c, c)
+  gr.addColorStop(0, 'rgba(255,255,255,0.55)')
+  gr.addColorStop(0.28, 'rgba(255,255,255,0.22)')
+  gr.addColorStop(0.62, 'rgba(255,255,255,0.06)')
   gr.addColorStop(1, 'rgba(255,255,255,0)')
   g.fillStyle = gr
-  g.beginPath()
-  g.arc(size / 2, size / 2, radius, 0, Math.PI * 2)
-  g.fill()
+  g.fillRect(0, 0, size, size)
   return Texture.from(cv)
 }
 

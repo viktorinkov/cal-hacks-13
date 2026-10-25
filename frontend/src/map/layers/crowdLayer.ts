@@ -9,7 +9,7 @@ import { EntityKind, type Vec2, type Venue } from '@/contracts/domain'
 import type { ElevationAt } from '@/lib/elevation'
 import { mapPalette, particleColor } from '../palette'
 import { groundMatrix, project, type Camera, type ScreenPoint } from '../projection'
-import { dotTexture, personTexture, ringTexture } from '../textures'
+import { personTexture, ringTexture, trailTexture } from '../textures'
 
 export const CLASS_NONE = 0
 export const CLASS_LANE = 1
@@ -19,15 +19,20 @@ const TRAIL_PPM = 10
 const TRAIL_PAD = 3
 /** Slower than this, m/s, and a person is standing: they leave no trail. */
 const TRAIL_MIN_SPEED = 0.3
-/** Stamp size on the 16 px dot: about a 0.2 m wide streak, a hairline behind each walker. */
+/**
+ * Scale of the 32 px puff on the trail sheet. About half a metre of soft light, feathered to nothing
+ * at the edge, so a walker leaves a wisp and not a stripe.
+ */
 const TRAIL_STAMP = 0.16
-/** Ink per stamp, for everyone and for people near an incident or in a cleared lane. */
-const TRAIL_INK = 0.018
-const TRAIL_INK_MARKED = 0.06
-/** Frames between erase passes; each pass takes 8% off, so a streak fades within about a second. */
-const TRAIL_ERASE_EVERY = 3
-/** Where many walkers share a lane the streaks stack up; held well down, they stay a hint of movement. */
-const TRAIL_ALPHA = 0.55
+/** White ink per stamp. The puff is already feathered; this is only the bright end of the tail. */
+const TRAIL_INK = 0.28
+const TRAIL_INK_MARKED = 0.4
+/** Fraction of the previous frame's sheet kept. At 60fps a tail is gone in about a second. */
+const TRAIL_KEEP = 0.86
+/** Metres to set the puff back along the step, so the bright end sits behind the feet. */
+const TRAIL_BACK = 0.16
+/** The sheet itself. Ink is the faint part; this only keeps the fade from disappearing into the floor. */
+const TRAIL_ALPHA = 0.7
 /** Structures lower than this, in metres, never hide a trail: tables, booths, the stage lip. */
 const COVER_MIN_HEIGHT = 2
 
@@ -67,17 +72,18 @@ export class CrowdLayer {
   readonly cover = new Graphics()
   private readonly covers: Cover[]
   private readonly personTex: Texture
-  private readonly dotTex: Texture
+  private readonly trailTex: Texture
   private readonly ringTex: Texture
   private readonly pools: Particle[][]
   private readonly ghostPool: Particle[] = []
   private readonly inkPool: Particle[] = []
   private readonly ink: ParticleContainer
   private readonly inkRoot = new Container()
-  private readonly eraseRoot = new Container()
-  private readonly rt: RenderTexture
+  /** Two ground sheets. Each frame the older one is copied, dimmed, onto the other, then the new steps are stamped. */
+  private readonly sheets: [RenderTexture, RenderTexture]
+  private readonly fadeSprite: Sprite
+  private front = 0
   private keys = new Float64Array(0)
-  private frame = 0
   private wipe = true
   private inkPrev = new Float32Array(0)
   private inkT = 0
@@ -92,22 +98,22 @@ export class CrowdLayer {
     this.worldW = worldW
     this.worldH = worldH
     this.personTex = personTexture()
-    this.dotTex = dotTexture(16, 6)
+    this.trailTex = trailTexture()
     this.ringTex = ringTexture(24)
     this.slices = Array.from({ length: sliceCount }, () => new ParticleContainer({ dynamicProperties: { position: true, color: true, vertex: true } }))
     this.pools = this.slices.map(() => [])
     this.ghosts = new ParticleContainer({ dynamicProperties: { position: true, color: true, vertex: true } })
-    this.ink = new ParticleContainer({ dynamicProperties: { position: true, color: true, vertex: false } })
+    this.ink = new ParticleContainer({ dynamicProperties: { position: true, color: true, vertex: true, rotation: true } })
     this.inkRoot.addChild(this.ink)
-    this.rt = RenderTexture.create({
-      width: Math.ceil((worldW + TRAIL_PAD * 2) * TRAIL_PPM),
-      height: Math.ceil((worldH + TRAIL_PAD * 2) * TRAIL_PPM),
-      resolution: 1,
-    })
-    const erase = new Graphics().rect(0, 0, this.rt.width, this.rt.height).fill({ color: 0x000000, alpha: 0.08 })
-    erase.blendMode = 'erase'
-    this.eraseRoot.addChild(erase)
-    this.trails = new Sprite(this.rt)
+    const sheet = () =>
+      RenderTexture.create({
+        width: Math.ceil((worldW + TRAIL_PAD * 2) * TRAIL_PPM),
+        height: Math.ceil((worldH + TRAIL_PAD * 2) * TRAIL_PPM),
+        resolution: 1,
+      })
+    this.sheets = [sheet(), sheet()]
+    this.fadeSprite = new Sprite(this.sheets[0])
+    this.trails = new Sprite(this.sheets[0])
     this.trails.alpha = TRAIL_ALPHA
     if (covers.length) this.trails.setMask({ mask: this.cover, inverse: true })
   }
@@ -182,7 +188,7 @@ export class CrowdLayer {
   }): void {
     const { cam, positions, count, kinds, poses, classes, stale, bucketOf } = opts
     const heights = opts.heights && opts.heights.length === count ? opts.heights : null
-    this.ensure(this.inkPool, this.ink, count, this.dotTex)
+    this.ensure(this.inkPool, this.ink, count, this.trailTex)
     for (const c of this.slices) c.visible = opts.showPeople
     const used = new Array<number>(this.slices.length).fill(0)
 
@@ -192,11 +198,11 @@ export class CrowdLayer {
     const st = Math.sin(cam.tilt)
     const s = cam.scale
     // level of detail: dots at overview zoom, standing figures once a person is big enough to read.
-    // `d` is the old circle's width. The head is the widest part of the i, and it stays that wide.
+    // Close in, the figure grows until the dot of the i is a real circle.
     const lod = Math.max(0, Math.min(1, (s - 10) / 8))
-    const span = Math.min(15, 0.42 * s)
+    const span = Math.min(34, 0.58 * s)
     const d = 2.6 + (span - 2.6) * lod
-    const unit = (d * 27) / 32 / 30.8
+    const unit = d / this.personTex.width
 
     // depth sort: far first. Key packs quantised depth and index into one float.
     if (this.keys.length < count) this.keys = new Float64Array(count * 2)
@@ -257,7 +263,11 @@ export class CrowdLayer {
 
     // trails, in ground space
     if (this.wipe) {
-      opts.renderer.render({ container: this.inkRoot, target: this.rt, clear: true, clearColor: [0, 0, 0, 0] })
+      for (const sheet of this.sheets) {
+        opts.renderer.render({ container: this.inkRoot, target: sheet, clear: true, clearColor: [0, 0, 0, 0] })
+      }
+      this.front = 0
+      this.trails.texture = this.sheets[0]
       this.wipe = false
     }
     if (opts.showTrails && opts.inking && count > 0) {
@@ -271,7 +281,10 @@ export class CrowdLayer {
         const q = this.inkPool[i]
         const x = positions[2 * i]
         const y = positions[2 * i + 1]
-        const moved = known && Math.hypot(x - this.inkPrev[2 * i], y - this.inkPrev[2 * i + 1]) > minStep
+        const vx = x - this.inkPrev[2 * i]
+        const vy = y - this.inkPrev[2 * i + 1]
+        const step = Math.hypot(vx, vy)
+        const moved = known && step > minStep
         this.inkPrev[2 * i] = x
         this.inkPrev[2 * i + 1] = y
         // trails are floor marks; nobody inks the ground from a deck
@@ -283,18 +296,27 @@ export class CrowdLayer {
           q.color = 0
           continue
         }
-        q.x = (positions[2 * i] + TRAIL_PAD) * TRAIL_PPM
-        q.y = (positions[2 * i + 1] + TRAIL_PAD) * TRAIL_PPM
-        q.scaleX = q.scaleY = TRAIL_STAMP
+        // a short dash behind the feet: longer along the step, narrow across it
+        const len = step || 1
+        q.x = (x - (vx / len) * TRAIL_BACK + TRAIL_PAD) * TRAIL_PPM
+        q.y = (y - (vy / len) * TRAIL_BACK + TRAIL_PAD) * TRAIL_PPM
+        q.rotation = Math.atan2(vy, vx)
+        q.scaleX = TRAIL_STAMP * 1.35
+        q.scaleY = TRAIL_STAMP * 0.55
         const cls = classes[i]
-        const color = cls === CLASS_NEAR ? mapPalette.personNear : cls === CLASS_LANE ? mapPalette.personLane : mapPalette.person
-        q.color = particleColor(color, cls ? TRAIL_INK_MARKED : TRAIL_INK)
+        q.color = particleColor(0xffffff, cls ? TRAIL_INK_MARKED : TRAIL_INK)
       }
       for (let i = count; i < this.inkPool.length; i++) this.inkPool[i].color = 0
-      // a faint stamp every other frame and a quick erase: walkers leave short streaks that fade
-      const f = this.frame++
-      if (f % TRAIL_ERASE_EVERY === 0) opts.renderer.render({ container: this.eraseRoot, target: this.rt, clear: false })
-      if (f % 2 === 0) opts.renderer.render({ container: this.inkRoot, target: this.rt, clear: false })
+      // Copy the previous sheet onto the other one, dimmed, then stamp the new step on top.
+      // That is the fade: the bright end stays by the feet and the tail dies in about a second.
+      const src = this.sheets[this.front]
+      const dst = this.sheets[1 - this.front]
+      this.fadeSprite.texture = src
+      this.fadeSprite.alpha = TRAIL_KEEP
+      opts.renderer.render({ container: this.fadeSprite, target: dst, clear: true, clearColor: [0, 0, 0, 0] })
+      opts.renderer.render({ container: this.inkRoot, target: dst, clear: false })
+      this.front = 1 - this.front
+      this.trails.texture = dst
       this.inkT = now
     }
   }
@@ -324,9 +346,11 @@ export class CrowdLayer {
 
   destroy(): void {
     this.cover.destroy()
-    this.rt.destroy(true)
+    this.fadeSprite.destroy()
+    this.sheets[0].destroy(true)
+    this.sheets[1].destroy(true)
     this.personTex.destroy(true)
-    this.dotTex.destroy(true)
+    this.trailTex.destroy(true)
     this.ringTex.destroy(true)
   }
 
