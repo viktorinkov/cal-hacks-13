@@ -661,7 +661,7 @@ def settle_claim(y0):
 
 def policy_amounts(y0):
     """Related inputs and formulas belong inside their calculation component."""
-    S.begin_frame("Policy amounts", 0, y0, 3920, 1500)
+    S.begin_frame("Policy amounts", 0, y0, 3920, 2240)
     medical = _claim_component(60, 80, 1320, 990, "medical basis", "device", HEART)
     _claim_property(medical, 100, 280, 380, "billed amount")
     _claim_property(medical, 520, 280, 380, "fee cap per unit")
@@ -690,7 +690,35 @@ def policy_amounts(y0):
     D(medical, "r", .5, payout, "l", .33, "injury basis")
     R(property_, "r", payout, "l", [S.P(1500, 1285), S.P(1500, 1040)], "property basis", seg=1, fb=.8)
     H(payout, recovery, "payout")
+    _policy_allocation_example(2760, 1160)
     return S.end_frame()
+
+
+def _policy_allocation_example(x, y):
+    """A compact worked allocation, exported from these same editable elements."""
+    first = len(S.elements)
+    parent = _claim_component(x, y, 1100, 1020, "One injury claim · calculated split", "stdb")
+
+    def amount(dx, dy, label, value, fill):
+        component = _claim_component(x + dx, y + dy, 480, 240, label, "stdb")
+        component.el["backgroundColor"] = fill
+        component.el["customData"]["diagramParentComponent"] = parent.id
+        number = _claim_property(component, x + dx + 30, y + dy + 100, 420, value, h=110)
+        for element in S.elements:
+            if element.get("containerId") == number.id:
+                element.setdefault("customData", {})["diagramTextSize"] = 96
+        return component
+
+    care = amount(40, 130, "Covered care", "$895", "#ffe8cc")
+    copay = amount(580, 130, "Plan copay", "$55", "#fff3bf")
+    plan = amount(40, 530, "Health-plan share", "$840", "#c3fae8")
+    venue = amount(580, 530, "Venue-cover payout", "$55", "#d3f9d8")
+    V(care, plan, "minus copay")
+    V(copay, venue, "within cover limits")
+    _claim_property(parent, x + 40, y + 830, 1020,
+                    "Excess venue cover · claim limit and cover remaining ≥ $55", h=130)
+    for element in S.elements[first:]:
+        element.setdefault("customData", {})["diagramExcerpt"] = "policy-allocation-example"
 
 
 def _claim_component(x, y, w, h, label, kind="stdb", logo_=None):
