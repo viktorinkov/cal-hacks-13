@@ -89,6 +89,7 @@ import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
+import ReportClaimStepReducer from "./report_claim_step_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
 import ReportVenueSetupStepReducer from "./report_venue_setup_step_reducer";
@@ -1130,6 +1131,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
   __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
+  __reducerSchema("report_claim_step", ReportClaimStepReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
   __reducerSchema("report_venue_setup_step", ReportVenueSetupStepReducer),
