@@ -1,6 +1,6 @@
 version: "1"
 name: bandit-read-document
-description: Reads one BandIt insurance PDF, already indexed one page per document, into the terms and clauses it states. The bandit-document-reader agent quotes the page behind every term, and the answer is saved as one document for bandit-workers to check.
+description: Reads one BandIt insurance PDF or hospital report, already indexed one page per document, into the terms and clauses it states, or the report's record. The bandit-document-reader agent quotes the page behind every term and fact, and the answer is saved as one document for bandit-workers to check.
 enabled: true
 tags: [bandit]
 triggers:
@@ -13,7 +13,7 @@ triggers:
       - name: kind
         type: string
         required: true
-        description: venue_policy, health_plan or attendee_policy.
+        description: venue_policy, health_plan, attendee_policy or hospital_report.
       - name: page_count
         type: number
         required: true

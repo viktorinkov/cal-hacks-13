@@ -1,6 +1,6 @@
 //! The claim paths end to end inside an in-memory module: band flags, the
 //! safety watch, the medic, the attendee filing in their own words, the
-//! hospital report, the record reader, Elastic and Claude's investigation
+//! hospital report, the Evidence Engine's reading of it, Elastic and Claude's investigation
 //! (played here by the test, through the same reducers the workers call), and
 //! the named approver.
 
@@ -183,12 +183,24 @@ impl World {
         self.t.db.clinic_report().claim_id().filter(claim_id).next().expect("hospital report requested")
     }
 
-    /// The worker writes the hospital report as `json` and hands it back.
+    /// The worker writes the hospital report as `json`, prints it as a PDF and hands it back.
     fn send_report(&self, claim_id: u64, json: &str) -> ClinicReport {
         let job = self.lease(KIND_CLINIC, claim_id);
         let hash = format!("{:064x}", claim_id * 104_729);
+        self.as_("worker", |ctx| register_blob(ctx, hash.clone(), None, "staff".into(), "hospital_report".into(), "application/pdf".into(), 1000));
         self.as_("worker", |ctx| file_clinic_report(ctx, job.id, json.into(), hash.clone(), call("clinic_report")));
         self.report_for(claim_id)
+    }
+
+    /// The Evidence Engine reads the claim's hospital report, printed from `json`, quoting every fact.
+    fn read_hospital_report(&self, claim_id: u64, json: &str) {
+        let record = self.t.db.medical_record().claim_id().filter(claim_id).filter(|r| r.status == "reading").max_by_key(|r| r.id).expect("a report to read");
+        let job = self.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, record.id);
+        assert_eq!(job.subject_table, REPORT_SUBJECT);
+        let written: bandit_insurance::medical::ExtractedRecord = serde_json::from_str(json).unwrap();
+        let pages = bandit_insurance::report::print_record(&written, record.page_count);
+        let read = serde_json::to_string(&bandit_insurance::report::quoted_read(&written)).unwrap();
+        self.as_("worker", |ctx| apply_hospital_report(ctx, job.id, read.clone(), pages.clone()));
     }
 
     fn view(&self, who: &str) -> spacetimedb::ViewContext {
@@ -227,8 +239,7 @@ impl World {
     fn file_record_hash(&self, claim_id: u64, json: &str, pages: u32, hash: &str) {
         self.as_("medic", |ctx| register_blob(ctx, hash.into(), None, "owner_only".into(), "medical".into(), "application/pdf".into(), 1000));
         self.as_("medic", |ctx| submit_medical_record(ctx, claim_id, hash.into(), pages));
-        let job = self.lease(KIND_RECORD_EXTRACT, claim_id);
-        self.as_("worker", |ctx| apply_medical_record(ctx, job.id, json.into(), call("claim_record_extract")));
+        self.read_hospital_report(claim_id, json);
     }
 
     fn verify(&self, claim_id: u64) {
@@ -870,11 +881,14 @@ fn a_matching_hospital_report_moves_the_claim_on() {
     assert_eq!((report.status.as_str(), report.provider_name.as_str()), ("received", "Event Medical Station - Cal Hacks 13.0"));
     assert!(report.problems.is_empty() && report.received_at.is_some() && report.model_call_id != 0);
     let c = w.claim(claim.id);
+    assert_eq!((c.status, c.status_note.as_str()), (ClaimStatus::ReadingRecord, "reading the hospital report"));
+    w.read_hospital_report(claim.id, FIRST_AID);
+    let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Verifying, "{}", c.status_note);
     assert_eq!(c.payout_cents, 18_000);
     let record = w.t.db.medical_record().claim_id().filter(claim.id).next().unwrap();
     assert_eq!((record.status.as_str(), record.page_count, record.file_hash.as_str()), ("extracted", 2, report.file_hash.as_str()));
-    assert_eq!(record.job_id, report.job_id);
+    assert_eq!(w.t.db.job().id().find(record.job_id).unwrap().kind, bandit_insurance::policy::KIND_DOCUMENT_READ);
     w.verify(claim.id);
     let p: ReviewPayload = serde_json::from_str(&w.open_job(KIND_REVIEW, claim.id).payload).unwrap();
     assert_eq!(p.claimant_statement, STATEMENT);
@@ -906,6 +920,47 @@ fn a_hospital_report_that_never_arrives_goes_to_a_person() {
     assert_eq!(w.report_for(claim.id).status, "failed");
     let c = w.claim(claim.id);
     assert_eq!((c.status, c.status_note.as_str()), (ClaimStatus::Routed, "the hospital report did not arrive; a person must file the record"));
+}
+
+#[test]
+fn a_report_read_off_its_pages_goes_to_a_person() {
+    let w = World::new();
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let hash = "ef".repeat(32);
+    w.as_("medic", |ctx| register_blob(ctx, hash.clone(), None, "owner_only".into(), "medical".into(), "application/pdf".into(), 1000));
+    w.as_("medic", |ctx| submit_medical_record(ctx, claim.id, hash.clone(), 1));
+    let record = w.t.db.medical_record().claim_id().filter(claim.id).next().unwrap();
+    let job = w.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, record.id);
+    let written: bandit_insurance::medical::ExtractedRecord = serde_json::from_str(FIRST_AID).unwrap();
+    let mut read = bandit_insurance::report::quoted_read(&written);
+    read.patient.name = "Sam Patel".into();
+    let pages = bandit_insurance::report::print_record(&written, 1);
+    w.as_("worker", |ctx| apply_hospital_report(ctx, job.id, serde_json::to_string(&read).unwrap(), pages.clone()));
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
+    assert_eq!(c.status_note, "the hospital report could not be read: the patient's name is not quoted from page 1");
+    let record = w.t.db.medical_record().id().find(record.id).unwrap();
+    assert_eq!((record.status.as_str(), record.dropped.len()), ("failed", 1));
+    assert_eq!(w.t.db.claim_line().claim_id().filter(claim.id).count(), 0);
+}
+
+#[test]
+fn a_report_the_evidence_engine_cannot_read_goes_to_a_person() {
+    let w = World::new();
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let hash = "ab".repeat(32);
+    w.as_("medic", |ctx| register_blob(ctx, hash.clone(), None, "owner_only".into(), "medical".into(), "application/pdf".into(), 1000));
+    w.as_("medic", |ctx| submit_medical_record(ctx, claim.id, hash.clone(), 2));
+    let record = w.t.db.medical_record().claim_id().filter(claim.id).next().unwrap();
+    for _ in 0..MAX_ATTEMPTS {
+        let job = w.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, record.id);
+        w.as_("worker", |ctx| fail_job(ctx, job.id, "the workflow timed out".into(), None));
+        w.advance(60);
+    }
+    assert_eq!(w.t.db.medical_record().id().find(record.id).unwrap().status, "failed");
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.status_note.as_str()), (ClaimStatus::Routed, "the hospital report could not be read; a person must enter it"));
+    assert!(w.t.db.policy_document().iter().next().is_none(), "a report is no policy document");
 }
 
 #[test]

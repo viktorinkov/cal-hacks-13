@@ -38,8 +38,8 @@ import AddIncidentNoteReducer from "./add_incident_note_reducer";
 import AddOwnerReducer from "./add_owner_reducer";
 import AddStaffReducer from "./add_staff_reducer";
 import ApplyDocumentTermsReducer from "./apply_document_terms_reducer";
+import ApplyHospitalReportReducer from "./apply_hospital_report_reducer";
 import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
-import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
 import ApproveChargeReducer from "./approve_charge_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
 import ApproveRuleProposalReducer from "./approve_rule_proposal_reducer";
@@ -1264,8 +1264,8 @@ const reducersSchema = __reducers(
   __reducerSchema("add_owner", AddOwnerReducer),
   __reducerSchema("add_staff", AddStaffReducer),
   __reducerSchema("apply_document_terms", ApplyDocumentTermsReducer),
+  __reducerSchema("apply_hospital_report", ApplyHospitalReportReducer),
   __reducerSchema("apply_medical_extract", ApplyMedicalExtractReducer),
-  __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
   __reducerSchema("approve_charge", ApproveChargeReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
   __reducerSchema("approve_rule_proposal", ApproveRuleProposalReducer),

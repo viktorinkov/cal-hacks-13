@@ -1,5 +1,5 @@
 //! A claim's life: open from a resolved incident (or the attendee's filing, in
-//! `filing`), read the medical record, verify in Elastic, Claude investigates
+//! `filing`), read the hospital report, verify in Elastic, Claude investigates
 //! and decides, code holds the decision to its limits, the organizer decides
 //! what comes to them, pay, reconcile with the insurer.
 
@@ -14,7 +14,9 @@ use bandit_insurance::complications::{ClaimState, Complication, complications};
 use bandit_insurance::coverage::{Amounts, compute_amounts};
 use bandit_insurance::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
 use bandit_insurance::letters::LetterData;
-use bandit_insurance::medical::{ExtractedRecord, ValidRecord, validate_record};
+use bandit_insurance::medical::{ValidRecord, validate_record};
+use bandit_insurance::policy::{DocumentReadPayload, KIND_DOCUMENT_READ};
+use bandit_insurance::report::{HOSPITAL_REPORT, ReportRead, check_report_read, summary as report_summary};
 use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
 use bandit_insurance::payloads::*;
 use bandit_insurance::decision::{AgentDecision, GuardInput, Investigation, guard, validate_review};
@@ -278,7 +280,7 @@ fn attendee_policy_hash(ctx: &ReducerContext, claim: &Claim) -> String {
     ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| p.document_hash).unwrap_or_default()
 }
 
-/// Files the medical record PDF (already in the blob store) for an injury claim.
+/// Files the hospital report PDF (already in the blob store) for an injury claim.
 #[spacetimedb::reducer]
 pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: String, page_count: u32) -> Result<(), String> {
     require_role(ctx, &["medic", "ops"])?;
@@ -290,15 +292,24 @@ pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: Str
     if ctx.db.blob_ref().hash().find(&file_hash).is_none() {
         return Err("register the PDF with register_blob first".into());
     }
-    if page_count == 0 {
-        return Err("a record has at least one page".into());
+    if !(1..=50).contains(&page_count) {
+        return Err("a hospital report has 1 to 50 pages".into());
     }
-    let record = insert_record(ctx, claim_id, file_hash.clone(), page_count);
-    let payload = RecordExtractPayload { claim_id, record_id: record.id, file_hash, page_count };
-    let job_id = jobs::enqueue(ctx, KIND_RECORD_EXTRACT, serde_json::to_string(&payload).unwrap(), "claim", claim_id);
-    ctx.db.medical_record().id().update(MedicalRecord { job_id, ..record });
-    save(ctx, Claim { status: ClaimStatus::ReadingRecord, status_note: "reading the medical record".into(), ..claim });
+    read_report(ctx, claim, file_hash, page_count);
     Ok(())
+}
+
+/// The table a hospital report's `document_read` job is about.
+pub const REPORT_SUBJECT: &str = "medical_record";
+
+/// Stores a record for a hospital report PDF and has the Evidence Engine read it: the `document_read`
+/// job with the kind `hospital_report`, which ends in `apply_hospital_report`.
+pub(super) fn read_report(ctx: &ReducerContext, claim: Claim, file_hash: String, page_count: u32) -> MedicalRecord {
+    let record = insert_record(ctx, claim.id, file_hash.clone(), page_count);
+    let payload = DocumentReadPayload { document_id: record.id, kind: HOSPITAL_REPORT.into(), file_hash, page_count };
+    let job_id = jobs::enqueue(ctx, KIND_DOCUMENT_READ, serde_json::to_string(&payload).unwrap(), REPORT_SUBJECT, record.id);
+    save(ctx, Claim { status: ClaimStatus::ReadingRecord, status_note: "reading the hospital report".into(), ..claim });
+    ctx.db.medical_record().id().update(MedicalRecord { job_id, ..record })
 }
 
 /// A record row for a file in the blob store, before anything is read from it.
@@ -329,30 +340,53 @@ pub(super) fn insert_record(ctx: &ReducerContext, claim_id: u64, file_hash: Stri
     })
 }
 
-/// The worker's reading of the record. Code validates it, decides which
-/// service lines are covered and for how much, and rebuilds the pack.
+/// What the Evidence Engine read from a hospital report, and the report's text
+/// layer, one string per page. Code checks every fact against its page and the
+/// record against its shape, then decides which service lines are covered and
+/// for how much, and rebuilds the pack. A read code rejects goes to a person.
 #[spacetimedb::reducer]
-pub fn apply_medical_record(ctx: &ReducerContext, job_id: u64, record_json: String, call: ModelCallIn) -> Result<(), String> {
+pub fn apply_hospital_report(ctx: &ReducerContext, job_id: u64, read_json: String, pages: Vec<String>) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
     let job = jobs::leased_by_caller(ctx, job_id)?;
-    let p: RecordExtractPayload = serde_json::from_str(&job.payload).map_err(|e| e.to_string())?;
-    let call_id = jobs::record_call(ctx, job_id, &call);
-    let claim = claim_by_id(ctx, p.claim_id)?;
-    let record = ctx.db.medical_record().id().find(p.record_id).ok_or("no record")?;
-    let parsed = serde_json::from_str::<ExtractedRecord>(&record_json)
-        .map_err(|e| vec![format!("not a record: {e}")])
-        .and_then(|raw| validate_record(raw, p.page_count));
-    let valid = match parsed {
+    let p: DocumentReadPayload = serde_json::from_str(&job.payload).map_err(|e| e.to_string())?;
+    let record = ctx.db.medical_record().id().find(p.document_id).ok_or("no record for this report")?;
+    let claim = claim_by_id(ctx, record.claim_id)?;
+    if claim.status != ClaimStatus::ReadingRecord || record.status != "reading" {
+        jobs::finish(ctx, job, "the claim no longer waits for this report");
+        return Ok(());
+    }
+    if pages.len() != p.page_count as usize {
+        return Err(format!("the worker sent {} pages, not {}", pages.len(), p.page_count));
+    }
+    let checked = serde_json::from_str::<ReportRead>(&read_json)
+        .map_err(|e| vec![format!("the reader's answer is not a hospital report: {e}")])
+        .and_then(|read| check_report_read(&read, &pages));
+    let valid = checked.and_then(|c| {
+        let line = report_summary(&c);
+        validate_record(c.record, p.page_count).map(|v| (ValidRecord { dropped: [c.dropped, v.dropped].concat(), ..v }, line))
+    });
+    let (valid, line) = match valid {
         Ok(v) => v,
         Err(reasons) => {
-            ctx.db.medical_record().id().update(MedicalRecord { status: "failed".into(), model_call_id: call_id, dropped: reasons.clone(), ..record });
-            jobs::finish(ctx, job, "record rejected");
-            route(ctx, claim, format!("medical record rejected: {}", reasons.join("; ")));
+            ctx.db.medical_record().id().update(MedicalRecord { status: "failed".into(), dropped: reasons.clone(), ..record });
+            jobs::finish(ctx, job, "report rejected");
+            route(ctx, claim, format!("the hospital report could not be read: {}", reasons.join("; ")));
             return Ok(());
         }
     };
-    jobs::finish(ctx, job, "record extracted");
-    apply_record(ctx, claim, record, &valid, call_id)
+    jobs::finish(ctx, job, line);
+    apply_record(ctx, claim, record, &valid, 0)
+}
+
+/// A hospital report's `document_read` that ran out of attempts: a person enters the record.
+pub fn on_report_read_dead(ctx: &ReducerContext, job: &Job) {
+    let Some(r) = ctx.db.medical_record().id().find(job.subject_id).filter(|r| r.status == "reading") else {
+        return;
+    };
+    ctx.db.medical_record().id().update(MedicalRecord { status: "failed".into(), dropped: vec![job.error.clone()], ..r });
+    if let Some(claim) = ctx.db.claim().id().find(r.claim_id).filter(|c| c.status == ClaimStatus::ReadingRecord) {
+        route(ctx, claim, "the hospital report could not be read; a person must enter it".into());
+    }
 }
 
 /// Stores a validated record on its claim: code decides which service lines
@@ -1193,12 +1227,6 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
         return;
     };
     match job.kind.as_str() {
-        KIND_RECORD_EXTRACT if claim.status == ClaimStatus::ReadingRecord => {
-            if let Some(r) = ctx.db.medical_record().claim_id().filter(claim.id).find(|r| r.status == "reading") {
-                ctx.db.medical_record().id().update(MedicalRecord { status: "failed".into(), ..r });
-            }
-            route(ctx, claim, "the medical record could not be read; a person must enter it".into());
-        }
         KIND_CLINIC if claim.status == ClaimStatus::AwaitingRecord => {
             if let Some(r) = ctx.db.clinic_report().claim_id().filter(claim.id).find(|r| r.job_id == job.id) {
                 ctx.db.clinic_report().id().update(ClinicReport { status: "failed".into(), problems: vec![job.error.clone()], ..r });

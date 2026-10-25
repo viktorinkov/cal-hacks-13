@@ -1,14 +1,16 @@
-//! `document_read`: the Evidence Engine reads an insurance PDF. Each page goes
-//! through the `<prefix>-documents-extract` pipeline (a scan is first written out
-//! word for word by the Claude API), the `bandit-read-document` workflow reads
-//! the terms and clauses, and code checks every quote against its page before
-//! the clauses are indexed and the module gets the answer.
+//! `document_read`: the Evidence Engine reads an insurance PDF or a hospital
+//! report. Each page goes through the `<prefix>-documents-extract` pipeline (a
+//! scan is first written out word for word by the Claude API), the
+//! `bandit-read-document` workflow reads the terms and clauses, or the report's
+//! record, and code checks every quote against its page before the clauses are
+//! indexed and the module gets the answer.
 
 use std::time::Duration;
 
 use anyhow::{Context, bail};
 use bandit_bindings::ModelCallIn;
 use bandit_insurance::policy::{CheckedPolicy, DocumentReadPayload, PolicyRead, VENUE_POLICY, check_policy, document_schema};
+use bandit_insurance::report::{self, HOSPITAL_REPORT, ReportRead, check_report_read};
 use claims_elastic::{PolicyClause, StoredPage, reader};
 use claude_client::{Effort, MessageRequest};
 use serde_json::{Value, json};
@@ -60,6 +62,9 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
         return Err(JobError { error: format!("{} execution {execution} {}", reader::WORKFLOW, reader::failure(&done)), calls });
     }
     let answer = es.document_terms(&p.file_hash).await.map_err(keep(&mut calls))?;
+    if p.kind == HOSPITAL_REPORT {
+        return finish_report(ctx, job, &answer, texts, calls).await;
+    }
     let read = policy_read(&answer).map_err(keep(&mut calls))?;
 
     let checked = check_policy(&read, &texts);
@@ -77,6 +82,21 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
     );
     let read_json = serde_json::to_string(&read).map_err(|e| JobError { error: format!("encoding the read: {e}"), calls: calls.clone() })?;
     ctx.sink.finish(job.id, Finish::DocumentTerms { read_json, pages: texts }, calls).await?;
+    Ok(())
+}
+
+/// A hospital report goes to the module as read; it is checked there and no clause of it is indexed.
+async fn finish_report(ctx: &Ctx, job: &JobIn, answer: &Value, pages: Vec<String>, calls: Vec<ModelCallIn>) -> Result<(), JobError> {
+    let read: ReportRead = match serde_json::from_value(answer["read"].clone()) {
+        Ok(r) => r,
+        Err(e) => return Err(JobError { error: format!("the reader's answer is not a hospital report: {e}"), calls }),
+    };
+    match check_report_read(&read, &pages) {
+        Ok(c) => tracing::info!(job_id = job.id, quoted = c.quoted, dropped = c.dropped.len(), "hospital report read: {}", report::summary(&c)),
+        Err(e) => tracing::warn!(job_id = job.id, problems = %e.join("; "), "hospital report read off its pages, the module will route it"),
+    }
+    let read_json = answer["read"].to_string();
+    ctx.sink.finish(job.id, Finish::HospitalReport { read_json, pages }, calls).await?;
     Ok(())
 }
 

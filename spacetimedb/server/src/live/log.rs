@@ -43,7 +43,7 @@ fn update_marker(ctx: &ReducerContext, incident_id: u64, f: impl FnOnce(Incident
 pub fn status_words(s: ClaimStatus) -> &'static str {
     match s {
         ClaimStatus::AwaitingRecord => "waiting for the clinic record",
-        ClaimStatus::ReadingRecord => "reading the clinic record",
+        ClaimStatus::ReadingRecord => "reading the hospital report",
         ClaimStatus::Verifying => "checking the evidence",
         ClaimStatus::Reviewing => "reviewing",
         ClaimStatus::Routed => "waiting for the organizer",
@@ -74,7 +74,7 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
             format!("Claim opened for {}", person(c)),
             "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
         ),
-        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
+        ClaimStatus::ReadingRecord => ("Evidence Engine", "Evidence Engine".into(), "Reading the hospital report".into(), "every fact must be quoted from its page".into()),
         ClaimStatus::Verifying if c.cover_kind == "personal_property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
             format!("claim {}", c.id),
@@ -129,17 +129,18 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
     record(ctx, c.incident_id, c.id, actor, &who, what, why);
 }
 
-/// Claude's reading of the clinic record.
+/// The Evidence Engine's reading of the hospital report.
 pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
     let dx = r.diagnoses.first().cloned().unwrap_or_default();
+    let dropped = if r.dropped.is_empty() { String::new() } else { format!("; {} dropped", r.dropped.len()) };
     record(
         ctx,
         c.incident_id,
         c.id,
-        "Claude",
-        "Claude",
-        format!("Read the clinic record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
-        format!("{}, {}: {dx}", r.provider_name, r.date_of_service),
+        "Evidence Engine",
+        "Evidence Engine",
+        format!("Read the hospital report: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
+        format!("{}, {}: {dx}; every fact quoted from its page{dropped}", r.provider_name, r.date_of_service),
     );
 }
 

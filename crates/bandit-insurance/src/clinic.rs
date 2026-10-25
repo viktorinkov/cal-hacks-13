@@ -127,33 +127,20 @@ pub fn check_report(p: &ClinicPayload, record: &ExtractedRecord) -> Result<(), V
     if problems.is_empty() { Ok(()) } else { Err(problems) }
 }
 
-/// The report as the hospital's plain-text document: the clinical note, then the itemized bill.
-pub fn render_text(record: &ExtractedRecord) -> String {
-    let r = record;
-    let mut out = vec![
-        r.provider.name.to_uppercase(),
-        r.provider.address.clone(),
-        String::new(),
-        "HOSPITAL REPORT".to_string(),
-        String::new(),
-        format!("Patient: {}", r.patient.name),
-    ];
-    if !r.patient.date_of_birth.is_empty() {
-        out.push(format!("Date of birth: {}", r.patient.date_of_birth));
-    }
-    out.push(format!("Date of service: {}{}", r.encounter.date_of_service, if r.encounter.time.is_empty() { String::new() } else { format!(" {}", r.encounter.time) }));
-    out.push(format!("Reason for visit: {}", r.encounter.reason_for_visit));
-    out.push(String::new());
-    out.push("History of present illness".to_string());
-    out.push(r.encounter.history.clone());
-    out.push(String::new());
-    out.push("Assessment".to_string());
-    out.extend(r.diagnoses.iter().map(|d| format!("  {}  {}", d.code, d.description)));
-    out.push(String::new());
-    out.push(format!("ITEMIZED BILL  Invoice {}", r.invoice_number));
-    out.extend(r.services.iter().map(|s| format!("  {}  {}  {} x{}  {}", s.date_of_service, s.code, s.description, s.units, format_cents(s.charge_cents))));
-    out.push(format!("  Total billed: {}", format_cents(r.total_billed_cents)));
-    out.join("\n")
+/// The report as the hospital prints it: the clinical note on page 1 and the itemized bill on page 2.
+pub fn as_printed(record: &ExtractedRecord) -> ExtractedRecord {
+    let mut r = record.clone();
+    r.patient.page = 1;
+    r.provider.page = 1;
+    r.encounter.page = 1;
+    r.diagnoses.iter_mut().for_each(|d| d.page = 1);
+    r.services.iter_mut().for_each(|s| s.page = 2);
+    r
+}
+
+/// The report's text, one string per page, as the hospital prints it.
+pub fn printed_pages(record: &ExtractedRecord) -> Vec<String> {
+    crate::report::print_record(&as_printed(record), REPORT_PAGES)
 }
 
 #[cfg(test)]
@@ -232,9 +219,10 @@ mod tests {
     }
 
     #[test]
-    fn renders_the_note_and_the_bill() {
-        let text = render_text(&record("2026-10-24", "Slipped near the stage."));
-        assert!(text.starts_with("WRENFIELD URGENT CARE"));
-        assert!(text.contains("HOSPITAL REPORT") && text.contains("S63.501A") && text.contains("Total billed: $180.00"), "{text}");
+    fn prints_the_note_then_the_bill() {
+        let pages = printed_pages(&record("2026-10-24", "Slipped near the stage."));
+        assert_eq!(pages.len(), 2);
+        assert!(pages[0].starts_with("Wrenfield Urgent Care") && pages[0].contains("HOSPITAL REPORT") && pages[0].contains("S63.501A"), "{}", pages[0]);
+        assert!(pages[1].contains("99213") && pages[1].contains("Total billed: $180.00") && !pages[1].contains("Patient"), "{}", pages[1]);
     }
 }

@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 use crate::model::{Claude, Failed};
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{charge, clinic, document, extract, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, venue_policy, verify, wallet};
+use crate::{charge, clinic, document, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, venue_policy, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -110,7 +110,6 @@ pub fn handles(kind: &str) -> bool {
 /// Runs one job to its result reducer. On `Err` the caller reports `fail_job`.
 pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
     match job.kind.as_str() {
-        KIND_RECORD_EXTRACT => extract::run(ctx, job, job.payload()?).await,
         KIND_VERIFY => verify::run(ctx, job, job.payload()?).await,
         KIND_REVIEW => investigate::run(ctx, job, job.payload()?).await,
         KIND_DRAFT => letters::run_draft(ctx, job, job.payload()?).await,

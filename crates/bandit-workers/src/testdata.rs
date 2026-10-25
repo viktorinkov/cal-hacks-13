@@ -38,7 +38,6 @@ pub fn recovery_data() -> LetterData {
 
 #[test]
 fn every_payload_file_parses() {
-    load::<RecordExtractPayload>(include_str!("../testdata/record-extract.json"));
     load::<ReviewPayload>(include_str!("../testdata/review-ankle-home.json"));
     load::<ReviewPayload>(include_str!("../testdata/review-first-aid.json"));
     let theft = theft_review_payload();

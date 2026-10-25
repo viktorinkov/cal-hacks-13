@@ -693,9 +693,12 @@ pub fn venue_policy_schema() -> serde_json::Value {
 }
 
 /// The JSON schema `bandit-read-document` gives the reader for `kind`: the
-/// venue policy's terms and clauses, or only the clauses of an attendee's
-/// health plan or own policy.
+/// venue policy's terms and clauses, a hospital report's record, or only the
+/// clauses of an attendee's health plan or own policy.
 pub fn document_schema(kind: &str) -> serde_json::Value {
+    if kind == crate::report::HOSPITAL_REPORT {
+        return crate::report::report_schema();
+    }
     let venue = venue_policy_schema();
     if kind == VENUE_POLICY {
         return venue;
