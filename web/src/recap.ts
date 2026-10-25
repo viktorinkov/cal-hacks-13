@@ -201,11 +201,15 @@ async function share(p: MyPhoto, event: string) {
   }
 }
 
+/** Everyone the bands put in the photo with you, by name and socials. */
 function who(p: MyPhoto) {
-  if (!p.people.length) return 'Just you';
-  const named = p.people.filter(x => x.nodeId !== 0n).map(x => x.name);
-  const others = p.people.length - named.length;
-  return `You with ${[...named, others && `${others} other${others > 1 ? 's' : ''}`].filter(Boolean).join(', ')}`;
+  if (!p.people.length) return h('div', { class: 'muted' }, 'Just you');
+  return [
+    h('div', {}, 'You with:'),
+    h('ul', {}, p.people.map(x => h('li', {},
+      h('b', {}, x.name), ' ',
+      x.handles.length ? handleLinks(x.handles) : h('span', { class: 'muted' }, 'no socials shared')))),
+  ];
 }
 
 function photos(conn: DbConnection, event: string) {
@@ -215,7 +219,7 @@ function photos(conn: DbConnection, event: string) {
     h('img', { src: p.url }),
     h('figcaption', {},
       h('b', {}, p.caption || p.zoneName), ` · ${p.zoneName} · ${time(p.takenAt)}`,
-      h('div', {}, who(p)),
+      who(p),
       h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
 }
 
@@ -302,7 +306,11 @@ const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid 
 /** The wallet's movements, newest first: payouts in, charges and merch out. */
 export function movements(conn: DbConnection) {
   const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
-  const what = (kind: string, memo: string) => kind === 'purchase' ? memo.replace(/^BandIt merch: /, 'Merch: ') : MOVES[kind] ?? (memo || kind);
+  const what = (kind: string, memo: string) => {
+    if (kind === 'purchase') return memo.replace(/^BandIt merch: /, 'Merch: ');
+    const claim = kind === 'payout' && memo.match(/claim (\d+)/)?.[1];
+    return claim ? `Paid in for claim ${claim}` : MOVES[kind] ?? (memo || kind);
+  };
   return entries.length > 0 && [h('h4', {}, 'Wallet activity'), h('table', {}, entries.map(e => h('tr', {},
     h('td', {}, date(e.createdAt)), h('td', {}, what(e.kind, e.memo)),
     h('td', { class: e.amountCents < 0n ? '' : 'pass' }, `${e.amountCents < 0n ? 'out' : 'in'} ${money(e.amountCents < 0n ? -e.amountCents : e.amountCents)}`))))];
