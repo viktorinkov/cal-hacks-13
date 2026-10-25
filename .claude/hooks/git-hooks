@@ -1,0 +1,5 @@
+#!/bin/sh
+# Session start: use the repo's .githooks, so commit-msg rejects messages that point at Claude.
+cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+git config core.hooksPath .githooks

@@ -1,0 +1,22 @@
+#!/bin/sh
+# Rejects commit and merge messages that point at Claude (claude/ branch names, claude.ai links,
+# Claude-Session and Co-Authored-By trailers) and commits authored as Claude.
+# .claude/hooks/git-hooks turns this on with core.hooksPath at session start.
+bad="$(grep -v '^#' "$1" | grep -inE '(^|[^.])claude/|claude\.(ai|com)|claude-session|co-authored-by:.*(claude|anthropic)|generated with.*claude|anthropic\.com')"
+author="$(git var GIT_AUTHOR_IDENT 2>/dev/null)"
+case "$author" in
+  Claude\ * | *anthropic.com*) bad="${bad:+$bad
+}author: $author" ;;
+esac
+[ -z "$bad" ] && exit 0
+
+cat >&2 <<MSG
+Commit rejected: the message or author points at Claude.
+$bad
+
+Write one short line that says what the change does, with no Claude branch names, links or trailers.
+For a merge: git merge -m "merge <what it brings>" <branch>
+If a merge stopped here, finish it with: git commit -m "merge <what it brings>"
+If the author is Claude: git config user.name "Viktor Minchev"; git config user.email vikitominchev@gmail.com
+MSG
+exit 1
