@@ -13,7 +13,7 @@ const initialSession = useSession.getState()
 const disputeCharge = vi.fn<(id: string, text: string) => Promise<void>>()
 const buyMerch = vi.fn<(templateId: string, photoId: string, size: string) => Promise<void>>()
 const connectWallet = vi.fn<() => Promise<void>>()
-const claimBand = vi.fn<(token: string) => Promise<unknown>>()
+const claimBand = vi.fn<(token: string) => Promise<void>>()
 const rerunShoppingAgent = vi.fn<() => Promise<void>>()
 
 const allReady = { walletEntriesReady: true, chargesReady: true, suggestionsReady: true, merchOrdersReady: true }
