@@ -1,6 +1,6 @@
 // The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it is only
 // the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
-// PDFs, the Capital One wallet, then a thank-you.
+// PDFs (or the plan's name), the insurance for their things, the Capital One wallet, then a thank-you.
 // When the host ends the event, the same page turns into the recap.
 // After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
 // shows how the payment is going until it lands in the wallet.
@@ -21,6 +21,7 @@ const QUERIES = [
   'SELECT * FROM my_handles',
   'SELECT * FROM my_medical_card',
   'SELECT * FROM my_medical_documents',
+  'SELECT * FROM my_plan_lookups',
   'SELECT * FROM my_visits',
   'SELECT * FROM my_encounters',
   'SELECT * FROM my_photos',
@@ -45,7 +46,7 @@ const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
 const bandId = bandFromCode(token);
 const code = bandId ? bandCode(bandId) : token;
 
-type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'wallet' | 'done';
+type Step = 'name' | 'socials' | 'history' | 'insurance' | 'things' | 'profile' | 'card' | 'wallet' | 'done';
 
 let conn: DbConnection;
 let testMode = false;
@@ -176,7 +177,60 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
       await fileDocument(kind, await (await fetch(`/test-records/${testFile}`)).arrayBuffer());
       go(next);
     }) }, 'Use a test record'),
+    kind === 'insurance' && planLookup('health', next),
     h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
+  ];
+}
+
+type PlanKind = 'health' | 'belongings';
+
+function latestLookup(kind: PlanKind) {
+  return [...conn.db.myPlanLookups.iter()].filter(l => l.kind === kind).sort((a, b) => Number(b.id - a.id))[0];
+}
+
+const dollars = (f: HTMLFormElement, name: string) =>
+  BigInt(Math.round(Number((f.elements.namedItem(name) as HTMLInputElement).value || 0) * 100));
+
+/** "Name your plan instead": the insurer and plan go to the web, and the plan's public document comes back. */
+function planLookup(kind: PlanKind, next: Step) {
+  const l = latestLookup(kind);
+  const status = !l ? null
+    : l.status === 'searching' ? h('p', { class: 'muted' }, kind === 'health' ? 'Looking up your plan…' : 'Looking up your policy…')
+    : l.status === 'found' ? h('p', {}, h('b', {}, kind === 'health' ? 'Plan found: ' : 'Policy found: '),
+        `${l.printedInsurer} ${l.printedPlan}${l.planYear ? ` (${l.planYear})` : ''} `, h('a', { href: l.sourceUrl, target: '_blank' }, 'read it'))
+    : h('p', { class: 'error' }, "We couldn't find your plan's documents online. Upload your policy instead.");
+  const look = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const v = (name: string) => (f.elements.namedItem(name) as HTMLInputElement).value;
+    const belongings = kind === 'belongings';
+    await conn.reducers.lookUpPlan({
+      kind, insurer: v('insurer'), plan: v('plan'), state: v('state'),
+      limitCents: belongings ? dollars(f, 'limit') : 0n, deductibleCents: belongings ? dollars(f, 'deductible') : 0n,
+    });
+    go(next);
+  };
+  return h('section', {},
+    h('h3', {}, kind === 'health' ? 'Name your plan instead' : 'Name your policy instead'),
+    status,
+    h('form', { onsubmit: (e: Event) => act(() => look(e)) },
+      h('label', {}, 'Insurer', h('input', { name: 'insurer', required: true, placeholder: kind === 'health' ? 'Blue Shield of California' : 'Lemonade' })),
+      h('label', {}, kind === 'health' ? 'Plan' : 'Policy', h('input', { name: 'plan', required: true, placeholder: kind === 'health' ? 'Silver 70 PPO' : 'Renters' })),
+      h('label', {}, 'State', h('input', { name: 'state', required: true, maxlength: 2, placeholder: 'CA' })),
+      kind === 'belongings' && [
+        h('label', {}, 'Personal property limit ($), from your declarations page', h('input', { name: 'limit', type: 'number', min: 1, required: true })),
+        h('label', {}, 'Deductible ($)', h('input', { name: 'deductible', type: 'number', min: 0, required: true })),
+      ],
+      h('button', {}, 'Look it up')));
+}
+
+/** The attendee's own insurance for their belongings, which pays when something of theirs is stolen or broken. */
+function thingsStep() {
+  return [
+    h('h2', {}, 'Insurance for your things'),
+    h('p', {}, 'If something of yours is stolen or broken here, your renters or home insurance pays for it, and the payout lands in your wallet.'),
+    planLookup('belongings', 'profile'),
+    h('button', { class: 'link', onclick: () => go('profile') }, 'Skip'),
   ];
 }
 
@@ -228,7 +282,7 @@ function cardStep() {
       card.bloodType && card.bloodType !== 'unknown' && h('p', {}, h('b', {}, 'Blood type: '), card.bloodType),
       list('Allergies', card.allergies), list('Conditions', card.conditions), list('Medications', card.medications),
       card.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), card.emergencyContact),
-      card.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${card.insurer} ${card.plan}, member ${card.memberId}, group ${card.groupNumber}${card.insurerPhone ? `, ${card.insurerPhone}` : ''}`),
+      card.insurer && h('p', {}, h('b', {}, 'Insurance: '), [`${card.insurer} ${card.plan}`, card.memberId && `member ${card.memberId}`, card.groupNumber && `group ${card.groupNumber}`, card.insurerPhone].filter(Boolean).join(', ')),
       docs.some(d => d.status === 'failed') && h('p', { class: 'error' }, 'One document could not be read.')),
     h('button', { onclick: () => act(() => conn.reducers.confirmMedicalCard({})).then(ok => ok && go('wallet')) }, 'Looks right'),
   ];
@@ -271,7 +325,8 @@ function resumeStep(): Step {
   if (!conn.db.myAttendee.iter().next().value?.displayName) return 'name';
   const docs = [...conn.db.myMedicalDocuments.iter()];
   if (!docs.some(d => d.kind === 'history')) return 'history';
-  if (!docs.some(d => d.kind === 'insurance')) return 'insurance';
+  if (!docs.some(d => d.kind === 'insurance') && !latestLookup('health')) return 'insurance';
+  if (!latestLookup('belongings')) return 'things';
   if (conn.db.myMedicalCard.iter().next().value?.status !== 'confirmed') return 'card';
   if (!conn.db.myWallet.iter().next().value) return 'wallet';
   return 'done';
@@ -282,7 +337,8 @@ function setup() {
     case 'name': return nameStep();
     case 'socials': return socialsStep();
     case 'history': return documentStep('history', 'insurance');
-    case 'insurance': return documentStep('insurance', 'profile');
+    case 'insurance': return documentStep('insurance', 'things');
+    case 'things': return thingsStep();
     case 'profile': return profileStep();
     case 'card': return cardStep();
     case 'wallet': return walletStep();

@@ -125,23 +125,6 @@ struct UploadQuery {
     purpose: String,
 }
 
-/// PDF pages, counted the way the claims CLI counts them.
-fn count_pages(pdf: &[u8]) -> u32 {
-    let mut n = 0;
-    let mut i = 0;
-    while let Some(at) = pdf[i..].windows(5).position(|w| w == b"/Type") {
-        let mut j = i + at + 5;
-        while j < pdf.len() && pdf[j].is_ascii_whitespace() {
-            j += 1;
-        }
-        if pdf[j..].starts_with(b"/Page") && !pdf.get(j + 5).is_some_and(|c| c.is_ascii_alphanumeric()) {
-            n += 1;
-        }
-        i = j;
-    }
-    n.max(1)
-}
-
 /// Stores the file in the blob store and registers it, so the page can file it on a claim
 /// (medical), register it as an event photo (photo), or file it on the attendee's medical card.
 async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: HeaderMap, body: Bytes) -> ApiResult<Json<Value>> {
@@ -170,7 +153,7 @@ async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: Hea
     rx.await
         .map_err(|e| error(StatusCode::BAD_GATEWAY, e))?
         .map_err(|e| error(StatusCode::BAD_GATEWAY, format!("register_blob: {e}")))?;
-    let pages = if content_type == "application/pdf" { count_pages(&body) } else { 0 };
+    let pages = if content_type == "application/pdf" { bandit_common::count_pages(&body) } else { 0 };
     Ok(Json(json!({
         "hash": blob.sha256,
         "size_bytes": blob.size_bytes,

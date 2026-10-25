@@ -11,6 +11,7 @@ pub mod evidence;
 pub mod filing;
 pub mod flow;
 pub mod people;
+pub mod plan_lookup;
 pub mod setup;
 pub mod tables;
 pub mod views;
