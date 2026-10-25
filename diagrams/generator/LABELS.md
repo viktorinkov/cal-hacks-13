@@ -14,6 +14,7 @@ Label standard for every box and arrow (kept in sync with diagrams/generator/LAB
 9. Make every frame visual: where an icon, a logo or a small picture can replace words on a box, use it. Text stays only for names and 1 to 3 word arrow verbs.
 10. No placeholders: no TBD, TODO, "planned", "not built" or "?", and no box for a part that is not built.
 11. No subtitle, caption or note under a frame title. The picture explains the frame.
+12. Never embed app screenshots. Replace them with short labels when that is enough. Redraw the surrounding flow when the screenshot was hiding unclear relationships. Keep original images, logos and standalone maps where they explain something useful.
 
 Logos live in diagrams/logos/. Use the word list above for every label, and no sponsor track or prize names on the diagrams.
 

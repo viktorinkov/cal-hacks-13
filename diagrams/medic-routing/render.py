@@ -1,6 +1,7 @@
 """Draws the venue floor grid from above with the medic's real paths (from web/src/floor-path.ts)."""
 import json, math, sys
 from collections import deque
+from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -58,7 +59,12 @@ for r in range(max(0, r0), min(rows, r1)):
         d.rectangle([a[0], a[1], b[0] - 1, b[1] - 1], fill=col)
 
 def font(sz):
-    return ImageFont.truetype('/usr/share/fonts/opentype/inter/Inter-SemiBold.otf', int(sz * SS))
+    for path in ('/usr/share/fonts/opentype/inter/Inter-SemiBold.otf',
+                 '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+                 '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'):
+        if Path(path).is_file():
+            return ImageFont.truetype(path, int(sz * SS))
+    return ImageFont.load_default(size=int(sz * SS))
 def ring(x, z, rad_m, width_m, colour):
     cx, cy = to_px(x, z); r = rad_m * PX * SS; w = max(2, int(width_m * PX * SS))
     d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=colour, width=w)
@@ -68,10 +74,15 @@ def dot(x, z, rad_m, colour, outline=None, w=0):
 def label(x, z, text, sz, colour, dx=0, dy=0, anchor='mm', bg=None):
     cx, cy = to_px(x, z)
     fnt = font(sz)
+    tx, ty = cx + dx * SS, cy + dy * SS
+    bb = d.textbbox((tx, ty), text, font=fnt, anchor=anchor)
+    padding = 12 * SS
+    tx += max(0, padding - bb[0]) - max(0, bb[2] + padding - W * SS)
+    ty += max(0, padding - bb[1]) - max(0, bb[3] + padding - H * SS)
     if bg:
-        bb = d.textbbox((cx + dx * SS, cy + dy * SS), text, font=fnt, anchor=anchor)
+        bb = d.textbbox((tx, ty), text, font=fnt, anchor=anchor)
         d.rounded_rectangle([bb[0] - 8 * SS, bb[1] - 5 * SS, bb[2] + 8 * SS, bb[3] + 5 * SS], 6 * SS, fill=bg)
-    d.text((cx + dx * SS, cy + dy * SS), text, font=fnt, fill=colour, anchor=anchor)
+    d.text((tx, ty), text, font=fnt, fill=colour, anchor=anchor)
 def dashed(a, b, colour, w, dash=10, gap=8):
     (ax, ay), (bx, by) = to_px(*a), to_px(*b)
     L = math.hypot(bx - ax, by - ay); n = L / ((dash + gap) * SS)
