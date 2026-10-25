@@ -19,7 +19,8 @@ use bandit_insurance::{CoverKind, IncidentKind};
 use spacetimedb::{Identity, ReducerContext, Table};
 
 /// Proposals still open: the Decision Engine is writing one, or it waits for the organizer.
-const OPEN: [&str; 2] = ["proposing", "proposed"];
+const OPEN: [&str; 3] = ["proposing", "proposed", "scope_proposed"];
+const SCOPE_REVIEW_PREFIX: &str = "Scope review ";
 
 /// "falls under medical payments cover".
 pub fn shape_words(incident_kind: &str, cover_kind: &str) -> String {
@@ -234,11 +235,12 @@ pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: St
             release(ctx, base.id, &p.precedent_claim_ids);
             let mut claim_ids = p.precedent_claim_ids.clone();
             claim_ids.sort();
-            let summary = p.summary.trim().to_string();
+            let needs_review = shape_needs_scope_review(ctx, &base.incident_kind, &base.cover_kind);
+            let summary = if needs_review { format!("Scope review of existing rule authority. Rationale only: {}", p.summary.trim()) } else { p.summary.trim().to_string() };
             let kind = IncidentKind::parse(&base.incident_kind).ok_or("unknown proposal incident kind")?;
             let cover = CoverKind::parse(&base.cover_kind).ok_or("unknown proposal cover kind")?;
             let rule = approval_scope(kind, cover, 0, true, p.ceiling_cents);
-            ctx.db.rule_proposal().id().update(RuleProposal { status: "proposed".into(), ceiling_cents: p.ceiling_cents, claim_ids: claim_ids.clone(), rule: rule.clone(), summary: summary.clone(), ..base });
+            ctx.db.rule_proposal().id().update(RuleProposal { status: if needs_review { "scope_proposed" } else { "proposed" }.into(), ceiling_cents: p.ceiling_cents, claim_ids: claim_ids.clone(), rule: rule.clone(), summary: summary.clone(), ..base });
             jobs::finish(ctx, job, "rule proposed");
             crate::live::record(ctx, incident_id, claim_id, "Decision Engine", "Decision Engine", format!("Proposed a rule: {rule}"), format!("{summary} From {}; waits for the organizer.", claims_words(&claim_ids)));
         }
@@ -250,10 +252,28 @@ pub fn submit_rule_proposal(ctx: &ReducerContext, job_id: u64, proposal_json: St
 /// with the proposal's precedents as its evidence. Whoever proposed a rule can never approve it.
 #[spacetimedb::reducer]
 pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_seen_cents: u64) -> Result<(), String> {
+    approve_rule(ctx, proposal_id, ceiling_seen_cents, None)
+}
+
+/// A legacy scope requires this explicit action, with the exact scope the organizer reviewed.
+/// Existing scripted callers of approve_rule_proposal cannot grant this authority.
+#[spacetimedb::reducer]
+pub fn approve_rule_scope_review(ctx: &ReducerContext, proposal_id: u64, ceiling_seen_cents: u64, scope_seen: String) -> Result<(), String> {
+    approve_rule(ctx, proposal_id, ceiling_seen_cents, Some(scope_seen))
+}
+
+fn approve_rule(ctx: &ReducerContext, proposal_id: u64, ceiling_seen_cents: u64, scope_seen: Option<String>) -> Result<(), String> {
     require_role(ctx, CLAIM_ROLES)?;
     let p = ctx.db.rule_proposal().id().find(proposal_id).ok_or_else(|| format!("no proposal {proposal_id}"))?;
-    if p.status != "proposed" {
-        return Err(format!("proposal {proposal_id} is {}, not waiting for the organizer", p.status));
+    let is_review = scope_seen.is_some();
+    let expected_status = if is_review { "scope_proposed" } else { "proposed" };
+    if p.status != expected_status {
+        return Err(format!("proposal {proposal_id} is {}, not {expected_status}; scope reviews require the explicit review action", p.status));
+    }
+    if let Some(seen) = scope_seen {
+        if seen != p.rule { return Err("stale scope: read the current approval scope before approving".into()); }
+    } else if proposal_is_scope_review(&p) || shape_needs_scope_review(ctx, &p.incident_kind, &p.cover_kind) {
+        return Err("scope review required: use the explicit scope-review approval action".into());
     }
     if p.proposed_by == ctx.sender() {
         return Err("separation of duties: whoever proposed a rule cannot approve it".into());
@@ -298,7 +318,7 @@ pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_see
     let shape = shape_words(&p.incident_kind, &p.cover_kind);
     let claims = claims_words(&p.claim_ids);
     ctx.db.rule_proposal().id().update(RuleProposal {
-        status: "approved".into(),
+        status: if is_review { "scope_approved" } else { "approved" }.into(),
         decided_by: ctx.sender(),
         decided_by_name: name.clone(),
         settlement_rule_id: rule.id,
@@ -311,6 +331,17 @@ pub fn approve_rule_proposal(ctx: &ReducerContext, proposal_id: u64, ceiling_see
     Ok(())
 }
 
+fn proposal_is_scope_review(p: &RuleProposal) -> bool {
+    matches!(p.status.as_str(), "scope_proposed" | "scope_approved") || p.summary.starts_with(SCOPE_REVIEW_PREFIX)
+}
+
+/// Any unresolved legacy authority keeps a new ordinary proposal from bypassing its review.
+fn shape_needs_scope_review(ctx: &ReducerContext, kind: &str, cover: &str) -> bool {
+    ctx.db.settlement_rule().iter().any(|r| r.incident_kind == kind && r.cover_kind == cover
+        && (r.status == "review_required" || (r.status == "active" && !rule_scope_approved(ctx, &r))))
+        || ctx.db.rule_proposal().iter().any(|p| p.incident_kind == kind && p.cover_kind == cover && p.status == "scope_proposed")
+}
+
 /// Only an exact, reciprocally linked approval can authorize automatic payments. This gate runs
 /// even before the post-publish review pass, so legacy prose is never silently reinterpreted.
 pub(super) fn rule_scope_approved(ctx: &ReducerContext, r: &SettlementRuleRow) -> bool {
@@ -319,7 +350,8 @@ pub(super) fn rule_scope_approved(ctx: &ReducerContext, r: &SettlementRuleRow) -
     }
     let (Some(kind), Some(cover)) = (IncidentKind::parse(&r.incident_kind), CoverKind::parse(&r.cover_kind)) else { return false };
     ctx.db.rule_proposal().id().find(r.proposal_id).is_some_and(|p| {
-        p.status == "approved" && p.settlement_rule_id == r.id && p.rule_version == r.version
+        p.status == (if proposal_is_scope_review(&p) { "scope_approved" } else { "approved" })
+            && p.settlement_rule_id == r.id && p.rule_version == r.version
             && p.incident_kind == r.incident_kind && p.cover_kind == r.cover_kind
             && p.ceiling_cents == r.ceiling_cents && p.decided_by == r.approver
             && p.rule == approval_scope(kind, cover, r.zone_id, r.requires_corroborated, r.ceiling_cents)
@@ -357,7 +389,8 @@ pub fn review_rule_scopes(ctx: &ReducerContext) -> Result<(), String> {
             "Future automatic decisions withheld: the earlier approval does not confirm the code-enforced scope. New and waiting claims require individual review until a new scope is approved.".into());
         // RuleProposal has no zone field. Never broaden a zone-specific legacy rule during review.
         if r.zone_id == 0 && r.requires_corroborated {
-            if let Some(p) = old.filter(|p| p.status == "approved" && p.settlement_rule_id == r.id
+            if let Some(p) = old.filter(|p| ["approved", "scope_approved"].contains(&p.status.as_str()) && p.settlement_rule_id == r.id
+                && p.rule_version == r.version && p.decided_by == r.approver
                 && p.incident_kind == r.incident_kind && p.cover_kind == r.cover_kind && p.ceiling_cents == r.ceiling_cents) {
                 offer_scope_review(ctx, &p);
             }
@@ -365,7 +398,8 @@ pub fn review_rule_scopes(ctx: &ReducerContext) -> Result<(), String> {
     }
     for p in ctx.db.rule_proposal().iter().filter(|p| p.status == "proposed").collect::<Vec<_>>() {
         let (Some(kind), Some(cover)) = (IncidentKind::parse(&p.incident_kind), CoverKind::parse(&p.cover_kind)) else { continue };
-        if p.rule == approval_scope(kind, cover, 0, true, p.ceiling_cents) { continue; }
+        if p.rule == approval_scope(kind, cover, 0, true, p.ceiling_cents)
+            && !proposal_is_scope_review(&p) && !shape_needs_scope_review(ctx, &p.incident_kind, &p.cover_kind) { continue; }
         ctx.db.rule_proposal().id().update(RuleProposal { status: "scope_review".into(), ..p.clone() });
         offer_scope_review(ctx, &p);
     }
@@ -380,10 +414,10 @@ fn offer_scope_review(ctx: &ReducerContext, old: &RuleProposal) {
     if ctx.db.rule_proposal().iter().any(|p| OPEN.contains(&p.status.as_str())
         && p.incident_kind == old.incident_kind && p.cover_kind == old.cover_kind && p.rule == scope) { return; }
     ctx.db.rule_proposal().insert(RuleProposal {
-        id: 0, status: "proposed".into(), rule: scope, limit_cents: limit,
+        id: 0, status: "scope_proposed".into(), rule: scope, limit_cents: limit,
         summary: format!("Scope review of proposal #{}. Earlier wording: {} Rationale only: {}", old.id, old.rule, old.summary),
         decided_by: Identity::ZERO, decided_by_name: String::new(), reason: String::new(),
-        settlement_rule_id: 0, rule_version: 0, created_at: ctx.timestamp, decided_at: None,
+        settlement_rule_id: 0, rule_version: 0, created_at: ctx.timestamp, proposed_at: Some(ctx.timestamp), decided_at: None,
         ..old.clone()
     });
 }
@@ -394,7 +428,7 @@ fn offer_scope_review(ctx: &ReducerContext, old: &RuleProposal) {
 pub fn reject_rule_proposal(ctx: &ReducerContext, proposal_id: u64, reason: String) -> Result<(), String> {
     require_role(ctx, CLAIM_ROLES)?;
     let p = ctx.db.rule_proposal().id().find(proposal_id).ok_or_else(|| format!("no proposal {proposal_id}"))?;
-    if p.status != "proposed" {
+    if !["proposed", "scope_proposed"].contains(&p.status.as_str()) {
         return Err(format!("proposal {proposal_id} is {}, not waiting for the organizer", p.status));
     }
     if reason.trim().is_empty() {

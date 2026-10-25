@@ -158,9 +158,9 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
                     }
                 }
             }
-            // A rule Claude proposed is approved as long after, as the organizer would.
+            // The live runner handles ordinary proposals only; legacy scope reviews require the organizer.
             let proposed: Vec<RuleProposal> =
-                db.db.rule_proposal().iter().filter(|p| p.status == "proposed" && p.proposed_at.is_some_and(|t| since(t) >= approve_after as i64)).collect();
+                db.db.rule_proposal().iter().filter(|p| p.status == "proposed" && !p.summary.starts_with("Scope review ") && p.proposed_at.is_some_and(|t| since(t) >= approve_after as i64)).collect();
             for p in proposed {
                 if done.insert((p.id, "approve rule")) {
                     if let Err(e) = decide::approve_proposal(app, p.id, None) {
