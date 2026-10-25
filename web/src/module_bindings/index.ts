@@ -36,6 +36,7 @@ import {
 // Import all reducer arg schemas
 import AddIncidentNoteReducer from "./add_incident_note_reducer";
 import AddOwnerReducer from "./add_owner_reducer";
+import AddStaffReducer from "./add_staff_reducer";
 import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
@@ -54,6 +55,7 @@ import CompleteJobReducer from "./complete_job_reducer";
 import ConfirmMedicalCardReducer from "./confirm_medical_card_reducer";
 import ConnectWalletReducer from "./connect_wallet_reducer";
 import EndEventReducer from "./end_event_reducer";
+import EndLiveRunReducer from "./end_live_run_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
@@ -66,9 +68,11 @@ import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
+import LoadVenueSpotsReducer from "./load_venue_spots_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
 import OpenIncidentReducer from "./open_incident_reducer";
+import PlaceBandReducer from "./place_band_reducer";
 import PlaceBoothReducer from "./place_booth_reducer";
 import RecordClaimPayoutReducer from "./record_claim_payout_reducer";
 import RecordInsurerPaymentReducer from "./record_insurer_payment_reducer";
@@ -80,6 +84,7 @@ import RegisterBridgeReducer from "./register_bridge_reducer";
 import RegisterPhotoReducer from "./register_photo_reducer";
 import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
+import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
@@ -105,6 +110,7 @@ import SleepBandsReducer from "./sleep_bands_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
 import StartFindReducer from "./start_find_reducer";
 import StartJobReaperReducer from "./start_job_reaper_reducer";
+import StartLiveRunReducer from "./start_live_run_reducer";
 import StartSafetyWatchReducer from "./start_safety_watch_reducer";
 import StartVenueSetupReducer from "./start_venue_setup_reducer";
 import StopCrowdReducer from "./stop_crowd_reducer";
@@ -116,6 +122,7 @@ import SubmitMedicalRecordReducer from "./submit_medical_record_reducer";
 import SubmitMerchPicksReducer from "./submit_merch_picks_reducer";
 import SubmitPhotoFeaturesReducer from "./submit_photo_features_reducer";
 import SubmitVisionAssessmentReducer from "./submit_vision_assessment_reducer";
+import UnplaceBandReducer from "./unplace_band_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
 import UpsertCameraReducer from "./upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "./upsert_coverage_rule_reducer";
@@ -126,6 +133,7 @@ import UpsertInsurancePolicyReducer from "./upsert_insurance_policy_reducer";
 // Import all table schema definitions
 import ApiSessionsRow from "./api_sessions_table";
 import BandRow from "./band_table";
+import BandPlaceRow from "./band_place_table";
 import BoardApprovalsRow from "./board_approvals_table";
 import BoardAttendeesRow from "./board_attendees_table";
 import BoardChecksRow from "./board_checks_table";
@@ -142,6 +150,7 @@ import BoardPrecedentsRow from "./board_precedents_table";
 import BoardRecordsRow from "./board_records_table";
 import BoardReviewsRow from "./board_reviews_table";
 import BoardRulesRow from "./board_rules_table";
+import BoardStaffRow from "./board_staff_table";
 import BoardWalletsRow from "./board_wallets_table";
 import BoothRow from "./booth_table";
 import CameraRow from "./camera_table";
@@ -154,6 +163,7 @@ import ClaimReviewsRow from "./claim_reviews_table";
 import ClaimedPeopleRow from "./claimed_people_table";
 import ClaimsBoardRow from "./claims_board_table";
 import CommandRow from "./command_table";
+import DecisionRow from "./decision_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
 import EventGraphRow from "./event_graph_table";
@@ -161,7 +171,10 @@ import EventStateRow from "./event_state_table";
 import GatewayRow from "./gateway_table";
 import ImportRunRow from "./import_run_table";
 import IncidentBandsRow from "./incident_bands_table";
+import IncidentMarkerRow from "./incident_marker_table";
 import LinkRow from "./link_table";
+import LivePlanRow from "./live_plan_table";
+import LiveRunRow from "./live_run_table";
 import MedicMedicalCardsRow from "./medic_medical_cards_table";
 import MerchTemplateRow from "./merch_template_table";
 import MyAttendeeRow from "./my_attendee_table";
@@ -199,6 +212,7 @@ import VenueRow from "./venue_table";
 import VenuePlanRow from "./venue_plan_table";
 import VenueSetupRow from "./venue_setup_table";
 import VenueSetupStepRow from "./venue_setup_step_table";
+import VenueSpotRow from "./venue_spot_table";
 import WorkerJobsRow from "./worker_jobs_table";
 import ZoneRow from "./zone_table";
 import ZoneVisitRow from "./zone_visit_table";
@@ -218,6 +232,17 @@ const tablesSchema = __schema({
       { name: 'band_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, BandRow),
+  bandPlace: __table({
+    name: 'band_place',
+    indexes: [
+      { accessor: 'band_id', name: 'band_place_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'band_place_band_id_key', constraint: 'unique', columns: ['bandId'] },
+    ],
+  }, BandPlaceRow),
   booth: __table({
     name: 'booth',
     indexes: [
@@ -282,6 +307,23 @@ const tablesSchema = __schema({
       { name: 'command_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CommandRow),
+  decision: __table({
+    name: 'decision',
+    indexes: [
+      { accessor: 'claim_id', name: 'decision_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'decision_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'incident_id', name: 'decision_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+    ],
+    constraints: [
+      { name: 'decision_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DecisionRow),
   encounter: __table({
     name: 'encounter',
     indexes: [
@@ -349,6 +391,23 @@ const tablesSchema = __schema({
       { name: 'import_run_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ImportRunRow),
+  incidentMarker: __table({
+    name: 'incident_marker',
+    indexes: [
+      { accessor: 'band_id', name: 'incident_marker_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+      { accessor: 'incident_id', name: 'incident_marker_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+      { accessor: 'status', name: 'incident_marker_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'incident_marker_incident_id_key', constraint: 'unique', columns: ['incidentId'] },
+    ],
+  }, IncidentMarkerRow),
   link: __table({
     name: 'link',
     indexes: [
@@ -363,6 +422,28 @@ const tablesSchema = __schema({
       { name: 'link_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, LinkRow),
+  livePlan: __table({
+    name: 'live_plan',
+    indexes: [
+      { accessor: 'incident_id', name: 'live_plan_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_plan_incident_id_key', constraint: 'unique', columns: ['incidentId'] },
+    ],
+  }, LivePlanRow),
+  liveRun: __table({
+    name: 'live_run',
+    indexes: [
+      { accessor: 'id', name: 'live_run_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LiveRunRow),
   merchTemplate: __table({
     name: 'merch_template',
     indexes: [
@@ -509,6 +590,23 @@ const tablesSchema = __schema({
       { name: 'venue_setup_step_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, VenueSetupStepRow),
+  venueSpot: __table({
+    name: 'venue_spot',
+    indexes: [
+      { accessor: 'id', name: 'venue_spot_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'kind', name: 'venue_spot_kind_idx_btree', algorithm: 'btree', columns: [
+        'kind',
+      ] },
+      { accessor: 'station_id', name: 'venue_spot_station_id_idx_btree', algorithm: 'btree', columns: [
+        'stationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'venue_spot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, VenueSpotRow),
   zone: __table({
     name: 'zone',
     indexes: [
@@ -666,6 +764,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardRulesRow),
+  boardStaff: __table({
+    name: 'board_staff',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardStaffRow),
   boardWallets: __table({
     name: 'board_wallets',
     indexes: [
@@ -945,6 +1050,7 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("add_incident_note", AddIncidentNoteReducer),
   __reducerSchema("add_owner", AddOwnerReducer),
+  __reducerSchema("add_staff", AddStaffReducer),
   __reducerSchema("apply_medical_extract", ApplyMedicalExtractReducer),
   __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
@@ -963,6 +1069,7 @@ const reducersSchema = __reducers(
   __reducerSchema("confirm_medical_card", ConfirmMedicalCardReducer),
   __reducerSchema("connect_wallet", ConnectWalletReducer),
   __reducerSchema("end_event", EndEventReducer),
+  __reducerSchema("end_live_run", EndLiveRunReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
@@ -975,9 +1082,11 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
+  __reducerSchema("load_venue_spots", LoadVenueSpotsReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
   __reducerSchema("open_incident", OpenIncidentReducer),
+  __reducerSchema("place_band", PlaceBandReducer),
   __reducerSchema("place_booth", PlaceBoothReducer),
   __reducerSchema("record_claim_payout", RecordClaimPayoutReducer),
   __reducerSchema("record_insurer_payment", RecordInsurerPaymentReducer),
@@ -989,6 +1098,7 @@ const reducersSchema = __reducers(
   __reducerSchema("register_photo", RegisterPhotoReducer),
   __reducerSchema("release_band", ReleaseBandReducer),
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
+  __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
@@ -1014,6 +1124,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_crowd", StartCrowdReducer),
   __reducerSchema("start_find", StartFindReducer),
   __reducerSchema("start_job_reaper", StartJobReaperReducer),
+  __reducerSchema("start_live_run", StartLiveRunReducer),
   __reducerSchema("start_safety_watch", StartSafetyWatchReducer),
   __reducerSchema("start_venue_setup", StartVenueSetupReducer),
   __reducerSchema("stop_crowd", StopCrowdReducer),
@@ -1025,6 +1136,7 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_merch_picks", SubmitMerchPicksReducer),
   __reducerSchema("submit_photo_features", SubmitPhotoFeaturesReducer),
   __reducerSchema("submit_vision_assessment", SubmitVisionAssessmentReducer),
+  __reducerSchema("unplace_band", UnplaceBandReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
   __reducerSchema("upsert_camera", UpsertCameraReducer),
   __reducerSchema("upsert_coverage_rule", UpsertCoverageRuleReducer),
@@ -1037,12 +1149,20 @@ const proceduresSchema = __procedures(
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
   tables: typeof tablesSchema.schemaType.tables & {
+    /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+    readonly "band_place": Omit<typeof tablesSchema.schemaType.tables["bandPlace"], "accessorName"> & { readonly accessorName: "band_place" };
     /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
     readonly "chosen_venue": Omit<typeof tablesSchema.schemaType.tables["chosenVenue"], "accessorName"> & { readonly accessorName: "chosen_venue" };
     /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
     readonly "import_run": Omit<typeof tablesSchema.schemaType.tables["importRun"], "accessorName"> & { readonly accessorName: "import_run" };
+    /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+    readonly "incident_marker": Omit<typeof tablesSchema.schemaType.tables["incidentMarker"], "accessorName"> & { readonly accessorName: "incident_marker" };
+    /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+    readonly "live_plan": Omit<typeof tablesSchema.schemaType.tables["livePlan"], "accessorName"> & { readonly accessorName: "live_plan" };
+    /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+    readonly "live_run": Omit<typeof tablesSchema.schemaType.tables["liveRun"], "accessorName"> & { readonly accessorName: "live_run" };
     /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
     readonly "merch_template": Omit<typeof tablesSchema.schemaType.tables["merchTemplate"], "accessorName"> & { readonly accessorName: "merch_template" };
     /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1051,6 +1171,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "venue_setup": Omit<typeof tablesSchema.schemaType.tables["venueSetup"], "accessorName"> & { readonly accessorName: "venue_setup" };
     /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
     readonly "venue_setup_step": Omit<typeof tablesSchema.schemaType.tables["venueSetupStep"], "accessorName"> & { readonly accessorName: "venue_setup_step" };
+    /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+    readonly "venue_spot": Omit<typeof tablesSchema.schemaType.tables["venueSpot"], "accessorName"> & { readonly accessorName: "venue_spot" };
     /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
     readonly "zone_visit": Omit<typeof tablesSchema.schemaType.tables["zoneVisit"], "accessorName"> & { readonly accessorName: "zone_visit" };
     /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
@@ -1087,6 +1209,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_reviews": Omit<typeof tablesSchema.schemaType.tables["boardReviews"], "accessorName"> & { readonly accessorName: "board_reviews" };
     /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
+    /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+    readonly "board_staff": Omit<typeof tablesSchema.schemaType.tables["boardStaff"], "accessorName"> & { readonly accessorName: "board_staff" };
     /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
     readonly "board_wallets": Omit<typeof tablesSchema.schemaType.tables["boardWallets"], "accessorName"> & { readonly accessorName: "board_wallets" };
     /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
@@ -1184,13 +1308,18 @@ const REMOTE_MODULE = {
 >;
 
 const tableAccessorAliases = {
+  "band_place": "bandPlace",
   "chosen_venue": "chosenVenue",
   "event_state": "eventState",
   "import_run": "importRun",
+  "incident_marker": "incidentMarker",
+  "live_plan": "livePlan",
+  "live_run": "liveRun",
   "merch_template": "merchTemplate",
   "schedule_slot": "scheduleSlot",
   "venue_setup": "venueSetup",
   "venue_setup_step": "venueSetupStep",
+  "venue_spot": "venueSpot",
   "zone_visit": "zoneVisit",
   "api_sessions": "apiSessions",
   "board_approvals": "boardApprovals",
@@ -1209,6 +1338,7 @@ const tableAccessorAliases = {
   "board_records": "boardRecords",
   "board_reviews": "boardReviews",
   "board_rules": "boardRules",
+  "board_staff": "boardStaff",
   "board_wallets": "boardWallets",
   "claim_checks": "claimChecks",
   "claim_facts": "claimFacts",
@@ -1268,12 +1398,20 @@ function __withTableAccessorAliases<T extends object>(target: T, freeze = false)
 
 type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
+  /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+  readonly "band_place": __DbViewBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __DbViewBase["chosenVenue"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __DbViewBase["importRun"];
+  /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+  readonly "incident_marker": __DbViewBase["incidentMarker"];
+  /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+  readonly "live_plan": __DbViewBase["livePlan"];
+  /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+  readonly "live_run": __DbViewBase["liveRun"];
   /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
   readonly "merch_template": __DbViewBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1282,6 +1420,8 @@ export type DbView = __DbViewBase & {
   readonly "venue_setup": __DbViewBase["venueSetup"];
   /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
   readonly "venue_setup_step": __DbViewBase["venueSetupStep"];
+  /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+  readonly "venue_spot": __DbViewBase["venueSpot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
   readonly "zone_visit": __DbViewBase["zoneVisit"];
   /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
@@ -1318,6 +1458,8 @@ export type DbView = __DbViewBase & {
   readonly "board_reviews": __DbViewBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __DbViewBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __DbViewBase["boardStaff"];
   /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
   readonly "board_wallets": __DbViewBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
@@ -1400,12 +1542,20 @@ export type DbView = __DbViewBase & {
 
 type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
+  /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+  readonly "band_place": __TablesBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __TablesBase["chosenVenue"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __TablesBase["importRun"];
+  /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+  readonly "incident_marker": __TablesBase["incidentMarker"];
+  /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+  readonly "live_plan": __TablesBase["livePlan"];
+  /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+  readonly "live_run": __TablesBase["liveRun"];
   /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
   readonly "merch_template": __TablesBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1414,6 +1564,8 @@ export type Tables = __TablesBase & {
   readonly "venue_setup": __TablesBase["venueSetup"];
   /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
   readonly "venue_setup_step": __TablesBase["venueSetupStep"];
+  /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+  readonly "venue_spot": __TablesBase["venueSpot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
   readonly "zone_visit": __TablesBase["zoneVisit"];
   /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
@@ -1450,6 +1602,8 @@ export type Tables = __TablesBase & {
   readonly "board_reviews": __TablesBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __TablesBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __TablesBase["boardStaff"];
   /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
   readonly "board_wallets": __TablesBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */

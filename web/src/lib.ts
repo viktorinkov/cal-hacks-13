@@ -11,7 +11,6 @@ export type Config = {
   spacetimedb_url: string;
   database: string;
   kibana_url: string;
-  dashboards: { title: string; url: string }[];
   auth_client_id: string;
   test_mode: boolean;
 };

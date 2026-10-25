@@ -46,4 +46,4 @@ cargo run -p bandit-claims -- story
 | `wait N --status settled` | block until a claim reaches a status |
 | `scorecard [--rounds 3]` | planted genuine and fake claims; straight-through rate, dollars wrongly paid, precision and recall |
 
-Record templates are in `fixtures/medical-records/`. The Kibana dashboard for the Elastic copy is installed with `crates/claims-elastic/kibana/install.sh`.
+Record templates are in `fixtures/medical-records/`. The Kibana dashboard for the Elastic copy is installed with `kibana/install.sh`.

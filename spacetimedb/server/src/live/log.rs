@@ -1,0 +1,163 @@
+//! The decision history: one row each time someone or something decides about an incident or its claim, with
+//! who decided, what and why. Bands raise incidents, the medic treats, Claude reads the clinic record and
+//! reviews the evidence, the Evidence Engine checks it against past claims, the Decision Engine settles,
+//! routes or refuses in code, and the organizer approves and teaches a rule. The 3D page lists it live.
+
+use super::{IncidentMarker, incident_marker};
+use crate::insurance::{Claim, ClaimStatus, MedicalRecord};
+use bandit_insurance::money::format_cents;
+use spacetimedb::{ReducerContext, Table, Timestamp};
+
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = decision, public)]
+pub struct Decision {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub at: Timestamp,
+    #[index(btree)]
+    pub incident_id: u64,
+    #[index(btree)]
+    pub claim_id: u64,
+    /// `band`, `camera`, `medic`, `organizer`, `Claude`, `Evidence Engine`, `Decision Engine`, `wallet` or
+    /// `venue`.
+    pub actor: String,
+    /// Their name: a band code, "Ari Ramos", "rule v2", "Ops desk".
+    pub who: String,
+    pub what: String,
+    pub why: String,
+}
+
+pub fn record(ctx: &ReducerContext, incident_id: u64, claim_id: u64, actor: &str, who: &str, what: String, why: String) {
+    ctx.db.decision().insert(Decision { id: 0, at: ctx.timestamp, incident_id, claim_id, actor: actor.into(), who: who.into(), what, why });
+}
+
+fn update_marker(ctx: &ReducerContext, incident_id: u64, f: impl FnOnce(IncidentMarker) -> IncidentMarker) {
+    if let Some(m) = ctx.db.incident_marker().incident_id().find(incident_id) {
+        ctx.db.incident_marker().incident_id().update(f(m));
+    }
+}
+
+/// The claim's status in the words the 3D page shows.
+pub fn status_words(s: ClaimStatus) -> &'static str {
+    match s {
+        ClaimStatus::AwaitingRecord => "waiting for the clinic record",
+        ClaimStatus::ReadingRecord => "reading the clinic record",
+        ClaimStatus::Verifying => "checking the evidence",
+        ClaimStatus::Reviewing => "reviewing",
+        ClaimStatus::Routed => "waiting for the organizer",
+        ClaimStatus::Paying => "paying",
+        ClaimStatus::Settled => "paid",
+        ClaimStatus::Refused => "refused",
+        ClaimStatus::Reconciled => "paid by the insurer",
+    }
+}
+
+fn person(c: &Claim) -> String {
+    if c.claimant_name.is_empty() { "the venue".into() } else { c.claimant_name.clone() }
+}
+
+/// Called with the claim before and after every save: a status change is a decision.
+pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
+    let changed = before.is_none_or(|b| b.status != c.status);
+    update_marker(ctx, c.incident_id, |m| IncidentMarker { claim_id: c.id, claim_status: status_words(c.status).into(), payout_cents: c.payout_cents, ..m });
+    if !changed {
+        return;
+    }
+    let (actor, who, what, why): (&str, String, String, String) = match c.status {
+        // A property claim is saved once before its evidence is read; it opens on the next save.
+        ClaimStatus::AwaitingRecord if c.cover_kind == "property" => return,
+        ClaimStatus::AwaitingRecord => (
+            "Decision Engine",
+            format!("claim {}", c.id),
+            format!("Claim opened for {}", person(c)),
+            "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
+        ),
+        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
+        ClaimStatus::Verifying if c.cover_kind == "property" => (
+            "Decision Engine",
+            format!("claim {}", c.id),
+            format!("Property claim opened for {}", format_cents(c.payout_cents)),
+            "the organizer logged the repair cost; the camera's assessment is evidence".into(),
+        ),
+        ClaimStatus::Verifying => return,
+        ClaimStatus::Reviewing => return,
+        ClaimStatus::Routed => ("Decision Engine", "code".into(), format!("Sent to the organizer: {}", format_cents(c.payout_cents)), c.status_note.clone()),
+        ClaimStatus::Paying => {
+            let who = if c.decided_by == "rule" { format!("rule v{}", c.settlement_rule_version) } else { c.routed_to_name.clone() };
+            let what = if c.decided_by == "rule" {
+                format!("Settled on its own: {} to {}", format_cents(c.payout_cents), person(c))
+            } else {
+                format!("Approved: {} to {}", format_cents(c.payout_cents), person(c))
+            };
+            let actor = if c.decided_by == "rule" { "Decision Engine" } else { "organizer" };
+            (actor, who, what, "paying into their Capital One wallet".into())
+        }
+        ClaimStatus::Settled if c.cover_kind == "property" => {
+            ("wallet", "Ledger".into(), format!("Repair paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
+        }
+        ClaimStatus::Settled => ("wallet", "Capital One".into(), format!("{} landed in {}'s wallet", format_cents(c.payout_cents), person(c)), c.payout_reference.clone()),
+        ClaimStatus::Refused => {
+            let actor = if c.decided_by == "approver" { "organizer" } else { "Decision Engine" };
+            let who = if c.decided_by == "approver" { c.routed_to_name.clone() } else { "code".into() };
+            (actor, who, format!("Refused {}'s claim", person(c)), c.refusal_reason.clone())
+        }
+        ClaimStatus::Reconciled => ("wallet", "Insurer".into(), "The insurer paid the venue back".into(), c.payout_reference.clone()),
+    };
+    record(ctx, c.incident_id, c.id, actor, &who, what, why);
+}
+
+/// Claude's reading of the clinic record.
+pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
+    let dx = r.diagnoses.first().cloned().unwrap_or_default();
+    record(
+        ctx,
+        c.incident_id,
+        c.id,
+        "Claude",
+        "Claude",
+        format!("Read the clinic record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
+        format!("{}, {}: {dx}", r.provider_name, r.date_of_service),
+    );
+}
+
+/// The Evidence Engine's checks and the similar past claims it found.
+pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], precedents: usize) {
+    let what = if failed.is_empty() { "Checked the evidence: nothing failed".to_string() } else { format!("Flagged: {}", failed.join(", ")) };
+    record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{precedents} similar past claims found"));
+}
+
+/// Claude's review of the evidence pack.
+pub fn reviewed(ctx: &ReducerContext, c: &Claim, verdict: &str, summary: &str) {
+    record(ctx, c.incident_id, c.id, "Claude", "Claude", format!("Review: {}", verdict.replace('_', " ")), summary.into());
+}
+
+/// The organizer's approval, and the rule it taught.
+pub fn approved(ctx: &ReducerContext, c: &Claim, approver: &str, rule: Option<(u32, u64)>) {
+    let why = match rule {
+        Some((v, ceiling)) => format!("learned rule v{v}: the next similar claim up to {} settles on its own", format_cents(ceiling)),
+        None => "approved without teaching a rule".into(),
+    };
+    record(ctx, c.incident_id, c.id, "organizer", approver, format!("Approved {}'s claim", person(c)), why);
+}
+
+/// The medic or the organizer on an incident.
+pub fn responding(ctx: &ReducerContext, incident_id: u64, medic: &str) {
+    update_marker(ctx, incident_id, |m| IncidentMarker { status: "responding".into(), medic: medic.into(), responding_at: Some(ctx.timestamp), ..m });
+    record(ctx, incident_id, 0, "medic", medic, "On the way".into(), "took the incident".into());
+}
+
+pub fn noted(ctx: &ReducerContext, incident_id: u64, author: &str, role: &str, text: &str, cost_cents: Option<u64>) {
+    let actor = if role == "medic" { "medic" } else { "organizer" };
+    let what = match cost_cents {
+        Some(c) => format!("Logged the cost: {}", format_cents(c)),
+        None => "Note on scene".into(),
+    };
+    record(ctx, incident_id, 0, actor, author, what, text.into());
+}
+
+pub fn resolved(ctx: &ReducerContext, incident_id: u64, by: &str, role: &str, resolution: &str) {
+    update_marker(ctx, incident_id, |m| IncidentMarker { status: "resolved".into(), resolved_at: Some(ctx.timestamp), ..m });
+    let actor = if role == "medic" { "medic" } else { "organizer" };
+    record(ctx, incident_id, 0, actor, by, "Resolved".into(), resolution.into());
+}

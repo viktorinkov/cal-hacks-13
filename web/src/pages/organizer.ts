@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the event graph with its photos, the merch templates
-// and orders, the Kibana dashboards, the venue setup from the event's name, and "Event ended".
+// and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -14,7 +14,6 @@ import { graphTab, showPhotoInGraph } from '../graph';
 import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { mockup } from '../recap';
-import { Identity } from 'spacetimedb';
 import type { DbConnection } from '../module_bindings';
 import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate } from '../module_bindings/types';
 
@@ -55,6 +54,7 @@ const QUERIES = [
   'SELECT * FROM venue_setup',
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
+  'SELECT * FROM board_staff',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -139,12 +139,15 @@ function header() {
   ];
 }
 
-/** A signed-in person with no staff role sees the code the organizer adds them by. */
+/** A signed-in person with no staff role sees the email the organizer adds them by. */
 function noRole() {
+  const email = signedInEmail();
+  if (roles().has('photographer')) return h('section', {}, h('h3', {}, 'Photographer'), h('p', {}, h('a', { href: '/photo' }, 'Add event photos')));
   return h('section', {},
     h('h3', {}, 'This account has no staff role'),
-    h('p', {}, 'The organizer portal is for the event\'s organizer and medics. To get access, send this code to the organizer:'),
-    h('p', {}, h('code', {}, conn.identity!.toHexString())),
+    email
+      ? h('p', {}, `The organizer portal is for the event's staff. Ask the organizer to add ${email} on the Staff tab; this page opens as soon as they do.`)
+      : [h('p', {}, 'The organizer portal is for the event\'s staff. To get access, send this code to the organizer:'), h('p', {}, h('code', {}, conn.identity!.toHexString()))],
     h('p', {}, 'Once you are a medic, tapping a band with this phone opens the wearer\'s medical card.'));
 }
 
@@ -237,36 +240,40 @@ function attendees() {
 
 // --- Staff ----------------------------------------------------------------------------------
 
-/** Who the owner added since the page loaded, so the tab confirms each one. */
-const staffAdded: string[] = [];
+/** The roles the owner adds people to by email, as the module allows them. */
+const EMAIL_ROLES: [string, string][] = [['medic', 'Medic'], ['ops', 'Organizer'], ['photographer', 'Photographer']];
 
-/** The owner makes a signed-in account a medic or an organizer, by the code that account's portal shows. */
+function roleName(role: string): string {
+  return EMAIL_ROLES.find(([r]) => r === role)?.[1] ?? role;
+}
+
+/** The owner adds a medic, organizer or photographer by email. Whoever signs in with it gets the role. */
 function staffTab() {
+  const staff = [...conn.db.boardStaff.iter()].sort((a, b) => a.name.localeCompare(b.name));
   const add = async (e: Event) => {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
-    const name = field(f, 'staff-name');
-    const role = field(f, 'staff-role');
-    const code = field(f, 'staff-code').replace(/^0x/, '');
-    const done = await act(async () => {
-      if (!/^[0-9a-f]{64}$/i.test(code)) throw new Error('The code is the 64-character line the person sees on this portal.');
-      await conn.reducers.grantRole({ identity: Identity.fromString(code), role, label: name });
-    });
-    if (done) {
-      staffAdded.push(`${name} as ${role === 'medic' ? 'a medic' : 'an organizer'}`);
+    if (await act(() => conn.reducers.addStaff({ email: field(f, 'staff-email'), role: field(f, 'staff-role'), name: field(f, 'staff-name') }))) {
       f.reset();
       render();
     }
   };
+  const remove = (id: bigint, name: string, role: string) =>
+    confirm(`Remove ${name} as ${roleName(role).toLowerCase()}?`) && act(() => conn.reducers.removeStaff({ id }));
   return h('section', {},
     h('h3', {}, 'Staff'),
-    h('p', {}, 'A medic or organizer signs in on this portal with their email, and it shows them a code. Add them with that code. A medic who then taps a band with the same phone gets the wearer\'s medical card.'),
+    h('p', {}, 'Add staff by the email they sign in with. A medic who then taps a band with their phone gets the wearer\'s medical card.'),
     h('form', { onsubmit: add },
       h('label', {}, 'Name', h('input', { name: 'staff-name', required: true })),
-      h('label', {}, 'Code from their portal', h('input', { name: 'staff-code', required: true })),
-      h('label', {}, 'Role', h('select', { name: 'staff-role' }, h('option', { value: 'medic' }, 'Medic'), h('option', { value: 'ops' }, 'Organizer'))),
+      h('label', {}, 'Email', h('input', { name: 'staff-email', type: 'email', required: true })),
+      h('label', {}, 'Role', h('select', { name: 'staff-role' }, EMAIL_ROLES.map(([value, label]) => h('option', { value }, label)))),
       h('button', {}, 'Add')),
-    staffAdded.length > 0 && h('p', { class: 'pass' }, `Added ${staffAdded.join(', ')}. They reload the portal to see their tabs.`));
+    staff.length > 0 && h('table', {},
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Email'), h('th', {}, 'Role'), h('th', {}, 'Signed in'), h('th', {}, '')),
+      staff.map(m => h('tr', {},
+        h('td', {}, m.name), h('td', {}, m.email), h('td', {}, roleName(m.role)),
+        h('td', { class: m.account ? 'pass' : 'muted' }, m.account ? 'yes' : 'not yet'),
+        h('td', {}, h('button', { class: 'link', onclick: () => remove(m.id, m.name, m.role) }, 'Remove'))))));
 }
 
 // --- Claims ---------------------------------------------------------------------------------
@@ -707,8 +714,45 @@ function merchTab() {
 
 // --- Kibana ---------------------------------------------------------------------------------
 
+/** Elastic's jobs in the order of the event, each with what it does and the Kibana views that show it. */
+const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[] = [
+  {
+    job: 'Before the event: organizing the scraped event data',
+    what: 'Bright Data scraped the event pages and the sponsors\' company profiles into raw indices. The workflow bandit-organize joins the exact matches with ES|QL LOOKUP JOIN, and the agent bandit-organizer resolves the rest and gives a reason for every merge. Rust checks the bundle and loads it into SpacetimeDB in one transaction: the venue, zones, sponsors, booths and schedule on the other tabs.',
+    views: [
+      ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
+      ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
+      ['bandit-organize runs, step by step', '/app/workflows'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+    ],
+  },
+  {
+    job: 'During the event: the bands\' radio log and the photos',
+    what: 'The venue laptop records every packet the gateway hears from the bands and the station markers: zone, battery, SOS, fall and button presses, and the signal strength of every band nearby. It also records every photo\'s camera, time and place, never the image. The log is kept for after the event; nothing live reads it, since the Live tab comes from SpacetimeDB.',
+    views: [['Band radio and photos', '/app/dashboards#/view/bandit-radio']],
+  },
+  {
+    job: 'After the event: ordering the recap\'s suggestions',
+    what: 'Each recap suggests the people an attendee hung out with and the booths where they spent time. SpacetimeDB decides who and what is on the list; Elastic only orders it by meaning, matching the attendee\'s interests against each person\'s interests and each booth\'s description.',
+    views: [['Recap suggestions: each attendee\'s latest ranking next to the minutes order', '/app/dashboards#/view/bandit-recap']],
+  },
+  {
+    job: 'Claims: checking the evidence',
+    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the most similar past claims. Both come back to the claim as checks on the Claims tab; they never change an amount.',
+    views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
+  },
+];
+
 function kibana() {
-  return [h('section', {}, h('ul', {}, cfg.dashboards.map(d => h('li', {}, h('a', { href: d.url, target: '_blank' }, d.title)))))];
+  return [
+    h('section', {},
+      h('h3', {}, 'Elastic, the Evidence Engine'),
+      h('p', {}, 'Elastic works in the background: it organizes and validates data and orders it by meaning. It never holds live state and never decides; SpacetimeDB owns the live event and Claude makes the decisions. Each view opens in Kibana, signed in to the Elastic Cloud project.')),
+    EVIDENCE_ENGINE.map(({ job, what, views }) => h('section', {},
+      h('h3', {}, job),
+      h('p', {}, what),
+      h('ul', {}, views.map(([title, path]) => h('li', {}, h('a', { href: `${cfg.kibana_url}${path}`, target: '_blank' }, title)))))),
+  ];
 }
 
 // The page redraws on every change and every second; holding off while a button is pressed keeps a

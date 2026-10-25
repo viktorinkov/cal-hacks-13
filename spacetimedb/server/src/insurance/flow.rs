@@ -24,7 +24,10 @@ fn claim_by_id(ctx: &ReducerContext, claim_id: u64) -> Result<Claim, String> {
 }
 
 fn save(ctx: &ReducerContext, claim: Claim) -> Claim {
-    ctx.db.claim().id().update(Claim { updated_at: ctx.timestamp, ..claim })
+    let before = ctx.db.claim().id().find(claim.id);
+    let saved = ctx.db.claim().id().update(Claim { updated_at: ctx.timestamp, ..claim });
+    crate::live::on_claim_saved(ctx, before.as_ref(), &saved);
+    saved
 }
 
 fn amounts(claim: &Claim) -> Amounts {
@@ -165,6 +168,7 @@ fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, St
         reconciled_at: None,
         updated_at: ctx.timestamp,
     });
+    crate::live::on_claim_saved(ctx, None, &claim);
     let claim = rebuild(ctx, claim)?;
     if claim.status == ClaimStatus::Refused || !kind.is_injury() {
         return Ok(claim);
@@ -354,6 +358,9 @@ pub fn apply_medical_record(ctx: &ReducerContext, job_id: u64, record_json: Stri
         ..record
     });
     jobs::finish(ctx, job, "record extracted");
+    if let Some(r) = ctx.db.medical_record().id().find(record.id) {
+        crate::live::record_read(ctx, &claim, &r);
+    }
     rebuild(ctx, claim)?;
     Ok(())
 }
@@ -378,6 +385,8 @@ pub fn submit_claim_checks(ctx: &ReducerContext, job_id: u64, checks: Vec<CheckI
         let check = Check { name: c.name.clone(), result, detail: c.detail.clone(), reader: bandit_insurance::Reader::Elastic };
         store_check(ctx, claim.id, claim.pack_version, &check);
     }
+    let failed: Vec<String> = checks.iter().filter(|c| c.result == "fail").map(|c| c.name.replace('_', " ")).collect();
+    crate::live::checks_done(ctx, &claim, &failed, precedents.len());
     for pr in precedents {
         ctx.db.claim_precedent().insert(ClaimPrecedent {
             id: 0,
@@ -520,6 +529,7 @@ pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: Strin
         model_call_id: call_id,
         created_at: ctx.timestamp,
     });
+    crate::live::reviewed(ctx, &claim, &verdict, &r.map(|r| r.summary.clone()).unwrap_or_default());
     let claim = save(ctx, Claim { review_verdict: verdict, ..claim });
     decide_claim(ctx, claim, review_gate)
 }
@@ -817,6 +827,7 @@ pub fn approve_claim(
     });
     let rules = core_rules(ctx);
     let covered_already = matching_rule(&rules, kind_of(&claim), cover_of(&claim), 0).is_some_and(|r| r.ceiling_cents >= claim.payout_cents);
+    let mut taught: Option<(u32, u64)> = None;
     if learn && !covered_already {
         let kind = kind_of(&claim);
         let cover = cover_of(&claim);
@@ -830,7 +841,11 @@ pub fn approve_claim(
             cover_kind: cover.as_str().into(),
             zone_id: 0,
             requires_corroborated: true,
-            ceiling_cents: learned_ceiling(requested_ceiling_cents, claim.payout_cents, None),
+            ceiling_cents: {
+                let c = learned_ceiling(requested_ceiling_cents, claim.payout_cents, None);
+                taught = Some((version, c));
+                c
+            },
             approver: ctx.sender(),
             approver_name: approver_name.clone(),
             approver_role: claim.routed_to_role.clone(),
@@ -840,6 +855,7 @@ pub fn approve_claim(
             created_at: ctx.timestamp,
         });
     }
+    crate::live::approved(ctx, &claim, &approver_name, taught);
     let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
     settle(ctx, claim, "approved")
 }
