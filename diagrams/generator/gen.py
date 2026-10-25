@@ -321,43 +321,131 @@ def evidence(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 7. The Decision Engine
+# ---------------------------------------------------------------- 7. The insurance Decision Engine
+def badge(box, n):
+    """A numbered stage marker on the top left corner of a box."""
+    d = 64
+    rid, tid = S.uid("bg"), S.uid("bt")
+    S.base("ellipse", box.x - 26, box.y - 26, d, d, id=rid, backgroundColor="#1e1e1e", strokeColor="#1e1e1e",
+           boundElements=[{"type": "text", "id": tid}])
+    s = str(n)
+    tw, th = len(s) * 32 * 0.64 + 4, 32 * 1.25
+    S.base("text", box.x - 26 + (d - tw) / 2, box.y - 26 + (d - th) / 2, tw, th, id=tid, strokeColor=WHITE, text=s,
+           originalText=s, fontSize=32, fontFamily=5, textAlign="center", verticalAlign="middle", containerId=rid,
+           autoResize=True, lineHeight=1.25)
+
+
 def insurance(y0):
-    S.begin_frame("7 · The Decision Engine", 0, y0, 1000, 600)
-    title("Decision Engine")
-    c = [60, 780, 1460, 2240, 2900]
-    r1, r2, r3 = 240, 520, 800
-    attendee = B(c[0], r1, "attendee", "web", w=460, icons={0: USER})
-    tap = B(c[0], r2, "tap page (/t/code)", "web", w=460, icons={0: PHONE})
-    incident = B(c[1], r1, "incident\nlight circle\ncamera sighting", "stdb", w=420, h=150)
-    file_ = B(c[1], r2, "file_claim", "stdb", w=420)
-    report = B(c[1], r3, "hospital report\nPDF, itemized bill", "note", w=420, icons={0: FILE})
-    pack = B(c[2], r1, "evidence pack\nprice, date, cover", "stdb", w=520, h=r2 + BH - r1)
-    extract = B(c[2], r3, "Anthropic Claude API\n(claim_record_extract)", "ext", w=520, icons={0: CLAUDE},
-                fill=WHITE)
-    refused = B(c[3], r1, "refused\nchecks listed", "bad", w=400)
-    review = B(c[3], r2, "Claude\n(claim_review)", "ext", w=400, icons={0: CLAUDE}, fill=WHITE)
-    payout = SV(c[4], r1, CAPONE, "Nessie (payout)", w=480)
-    rule = B(c[4], 0, "rule match", "stdb", w=480, h=220, shape="diamond", cy=r2 + BH / 2)
-    org = B(c[4], r3, "organizer portal\n(/organizer, Claims)", "web", w=480, icons={0: MONITOR})
-    venue = B(c[4], r3 + BH + 140, "venue damage", "stdb")
-    V(org, venue, "opens claim", x=org.x + 0.3 * org.w)
-    V(attendee, tap, "opens")
-    H(tap, file_, "files claim")
-    H(file_, pack, "opens claim", y=file_.cy)
-    H(incident, pack, "adds facts", y=incident.cy)
-    V(file_, report, "requests report")
-    H(report, extract)
-    V(extract, pack, "adds lines")
-    H(pack, refused, "fails", y=refused.cy)
-    H(pack, review, "passes", y=review.cy)
-    H(review, rule, "confirms story", y=rule.cy)
-    V(rule, payout, "settles", x=rule.cx)
-    V(rule, org, "escalates", x=rule.cx)
-    lx = rule.cx + 170  # the learning loop meets the diamond's lower right edge
-    edge = rule.cy + rule.h / 2 * (1 - 170 / (rule.w / 2)) + 5
-    S.arrow(org, rule, [(lx, org.y), (lx, edge)], label="learns rule", dashed=True, color="#2b8a3e", fs=AFS)
-    R(org, "r", payout, "r", [(org.right + 90, org.cy), (org.right + 90, payout.cy)], label="approves", seg=1)
+    S.begin_frame("7 · Insurance Decision Engine", 0, y0, 1000, 600)
+    S.text(40, 28, "Insurance Decision Engine", fs=64)
+    C = [60, 840, 1600, 2360, 3120, 3900]
+    SH, LH = 150, 280  # source box height, report lane box height
+    lane = [250, 430, 610, 790, 1040]  # centre y of each evidence lane
+    mk = dict(fill=WHITE)
+
+    # 1. evidence, one lane per source
+    band = B(C[0], 0, "band", "device", w=400, h=SH, wordmark=WATCH, mark_h=70, cy=lane[0], **mk)
+    circle = B(C[0], 0, "light circle", "device", w=400, h=SH, wordmark=RADIO, mark_h=70, cy=lane[1], **mk)
+    medic = B(C[0], 0, "medic", "web", w=400, h=SH, wordmark=USER, mark_h=70, cy=lane[2], **mk)
+    cam = B(C[0], 0, "security camera", "device", w=400, h=SH, wordmark=CAMERA, mark_h=70, cy=lane[3], **mk)
+    report = B(C[0], 0, "hospital report", "note", w=400, h=SH + 30, wordmark=FILE, mark_h=90, cy=lane[4], **mk)
+
+    incident = B(C[1], 0, "incident\nSOS or fall", "stdb", w=460, h=SH, wordmark=STDB, mark_h=MARK_H[STDB],
+                 cy=lane[0], **mk)
+    witness = B(C[1], 0, "witness_zone\n2+ bands in zone", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[1])
+    note = B(C[1], 0, "staff_note_time\nnote within 30 min", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[2])
+    vision = B(C[1], 0, "vision_time\nsame zone, 120 s", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[3])
+    extract = B(C[1], 0, "Claude reads bill\n(claim_record_extract)", "claude", w=460, h=LH, wordmark=CLAUDE,
+                mark_h=90, cy=lane[4], **mk)
+    corro = B(C[2], 0, "corroborate\nnote + witnesses\nor camera\ncorroborated\nor disputed", "rust", w=460,
+              h=lane[3] - lane[1] + SH, wordmark=RUST, mark_h=80, cy=lane[2])
+    checks = B(C[2], 0, "record_checks\ntotals, patient\ndate, injury code\nduplicate bill", "rust", w=460, h=LH,
+               wordmark=RUST, mark_h=70, cy=lane[4])
+    price = B(C[3], 0, "cover_lines\nfee schedule\nbilled $1,308\npays $895", "rust", w=460, h=LH, wordmark=RUST,
+              mark_h=70, cy=lane[4])
+    pack = B(C[4], lane[0] - SH / 2, "evidence pack\nnumbered facts\nSHA-256\nnew version\neach rebuild", "stdb",
+             w=460, h=lane[4] + LH / 2 - lane[0] + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
+
+    H(band, incident, "SOS or fall\nzone, time")
+    H(circle, witness, "witness bands")
+    H(medic, note, "staff note")
+    H(cam, vision, "camera sighting")
+    H(report, extract, "PDF\n(submit_medical_record)", y=lane[4])
+    H(witness, corro, "witnesses", y=lane[1])
+    H(note, corro, "note", y=lane[2])
+    H(vision, corro, "camera", y=lane[3])
+    H(extract, checks, "lines + pages")
+    H(checks, price, "valid lines")
+    H(incident, pack, "incident facts", y=lane[0])
+    H(corro, pack, "corroborated\nor disputed", y=lane[2])
+    H(price, pack, "priced lines", y=lane[4])
+
+    # 2. past claims and Claude's review
+    ee = B(C[5], lane[0] - SH / 2, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=520, h=300,
+           wordmark=ELASTIC, mark_h=MARK_H[ELASTIC], **mk)
+    review = B(C[5], 0, "Claude\nverdict, causation\ncited fact ids\n(claim_review)", "claude", w=520, h=380,
+               wordmark=CLAUDE, mark_h=110, cy=lane[2] + 120, **mk)
+    vcheck = B(C[5], 0, "validate_review\ncites exist\nno new $ figures", "rust", w=520, h=210, icons={0: RUST},
+               cy=lane[4] + 70)
+    H(pack, ee, "claim, no names\n(claim_verify)", y=ee.cy)
+    H(pack, review, "whole pack", y=review.cy)
+    V(ee, review, "top 3 + scores\n(submit_claim_checks)")
+    V(review, vcheck, "answer\n(submit_claim_review)")
+
+    # 3. code decides, in order
+    top = 1430
+    DW, DH, G = 380, 240, 170
+    X = [60 + i * (DW + G) for i in range(7)]
+    d = dict(shape="diamond", h=DH)
+    refuse_d = B(X[0], top, "refuse\ncheck", "rust", w=DW, **d)
+    checks_d = B(X[1], top, "checks\npass", "rust", w=DW, **d)
+    verdict_d = B(X[2], top, "Claude\nverdict", "claude", w=DW, **d)
+    second_d = B(X[3], top, "second\nsource", "rust", w=DW, **d)
+    mass_d = B(X[4], top, "mass\noccurrence", "rust", w=DW, **d)
+    rule_d = B(X[5], top, "rule\nmatch", "stdb", w=DW, **d)
+    settle = B(X[6], 0, "auto-settle\nrule vN", "good", w=360, cy=refuse_d.cy - S.oy)
+    payout = B(X[6] + 560, 0, "payout\nmin(cost, $5,000,\n$25,000 left)\ndouble-entry journals", "rust", w=520,
+               h=260, icons={0: RUST},
+               cy=refuse_d.cy - S.oy)
+    nessie = B(payout.right - S.ox + 260, 0, "deposit\n(wallet)", "ext", w=400, h=200, wordmark=CAPONE,
+               mark_h=MARK_H[CAPONE], cy=refuse_d.cy - S.oy, **mk)
+    R(vcheck, "b", refuse_d, "t", [(vcheck.cx, top + S.oy - 110), (refuse_d.cx, top + S.oy - 110)],
+      label="checked review + pack", seg=1)
+    H(refuse_d, checks_d, "covered")
+    H(checks_d, verdict_d, "all pass")
+    H(verdict_d, second_d, "consistent")
+    H(second_d, mass_d, "corroborated")
+    H(mass_d, rule_d, "under 3")
+    H(rule_d, settle, "under ceiling")
+    H(settle, payout, "settles")
+    H(payout, nessie, "deposit\n(claim_payout)")
+
+    # 4. the organizer, the refusals and the learned rules
+    low = top + DH + 220
+    refused = B(X[0], low, "refused\nreason listed", "bad", w=DW, h=200)
+    org = B(X[1], low, "organizer portal (/organizer, Claims)\nWaiting for your decision", "web",
+            w=X[4] + DW - X[1], h=200, wordmark=MONITOR, mark_h=70, **mk)
+    rules = B(X[5] - 30, low, "learned rules\nversion, approver", "stdb", w=DW + 60, h=200, wordmark=STDB,
+              mark_h=MARK_H[STDB], **mk)
+    stale = B(X[6], low, "approver_check\norganizer only\namount + SHA seen", "rust", w=400, h=200, icons={0: RUST})
+    letters = B(nessie.x - S.ox, low, "Claude\nnotice of loss\n(ACORD 3)", "claude", w=400, h=200,
+                icons={0: CLAUDE}, **mk)
+    V(refuse_d, refused, "no cover, staff\ndisputed, $0")
+    V(checks_d, org, "check failed", x=checks_d.cx)
+    V(verdict_d, org, "needs_human\ninconsistent", x=verdict_d.cx)
+    V(second_d, org, "uncorroborated", x=second_d.cx)
+    V(mass_d, org, "3+ in zone\nwithin 5 min", x=mass_d.cx)
+    V(rules, rule_d, "rule vN\nceiling", dashed=True, color="#2b8a3e", x=rule_d.cx)
+    D(rule_d, "l", 0.75, org, "t", 0.97, "no rule")
+    H(org, refused, "refuses")
+    H(org, rules, "learns", dashed=True, color="#2b8a3e", y=rules.cy)
+    R(org, "b", stale, "b", [(org.right - 120, org.bottom + 110), (stale.cx, org.bottom + 110)],
+      label="approves, amount + SHA seen", seg=1, fa=(org.w - 120) / org.w)
+    D(stale, "t", 0.5, payout, "b", 0.15, "unchanged")
+    V(nessie, letters, "paid\n(claim_draft)")
+    for box, n in ((extract, 1), (checks, 2), (price, 3), (corro, 4), (pack, 5), (ee, 6), (review, 7),
+                   (refuse_d, 8), (org, 9), (payout, 10), (letters, 11)):
+        badge(box, n)
     return S.end_frame()
 
 
@@ -527,9 +615,12 @@ def hardware(y0):
     return S.end_frame()
 
 
+FRAMES = (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, merch,
+          nessie, vultr, hardware)
+only = sys.argv[2:]  # frame function names, for a board of just those frames
 y = 0
-for draw in (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, merch,
-             nessie, vultr, hardware):
-    y += draw(y) + GAP
+for draw in FRAMES:
+    if not only or draw.__name__ in only:
+        y += draw(y) + GAP
 S.dump(sys.argv[1] if len(sys.argv) > 1 else "bandit-system-design.excalidraw")
 print(len(S.elements), "elements")
