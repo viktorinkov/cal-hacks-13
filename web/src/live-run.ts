@@ -13,7 +13,7 @@ import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
 import { venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
-import type { Band, IncidentMarker, LiveRun } from './module_bindings/types';
+import type { Band, Claim, IncidentMarker, LiveRun } from './module_bindings/types';
 
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
@@ -32,6 +32,8 @@ let zones: ZoneCircles;
 /** What the portal does with a person clicked in the view, and the band of the person it has open. */
 let pick: Picking | undefined;
 let tip: HTMLElement;
+/** The incident the camera flew to; the decision history shows only its rows. */
+let focus: bigint | undefined;
 /** A dark ring on the floor under the opened person. */
 const mark = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.15, 40).rotateX(-Math.PI / 2),
   new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.DoubleSide, depthWrite: false }));
@@ -86,8 +88,11 @@ function setUp(c: DbConnection) {
   v.canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
   v.canvas.addEventListener('pointerup', e => {
     if (dragging || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_PX) return;
-    const b = crowd.pick(v!.rayAt(e));
-    if (b) pick?.open(b.id);
+    const ray = v!.rayAt(e);
+    const b = crowd.pick(ray);
+    if (b) return openBand(b);
+    const pole = poleAt(ray);
+    if (pole) focusOn(pole);
   });
   let moved: PointerEvent | undefined;
   v.canvas.addEventListener('pointermove', e => {
@@ -162,6 +167,35 @@ function marker(text: Node | string, take: () => Placing, title: string) {
 
 // --- Hovering and clicking ---------------------------------------------------------------------
 
+/** A person clicked: they open beside the view and the camera flies to them; someone down also focuses their incident. */
+function openBand(b: Band) {
+  tip.hidden = true;
+  pick?.open(b.id);
+  const at = crowd.where(b.id) ?? { x: b.xM, z: b.yM };
+  const incident = isDown(b) ? [...conn.db.incidentMarker.iter()].find(m => m.bandId === b.id && m.status !== 'resolved') : undefined;
+  if (incident) focus = incident.incidentId;
+  v!.lookAt(at.x, at.z);
+}
+
+/** The camera flies to an incident and the decision history shows only its rows. */
+function focusOn(m: IncidentMarker) {
+  tip.hidden = true;
+  focus = m.incidentId;
+  v!.lookAt(m.xM, m.yM);
+}
+
+function focusOnId(id: bigint) {
+  const m = conn.db.incidentMarker.incidentId.find(id);
+  if (m) focusOn(m);
+  else focus = id;
+}
+
+/** Back to the whole hall and every decision. */
+function showAll() {
+  focus = undefined;
+  v!.overview();
+}
+
 /** What is under the pointer, nearest first: a person, an open incident's pole, then a zone's circle. */
 function hover(e: PointerEvent) {
   tip.hidden = true;
@@ -191,7 +225,7 @@ function personWords(b: Band): [string, string[]] {
   return [a ? a.displayName || '(no name yet)' : 'Nobody wears this band', [
     `Band ${bandCode(b.id)}${a?.organization ? `, ${a.organization}` : ''}`,
     `${light}.`,
-    pick ? 'Click to open them.' : '',
+    pick ? 'Click to open them and fly to them.' : '',
   ].filter(Boolean)];
 }
 
@@ -216,6 +250,7 @@ function poleAt(ray: THREE.Ray): IncidentMarker | undefined {
 
 function poleWords(m: IncidentMarker): [string, string[]] {
   return [`Incident ${m.incidentId}: ${m.kind}`, [
+    'Click to fly to it and show its decisions.',
     [m.person, m.place && `at ${m.place}`].filter(Boolean).join(' '),
     m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
     m.claimId ? `Claim: ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : '',
@@ -348,21 +383,43 @@ function placeBands() {
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
 }
 
-function history() {
+/** The organizer approves a claim waiting for them and teaches the Decision Engine a rule for similar claims. */
+function approveButton(c: Claim) {
+  return h('button', {
+    onclick: (e: Event) => {
+      e.stopPropagation();
+      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: true }));
+    },
+  }, 'Approve and teach a rule');
+}
+
+/** Every decision, newest first; a click on a row of an incident flies to it and shows only its rows. The newest
+ *  row of each claim waiting for the organizer carries the approve button. */
+function history(canRun: boolean) {
   const all = [...conn.db.decision.iter()];
   const words = searchWords('decisions');
-  const hits = words.length ? all.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : all;
+  const mine = focus === undefined ? all : all.filter(d => d.incidentId === focus);
+  const hits = words.length ? mine.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : mine;
   const rows = hits.sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
+  const claims = new Map([...conn.db.claimsBoard.iter()].map(c => [c.id, c]));
+  const waiting = new Set<bigint>();
+  const focused = focus !== undefined ? conn.db.incidentMarker.incidentId.find(focus) : undefined;
   return h('section', {},
-    h('h4', {}, 'Decision history'),
+    h('h4', {}, focus === undefined ? 'Decision history' : `Decision history of incident #${focus}${focused ? `: ${focused.kind}${focused.person ? `, ${focused.person}` : ''}` : ''}`),
+    focus !== undefined && h('p', {}, h('button', { onclick: showAll }, 'Show all decisions and the whole hall')),
     all.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
       : searchable('decisions', h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Who'), h('th', {}, 'Decided')),
-        rows.map(d => h('tr', {},
-          h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
-          h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
-          h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)])))), rows.length < all.length));
+        rows.map(d => {
+          const c = d.claimId ? claims.get(d.claimId) : undefined;
+          const approve = canRun && c?.status.tag === 'Routed' && !waiting.has(c.id);
+          if (approve) waiting.add(c!.id);
+          return h('tr', d.incidentId ? { class: 'linked', title: 'Show this incident on the map', onclick: () => focusOnId(d.incidentId) } : {},
+            h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
+            h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
+            h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)], approve && [h('br'), approveButton(c!)]));
+        })), rows.length < mine.length));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -390,10 +447,8 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : ''),
             h('td', {},
-              h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
-              waiting && [' ', h('button', {
-                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]));
+              h('button', { class: 'link', onclick: () => focusOn(m) }, 'Show'),
+              waiting && [' ', approveButton(c!)]));
         }))));
 }
 
@@ -433,6 +488,6 @@ export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picki
   syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
   return h('div', { class: 'live' },
     h('div', {}, incidents(r, canRun), legend()),
-    h('div', {}, h('section', {}, v!.view, v!.note)),
-    h('div', {}, picking?.panel, history(), canRun && placeBands()));
+    h('div', {}, h('section', {}, v!.view, h('p', {}, h('button', { onclick: showAll }, 'Whole hall')), v!.note)),
+    h('div', {}, picking?.panel, history(canRun), canRun && placeBands()));
 }
