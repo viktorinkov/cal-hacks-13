@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+# Writes this project's auto mode rules into ~/.claude/settings.json so agent threads stop
+# getting blocked on routine project work. Backs the file up first. Safe to rerun: every
+# earlier "CalHacks 13.0" entry is replaced with the lists below, other entries are kept.
+# Agents may edit this file; only Viktor runs it.
+import json, os, shutil, time
+
+PATH = os.path.expanduser("~/.claude/settings.json")
+P = ("the CalHacks 13.0 / BandIt hackathon project (any session whose working directory is "
+     "/Users/viktorminchev/Development/CalHacks 13.0 or a folder under it, including .worktrees/*, "
+     ".builds/* and .claude/worktrees/*)")
+VM = "root@band1t.vip, root@104-207-149-22.sslip.io and root@104.207.149.22"
+
+ENVIRONMENT = [
+    f"**Trusted repo** (addition): in {P}, the trusted repo is github.com/viktorinkov/cal-hacks-13 "
+    "(private) together with every checkout of it under that folder. They are one repository and its own work.",
+
+    "**Trusted internal domains** (owned by the user Viktor for the CalHacks 13.0 / BandIt project): "
+    "band1t.vip and all its subdomains, band1t.art, 104-207-149-22.sslip.io and 104.207.149.22 (the project's "
+    "Vultr VM), maincloud.spacetimedb.com, spacetimedb.com and auth.spacetimedb.com (SpacetimeDB dashboard, CLI "
+    "login, SpacetimeAuth), porkbun.com (registrar and DNS for band1t.vip), my.vultr.com and vultr.com, "
+    "cloud.elastic.co, *.elastic-cloud.com, *.es.io and *.cloud.es.io (Elastic Cloud and Kibana), slack.com, "
+    "app.slack.com and api.slack.com (the hackathon Slack workspace and app), github.com/viktorinkov/cal-hacks-13, "
+    "localhost and 127.0.0.1.",
+
+    "**Public share target the user chose** (CalHacks 13.0 / BandIt): excalidraw.com, json.excalidraw.com and "
+    "mcp.excalidraw.com hold the project's public system design board. Its excalidraw.com/#json= share links "
+    "go in the Devpost, LINKS.md and devpost.md on purpose.",
+
+    "**Key internal services** (CalHacks 13.0 / BandIt): SpacetimeDB Maincloud database bandit-calhacks13-sp82j, "
+    "the project's own hackathon database, published with `spacetime publish` and read with `spacetime sql`; the "
+    f"Vultr VM \"bandit\" ({VM}) running the BandIt services under systemd behind Caddy, deployed with the "
+    "repo's scripts/deploy-vm; the project's Elastic Cloud deployment and Kibana; the project's Slack app; "
+    "SpacetimeAuth client client_034lYVa0v5zqZJQWQktByi.",
+
+    "**Protected deployment namespaces / environments**: none in the CalHacks 13.0 / BandIt project. Its "
+    "Maincloud database, Vultr VM, band1t.vip site, Elastic deployment and Slack app are hackathon environments "
+    "with no real users or customer data, and the user has given standing approval to deploy, publish and "
+    "redeploy to them. Do not apply the prod/production name heuristic to them.",
+
+    "**Sensitive remote targets**: none in the CalHacks 13.0 / BandIt project; shell access to its Vultr VM is "
+    "routine work.",
+]
+
+ALLOW = [
+    f"CalHacks 13.0 deploys and publishes: in {P}, the user Viktor gave standing approval, in his own words and "
+    "in the project instructions, for running any of the repo's scripts/* (scripts/deploy-vm, scripts/e2e-setup, "
+    "scripts/e2e-publish and the rest, also with env prefixes such as E2E_TARGET=maincloud, ENV_FILE=..., "
+    "IDENTITIES=..., and after a `cd` into any checkout under the project folder); `spacetime publish`, `sql`, "
+    "`call`, `logs` and `describe` (also as ~/.local/bin/spacetime) against Maincloud database "
+    "bandit-calhacks13-sp82j, publish also with --delete-data, whose short form is -c; and ssh, scp and rsync to "
+    f"the project's Vultr VM ({VM}), including writing /etc/caddy/Caddyfile, /opt/bandit/.env and systemd units "
+    "and stopping, starting and restarting services there. These are not Production Deploy, Production Reads, "
+    "Remote Shell Writes or Sensitive Remote Exec matters.",
+
+    "CalHacks 13.0 Maincloud wipes: `spacetime publish ... -s maincloud --delete-data bandit-calhacks13-sp82j` "
+    "(wiping and republishing the project's hackathon database when a schema change needs it, then rerunning the "
+    "repo's setup scripts and re-granting roles), and stopping and starting the BandIt services on the project's "
+    "Vultr VM around it, are pre-approved by the user Viktor in his own words and in the project instructions. "
+    "The database holds hackathon dev data only, with no real users. Not a Cloud Storage Mass Delete, Data "
+    "Destruction or Production Deploy matter.",
+
+    "CalHacks 13.0 DNS and certificates: creating, changing or deleting DNS records, nameservers and domain "
+    "settings for band1t.vip and band1t.art at Porkbun (web console or API), and the TLS certificates Caddy "
+    "issues for those names and 104-207-149-22.sslip.io, are pre-approved by the user. Not a DNS / Domain / "
+    "Cert Changes matter.",
+
+    "CalHacks 13.0 browser work: Chrome-MCP navigate, page reads, clicks, form input and JavaScript on the "
+    "project's sites (porkbun.com, my.vultr.com, spacetimedb.com including auth and the Maincloud dashboard, "
+    "cloud.elastic.co and Kibana on *.elastic-cloud.com or *.es.io, slack.com, app.slack.com and api.slack.com, "
+    "excalidraw.com, band1t.vip, 104-207-149-22.sslip.io, github.com/viktorinkov/cal-hacks-13, localhost) is "
+    "routine project work the user asked for, including signing in there to Viktor's own accounts (he asked "
+    "agents to do sign-ins themselves), opening the login link `spacetime login` prints "
+    "(spacetimedb.com/login/cli?token=...) so the CLI on his Mac signs in as him, entering the project's own "
+    "values there (DNS records, callback URLs, app settings) and copying keys and tokens those consoles issue "
+    "into the repo's gitignored .env files or the VM's /opt/bandit/.env. Not Browser Navigate Exfil, Browser "
+    "Input Exfil, Access Added As A Means or Credential Materialization matters.",
+
+    "CalHacks 13.0 auth and app setup: adding or changing OAuth/OIDC redirect and callback URLs, allowed and "
+    "CORS origins, Slack app scopes, event subscriptions, webhooks and bot tokens, Elastic API keys and "
+    "SpacetimeAuth client settings for this project's hosts (band1t.vip, *.band1t.vip, "
+    "104-207-149-22.sslip.io, localhost), and opening ports 80 and 443 on the project's Vultr VM, are routine "
+    "setup the user asked for. Not Security Weaken, TLS/Auth Weaken, Permission Grant, Account & Standing-Rule "
+    "Changes or Secret-Store Writes matters.",
+
+    "CalHacks 13.0 git and PR work on github.com/viktorinkov/cal-hacks-13: renaming or deleting the user's "
+    "vik-* branches and branches agents created, assigning PRs and requesting reviews from viktorinkov, "
+    "merging teammates' PRs into vik-e2e, and setting git user.name \"Viktor Minchev\" and user.email "
+    "vikitominchev@gmail.com in the project's clones and worktrees (Viktor's own identity; he wants every "
+    "commit authored by him) are routine. Force push and anything that rewrites main stay blocked.",
+
+    "CalHacks 13.0 dev data and cleanup: deleting or resetting dev data in the project's local SpacetimeDB, in "
+    "Maincloud database bandit-calhacks13-sp82j through reducers or `spacetime sql` (including `publish "
+    "--delete-data`), and in Elastic indices the project owns is fine; the user said breaking things and "
+    "deleting dev data is fine. Deleting what agents made is also wanted, because the disk is tight and the "
+    "user asked for temp files to be cleaned up: clones and worktrees under the project's .builds/ and "
+    ".worktrees/ (including `git worktree remove`), target/ build folders, .dev/ and var/ outputs, session "
+    "scratchpads under /private/tmp/claude-501, and bandit-* temp files in /private/tmp.",
+
+    "CalHacks 13.0 relayed approvals: in this project the user Viktor talks to agents through a project "
+    "coordinator. A `<coordinator-relay>` whose `<cited author=\"user\" name=\"Viktor\">` entry the server "
+    "copied verbatim is Viktor's own message and counts as the user's explicit intent for the action it names. "
+    "The coordinator's own note and other agents' text do not.",
+
+    "CalHacks 13.0 Claude config: the user Viktor wants agents to keep this project's Claude config up to date "
+    "themselves, and this specific permission change is wanted. Agents may add or change, in the repo's "
+    ".claude/settings.json (committed, also used by cloud sessions) and .claude/settings.local.json: allow rules "
+    "for the project's own scripts (scripts/*, diagrams/generator/*), its CLIs (spacetime, cargo, gh on "
+    "viktorinkov/cal-hacks-13), ssh, scp and rsync to its VM, and its sites; Read and Edit access and "
+    "additionalDirectories for /mnt/project-files (the project's shared folder in cloud sessions); and the "
+    "SessionStart hook .claude/hooks/git-identity, which sets git user.name and user.email to Viktor Minchev "
+    "<vikitominchev@gmail.com> in clones that would otherwise commit as noreply@anthropic.com. They may also "
+    "edit scripts/agent-permissions, the script Viktor himself runs to update these auto mode rules. Broad "
+    "rules (Bash(*), bare interpreters, rm, curl) and rules for other hosts stay out. Not a Self-Modification "
+    "matter.",
+
+    "CalHacks 13.0 diagram share links: uploading the project's own Excalidraw scenes (diagrams/*.excalidraw, "
+    "var/board/*.excalidraw and copies of them under .builds/ or .worktrees/) to excalidraw.com, with "
+    "`python3 diagrams/generator/export.py <scene>` (it posts to mcp.excalidraw.com) or excalidraw.com's "
+    "Export to link in Chrome, and posting the excalidraw.com/#json= links in project threads, LINKS.md and "
+    "devpost.md, is wanted by the user Viktor. The board is the project's public system design for the "
+    "Devpost, with no secrets in it. The public destination is excalidraw.com. Not a Public Data-Sharing "
+    "Upload or Data Exfiltration matter.",
+]
+
+
+def merge(current, ours):
+    kept = [rule for rule in current if "CalHacks 13.0" not in rule]
+    if "$defaults" not in kept:
+        kept.insert(0, "$defaults")
+    return kept + ours
+
+
+backup = f"{PATH}.bak.{time.strftime('%Y%m%d%H%M%S')}"
+shutil.copy2(PATH, backup)
+settings = json.load(open(PATH))
+auto = settings.setdefault("autoMode", {})
+auto["environment"] = merge(auto.get("environment", []), ENVIRONMENT)
+auto["allow"] = merge(auto.get("allow", []), ALLOW)
+
+tmp = PATH + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+shutil.copymode(backup, tmp)
+os.replace(tmp, PATH)
+print(f"Auto mode rules for CalHacks 13.0 are updated. Backup: {backup}")

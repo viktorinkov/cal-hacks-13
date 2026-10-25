@@ -15,6 +15,7 @@ use crate::tables::*;
 use crate::venue::*;
 use crate::wallet;
 use crate::web::event_state;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 use std::collections::{BTreeSet, HashMap};
 
@@ -296,7 +297,7 @@ pub fn my_held_cents(ctx: &ViewContext, who: Identity) -> i64 {
 
 #[spacetimedb::view(accessor = my_merch_orders, public)]
 pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {
-    ctx.db.merch_order().attendee().filter(ctx.sender()).collect()
+    ctx.db.merch_order().attendee().filter(viewed(ctx)).collect()
 }
 
 /// One order with who placed it, for the organizer portal's Merch tab.
@@ -321,8 +322,8 @@ pub struct BoardMerchOrder {
 /// Every attendee's merch orders, for the organizer (ops) only.
 #[spacetimedb::view(accessor = board_merch_orders, public)]
 pub fn board_merch_orders(ctx: &ViewContext) -> Vec<BoardMerchOrder> {
-    let ops = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "ops");
+    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == "ops");
     if !ops {
         return Vec::new();
     }
@@ -573,7 +574,7 @@ pub struct MerchSuggestion {
 /// templates before sponsor ones.
 #[spacetimedb::view(accessor = my_merch_suggestions, public)]
 pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     let photos: Vec<Photo> = ctx
         .db
         .photo_tag()
@@ -714,8 +715,8 @@ pub struct BoardMerchPick {
 /// Every attendee's picks from the shopping agent, for staff.
 #[spacetimedb::view(accessor = board_merch_picks, public)]
 pub fn board_merch_picks(ctx: &ViewContext) -> Vec<BoardMerchPick> {
-    let staff = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| STAFF_ROLES.contains(&r.role.as_str()));
+    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| STAFF_ROLES.contains(&r.role.as_str()));
     if !staff {
         return Vec::new();
     }
