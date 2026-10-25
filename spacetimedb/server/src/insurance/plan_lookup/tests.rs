@@ -1,9 +1,10 @@
 //! A plan lookup inside an in-memory module: the attendee names their plan, the worker finds its PDF
-//! or nothing, the medical card gets a found health plan, and a lookup that keeps failing ends failed.
+//! or nothing, a found health plan lands on the medical card and a found belongings policy becomes their
+//! own policy, and a lookup that keeps failing ends failed.
 
 use super::*;
 use crate::insurance::documents::*;
-use crate::jobs::*;
+use crate::insurance::own_policy::*;
 use crate::tables::*;
 use spacetimedb::test_utils::{TestAuth, TestContext};
 use spacetimedb::{ConnectionId, Identity, Table, Timestamp};
@@ -101,6 +102,16 @@ fn a_belongings_policy_needs_the_typed_limit_and_deductible() {
     ask(1_000_000, 25_000).unwrap();
     let l = w.lookup();
     assert_eq!((l.kind.as_str(), l.limit_cents, l.deductible_cents), (BELONGINGS, 1_000_000, 25_000));
+
+    // The found form becomes their own policy with the numbers they typed, marked as found online.
+    let job = w.lease();
+    let form = PlanLookupResult { printed_insurer: "Lemonade Insurance Company".into(), printed_plan: "Renters Policy CA".into(), page_count: 40, ..found() };
+    w.as_("worker", |ctx| finish_plan_lookup(ctx, job.id, form, None));
+    let p = w.t.db.attendee_policy().holder().find(id("alex")).unwrap();
+    assert_eq!((p.insurer_name.as_str(), p.policy_number.as_str(), p.source.as_str()), ("Lemonade Insurance Company", "Renters Policy CA", KIND_PLAN_LOOKUP));
+    assert_eq!((p.per_claim_limit_cents, p.aggregate_limit_cents, p.deductible_cents, p.document_hash.as_str()), (1_000_000, 1_000_000, 25_000, "c".repeat(64).as_str()));
+    let doc = w.t.db.policy_document().iter().next().unwrap();
+    assert_eq!((doc.kind.as_str(), doc.page_count), (ATTENDEE_POLICY, 40));
 }
 
 #[test]

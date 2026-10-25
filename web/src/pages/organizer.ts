@@ -872,7 +872,9 @@ function whoPays(c: Claim) {
     const rows: [string, bigint][] = [['Cost', c.costCents], [`Paid to ${payee(c)}`, c.payoutCents], [insurer, c.recoverableCents]];
     if (c.costCents > c.payoutCents) rows.push([`${name} carries (their deductible, and anything over their limit)`, c.costCents - c.payoutCents]);
     return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents))))),
-      !own && h('p', { class: 'muted' }, `${name} has no policy of their own on file, so nothing pays on its own: the venue's policy excludes guests' property.`)];
+      !own && h('p', { class: 'muted' }, `${name} has no policy of their own on file, so nothing pays on its own: the venue's policy excludes guests' property.`),
+      own?.source === 'plan_lookup' && h('p', { class: 'muted' }, `Policy found online from its name. ${name} typed the ${money(own.perClaimLimitCents)} limit and the ${money(own.deductibleCents)} deductible from their declarations page, so check them before you approve. `,
+        own.documentHash && h('a', { href: `/blobs/${own.documentHash}`, target: '_blank' }, 'Open the policy wording'))];
   }
   const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
   const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${COVER_WORDS[c.coverKind] ?? c.coverKind} cover` : 'The insurer pays back';

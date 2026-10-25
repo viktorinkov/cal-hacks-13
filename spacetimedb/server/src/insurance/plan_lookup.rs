@@ -6,6 +6,7 @@
 //! limit and deductible they typed, because no public form holds a policyholder's own numbers.
 
 use super::documents::{DocumentIn, queue_document_read};
+use super::own_policy::{self, AttendeePolicyTerms};
 use crate::jobs::{self, *};
 use crate::medical::{self, *};
 use crate::roles::*;
@@ -218,6 +219,8 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
     };
     if found.kind == HEALTH {
         land_health_plan(ctx, &found);
+    } else {
+        land_own_policy(ctx, &found)?;
     }
     // The Evidence Engine reads the found PDF like an upload; a document it can't take still leaves the lookup found.
     let read = DocumentIn {
@@ -236,11 +239,15 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
     Ok(())
 }
 
+/// What the PDF prints, or what the attendee typed when it prints nothing there.
+fn printed_or(printed: &str, typed: &str) -> String {
+    if printed.trim().is_empty() { typed.to_string() } else { printed.trim().to_string() }
+}
+
 /// A found health plan fills an empty insurer and plan on the medical card, from what it prints.
 fn land_health_plan(ctx: &ReducerContext, l: &PlanLookup) {
-    let or = |printed: &str, typed: &str| if printed.trim().is_empty() { typed.to_string() } else { printed.trim().to_string() };
-    let insurer = or(&l.printed_insurer, &l.insurer);
-    let plan = or(&l.printed_plan, &l.plan);
+    let insurer = printed_or(&l.printed_insurer, &l.insurer);
+    let plan = printed_or(&l.printed_plan, &l.plan);
     match ctx.db.medical_card().attendee().find(l.attendee) {
         Some(card) if !card.insurer.is_empty() => {}
         Some(card) => {
@@ -250,6 +257,22 @@ fn land_health_plan(ctx: &ReducerContext, l: &PlanLookup) {
             ctx.db.medical_card().insert(MedicalCard { insurer, plan, ..medical::empty_card(l.attendee, ctx.timestamp) });
         }
     }
+}
+
+/// A found belongings policy becomes the attendee's own policy: the printed insurer and plan, and the
+/// limit and deductible they typed, since the public form prints neither. The plan's name stands in
+/// for the policy number, which only their declarations page prints.
+fn land_own_policy(ctx: &ReducerContext, l: &PlanLookup) -> Result<(), String> {
+    let terms = AttendeePolicyTerms {
+        insurer_name: printed_or(&l.printed_insurer, &l.insurer),
+        policy_number: printed_or(&l.printed_plan, &l.plan),
+        per_claim_limit_cents: l.limit_cents,
+        aggregate_limit_cents: l.limit_cents,
+        deductible_cents: l.deductible_cents,
+        source: KIND_PLAN_LOOKUP.into(),
+        document_hash: l.file_hash.clone(),
+    };
+    own_policy::upsert(ctx, l.attendee, terms).map(|_| ())
 }
 
 /// A lookup job gave up after its last attempt.

@@ -992,6 +992,25 @@ fn a_stolen_bag_with_no_policy_on_file_goes_to_the_organizer() {
     assert!(c.status_note.contains("no policy of their own on file"), "{}", c.status_note);
 }
 
+#[test]
+fn a_pay_on_a_policy_found_online_goes_to_the_organizer() {
+    use bandit_insurance::outcome::Decision;
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 6, "Lee's backpack is gone".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "headphones and a charger, $340.00".into(), Some(34_000)));
+    w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Lee Park"), "Lemonade".into(), "Renters".into(), 100_000, 100_000, 25_000, "document".into(), "AB".repeat(32)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "no camera covers the seats".into()));
+    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
+    // A pay on a policy read from the attendee's own document stands; on one found online from its name it goes to the organizer.
+    for (source, routed) in [("document", false), ("plan_lookup", true)] {
+        w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Lee Park"), "Lemonade".into(), "Renters".into(), 100_000, 100_000, 25_000, source.into(), "AB".repeat(32)));
+        let d = w.as_("ops", |ctx| Ok(typed_policy(ctx, &claim, Decision::AutoSettle { rule_id: 1, rule_version: 1 })));
+        assert_eq!(matches!(d, Decision::Route { .. }), routed, "{source}: {d:?}");
+    }
+}
+
 /// The text layer of the venue's policy, one string per page.
 fn policy_pages() -> Vec<String> {
     vec![
