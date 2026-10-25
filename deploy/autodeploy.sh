@@ -20,5 +20,7 @@ if git -C "$APP" show "$commit:deploy/setup.sh" | BANDIT_BRANCH=vik-e2e BANDIT_H
 else
   result=failed
 fi
+# setup.sh fetches again, so name the commit it actually checked out.
+commit="$(git -C "$APP" rev-parse HEAD)"
 { printf 'vik-e2e %s %s at %s (started %s)\n\n' "$commit" "$result" "$(date -u +%FT%TZ)" "$started"; tail -40 "$OUT/log.txt"; } > "$OUT/status.tmp"
 mv "$OUT/status.tmp" "$OUT/status.txt"
