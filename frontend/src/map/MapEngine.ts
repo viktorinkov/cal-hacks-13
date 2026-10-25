@@ -518,8 +518,8 @@ export class MapEngine {
   }
 
   /**
-   * CalHacks keeps band ids in the roster. The floor draws a page of characters instead of a pin
-   * per id. The concert demo still shows its bands.
+   * CalHacks draws database people as figures. Wristband icons stay with the hardware in the ring.
+   * The concert demo still shows its bands.
    */
   private demoDevices(): Record<string, Device> {
     const devices: Record<string, Device> = {}

@@ -58,4 +58,37 @@ describe('live floor', () => {
     expect(snap.incidents[0]?.candidateZone).toBe('atrium')
     expect(placeOnCalhacks(null).devices).toEqual([])
   })
+
+  it('leaves crowd falls off the operator map', () => {
+    const snap = placeOnCalhacks({
+      ...input,
+      incidents: [
+        ...input.incidents,
+        { id: '75', kind: 'fall', zoneId: '2', stationId: 101, bandId: 888, openedAt: 60, resolved: false },
+      ],
+    })
+    expect(snap.incidents.map((incident) => incident.incidentId)).toEqual(['4'])
+  })
+
+  it('does not turn the crowd table into wristband markers', () => {
+    const crowd = {
+      id: 400,
+      zone: 101,
+      online: true,
+      sos: false,
+      fall: false,
+      lastSeen: 1,
+      hasMotor: true,
+      hasMpu: true,
+      wearer: 'Mina Cole',
+      xM: 12,
+      yM: 40,
+      boothId: 0,
+      hasPosition: true,
+      state: 0,
+    }
+    const snap = placeOnCalhacks({ ...input, bands: [...input.bands, crowd] })
+    expect(snap.devices.map((device) => device.deviceId)).not.toContain('band-400')
+    expect(snap.devices.map((device) => device.deviceId).sort()).toEqual(['band-92', 'band-94'])
+  })
 })

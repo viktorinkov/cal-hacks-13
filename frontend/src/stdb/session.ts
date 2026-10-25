@@ -453,12 +453,24 @@ function safePublish() {
   }
 }
 
+let publishQueued = false
+
+/** A crowd tick updates many rows. Fold them into one read of the tables. */
+function queuePublish() {
+  if (publishQueued) return
+  publishQueued = true
+  window.setTimeout(() => {
+    publishQueued = false
+    safePublish()
+  }, 200)
+}
+
 function wireTables(db: unknown) {
   const tables = db as Record<string, { onInsert?: (cb: () => void) => void; onDelete?: (cb: () => void) => void; onUpdate?: (cb: () => void) => void }>
   for (const table of Object.values(tables)) {
-    table?.onInsert?.(safePublish)
-    table?.onDelete?.(safePublish)
-    table?.onUpdate?.(safePublish)
+    table?.onInsert?.(queuePublish)
+    table?.onDelete?.(queuePublish)
+    table?.onUpdate?.(queuePublish)
   }
 }
 

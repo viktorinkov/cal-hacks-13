@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { castPageOf, MAP_CAST, type CastBand } from '@/stdb/cast'
+import { castPageOf, MAP_CAST, MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
 
 function band(id: number, flags: Partial<Pick<CastBand, 'sos' | 'fall'>> = {}): CastBand {
   return { id, sos: false, fall: false, ...flags }
@@ -25,5 +25,16 @@ describe('map cast', () => {
   it('wraps the window once the roster has been shown', () => {
     const bands = Array.from({ length: 6 }, (_, index) => band(index + 1))
     expect(castPageOf(bands, 3, 4).map((item) => item.id)).toEqual([1, 2, 3, 4])
+  })
+
+  it('keeps a stable spread under the render cap, with alerts kept', () => {
+    const bands = [band(50, { sos: true }), ...Array.from({ length: 40 }, (_, index) => band(100 + index))]
+    const first = sampleCast(bands, 10).map((item) => item.id)
+    const shuffled = sampleCast([...bands].reverse(), 10).map((item) => item.id)
+    expect(first).toHaveLength(10)
+    expect(first[0]).toBe(50)
+    expect(first).toEqual(shuffled)
+    expect(new Set(first).size).toBe(10)
+    expect(sampleCast(bands).length).toBeLessThanOrEqual(MAP_PEOPLE)
   })
 })

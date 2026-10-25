@@ -1,14 +1,16 @@
 /**
- * Simulated attendees on the CalHacks floor. The crowd fills the hall. Only the current page of
- * band ids is bound onto characters, so the roster never becomes a sprite per wristband.
+ * People on the CalHacks floor. Until the database has a crowd, the hall is filled locally.
+ * Once it does, those rows seed who is here: a capped sample, placed from their coordinates
+ * when those land on this plan, then walked on the client. Later position ticks do not
+ * rebuild them, and they are not drawn as wristband icons.
  * They are not the concert simulator.
  */
 import { EntityKind, type EntityFrame, type VenueZone } from '@/contracts/domain'
 import { bbox, newProjectResult, Path, pointInPolygon, type ProjectResult } from '@/lib/geometry'
 import { frames } from '@/stores/frames'
 import { useWorld } from '@/stores/world'
-import { currentCast, setCastRoster, turnCastPage, type CastBand } from '@/stdb/cast'
-import { DEMO_LANE, demoIsActive, demoPath, useDemoRing } from '@/booth/demoRing'
+import { MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
+import { DEMO_LANE, demoIsActive, demoPath, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
 import { liveBands } from '@/booth/place'
 import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
 import { Rng } from './sim/rng'
@@ -282,9 +284,18 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return copy
 }
 
+export interface CrowdSeed extends CastBand {
+  online?: boolean
+  xM?: number | null
+  yM?: number | null
+  hasPosition?: boolean
+}
+
 export class CalhacksCrowd {
-  readonly people: Person[]
+  people: Person[]
   private readonly rng: Rng
+  /** Ids of the database sample currently on the floor. Empty while the crowd is still local. */
+  private seedKey = ''
   private readonly lanes: Lane[]
   private seq = 0
   private t = 0
@@ -298,14 +309,30 @@ export class CalhacksCrowd {
   private laneReveal = 0
   private readonly hit: ProjectResult = newProjectResult()
 
-  /** Point the characters at this page of band ids. Positions stay where the people already are. */
-  assign(ids: number[]): void {
+  /** True once the people on the floor were taken from database rows. */
+  seeded(): boolean {
+    return this.seedKey !== ''
+  }
+
+  /**
+   * Replace the local crowd with a capped sample of database people.
+   * The same ids are a no-op, including when only their coordinates changed,
+   * so a live position tick cannot rebuild the hall.
+   */
+  adopt(bands: CrowdSeed[], limit = MAP_PEOPLE): boolean {
+    const pool = bands.filter((band) => band.id > HARDWARE_ID_MAX)
+    if (pool.length === 0) return false
+    const chosen = sampleCast(pool, limit)
+    const key = chosen.map((band) => band.id).join(',')
+    if (key === this.seedKey) return false
+    this.seedKey = key
+    this.people = this.peopleFrom(chosen)
     this.byBand.clear()
-    for (let i = 0; i < this.people.length; i++) {
-      const id = ids[i] ?? 0
-      this.people[i]!.bandId = id
-      if (id) this.byBand.set(id, this.people[i]!)
-    }
+    for (const person of this.people) if (person.bandId) this.byBand.set(person.bandId, person)
+    this.conversations()
+    this.tally()
+    this.seq += 1
+    return true
   }
 
   character(bandId: number): { x: number; y: number } | null {
@@ -433,6 +460,40 @@ export class CalhacksCrowd {
       pose[i] = person.pose
     }
     return { seq: this.seq, t: this.t, source: 'simulation', count, positions, velocities, kinds, pose }
+  }
+
+  /** One person per database row. A coordinate on this plan is the start; anything else is placed locally. */
+  private peopleFrom(seeds: CrowdSeed[]): Person[] {
+    const seats = shuffle(anchors(calhacksTables.flatMap(chairs)), this.rng)
+    const standing = shuffle(anchors(calhacksTables.flatMap(ends)), this.rng)
+    const nSit = Math.min(seats.length, Math.round(seeds.length * 0.56))
+    const nStand = Math.min(standing.length, Math.round(seeds.length * 0.16))
+    const people: Person[] = []
+    let sit = 0
+    let stand = 0
+    for (const seed of seeds) {
+      const known = this.planted(seed)
+      const person = known ?? (sit < nSit ? this.still(seats[sit++]!, SEATED) : stand < nStand ? this.still(standing[stand++]!, STANDING) : this.walker())
+      person.bandId = seed.id
+      people.push(person)
+    }
+    return people
+  }
+
+  /** The database coordinate, when it is a place someone can actually stand or sit on this plan. */
+  private planted(seed: CrowdSeed): Person | null {
+    if (!seed.hasPosition || seed.xM == null || seed.yM == null) return null
+    const zone = zoneAt(seed.xM, seed.yM)
+    if (zone < 0) return null
+    const use = floorUse(seed.xM, seed.yM)
+    if (use !== 'walk' && use !== 'seat') return null
+    const person = this.still({ x: seed.xM, y: seed.yM, zone }, use === 'seat' ? SEATED : WALKING)
+    if (use === 'walk') {
+      person.speed = this.rng.range(0.35, 1.55)
+      person.pose = WALKING
+      this.retarget(person)
+    }
+    return person
   }
 
   private still(at: Anchor, pose: number): Person {
@@ -795,16 +856,19 @@ export function crowdSize(): number {
   return crowd?.people.length ?? 0
 }
 
+export function crowdIsSeeded(): boolean {
+  return crowd?.seeded() ?? false
+}
+
 /** How far the demo path has opened. The map draws its arrows to the same point. */
 export function demoReveal(): number {
   return crowd?.revealed() ?? 0
 }
 
-/** Starts the wanderers once. Safe to call on every CalHacks snapshot. */
-/** Remember the roster and point the characters at the current page. */
-export function bindCrowdCast(bands: CastBand[]): void {
-  setCastRoster(bands)
-  applyCast()
+/** Seed the hall from database people. The same ids leave everyone where they already are. */
+export function bindCrowdCast(bands: CrowdSeed[]): void {
+  if (!crowd) return
+  if (crowd.adopt(bands)) frames.push(crowd.frame())
 }
 
 /** Where the character for this band is standing, if this page is drawing them. */
@@ -812,15 +876,9 @@ export function characterAt(bandId: number): { x: number; y: number } | null {
   return crowd?.character(bandId) ?? null
 }
 
-function applyCast(): void {
-  if (!crowd) return
-  crowd.assign(currentCast().map((band) => band.id))
-}
-
 export function startCalhacksCrowd(): void {
   if (crowd || import.meta.env.MODE === 'test') return
   crowd = new CalhacksCrowd()
-  applyCast()
   frames.push(crowd.frame())
   timer = setInterval(() => {
     if (!crowd) return
@@ -830,7 +888,6 @@ export function startCalhacksCrowd(): void {
     crowd.step()
     frames.push(crowd.frame())
     const now = Date.now()
-    if (turnCastPage(now)) applyCast()
     if (now - publishedAt < 1000) return
     publishedAt = now
     publishCounts()
@@ -847,6 +904,7 @@ export function stopCalhacksCrowd(): void {
 function publishCounts(): void {
   if (!crowd) return
   const counts = crowd.counts
+  const seeded = crowd.seeded()
   useWorld.setState((state) => {
     if (state.venue?.venueId !== 'calhacks') return state
     const zones = { ...state.zones }
@@ -864,10 +922,10 @@ function publishCounts(): void {
         estimatedDensity: density,
         peakDensity: Math.max(current.peakDensity ?? 0, density),
         congestionStatus: density >= packed ? 'critical' : density >= line ? 'caution' : 'normal',
-        source: 'simulation',
+        source: seeded ? 'estimated' : 'simulation',
         updatedAt: Date.now(),
       }
     }
-    return { zones, mode: state.mode === 'live' ? 'hybrid' : state.mode }
+    return { zones, mode: seeded ? 'live' : state.mode === 'live' ? 'hybrid' : state.mode }
   })
 }
