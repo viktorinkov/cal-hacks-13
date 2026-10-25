@@ -2,14 +2,14 @@
 // the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
 // PDFs, the Capital One wallet, then a thank-you.
 // When the host ends the event, the same page turns into the recap.
-// After a fall or a call for help, the top of the page asks what happened and files the claim, then
-// shows how it is going until the payout lands in the wallet.
+// After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
+// shows how the payment is going until it lands in the wallet.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
 // for first aid.
 
 import {
   act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
-  signIn, signOut, signedInEmail, testAs, time, type Actor, PLATFORMS,
+  signIn, signOut, signedInEmail, testAs, time, viewing, type Actor, PLATFORMS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
 import { recap } from '../recap';
@@ -243,7 +243,7 @@ function walletStep() {
     return [
       h('h2', {}, 'Your wallet is connected'),
       h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`),
-      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue's insurance pays into it, and after the event you can buy merch with your photos from it.`),
+      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue pays your treatment into it, and after the event you can buy merch with your photos from it.`),
       h('button', { onclick: () => go('done') }, 'Continue'),
     ];
   }
@@ -252,7 +252,7 @@ function walletStep() {
   }
   return [
     h('h2', {}, 'Connect your Capital One wallet'),
-    h('p', {}, "If you get hurt here, the venue's insurance pays into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
+    h('p', {}, "If you get hurt here, the venue pays your treatment into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
     h('button', { onclick: () => act(() => conn.reducers.connectWallet({})).then(ok => { if (ok) { walletAsked = true; render(); } }) }, 'Connect'),
     h('button', { class: 'link', onclick: () => go('done') }, 'Skip'),
   ];
@@ -297,17 +297,17 @@ function claimStatus(tag: string, payoutCents: bigint): string {
   switch (tag) {
     case 'AwaitingRecord': return 'Waiting for the hospital report';
     case 'ReadingRecord': case 'Verifying': case 'Reviewing': return 'Being reviewed';
-    case 'Routed': return 'With the organizer for a decision';
+    case 'Routed': return 'Waiting for the organizer to approve the payment';
     case 'Paying': return 'Approved, paying into your wallet';
     case 'Settled': case 'Reconciled': return `Paid ${money(payoutCents)} into your wallet`;
-    case 'Refused': return 'Not covered. The organizer can tell you why.';
+    case 'Refused': return 'Not paid. The organizer can tell you why.';
     default: return 'Being reviewed';
   }
 }
 
 const KIND_WORDS: Record<string, string> = { fall: 'a fall', sos: 'a call for help' };
 
-/** After a fall or a call for help: file a claim in your own words, then follow it to the payout. */
+/** After a fall or a call for help: ask the venue to pay, in your own words, then follow the payment to the wallet. */
 function claims() {
   const open = [...conn.db.myIncidents.iter()].filter(i => i.resolved && i.claimId === 0n).sort((a, b) => Number(a.incidentId - b.incidentId));
   const mine = [...conn.db.myClaims.iter()].sort((a, b) => Number(a.id - b.id));
@@ -320,11 +320,11 @@ function claims() {
     open.length > 0 && h('section', {},
       h('h3', {}, 'Hurt at the event?'),
       open.map(i => h('form', { onsubmit: file(i.incidentId) },
-        h('p', {}, `Your band flagged ${KIND_WORDS[i.kind] ?? 'an alert'} at the ${i.zoneName} at ${time(i.openedAt)}. If you were hurt, tell us what happened and the venue's insurance can pay for your treatment.`),
+        h('p', {}, `Your band flagged ${KIND_WORDS[i.kind] ?? 'an alert'} at the ${i.zoneName} at ${time(i.openedAt)}. If you were hurt, tell us what happened and the venue pays your treatment into your wallet.`),
         h('textarea', { name: `statement-${i.incidentId}`, rows: 4, required: true, placeholder: 'Tell us what happened…' }),
-        h('button', {}, 'File a claim')))),
+        h('button', {}, 'Ask the venue to pay')))),
     mine.length > 0 && h('section', {},
-      h('h3', {}, 'Your claim'),
+      h('h3', {}, 'Your payment'),
       mine.map(c => h('div', {},
         h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents)),
         h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an injury'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
@@ -374,6 +374,18 @@ function medicView() {
   return [title, h('p', { class: 'error' }, tap), again];
 }
 
+// --- View as -------------------------------------------------------------------------------
+
+/** The screen the organizer's View as frame picked by its hash: the medical card or the recap. */
+function viewedScreen() {
+  const screen = location.hash.slice(1);
+  if (screen === 'card') {
+    const me = conn.db.myAttendee.iter().next().value;
+    return medicalCard({ incidentId: 0n, bandId, name: me?.displayName ?? '', card: conn.db.myMedicalCard.iter().next().value });
+  }
+  return screen === 'recap' ? recap(conn, render) : null;
+}
+
 function render() {
   // While someone types what happened, the page holds still so the phone keeps its keyboard up.
   if (!conn || document.activeElement instanceof HTMLTextAreaElement) return;
@@ -381,9 +393,13 @@ function render() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
-    testMode && people.length > 0 && testAs(people));
+    testMode && !viewing() && people.length > 0 && testAs(people));
   if (isMedic()) return mount('app', top, medicView());
-  if (mb && mb.bandId === bandId && mb.status === 'claimed') {
+  // The View as frame also shows a crowd attendee, who wears a band without tapping it.
+  const wears = mb && mb.bandId === bandId && mb.status === 'claimed';
+  if (wears || (viewing() && conn.db.myAttendee.count() > 0)) {
+    const screen = viewing() && viewedScreen();
+    if (screen) return mount('app', top, claims(), screen);
     if (ended) {
       return mount('app', top, claims(), recap(conn, render));
     }
@@ -402,13 +418,19 @@ async function main() {
   testMode = cfg.test_mode;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest && !viewing()) {
     return mount('app', h('h2', {}, `Band ${code}`), h('p', {}, 'Sign in with your email to make this band yours.'),
       h('button', { onclick: signIn }, 'Sign in with email'),
       testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   if (testMode) people = await actors();
   conn = await connect([...QUERIES, `SELECT * FROM band WHERE id = ${bandId}`], render);
+  // The View as frame only reads: it never taps, claims or opens a card, and its hash picks the screen.
+  if (viewing()) {
+    step = resumeStep();
+    window.addEventListener('hashchange', render);
+    return render();
+  }
   // A medic's tap opens the medical card; it never claims the band.
   if (isMedic()) return tapAsMedic();
   const mb = conn.db.myBand.iter().next().value;

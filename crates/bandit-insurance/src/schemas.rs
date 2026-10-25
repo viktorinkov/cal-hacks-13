@@ -7,11 +7,12 @@
 //! `items`, `enum` (strings only) and `description`. Formats are left out on
 //! purpose: a date the model cannot read must come back empty, not invented.
 
-use crate::{Causation, Verdict};
+use crate::Causation;
+use crate::decision::{Choice, EvidenceSource, Stance};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-/// The kinds listed on `review::Concern`.
+/// The kinds listed on `decision::Concern`.
 const CONCERN_KINDS: [&str; 7] = ["causation", "timing", "location", "identity", "amount", "duplicate", "other"];
 
 /// An object whose properties are all required and nothing else is allowed.
@@ -88,19 +89,30 @@ pub fn medical_record_schema() -> Value {
     ])
 }
 
-/// Schema for `review::AgentReview`. `verdict` and `causation` are enums of
-/// the snake_case variant names; concern `kind` is an enum of the kinds listed
-/// on `review::Concern`.
-pub fn agent_review_schema() -> Value {
-    let verdicts = [Verdict::Consistent, Verdict::NeedsHuman, Verdict::Inconsistent].map(Verdict::as_str);
+/// Schema for `decision::AgentDecision`. Enums carry the snake_case variant
+/// names; concern `kind` is an enum of the kinds listed on `decision::Concern`.
+pub fn agent_decision_schema() -> Value {
+    let choices = [Choice::Pay, Choice::Refuse, Choice::AskOrganizer].map(Choice::as_str);
     let causations = [Causation::Supported, Causation::Unsupported, Causation::Unclear].map(Causation::as_str);
+    let sources = EvidenceSource::ALL.map(EvidenceSource::as_str);
+    let stances = [Stance::Supports, Stance::Contradicts, Stance::Neutral, Stance::Missing].map(Stance::as_str);
     object(vec![
         (
-            "verdict",
-            one_of(&verdicts, "consistent only when nothing needs a person's eyes; needs_human when something does; inconsistent when the evidence contradicts the claim"),
+            "decision",
+            one_of(&choices, "pay when the evidence shows a covered injury or loss at the event; refuse when it shows the claim is not one; ask_organizer when a person should look"),
         ),
-        ("causation", one_of(&causations, "whether the treated injury plausibly follows from the incident")),
-        ("summary", string("two to four sentences for the approver, at most 800 characters; dollar figures only from the claim's amounts")),
+        ("causation", one_of(&causations, "whether the treated injury or the damage follows from the incident")),
+        ("summary", string("two to four sentences for the organizer, at most 800 characters; dollar figures only from the claim's amounts")),
+        (
+            "findings",
+            array(object(vec![
+                ("source", one_of(&sources, "")),
+                ("stance", one_of(&stances, "how this source bears on the claim")),
+                ("detail", string("what the source showed, at most 400 characters")),
+                ("fact_ids", array(integer("seq of a fact from this source"))),
+            ])),
+        ),
+        ("trusted_source", string("when sources disagree: the one you trust and why; empty when none disagree")),
         (
             "concerns",
             array(object(vec![
@@ -111,7 +123,9 @@ pub fn agent_review_schema() -> Value {
         ),
         ("innocent_explanations", array(string("a benign reading of something that looks off"))),
         ("missing_evidence", array(string("evidence a person could fetch to settle a concern"))),
-        ("cited_fact_ids", array(integer("seq of a fact the verdict rests on"))),
+        ("refusal_checks", array(string("for a refusal: the name of a failed check it rests on"))),
+        ("question", string("for ask_organizer: the one question the organizer should answer; empty otherwise")),
+        ("cited_fact_ids", array(integer("seq of a fact the decision rests on"))),
     ])
 }
 
@@ -161,7 +175,7 @@ pub struct RecoveryLetter {
 mod tests {
     use super::*;
     use crate::medical::fixtures::maya_record;
-    use crate::review::{AgentReview, Concern};
+    use crate::decision::{AgentDecision, Concern, Finding};
     use std::collections::BTreeSet;
 
     /// What structured outputs accept and these schemas use.
@@ -209,14 +223,18 @@ mod tests {
         }
     }
 
-    fn review_sample() -> AgentReview {
-        AgentReview {
-            verdict: Verdict::NeedsHuman,
+    fn full_decision() -> AgentDecision {
+        AgentDecision {
+            decision: Choice::AskOrganizer,
             causation: Causation::Unclear,
-            summary: "The record says the wrist was hurt at home.".to_string(),
+            summary: "The hospital report says the wrist was hurt at home.".to_string(),
+            findings: vec![Finding { source: EvidenceSource::HospitalReport, stance: Stance::Contradicts, detail: "history says home".to_string(), fact_ids: vec![20] }],
+            trusted_source: "the hospital report".to_string(),
             concerns: vec![Concern { kind: "causation".to_string(), detail: "history says home".to_string(), fact_ids: vec![20] }],
             innocent_explanations: vec!["an older injury mentioned in passing".to_string()],
             missing_evidence: vec!["intake form".to_string()],
+            refusal_checks: vec!["witness_zone".to_string()],
+            question: "Was the attendee hurt at the event?".to_string(),
             cited_fact_ids: vec![1, 20],
         }
     }
@@ -237,7 +255,7 @@ mod tests {
         };
         let cases = [
             ("medical_record", medical_record_schema(), serde_json::to_value(maya_record()).unwrap()),
-            ("agent_review", agent_review_schema(), serde_json::to_value(review_sample()).unwrap()),
+            ("agent_decision", agent_decision_schema(), serde_json::to_value(full_decision()).unwrap()),
             ("claim_letters", claim_letters_schema(), serde_json::to_value(letters).unwrap()),
             ("recovery_letter", recovery_letter_schema(), serde_json::to_value(recovery).unwrap()),
         ];
@@ -248,13 +266,16 @@ mod tests {
 
     #[test]
     fn enums_match_the_rust_enums() {
-        let s = agent_review_schema();
-        let verdicts = s["properties"]["verdict"]["enum"].as_array().unwrap();
-        assert_eq!(verdicts.len(), 3);
-        for v in verdicts {
-            let parsed: Verdict = serde_json::from_value(v.clone()).unwrap();
+        let s = agent_decision_schema();
+        let choices = s["properties"]["decision"]["enum"].as_array().unwrap();
+        assert_eq!(choices.len(), 3);
+        for v in choices {
+            let parsed: Choice = serde_json::from_value(v.clone()).unwrap();
             assert_eq!(json!(parsed.as_str()), *v);
         }
+        let finding = &s["properties"]["findings"]["items"]["properties"];
+        assert_eq!(finding["source"]["enum"].as_array().unwrap().len(), EvidenceSource::ALL.len());
+        assert_eq!(finding["stance"]["enum"], json!(["supports", "contradicts", "neutral", "missing"]));
         let causations = s["properties"]["causation"]["enum"].as_array().unwrap();
         assert_eq!(causations.len(), 3);
         for c in causations {
@@ -270,8 +291,8 @@ mod tests {
 
     #[test]
     fn model_output_parses_into_the_types() {
-        let review: AgentReview = serde_json::from_value(serde_json::to_value(review_sample()).unwrap()).unwrap();
-        assert_eq!(review, review_sample());
+        let decision: AgentDecision = serde_json::from_value(serde_json::to_value(full_decision()).unwrap()).unwrap();
+        assert_eq!(decision, full_decision());
         let raw = json!({"stance": "query", "subject": "s", "body": "b?", "cited_fact_ids": []});
         assert_eq!(serde_json::from_value::<RecoveryLetter>(raw).unwrap().stance, "query");
     }

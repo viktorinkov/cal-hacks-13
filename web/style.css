@@ -61,3 +61,7 @@ label.check.inline { display: inline-flex; margin: 0 8px; }
 button.on { font-weight: bold; border-width: 2px; }
 #head:empty { display: none; }
 #head { padding-bottom: 0; }
+#viewas { max-width: 1100px; margin: 0 auto; padding: 0 16px 24px; }
+#viewas iframe { display: block; width: 100%; height: calc(100vh - 160px); min-height: 560px; border: 2px solid #888; border-radius: 12px; background: #fff; }
+/* A page in the View as frame is read-only: its controls show but cannot be used. */
+body.viewing button, body.viewing input, body.viewing select, body.viewing textarea { pointer-events: none; opacity: .55; }

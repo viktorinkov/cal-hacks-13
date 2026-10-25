@@ -1,8 +1,8 @@
 //! The claim paths end to end inside an in-memory module: band flags, the
 //! safety watch, the medic, the attendee filing in their own words, the
-//! hospital report, the record reader, Elastic and the claims agent (played
-//! here by the test, through the same reducers the workers call), and the
-//! named approver.
+//! hospital report, the record reader, Elastic and Claude's investigation
+//! (played here by the test, through the same reducers the workers call), and
+//! the named approver.
 
 use super::evidence::*;
 use super::filing::*;
@@ -10,6 +10,7 @@ use super::flow::*;
 use super::setup::*;
 use super::*;
 use crate::jobs::*;
+use crate::live::decision;
 use crate::roles::*;
 use crate::safety::*;
 use crate::social::tables::*;
@@ -238,17 +239,26 @@ impl World {
         self.as_("worker", |ctx| submit_claim_checks(ctx, job.id, checks, precedents));
     }
 
-    fn review(&self, claim_id: u64, verdict: &str, causation: &str, concern: Option<&str>) {
+    /// Claude's investigation: one step reported while it runs, then the
+    /// decision `decide` makes from the payload, after reading `read`.
+    fn investigate(&self, claim_id: u64, read: &[&str], decide: impl FnOnce(&ReviewPayload) -> serde_json::Value) {
         let job = self.lease(KIND_REVIEW, claim_id);
         let p: ReviewPayload = serde_json::from_str(&job.payload).unwrap();
-        let concerns = match concern {
-            Some(c) => format!(r#"[{{"kind":"causation","detail":"{c}","fact_ids":[{}]}}]"#, p.facts[0].seq),
-            None => "[]".into(),
-        };
-        let review = format!(
-            r#"{{"verdict":"{verdict}","causation":"{causation}","summary":"The band, the light circle and the medic note agree.","concerns":{concerns},"innocent_explanations":[],"missing_evidence":[],"cited_fact_ids":[1,2]}}"#
-        );
-        self.as_("worker", |ctx| submit_claim_review(ctx, job.id, review, call("claim_review")));
+        self.as_("worker", |ctx| report_claim_step(ctx, job.id, "Claude".into(), "Read the light circle: 2 fact(s)".into(), "who was around".into()));
+        let investigation = serde_json::json!({ "decision": decide(&p), "steps": [], "sources_read": read });
+        self.as_("worker", |ctx| submit_claim_review(ctx, job.id, investigation.to_string(), call("claim_investigation")));
+    }
+
+    /// Claude reads the evidence a payment needs and decides to pay.
+    fn claude_pays(&self, claim_id: u64) {
+        self.investigate(claim_id, &["band", "light_circle", "hospital_report", "camera"], |p| decision(p, "pay"));
+    }
+
+    /// The decision history of a claim, oldest first: (actor, what).
+    fn history(&self, claim_id: u64) -> Vec<(String, String)> {
+        let mut rows: Vec<crate::live::Decision> = self.t.db.decision().claim_id().filter(claim_id).collect();
+        rows.sort_by_key(|d| d.id);
+        rows.into_iter().map(|d| (d.actor, d.what)).collect()
     }
 
     /// The worker's Nessie deposit for an injury payout.
@@ -265,6 +275,19 @@ impl World {
         rows.sort_by_key(|e| e.id);
         rows.into_iter().map(|e| (e.journal, e.account, e.debit_cents, e.credit_cents)).collect()
     }
+}
+
+/// A decision Claude could send, citing the payload's first fact: one finding
+/// from the light circle that supports the claim. Tests change what they need.
+fn decision(p: &ReviewPayload, choice: &str) -> serde_json::Value {
+    let fact = p.facts[0].seq;
+    serde_json::json!({
+        "decision": choice, "causation": "supported",
+        "summary": "The band, the light circle and the medic note agree.",
+        "findings": [{ "source": "light_circle", "stance": "supports", "detail": "the witnesses were in the zone", "fact_ids": [fact] }],
+        "trusted_source": "", "concerns": [], "innocent_explanations": [], "missing_evidence": [],
+        "refusal_checks": [], "question": "", "cited_fact_ids": [fact]
+    })
 }
 
 fn band(id: u8, station: u8) -> Band {
@@ -310,9 +333,10 @@ fn approve_larger_fall(w: &World) -> Claim {
     assert_eq!((c.cost_cents, c.payout_cents, c.recoverable_cents), (89_500, 89_500, 89_500));
     assert_eq!(c.corroboration, "corroborated");
     w.verify(claim.id);
-    w.review(claim.id, "consistent", "supported", None);
+    w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
+    assert!(c.status_note.starts_with("Claude would pay $895.00"), "{}", c.status_note);
     assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
     let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
@@ -358,11 +382,14 @@ fn small_fall_settles_automatically_under_the_learned_rule() {
     w.file_record(claim.id, FIRST_AID, 1);
     assert_eq!(w.claim(claim.id).payout_cents, 18_000);
     w.verify(claim.id);
-    w.review(claim.id, "consistent", "supported", None);
+    w.claude_pays(claim.id);
     w.pay(claim.id);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Settled, "{}", c.status_note);
-    assert_eq!((c.decided_by.as_str(), c.settlement_rule_version), ("rule", 1));
+    assert_eq!((c.decided_by.as_str(), c.settlement_rule_version), ("claude", 1));
+    let history = w.history(c.id);
+    assert!(history.contains(&("Claude".into(), "Read the light circle: 2 fact(s)".into())), "{history:?}");
+    assert!(history.iter().any(|(a, w)| a == "Decision Engine" && w == "Paid on Claude's decision: $180.00 to Maya Chen"), "{history:?}");
     assert_eq!(c.payout_reference, format!("Nessie deposit dep-{}", c.id));
     let account = w.t.db.claimant_account().identity().find(id("Maya Chen")).unwrap();
     assert_eq!(account.account_id, "acct-1");
@@ -370,7 +397,7 @@ fn small_fall_settles_automatically_under_the_learned_rule() {
 }
 
 #[test]
-fn the_claims_agent_stops_an_injury_that_happened_at_home() {
+fn claude_flags_an_injury_that_happened_at_home_for_a_person() {
     let w = World::new();
     approve_larger_fall(&w);
     w.advance(3600);
@@ -381,10 +408,18 @@ fn the_claims_agent_stops_an_injury_that_happened_at_home() {
     let version = w.claim(claim.id).pack_version;
     let checks = w.as_("ops", |ctx| Ok(pack_checks(ctx, claim.id, version)));
     assert!(checks.iter().all(|c| c.result != bandit_insurance::CheckResult::Fail), "{checks:?}");
-    w.review(claim.id, "needs_human", "unsupported", Some("the record says the ankle was hurt playing basketball at home the day before"));
+    w.investigate(claim.id, &["band", "light_circle", "hospital_report"], |p| {
+        let mut d = decision(p, "refuse");
+        let at_home = "the record says the ankle was hurt playing basketball at home the day before";
+        d["causation"] = "unsupported".into();
+        d["findings"] = serde_json::json!([{ "source": "hospital_report", "stance": "contradicts", "detail": at_home, "fact_ids": [p.facts[0].seq] }]);
+        d["concerns"] = serde_json::json!([{ "kind": "causation", "detail": at_home, "fact_ids": [p.facts[0].seq] }]);
+        d
+    });
     let c = w.claim(claim.id);
-    assert_eq!(c.status, ClaimStatus::Routed);
-    assert!(c.status_note.starts_with("claims agent: needs_human: causation"), "{}", c.status_note);
+    assert_eq!(c.status, ClaimStatus::Routed, "every check passed, so a refusal on Claude's judgment goes to a person");
+    assert!(c.status_note.starts_with("Claude recommends refusing: causation: the record says"), "{}", c.status_note);
+    assert!(c.status_note.ends_with("Every check passed, so a person decides"), "{}", c.status_note);
     assert_eq!(c.routed_to_name, "Organizer");
 }
 
@@ -393,9 +428,66 @@ fn a_circle_in_another_zone_disputes_the_fall() {
     let w = World::new();
     let incident = w.fall(6, 101, &[(1, 102), (2, 102), (4, 102)]);
     let claim = w.injury_claim(incident);
-    assert_eq!(claim.status, ClaimStatus::Refused);
-    assert!(claim.refusal_reason.contains("witness_zone"), "{}", claim.refusal_reason);
+    assert_eq!(claim.status, ClaimStatus::Verifying, "disputed evidence goes to Claude without waiting for a record");
+    w.verify(claim.id);
+    w.investigate(claim.id, &["band", "light_circle"], |p| {
+        let mut d = decision(p, "refuse");
+        d["causation"] = "unsupported".into();
+        d["findings"][0]["stance"] = "contradicts".into();
+        d["findings"][0]["detail"] = "every witness band lit up in Sponsor row, not Main stage".into();
+        d["refusal_checks"] = serde_json::json!(["witness_zone"]);
+        d
+    });
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.decided_by.as_str()), (ClaimStatus::Refused, "claude"), "{}", c.status_note);
+    assert!(c.refusal_reason.starts_with("Claude refused: failed witness_zone"), "{}", c.refusal_reason);
     assert!(w.ledger(claim.id).is_empty());
+}
+
+#[test]
+fn claude_cannot_pay_a_disputed_fall() {
+    let w = World::new();
+    let claim = w.injury_claim(w.fall(6, 101, &[(1, 102), (2, 102), (4, 102)]));
+    w.verify(claim.id);
+    w.investigate(claim.id, &["band", "light_circle"], |p| {
+        let mut d = decision(p, "pay");
+        d["trusted_source"] = "the medic saw the fall".into();
+        d
+    });
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    assert!(c.status_note.starts_with("Claude would pay $0.00, but checks failed: witness_zone"), "{}", c.status_note);
+}
+
+#[test]
+fn a_decision_that_breaks_the_rules_is_set_aside() {
+    let w = World::new();
+    approve_larger_fall(&w);
+    w.advance(3600);
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record(claim.id, FIRST_AID, 1);
+    w.verify(claim.id);
+    w.investigate(claim.id, &["band"], |p| decision(p, "pay"));
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.review_verdict.as_str()), (ClaimStatus::Routed, "invalid"), "{}", c.status_note);
+    let review = w.t.db.claim_review().claim_id().filter(c.id).last().unwrap();
+    assert!(review.rejected.iter().any(|r| r.starts_with("pay without reading the light circle")), "{:?}", review.rejected);
+    assert!(w.history(c.id).iter().any(|(a, w)| a == "Decision Engine" && w == "Set Claude's decision aside"));
+}
+
+#[test]
+fn only_claude_and_the_evidence_engine_report_investigation_steps() {
+    let w = World::new();
+    approve_larger_fall(&w);
+    w.advance(3600);
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record(claim.id, FIRST_AID, 1);
+    w.verify(claim.id);
+    let job = w.lease(KIND_REVIEW, claim.id);
+    let spoof = w.try_as("worker", |ctx| report_claim_step(ctx, job.id, "organizer".into(), "Approved".into(), String::new()));
+    assert!(spoof.unwrap_err().contains("does not investigate claims"));
+    w.as_("worker", |ctx| report_claim_step(ctx, job.id, "Evidence Engine".into(), "Past fall claims: 12 approved".into(), "base rates".into()));
+    assert!(w.history(claim.id).contains(&("Evidence Engine".into(), "Past fall claims: 12 approved".into())));
 }
 
 #[test]
@@ -409,7 +501,7 @@ fn the_same_record_filed_twice_goes_to_a_person() {
     let second = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record_hash(second.id, FIRST_AID, 1, &hash);
     w.verify(second.id);
-    w.review(second.id, "consistent", "supported", None);
+    w.claude_pays(second.id);
     let c = w.claim(second.id);
     assert_eq!(c.status, ClaimStatus::Routed);
     assert!(c.status_note.contains("record_duplicate"), "{}", c.status_note);
@@ -449,7 +541,7 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
     assert_eq!((claim.payout_cents, claim.recoverable_cents, claim.venue_cost_cents), (240_000, 190_000, 50_000));
     assert_eq!(claim.corroboration, "corroborated");
     w.verify(claim.id);
-    w.review(claim.id, "consistent", "supported", None);
+    w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
     w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
@@ -500,7 +592,7 @@ fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     w.injury_claim(c);
     w.file_record(first.id, FIRST_AID, 1);
     w.verify(first.id);
-    w.review(first.id, "consistent", "supported", None);
+    w.claude_pays(first.id);
     let claim = w.claim(first.id);
     assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
     assert!(claim.status_note.starts_with("3 people hurt in Main stage"), "{}", claim.status_note);

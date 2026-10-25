@@ -290,6 +290,7 @@ pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
 pub mod remove_staff_reducer;
 pub mod reopen_event_reducer;
+pub mod report_claim_step_reducer;
 pub mod report_property_event_reducer;
 pub mod report_test_band_reducer;
 pub mod report_venue_setup_step_reducer;
@@ -677,6 +678,7 @@ pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use remove_staff_reducer::remove_staff;
 pub use reopen_event_reducer::reopen_event;
+pub use report_claim_step_reducer::report_claim_step;
 pub use report_property_event_reducer::report_property_event;
 pub use report_test_band_reducer::report_test_band;
 pub use report_venue_setup_step_reducer::report_venue_setup_step;
@@ -1022,6 +1024,12 @@ pub enum Reducer {
         id: u64,
     },
     ReopenEvent,
+    ReportClaimStep {
+        job_id: u64,
+        actor: String,
+        what: String,
+        why: String,
+    },
     ReportPropertyEvent {
         incident_id: u64,
         camera_id: u64,
@@ -1291,6 +1299,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::RemoveStaff { .. } => "remove_staff",
             Reducer::ReopenEvent => "reopen_event",
+            Reducer::ReportClaimStep { .. } => "report_claim_step",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportTestBand { .. } => "report_test_band",
             Reducer::ReportVenueSetupStep { .. } => "report_venue_setup_step",
@@ -1751,6 +1760,17 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenEvent => {
                 __sats::bsatn::to_vec(&reopen_event_reducer::ReopenEventArgs {})
             }
+            Reducer::ReportClaimStep {
+                job_id,
+                actor,
+                what,
+                why,
+            } => __sats::bsatn::to_vec(&report_claim_step_reducer::ReportClaimStepArgs {
+                job_id: job_id.clone(),
+                actor: actor.clone(),
+                what: what.clone(),
+                why: why.clone(),
+            }),
             Reducer::ReportPropertyEvent {
                 incident_id,
                 camera_id,

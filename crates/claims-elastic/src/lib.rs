@@ -102,6 +102,15 @@ pub struct SimilarClaim {
     pub score: f64,
 }
 
+/// How the decided claims of one incident kind ended, from ES|QL.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OutcomeStats {
+    pub outcome: String,
+    pub claims: i64,
+    pub median_paid_cents: i64,
+    pub max_paid_cents: i64,
+}
+
 /// Plain inputs for [`narrative_for`]. Every text is a code-built phrase, never
 /// a name or free text typed by a person.
 #[derive(Clone, Debug, Default)]
@@ -282,6 +291,19 @@ impl ClaimsIndex {
             .collect()
     }
 
+    /// Counts the decided claims of `incident_kind` by outcome with ES|QL, with
+    /// the median and largest payout of each, for example 12 approved, median $180.00.
+    pub async fn outcome_stats(&self, incident_kind: &str) -> Result<Vec<OutcomeStats>> {
+        let query = format!(
+            "FROM {} | WHERE outcome != \"\" AND incident_kind == ? \
+             | STATS claims = COUNT(*), median_paid_cents = MEDIAN(payout_cents), max_paid_cents = MAX(payout_cents) BY outcome \
+             | SORT claims DESC",
+            self.index
+        );
+        let v = self.call(Method::POST, "_query", Some(json!({ "query": query, "params": [incident_kind] }))).await?;
+        outcome_rows(&v)
+    }
+
     /// Records the decision on an indexed live claim pack version.
     pub async fn set_outcome(&self, claim_id: i64, pack_version: i32, outcome: &str, payout_cents: u64) -> Result<()> {
         if !OUTCOMES.contains(&outcome) {
@@ -405,6 +427,25 @@ fn mappings() -> Value {
     })
 }
 
+/// Reads ES|QL `columns` and `values` into [`OutcomeStats`] by column name.
+fn outcome_rows(v: &Value) -> Result<Vec<OutcomeStats>> {
+    let columns: Vec<&str> = v["columns"].as_array().context("ES|QL answer has no columns")?.iter().filter_map(|c| c["name"].as_str()).collect();
+    let at = |name: &str| columns.iter().position(|c| *c == name).with_context(|| format!("ES|QL answer has no {name} column"));
+    let (outcome, claims, median, max) = (at("outcome")?, at("claims")?, at("median_paid_cents")?, at("max_paid_cents")?);
+    let number = |x: &Value| x.as_i64().or_else(|| x.as_f64().map(|f| f.round() as i64)).unwrap_or(0);
+    Ok(v["values"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|row| OutcomeStats {
+            outcome: row[outcome].as_str().unwrap_or_default().to_string(),
+            claims: number(&row[claims]),
+            median_paid_cents: number(&row[median]),
+            max_paid_cents: number(&row[max]),
+        })
+        .collect())
+}
+
 fn hits(v: &Value) -> impl Iterator<Item = &Value> {
     v["hits"]["hits"].as_array().into_iter().flatten()
 }
@@ -424,6 +465,18 @@ fn short(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn esql_rows_by_column_name() {
+        let v = json!({
+            "columns": [{"name": "claims", "type": "long"}, {"name": "median_paid_cents", "type": "double"}, {"name": "max_paid_cents", "type": "long"}, {"name": "outcome", "type": "keyword"}],
+            "values": [[12, 18000.0, 89500, "approved"], [3, 0.0, 0, "refused"]]
+        });
+        let rows = outcome_rows(&v).unwrap();
+        assert_eq!(rows[0], OutcomeStats { outcome: "approved".into(), claims: 12, median_paid_cents: 18_000, max_paid_cents: 89_500 });
+        assert_eq!((rows[1].outcome.as_str(), rows[1].claims), ("refused", 3));
+        assert!(outcome_rows(&json!({"columns": [], "values": []})).is_err());
+    }
 
     #[test]
     fn fall_narrative() {

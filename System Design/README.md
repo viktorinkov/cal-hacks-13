@@ -4,7 +4,9 @@ BandIt is the only band you need at a public event. The band senses crowd densit
 
 Later, the same band turns the night into a recap, a people graph, merch and settled insurance claims. When an organizer (`ops`) ends the event, every attendee's tap page (/t/code) becomes their recap.
 
-This folder is the system design. Each component has its own file, so any optional part can be removed on its own. Start with [Requirements](1-overview/Requirements.md), then [Architecture](1-overview/Architecture.md).
+This folder is the system design. Each component has its own file, so any optional part can be removed on its own.
+
+Judges: start with [Sponsor-Tracks](1-overview/Sponsor-Tracks.md), which quotes each track and points to the part that answers it. Then read [Architecture](1-overview/Architecture.md) for how the parts interact, [Insurance](6-features/Insurance.md) for the insurance Decision Engine and [Elastic](7-integrations/Elastic.md) for The Evidence Engine.
 
 ## Terms
 
@@ -35,10 +37,15 @@ One word for one thing in every doc. Code names stay as the code spells them, in
 | camera sighting | the security view's record of a flash on an incident | verdict, assessment |
 | medical card | the attendee's own health information | medical ID, medical profile |
 | hospital report | the hospital's report and itemised bill for a claim | medical record, clinic report |
-| claim | an insurance claim BandIt opens after an incident | case, request |
+| claim | an insurance claim the attendee files after an incident | case, request |
 | evidence pack | a claim's numbered facts, checks and fingerprint | evidence bundle |
-| The Evidence Engine | Elastic's part of a claim: past claims and event data | evidence agent |
-| The Decision Engine | the Anthropic Claude API plus the Rust code that decides a claim | claims agent |
+| The Evidence Engine | Elastic's part: reading the insurance documents and finding their clauses, checking claim copies, recap ranking, event setup and the raw data | evidence agent, search |
+| the insurance Decision Engine | the Anthropic Claude API plus the Rust code that decides insurance claims | claims agent, Decision Engine (alone) |
+| the venue's policy | the venue's general liability insurance policy, uploaded as a PDF at event setup | |
+| policy terms | the limits, deductible, minimum payout, service window, fee schedule and exclusions read from the venue's policy, each quoting its clause | settings, config |
+| clause | one section of the wording of the venue's policy or the attendee's insurance card, as The Evidence Engine indexed it | rule, paragraph |
+| the guard | the code that holds Claude's decision to the policy terms and the checks | |
+| charge | what an attendee owes the venue for something they broke or took, which they see on their tap page | fine, bill |
 | wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
 | findable switch | the one consent switch at sign-up | privacy toggle, consent switch |
 
@@ -48,7 +55,7 @@ The folders follow the usual order of a system design: what the system must do, 
 
 | Folder | Files | What it answers |
 |---|---|---|
-| 1-overview | [Requirements](1-overview/Requirements.md), [Architecture](1-overview/Architecture.md), [Flows](1-overview/Flows.md), [Decisions](1-overview/Decisions.md) | what BandIt must do, how the parts fit, the event step by step, and the choices that cut across files |
+| 1-overview | [Sponsor-Tracks](1-overview/Sponsor-Tracks.md), [Requirements](1-overview/Requirements.md), [Architecture](1-overview/Architecture.md), [Flows](1-overview/Flows.md), [Decisions](1-overview/Decisions.md) | what each sponsor track asks and where BandIt answers it, what BandIt must do, how the parts interact, the event step by step, and the choices that cut across files |
 | 2-data | [SpacetimeDB](2-data/SpacetimeDB.md) | the single source of truth: tables, reducers, views, subscriptions |
 | 3-services | [Rust-Backend](3-services/Rust-Backend.md), [Gateway-Bridge](3-services/Gateway-Bridge.md), [Test-Bands](3-services/Test-Bands.md) | the Rust processes and where they run |
 | 4-devices | [Hardware](4-devices/Hardware.md), [Vision](4-devices/Vision.md) | the bands, the gateway, the station markers and the security cameras (TBD -- LEO) |
@@ -58,13 +65,14 @@ The folders follow the usual order of a system design: what the system must do, 
 
 ## Reading order
 
-1. [Requirements](1-overview/Requirements.md): goals, functional and non-functional requirements, scale, constraints.
-2. [Architecture](1-overview/Architecture.md): the whole system on one page, what each database does best, deployment.
-3. [Flows](1-overview/Flows.md): the event from setup to the close, step by step.
-4. [SpacetimeDB](2-data/SpacetimeDB.md) and [Safety](6-features/Safety.md): the live world and the safety behaviours built on it.
-5. [Hardware](4-devices/Hardware.md), [Gateway-Bridge](3-services/Gateway-Bridge.md) and [Rust-Backend](3-services/Rust-Backend.md): how the devices and services connect.
-6. The apps, then the features and integrations you care about.
-7. [Decisions](1-overview/Decisions.md) is the log of cross-cutting choices. Each file also ends with its own Decisions table.
+1. [Sponsor-Tracks](1-overview/Sponsor-Tracks.md): each track's own words, the three engines, and where to see each part running.
+2. [Requirements](1-overview/Requirements.md): goals, functional and non-functional requirements, scale, constraints.
+3. [Architecture](1-overview/Architecture.md): how the parts interact, who decides what, what each database does best, deployment.
+4. [Flows](1-overview/Flows.md): the event from setup to the close, step by step.
+5. [SpacetimeDB](2-data/SpacetimeDB.md) and [Safety](6-features/Safety.md): the live world and the safety behaviours built on it.
+6. [Hardware](4-devices/Hardware.md), [Gateway-Bridge](3-services/Gateway-Bridge.md) and [Rust-Backend](3-services/Rust-Backend.md): how the devices and services connect.
+7. The apps, then the features and integrations you care about. For the tracks: [Insurance](6-features/Insurance.md) (the insurance Decision Engine) and [Elastic](7-integrations/Elastic.md) (The Evidence Engine).
+8. [Decisions](1-overview/Decisions.md) is the log of cross-cutting choices. Each file also ends with its own Decisions table.
 
 ## Components
 
@@ -72,8 +80,9 @@ Core components are what the safety features need. Optional components are featu
 
 | File | Component | Kind | What it covers | Needs |
 |---|---|---|---|---|
+| [Sponsor-Tracks.md](1-overview/Sponsor-Tracks.md) | Sponsor tracks | core | each track's exact words, mapped to the part of BandIt that answers it; the three engines; where judges see each part | none |
 | [Requirements.md](1-overview/Requirements.md) | Requirements | core | goals, functional requirements F1 to F17, quality targets, scale, constraints, out of scope | none |
-| [Architecture.md](1-overview/Architecture.md) | Whole system | core | context, containers, the live loop, data ownership, what each database does best, deployment, prize tracks | all |
+| [Architecture.md](1-overview/Architecture.md) | Whole system | core | how the parts interact, who decides what, context, containers, the live loop, data ownership, what each database does best, deployment | all |
 | [Flows.md](1-overview/Flows.md) | The event flow | core | setup before doors open, the nine steps of the event, the index of sequence diagrams | all |
 | [Decisions.md](1-overview/Decisions.md) | Decision log | core | build, deployment, identity and sponsor decisions | none |
 | [SpacetimeDB.md](2-data/SpacetimeDB.md) | `band1t` module | core | tables, reducers, scheduled reducers, roles and views, subscriptions, deployment | none |

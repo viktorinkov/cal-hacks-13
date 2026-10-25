@@ -1,0 +1,29 @@
+#!/bin/sh
+# Session start: commit as Viktor in clones whose git identity is unset or the cloud default
+# (noreply@anthropic.com). Clones that already have a real identity are left alone.
+NAME="Viktor Minchev"
+EMAIL="vikitominchev@gmail.com"
+
+cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+current="$(git config user.email 2>/dev/null)"
+case "$current" in
+  "" | noreply@anthropic.com) ;;
+  *) exit 0 ;;
+esac
+
+git config user.name "$NAME"
+git config user.email "$EMAIL"
+
+# Cover other clones made this session and identities set through env vars.
+if [ -n "$CLAUDE_ENV_FILE" ]; then
+  cat >> "$CLAUDE_ENV_FILE" <<EOF
+export GIT_AUTHOR_NAME="$NAME"
+export GIT_AUTHOR_EMAIL="$EMAIL"
+export GIT_COMMITTER_NAME="$NAME"
+export GIT_COMMITTER_EMAIL="$EMAIL"
+EOF
+fi
+
+echo "Git now commits as $NAME <$EMAIL> in this session."
