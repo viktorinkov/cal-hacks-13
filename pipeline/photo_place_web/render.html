@@ -22,7 +22,8 @@ renderer.setClearColor(0x000000, 0);
 document.body.appendChild(renderer.domElement);
 const world = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 500);
-world.add(new SparkRenderer({ renderer }));
+const spark = new SparkRenderer({ renderer });
+world.add(spark);
 
 function place(mesh) {
   mesh.matrixAutoUpdate = false;
@@ -56,7 +57,13 @@ async function shot(c2w, fovY, w, h, frames, asDepth) {
   camera.updateProjectionMatrix();
   new THREE.Matrix4().fromArray(c2w).decompose(camera.position, camera.quaternion, camera.scale);
   camera.updateMatrixWorld(true);
-  for (let i = 0; i < frames; i++) await frame();
+  let n = 0;
+  for (; n < 240; n++) {
+    await frame();
+    if (n + 1 >= frames && !spark.sorting && !spark.sortDirty && spark.sortedCenter.distanceTo(camera.position) < 1e-3) break;
+  }
+  await frame();
+  window.lastFrames = n + 2;
   return renderer.domElement.toDataURL(asDepth ? 'image/png' : 'image/jpeg', 0.92).split(',')[1];
 }
 
