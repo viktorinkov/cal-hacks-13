@@ -237,10 +237,11 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 1. An `ids` query gets the caller's `bandit-people` document and its `interests` text.
 2. Two `semantic` queries run at once with that text: one on `bandit-people` `interests`, filtered with `terms` on the `node_id` of both lists of people, and one on `bandit-booths` `description`, filtered on the candidates' `booth_id`.
 3. Elastic embeds the query with the same inference endpoint and returns the candidates best match first, with scores.
+4. Social.md: for the people who share no booth with the caller, a third `semantic` query in the same round, on `bandit-booths` `description` with the same text and filtered to those people's booths, puts each person's booths in order of how close they are to the caller's interests. Then, for each person's closest booth, one `semantic` query with that booth's text, filtered to the caller's own booths, finds the caller's closest booth. Each answer brings back the booths' `tags`.
 
-**Output.** `bandit-api` puts `suggested_people`, `also_there` and `suggested_booths` in that order and sets `suggestions_ranked`. One people query serves both lists of people, so the same score orders each. It then writes the caller's latest ranking to `bandit-recap-rankings` (`log_ranking`) for the recap suggestions dashboard; a failed write is only logged.
+**Output.** `bandit-api` puts `suggested_people`, `also_there` and `suggested_booths` in that order and sets `suggestions_ranked`. One people query serves both lists of people, so the same score orders each. Social.md: each person who shares no booth with the caller gets `similar`: their closest booth, the caller's closest booth and a tag both carry, for the card's "why" line. It then writes the caller's latest ranking to `bandit-recap-rankings` (`log_ranking`) for the recap suggestions dashboard; a failed write is only logged.
 
-**Can change** the order of the three lists. **Cannot** add a person or a booth (every query is filtered to the candidates), decide who is findable, or hold up the recap: after 10 s, or on any error, the lists stay in minutes order. Detail: [Part two](#part-two-the-one-way-copy-downstream-of-spacetimedb) and [Part three](#part-three-ordering-the-recaps-suggestions).
+**Can change** the order of the three lists, and which pair of booths a card's "why" line names when two people share none. **Cannot** add a person or a booth (every query is filtered to the candidates), decide who is findable, or hold up the recap: after 10 s, or on any error, the lists stay in minutes order. Detail: [Part two](#part-two-the-one-way-copy-downstream-of-spacetimedb) and [Part three](#part-three-ordering-the-recaps-suggestions).
 
 #### Read every insurance document (next to build)
 
@@ -566,7 +567,10 @@ sequenceDiagram
   ES-->>API: interests text
   API->>ES: semantic query on bandit-people interests, terms on the node_id of the people met and also there
   API->>ES: semantic query on bandit-booths description, terms on candidate booth_id
+  API->>ES: semantic query on bandit-booths description, terms on the booths of people who share none with the caller
   ES-->>API: ranked ids and scores
+  API->>ES: per picked booth, semantic query with its text, terms on the caller's booths
+  ES-->>API: the caller's closest booth, with tags
   API->>ES: PUT bandit-recap-rankings, log_ranking
   API-->>APP: the recap with suggestions in order and suggestions_ranked
   APP->>STDB: subscribe to my_visits and my_encounters for the night's timeline

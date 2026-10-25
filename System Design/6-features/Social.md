@@ -338,7 +338,20 @@ The card's first line reads like "At Stage for 25 min from 9:40 PM · 2 shared i
 | `places` | Each shared visit with them: `zone_name`, `started_at` and `minutes`, most minutes first |
 | `minutes` | All your shared minutes with them, the order without Elastic |
 | `interests` | Their booths, as in the Interest table |
+| `similar` | Elastic.md: the closest pair of booths when you share none, as below |
 | `score` | Elastic.md: the match to your interests, empty when unranked |
+
+**Why each person is on your recap.** Every card in both lists starts with one line that says why, read off the booths. When you share booths it names them, such as "You both hung out at the Visa booth (10 min you, 8 min Jonah)", and a card under "Also there with you" ends it with "but never met".
+
+Elastic.md: when you share no booth, Elastic finds the closest pair by meaning: their booth closest to your interests, then your booth closest to that one. A tag both booths carry names the topic, such as "You're both into drones: you stood at Skydio, Maya at the robotics table"; without a shared tag the line starts "Close interests:".
+
+When either of you stood at no booth, or Elastic cannot answer, the line falls back to the place and minutes, such as "You spent 3 min together at Food and drinks" or "You were both at Stage for 25 min but never met". The line uses only booths and minutes, the facts the cards already show.
+
+| `similar` field | Meaning |
+|---|---|
+| `your_booth` | Your booth closest by meaning to `their_booth` |
+| `their_booth` | Their booth closest by meaning to your interests |
+| `topic` | A tag both booths carry, such as "drones"; empty when they share none |
 
 
 ### Share links
@@ -424,6 +437,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | The people graph lives in SpacetimeDB as the derived table `people_link`, written by `social_tick`; Elastic draws nothing on it | Every link is an exact fact the bands measured, it must reach every screen live, and `findable` must be enforced in the views; there are no links between people who never met |
 | Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and the people also there from `social_shared_visits`; Elastic only orders the people, the people also there and the booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
 | Each person you spent time with shows their interests: the booths their band stood at, the ones you both stood at first and highlighted, with both people's minutes | At a venue the booths someone stands at are what they are into, and a booth you share is the plainest reason two people connect; a zone-only visit names no booth, so it adds none |
+| Every person card starts with why: the booths you share, else the closest pair of booths by meaning, else the place and minutes | A suggestion is only worth a message when it says what you have in common; the booths are facts the bands measured, and meaning finds the link when the booths differ |
 | "Also there with you" holds one card per person you shared a zone with for at least 5 minutes and never met, with their interests, ranked like the people you met | A shared zone alone is a weak reason to reach out; the booths you both stood at make it one, and anyone you met already has a card above |
 | `bandit-indexer` and `bandit-api` read the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only | `findable` is enforced once, in the module, before anything leaves it |
 | A shared visit is two `findable` attendees' visits to one zone that overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value); it is a recap row, not a `people_link` kind | People you were in the same place with for a while belong in the recap next to the people you met, while the graph keeps only measured meetings and visits |
