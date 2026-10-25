@@ -23,7 +23,7 @@ use crate::insurance::settlement_rule;
 use crate::safety::{self, IncidentKind, IncidentStatus, incident};
 use crate::social::crowd::{self, MAX_CROWD};
 use crate::tables::*;
-use crate::venue::{nearest_station, place_name, venue_spot, zone_for_station};
+use crate::venue::{nearest_booth, nearest_station, place_name, venue_spot, zone_for_station};
 use crate::web::event_state;
 use spacetimedb::rand::rngs::StdRng;
 use spacetimedb::rand::{Rng, SeedableRng};
@@ -483,23 +483,27 @@ pub fn place_band(ctx: &ReducerContext, band_id: u32, x_m: f32, y_m: f32, label:
         Some(b) if !test_band && b.zone != 0 => b.zone,
         _ => station_id,
     };
+    // At a sponsor table the band stands at that table's booth, the way a crowd band at a booth does.
+    let booth_id = if zone == station_id { nearest_booth(ctx, x_m, y_m) } else { 0 };
     match prev {
         Some(b) => {
-            if b.zone != zone {
+            let other_booth = ctx.db.zone_visit().band_id().filter(band_id).any(|v| v.open && v.booth_id != booth_id);
+            if b.zone != zone || other_booth {
                 crate::ingest::leave_zone(ctx, band_id);
-                crate::ingest::open_stay(ctx, band_id, zone, 0);
+                crate::ingest::open_stay(ctx, band_id, zone, booth_id);
             }
             ctx.db.band().id().update(Band {
                 x_m,
                 y_m,
                 zone,
+                booth_id,
                 online: b.online || test_band,
                 last_seen: if test_band { ctx.timestamp } else { b.last_seen },
                 ..b
             });
         }
         None if test_band => {
-            crate::ingest::open_stay(ctx, band_id, zone, 0);
+            crate::ingest::open_stay(ctx, band_id, zone, booth_id);
             ctx.db.band().insert(Band {
                 id: band_id,
                 state: 0,
@@ -520,7 +524,7 @@ pub fn place_band(ctx: &ReducerContext, band_id: u32, x_m: f32, y_m: f32, label:
                 last_seen: ctx.timestamp,
                 x_m,
                 y_m,
-                booth_id: 0,
+                booth_id,
             });
         }
         None => {}
