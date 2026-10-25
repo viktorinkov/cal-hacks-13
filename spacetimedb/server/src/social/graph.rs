@@ -3,7 +3,7 @@
 
 use super::logic::*;
 use super::tables::*;
-use crate::venue::{booth, booths_in_zone};
+use crate::venue::booth;
 use spacetimedb::{Identity, ReducerContext, Table};
 
 pub const PERSON: &str = "person";
@@ -50,20 +50,16 @@ pub fn link_met(ctx: &ReducerContext, a: Identity, b: Identity, minutes: f32) {
     link(ctx, LINK_MET, (PERSON, na), (PERSON, nb), minutes.floor(), "radio");
 }
 
-/// A person to the booth they stood at, or to every booth of the zone when only the zone of the stay is
-/// known, weighted by their minutes there, plus each of those booths to the company exhibiting there.
-pub fn link_visited(ctx: &ReducerContext, who: Identity, zone_id: u64, booth_id: u64) {
-    let Some(node) = person_node(ctx, who) else {
+/// A person to the booth they stood at, weighted by their minutes there, plus the booth to the company exhibiting
+/// there. A stay known only by its zone links no booth: only the booths someone stood at are theirs.
+pub fn link_visited(ctx: &ReducerContext, who: Identity, booth_id: u64) {
+    let (Some(node), Some(b)) = (person_node(ctx, who), ctx.db.booth().id().find(booth_id)) else {
         return;
     };
-    let visits: Vec<Visit> = ctx.db.visit().attendee().filter(who).filter(|v| v.zone_id == zone_id).collect();
-    let booths = if booth_id != 0 { ctx.db.booth().id().find(booth_id).into_iter().collect() } else { booths_in_zone(ctx, zone_id) };
-    for b in booths {
-        let minutes: f32 = visits.iter().filter(|v| v.booth_id == 0 || v.booth_id == b.id).map(|v| v.minutes).sum();
-        link(ctx, LINK_VISITED, (PERSON, node), (BOOTH, b.id), minutes.floor(), "zone");
-        if b.organization_id != 0 {
-            link(ctx, LINK_EXHIBITS, (BOOTH, b.id), (COMPANY, b.organization_id), 1.0, "import");
-        }
+    let minutes: f32 = ctx.db.visit().attendee().filter(who).filter(|v| v.booth_id == b.id).map(|v| v.minutes).sum();
+    link(ctx, LINK_VISITED, (PERSON, node), (BOOTH, b.id), minutes.floor(), "zone");
+    if b.organization_id != 0 {
+        link(ctx, LINK_EXHIBITS, (BOOTH, b.id), (COMPANY, b.organization_id), 1.0, "import");
     }
 }
 
@@ -92,11 +88,11 @@ pub fn relink(ctx: &ReducerContext, a: &Attendee) {
         return;
     }
     link_works_at(ctx, a);
-    let mut stays: Vec<(u64, u64)> = ctx.db.visit().attendee().filter(a.identity).map(|v| (v.zone_id, v.booth_id)).collect();
-    stays.sort_unstable();
-    stays.dedup();
-    for (zone_id, booth_id) in stays {
-        link_visited(ctx, a.identity, zone_id, booth_id);
+    let mut booths: Vec<u64> = ctx.db.visit().attendee().filter(a.identity).map(|v| v.booth_id).filter(|b| *b != 0).collect();
+    booths.sort_unstable();
+    booths.dedup();
+    for booth_id in booths {
+        link_visited(ctx, a.identity, booth_id);
     }
     let met: Vec<SocialEncounter> = ctx
         .db
