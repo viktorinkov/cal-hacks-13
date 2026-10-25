@@ -1,6 +1,6 @@
 //! What the plain web pages read beyond the feature views: whether the event has ended, the claims
-//! board for staff and an attendee's own claims. Staff here means the module owner or anyone holding
-//! a staff role.
+//! board for staff, and an attendee's own incidents and claims. Staff here means the module owner or
+//! anyone holding a staff role.
 
 use crate::insurance::*;
 use crate::roles::*;
@@ -118,6 +118,14 @@ pub fn board_records(ctx: &ViewContext) -> Vec<MedicalRecord> {
     ctx.db.medical_record().claim_id().filter(0u64..).collect()
 }
 
+#[spacetimedb::view(accessor = board_clinic_reports, public)]
+pub fn board_clinic_reports(ctx: &ViewContext) -> Vec<ClinicReport> {
+    if !is_staff(ctx) {
+        return Vec::new();
+    }
+    ctx.db.clinic_report().claim_id().filter(0u64..).collect()
+}
+
 #[spacetimedb::view(accessor = board_approvals, public)]
 pub fn board_approvals(ctx: &ViewContext) -> Vec<Approval> {
     if !is_staff(ctx) {
@@ -164,6 +172,8 @@ pub struct MyClaim {
     pub payout_reference: String,
     pub opened_at: Timestamp,
     pub settled_at: Option<Timestamp>,
+    pub incident_id: u64,
+    pub statement: String,
 }
 
 /// The caller's own claims, as the claimant sees them: status and payout, no evidence.
@@ -185,6 +195,101 @@ pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {
             payout_reference: c.payout_reference,
             opened_at: c.opened_at,
             settled_at: c.settled_at,
+            incident_id: c.incident_id,
+            statement: c.statement,
+        })
+        .collect()
+}
+
+fn kind_name(kind: IncidentKind) -> String {
+    kind.core().as_str().into()
+}
+
+fn zone_name(ctx: &ViewContext, zone_id: u64) -> String {
+    ctx.db.zone().id().find(zone_id).map(|z| z.name).unwrap_or_else(|| "unzoned".into())
+}
+
+fn claim_id_for(ctx: &ViewContext, incident_id: u64) -> u64 {
+    ctx.db.claim().incident_id().find(incident_id).map(|c| c.id).unwrap_or(0)
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct MyIncident {
+    pub incident_id: u64,
+    /// `sos` or `fall`.
+    pub kind: String,
+    pub zone_name: String,
+    pub opened_at: Timestamp,
+    pub resolved: bool,
+    pub resolved_at: Option<Timestamp>,
+    pub resolution: String,
+    /// 0 until a claim is filed.
+    pub claim_id: u64,
+}
+
+/// SOS and fall incidents on the band the caller wears, since they claimed it: what they can file a claim for.
+#[spacetimedb::view(accessor = my_incidents, public)]
+pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident> {
+    let Some(own) = ctx.db.band_owner().owner().find(ctx.sender()) else {
+        return Vec::new();
+    };
+    ctx.db
+        .incident()
+        .subject_band()
+        .filter(u32::from(own.band_id))
+        .filter(|i| i.kind != IncidentKind::Property && i.opened_at >= own.claimed_at)
+        .map(|i| MyIncident {
+            incident_id: i.id,
+            kind: kind_name(i.kind),
+            zone_name: zone_name(ctx, i.zone_id),
+            opened_at: i.opened_at,
+            resolved: i.resolved,
+            resolved_at: i.resolved_at,
+            resolution: i.resolution,
+            claim_id: claim_id_for(ctx, i.id),
+        })
+        .collect()
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct UnclaimedInjury {
+    pub incident_id: u64,
+    /// `sos` or `fall`.
+    pub kind: String,
+    pub zone_name: String,
+    pub band_id: u32,
+    pub wearer_name: String,
+    pub opened_at: Timestamp,
+    pub resolved_at: Option<Timestamp>,
+    /// The staff notes, oldest first.
+    pub notes: Vec<String>,
+}
+
+/// Resolved SOS and fall incidents whose wearer has not filed a claim yet, for staff to file for them.
+#[spacetimedb::view(accessor = unclaimed_injuries, public)]
+pub fn unclaimed_injuries(ctx: &ViewContext) -> Vec<UnclaimedInjury> {
+    if !is_staff(ctx) {
+        return Vec::new();
+    }
+    ctx.db
+        .incident()
+        .subject_band()
+        .filter(1u32..)
+        .filter(|i| i.resolved && i.kind != IncidentKind::Property && claim_id_for(ctx, i.id) == 0)
+        .filter_map(|i| {
+            let wearer = ctx.db.band_owner().band_id().find(radio_id(i.subject_band)?).filter(|o| o.claimed_at <= i.opened_at)?;
+            let mut notes: Vec<IncidentNote> = ctx.db.incident_note().incident_id().filter(i.id).collect();
+            notes.sort_by_key(|n| n.id);
+            Some(UnclaimedInjury {
+                incident_id: i.id,
+                kind: kind_name(i.kind),
+                zone_name: zone_name(ctx, i.zone_id),
+                band_id: i.subject_band,
+                wearer_name: ctx.db.attendee().identity().find(wearer.owner).map(|a| a.display_name).unwrap_or_default(),
+                opened_at: i.opened_at,
+                resolved_at: i.resolved_at,
+                notes: notes.into_iter().map(|n| n.text).collect(),
+            })
         })
         .collect()
 }

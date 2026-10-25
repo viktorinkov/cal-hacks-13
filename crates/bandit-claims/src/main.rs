@@ -57,7 +57,7 @@ enum Cmd {
         #[arg(long)]
         note: String,
     },
-    /// The medic resolves the incident; a claim opens when it qualifies
+    /// The medic resolves the incident and the organizer files the wearer's claim
     Resolve {
         #[arg(long)]
         incident: u64,

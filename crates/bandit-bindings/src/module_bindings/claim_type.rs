@@ -47,6 +47,7 @@ pub struct Claim {
     pub settled_at: Option<__sdk::Timestamp>,
     pub reconciled_at: Option<__sdk::Timestamp>,
     pub updated_at: __sdk::Timestamp,
+    pub statement: String,
 }
 
 impl __sdk::InModule for Claim {
@@ -95,6 +96,7 @@ pub struct ClaimCols {
     pub settled_at: __sdk::__query_builder::Col<Claim, Option<__sdk::Timestamp>>,
     pub reconciled_at: __sdk::__query_builder::Col<Claim, Option<__sdk::Timestamp>>,
     pub updated_at: __sdk::__query_builder::Col<Claim, __sdk::Timestamp>,
+    pub statement: __sdk::__query_builder::Col<Claim, String>,
 }
 
 impl __sdk::__query_builder::HasCols for Claim {
@@ -142,6 +144,7 @@ impl __sdk::__query_builder::HasCols for Claim {
             settled_at: __sdk::__query_builder::Col::new(table_name, "settled_at"),
             reconciled_at: __sdk::__query_builder::Col::new(table_name, "reconciled_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            statement: __sdk::__query_builder::Col::new(table_name, "statement"),
         }
     }
 }

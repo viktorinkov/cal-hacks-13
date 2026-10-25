@@ -2,7 +2,8 @@
 //! opens `sos` and `fall` incidents from band flags, freezes a snapshot of the
 //! zone in the same transaction, and records every band that shows the light
 //! circle (state 4) as a witness. Staff add notes and costs and resolve the
-//! incident; resolving hands it to insurance.
+//! incident; resolving a property incident opens the venue's claim, and an
+//! injury waits for the attendee who wore the band to file theirs.
 
 use crate::roles::*;
 use crate::tables::*;
@@ -481,7 +482,8 @@ pub fn add_incident_note(ctx: &ReducerContext, incident_id: u64, text: String, c
 }
 
 /// Closes the incident, releases the subject band's SOS latch, and opens the
-/// insurance claim when the incident qualifies.
+/// venue's property claim when a repair cost was logged. SOS and fall claims
+/// are not opened here: the wearer files them (`file_claim`).
 #[spacetimedb::reducer]
 pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: String) -> Result<(), String> {
     require_role(ctx, &["ops", "medic"])?;

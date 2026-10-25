@@ -1,9 +1,11 @@
 //! The claim paths end to end inside an in-memory module: band flags, the
-//! safety watch, the medic, the record reader, Elastic and the claims agent
-//! (played here by the test, through the same reducers the workers call),
-//! and the named approver.
+//! safety watch, the medic, the attendee filing in their own words, the
+//! hospital report, the record reader, Elastic and the claims agent (played
+//! here by the test, through the same reducers the workers call), and the
+//! named approver.
 
 use super::evidence::*;
+use super::filing::*;
 use super::flow::*;
 use super::setup::*;
 use super::*;
@@ -23,6 +25,7 @@ const PDT: i32 = -420;
 const FIRST_AID: &str = include_str!("../../../../fixtures/medical-records/expected/first-aid-wrist.json");
 const URGENT_CARE: &str = include_str!("../../../../fixtures/medical-records/expected/urgent-care-wrist.json");
 const ANKLE_AT_HOME: &str = include_str!("../../../../fixtures/medical-records/expected/urgent-care-ankle-home.json");
+const STATEMENT: &str = "I slipped on a spilled drink by the stage and landed on my right wrist.";
 
 fn id(name: &str) -> Identity {
     Identity::from_claims("bandit-test", name)
@@ -152,13 +155,42 @@ impl World {
         self.t.db.incident().subject_band().filter(u32::from(subject)).max_by_key(|i| i.id).unwrap().id
     }
 
-    fn treat_and_resolve(&self, incident_id: u64) -> Claim {
+    /// The medic treats and resolves the incident; no claim opens until the wearer files.
+    fn treat_and_resolve(&self, incident_id: u64) -> u64 {
         self.as_("medic", |ctx| assign_medic(ctx, incident_id));
         self.advance(12 * 60);
         self.as_("medic", |ctx| add_incident_note(ctx, incident_id, "wrist wrapped, cold pack, first aid".into(), None));
         self.advance(5 * 60);
         self.as_("medic", |ctx| resolve_incident(ctx, incident_id, "treated on site".into()));
-        self.t.db.claim().incident_id().find(incident_id).expect("claim opened on resolve")
+        assert!(self.t.db.claim().incident_id().find(incident_id).is_none(), "an injury claim opened on resolve");
+        incident_id
+    }
+
+    /// Staff file the claim for the wearer, choosing the hospital report (`pdf` for none).
+    fn file_for(&self, incident_id: u64, report: &str) -> Claim {
+        self.as_("ops", |ctx| file_claim_for_wearer(ctx, incident_id, STATEMENT.into(), report.into()));
+        self.t.db.claim().incident_id().find(incident_id).expect("claim filed")
+    }
+
+    /// Treated, resolved and filed by staff with no hospital report; the record PDF is filed by hand.
+    fn injury_claim(&self, incident_id: u64) -> Claim {
+        self.file_for(self.treat_and_resolve(incident_id), "pdf")
+    }
+
+    fn report_for(&self, claim_id: u64) -> ClinicReport {
+        self.t.db.clinic_report().claim_id().filter(claim_id).next().expect("hospital report requested")
+    }
+
+    /// The worker writes the hospital report as `json` and hands it back.
+    fn send_report(&self, claim_id: u64, json: &str) -> ClinicReport {
+        let job = self.lease(KIND_CLINIC, claim_id);
+        let hash = format!("{:064x}", claim_id * 104_729);
+        self.as_("worker", |ctx| file_clinic_report(ctx, job.id, json.into(), hash.clone(), call("clinic_report")));
+        self.report_for(claim_id)
+    }
+
+    fn view(&self, who: &str) -> spacetimedb::ViewContext {
+        self.t.view_context(auth(who))
     }
 
     fn claim(&self, claim_id: u64) -> Claim {
@@ -269,7 +301,7 @@ fn call(kind: &str) -> ModelCallIn {
 /// settles the next small fall on its own.
 fn approve_larger_fall(w: &World) -> Claim {
     let incident = w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]);
-    let claim = w.treat_and_resolve(incident);
+    let claim = w.injury_claim(incident);
     assert_eq!(claim.status, ClaimStatus::AwaitingRecord);
     assert_eq!(claim.claimant_name, "Jordan Alvarez");
     w.file_record(claim.id, URGENT_CARE, 2);
@@ -321,7 +353,7 @@ fn small_fall_settles_automatically_under_the_learned_rule() {
     approve_larger_fall(&w);
     w.advance(3600);
     let incident = w.fall(3, 101, &[(1, 101), (5, 101)]);
-    let claim = w.treat_and_resolve(incident);
+    let claim = w.injury_claim(incident);
     assert_eq!(claim.claimant_name, "Maya Chen");
     w.file_record(claim.id, FIRST_AID, 1);
     assert_eq!(w.claim(claim.id).payout_cents, 18_000);
@@ -343,7 +375,7 @@ fn the_claims_agent_stops_an_injury_that_happened_at_home() {
     approve_larger_fall(&w);
     w.advance(3600);
     let incident = w.fall(8, 101, &[(1, 101), (5, 101)]);
-    let claim = w.treat_and_resolve(incident);
+    let claim = w.injury_claim(incident);
     w.file_record(claim.id, ANKLE_AT_HOME, 2);
     w.verify(claim.id);
     let version = w.claim(claim.id).pack_version;
@@ -360,7 +392,7 @@ fn the_claims_agent_stops_an_injury_that_happened_at_home() {
 fn a_circle_in_another_zone_disputes_the_fall() {
     let w = World::new();
     let incident = w.fall(6, 101, &[(1, 102), (2, 102), (4, 102)]);
-    let claim = w.treat_and_resolve(incident);
+    let claim = w.injury_claim(incident);
     assert_eq!(claim.status, ClaimStatus::Refused);
     assert!(claim.refusal_reason.contains("witness_zone"), "{}", claim.refusal_reason);
     assert!(w.ledger(claim.id).is_empty());
@@ -371,10 +403,10 @@ fn the_same_record_filed_twice_goes_to_a_person() {
     let w = World::new();
     approve_larger_fall(&w);
     let hash = "ab".repeat(32);
-    let first = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let first = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record_hash(first.id, FIRST_AID, 1, &hash);
     w.advance(3600);
-    let second = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let second = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record_hash(second.id, FIRST_AID, 1, &hash);
     w.verify(second.id);
     w.review(second.id, "consistent", "supported", None);
@@ -431,7 +463,7 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
 fn a_dead_review_job_sends_the_claim_to_a_person() {
     let w = World::new();
     approve_larger_fall(&w);
-    let claim = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record(claim.id, FIRST_AID, 1);
     w.verify(claim.id);
     for _ in 0..MAX_ATTEMPTS {
@@ -448,7 +480,7 @@ fn a_dead_review_job_sends_the_claim_to_a_person() {
 fn injured_staff_are_excluded_from_medical_payments() {
     let w = World::new();
     w.t.db.staff_role().insert(StaffRole { id: 0, identity: id("Lee Park"), role: "medic".into(), label: "Lee Park".into(), granted_by: id("owner"), granted_at: w.t.clock.now() });
-    let claim = w.treat_and_resolve(w.fall(6, 101, &[(1, 101), (2, 101)]));
+    let claim = w.injury_claim(w.fall(6, 101, &[(1, 101), (2, 101)]));
     assert_eq!(claim.status, ClaimStatus::Refused);
     assert!(claim.refusal_reason.starts_with("medical payments cover excludes staff: Lee Park holds the staff role medic"), "{}", claim.refusal_reason);
 }
@@ -463,9 +495,9 @@ fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     let b = w.fall(8, 101, &[(1, 101), (5, 101)]);
     w.advance(30);
     let c = w.fall(6, 101, &[(1, 101), (5, 101)]);
-    let first = w.treat_and_resolve(a);
-    w.treat_and_resolve(b);
-    w.treat_and_resolve(c);
+    let first = w.injury_claim(a);
+    w.injury_claim(b);
+    w.injury_claim(c);
     w.file_record(first.id, FIRST_AID, 1);
     w.verify(first.id);
     w.review(first.id, "consistent", "supported", None);
@@ -484,10 +516,10 @@ fn the_same_invoice_on_another_claim_goes_to_a_person() {
     let w = World::new();
     approve_larger_fall(&w);
     w.advance(3600);
-    let first = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let first = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record_hash(first.id, FIRST_AID, 1, &"ab".repeat(32));
     w.advance(3600);
-    let second = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let second = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
     w.file_record_hash(second.id, FIRST_AID, 1, &"cd".repeat(32));
     let version = w.claim(second.id).pack_version;
     let checks = w.as_("ops", |ctx| Ok(pack_checks(ctx, second.id, version)));
@@ -521,4 +553,169 @@ fn a_medic_tap_opens_the_card_without_an_incident() {
     w.as_("medic", |ctx| request_medical_card(ctx, 3));
     let read = w.t.db.medical_access_log().reader().filter(id("medic")).next().unwrap();
     assert_eq!((read.attendee, read.incident_id, read.granted), (id("Maya Chen"), 0, true));
+}
+
+#[test]
+fn resolving_an_injury_waits_for_the_wearer_to_file() {
+    let w = World::new();
+    let incident = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let err = w.try_as("Jordan Alvarez", |ctx| file_claim(ctx, incident, STATEMENT.into())).unwrap_err();
+    assert!(err.starts_with("only the person who wore band 3"), "{err}");
+    assert!(w.try_as("ops", |ctx| file_claim(ctx, incident, STATEMENT.into())).is_err());
+    assert!(w.try_as("Maya Chen", |ctx| file_claim(ctx, incident, "   ".into())).is_err());
+    assert!(w.try_as("Maya Chen", |ctx| file_claim(ctx, incident, "x".repeat(2001))).is_err());
+    w.as_("Maya Chen", |ctx| file_claim(ctx, incident, format!("  {STATEMENT}\n")));
+    let claim = w.t.db.claim().incident_id().find(incident).unwrap();
+    assert_eq!((claim.status, claim.status_note.as_str()), (ClaimStatus::AwaitingRecord, "waiting for the hospital report"));
+    assert_eq!((claim.claimant, claim.claimant_name.as_str(), claim.statement.as_str()), (Some(id("Maya Chen")), "Maya Chen", STATEMENT));
+
+    let report = w.report_for(claim.id);
+    assert_eq!((report.choice.as_str(), report.status.as_str(), report.requested_by), ("random", "requested", id("Maya Chen")));
+    let job = w.open_job(KIND_CLINIC, claim.id);
+    assert_eq!(report.job_id, job.id);
+    let p: ClinicPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!((p.claim_id, p.report_id, p.scenario.as_str(), p.visit_date.as_str()), (claim.id, report.id, report.scenario.as_str(), report.visit_date.as_str()));
+    assert_eq!((p.statement.as_str(), p.claimant_name.as_str(), p.incident_kind.as_str(), p.zone_name.as_str()), (STATEMENT, "Maya Chen", "fall", "Main stage"));
+    assert_eq!((p.incident_date.as_str(), p.incident_time.as_str(), p.venue_name.as_str()), ("2026-10-24", "22:14", "Cal Hacks 13.0"));
+    assert_eq!(p.medic_notes, ["wrist wrapped, cold pack, first aid"]);
+    let facts = w.as_("ops", |ctx| Ok(pack_facts(ctx, claim.id, claim.pack_version)));
+    assert!(facts.iter().any(|f| f.key == "claimant_statement" && f.value == STATEMENT), "{facts:?}");
+
+    let err = w.try_as("Maya Chen", |ctx| file_claim(ctx, incident, STATEMENT.into())).unwrap_err();
+    assert!(err.contains("already has a claim"), "{err}");
+}
+
+#[test]
+fn staff_choose_the_hospital_report() {
+    let w = World::new();
+    let first = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    assert!(w.try_as("Maya Chen", |ctx| file_claim_for_wearer(ctx, first, STATEMENT.into(), "matches".into())).is_err());
+    assert!(w.try_as("ops", |ctx| file_claim_for_wearer(ctx, first, STATEMENT.into(), "fake".into())).is_err());
+    let matched = w.report_for(w.file_for(first, "matches").id);
+    assert_eq!((matched.scenario.as_str(), matched.choice.as_str(), matched.visit_date.as_str()), ("matches", "matches", "2026-10-24"));
+
+    w.advance(3600);
+    let second = w.treat_and_resolve(w.fall(7, 101, &[(1, 101), (5, 101)]));
+    w.as_("medic", |ctx| file_claim_for_wearer(ctx, second, STATEMENT.into(), "mismatch".into()));
+    let claim = w.t.db.claim().incident_id().find(second).unwrap();
+    let mismatch = w.report_for(claim.id);
+    let scenario = bandit_insurance::clinic::Scenario::parse(&mismatch.scenario).unwrap();
+    assert!(!scenario.matches(), "{}", mismatch.scenario);
+    assert_eq!(claim.claimant_name, "Jordan Alvarez");
+
+    w.advance(3600);
+    let third = w.treat_and_resolve(w.fall(8, 101, &[(1, 101), (5, 101)]));
+    let claim = w.file_for(third, "pdf");
+    assert_eq!((claim.status, claim.status_note.as_str()), (ClaimStatus::AwaitingRecord, "waiting for the medical record"));
+    assert!(w.t.db.clinic_report().claim_id().filter(claim.id).next().is_none());
+    assert!(w.t.db.job().iter().all(|j| !(j.kind == KIND_CLINIC && j.subject_id == claim.id)));
+
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.as_("ops", |ctx| open_incident(ctx, "property".into(), zone, 0, "a chair broke".into()));
+    let property = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Property).unwrap().id;
+    w.as_("ops", |ctx| resolve_incident(ctx, property, "chair removed".into()));
+    let err = w.try_as("ops", |ctx| file_claim_for_wearer(ctx, property, STATEMENT.into(), "random".into())).unwrap_err();
+    assert!(err.contains("not an injury"), "{err}");
+}
+
+#[test]
+fn a_matching_hospital_report_moves_the_claim_on() {
+    let w = World::new();
+    let claim = w.file_for(w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)])), "matches");
+    let report = w.send_report(claim.id, FIRST_AID);
+    assert_eq!((report.status.as_str(), report.provider_name.as_str()), ("received", "Event Medical Station - Cal Hacks 13.0"));
+    assert!(report.problems.is_empty() && report.received_at.is_some() && report.model_call_id != 0);
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Verifying, "{}", c.status_note);
+    assert_eq!(c.payout_cents, 18_000);
+    let record = w.t.db.medical_record().claim_id().filter(claim.id).next().unwrap();
+    assert_eq!((record.status.as_str(), record.page_count, record.file_hash.as_str()), ("extracted", 2, report.file_hash.as_str()));
+    assert_eq!(record.job_id, report.job_id);
+    w.verify(claim.id);
+    let p: ReviewPayload = serde_json::from_str(&w.open_job(KIND_REVIEW, claim.id).payload).unwrap();
+    assert_eq!(p.claimant_statement, STATEMENT);
+}
+
+#[test]
+fn a_hospital_report_off_its_case_goes_to_a_person() {
+    let w = World::new();
+    let claim = w.file_for(w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)])), "matches");
+    let report = w.send_report(claim.id, &FIRST_AID.replace("2026-10-24", "2026-10-23"));
+    assert_eq!(report.status, "failed");
+    assert!(report.problems.iter().any(|p| p.contains("visit date must be 2026-10-24")), "{:?}", report.problems);
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
+    assert!(c.status_note.starts_with("the hospital report could not be read: "), "{}", c.status_note);
+    assert_eq!(w.t.db.medical_record().claim_id().filter(claim.id).count(), 0);
+    assert_eq!(w.t.db.job().id().find(report.job_id).unwrap().status, JobStatus::Done);
+}
+
+#[test]
+fn a_hospital_report_that_never_arrives_goes_to_a_person() {
+    let w = World::new();
+    let claim = w.file_for(w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)])), "random");
+    for _ in 0..MAX_ATTEMPTS {
+        let job = w.lease(KIND_CLINIC, claim.id);
+        w.as_("worker", |ctx| fail_job(ctx, job.id, "the writer is unavailable".into(), None));
+        w.advance(60);
+    }
+    assert_eq!(w.report_for(claim.id).status, "failed");
+    let c = w.claim(claim.id);
+    assert_eq!((c.status, c.status_note.as_str()), (ClaimStatus::Routed, "the hospital report did not arrive; a person must file the record"));
+}
+
+#[test]
+fn a_hospital_report_after_a_filed_record_only_finishes_its_job() {
+    let w = World::new();
+    let claim = w.file_for(w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)])), "matches");
+    w.file_record(claim.id, FIRST_AID, 1);
+    assert_eq!(w.claim(claim.id).status, ClaimStatus::Verifying);
+    let report = w.send_report(claim.id, FIRST_AID);
+    assert_eq!(report.status, "requested");
+    assert_eq!(w.t.db.job().id().find(report.job_id).unwrap().status, JobStatus::Done);
+    assert_eq!(w.claim(claim.id).status, ClaimStatus::Verifying);
+    assert_eq!(w.t.db.medical_record().claim_id().filter(claim.id).count(), 1);
+}
+
+#[test]
+fn about_half_the_hospital_reports_match() {
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    let n = 120;
+    let mut matched = 0;
+    for _ in 0..n {
+        w.as_("medic", |ctx| open_incident(ctx, "sos".into(), zone, 3, "felt faint by the stage".into()));
+        let incident = w.t.db.incident().subject_band().filter(3u32).max_by_key(|i| i.id).unwrap().id;
+        w.as_("medic", |ctx| resolve_incident(ctx, incident, "rested and recovered".into()));
+        w.as_("Maya Chen", |ctx| file_claim(ctx, incident, STATEMENT.into()));
+        let claim = w.t.db.claim().incident_id().find(incident).unwrap();
+        matched += (w.report_for(claim.id).scenario == "matches") as u32;
+        w.advance(60);
+    }
+    assert!((40..=80).contains(&matched), "{matched} of {n} matched");
+}
+
+#[test]
+fn the_wearer_sees_their_incidents_and_staff_see_the_unclaimed_ones() {
+    use crate::web::{board_clinic_reports, my_claims, my_incidents, unclaimed_injuries};
+    let w = World::new();
+    let incident = w.treat_and_resolve(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    let mine = my_incidents(&w.view("Maya Chen"));
+    assert_eq!(mine.len(), 1);
+    assert_eq!((mine[0].incident_id, mine[0].kind.as_str(), mine[0].zone_name.as_str(), mine[0].resolved, mine[0].claim_id), (incident, "fall", "Main stage", true, 0));
+    assert!(my_incidents(&w.view("Jordan Alvarez")).is_empty());
+    let open = unclaimed_injuries(&w.view("ops"));
+    assert_eq!(open.len(), 1);
+    assert_eq!((open[0].incident_id, open[0].band_id, open[0].wearer_name.as_str(), open[0].kind.as_str()), (incident, 3, "Maya Chen", "fall"));
+    assert_eq!(open[0].notes, ["wrist wrapped, cold pack, first aid"]);
+    assert!(unclaimed_injuries(&w.view("Maya Chen")).is_empty());
+
+    w.as_("Maya Chen", |ctx| file_claim(ctx, incident, STATEMENT.into()));
+    let claim = w.t.db.claim().incident_id().find(incident).unwrap();
+    assert_eq!(my_incidents(&w.view("Maya Chen"))[0].claim_id, claim.id);
+    assert!(unclaimed_injuries(&w.view("ops")).is_empty());
+    let claims = my_claims(&w.view("Maya Chen"));
+    assert_eq!((claims[0].incident_id, claims[0].statement.as_str()), (incident, STATEMENT));
+    assert_eq!(board_clinic_reports(&w.view("ops")).len(), 1);
+    assert!(board_clinic_reports(&w.view("Maya Chen")).is_empty());
 }
