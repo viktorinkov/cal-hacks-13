@@ -30,7 +30,7 @@ export function DeskFrame({ title, sentence, figures, children }: { title?: stri
 export function Figure({ label, value, note, lead = false, chip }: { label: string; value: ReactNode; note: string; lead?: boolean; chip?: ReactNode }) {
   return (
     <div className="md:px-6 md:first:pl-0 md:last:pr-0">
-      <p className={cn('text-[13px] text-ink-dim', chip && 'flex items-center gap-2')}>{label}{chip}</p>
+      <p className={cn('text-[13px] text-ink-dim', chip && 'flex flex-wrap items-center gap-x-2 gap-y-1')}>{chip ? <span className="whitespace-nowrap">{label}</span> : label}{chip}</p>
       <p className={cn('mt-1 flex h-9 items-end tabular-nums leading-none text-ink', lead ? 'text-[32px]' : 'text-[22px]')}>{value}</p>
       <p className="mt-2 text-[13px] text-ink-dim">{note}</p>
     </div>
