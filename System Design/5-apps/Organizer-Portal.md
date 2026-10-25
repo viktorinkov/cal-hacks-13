@@ -278,7 +278,7 @@ Each claim's cover picks its cost center. Medical payments cover goes to Medical
 
 The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application.
 
-"Costs so far by cost center" has one row per cost center and a total row:
+"Cost centers" has one row per cost center and a total row:
 
 | Column | From |
 |---|---|
@@ -288,19 +288,16 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 | Paid | J3 payments: the `cash` credits |
 | Insurer owes | J2 receivables not yet paid back: the `insurer_receivable` balance |
 | Insurer paid | J4 receipts: the `cash` debits |
-| Venue's cost | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
+| Venue | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
 | Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
 
-"Who pays what" sums the same journals by party:
+"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical did not cover; and what is unpaid.
 
-- The venue: its cost, split into deductibles, insurer short payments (the J4 difference) and reserves whose insurer share is not posted yet.
-- The venue's insurer: what it paid back and what it still owes.
-- Attendees or their health plans: what Medical did not cover.
-- Still to pay: the accrued reserves.
+"Claims" has one row per claim with its cost center, claimant, amounts and status. The claim number opens the claim on the Settlements tab.
 
-"Cost lines" has one row per claim with its cost center, claimant, incident, status and the same amounts. The claim number opens the claim on the Settlements tab.
+"Trial balance" has one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. "Journal" lists every journal entry, newest first, with its claim, its lines on one row and when it was posted.
 
-"Journal" starts with the trial balance: one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. Below it comes every journal entry, newest first, with its name, claim, lines, who posted it and when.
+With no claims the tab reads "No claims yet."
 
 The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
 
