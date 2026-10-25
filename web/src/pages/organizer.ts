@@ -20,6 +20,7 @@ import { venueSetupTab } from '../venue-setup';
 import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { matches, redrawOnSearch, searchWords, searchable } from '../table-search';
+import { keepTableHeights } from '../resize';
 import { defineTerms } from '../terms';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -1289,6 +1290,7 @@ function render() {
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : [live(), personPanel(people)];
   mount('app', body);
   if (tab === 'claims' || tab === 'costs') defineTerms(document.getElementById('app')!);
+  keepTableHeights(document.getElementById('app')!);
   if (scrollToClaim) {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
