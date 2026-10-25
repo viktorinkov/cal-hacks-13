@@ -1018,7 +1018,7 @@ fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
     assert_eq!(charge.recommendation, "charge");
     // The charge waits for the claim; a stale amount fails closed; then the organizer approves what they see.
     assert!(w.try_as("ops", |ctx| approve_charge(ctx, charge.id, 240_000, c.pack_hash.clone())).unwrap_err().contains("waits for claim"));
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, false));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
     assert_eq!(w.claim(c.id).status, ClaimStatus::Settled);
     assert!(w.try_as("ops", |ctx| approve_charge(ctx, charge.id, 1, c.pack_hash.clone())).is_err());
     w.as_("ops", |ctx| approve_charge(ctx, charge.id, 240_000, c.pack_hash.clone()));
@@ -1084,7 +1084,7 @@ fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
     w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, false));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
     w.pay(c.id);
     assert_eq!(w.claim(c.id).status, ClaimStatus::Settled);
     assert_eq!(w.t.db.attendee_policy().holder().find(id("Maya Chen")).unwrap().used_cents, 94_900);
