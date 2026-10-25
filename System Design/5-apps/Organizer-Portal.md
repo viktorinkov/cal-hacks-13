@@ -15,7 +15,7 @@ Responsibilities:
 - Run incidents in the incident desk: a medic takes one ("Take it"), staff add notes with a cost, and staff resolve it.
 - Show where each booth stands.
 - Give the organizer (`ops`) the attendee list with band status and "Take the band back" (`release_band`), and the "Event ended" button (`end_event`). Once the event has ended, the button becomes "Reopen the event" (`reopen_event`).
-- Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
+- Insurance.md: give the organizer "Waiting for your decision", every claim with a complication, to decide after the event.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
 - Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab.
@@ -69,7 +69,7 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 | owner | the team member signed in with the identity that published the module | passes every role check, on the page as in the module; grants roles from the command line |
 
 - Medical-Card.md: the medic also opens the medical card with "Tap band <band code> for the medical card" (`request_medical_card`), or by tapping the band with their phone. The phone's medic view links back here with "Notes, cost and resolve on the incident desk". The granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the attendee confirms it.
-- Insurance.md: after the event the organizer decides every claim no learned rule settled, in "Waiting for your decision" on the Claims tab.
+- Insurance.md: after the event the organizer decides every claim with a complication, in "Waiting for your decision" on the Claims tab.
 - Social.md: the Event graph and Photos tabs are for every staff member, like the other tabs. The `photographer` role has no screen here and uses the photographer route `/photo`, served with the tap page.
 
 The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This account has no staff role", then "The organizer portal is for the event's organizer and medics. To get access, send this code to the organizer:", and their full identity code.
@@ -96,7 +96,7 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Attendee list | "<n> attendees", then a line that counts them: "<h> wearing hardware bands", with ", <m> without a band" when someone has none; every attendee by display name, with their band's code, which opens its tap link, its status ("online", "offline" or "not seen yet"), company, `findable` and socials | `board_attendees`, `band` | per attendee with a band, while the event has not ended: "Take the band back" (`release_band`), after the confirm "Take band <band code> back from <name>? They keep their profile and memories; the next person can claim the band." |
 | Live zones | the venue map and the zone table | the Live tab's tables | the low-visibility button |
 | Alerts | "Alerts", shown while a band on the map has a fall or SOS flag or an incident is open: "Fall on band <band code> (<name>) in <zone>: the bands around it show the light circle." ("SOS on band" for an SOS), and every open incident as "Incident <id>: <Kind> in <zone>, band <band code> (<name>), <Status>, opened <time>" with "open in Claims" | `band`, `open_incidents`, `board_attendees` | none |
-| Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note | the Claims queue's tables | `approve_claim`, `refuse_claim` |
+| Insurance.md: Waiting for your decision | for `ops`, the claims with a complication, oldest first, each with its claimant, incident kind, zone, payout and status note: Claude's decision, then every complication | the Claims queue's tables | `approve_claim`, `refuse_claim` |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
 Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
@@ -424,7 +424,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | Staff roles are granted by the owner with `grant_role` from the command line at setup, before doors open; the page has no grant button | nobody types identity codes in front of judges, and no staff screen can widen its own access |
 | One page for all staff: every tab for anyone with `ops` or `medic`, with the buttons a role cannot use hidden | two roles need no separate layouts; the module checks every role again, so the page cannot grant more than the role |
 | A signed-in person with no staff role sees their identity code and nothing else | the owner reads the code off their screen to grant the role, and no venue data shows to a stranger |
-| Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works in the venue during the event, and one person decides every claim no learned rule settled |
+| Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works in the venue during the event, and one person decides every claim with a complication |
 | Insurance.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Insurance.md: the hospital report is filed on the claim that waits for it, by `medic` or `ops` | the claim says what it is waiting for, and the incident desk stays for the person in front of the medic |
 | A medic takes an incident with "Take it" (`assign_medic`); the organizer does not assign medics; medics wear no bands | the medic knows whether they are free, and the desk shows who took it |
