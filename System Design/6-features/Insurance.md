@@ -4,7 +4,7 @@ Insurance resolves the money after an incident: who is paid, how much, from whic
 
 - **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own health insurance card and the hospital report. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
-- **The organizer** decides each claim that Claude or the guard sends them. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Each approval can teach a rule, and the next claim of that shape is then paid with nobody involved.
+- **The organizer** decides each claim that Claude or the guard sends them. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Approving any other claim can teach a rule, and the next claim of that shape is then paid with nobody involved. A complicated claim teaches no rule: the decision is kept as a precedent that the next such claim shows.
 
 Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first.
 
@@ -80,9 +80,9 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | Do the sources agree on time and zone? | code, `corroborate` | a pay needs `corroborated` |
 | Is the copy valid, and what do the two policies say about this claim? | The Evidence Engine, `claim_verify`, then Claude's policy searches (next to build) | a failed validation is a failed check; the clauses are what Claude cites |
 | Pay, refuse or ask the organizer? | the Anthropic Claude API, investigating with tools (`claim_review`) | proposes the decision, with the facts it rests on |
-| Is the claim complicated: a gap or mismatch in the policies? | code, the guard, from the cover, the amounts and the checks | sends it to the organizer whatever Claude decided, with every complication listed |
+| Is the claim complicated: a gap or mismatch in the policies? | code, the guard, from the cover and the amounts | sends it to the organizer whatever Claude decided, with every complication listed |
 | Does the decision go through? | code, the guard | lets a pay or a refusal through only inside the terms and the checks; otherwise sends it to the organizer |
-| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses, and can teach a rule |
+| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses; teaches a rule only from a claim that is not complicated, and keeps a precedent from one that is |
 | What the next similar claim does | the organizer's approval, as a `settlement_rule` version | the ceiling under which a pay goes through |
 | The wording of the letters | the Anthropic Claude API, `claim_draft` and `recovery_letter`; code checks every figure | words only |
 | Did an attendee break or take something? (next to build) | staff name the band; code checks it against the evidence; Claude recommends; the organizer approves | a charge the attendee sees, and can pay or dispute |
@@ -114,13 +114,23 @@ Code finds each complication from stored rows and lists every one the claim has,
 |---|---|---|
 | No policy covers it | no active cover of the venue's policy pays for this kind of incident | an attendee's phone stolen from a booth; venue merch taken when the policy has no theft cover |
 | The bill is over the policy's limit | the covered cost is above the per-claim limit or what is left of the aggregate, so the policy pays only part of it, or nothing | a $7,200 emergency room bill against the $5,000 per-claim limit |
-| The policy does not list a billed service | the fee schedule has no line for a billed code (the `record_lines` check fails) | Jordan's urgent care bills a Tdap shot, `90715`, that the schedule of benefits leaves out |
 | The policies disagree on who pays (next to build) | the attendee's own plan is on file, and the two other-insurance clauses do not settle which pays first: both say they pay second, or the venue's term is not confirmed | the venue's medical payments cover is excess, and the attendee's plan also pays only after any other medical cover |
 | The clauses conflict (next to build) | a clause Claude cites covers the claim while another cited clause excludes it, or Claude's `paying_policy` differs from the confirmed other-insurance term | the theft clause covers stolen merch, but its condition excludes a loss with no sign of forced entry |
 
-A complicated claim goes to the organizer as `Complication: {each complication}. {Claude's decision}`, for example `Complication: the policy's fee schedule does not list 90715. Claude would pay $895.00`.
+A billed service the fee schedule does not list is not a complication: the schedule answers it, so the line is excluded, the rest is paid and the `record_lines` check records it. Jordan's Tdap shot, `90715`, is one.
 
-The organizer can approve it, which can still teach a rule for its shape, but the rule never settles a complicated claim: the next one with a gap goes to a person too. When the policy covers none of the claim, there is nothing to approve, and the organizer refuses it with the reason; the attendee keeps the incident record for their own insurer.
+A complicated claim goes to the organizer as `Complication: {each complication}. {Claude's decision}`, for example `Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00`.
+
+Approving a complicated claim never teaches a rule, because the policies give it none: `approve_claim` ignores `learn` for one, and the organizer screens offer no "teach a rule" or rule ceiling on it. Hyphenate's track still asks that "what happened in March should change what the system does in June", so the organizer's decision is kept as a precedent instead, a `decision` row for each kind of gap:
+
+| The organizer | Precedent row (`what`, then `why`) |
+|---|---|
+| approves | `Precedent, over the policy's limit: approved $150.00 for Jordan Alvarez` |
+| refuses | `Precedent, no cover: refused {name}'s claim`, with the reason |
+
+The next claim with the same kind of gap shows the latest one at the end of its route reason, for example `... Claude would pay $150.00. Precedent, not applied: Ops desk approved $150.00 for Jordan Alvarez (claim 4)`. It still waits for the organizer: a precedent is shown, never applied, and it names the person who decided so the call traces back to them.
+
+When the policy covers none of the claim, there is nothing to approve, and the organizer refuses it with the reason; the attendee keeps the incident record for their own insurer.
 
 ### Step 1: what code refuses before Claude
 
@@ -225,7 +235,7 @@ A decision that goes through is stored with `decided_by` = `claude`. Claude neve
 
 A claim is paid with nobody involved only when all of these hold:
 
-1. The claim is not complicated: an active cover of the policy covers this incident kind, the covered cost fits inside the policy's limits, and the fee schedule lists every billed service.
+1. The claim is not complicated: an active cover of the policy covers this incident kind, and the covered cost fits inside the policy's limits.
 2. The claimant is not excluded as staff.
 3. The payout is above $0 and above the policy's minimum payout.
 4. No check of the current pack version failed, from code or from The Evidence Engine.
@@ -282,7 +292,7 @@ These are the scripted claims run's claims (`bandit-claims story`).
 | Claim | What happened | What Claude can decide, and what the guard does | Result |
 |---|---|---|---|
 | Maya Chen, band 91 | Slipped near the stage; 2 witnesses; first-aid report, $180 | Claude pays; every check passed, the evidence is corroborated and $180 is under rule v1's $895 ceiling | paid in seconds, `decided_by` `claude` under rule v1 |
-| Jordan Alvarez, band 90 | Fell in the Main stage pit; 3 witnesses; urgent care billed $1,308, covered $895; the Tdap shot (`90715`) is not on the fee schedule | complicated: the policy does not list a billed service, so no pay goes through | waits for the organizer as `Complication: the policy's fee schedule does not list 90715`; they approve with learn on and teach rule v1 |
+| Jordan Alvarez, band 90 | Fell in the Main stage pit; 3 witnesses; urgent care billed $1,308, covered $895; the Tdap shot (`90715`) is not on the fee schedule | `record_lines` failed, so no pay goes through | waits for the organizer, who approves with learn on and teaches rule v1 |
 | Sam Patel, band 92 | Went down on the Hacking floor; the report's history says he hurt the ankle playing basketball at home the evening before | Claude finds the report contradicts the incident and recommends a refusal; no check failed, so the refusal cannot go through alone | waits for the organizer with Claude's finding on top |
 | Lee Park, band 93 | The band reports a fall at Main stage, but the light circle forms on Sponsor row | disputed, so Claude decides at once; it refuses on the failed `witness_zone` check, and the guard lets the refusal through | refused, with every check listed |
 | The speaker | Knocked off its stand at Main stage; the camera confirms it; repair $2,400 | no property rule exists yet, so a pay cannot go through | waits for the organizer, who approves; J3 pays the repair vendor on the ledger |
@@ -809,6 +819,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Code computes every amount; Claude never sets a figure | a model must never decide a payable |
 | Code refuses a staff claimant and a claim with nothing to pay before Claude | those need no judgment |
 | A complicated claim, one with a gap or mismatch in the policies, always goes to the organizer, one by one | no rule can settle what the contract does not answer; the organizer sees every gap at once |
+| A complicated claim teaches no rule; the organizer's decision is kept as a precedent the next claim with the same gap shows, never applied | the system remembers what a person decided without turning one exception into a policy |
 | Disputed evidence goes to Claude at once, without waiting for a hospital report | the sources already contradict each other, so there is nothing to wait for |
 | Every routed claim goes to the organizer (`ops`), with no approval ladder | one person decides money after the event, and anyone with `ops` can act for them; the stale check and the learned rule guard the money |
 | `approve_claim` fails closed on a stale amount or pack | the guardrail finance reviewers ask about first |
