@@ -1010,55 +1010,125 @@ def venue_reconstruction(y0):
 
 
 
+def _product_frame(y0, filename, prefix, artwork_sources=None):
+    """Preserve approved native product illustrations on the same editable board."""
+    source_path = LOGOS.parent / filename
+    source = json.loads(source_path.read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    id_map = {element["id"]: prefix + element["id"] for element in source["elements"]}
+    scale = 2
+    origin_x, origin_y = frame["x"], frame["y"]
+    for element in source["elements"]:
+        element["id"] = id_map[element["id"]]
+        element["x"] = (element["x"] - origin_x) * scale
+        element["y"] = y0 + (element["y"] - origin_y) * scale
+        element["width"] *= scale
+        element["height"] *= scale
+        element["strokeWidth"] *= scale
+        if element["type"] == "arrow":
+            element["strokeWidth"] = 6
+        if element.get("fontSize"):
+            element["fontSize"] *= scale
+        if element.get("points"):
+            element["points"] = [[x * scale, y * scale] for x, y in element["points"]]
+        if element.get("frameId"):
+            element["frameId"] = id_map[element["frameId"]]
+        if element.get("containerId"):
+            element["containerId"] = id_map[element["containerId"]]
+        element["groupIds"] = [prefix + group for group in element.get("groupIds", [])]
+        for bound in element.get("boundElements") or []:
+            bound["id"] = id_map[bound["id"]]
+        for key in ("startBinding", "endBinding"):
+            binding = element.get(key)
+            if binding:
+                binding["elementId"] = id_map[binding["elementId"]]
+                if "gap" in binding:
+                    binding["gap"] *= scale
+        if element["type"] == "frame":
+            element.setdefault("customData", {}).update(
+                diagramStyleVersion=1,
+                diagramImportedSource="diagrams/" + filename)
+        if artwork_sources and element.get("customData", {}).get("assetSource") in artwork_sources:
+            element["customData"]["assetSource"] = artwork_sources[element["customData"]["assetSource"]]
+        S.elements.append(element)
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    return frame["height"]
+
+
+def fire_evacuation(y0):
+    return _product_frame(y0, "fire-evacuation-source.excalidraw", "fire_")
+
+
+def photo_product_flow(y0):
+    names = ("photographer-illustration.svg", "nearby-bands-illustration.svg", "recap-photo-illustration.svg")
+    sources = {"artifacts/devpost/social-photo-flow/" + name: "diagrams/product-assets/" + name for name in names}
+    return _product_frame(y0, "photo-flow-source.excalidraw", "photo_", sources)
+
+
+def merch_product_flow(y0):
+    return _product_frame(y0, "merch-image-source.excalidraw", "merch_")
+
+
+
 def nessie(y0):
     """One provider, its operations and references, then local wallet accounting."""
-    S.begin_frame("Capital One Nessie", 0, y0, 4480, 2070)
-    provider = _nessie_component(1000, 100, 1600, 1430, "Nessie API", "ext")
+    S.begin_frame("Capital One Nessie", 0, y0, 4480, 1770)
+    provider = _nessie_component(1000, 100, 1600, 1040, "Nessie API", "ext")
     brand = S.image(S.ox + 1070, S.oy + 155, CAPONE, 175)
     brand.setdefault("customData", {})["diagramParentComponent"] = provider.id
-    customer = _nessie_component(1060, 350, 620, 360, "Create customer", "ext", parent=provider)
-    _nessie_property(customer, 1100, 560, 540, "returns customer_id")
-    account = _nessie_component(1920, 350, 620, 360, "Checking account", "ext", parent=provider)
-    _nessie_property(account, 1960, 560, 540, "returns account_id")
-    deposit = _nessie_component(1060, 1040, 620, 360, "Deposit", "ext", parent=provider)
-    _nessie_property(deposit, 1100, 1250, 540, "returns deposit_id")
-    purchase = _nessie_component(1920, 1040, 620, 360, "Purchase", "ext", parent=provider)
-    _nessie_property(purchase, 1960, 1250, 540, "returns purchase_id")
+    customer = _nessie_component(1060, 350, 620, 230, "Create customer", "ext", parent=provider)
+    _nessie_property(customer, 1100, 445, 540, "returns customer_id")
+    account = _nessie_component(1920, 350, 620, 230, "Checking account", "ext", parent=provider)
+    _nessie_property(account, 1960, 445, 540, "returns account_id")
+    deposit = _nessie_component(1060, 790, 620, 230, "Deposit", "ext", parent=provider)
+    _nessie_property(deposit, 1100, 885, 540, "returns deposit_id")
+    purchase = _nessie_component(1920, 790, 620, 230, "Purchase", "ext", parent=provider)
+    _nessie_property(purchase, 1960, 885, 540, "returns purchase_id")
     H(customer, account, "worker uses customer ID")
 
-    setup = B(80, 350, "Wallet setup", "web", w=550, h=360,
+    setup = B(80, 350, "Wallet setup", "web", w=550, h=230,
               wordmark=PHONE, mark_h=100)
-    injury = B(80, 1040, "Approved injury payout", "good", w=550, h=360,
+    injury = B(80, 790, "Approved injury payout", "good", w=550, h=230,
                wordmark=HEART, mark_h=100)
+    setup.el.setdefault("customData", {})["diagramArtworkHeight"] = 200
+    injury.el.setdefault("customData", {})["diagramArtworkHeight"] = 200
     H(setup, customer, "worker POST")
     H(injury, deposit, "worker POST")
 
-    ledger = _nessie_component(2970, 1040, 620, 430, "wallet_entry", "stdb", STDB)
-    _nessie_property(ledger, 3010, 1250, 540, "signed amount_cents")
-    _nessie_property(ledger, 3010, 1370, 540, "Nessie reference", h=70)
-    total = _nessie_component(2970, 350, 620, 430, "Spendable balance", "rust", RUST)
-    _nessie_property(total, 3010, 560, 540, "sum wallet_entry cents")
-    _nessie_property(total, 3010, 680, 540, "subtract pending holds", h=70)
-    wallet = SV(3890, 350, STDB, "my_wallet", kind="stdb", w=500, h=430)
+    ledger = _nessie_component(2970, 790, 620, 350, "wallet_entry", "stdb", STDB)
+    _nessie_property(ledger, 3010, 935, 540, "signed amount_cents")
+    _nessie_property(ledger, 3010, 1045, 540, "Nessie reference", h=70)
+    total = _nessie_component(2970, 350, 620, 350, "Spendable balance", "rust", RUST)
+    _nessie_property(total, 3010, 495, 540, "sum wallet_entry cents")
+    _nessie_property(total, 3010, 605, 540, "subtract pending holds", h=70)
+    wallet = SV(3890, 350, STDB, "my_wallet", kind="stdb", w=500, h=350)
     H(total, wallet, "available cents")
     V(ledger, total, "wallet entries")
-    R(account, "r", ledger, "l", [S.P(2770, 530), S.P(2770, 1147.5)],
+    R(account, "r", ledger, "l", [S.P(2770, 465), S.P(2770, 877.5)],
       "worker records opening", seg=1, fb=.25)
     H(purchase, ledger, "worker records debit", y=purchase.cy)
-    R(deposit, "b", ledger, "b", [S.P(1370, 1490), S.P(3280, 1490)],
-      "worker records credit", seg=1)
+    R(deposit, "b", ledger, "b", [S.P(1370, 1210), S.P(2580, 1210), S.P(3280, 1210)],
+      "worker records credit", seg=2)
 
-    approval = B(80, 1690, "Organizer approves charge", "good", w=550, h=300,
+    approval = B(80, 1390, "Organizer approves charge", "good", w=550, h=300,
                  wordmark=USER, mark_h=100)
-    payment = B(920, 1690, "Attendee pays", "web", w=550, h=300,
+    payment = B(920, 1390, "Attendee pays", "web", w=550, h=300,
                 wordmark=PHONE, mark_h=100)
-    merch = B(1940, 1690, "Merch checkout", "web", w=550, h=300,
+    merch = B(1940, 1390, "Merch checkout", "web", w=550, h=300,
               wordmark=STORE, mark_h=100)
     H(approval, payment, "permits payment")
-    R(payment, "t", purchase, "b", [S.P(1195, 1590), S.P(2050, 1590)],
+    R(payment, "t", purchase, "b", [S.P(1195, 1290), S.P(2050, 1290)],
       "worker POST", seg=1, fb=.21)
-    V(merch, purchase, "worker POST", x=S.ox + 2390)
+    R(merch, "t", purchase, "b", [S.P(2390, 1240)],
+      "worker POST", seg=0, fa=(2390 - 1940) / 550, fb=(2390 - 1920) / 620)
     return S.end_frame()
+
+
 
 
 def _nessie_component(x, y, w, h, label, kind="stdb", logo_=None, parent=None):
@@ -1258,7 +1328,7 @@ def band_firmware(y0):
 FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
           nessie, jobs, prepare_event, find_people, photo_memories,
           settle_claim, policy_amounts, approve_rule, respond_incident,
-          routes_space, hardware, band_wiring, exit_markers_gateway,
+          routes_space, fire_evacuation, photo_product_flow, merch_product_flow, hardware, band_wiring, exit_markers_gateway,
           band_firmware, vision, venue_reconstruction)
 
 ALIASES = {

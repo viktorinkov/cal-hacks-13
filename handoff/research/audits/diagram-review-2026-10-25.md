@@ -1,6 +1,6 @@
 # Diagram review, 25 October 2026
 
-SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The 21-frame reduction is now published and readback-verified on the canonical Plus board; the prior 24-frame source remains a saved checkpoint.
+SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The current canonical Plus product-flow revision has 24 frames and passed exact readback verification. Earlier 24- and 21-frame revisions remain saved historical checkpoints.
 
 ## What each sponsor contribution means
 
@@ -14,7 +14,7 @@ SpacetimeDB and Elastic are the primary presentation priorities. This review com
 
 ## Board organization
 
-The current verified board has 21 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. Interest suggestions, Buy a memory and Exit guidance move to existing Devpost prose; their feature facts remain in force and their prior drawings remain in the saved 24-frame checkpoint. Hardware and vision detail stays on the main board.
+The current verified product-flow board has 24 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. The earlier reduction retained Interest suggestions, Buy a memory and Exit guidance in prose and saved their drawings. This new consolidation adds separate supplied product journeys for fire evacuation, photo matching and photo merchandise; their technical details remain in the existing engine diagrams. Hardware and vision detail stays on the main board.
 
 | Diagram | Question or responsibility |
 |---|---|
@@ -33,6 +33,9 @@ The current verified board has 21 diagrams, listed by title below. The single Ar
 | Approve a reusable rule | How precedents become explicitly approved, code-guarded authority. |
 | Respond to an incident | How incident response reaches the appropriate people. |
 | Routes and clear space | How routes and nearby bands support response. |
+| Fire evacuation | How the organizer starts evacuation and attendees follow paths toward exits, with incident subjects waiting for help. The paths and positions are illustrative. |
+| How your photos find you | How a photographer’s event-area and time context combines with band records and image people-counting to suggest photo identities, without face identification. |
+| Your photo on your merch | How a tagged photo and booth interests become a prepared-design suggestion that the attendee previews and chooses to buy. |
 | Band data flow | What band telemetry contains and where it goes. |
 | Band wiring | How hardware components are connected. |
 | Exit markers and gateway | How stations, exit-color swatches and the gateway relate. |
@@ -45,6 +48,8 @@ The rule diagram removes historical repair detail and a repeated individual-deci
 The canonical style uses large original artwork/logos, soft fills and dark text. Each main actor, component or object remains a visible outer card; its descriptive properties become small filled rectangles inside it. Actual actors and workflow/calculation stages may stand alone with arrows, while related formula inputs and conditions stay within their calculation group. Descriptive properties do not become artificial process steps. A short label may use several lines for one concept. App screenshots are excluded. Imported hardware source remains unchanged; editable checkpoints precede major rewrites.
 
 ## Diagram errors corrected
+
+The new product-flow revision preserves all existing technical frames; hardware and vision are only renumbered after the inserted product journeys. The Nessie layout is compacted; all wording and API relationships are preserved. The supplied Fire evacuation, photo-flow and merch-image source boards are kept separately, together with three original photo illustrations. The export `policy-calculations.svg` contains only the 54 formula elements from Policy amounts, excluding the 24 tagged numeric-example elements. It is an export-only view, not a board change or an extra frame.
 
 The compact board separates queue coordination from model execution, retrieval from approval, shopping from payment transport, and live writes from audience subscriptions. Workers call Elastic and validate results; Elastic does not directly write application tables. The investigation agent requests clause searches that the worker executes. The original hardware board is retained unchanged and only its new hardware frames are combined.
 
@@ -87,3 +92,5 @@ The 21-frame revision with the allocation inset passed native rendering, geometr
 The [prior grouped 24-frame public checkpoint](https://excalidraw.com/#json=p0Gilq4ytTdJY3VKU_r-r,Xq8vDszi13_7kLdKju8n0Q) remains verified and recoverable, along with commit `daf0d74` and the pre-cut editable checkpoint. The [prior 21-frame generator snapshot before the allocation inset](https://excalidraw.com/#json=PIWdtEXRGfKzdy5HzX407,XSCCTxDLfUE4u1RGSecLqQ) also passed exact readback verification for all 1,550 elements and 40 assets. The canonical Plus board remains the shared working board. The separate claims Plus scene is historical, not a competing current board. Editable checkpoints and Git preserve saved versions, not every browser edit.
 
 The [current allocation checkpoint](https://excalidraw.com/#json=uav7aeS1XhZXosyIEQVoi,PYVd5M9WtmWod1yIAwgk5Q) passed exact public readback for all 1,574 elements and 40 assets. Canonical Plus verification is stored in `.builds/diagram-history/20261025T111217Z-before-policy-allocation/apply/verification.json`.
+
+The subsequent product-flow consolidation passed independent source and native-export review and exact canonical Plus readback: 1,728 active elements, 24 frames, 214 images and 45 assets, with the user’s station-position adjustment preserved and zero errors. The reviewed generator source is `471cd6fae0887675c10524bdd490e17ffb0938de2e8f9f525b4b23dd095ad276`; the saved live-content hash is `5491c810297b389fc883f4a2e8da5f87a85b8baafdf38671c2c0072a04aa05ec`. Proof is `.builds/diagram-history/20261025-before-product-flows/apply/verification.json`. Earlier 21-frame readbacks above describe historical revisions, not the current frame count.
