@@ -274,13 +274,18 @@ A plan lookup finds the plan's public wording and fetches its PDF. From then on 
 
 **The run.**
 
-1. **Start.** On the tap page, "Name your plan instead" calls `look_up_plan(insurer, plan, state)`. It needs a claimed band, an insurer and a plan of 2 to 80 characters each, and a two-letter state. It writes a `plan_lookup` row in status `searching` and a job of kind `plan_lookup`.
-2. **Search.** The worker calls the Bright Data Web MCP's `search_engine` twice: "<insurer> <plan> <state> <year> summary of benefits and coverage pdf" and "<insurer> <plan> SBC <year>".
-3. **Pick.** The Anthropic Claude API (`plan_find`) reads the results and returns up to 3 addresses of this plan's own document, best first, each with why. It passes over broker pages, comparison sites, other plans and other years. Code keeps only addresses the results named.
-4. **Fetch.** The worker fetches the addresses in turn through the Bright Data Web Unlocker API. An answer counts only when it starts with `%PDF-` and is at most 15 MB.
-5. **Check.** The Evidence Engine reads the PDF ([Elastic](Elastic.md)): its pages go to `bandit-documents`, and the Elastic Workflow `bandit-read-document` reads it as `health_plan`. Besides the clauses, that kind's schema asks what the document prints about itself: whether it is a Summary of Benefits and Coverage, and the insurer, the plan and the plan year, each copied exactly with its page. Code finds each name word for word on its page, and a name that is not there counts against the PDF. Code then compares them with what the attendee typed: at least half the words of the typed insurer, and of the typed plan, must be in what is printed, so "Blue Shield" finds "Blue Shield of California" but not "Anthem Blue Cross". A PDF of another plan is passed over, its pages and answer are deleted from Elastic, and the next address is fetched. A PDF of over 100 pages, or one the Evidence Engine cannot read, is passed over too.
-6. **Land.** The worker stores the first PDF that passes in the blob store, registers it as an `owner_only` blob of the attendee with purpose `plan_wording`, and calls `finish_plan_lookup` with the address, the printed insurer, plan and year, the SHA-256 and the page count. In one transaction the module turns the lookup `found` and writes what it gives: an empty insurer and plan on the attendee's `medical_card`, from what is printed.
-7. **Read.** The module files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `health_plan`, source `plan_lookup`, the address it came from. The job `document_read` finds the answer the check saved for the same PDF, kind and reader, and uses it, so the PDF is read once. Its terms and clauses become the attendee's policy in `bandit-policy-clauses` ([Elastic](Elastic.md)). A PDF over 50 pages stays `found` but is not filed, since the module files 1 to 50 pages.
+1. **Start.** On the tap page, "Name your plan instead" calls `look_up_plan(insurer, plan, state)`. It needs a claimed band, an insurer and a plan of 2 to 80 characters each, and a two-letter state.
+2. **Reuse.** In the same call, the module looks for the same plan among the lookups already `found`: the same state, the same calendar year (UTC), which is the year the searches ask for, and an insurer and plan with the same telling words, in order, as that lookup's typed names or as the names its PDF prints. The telling words are the ones the check in step 6 compares: lowercase, three letters or more or a number, without common words such as "plan" and "insurance".
+
+   So "blue shield of california" and "Silver 70 PPO" find a lookup of "Blue Shield of California" and "Silver 70 PPO", while "Blue Shield" and "Silver 70" run a search of their own. When a lookup matches (the newest, when several do), the new `plan_lookup` row is written `found` at once with its address, printed names, plan year, matched chunks, SHA-256 and page count, and `reused_from` its id. The run goes straight on to step 7 with no job, no search, no Claude call and no fetch. Otherwise the row is written in status `searching` with a job of kind `plan_lookup`.
+3. **Search.** The worker calls the Bright Data Web MCP's `search_engine` twice: "<insurer> <plan> <state> <year> summary of benefits and coverage pdf" and "<insurer> <plan> SBC <year>".
+4. **Pick.** The Anthropic Claude API (`plan_find`) reads the results and returns up to 3 addresses of this plan's own document, best first, each with why. It passes over broker pages, comparison sites, other plans and other years. Code keeps only addresses the results named.
+5. **Fetch.** The worker fetches the addresses in turn through the Bright Data Web Unlocker API. An answer counts only when it starts with `%PDF-` and is at most 15 MB.
+6. **Check.** The Evidence Engine reads the PDF ([Elastic](Elastic.md)): its pages go to `bandit-documents`, and the Elastic Workflow `bandit-read-document` reads it as `health_plan`. Besides the clauses, that kind's schema asks what the document prints about itself: whether it is a Summary of Benefits and Coverage, and the insurer, the plan and the plan year, each copied exactly with its page. Code finds each name word for word on its page, and a name that is not there counts against the PDF. Code then compares them with what the attendee typed: at least half the words of the typed insurer, and of the typed plan, must be in what is printed, so "Blue Shield" finds "Blue Shield of California" but not "Anthem Blue Cross". A PDF of another plan is passed over, its pages and answer are deleted from Elastic, and the next address is fetched. A PDF of over 100 pages, or one the Evidence Engine cannot read, is passed over too.
+7. **Land.** The worker stores the first PDF that passes in the blob store, registers it as an `owner_only` blob of the attendee with purpose `plan_wording`, and calls `finish_plan_lookup` with the address, the printed insurer, plan and year, the SHA-256 and the page count. In one transaction the module turns the lookup `found` and writes what it gives: an empty insurer and plan on the attendee's `medical_card`, from what is printed. A reused lookup writes the same inside `look_up_plan`. Its PDF is already in the blob store and stays the blob of the attendee whose lookup fetched it, because files are stored by content and the tap page links the plan's public address, never the blob.
+8. **Read.** The module files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `health_plan`, source `plan_lookup`, the address it came from. The job `document_read` finds the answer the check saved for the same PDF, kind and reader, and uses it, so the PDF is read once. A reused lookup files the same PDF again for its own attendee, and `document_read` finds its pages and saved answer under the same SHA-256, so the plan is read once however many attendees name it. Its terms and clauses become the attendee's policy in `bandit-policy-clauses` ([Elastic](Elastic.md)). A PDF over 50 pages stays `found` but is not filed, since the module files 1 to 50 pages.
+
+Only a `found` lookup is reused. When two attendees name the same plan before either lookup is found, each runs its own search, and the PDF and its reading are still stored once under its SHA-256.
 
 When no address gives a PDF, the lookup turns `not_found`; when PDFs came back but none was this plan's, it turns `wrong_plan`. Either way nothing is written, and the tap page offers the upload: "We couldn't find your plan's documents online. Upload your policy instead."
 
@@ -289,7 +294,9 @@ The question this diagram answers: what happens between an attendee's plan name 
 ```mermaid
 flowchart LR
   TAP["tap page (/t/code): Name your plan instead"] -->|"insurer + plan, look_up_plan"| MOD["band1t module"]
-  MOD -->|"plan_lookup job"| W["bandit-workers"]
+  MOD -->|"same state, year and plan words?"| PREV["a plan_lookup already found"]
+  PREV -->|"its address + SHA-256, reused_from; no job"| MOD
+  MOD -->|"plan_lookup job, when none matches"| W["bandit-workers"]
   W -->|"2 queries, search_engine"| MCP["Bright Data Web MCP"]
   W -->|"results, plan_find"| CL["Anthropic Claude API"]
   W -->|"picked addresses"| WU["Bright Data Web Unlocker API"]
@@ -307,7 +314,7 @@ flowchart LR
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   class MCP,CL,WU,EE,CLS ext
   class TAP web
-  class MOD,POL stdb
+  class MOD,POL,PREV stdb
   class W,BLOB rust
 ```
 
@@ -322,9 +329,10 @@ flowchart LR
 | `status` | text | `searching`, `found`, `not_found`, `wrong_plan` or `failed` |
 | `source_url`, `printed_insurer`, `printed_plan`, `plan_year` | text | the document the lookup found, and what it prints |
 | `file_hash`, `page_count` | text, u32 | the PDF in the blob store |
-| `job_id` | id | the `plan_lookup` job |
+| `job_id` | id | the `plan_lookup` job; 0 for a reused lookup |
 | `note` | text | why it ended `not_found`, `wrong_plan` or `failed`, in plain words |
 | `created_at`, `updated_at` | timestamps | |
+| `reused_from` | id | the found lookup whose PDF and reading this one links to, when it named a plan already found; 0 when it searched |
 
 `finish_plan_lookup` is callable only by the `worker` holding the job's lease. When the job uses up its attempts, the module marks the lookup `failed` with the job's error. A new lookup of the same kind replaces what the last one wrote.
 
@@ -544,6 +552,7 @@ sequenceDiagram
 | A venue setup job uses up its attempts | The run stops | The module marks the setup `failed` with the job's error; the organizer can start it again |
 | A plan lookup finds no PDF of the plan | No public wording for that plan, common for an employer's plan | The lookup ends `not_found`, and the tap page offers the upload instead |
 | The PDF a plan lookup found is another plan's | Wrong terms for the attendee | Code finds the insurer and plan the Evidence Engine read on their pages and compares them with what the attendee typed; the next address is tried, and when none matches the lookup ends `wrong_plan` with nothing written |
+| An attendee names a plan another lookup already found | A second search, pick, fetch and check of the same PDF | `look_up_plan` links the earlier lookup's PDF and its saved reading at once, with no job |
 | The Evidence Engine cannot read a fetched PDF: a workflow run fails or takes over 10 minutes | That address gives nothing | The PDF is passed over with the reason in the lookup's note, and the next address is fetched |
 | A venue policy lookup finds neither form | No policy wording to read | The lookup ends `not_found`, or `wrong_form` when PDFs came back but none was the typed form, and nothing is filed; the tab offers the upload |
 | A venue policy lookup finds one form of the two | The other part's clauses are missing | The lookup ends `found` with the one form, and its note names the missing one; that part's terms are the typed ones and the defaults |
@@ -610,6 +619,7 @@ sequenceDiagram
 | Code checks a found form by the form number it prints, against the number the organizer typed from the declarations' forms schedule | a form number and its edition name one exact wording, which no title or insurer name does |
 | The hospital report stays an upload | it is the attendee's medical record and never public |
 | The Anthropic Claude API picks the plan's document among the search results, and the Evidence Engine reads what the PDF prints about itself in the same step that reads its clauses; code keeps only addresses the results named, only a real PDF, and only a PDF whose printed insurer and plan are on their pages and match what the attendee typed | a search for a plan returns broker pages, comparison sites and other years' forms, and telling them apart is judgment; whether a file is a PDF, whether a name is on its page and whether two names share their words, is not; one reading in Elastic gives every printed name a page that code checks, and the found PDF is not read a second time |
+| A plan already found is reused only when the state, the calendar year and the telling words of the typed insurer and plan are the same, in order, not under the looser half-the-words check | the looser check is safe after a search narrowed the results to this plan; with no search, "Blue Shield" and "Silver" would match several plans, so only the same name links |
 | A venue policy lookup's typed declarations stand over whatever the forms read for the same terms, and show as `typed` | a public form only points at "the Declarations" for its limits; the organizer typed the venue's own numbers and confirms them with the rest |
 | Each step of a venue setup is a `venue_setup_step` row, and the organizer picks the shown venue (`chosen_venue`) | the tab shows the run live by subscription, and a new setup never replaces the venue on screen by itself |
 | The Elastic Workflow `bandit-organize` is the one place facts are merged across sources, and `bandit-ingest` checks its answer twice, once after the workflow and once while assembling | one owner per step, and a wrong key never reaches SpacetimeDB |
