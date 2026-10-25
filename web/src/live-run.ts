@@ -5,13 +5,14 @@
 // what it is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, money, time } from './lib';
+import { act, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
 import { ZoneCircles, zoneWords } from './zones-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
-import { venueView, type LiveView } from './venue-setup';
+import { dragBar, dragged } from './resize';
+import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { Band, Claim, IncidentMarker, LiveRun } from './module_bindings/types';
 
@@ -79,6 +80,9 @@ function setUp(c: DbConnection) {
   v.view.append(tip);
   v.onFrame(now => {
     crowd.frame(now);
+    // Our bands' tags: the name typed when the band was placed, over its code.
+    const ours = crowd.ours();
+    v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
     zones.update(conn, now);
     const at = pick?.selected ? crowd.where(pick.selected) : undefined;
     mark.visible = !!at;
@@ -383,14 +387,14 @@ function placeBands() {
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
 }
 
-/** The organizer approves a claim waiting for them and teaches the Decision Engine a rule for similar claims. */
+/** The organizer approves a claim waiting for them, and teaches the Decision Engine a rule for similar claims unless it is complicated. */
 function approveButton(c: Claim) {
   return h('button', {
     onclick: (e: Event) => {
       e.stopPropagation();
-      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: true }));
+      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: !complicated(c) }));
     },
-  }, 'Approve and teach a rule');
+  }, complicated(c) ? 'Approve' : 'Approve and teach a rule');
 }
 
 /** Every decision, newest first; a click on a row of an incident flies to it and shows only its rows. The newest
@@ -438,17 +442,16 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
     list.length === 0
       ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
       : searchable('incidents', h('table', {},
-        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
+        h('tr', {}, h('th', {}, 'Incident'), h('th', {}, 'Status'), h('th', {}, '')),
         list.map(m => {
           const c = claims.get(m.claimId);
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
             h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${m.kind}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
-              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : ''),
-            h('td', {},
-              h('button', { class: 'link', onclick: () => focusOn(m) }, 'Show'),
-              waiting && [' ', approveButton(c!)]));
+              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
+              waiting && [h('br'), approveButton(c!)]),
+            h('td', {}, h('button', { class: 'link', onclick: () => focusOn(m) }, 'Show')));
         }))));
 }
 
@@ -473,12 +476,26 @@ function legend() {
       h('td', {}, meaning)))));
 }
 
+/** The side panels' widths until their bars are dragged. */
+const SIDES = { left: 300, right: 340 };
+/** The 3D view keeps at least this much of the window's width between the side panels. */
+const MIN_VIEW = 320;
+
+/** The bar between a side panel and the 3D view, which drags the panel wider or narrower. */
+function sideBar(side: 'left' | 'right') {
+  const other = side === 'left' ? 'right' : 'left';
+  const width = (s: 'left' | 'right') => dragged(`live ${s}`) ?? SIDES[s];
+  return dragBar(`live ${side}`, 'x', side === 'left' ? 1 : -1, () => width(side),
+    px => (document.querySelector('.live') as HTMLElement | null)?.style.setProperty(`--${side}`, `${px}px`),
+    180, () => innerWidth - width(other) - MIN_VIEW);
+}
+
 /** A person clicked in the 3D view opens with `open`; `selected` is the band of the person open now, or 0, and
  *  `panel` shows them at the top of the right side. */
 export type Picking = { open(bandId: number): void; selected: number; panel: HTMLElement | null };
 
 /** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the opened person, the
- * decisions and our bands on the right. */
+ * decisions and our bands on the right. The bars between them and under the view resize them. */
 export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picking) {
   pick = picking;
   if (!v) setUp(c);
@@ -486,8 +503,14 @@ export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picki
   crowd.recheck();
   const r = run();
   syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
-  return h('div', { class: 'live' },
+  const height = dragged('live height');
+  if (height) setLiveHeight(height);
+  const sides = (['left', 'right'] as const).map(s => `--${s}: ${dragged(`live ${s}`) ?? SIDES[s]}px`).join('; ');
+  return h('div', { class: 'live', style: sides },
     h('div', {}, incidents(r, canRun), legend()),
-    h('div', {}, h('section', {}, v!.view, h('p', {}, h('button', { onclick: showAll }, 'Whole hall')), v!.note)),
+    sideBar('left'),
+    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240),
+      h('p', {}, h('button', { onclick: showAll }, 'Whole hall')), v!.note)),
+    sideBar('right'),
     h('div', {}, picking?.panel, history(canRun), canRun && placeBands()));
 }

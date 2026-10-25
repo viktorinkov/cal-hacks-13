@@ -45,6 +45,13 @@ code { background: #eee; padding: 1px 4px; border-radius: 3px; }
 tr.linked { cursor: pointer; }
 tr.linked:hover td { background: #f3f6ff; }
 .venue-tip { position: absolute; z-index: 2; max-width: 300px; padding: 6px 8px; background: #fff; border: 1px solid #999; font-size: 13px; pointer-events: none; }
+.venue-names { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.venue-name { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; font-size: 11px; line-height: 1.3; color: #dfe5ee; text-shadow: 0 0 3px #000, 0 0 5px #000; }
+.venue-name.area { font-size: 13px; font-weight: 600; color: #fff; }
+.venue-name.sponsor_table { font-weight: 600; color: #ffc864; }
+.venue-name.exit { color: #8fe0ff; }
+.venue-name.band { display: flex; flex-direction: column; align-items: center; padding: 2px 7px; border-radius: 6px; background: #1d5cdc; color: #fff; font-size: 12px; text-shadow: none; }
+.venue-name.band small { font-size: 10px; color: #cfe0ff; }
 .graph { position: relative; height: 70vh; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #0b1020; }
 .graph:fullscreen { border-radius: 0; }
 .graph-card { position: absolute; top: 8px; left: 8px; z-index: 2; max-width: 240px; padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, .94); font-size: 13px; }
@@ -77,10 +84,18 @@ ul.results button:hover, ul.results button.on { background: #eef3ff; }
 body.viewing button, body.viewing input, body.viewing select, body.viewing textarea { pointer-events: none; opacity: .55; }
 /* Tables scroll by themselves instead of stretching the page. */
 #app table { display: block; max-height: 60vh; overflow: auto; }
+/* Their bottom-right corner drags them taller or shorter; a dragged height replaces the 60vh. */
+#app table.resizable { resize: vertical; }
+#app table[style*="height"] { max-height: none; }
 /* The Live tab: incidents and the legend, the 3D venue, the decisions, side by side across the window. */
 body.wide main { max-width: none; }
-.live { display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+.live { display: grid; grid-template-columns: var(--left, 300px) 8px minmax(0, 1fr) 8px var(--right, 340px); gap: 12px 2px; align-items: start; }
 .live section { margin-top: 0; }
-@media (max-width: 1100px) { .live { grid-template-columns: 1fr; } }
+/* The bars that drag the Live tab's side panels and its 3D view to a new size. */
+.drag-bar { background: #e2e2e2; touch-action: none; user-select: none; -webkit-user-select: none; }
+.drag-bar:hover { background: #b8b8b8; }
+.drag-bar.x { align-self: stretch; cursor: col-resize; }
+.drag-bar.y { height: 8px; cursor: row-resize; }
+@media (max-width: 1100px) { .live { grid-template-columns: 1fr; } .live > .drag-bar { display: none; } }
 .drag-band { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .drag-tag { position: fixed; z-index: 10; margin: 0; pointer-events: none; white-space: nowrap; }
