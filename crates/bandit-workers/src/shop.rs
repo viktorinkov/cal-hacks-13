@@ -1,7 +1,7 @@
-//! `merch_picks`: the shopping agent. When the event ends, Claude picks the three products an attendee
-//! would most want from their night: which template, which of their photos (the ones with the people they
-//! met first) and a short line printed under the photo, with one sentence on why. Code checks every id and
-//! length, and the module keeps the prices and the wallet.
+//! `merch_picks`: the shopping agent. When an attendee's night ends (they leave early or the event ends),
+//! Claude picks the three products they would most want from their night: which template, which of their
+//! photos (the ones with the people they met first) and a short line printed under the photo, with one
+//! sentence on why. Code checks every id and length, and the module keeps the prices and the wallet.
 
 use std::collections::HashSet;
 
@@ -19,9 +19,10 @@ const PICKS: usize = 3;
 const LINE_CHARS: usize = 36;
 const REASON_CHARS: usize = 200;
 
-const SYSTEM: &str = "You are BandIt's shopping agent. An event has just ended, and nobody bought merch during it, so their \
-hands stayed free. From what the wristbands measured about one attendee's night, pick the three products they would \
-most want to keep as a memory, each with one of their own photos and a short line printed under the photo.\n\
+const SYSTEM: &str = "You are BandIt's shopping agent. One attendee's night at an event has just ended, because the event closed \
+or because they left early, and nobody bought merch during it, so their hands stayed free. From what the wristbands \
+measured about their night, pick the three products they would most want to keep as a memory, each with one of \
+their own photos and a short line printed under the photo.\n\
 Rules:\n\
 - Pick three different products from `products` by `template_id`, and for each one photo from `photos` by `photo_id`. \
 A photo may be used for more than one product.\n\

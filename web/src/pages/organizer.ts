@@ -24,7 +24,7 @@ import { keepTableHeights } from '../resize';
 import { defineTerms } from '../terms';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
-import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
+import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, Departure, MerchTemplate, ViewablePerson } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
@@ -75,6 +75,7 @@ const QUERIES = [
   'SELECT * FROM incident_marker',
   'SELECT * FROM decision',
   'SELECT * FROM band_place',
+  'SELECT * FROM departure',
   'SELECT * FROM venue_spot',
   'SELECT * FROM view_as_people',
 ];
@@ -140,6 +141,22 @@ function bandStatus(bandId: number): string {
   if (!bandId) return 'no band';
   if (!bandById(conn, bandId)) return 'not seen yet';
   return alive(bandId) ? 'online' : 'offline';
+}
+
+/** The attendee's departure, by graph node id, once they left early. */
+function departureOf(nodeId: bigint | undefined) {
+  return nodeId === undefined ? undefined : [...conn.db.departure.iter()].find(d => d.nodeId === nodeId);
+}
+
+/** True once the event has ended for this attendee: it ended, or they walked out early. */
+function overFor(nodeId: bigint | undefined): boolean {
+  return (conn.db.eventState.id.find(0)?.ended ?? false) || !!departureOf(nodeId)?.leftAt;
+}
+
+/** "walking to the Public Entrance" or "left at 09:41 PM by the Public Entrance". */
+function leftWords(d: Departure): string {
+  const door = d.door ? ` by the ${d.door}` : '';
+  return d.leftAt ? `left at ${time(d.leftAt)}${door}` : `walking to the ${d.door || 'door'}`;
 }
 
 function header() {
@@ -228,7 +245,24 @@ function live(people: Person[]) {
             h('td', { class: `level ${level.replace(' ', '-')}` }, level), h('td', {}, z.capacity),
             h('td', {}, EXIT_COLOURS[z.exitColour]), h('td', {}, `${z.stationId} ${st?.online ? 'online' : 'offline'}`));
         }))),
+    leftEarly(people),
   ];
+}
+
+/** Everyone who left before the event ended, newest first. */
+function leftEarly(people: Person[]) {
+  const gone = [...conn.db.departure.iter()].sort((a, b) => Number(b.askedAt.microsSinceUnixEpoch - a.askedAt.microsSinceUnixEpoch));
+  if (!gone.length) return null;
+  return h('section', {},
+    h('h3', {}, `Left early (${gone.length})`),
+    h('table', {},
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Door'), h('th', {}, 'Set off'), h('th', {}, 'Left'), h('th', {}, 'By'), h('th', {})),
+      gone.map(d => {
+        const p = people.find(x => x.att?.nodeId === d.nodeId);
+        return h('tr', {},
+          h('td', {}, d.name), h('td', {}, d.door), h('td', {}, time(d.askedAt)), h('td', {}, d.leftAt ? time(d.leftAt) : 'walking'), h('td', {}, d.by),
+          h('td', {}, p && h('button', { onclick: () => openPerson(p) }, 'Open')));
+      })));
 }
 
 // --- Attendees ------------------------------------------------------------------------------
@@ -386,10 +420,12 @@ function peopleList(all: Person[]) {
     if (c.claimant) claims.set(`${c.bandId} ${c.claimantName}`, (claims.get(`${c.bandId} ${c.claimantName}`) ?? 0) + 1);
   }
   const filed = (p: Person) => p.att ? claims.get(`${p.bandId} ${p.name}`) ?? 0 : 0;
+  const left = new Map([...conn.db.departure.iter()].map(d => [d.nodeId, d]));
   const rows = shown.map(p => {
     const b = p.bandId ? bandById(conn, p.bandId) : undefined;
+    const gone = left.get(p.att?.nodeId ?? -1n);
     const cells = [p.name || '(no name yet)', p.kind, p.bandId ? code(p.bandId) : '', b && present(b) ? stations.get(b.zone) ?? 'no zone' : '',
-      bandStatus(p.bandId), p.att?.organization ?? '', String(filed(p) || '')];
+      gone ? (gone.leftAt ? 'left' : 'walking out') : bandStatus(p.bandId), p.att?.organization ?? '', String(filed(p) || '')];
     const shows = [...cells, p.key === opened].join('|');
     let kept = personRows.get(p.key);
     if (kept?.shows !== shows) {
@@ -432,9 +468,11 @@ function personPanel(all: Person[]) {
   const a = p.att;
   const b = p.bandId ? bandById(conn, p.bandId) : undefined;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const gone = departureOf(a?.nodeId);
   const name = p.name || 'them';
   const facts = [
     p.kind,
+    gone && leftWords(gone),
     b && present(b) ? `${bandStatus(p.bandId)} in ${[...conn.db.zone.iter()].find(z => z.stationId === b.zone)?.name ?? 'no zone'}` : p.bandId ? bandStatus(p.bandId) : '',
     a?.organization,
     a?.handles.map(x => `${x.platform} ${x.handle}`).join(', '),
@@ -453,7 +491,9 @@ function personPanel(all: Person[]) {
       showing && h('button', { class: 'link', onclick: () => { viewScreen = ''; render(); } }, 'Hide their page')),
     a && claimAs(p),
     a && theirClaims(p),
-    a && can('ops') && theirShop(a, ended),
+    a && can('ops') && !ended && !gone && h('p', {},
+      h('button', { onclick: () => confirm(`${name} leaves the event now? Their recap and merch open once they are out.`) && act(() => conn.reducers.leaveEarly({ nodeId: a.nodeId })) }, 'Leave early')),
+    a && can('ops') && theirShop(a, overFor(a.nodeId)),
     p.bandId > 0 && p.bandId < 100 && h('p', {},
       !ended && a && h('button', { onclick: () => takeBack(p.bandId, p.name) }, `Take band ${bandCode(p.bandId)} back`),
       can('medic') && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: p.bandId })) }, `Tap band ${bandCode(p.bandId)} for ${name}'s medical card`)),
@@ -1124,7 +1164,7 @@ function buyAs() {
     !wallets.length && h('p', { class: 'muted' }, 'Nobody has a wallet yet. Attendees connect one at band setup.'),
     wallets.length > 0 && personSearch('shopper-search', everyone().filter(p => p.att && byNode.has(p.att.nodeId)), p => p.att!.nodeId === shopper,
       p => { shopper = p.att!.nodeId; }, p => ` · ${money(byNode.get(p.att!.nodeId)!.balanceCents)}`),
-    chosen && shopFor(chosen, people, ended));
+    chosen && shopFor(chosen, people, overFor(chosen.nodeId)));
 }
 
 /** The pick as the recap draws it. The booth crawl ticks come from the attendee's own view, so none show here. */

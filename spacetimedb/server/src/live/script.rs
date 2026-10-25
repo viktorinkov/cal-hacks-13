@@ -9,6 +9,7 @@
 
 use super::*;
 use crate::insurance::people::wearer;
+use crate::departure::departure;
 use crate::social::tables::{crowd_group, crowd_member};
 use crate::venue::zone;
 use spacetimedb::rand::rngs::StdRng;
@@ -81,7 +82,7 @@ fn person(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mu
         ctx.db
             .crowd_member()
             .iter()
-            .filter(|m| !down.contains(&m.band_id))
+            .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
             .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| g.staff_booth == 0))
             .filter_map(|m| ctx.db.band().id().find(m.band_id))
             .filter(|b| b.online && station.is_none_or(|s| b.zone == s))
@@ -125,6 +126,27 @@ fn person(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mu
         (format!("SOS: {who} pressed the button at {place}"), "the wearer held the band's button; the bands around them light the circle and point people away")
     };
     record(ctx, incident.id, 0, "band", &crate::band_code::band_code(b.id), what, why.into());
+}
+
+/// Someone of the crowd goes home early: a hacker who has walked in, is not down and has not left yet. They
+/// walk to the nearest door, and their night ends as they walk out.
+pub fn send_someone_home(ctx: &ReducerContext, rng: &mut StdRng) {
+    let down: Vec<u32> = down_bands(ctx).iter().map(|d| d.band_id).collect();
+    let mut pool: Vec<(u32, Identity)> = ctx
+        .db
+        .crowd_member()
+        .iter()
+        .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
+        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| g.staff_booth == 0))
+        .filter(|m| ctx.db.band().id().find(m.band_id).is_some_and(|b| b.online))
+        .map(|m| (m.band_id, m.identity))
+        .collect();
+    if pool.is_empty() {
+        return;
+    }
+    pool.sort_by_key(|p| p.0);
+    let (_, who) = pool[rng.gen_range(0..pool.len())];
+    let _ = crate::departure::depart(ctx, who, "live run");
 }
 
 /// Equipment breaks where a camera sees it.

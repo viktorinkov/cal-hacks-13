@@ -505,6 +505,21 @@ export const Decision = __t.object("Decision", {
 });
 export type Decision = __Infer<typeof Decision>;
 
+export const Departure = __t.object("Departure", {
+  attendee: __t.identity(),
+  nodeId: __t.u64(),
+  name: __t.string(),
+  bandId: __t.u32(),
+  door: __t.string(),
+  stationId: __t.u8(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  askedAt: __t.timestamp(),
+  leftAt: __t.option(__t.timestamp()),
+  by: __t.string(),
+});
+export type Departure = __Infer<typeof Departure>;
+
 export const Encounter = __t.object("Encounter", {
   key: __t.u64(),
   bandA: __t.u32(),

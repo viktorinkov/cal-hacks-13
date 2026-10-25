@@ -129,6 +129,8 @@ pub mod crowd_walk_table;
 pub mod crowd_walk_type;
 pub mod decision_table;
 pub mod decision_type;
+pub mod departure_table;
+pub mod departure_type;
 pub mod encounter_table;
 pub mod encounter_type;
 pub mod end_event_reducer;
@@ -194,6 +196,8 @@ pub mod job_reaper_timer_type;
 pub mod job_status_type;
 pub mod job_table;
 pub mod job_type;
+pub mod leave_early_reducer;
+pub mod leave_event_reducer;
 pub mod ledger_entry_table;
 pub mod ledger_entry_type;
 pub mod link_table;
@@ -241,6 +245,7 @@ pub mod my_band_type;
 pub mod my_claim_queue_table;
 pub mod my_claim_type;
 pub mod my_claims_table;
+pub mod my_departure_table;
 pub mod my_encounter_type;
 pub mod my_encounters_table;
 pub mod my_graph_table;
@@ -542,6 +547,8 @@ pub use crowd_walk_table::*;
 pub use crowd_walk_type::CrowdWalk;
 pub use decision_table::*;
 pub use decision_type::Decision;
+pub use departure_table::*;
+pub use departure_type::Departure;
 pub use encounter_table::*;
 pub use encounter_type::Encounter;
 pub use end_event_reducer::end_event;
@@ -607,6 +614,8 @@ pub use job_reaper_timer_type::JobReaperTimer;
 pub use job_status_type::JobStatus;
 pub use job_table::*;
 pub use job_type::Job;
+pub use leave_early_reducer::leave_early;
+pub use leave_event_reducer::leave_event;
 pub use ledger_entry_table::*;
 pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
@@ -654,6 +663,7 @@ pub use my_band_type::MyBand;
 pub use my_claim_queue_table::*;
 pub use my_claim_type::MyClaim;
 pub use my_claims_table::*;
+pub use my_departure_table::*;
 pub use my_encounter_type::MyEncounter;
 pub use my_encounters_table::*;
 pub use my_graph_table::*;
@@ -1003,6 +1013,10 @@ pub enum Reducer {
     JobReaper {
         timer: JobReaperTimer,
     },
+    LeaveEarly {
+        node_id: u64,
+    },
+    LeaveEvent,
     LiveTick {
         timer: LiveRunTimer,
     },
@@ -1354,6 +1368,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::IngestHeard { .. } => "ingest_heard",
             Reducer::IngestStation { .. } => "ingest_station",
             Reducer::JobReaper { .. } => "job_reaper",
+            Reducer::LeaveEarly { .. } => "leave_early",
+            Reducer::LeaveEvent => "leave_event",
             Reducer::LiveTick { .. } => "live_tick",
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
             Reducer::LoadVenueFloor { .. } => "load_venue_floor",
@@ -1710,6 +1726,12 @@ impl __sdk::Reducer for Reducer {
                     timer: timer.clone(),
                 })
             }
+            Reducer::LeaveEarly { node_id } => {
+                __sats::bsatn::to_vec(&leave_early_reducer::LeaveEarlyArgs {
+                    node_id: node_id.clone(),
+                })
+            }
+            Reducer::LeaveEvent => __sats::bsatn::to_vec(&leave_event_reducer::LeaveEventArgs {}),
             Reducer::LiveTick { timer } => {
                 __sats::bsatn::to_vec(&live_tick_reducer::LiveTickArgs {
                     timer: timer.clone(),
@@ -2316,6 +2338,7 @@ pub struct DbUpdate {
     crowd_timer: __sdk::TableUpdate<CrowdTimer>,
     crowd_walk: __sdk::TableUpdate<CrowdWalk>,
     decision: __sdk::TableUpdate<Decision>,
+    departure: __sdk::TableUpdate<Departure>,
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
     event_graph: __sdk::TableUpdate<EventLink>,
@@ -2356,6 +2379,7 @@ pub struct DbUpdate {
     my_band: __sdk::TableUpdate<MyBand>,
     my_claim_queue: __sdk::TableUpdate<Claim>,
     my_claims: __sdk::TableUpdate<MyClaim>,
+    my_departure: __sdk::TableUpdate<Departure>,
     my_encounters: __sdk::TableUpdate<MyEncounter>,
     my_graph: __sdk::TableUpdate<GraphLink>,
     my_handles: __sdk::TableUpdate<SocialHandle>,
@@ -2600,6 +2624,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "decision" => db_update
                     .decision
                     .append(decision_table::parse_table_update(table_update)?),
+                "departure" => db_update
+                    .departure
+                    .append(departure_table::parse_table_update(table_update)?),
                 "encounter" => db_update
                     .encounter
                     .append(encounter_table::parse_table_update(table_update)?),
@@ -2720,6 +2747,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_claims" => db_update
                     .my_claims
                     .append(my_claims_table::parse_table_update(table_update)?),
+                "my_departure" => db_update
+                    .my_departure
+                    .append(my_departure_table::parse_table_update(table_update)?),
                 "my_encounters" => db_update
                     .my_encounters
                     .append(my_encounters_table::parse_table_update(table_update)?),
@@ -3007,6 +3037,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.decision = cache
             .apply_diff_to_table::<Decision>("decision", &self.decision)
             .with_updates_by_pk(|row| &row.id);
+        diff.departure = cache
+            .apply_diff_to_table::<Departure>("departure", &self.departure)
+            .with_updates_by_pk(|row| &row.attendee);
         diff.encounter = cache
             .apply_diff_to_table::<Encounter>("encounter", &self.encounter)
             .with_updates_by_pk(|row| &row.key);
@@ -3291,6 +3324,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.my_claim_queue =
             cache.apply_diff_to_table::<Claim>("my_claim_queue", &self.my_claim_queue);
         diff.my_claims = cache.apply_diff_to_table::<MyClaim>("my_claims", &self.my_claims);
+        diff.my_departure =
+            cache.apply_diff_to_table::<Departure>("my_departure", &self.my_departure);
         diff.my_encounters =
             cache.apply_diff_to_table::<MyEncounter>("my_encounters", &self.my_encounters);
         diff.my_graph = cache.apply_diff_to_table::<GraphLink>("my_graph", &self.my_graph);
@@ -3524,6 +3559,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "departure" => db_update
+                    .departure
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "encounter" => db_update
                     .encounter
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3643,6 +3681,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_claims" => db_update
                     .my_claims
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_departure" => db_update
+                    .my_departure
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_encounters" => db_update
                     .my_encounters
@@ -4011,6 +4052,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "departure" => db_update
+                    .departure
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "encounter" => db_update
                     .encounter
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4130,6 +4174,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_claims" => db_update
                     .my_claims
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_departure" => db_update
+                    .my_departure
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_encounters" => db_update
                     .my_encounters
@@ -4382,6 +4429,7 @@ pub struct AppliedDiff<'r> {
     crowd_timer: __sdk::TableAppliedDiff<'r, CrowdTimer>,
     crowd_walk: __sdk::TableAppliedDiff<'r, CrowdWalk>,
     decision: __sdk::TableAppliedDiff<'r, Decision>,
+    departure: __sdk::TableAppliedDiff<'r, Departure>,
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
     event_graph: __sdk::TableAppliedDiff<'r, EventLink>,
@@ -4422,6 +4470,7 @@ pub struct AppliedDiff<'r> {
     my_band: __sdk::TableAppliedDiff<'r, MyBand>,
     my_claim_queue: __sdk::TableAppliedDiff<'r, Claim>,
     my_claims: __sdk::TableAppliedDiff<'r, MyClaim>,
+    my_departure: __sdk::TableAppliedDiff<'r, Departure>,
     my_encounters: __sdk::TableAppliedDiff<'r, MyEncounter>,
     my_graph: __sdk::TableAppliedDiff<'r, GraphLink>,
     my_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
@@ -4701,6 +4750,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<CrowdTimer>("crowd_timer", &self.crowd_timer, event);
         callbacks.invoke_table_row_callbacks::<CrowdWalk>("crowd_walk", &self.crowd_walk, event);
         callbacks.invoke_table_row_callbacks::<Decision>("decision", &self.decision, event);
+        callbacks.invoke_table_row_callbacks::<Departure>("departure", &self.departure, event);
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
         callbacks.invoke_table_row_callbacks::<EventLink>("event_graph", &self.event_graph, event);
@@ -4825,6 +4875,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<MyClaim>("my_claims", &self.my_claims, event);
+        callbacks.invoke_table_row_callbacks::<Departure>(
+            "my_departure",
+            &self.my_departure,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<MyEncounter>(
             "my_encounters",
             &self.my_encounters,
@@ -5723,6 +5778,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         crowd_timer_table::register_table(client_cache);
         crowd_walk_table::register_table(client_cache);
         decision_table::register_table(client_cache);
+        departure_table::register_table(client_cache);
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
         event_graph_table::register_table(client_cache);
@@ -5763,6 +5819,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_band_table::register_table(client_cache);
         my_claim_queue_table::register_table(client_cache);
         my_claims_table::register_table(client_cache);
+        my_departure_table::register_table(client_cache);
         my_encounters_table::register_table(client_cache);
         my_graph_table::register_table(client_cache);
         my_handles_table::register_table(client_cache);
@@ -5878,6 +5935,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "crowd_timer",
         "crowd_walk",
         "decision",
+        "departure",
         "encounter",
         "event",
         "event_graph",
@@ -5917,6 +5975,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_band",
         "my_claim_queue",
         "my_claims",
+        "my_departure",
         "my_encounters",
         "my_graph",
         "my_handles",

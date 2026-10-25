@@ -73,6 +73,8 @@ import ImportEventReducer from "./import_event_reducer";
 import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
+import LeaveEarlyReducer from "./leave_early_reducer";
+import LeaveEventReducer from "./leave_event_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
 import LoadVenueFloorReducer from "./load_venue_floor_reducer";
 import LoadVenueSpotsReducer from "./load_venue_spots_reducer";
@@ -182,6 +184,7 @@ import ClaimsBoardRow from "./claims_board_table";
 import CommandRow from "./command_table";
 import CrowdWalkRow from "./crowd_walk_table";
 import DecisionRow from "./decision_table";
+import DepartureRow from "./departure_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
 import EventGraphRow from "./event_graph_table";
@@ -200,6 +203,7 @@ import MyAttendeeRow from "./my_attendee_table";
 import MyBandRow from "./my_band_table";
 import MyClaimQueueRow from "./my_claim_queue_table";
 import MyClaimsRow from "./my_claims_table";
+import MyDepartureRow from "./my_departure_table";
 import MyEncountersRow from "./my_encounters_table";
 import MyGraphRow from "./my_graph_table";
 import MyHandlesRow from "./my_handles_table";
@@ -357,6 +361,20 @@ const tablesSchema = __schema({
       { name: 'decision_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, DecisionRow),
+  departure: __table({
+    name: 'departure',
+    indexes: [
+      { accessor: 'attendee', name: 'departure_attendee_idx_btree', algorithm: 'btree', columns: [
+        'attendee',
+      ] },
+      { accessor: 'band_id', name: 'departure_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'departure_attendee_key', constraint: 'unique', columns: ['attendee'] },
+    ],
+  }, DepartureRow),
   encounter: __table({
     name: 'encounter',
     indexes: [
@@ -955,6 +973,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyClaimsRow),
+  myDeparture: __table({
+    name: 'my_departure',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyDepartureRow),
   myEncounters: __table({
     name: 'my_encounters',
     indexes: [
@@ -1187,6 +1212,8 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_band", IngestBandReducer),
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
+  __reducerSchema("leave_early", LeaveEarlyReducer),
+  __reducerSchema("leave_event", LeaveEventReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
   __reducerSchema("load_venue_floor", LoadVenueFloorReducer),
   __reducerSchema("load_venue_spots", LoadVenueSpotsReducer),
@@ -1367,6 +1394,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_claim_queue": Omit<typeof tablesSchema.schemaType.tables["myClaimQueue"], "accessorName"> & { readonly accessorName: "my_claim_queue" };
     /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
     readonly "my_claims": Omit<typeof tablesSchema.schemaType.tables["myClaims"], "accessorName"> & { readonly accessorName: "my_claims" };
+    /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+    readonly "my_departure": Omit<typeof tablesSchema.schemaType.tables["myDeparture"], "accessorName"> & { readonly accessorName: "my_departure" };
     /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
     readonly "my_encounters": Omit<typeof tablesSchema.schemaType.tables["myEncounters"], "accessorName"> & { readonly accessorName: "my_encounters" };
     /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */
@@ -1493,6 +1522,7 @@ const tableAccessorAliases = {
   "my_band": "myBand",
   "my_claim_queue": "myClaimQueue",
   "my_claims": "myClaims",
+  "my_departure": "myDeparture",
   "my_encounters": "myEncounters",
   "my_graph": "myGraph",
   "my_handles": "myHandles",
@@ -1646,6 +1676,8 @@ export type DbView = __DbViewBase & {
   readonly "my_claim_queue": __DbViewBase["myClaimQueue"];
   /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
   readonly "my_claims": __DbViewBase["myClaims"];
+  /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+  readonly "my_departure": __DbViewBase["myDeparture"];
   /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
   readonly "my_encounters": __DbViewBase["myEncounters"];
   /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */
@@ -1810,6 +1842,8 @@ export type Tables = __TablesBase & {
   readonly "my_claim_queue": __TablesBase["myClaimQueue"];
   /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
   readonly "my_claims": __TablesBase["myClaims"];
+  /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+  readonly "my_departure": __TablesBase["myDeparture"];
   /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
   readonly "my_encounters": __TablesBase["myEncounters"];
   /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */

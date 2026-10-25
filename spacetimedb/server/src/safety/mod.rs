@@ -334,6 +334,10 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
     if !TEST_BANDS.contains(&band_id) {
         return Err(format!("test bands are {} to {}", TEST_BANDS.start(), TEST_BANDS.end()));
     }
+    // A band whose wearer went home is out of reach of the venue's stations.
+    if crate::departure::band_left(ctx, band_id.into()) {
+        return Ok(());
+    }
     let flags = sos as u8 * F_SOS | fall as u8 * F_FALL | press as u8 * F_PRESS | F_MPU | F_MOTOR;
     let id = u32::from(band_id);
     let prev = ctx.db.band().id().find(id);

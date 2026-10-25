@@ -30,6 +30,7 @@ use crate::tables::micros;
 use crate::safety::{self, incident, incident_band, S_NEAR_SOS};
 use crate::venue::floor::{Floor, P};
 use crate::venue::{booth, organization, venue_spot, zone, Booth, Organization, VenueSpot, Zone};
+use crate::departure::{departure, Departure};
 use spacetimedb::rand::rngs::StdRng;
 use spacetimedb::rand::{Rng, SeedableRng};
 use spacetimedb::{AnonymousViewContext, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp};
@@ -529,6 +530,7 @@ fn clear_crowd(ctx: &ReducerContext) {
         for t in ctx.db.photo_tag().attendee().filter(a.identity).collect::<Vec<_>>() {
             ctx.db.photo_tag().id().delete(t.id);
         }
+        ctx.db.departure().attendee().delete(a.identity);
         // The crowd once wore radio band ids.
         ctx.db.band_owner().owner().delete(a.identity);
         ctx.db.attendee().identity().delete(a.identity);
@@ -818,6 +820,7 @@ pub fn head_for_exits(ctx: &ReducerContext) {
     let mut rng = moves_rng(ctx, u64::MAX - 1);
     let (groups, members) = teams(ctx);
     let down: Vec<u32> = crate::live::down_bands(ctx).iter().map(|d| d.band_id).collect();
+    let gone: HashSet<u32> = ctx.db.departure().iter().map(|d| d.band_id).collect();
     for g in groups {
         let Some((x, y, station)) = venue.nearest_exit(g.x_m, g.y_m) else { continue };
         let to = ctx.db.crowd_group().id().update(CrowdGroup {
@@ -829,15 +832,34 @@ pub fn head_for_exits(ctx: &ReducerContext) {
             ..g.clone()
         });
         let Some(team) = members.get(&g.id) else { continue };
-        // Whoever is down stays down until the medic is done, then walks out on their own.
+        // Whoever is down stays down until the medic is done, then walks out on their own. Whoever left early
+        // is already on their way.
         let starts: Vec<(&CrowdMember, P)> = team
             .iter()
-            .filter(|m| !down.contains(&m.band_id))
+            .filter(|m| !down.contains(&m.band_id) && !gone.contains(&m.band_id))
             .map(|m| (m, standing(ctx, m).unwrap_or_else(|| venue.place(&g, m))))
             .collect();
         let at = ctx.timestamp + TimeDuration::from_micros((rng.gen_range(0.0..WALK_OUT_SECS) * 1e6) as i64);
         venue.walk_team(ctx, (g.x_m, g.y_m), &to, &starts, at, pace);
     }
+}
+
+/// Sends one member of the crowd home early: they leave their team and walk alone from where they stand to the
+/// door nearest to them. Returns the door and its station, or None when the venue has no exits on its floor.
+pub fn send_home(ctx: &ReducerContext, m: &CrowdMember) -> Option<(f32, f32, u8)> {
+    let venue = Venue::load(ctx);
+    let g = ctx.db.crowd_group().id().find(m.group_id)?;
+    let here = standing(ctx, m).unwrap_or_else(|| venue.place(&g, m));
+    let (x, y, station) = venue.nearest_exit(here.0, here.1)?;
+    let door = venue.snap((x, y));
+    let way = walks::member_way(venue.floor.as_ref(), here, &[], door);
+    walks::begin(ctx, m.band_id, way, ctx.timestamp, walks::team_speed(g.id, walk_pace(ctx)));
+    // Whoever they were talking to stops.
+    if let Some(other) = ctx.db.crowd_member().band_id().find(m.chat).filter(|o| o.chat == m.band_id) {
+        ctx.db.crowd_member().band_id().update(CrowdMember { chat: 0, ..other });
+    }
+    ctx.db.crowd_member().band_id().update(CrowdMember { chat: 0, ..m.clone() });
+    Some((door.0, door.1, station))
 }
 
 /// True while someone of the crowd is still on their way.
@@ -986,6 +1008,8 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     let leaving = crate::live::leaving(ctx);
     let down = crate::live::down_bands(ctx);
     let is_down = |band: u32| down.iter().any(|d| d.band_id == band);
+    // Whoever leaves early walks to their door on their own, and is out once they are through it.
+    let gone: HashMap<u32, Departure> = ctx.db.departure().iter().filter(|d| d.band_id >= FIRST_CROWD_BAND).map(|d| (d.band_id, d)).collect();
     // Where each member stands as this tick starts: along their walk, else at their band's last spot.
     let here = |m: &CrowdMember, walking: &HashMap<u32, CrowdWalk>, bands: &HashMap<u32, Band>, g: &CrowdGroup| -> P {
         match (walking.get(&m.band_id), bands.get(&m.band_id)) {
@@ -1002,8 +1026,8 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         if micros(groups[i].next_move_at) > now {
             continue;
         }
-        let team: Vec<&CrowdMember> = members.iter().filter(|m| m.group_id == groups[i].id).collect();
-        if team.iter().any(|m| is_down(m.band_id)) {
+        let team: Vec<&CrowdMember> = members.iter().filter(|m| m.group_id == groups[i].id && !gone.contains_key(&m.band_id)).collect();
+        if team.is_empty() || team.iter().any(|m| is_down(m.band_id)) {
             continue;
         }
         let interests: Vec<String> = team.iter().flat_map(|m| m.interests.clone()).collect();
@@ -1026,7 +1050,10 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
 
     // Someone back on their feet after an incident walks from where they fell to their team.
     for m in &members {
-        let up = bands.get(&m.band_id).is_some_and(|b| (b.fall || b.sos) && b.online) && !is_down(m.band_id) && !moved_bands.contains(&m.band_id);
+        let up = bands.get(&m.band_id).is_some_and(|b| (b.fall || b.sos) && b.online)
+            && !is_down(m.band_id)
+            && !moved_bands.contains(&m.band_id)
+            && !gone.contains_key(&m.band_id);
         if up {
             let b = &bands[&m.band_id];
             let g = group_of[&m.group_id];
@@ -1045,21 +1072,29 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         .enumerate()
         .map(|(i, m)| {
             let g = group_of[&m.group_id];
+            let away = gone.get(&m.band_id);
             let Some(w) = walking.get(&m.band_id) else {
                 let (x, y) = venue.place(g, m);
+                inside[i] = away.is_none();
                 return (g.station, g.booth_id, x, y);
             };
             let ((x, y), along) = walks::at(w, ctx.timestamp);
             let arrived = ctx.timestamp >= w.arrives_at;
             still[i] = arrived;
             let walked_in = ctx.timestamp >= w.started_at || bands.get(&m.band_id).is_some_and(|b| b.online);
-            inside[i] = walked_in && !(leaving && arrived);
-            match bands.get(&m.band_id) {
-                Some(b) if !arrived && along < 0.5 => (b.zone, b.booth_id, x, y),
+            inside[i] = walked_in && !((leaving || away.is_some()) && arrived) && !away.is_some_and(|d| d.left_at.is_some());
+            match (bands.get(&m.band_id), away) {
+                (Some(b), _) if !arrived && along < 0.5 => (b.zone, b.booth_id, x, y),
+                (_, Some(d)) => (d.station_id, 0, x, y),
                 _ => (g.station, g.booth_id, x, y),
             }
         })
         .collect();
+    for (i, m) in members.iter().enumerate() {
+        if let Some(d) = gone.get(&m.band_id).filter(|d| d.left_at.is_none() && !inside[i]) {
+            crate::departure::walked_out(ctx, d.clone());
+        }
+    }
     // Whoever is down stays where they fell. Everyone standing within reach lights the circle and steps back,
     // which is the band's compass pointing them away; someone walking past lights it as they go.
     let mut circle: Vec<Option<usize>> = vec![None; members.len()];

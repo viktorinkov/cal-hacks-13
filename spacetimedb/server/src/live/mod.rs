@@ -39,6 +39,10 @@ const INCIDENT_GAP_SECS: (i64, i64) = (70, 95);
 const WALK_OUT_SECS: (i64, i64) = (10, 120);
 /// The doors stay closed at most this long waiting for the medic to resolve the last incidents.
 const CLOSE_WAIT_SECS: i64 = 120;
+/// While the doors are open someone of the crowd goes home early about this often, in seconds, from the first
+/// incident until this long before the doors close.
+const LEAVE_EVERY_SECS: f64 = 120.0;
+const LAST_LEAVE_SECS: i64 = 60;
 /// A test band that stops reporting goes offline after 5 s; the run reports placed test bands every tick.
 const TEST_BAND_FIRST: u32 = 90;
 
@@ -362,6 +366,9 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
     if paused(ctx) {
         return Ok(());
     }
+    if r.phase == LivePhase::Running && ctx.timestamp < r.ends_at {
+        maybe_send_home(ctx, &r);
+    }
     match r.phase {
         LivePhase::Running if ctx.timestamp >= r.ends_at => close_doors(ctx, r),
         LivePhase::Running if ctx.timestamp >= r.next_incident_at => {
@@ -382,6 +389,19 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
         _ => {}
     }
     Ok(())
+}
+
+/// Once a second, a draw from the run's seed and the second decides whether someone of the crowd goes home early.
+fn maybe_send_home(ctx: &ReducerContext, r: &LiveRun) {
+    let secs = safety::micros_between(r.started_at, ctx.timestamp) / 1_000_000;
+    let left = safety::micros_between(ctx.timestamp, r.ends_at) / 1_000_000;
+    if secs < FIRST_INCIDENT_SECS || left < LAST_LEAVE_SECS {
+        return;
+    }
+    let mut rng = StdRng::seed_from_u64(r.seed ^ 0x1EA7_E5EA_71E5 ^ (secs as u64).wrapping_mul(0xA24B_AED4_963E_E407));
+    if rng.gen_bool(1.0 / LEAVE_EVERY_SECS) {
+        script::send_someone_home(ctx, &mut rng);
+    }
 }
 
 /// The generator for incident number `step`: the same seed and step always draw the same person, spot and gap.
@@ -425,7 +445,7 @@ fn report_placed_test_bands(ctx: &ReducerContext) {
             continue;
         }
         let Some(b) = ctx.db.band().id().find(p.band_id) else { continue };
-        if ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) {
+        if ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) || crate::departure::band_left(ctx, p.band_id) {
             continue;
         }
         ctx.db.band().id().update(Band { online: true, last_seen: ctx.timestamp, x_m: p.x_m, y_m: p.y_m, zone: p.station_id, ..b });
