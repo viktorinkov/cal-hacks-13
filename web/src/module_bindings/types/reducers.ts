@@ -15,6 +15,7 @@ import ApplyMedicalExtractReducer from "../apply_medical_extract_reducer";
 import ApproveChargeReducer from "../approve_charge_reducer";
 import ApproveClaimReducer from "../approve_claim_reducer";
 import ApproveRuleProposalReducer from "../approve_rule_proposal_reducer";
+import ApproveRuleScopeReviewReducer from "../approve_rule_scope_review_reducer";
 import AssignMedicReducer from "../assign_medic_reducer";
 import AttachClaimLettersReducer from "../attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "../attach_recovery_letter_reducer";
@@ -140,6 +141,7 @@ export type ApplyMedicalExtractParams = __Infer<typeof ApplyMedicalExtractReduce
 export type ApproveChargeParams = __Infer<typeof ApproveChargeReducer>;
 export type ApproveClaimParams = __Infer<typeof ApproveClaimReducer>;
 export type ApproveRuleProposalParams = __Infer<typeof ApproveRuleProposalReducer>;
+export type ApproveRuleScopeReviewParams = __Infer<typeof ApproveRuleScopeReviewReducer>;
 export type AssignMedicParams = __Infer<typeof AssignMedicReducer>;
 export type AttachClaimLettersParams = __Infer<typeof AttachClaimLettersReducer>;
 export type AttachRecoveryLetterParams = __Infer<typeof AttachRecoveryLetterReducer>;

@@ -545,15 +545,18 @@ fn legacy_clinical_approval_is_withheld_then_requires_a_new_scope_approval() {
     });
     assert_eq!(w.t.db.settlement_rule().id().find(rule.id).unwrap().status, "review_required");
     assert_eq!(w.t.db.rule_proposal().id().find(old.id).unwrap().rule, old.rule, "historical approval is not rewritten");
-    let fresh = w.t.db.rule_proposal().iter().find(|p| p.status == "proposed").unwrap();
+    let fresh = w.t.db.rule_proposal().iter().find(|p| p.status == "scope_proposed").unwrap();
     assert_ne!(fresh.id, old.id);
     assert!(fresh.rule.starts_with("Automatic payment scope: fall claims"));
     assert!(fresh.summary.contains(&old.rule));
     assert_eq!(w.claim(waiting.id).status, ClaimStatus::Routed, "reconciliation never pays");
     w.as_("worker", review_rule_scopes);
     assert_eq!(w.t.db.rule_proposal().iter().count(), 2, "reconciliation is idempotent");
-    assert!(w.try_as("worker", |ctx| approve_rule_proposal(ctx, fresh.id, 18_000)).is_err());
-    w.as_("ops", |ctx| approve_rule_proposal(ctx, fresh.id, 18_000));
+    assert!(w.try_as("ops", |ctx| approve_rule_proposal(ctx, fresh.id, 18_000)).is_err(), "ordinary scripted approval cannot approve a scope review");
+    assert!(w.try_as("worker", |ctx| approve_rule_scope_review(ctx, fresh.id, 18_000, fresh.rule.clone())).is_err());
+    assert!(w.try_as("ops", |ctx| approve_rule_scope_review(ctx, fresh.id, 18_000, old.rule.clone())).is_err(), "old scope text is not an acknowledgement");
+    w.as_("ops", |ctx| approve_rule_scope_review(ctx, fresh.id, 18_000, fresh.rule.clone()));
+    assert_eq!(w.t.db.rule_proposal().id().find(fresh.id).unwrap().status, "scope_approved");
     assert_eq!(w.claim(waiting.id).status, ClaimStatus::Paying, "new explicit scope approval may pay a matching waiting claim");
     assert_eq!(w.t.db.settlement_rule().id().find(rule.id).unwrap().status, "superseded");
     w.as_("worker", review_rule_scopes);
@@ -578,8 +581,49 @@ fn stale_narrow_proposal_cannot_be_approved_and_review_keeps_original_text() {
     let kept = w.t.db.rule_proposal().id().find(old.id).unwrap();
     assert_eq!((kept.status.as_str(), kept.rule), ("scope_review", old.rule));
     assert!(w.try_as("ops", |ctx| approve_rule_proposal(ctx, old.id, 18_000)).is_err(), "old screen cannot approve a replacement it never saw");
-    assert_eq!(w.t.db.rule_proposal().iter().filter(|p| p.status == "proposed").count(), 1);
+    assert_eq!(w.t.db.rule_proposal().iter().filter(|p| p.status == "scope_proposed").count(), 1);
     assert_eq!(w.t.db.settlement_rule().iter().count(), 0);
+}
+
+#[test]
+fn already_script_approved_review_is_withheld_and_a_duplicate_cannot_bypass_review() {
+    use super::proposals::*;
+    let w = World::new();
+    let (old, rule) = legacy_fall_rule(&w);
+    // Reproduce the first publication: the old live runner approved a replacement
+    // through the ordinary action, without an explicit scope-review acknowledgement.
+    let canonical = bandit_insurance::rules::approval_scope(bandit_insurance::IncidentKind::Fall, bandit_insurance::CoverKind::MedicalPayments, 0, true, old.ceiling_cents);
+    let automated = RuleProposal { rule: canonical.clone(), summary: format!("Scope review of proposal #1. Earlier wording: {}", old.rule), ..old.clone() };
+    w.t.db.rule_proposal().id().update(automated.clone());
+    let duplicate = w.t.db.rule_proposal().insert(RuleProposal {
+        id: 0, status: "proposed".into(), rule: canonical,
+        summary: "Three further ordinary precedents".into(), settlement_rule_id: 0, rule_version: 0,
+        decided_by: spacetimedb::Identity::ZERO, decided_by_name: String::new(), decided_at: None,
+        ..automated.clone()
+    });
+    w.as_("worker", |ctx| {
+        assert!(!rule_scope_approved(ctx, &rule), "already auto-approved review has no explicit scope authority");
+        Ok(())
+    });
+    assert!(w.try_as("ops", |ctx| approve_rule_proposal(ctx, duplicate.id, duplicate.ceiling_cents)).unwrap_err().contains("scope review required"), "an ordinary pending duplicate cannot bypass unresolved legacy scope");
+    w.as_("worker", review_rule_scopes);
+    assert_eq!(w.t.db.settlement_rule().id().find(rule.id).unwrap().status, "review_required");
+    assert_eq!(w.t.db.rule_proposal().id().find(old.id).unwrap().status, "approved", "historical automated action remains visible");
+    assert_eq!(w.t.db.rule_proposal().id().find(duplicate.id).unwrap().status, "scope_review");
+    let fresh = w.t.db.rule_proposal().iter().find(|p| p.status == "scope_proposed").unwrap();
+    assert!(!w.t.db.rule_proposal().iter().any(|p| p.status == "proposed"), "old runner has no selectable review proposal");
+    assert_eq!(fresh.proposed_at, Some(fresh.created_at));
+    assert!(w.try_as("ops", |ctx| approve_rule_proposal(ctx, fresh.id, fresh.ceiling_cents)).is_err());
+    let count = w.t.db.rule_proposal().iter().count();
+    let claim = w.claim(old.claim_ids[0]);
+    w.as_("ops", |ctx| {
+        assert!(after_approval(ctx, &claim).contains("already proposed"));
+        Ok(())
+    });
+    assert_eq!(w.t.db.rule_proposal().iter().count(), count, "the normal proposer cannot bypass a pending review");
+    w.as_("worker", review_rule_scopes);
+    assert_eq!(w.t.db.rule_proposal().iter().count(), count, "review remains idempotent");
+    assert!(w.t.db.settlement_rule().iter().all(|r| r.status != "active"));
 }
 
 #[test]

@@ -445,7 +445,7 @@ pub struct RuleProposal {
     pub incident_kind: String,
     pub cover_kind: String,
     /// `proposing` (Claude is reading the precedents), `proposed` (waits for the organizer), `approved`,
-    /// `rejected`, `declined` (the agent proposed no rule), `scope_review`, `failed` or `retired`.
+    /// `rejected`, `declined` (the agent proposed no rule), `scope_review`, `scope_proposed`, `scope_approved`, `failed` or `retired`.
     pub status: String,
     pub ceiling_cents: u64,
     /// The cover's per-claim limit in the policy when the proposal opened.
