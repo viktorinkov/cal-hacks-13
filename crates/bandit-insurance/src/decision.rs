@@ -299,10 +299,13 @@ fn injury_reading(p: &ReviewPayload) -> Vec<EvidenceSource> {
 }
 
 /// The figures a decision may print: the four amounts, every line's billed,
-/// allowed and covered cents, and what code would charge the person named.
+/// allowed and covered cents and the lines' covered total, what the attendee's
+/// own plan pays first, and what code would charge the person named.
 pub fn allowed_amounts(p: &ReviewPayload) -> Vec<Cents> {
     let mut allowed = p.amounts.figures().to_vec();
     allowed.extend(p.lines.iter().flat_map(|l| [l.billed_cents, l.allowed_cents, l.covered_cents]));
+    allowed.push(p.lines.iter().map(|l| l.covered_cents).sum());
+    allowed.extend(Some(p.plan_pays_cents).filter(|c| *c > 0));
     allowed.extend(p.charge.as_ref().map(|c| c.amount_cents));
     allowed
 }
@@ -832,6 +835,7 @@ mod tests {
             charge: None,
             attendee_policy_hash: String::new(),
             venue_policy_hash: String::new(),
+            plan_pays_cents: 0,
         }
     }
 

@@ -1,11 +1,12 @@
 //! What a PDF prints about itself, as `bandit-read-document` reads it: the
-//! kind of document, and the insurer, plan and plan year of an attendee's
+//! kind of document, and the insurer, plan, plan year and visit copays of an attendee's
 //! health plan, or the coverage forms a venue policy lookup fetched, each with its
 //! form number, title and pages. A plan lookup and a venue policy lookup keep
 //! a fetched PDF only when this matches what was typed, and code finds every
 //! printed name word for word on its page first.
 
-use crate::policy::on_page;
+use crate::Cents;
+use crate::policy::{on_page, parse_amount};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -18,6 +19,20 @@ pub const COVERAGE_FORM: &str = "coverage_form";
 pub const PLAN_DOCUMENTS: [&str; 2] = ["sbc", "other"];
 /// What one coverage form is: the liability part, the property part, or another form.
 pub const FORM_DOCUMENTS: [&str; 3] = ["liability_form", "property_form", "other"];
+
+/// The copay terms of a health plan, stored as `policy_term` rows of its document.
+pub const URGENT_CARE_COPAY: &str = "urgent_care_copay";
+pub const EMERGENCY_ROOM_COPAY: &str = "emergency_room_copay";
+
+/// The copay term for the visit a hospital report of `document_kind` records:
+/// urgent care or the emergency room; none for first aid.
+pub fn copay_term(document_kind: &str) -> Option<&'static str> {
+    match document_kind {
+        "urgent_care_record" => Some(URGENT_CARE_COPAY),
+        "emergency_record" => Some(EMERGENCY_ROOM_COPAY),
+        _ => None,
+    }
+}
 
 /// The longest printed name kept.
 const MAX_CHARS: usize = 120;
@@ -40,6 +55,10 @@ pub struct PlanPrinted {
     pub insurer: PrintedText,
     pub plan: PrintedText,
     pub plan_year: PrintedText,
+    /// What the member pays for one in-network urgent care visit, such as `$55`.
+    pub urgent_care_copay: PrintedText,
+    /// What the member pays for one emergency room visit.
+    pub emergency_room_copay: PrintedText,
 }
 
 /// One coverage form a fetched PDF holds.
@@ -53,6 +72,17 @@ pub struct FormPrinted {
     /// The form's own pages in the PDF, 1-based and inclusive.
     pub first_page: u32,
     pub last_page: u32,
+}
+
+fn copay_schema(visit: &str) -> Value {
+    json!({
+        "type": "object",
+        "required": ["text", "page"],
+        "properties": {
+            "text": {"type": "string", "description": format!("the member's copay for one in-network {visit} visit: the amount alone as printed, such as $55; empty when the plan charges coinsurance there or prints no copay")},
+            "page": {"type": "integer", "description": "the 1-based page it is printed on; 0 when it is not printed"}
+        }
+    })
 }
 
 fn item_schema(what: &str) -> Value {
@@ -70,12 +100,14 @@ fn item_schema(what: &str) -> Value {
 pub fn plan_schema() -> Value {
     json!({
         "type": "object",
-        "required": ["document", "insurer", "plan", "plan_year"],
+        "required": ["document", "insurer", "plan", "plan_year", "urgent_care_copay", "emergency_room_copay"],
         "properties": {
             "document": {"type": "string", "enum": PLAN_DOCUMENTS, "description": "sbc for a Summary of Benefits and Coverage, other for anything else"},
             "insurer": item_schema("the insurer's name"),
             "plan": item_schema("the plan's name"),
-            "plan_year": item_schema("the plan year")
+            "plan_year": item_schema("the plan year"),
+            "urgent_care_copay": copay_schema("urgent care"),
+            "emergency_room_copay": copay_schema("emergency room")
         }
     })
 }
@@ -121,14 +153,52 @@ impl PlanPrinted {
 
     /// The names code finds word for word on their pages, or why the reading
     /// cannot be trusted: an insurer or a plan that is not on the page it names.
-    /// A plan year off its page is left out.
+    /// A plan year off its page, or a copay off its page or not an amount, is left out.
     pub fn checked(&self, pages: &[String]) -> Result<Self, String> {
         Ok(PlanPrinted {
             document: self.document.trim().to_string(),
             insurer: on_its_page(&self.insurer, pages, "insurer")?.unwrap_or_default(),
             plan: on_its_page(&self.plan, pages, "plan")?.unwrap_or_default(),
             plan_year: on_its_page(&self.plan_year, pages, "plan year").ok().flatten().unwrap_or_default(),
+            urgent_care_copay: copay_on_its_page(&self.urgent_care_copay, pages),
+            emergency_room_copay: copay_on_its_page(&self.emergency_room_copay, pages),
         })
+    }
+
+    /// The copay for the visit a hospital report of `document_kind` records, in cents: urgent care or
+    /// the emergency room. A first-aid visit, or one the plan prints no copay for, has none.
+    pub fn copay_for(&self, document_kind: &str) -> Option<Cents> {
+        let term = copay_term(document_kind)?;
+        self.copays().into_iter().find(|(name, _)| *name == term).and_then(|(_, item)| copay_cents(item))
+    }
+
+    /// Each copay term with what the plan printed for it.
+    pub fn copays(&self) -> [(&'static str, &PrintedText); 2] {
+        [(URGENT_CARE_COPAY, &self.urgent_care_copay), (EMERGENCY_ROOM_COPAY, &self.emergency_room_copay)]
+    }
+
+    /// The copays code finds word for word on their pages that read as amounts, with their cents.
+    pub fn checked_copays(&self, pages: &[String]) -> Vec<(&'static str, PrintedText, Cents)> {
+        self.copays()
+            .into_iter()
+            .filter_map(|(name, item)| {
+                let c = copay_on_its_page(item, pages);
+                copay_cents(&c).map(|cents| (name, c, cents))
+            })
+            .collect()
+    }
+}
+
+/// A copay as an amount: `$55`, `$55.00`; none for anything else, such as `20% coinsurance`.
+pub fn copay_cents(item: &PrintedText) -> Option<Cents> {
+    parse_amount(&item.text)
+}
+
+/// A copay code finds word for word on its page and reads as an amount; empty otherwise.
+fn copay_on_its_page(item: &PrintedText, pages: &[String]) -> PrintedText {
+    match on_its_page(item, pages, "copay") {
+        Ok(Some(c)) if copay_cents(&c).is_some() => c,
+        _ => PrintedText::default(),
     }
 }
 
@@ -233,6 +303,19 @@ mod tests {
         let unprinted = PlanPrinted { plan: item("", 0), ..p };
         assert_eq!(unprinted.checked(&sbc()).unwrap().plan, PrintedText::default());
         assert_eq!(PlanPrinted::from_read(&json!({"clauses": []})), PlanPrinted::default());
+    }
+
+    #[test]
+    fn a_copay_must_be_an_amount_on_its_page() {
+        let pages = vec!["Urgent care $55 copay/visit Deductible does not apply\nEmergency room care 20% coinsurance".to_string()];
+        let read = PlanPrinted { urgent_care_copay: item("$55", 1), emergency_room_copay: item("20% coinsurance", 1), ..Default::default() };
+        let p = read.checked(&pages).unwrap();
+        assert_eq!((p.copay_for("urgent_care_record"), p.copay_for("emergency_record")), (Some(5_500), None), "coinsurance is no copay");
+        assert_eq!(p.copay_for("first_aid_record"), None, "first aid has no copay");
+        let kept = read.checked_copays(&pages);
+        assert_eq!(kept.iter().map(|(n, c, cents)| (*n, c.text.as_str(), *cents)).collect::<Vec<_>>(), [(URGENT_CARE_COPAY, "$55", 5_500)]);
+        let off = PlanPrinted { urgent_care_copay: item("$75", 1), ..read };
+        assert_eq!(off.checked(&pages).unwrap().urgent_care_copay, PrintedText::default(), "a copay not on its page is left out");
     }
 
     /// A specimen policy: declarations with the forms schedule, then two forms with their footers.

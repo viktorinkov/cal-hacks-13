@@ -11,6 +11,8 @@ use std::io::BufRead;
 
 /// Long enough for the Evidence Engine to read a record and Claude to review the pack.
 const FLOW_SECS: u64 = 360;
+/// Long enough for a plan lookup to find and read a plan.
+const PLAN_SECS: f64 = 300.0;
 
 pub fn run(app: &App, pause: bool) -> Result<()> {
     let test_bands = setup::run(app)?;
@@ -29,6 +31,7 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     crowd[2].1 = Pose::at(app.station(HACKING_FLOOR)?);
     test_bands.place(&crowd);
     println!("\ncrowd      test bands 90-99 online: Sam Patel (92) on the Hacking floor, everyone else at Main stage");
+    setup::wait_for_plan(app, "jordan", PLAN_SECS)?;
 
     step(pause, "1. Jordan Alvarez falls in the Main stage pit; bands 94, 95 and 96 around him light the circle")?;
     let note = "on scene in the pit: left wrist pain and swelling after the crowd surged; wrapping the wrist, referring him to urgent care";

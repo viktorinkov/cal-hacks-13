@@ -147,10 +147,23 @@ pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
     );
 }
 
-/// The Evidence Engine's checks and the policy clauses it found.
-pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], clauses: usize) {
+/// The attendee's own health plan pays first, and the venue's excess cover only the copay it leaves.
+pub fn plan_pays_first(ctx: &ReducerContext, c: &Claim, plan_cents: u64, copay_cents: u64, visit: &str) {
+    record(
+        ctx,
+        c.incident_id,
+        c.id,
+        "Decision Engine",
+        "code",
+        format!("{}'s health plan pays {} first", person(c), format_cents(plan_cents)),
+        format!("the venue's cover is excess over other insurance, so it pays only the {} {visit} copay the plan leaves", format_cents(copay_cents)),
+    );
+}
+
+/// The Evidence Engine's checks and the policy clauses it found, in the venue's policy and the attendee's plan.
+pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], clauses: usize, with_plan: bool) {
     let what = if failed.is_empty() { "Checked the evidence: nothing failed".to_string() } else { format!("Flagged: {}", failed.join(", ")) };
-    let policies = "the venue's policy";
+    let policies = if with_plan { "the venue's policy and the attendee's health plan" } else { "the venue's policy" };
     record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{clauses} clauses of {policies} bear on this {} claim", c.incident_kind));
 }
 

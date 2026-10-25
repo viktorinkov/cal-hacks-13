@@ -1,7 +1,7 @@
 //! Every system prompt, and the user turns that carry claim data in
 //! delimited blocks. Text inside a block is escaped so it cannot close it.
 
-use bandit_insurance::IncidentKind;
+use bandit_insurance::{Cents, IncidentKind};
 use bandit_insurance::clinic::Scenario;
 use bandit_insurance::coverage::Amounts;
 use bandit_insurance::letters::{FAULT_PHRASES, LetterData};
@@ -230,7 +230,16 @@ pub fn brief_prompt(p: &ReviewPayload, sources: &[(&str, usize)]) -> String {
     if !p.claimant_statement.trim().is_empty() {
         block(&mut s, "claimant_statement", [p.claimant_statement.clone()]);
     }
-    block(&mut s, "amounts", amount_lines(&p.amounts));
+    let mut amounts = amount_lines(&p.amounts);
+    if p.plan_pays_cents > 0 {
+        let covered: Cents = p.lines.iter().map(|l| l.covered_cents).sum();
+        amounts.push(format!(
+            "paid first by the attendee's own health plan: {} of the {} the lines cover; the venue's cover is excess, so its covered cost is the copay the plan leaves",
+            format_cents(p.plan_pays_cents),
+            format_cents(covered)
+        ));
+    }
+    block(&mut s, "amounts", amounts);
     block(&mut s, "policy", [p.policy_summary.clone()]);
     if let Some(c) = &p.charge {
         let mut lines = vec![
@@ -382,6 +391,19 @@ mod tests {
         let mut quiet = p.clone();
         quiet.claimant_statement.clear();
         assert!(!brief_prompt(&quiet, &[]).contains("<claimant_statement>"));
+    }
+
+    #[test]
+    fn brief_shows_what_the_attendees_plan_pays_first() {
+        let mut p = testdata::review_payload();
+        assert!(!brief_prompt(&p, &[]).contains("paid first"), "no plan on file");
+        let covered: Cents = p.lines.iter().map(|l| l.covered_cents).sum();
+        p.amounts = Amounts { cost_cents: 5_500, payout_cents: 5_500, recoverable_cents: 5_500, venue_cost_cents: 0 };
+        p.plan_pays_cents = covered - 5_500;
+        let text = brief_prompt(&p, &[]);
+        assert!(text.contains("covered cost: $55.00\n"), "{text}");
+        assert!(text.contains(&format!("paid first by the attendee's own health plan: {} of the {} the lines cover", format_cents(covered - 5_500), format_cents(covered))), "{text}");
+        assert!(bandit_insurance::decision::allowed_amounts(&p).contains(&(covered - 5_500)));
     }
 
     #[test]

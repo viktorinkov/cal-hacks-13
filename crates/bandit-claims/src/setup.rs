@@ -10,6 +10,11 @@ use std::collections::HashMap;
 
 pub const POLICY: &str = "GL-2026-04417";
 
+/// The health plan Jordan names at sign-up: insurer, plan and state. The plan
+/// lookup finds its public Summary of Benefits and Coverage, and its urgent
+/// care copay is what the venue's excess cover pays for his visit.
+pub const JORDAN_PLAN: (&str, &str, &str) = ("Blue Shield of California", "Silver 70 PPO 2500/55", "CA");
+
 /// Creates every actor and the test world. Safe to run again: every step is an
 /// upsert. Never touches the hardware bridge or real bands: only the
 /// test bands 90-99. Returns the running reporter, so a story run keeps the
@@ -92,6 +97,7 @@ pub fn run(app: &App) -> Result<TestBands> {
         ensure_attendee(app, &test_bands, name, display, *band)?;
         println!("{name:<10} {}  attendee {display}, band {band}", short_id(ids[name]));
     }
+    ensure_plan(app, "jordan", JORDAN_PLAN)?;
     println!("tokens     {}", app.tokens().dir().display());
     Ok(test_bands)
 }
@@ -127,6 +133,40 @@ pub fn ensure_attendee(app: &App, test_bands: &TestBands, name: &str, display: &
     call!(conn, connect_wallet_then())?;
     ensure_medical_card(app, &conn, me)?;
     Ok(me)
+}
+
+/// The attendee names their health plan, as at sign-up, unless they already did.
+fn ensure_plan(app: &App, name: &str, (insurer, plan, state): (&str, &str, &str)) -> Result<()> {
+    let conn = app.actor_with(name, true)?;
+    let me = conn.identity();
+    if app.db()?.db.plan_lookup().iter().any(|l| l.attendee == me) {
+        return Ok(());
+    }
+    call!(conn, look_up_plan_then(insurer.into(), plan.into(), state.into()))?;
+    println!("plan       {} names their plan: {insurer} {plan} ({state}); the plan lookup searches for it", app.person(me));
+    Ok(())
+}
+
+/// Waits up to `secs` for the attendee's plan to be found and read, and says
+/// what it leaves them for urgent care: the copay the venue's excess cover pays.
+pub fn wait_for_plan(app: &App, name: &str, secs: f64) -> Result<()> {
+    let me = app.actor_with(name, true)?.identity();
+    let db = app.db()?;
+    let done = until(secs, || {
+        let lookup = db.db.plan_lookup().iter().filter(|l| l.attendee == me).max_by_key(|l| l.id)?;
+        if lookup.status != "found" && lookup.status != "searching" {
+            return Some(format!("not found ({}): the venue's cover pays the whole visit", lookup.note));
+        }
+        let doc = db.db.policy_document().iter().filter(|d| d.attendee == Some(me) && d.kind == "health_plan" && d.status != "reading").max_by_key(|d| d.id)?;
+        let copay = db.db.policy_term().iter().find(|t| t.document_id == doc.id && t.name == "urgent_care_copay").map(|t| t.shown);
+        Some(match copay {
+            Some(c) => format!("read: {} urgent care copay, which the venue's excess cover pays", c),
+            None => format!("{}: no urgent care copay printed, so the venue's cover pays the whole visit", doc.status),
+        })
+    });
+    let line = done.unwrap_or_else(|| format!("still being looked up after {secs:.0} s: the venue's cover pays the whole visit"));
+    println!("plan       {}'s plan {line}", app.person(me));
+    Ok(())
 }
 
 /// Files the sample medical history and insurance card for the attendee, as if they uploaded them at
