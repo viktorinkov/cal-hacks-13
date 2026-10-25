@@ -28,8 +28,11 @@ let conn: DbConnection;
 
 // --- The 3D view ------------------------------------------------------------------------------
 
-/** On the Live tab everything above this height is cut away, so the mezzanine (its underside is at 4.25 m) and the roof do not hide the crowd. */
+/** On the Live tab everything of the model above this height is cut away, so the mezzanine (its underside is at
+ * 4.25 m) and the roof do not hide the crowd. Only the model is cut: the incidents' beams and tags rise above it. */
 const CUT_M = 4.1;
+/** The cut, far above the model off the Live tab. */
+const cut = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e9);
 
 /** The view and the picker live across redraws, so the model stays loaded and an open dropdown stays open. */
 let view: HTMLElement | undefined;
@@ -50,6 +53,7 @@ function makeView() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.localClippingEnabled = true;
   view.append(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -74,7 +78,11 @@ function makeView() {
       // Cut open, the walls show their inner faces from above.
       model.traverse(o => {
         const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.side = THREE.DoubleSide;
+        if (!mesh.isMesh) return;
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          m.side = THREE.DoubleSide;
+          m.clippingPlanes = [cut];
+        }
       });
       scene.add(model);
       // Frame the model whatever its size: the camera, its range and the sun scale with it.
@@ -136,7 +144,7 @@ function showLive(on: boolean) {
     controls.update();
   }
   liveLayer.visible = on;
-  renderer.clippingPlanes = on ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT_M)] : [];
+  cut.constant = on ? CUT_M : 1e9;
 }
 
 function lookAt(x: number, z: number) {

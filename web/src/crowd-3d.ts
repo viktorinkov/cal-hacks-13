@@ -106,7 +106,12 @@ export class Crowd {
 
   /** The module's time now, in ms since the epoch: frozen while the run is paused. */
   private clock(): number {
-    return this.pausedAt ?? Date.now() + this.skew;
+    return this.pausedAt ?? this.moduleNow();
+  }
+
+  /** The module's time now, in ms since the epoch, going on while the run is paused. */
+  moduleNow(): number {
+    return Date.now() + this.skew;
   }
 
   /** On its way along a walk from the module: the walk places it, not its band's last report. */

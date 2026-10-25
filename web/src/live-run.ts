@@ -1,5 +1,5 @@
 // The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
-// resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
+// resume, end the event), and on the Live tab the crowd, the incidents and the medic in the venue's 3D view from
 // the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. The module
 // runs everything; this page only shows it.
 
@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { act, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
+import { Incidents } from './incidents-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
 import { venueView, type LiveView } from './venue-setup';
@@ -21,6 +22,7 @@ const HISTORY_ROWS = 60;
 let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
+let incidentPins: Incidents;
 /** A band to put on the floor: from the panel, with the name typed there, or one already placed. */
 type Placing = { bandId: number; label: string; fromPanel: boolean };
 /** The band being dragged, with the tag that follows the pointer. */
@@ -33,10 +35,6 @@ const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.Do
 const dropPin = new THREE.Group().add(
   new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
   new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
-/** A red pole over each open incident. */
-const poles = new Map<bigint, THREE.Mesh>();
-const poleShape = new THREE.CylinderGeometry(0.35, 0.35, 3.6, 12).translate(0, 1.8, 0);
-const poleColour = new THREE.MeshBasicMaterial({ color: '#e00020' });
 
 function setUp(c: DbConnection) {
   conn = c;
@@ -56,7 +54,16 @@ function setUp(c: DbConnection) {
   conn.db.livePause.onInsert(pause);
   conn.db.livePause.onDelete(pause);
   pause();
-  v.onFrame(now => crowd.frame(now));
+  // This run's incidents, as they open, change and resolve.
+  incidentPins = new Incidents(v.layer, () => crowd.moduleNow());
+  const sync = () => incidentPins.sync(markers(run()));
+  for (const t of [conn.db.incidentMarker, conn.db.liveRun]) {
+    t.onInsert(sync);
+    t.onUpdate(sync);
+    t.onDelete(sync);
+  }
+  sync();
+  v.onFrame(now => { crowd.frame(now); incidentPins.frame(now); });
   dropPin.visible = false;
   v.layer.add(dropPin);
   window.addEventListener('pointermove', moveDrag);
@@ -134,20 +141,6 @@ function going(r: LiveRun | undefined): boolean {
 function markers(r: LiveRun | undefined): IncidentMarker[] {
   if (!r) return [];
   return [...conn.db.incidentMarker.iter()].filter(m => m.openedAt.microsSinceUnixEpoch >= r.startedAt.microsSinceUnixEpoch);
-}
-
-function syncPoles(open: IncidentMarker[]) {
-  const keep = new Set(open.map(m => m.incidentId));
-  for (const [id, pole] of poles) if (!keep.has(id)) { pole.removeFromParent(); poles.delete(id); }
-  for (const m of open) {
-    let pole = poles.get(m.incidentId);
-    if (!pole) {
-      pole = new THREE.Mesh(poleShape, poleColour);
-      poles.set(m.incidentId, pole);
-      v!.layer.add(pole);
-    }
-    pole.position.set(m.xM, 0, m.yM);
-  }
 }
 
 function phaseWords(r: LiveRun | undefined): string {
@@ -303,7 +296,10 @@ const LEGEND: [string, string][] = [
   ['#ff1030', 'SOS or a fall: red strobe; someone who fell lies down'],
   ['#2f6bff', 'The light circle around them: blue pulse'],
   ['#3d8bff', 'Our hardware and test bands'],
-  ['#e00020', 'Pole: an open incident'],
+  ['#ff2f45', 'Ring and beam: an open incident, with a tag saying who, where and how far the claim is'],
+  ['#ffb020', 'Amber ring: the medic is responding'],
+  ['#34d399', 'Green ring: resolved; it fades out 20 s later'],
+  ['#2fe08a', 'White figure with a green ring and a cross: the medic, walking in from the nearest door'],
 ];
 
 function legend() {
@@ -321,7 +317,7 @@ export function liveRunSection(c: DbConnection, canRun: boolean) {
   else venueView(c);
   crowd.recheck();
   const r = run();
-  syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
+  incidentPins.sync(markers(r));
   return h('div', { class: 'live' },
     h('div', {}, incidents(r, canRun), legend()),
     h('div', {}, h('section', {}, v!.view, v!.note)),
