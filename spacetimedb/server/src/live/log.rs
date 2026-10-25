@@ -60,7 +60,8 @@ fn person(c: &Claim) -> String {
 /// Called with the claim before and after every save: a status change is a decision.
 pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
     let changed = before.is_none_or(|b| b.status != c.status);
-    update_marker(ctx, c.incident_id, |m| IncidentMarker { claim_id: c.id, claim_status: status_words(c.status).into(), payout_cents: c.payout_cents, ..m });
+    let payout_cents = if c.status == ClaimStatus::Refused { 0 } else { c.payout_cents };
+    update_marker(ctx, c.incident_id, |m| IncidentMarker { claim_id: c.id, claim_status: status_words(c.status).into(), payout_cents, ..m });
     if !changed {
         return;
     }
@@ -70,10 +71,14 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::AwaitingRecord => (
             "Decision Engine",
             format!("claim {}", c.id),
-            format!("Claim opened for {}", person(c)),
-            "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
+            format!("Claim filed for {}", person(c)),
+            if c.statement.is_empty() {
+                "a medical payments claim; it waits for the hospital report".into()
+            } else {
+                format!("\"{}\" It waits for the hospital report.", c.statement)
+            },
         ),
-        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
+        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the medical record".into(), "the record was filed on the claim".into()),
         ClaimStatus::Verifying if c.cover_kind == "property" => (
             "Decision Engine",
             format!("claim {}", c.id),
@@ -84,7 +89,7 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::Reviewing => return,
         ClaimStatus::Routed => ("Decision Engine", "code".into(), format!("Sent to the organizer: {}", format_cents(c.payout_cents)), c.status_note.clone()),
         ClaimStatus::Paying => {
-            let who = if c.decided_by == "rule" { format!("rule v{}", c.settlement_rule_version) } else { c.routed_to_name.clone() };
+            let who = if c.decided_by == "rule" { format!("rule v{}", c.settlement_rule_version) } else { crate::safety::caller_name(ctx) };
             let what = if c.decided_by == "rule" {
                 format!("Settled on its own: {} to {}", format_cents(c.payout_cents), person(c))
             } else {
@@ -99,7 +104,7 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::Settled => ("wallet", "Capital One".into(), format!("{} landed in {}'s wallet", format_cents(c.payout_cents), person(c)), c.payout_reference.clone()),
         ClaimStatus::Refused => {
             let actor = if c.decided_by == "approver" { "organizer" } else { "Decision Engine" };
-            let who = if c.decided_by == "approver" { c.routed_to_name.clone() } else { "code".into() };
+            let who = if c.decided_by == "approver" { crate::safety::caller_name(ctx) } else { "code".into() };
             (actor, who, format!("Refused {}'s claim", person(c)), c.refusal_reason.clone())
         }
         ClaimStatus::Reconciled => ("wallet", "Insurer".into(), "The insurer paid the venue back".into(), c.payout_reference.clone()),
@@ -116,7 +121,7 @@ pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
         c.id,
         "Claude",
         "Claude",
-        format!("Read the clinic record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
+        format!("Read the medical record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
         format!("{}, {}: {dx}", r.provider_name, r.date_of_service),
     );
 }

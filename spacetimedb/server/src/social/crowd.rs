@@ -781,6 +781,10 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     if ctx.sender() != ctx.database_identity() {
         return Err("crowd_tick is internal".into());
     }
+    // A paused live run holds everyone where they stand.
+    if crate::live::paused(ctx) {
+        return Ok(());
+    }
     let venue = Venue::load(ctx);
     if venue.zones.is_empty() {
         return Ok(());

@@ -61,5 +61,3 @@ label.check.inline { display: inline-flex; margin: 0 8px; }
 button.on { font-weight: bold; border-width: 2px; }
 #head:empty { display: none; }
 #head { padding-bottom: 0; }
-#live3d { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
-#live3d iframe { display: block; width: 100%; height: calc(100vh - 120px); min-height: 560px; border: 0; border-radius: 12px; background: #0e1522; }

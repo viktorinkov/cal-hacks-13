@@ -160,6 +160,8 @@ export async function connect(queries: string[], onChange: () => void): Promise<
           .subscribe(queries);
       })
       .onConnectError((_ctx, e) => reject(e))
+      // A lost connection (a module update, a network drop) never comes back on its own: the page reloads.
+      .onDisconnect(() => setTimeout(() => location.reload(), 3000))
       .build();
   });
   try {
