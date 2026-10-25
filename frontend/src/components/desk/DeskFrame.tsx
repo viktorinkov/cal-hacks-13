@@ -2,16 +2,23 @@ import type { ReactNode } from 'react'
 import { useOperatorName } from '@/stdb/operatorName'
 import { cn } from '@/lib/utils'
 import { DeskTabs } from './DeskTabs'
+import { EventClose } from './EventClose'
 
 const MARK = {
+  run: 'Run',
   payments: 'Till',
   venue: 'Plot',
   attendees: 'Door',
   bands: 'Bands',
+  testbands: 'Test',
   photos: 'Pit',
   merch: 'Tags',
   graph: 'Meet',
   costs: 'Rider',
+  kibana: 'Logs',
+  rules: 'Rules',
+  staff: 'Crew',
+  viewas: 'As',
 } as const
 
 export type DeskMotif = keyof typeof MARK
@@ -28,6 +35,7 @@ export function DeskFrame({ motif, title, sentence, figures, children }: { motif
           </div>
           {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </header>
+        <EventClose />
         {(title || sentence) && (
           <div className="desk-head mt-8">
             <p className="desk-mark" aria-hidden="true">{MARK[motif]}</p>

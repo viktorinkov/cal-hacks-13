@@ -1,0 +1,186 @@
+{
+ "version": 1,
+ "kind": "app",
+ "at": "2026-10-25T08:39:27.455Z",
+ "seed": 1881144183,
+ "input": {
+  "kind": "commerce",
+  "brief": "BandIt organizer payments desk: wristband wallets, merch orders and damage charges at a live event",
+  "theme": "dark",
+  "screens": [
+   "overview",
+   "list",
+   "detail"
+  ],
+  "keep": [
+   "palette",
+   "type"
+  ],
+  "style": "data-terminal"
+ },
+ "style": {
+  "id": "data-terminal",
+  "name": "Data terminal",
+  "theme": "dark",
+  "basis": "1 screen: a stock research view. Keep it narrow.",
+  "suits": [
+   "markets",
+   "devtools"
+  ],
+  "idea": "A research or monitoring screen read in long sessions: cards darker than the ground, tabular digits that stack, signs instead of colour, and every selection marked by the same 1px accent line.",
+  "colourBudget": "under 3%; the accent is never more than a 1px line",
+  "tokens": {
+   "ground": "#171719",
+   "surface": "#131217",
+   "raised": "#212023",
+   "border": "#222224",
+   "rule": "#1b1a1f",
+   "control": "#3a3a3e",
+   "text": "#ffffff",
+   "muted": "#8a8c92",
+   "accent": "#4a8ad6",
+   "positive": "#44a282",
+   "negative": "#e5566f",
+   "warning": "#d9a441",
+   "chart": [
+    "#f2f2f3",
+    "#e5566f",
+    "#4a8ad6"
+   ],
+   "pills": {
+    "positive": [
+     "#1b2828",
+     "#5fc39c"
+    ],
+    "negative": [
+     "#2c1a20",
+     "#e5566f"
+    ],
+    "warning": [
+     "#2a2416",
+     "#d9a441"
+    ],
+    "neutral": [
+     "#212023",
+     "#bdbdc0"
+    ]
+   },
+   "shadow": "0 12px 28px rgba(0,0,0,.2)",
+   "radius": {
+    "card": 6,
+    "control": 999
+   },
+   "font": {
+    "family": "Public Sans",
+    "second": null,
+    "fallback": "Inter, system-ui, sans-serif",
+    "sizes": {
+     "title": 26,
+     "section": 20,
+     "kpi": 20,
+     "body": 13,
+     "small": 12
+    },
+    "weights": [
+     400,
+     500,
+     600,
+     700
+    ],
+    "note": "Section titles 20/400 in the muted grey; card titles 16/600; tabular figures everywhere."
+   },
+   "density": "dense",
+   "rowHeight": 42,
+   "sidebarWidth": 50,
+   "gap": 24,
+   "pad": 32,
+   "controlHeight": 34
+  },
+  "shell": "icon-rail",
+  "shellAlternatives": [],
+  "signature": "Every selection (tab, toggle, range, nav item) is a 1px accent line exactly as wide as its label, placed on the nearest existing edge; numbers stay white or grey and carry their sign in the text ('+$24,000,000').",
+  "identity": [
+   "Every figure in a monospace as the style's decision (IBM Plex Mono or JetBrains Mono for each price, count and time, digits that stack), with the text in Public Sans. Lint and the inspector flag mono; give the reason in the report.",
+   "The one accent line from the product's world in place of the dealt blue (the exchange's or the team's hue): still the only selection mark, never violet or indigo.",
+   "A signature of the market or the system as the lead: an order book's depth as two mirrored bar lists, an incident as a minute-by-minute strip, a region map with the list beside it."
+  ],
+  "avoid": [
+   "filled pill tabs or a coloured segmented control",
+   "a chart with no scale and no dates (the studied screen had none and was flagged)",
+   "tertiary text under 4.5:1 (#4c4c4f read at about 2:1 in the study)",
+   "lighter cards with borders and a glow",
+   "green and red on every number; the one column whose job is \"what moved today\" and a negative headline figure may carry the polarity colours"
+  ],
+  "notes": "The studied screen's muted grey #82848a and red #d4405d were lifted to #8a8c92 and #e5566f so text passes 4.5:1 on the card. Its card list rows sit on a 28px pitch and its table rows on 42px."
+ },
+ "shell": {
+  "id": "icon-rail",
+  "name": "Icon rail",
+  "basis": "3 of 23 screens",
+  "suits": [
+   "markets",
+   "devtools",
+   "finance",
+   "wallet"
+  ],
+  "numbers": {
+   "railWidth": "50-60, median 55",
+   "icon": "15-18px outline",
+   "pitch": "34-49",
+   "active": "icon colour alone, or a full-bleed 50px band at a 2% tint, or a 1px accent bar on the rail's border",
+   "groups": "short 20px hairlines, no labels",
+   "utilities": "pushed to the bottom after a gap of about 200px"
+  },
+  "blueprint": "An unlabelled rail of 50-60px carries the brand mark at the top and 15-18px outline icons on a 34-49px pitch; groups are split by 20px hairlines, utilities sit at the bottom. The rail sits on the page ground with a 1px edge, or is white with a faint 4px shadow on a grey ground. It saves about 180px of width against a labelled sidebar, so it suits products with few destinations and screens that need the width. Icons need tooltips and an accessible name.",
+  "phone": "The rail becomes a bottom bar with the same four or five icons, each with a short label under it."
+ },
+ "screens": [
+  {
+   "name": "overview",
+   "pattern": {
+    "id": "kpi-tabs-chart",
+    "name": "KPIs as the chart's tabs",
+    "screen": "overview",
+    "kinds": [
+     "finance",
+     "commerce"
+    ],
+    "basis": "a seller home",
+    "blueprint": "One card per subject, 8-16px apart: the main chart card runs full width, and any card holding a table of five columns or fewer, or a short list, pairs with its neighbour in two columns, the page header indented by the card padding so the title, the card titles, the numbers and the plot share one left edge. Balances that do not change during the day go first, in one container split by 1px dividers into equal columns; a zero balance is grey and its caption becomes the next step. In the main card, 2-4 KPIs sit in a row and act as the chart's series tabs: the selected one carries a 2px rule and an ink label, the others keep a grey label and their value in ink at a lighter weight (a grey value reads as disabled); when the tabs are the per-entity breakdown the brief asks for (takings by shop), nothing is greyed and the rule alone marks the selection. Choosing one swaps the series. Under them, one line chart as wide as the card's content (about 1136x220 in the study): 3-4 solid 1px gridlines, 4-6 round y ticks at 12px, a 2-3px line in ink with straight segments and no fill, an 8px hover dot with a 1px dashed guide and the line after the cursor in pale grey. Close with a 2-3 row comparison table on a 36px pitch, value and change columns right-aligned under a 14px grey header such as 'vs prior Monday'.",
+    "phone": "KPI tabs become a 2-up grid above the chart, with the selected cell marked by a fill (never an underline floating inside the grid) or a row of tabs that scrolls sideways; the chart is full width, 160-200px tall, with 4 x labels; the comparison table keeps its two right-aligned columns."
+   }
+  },
+  {
+   "name": "list",
+   "pattern": {
+    "id": "count-cards-filter",
+    "name": "Count cards that filter",
+    "screen": "list",
+    "kinds": [
+     "community",
+     "commerce",
+     "support"
+    ],
+    "basis": "an events back office",
+    "blueprint": "Above a list, 3-5 equal count cards (61px tall, 12px padding, a 13px grey label over a 16/600 value, 8px gap) are the type filter: the selected card gets a 1.5px accent border and a pale accent fill, and the list below shows that type only. Zero counts print as '0' in the same style; no deltas, no icons. This is one place where a row of identical small cards is right: the cards are peers and each one does work.",
+    "phone": "The count cards become a horizontally scrolling row of chips with the count inside each, or a select above the list."
+   }
+  },
+  {
+   "name": "detail",
+   "pattern": {
+    "id": "object-detail-header-grid",
+    "name": "Object header and a six-column grid",
+    "screen": "detail",
+    "kinds": [
+     "community",
+     "commerce",
+     "analytics"
+    ],
+    "basis": "an event's analytics tab",
+    "blueprint": "The page header is the object itself: one card (88px, 14px padding) holding a 50x62 cover, the 18/600 name with 28px icon buttons beside it (open, copy, share), a 13px grey meta line (date, time, place) and outlined 36px actions on the right. Under it, underline tabs on a full-width 1px rule, then a 36px row with a segmented time range on the left and a refresh button on the right. The body is one 6-column grid with one gutter (14px) in both directions whose spans change by row while every edge lands on the same lines: 3 KPI tiles of 2 columns, the main chart in 4 columns beside a side chart in 2, two progress cards of 3, a full-width trend of 6. Give the widest card to the screen's question, and do not give 824px to one ring and one legend row (flagged).",
+    "phone": "The header card keeps cover, name and meta, with actions in a kebab; every grid item takes the full width in the same order."
+   }
+  }
+ ]
+}

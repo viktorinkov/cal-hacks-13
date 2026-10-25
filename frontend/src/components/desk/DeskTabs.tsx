@@ -4,14 +4,18 @@ import { useRoute } from '@/cover/route'
 const ITEMS = [
   { to: '/', label: 'Map', on: (path: string) => path === '/' || path === '/organizer' },
   { to: '/payments', label: 'Payments', on: (path: string) => path === '/payments' },
+  { to: '/run', label: 'Run', on: (path: string) => path === '/run' },
   { to: '/venue', label: 'Venue', on: (path: string) => path === '/venue' },
   { to: '/attendees', label: 'Attendees', on: (path: string) => path === '/attendees' },
   { to: '/bands', label: 'Bands', on: (path: string) => path === '/bands' },
+  { to: '/test-bands', label: 'Test bands', on: (path: string) => path === '/test-bands' },
   { to: '/photos', label: 'Photos', on: (path: string) => path === '/photos' },
   { to: '/merch', label: 'Merch', on: (path: string) => path === '/merch' },
   { to: '/graph', label: 'Event graph', on: (path: string) => path === '/graph' },
   { to: '/claims', label: 'Settlements', on: (path: string) => path === '/claims' },
+  { to: '/rules', label: 'Rules', on: (path: string) => path === '/rules' },
   { to: '/costs', label: 'Costs', on: (path: string) => path === '/costs' },
+  { to: '/kibana', label: 'Kibana', on: (path: string) => path === '/kibana' },
 ] as const
 
 /** The desks. Settlements and costs stay at the end. */

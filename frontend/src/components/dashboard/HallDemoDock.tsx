@@ -3,6 +3,8 @@ import { Check, ChevronDown } from 'lucide-react'
 import { demoIsActive, useHardware } from '@/booth/demoRing'
 import { useHallDemo } from '@/booth/hallDemo'
 import { guideHallAcknowledge, guideHallPath, guideHallResolve, guideHallSos } from '@/booth/hallGuide'
+import { acknowledgeIncident, isModuleIncident, noteIncidentPath, resolveIncident } from '@/services/operatorCommands'
+import { useDesk } from '@/stdb/deskOps'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useWorld } from '@/stores/world'
@@ -25,6 +27,7 @@ export function HallDemoDock() {
   const scripted = useHallDemo((s) => s.scripted)
   const acknowledged = useHallDemo((s) => s.acknowledged)
   const pathOpen = useHallDemo((s) => s.pathOpen)
+  const notes = useDesk((s) => s.notes)
   const [open, setOpen] = useState(true)
 
   const real = demoIsActive(bands, Object.values(incidents))
@@ -39,6 +42,9 @@ export function HallDemoDock() {
   if (sosOn) done.add('sos')
   if (acknowledged || pathOpen) done.add('acknowledge')
   if (pathOpen) done.add('path')
+  const lead = Object.values(incidents).find((incident) => isModuleIncident(incident.incidentId) && incident.status !== 'resolved')
+  if (lead && lead.status !== 'reported') done.add('acknowledge')
+  if (lead && notes.some((note) => note.incidentId === lead.incidentId)) done.add('path')
   const next = STEPS.find((step) => !done.has(step.id))?.id
 
   const run = (id: (typeof STEPS)[number]['id']) => {
@@ -47,10 +53,15 @@ export function HallDemoDock() {
       setOpen(true)
       return
     }
-    if (!sosOn) return
-    if (id === 'acknowledge') guideHallAcknowledge()
-    else if (id === 'path') guideHallPath()
-    else guideHallResolve()
+    if (!sosOn && !lead) return
+    if (id === 'acknowledge') {
+      if (!lead) guideHallAcknowledge()
+      else void acknowledgeIncident(lead.incidentId)
+    } else if (id === 'path') {
+      if (!lead) guideHallPath()
+      else void noteIncidentPath(lead.incidentId, 'Path opened from the entrance.', '')
+    } else if (!lead) guideHallResolve()
+    else void resolveIncident(lead.incidentId, 'assisted_on_scene')
   }
 
   if (!open) {
@@ -108,7 +119,15 @@ export function HallDemoDock() {
                     {step.label}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">{step.hint}</TooltipContent>
+                <TooltipContent side="top">
+                  {lead && step.id === 'acknowledge'
+                    ? 'Take the incident and ask for the medical card.'
+                    : lead && step.id === 'path'
+                      ? 'Add the treatment note on the incident.'
+                      : lead && step.id === 'resolve'
+                        ? 'Resolve it as treated on site.'
+                        : step.hint}
+                </TooltipContent>
               </Tooltip>
             </li>
           )

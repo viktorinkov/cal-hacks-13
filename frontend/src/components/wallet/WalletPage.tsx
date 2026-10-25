@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Waves } from 'lucide-react'
+import { ChargePay } from '@/components/attendee/ChargePay'
+import { LeaveEvent } from '@/components/attendee/LeaveEvent'
+import { MyIncidents } from '@/components/attendee/MyIncidents'
+import { ProfileMatch } from '@/components/attendee/ProfileMatch'
+import { OrderShipping, ShippingBuy } from '@/components/attendee/ShippingBuy'
 import { SourceChip } from '@/components/dashboard/SourceChip'
+import { Recap } from '@/components/recap/Recap'
 import { useAction } from '@/components/payments/action'
 import { CopyId, StatusPill } from '@/components/payments/bits'
 import { MerchThumb } from '@/components/payments/MerchThumb'
@@ -11,11 +17,12 @@ import { bandIdFromSearch, rememberedBand, rememberBand } from '@/cover/tapLink'
 import { cn } from '@/lib/utils'
 import { FIXTURE_BAND } from '@/payments/fixture'
 import {
-  bandDigits, bandLabel, canDispute, clock, merchTimeline, myChargeStatus, needsSize, plain, SIZES, STATUS_LABEL, walletActivity, walletFinding, walletSummary,
+  bandDigits, bandLabel, canDispute, clock, merchTimeline, myChargeStatus, plain, STATUS_LABEL, walletActivity, walletFinding, walletSummary,
   type DisplayStatus, type Payment,
 } from '@/payments/model'
 import { usePaymentActions, usePaymentsFixture, useWalletData } from '@/payments/live'
-import type { MerchPick, MyCharge, WalletData } from '@/payments/rows'
+import type { MerchPick, MyCharge, NightPhoto, WalletData } from '@/payments/rows'
+import { nightIsOver, nightKnown } from '@/recap/night'
 import { useSession } from '@/stdb/session'
 import '../join/RegisterPage.css'
 import './WalletPage.css'
@@ -28,6 +35,7 @@ function useViewStates(fixture: boolean) {
   const charges = useSession((s) => s.chargesReady)
   const suggestions = useSession((s) => s.suggestionsReady)
   const orders = useSession((s) => s.merchOrdersReady)
+  const photos = useSession((s) => s.photosReady)
   const of = (ready: boolean, ...views: string[]): ViewState => {
     if (fixture) return { state: 'ready', message: '' }
     const error = views.map((view) => errors[view]).find(Boolean)
@@ -38,6 +46,7 @@ function useViewStates(fixture: boolean) {
     charges: of(charges, 'my_charges'),
     activity: of(entries && orders, 'my_wallet_entries', 'my_merch_orders'),
     picks: of(suggestions, 'my_merch_suggestions'),
+    photos: of(photos, 'my_photos'),
   }
 }
 
@@ -97,6 +106,7 @@ function ChargeRow({ charge }: { charge: MyCharge }) {
         </div>
       </div>
       {charge.why && <p className="mt-2 text-[14px] leading-6 text-ink-dim">{charge.why}</p>}
+      <ChargePay charge={charge} />
       {charge.disputeText && (
         <blockquote className="mt-3 border-l border-[var(--signup-control)] pl-3 text-[14px] leading-6 text-ink-dim">
           You wrote: “{charge.disputeText}”
@@ -179,6 +189,7 @@ function ActivitySheet({ payment, data, onClose }: { payment: Payment | null; da
           <Timeline steps={merchTimeline(order, shown.status).map((step) => ({ ...step, at: clock(step.at), warn: step.key === 'failed' }))} />
         </section>
       )}
+      {order && <OrderShipping orderId={order.id} />}
       <div className="mt-7 flex items-center justify-between gap-3 border-t border-line pt-3 text-[13px] text-ink-dim">
         <span>Bank reference</span>
         <CopyId value={shown.reference} label="Reference" chars={12} large />
@@ -187,62 +198,35 @@ function ActivitySheet({ payment, data, onClose }: { payment: Payment | null; da
   )
 }
 
-function BuySheet({ pick, band, onClose }: { pick: MerchPick | null; band: string; onClose: () => void }) {
-  const actions = usePaymentActions()
-  const { busy, error, run } = useAction()
-  const [size, setSize] = useState('')
-  const [missing, setMissing] = useState(false)
+function BuySheet({ pick, band, bandId, onClose }: { pick: MerchPick | null; band: string; bandId: number; onClose: () => void }) {
   const [last, setLast] = useState<MerchPick | null>(pick)
-  if (pick && pick !== last) {
-    setLast(pick)
-    setSize('')
-    setMissing(false)
-  }
+  if (pick && pick !== last) setLast(pick)
   const shown = pick ?? last
   if (!shown) return null
-  const sized = needsSize(shown.kind, shown.title)
-  const buy = async (event: FormEvent) => {
-    event.preventDefault()
-    if (sized && !size) {
-      setMissing(true)
-      return
-    }
-    const ok = await run('buy', () => actions.buyMerch(shown.templateId, shown.photoId, sized ? size : ''), {
-      success: 'Ordered. It stays pending until the bank settles it.',
-      failure: 'The order wasn’t placed',
-    })
-    if (ok) onClose()
-  }
   return (
     <Sheet open={Boolean(pick)} onClose={onClose} title={shown.title} description={`Charged to your band’s wallet · ${band}`} className="bg-[#151518]">
-      <form id="buy-form" onSubmit={(event) => void buy(event)} noValidate>
-        <MerchThumb kind={shown.kind} title={shown.title} imageUrl={shown.imageUrl} photoUrl={shown.photoUrl} area={shown.area} className="mx-auto w-full max-w-[16rem]" />
-        {shown.line && <p className="mt-4 text-[14px] leading-6 text-ink-dim">{shown.line}</p>}
-        {sized && (
-          <fieldset className="mt-6" aria-describedby={missing ? 'size-missing' : undefined}>
-            <legend className="text-[14px] font-medium text-ink">Size</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {SIZES.map((item) => (
-                <label key={item} className="wallet-size">
-                  <input type="radio" name="size" value={item} checked={size === item} onChange={() => { setSize(item); setMissing(false) }} className="sr-only" />
-                  <span>{item}</span>
-                </label>
-              ))}
-            </div>
-            {missing && <p id="size-missing" className="mt-2 text-[13px] text-caution">Choose a size.</p>}
-          </fieldset>
-        )}
-        {error && <p role="alert" className="mt-4 text-[13px] text-caution">{error.message}</p>}
-        <div className="mt-6 flex items-baseline justify-between gap-3 border-t border-line pt-4 text-[14px]">
-          <span className="text-ink-dim">From your band’s wallet</span>
-          <span className="text-[18px] font-medium tabular-nums text-ink">{formatCents(shown.priceCents)}</span>
-        </div>
-        <button type="submit" disabled={busy != null} className="wallet-primary mt-5 w-full">
-          {busy ? 'Ordering…' : <>Buy for <span className="tabular-nums">{formatCents(shown.priceCents)}</span></>}
-        </button>
-        <p className="mt-3 text-center text-[12px] text-ink-muted">Nessie sandbox wallet. No card is used.</p>
-      </form>
+      <MerchThumb kind={shown.kind} title={shown.title} imageUrl={shown.imageUrl} photoUrl={shown.photoUrl} area={shown.area} className="mx-auto w-full max-w-[16rem]" />
+      {shown.line && <p className="mt-4 text-[14px] leading-6 text-ink-dim">{shown.line}</p>}
+      <ShippingBuy key={shown.key} pick={shown} bandId={bandId} onDone={onClose} />
     </Sheet>
+  )
+}
+
+function PhotoCard({ photo }: { photo: NightPhoto }) {
+  const where = [photo.zoneName, clock(photo.takenAt)].filter(Boolean).join(' · ')
+  const withWhom = photo.people.length ? `With ${photo.people.join(', ')}` : 'Just you'
+  return (
+    <li>
+      <figure>
+        <span className="wallet-photo-frame">
+          {photo.url && <img src={photo.url} alt={photo.caption || 'A photograph of you'} />}
+        </span>
+        <figcaption className="mt-2">
+          <span className="block truncate text-[14px] text-ink">{photo.caption || photo.zoneName || 'Untitled'}</span>
+          <span className="mt-1 block truncate text-[13px] text-[var(--signup-muted)]">{[where, withWhom].filter(Boolean).join(' · ')}</span>
+        </figcaption>
+      </figure>
+    </li>
   )
 }
 
@@ -309,7 +293,7 @@ function HoldYourPhone() {
   )
 }
 
-function Wallet({ bandId, fixture, notice, onRetry }: { bandId: number; fixture: boolean; notice?: string | null; onRetry?: () => void }) {
+function Wallet({ bandId, fixture, recap = false, notice, onRetry }: { bandId: number; fixture: boolean; recap?: boolean; notice?: string | null; onRetry?: () => void }) {
   const { data } = useWalletData()
   const views = useViewStates(fixture)
   const actions = usePaymentActions()
@@ -321,26 +305,29 @@ function Wallet({ bandId, fixture, notice, onRetry }: { bandId: number; fixture:
   const summary = walletSummary(activity, data.charges)
   const charges = [...data.charges].sort((a, b) => b.happenedAt - a.happenedAt)
   const picks = [...data.suggestions].sort((a, b) => a.rank - b.rank).slice(0, 3)
+  const photos = [...data.photos].sort((a, b) => b.takenAt - a.takenAt)
   const ready = views.activity.state === 'ready' && views.charges.state === 'ready'
   const open = openId ? activity.find((payment) => payment.id === openId) ?? null : null
 
   return (
     <main className="wallet-main">
-      <div className="signup-intro">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="signup-title">
-            {ready ? (summary.paidCents ? `${formatCents(summary.paidCents)} paid tonight.` : 'Nothing paid yet tonight.') : 'Your band’s wallet.'}
-          </h1>
-          {fixture && <SourceChip tag="sim" />}
+      {recap ? <Recap /> : (
+        <div className="signup-intro">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="signup-title">
+              {ready ? (summary.paidCents ? `${formatCents(summary.paidCents)} paid tonight.` : 'Nothing paid yet tonight.') : 'Your band’s wallet.'}
+            </h1>
+            {fixture && <SourceChip tag="sim" />}
+          </div>
+          <p>{ready ? walletFinding(summary) : 'Checking what’s on your band…'}</p>
+          {notice && (
+            <p role="alert" className="mt-4 text-[14px] leading-6 text-signal">
+              {notice}
+              {onRetry && <button type="button" onClick={onRetry} className="ml-3 underline">Try again</button>}
+            </p>
+          )}
         </div>
-        <p>{ready ? walletFinding(summary) : 'Checking what’s on your band…'}</p>
-        {notice && (
-          <p role="alert" className="mt-4 text-[14px] leading-6 text-signal">
-            {notice}
-            {onRetry && <button type="button" onClick={onRetry} className="ml-3 underline">Try again</button>}
-          </p>
-        )}
-      </div>
+      )}
 
       <section aria-label={`${band} wallet`} className="wallet-hero">
         <div className="signup-strap" aria-hidden="true"><span>{bandDigits(bandId)}</span><i /></div>
@@ -350,6 +337,21 @@ function Wallet({ bandId, fixture, notice, onRetry }: { bandId: number; fixture:
           <p className="mt-1 text-[13px] leading-5 text-[var(--signup-muted)]">Pay at booths and the merch desk with your band. A Nessie sandbox account, not a card.</p>
         </div>
       </section>
+
+      <MyIncidents />
+      {!recap && <div className="mt-10"><ProfileMatch /></div>}
+
+      {!recap && (
+        <section aria-labelledby="wallet-photos" className="wallet-section mt-10">
+          <h2 id="wallet-photos">Photographs of you</h2>
+          <p className="text-[13px] text-[var(--signup-muted)]">Frames you are in. The bands in the shot say who else is there.</p>
+          {views.photos.state === 'ready' && photos.length ? (
+            <ul className="wallet-photos">{photos.map((photo) => <PhotoCard key={photo.id} photo={photo} />)}</ul>
+          ) : (
+            <Note view={views.photos} loading="Looking for photographs of you…" empty="No photograph of you yet." />
+          )}
+        </section>
+      )}
 
       <div className="wallet-grid">
         <div className="min-w-0">
@@ -390,8 +392,9 @@ function Wallet({ bandId, fixture, notice, onRetry }: { bandId: number; fixture:
           )}
         </section>
       </div>
+      {!recap && <LeaveEvent />}
       <ActivitySheet payment={open} data={data} onClose={() => setOpenId(null)} />
-      <BuySheet pick={buying} band={band} onClose={() => setBuying(null)} />
+      <BuySheet pick={buying} band={band} bandId={bandId} onClose={() => setBuying(null)} />
     </main>
   )
 }
@@ -412,10 +415,14 @@ export function WalletPage() {
   const wallet = useSession((s) => s.wallet)
   const claimBand = useSession((s) => s.claimBand)
   const connectWallet = useSession((s) => s.connectWallet)
+  const eventEnded = useSession((s) => s.eventEnded)
+  const leftAt = useSession((s) => s.departure?.leftAt)
+  const known = useSession((s) => nightKnown(s.eventReady, s.departureReady, s.recapViewErrors.my_departure))
+  const over = known && nightIsOver(eventEnded, leftAt)
   const fromUrl = bandIdFromSearch(search)
   const linked = fromUrl ?? rememberedBand()
   const attached = bandOnThisPhone(myBand)
-  const bandId = fixture ? FIXTURE_BAND : attached ?? linked
+  const bandId = !known ? null : fixture ? FIXTURE_BAND : attached ?? (over ? null : linked)
   const label = bandId == null ? '' : bandDigits(bandId)
   const [notice, setNotice] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
@@ -426,7 +433,7 @@ export function WalletPage() {
   }, [fromUrl])
 
   useEffect(() => {
-    if (fixture || phase !== 'live' || !myBandReady || linked == null) return
+    if (fixture || phase !== 'live' || !myBandReady || !known || over || linked == null) return
     const mine = bandOnThisPhone(myBand)
     if (mine != null && mine !== linked) return
     if (mine != null && wallet) return
@@ -442,19 +449,21 @@ export function WalletPage() {
         ? 'Add your name on your band’s page. The account opens once it has a name.'
         : message)
     })
-  }, [fixture, phase, myBandReady, linked, myBand, wallet, claimBand, connectWallet, retry])
+  }, [fixture, phase, myBandReady, known, over, linked, myBand, wallet, claimBand, connectWallet, retry])
 
   let body
-  if (bandId != null && phase !== 'error') body = (
+  if (phase === 'error') body = <div className="signup-tap"><h1 className="signup-title">Your wallet can’t load right now.</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">{error ?? 'The host didn’t answer.'}</p></div>
+  else if (phase !== 'live' || !myBandReady || !known) body = <div className="signup-tap" role="status"><h1 className="signup-title">Opening your wallet…</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">Checking which band is yours.</p></div>
+  else if (over && bandId == null) body = <main className="wallet-main"><Recap /></main>
+  else if (bandId != null) body = (
     <Wallet
       bandId={bandId}
       fixture={fixture}
+      recap={over}
       notice={notice}
       onRetry={notice && !/your name/i.test(notice) ? () => { attempt.current = null; setNotice(null); setRetry((n) => n + 1) } : undefined}
     />
   )
-  else if (phase === 'error') body = <div className="signup-tap"><h1 className="signup-title">Your wallet can’t load right now.</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">{error ?? 'The host didn’t answer.'}</p></div>
-  else if (phase !== 'live' || !myBandReady) body = <div className="signup-tap" role="status"><h1 className="signup-title">Opening your wallet…</h1><p className="mt-5 text-[16px] leading-7 text-ink-dim">Checking which band is yours.</p></div>
   else body = <HoldYourPhone />
 
   return (

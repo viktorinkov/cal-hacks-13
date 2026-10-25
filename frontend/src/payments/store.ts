@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import {
   EMPTY_DESK, EMPTY_WALLET, idOf, millis, readBoardPick, readCharge, readFeeCap, readMerchOrder, readMyCharge, readPerson,
-  readSuggestion, readTemplate, readWallet, readWalletEntry, text, type DeskData, type WalletData,
+  readNightPhoto, readSuggestion, readTemplate, readWallet, readWalletEntry, text, type DeskData, type WalletData,
 } from './rows'
 
 export interface PaymentsState {
@@ -56,6 +56,7 @@ export function readPayments(db: unknown): PaymentsState {
       orders: rowsOf(tables.myMerchOrders).map(readMerchOrder),
       suggestions: rowsOf(tables.myMerchSuggestions).map(readSuggestion),
       templates,
+      photos: rowsOf(tables.myPhotos).map(readNightPhoto).sort((a, b) => b.takenAt - a.takenAt),
     },
   }
 }

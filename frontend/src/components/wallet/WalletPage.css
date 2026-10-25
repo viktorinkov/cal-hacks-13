@@ -5,6 +5,9 @@
 .wallet-hero-aside { min-width: 0; padding-left: 24px; border-left: 1px solid var(--signup-control); }
 .wallet-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; gap: 48px; margin-top: 40px; }
 .wallet-section + .wallet-section { margin-top: 40px; }
+.wallet-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; margin-top: 12px; }
+.wallet-photo-frame { display: block; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 12px; background: var(--signup-raised, #202023); }
+.wallet-photo-frame img { width: 100%; height: 100%; object-fit: cover; }
 .wallet-section h2 { font-size: 16px; font-weight: 500; line-height: 1.5; }
 .wallet-row { padding-block: 14px; border-top: 1px solid var(--signup-rule); }
 .wallet-row:first-child { border-top: 0; }
@@ -21,6 +24,9 @@
 .wallet-primary:focus-visible { outline: 2px solid var(--color-champagne); outline-offset: 3px; }
 @media (max-width: 900px) {
   .wallet-grid { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (min-width: 900px) {
+  .wallet-photos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 768px) {
   .wallet-main { padding-top: 24px; }

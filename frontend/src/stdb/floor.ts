@@ -56,6 +56,8 @@ export interface FloorIncident {
   bandId: number
   openedAt: number | null
   resolved: boolean
+  /** `open`, `responding`, or `resolved`, from the incident row. */
+  status: string
 }
 
 export interface FloorInput {
@@ -115,6 +117,12 @@ function num(value: unknown): number {
 function tag(value: unknown): string {
   if (value && typeof value === 'object' && 'tag' in value) return text((value as { tag: unknown }).tag).toLowerCase()
   return text(value).toLowerCase()
+}
+
+function standing(incident: FloorIncident): Incident['status'] {
+  if (incident.resolved || incident.status === 'resolved') return 'resolved'
+  if (incident.status === 'responding') return 'responding'
+  return 'reported'
 }
 
 function finite(value: unknown): number | null {
@@ -291,7 +299,7 @@ export function projectFloor(input: FloorInput): WorldSnapshot | null {
       displayId: `INC-${incident.id}`,
       reportedByDeviceId: incident.bandId ? `band-${incident.bandId}` : null,
       reportedAt: incident.openedAt ?? now,
-      status: incident.resolved ? 'resolved' : 'reported',
+      status: standing(incident),
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zone.id,
@@ -415,7 +423,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       displayId: `INC-${incident.id}`,
       reportedByDeviceId: incident.bandId ? `band-${incident.bandId}` : null,
       reportedAt: incident.openedAt ?? now,
-      status: incident.resolved ? 'resolved' : 'reported',
+      status: standing(incident),
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zoneId,
@@ -522,6 +530,7 @@ export function syncFloor(db: Record<string, unknown>): boolean {
     bandId: num(row.subjectBand),
     openedAt: millis(row.openedAt),
     resolved: row.resolved === true,
+    status: tag(row.status),
   }))
   setLiveBands(bands)
   if (zones.length === 0) return false

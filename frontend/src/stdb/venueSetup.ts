@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { attachDesk, detachDesk } from './deskOps'
 import type { DbConnection } from './module_bindings'
 
 /** Setup 0 is the Palace of Fine Arts model that ships with the app. */
@@ -240,6 +241,7 @@ function watch(next: DbConnection, table: unknown) {
 /** Called once per connection from the session. The three tables are public. */
 export function subscribeVenueSetup(next: DbConnection) {
   conn = next
+  attachDesk(next)
   useVenueSetup.setState({ setupsReady: false, stepsReady: false, chosenReady: false, error: null })
   const db = next.db as unknown as Record<string, unknown>
   watch(next, db.venueSetup)
@@ -282,6 +284,7 @@ export function subscribeVenueSetup(next: DbConnection) {
 
 export function dropVenueSetup() {
   conn = null
+  detachDesk()
 }
 
 type VenueReducers = {

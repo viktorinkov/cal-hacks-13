@@ -15,8 +15,16 @@ const buyMerch = vi.fn<(templateId: string, photoId: string, size: string) => Pr
 const connectWallet = vi.fn<() => Promise<void>>()
 const claimBand = vi.fn<(token: string) => Promise<void>>()
 const rerunShoppingAgent = vi.fn<() => Promise<void>>()
+// The buy sheet ships an order, so it goes through the attendee module rather than the session.
+const { buyMerchWithShipping } = vi.hoisted(() => ({
+  buyMerchWithShipping: vi.fn<(templateId: string, photoId: string, size: string, address: string) => Promise<boolean>>(),
+}))
+vi.mock('@/stdb/attendeeOps', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stdb/attendeeOps')>()),
+  buyMerchWithShipping,
+}))
 
-const allReady = { walletEntriesReady: true, chargesReady: true, suggestionsReady: true, merchOrdersReady: true }
+const allReady = { walletEntriesReady: true, chargesReady: true, suggestionsReady: true, merchOrdersReady: true, photosReady: true }
 const myBand = { bandId: 7, status: 'claimed', expiresAt: null }
 
 function renderWallet(path = '/wallet') {
@@ -32,6 +40,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   sessionStorage.clear()
   for (const action of [disputeCharge, buyMerch, connectWallet, rerunShoppingAgent, claimBand]) action.mockResolvedValue(undefined)
+  buyMerchWithShipping.mockResolvedValue(true)
   seedSession([], { myBand, myBandReady: true, wallet: { accountId: 'acct-0007', balanceCents: 6_000 }, ...allReady })
   useSession.setState({ disputeCharge, buyMerch, connectWallet, rerunShoppingAgent, claimBand })
   withWallet(FIXTURE_WALLET)
@@ -76,6 +85,7 @@ describe('the wallet', () => {
     expect(screen.getByText('Nothing has been charged to your band.')).toBeInTheDocument()
     expect(screen.getByText('Nothing has moved through your wallet yet.')).toBeInTheDocument()
     expect(screen.getByText('No picks yet. They come from tonight’s photos of you.')).toBeInTheDocument()
+    expect(screen.getByText('No photograph of you yet.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Nothing paid yet tonight.')
   })
 
@@ -132,19 +142,30 @@ describe('the wallet', () => {
     expect(disputeCharge).toHaveBeenCalledWith(FIXTURE_WALLET.charges[0].id, 'I was at the stage then.')
   })
 
-  it('needs a size before it buys a tee', async () => {
+  it('shows photographs the band is in', () => {
+    withWallet({
+      ...FIXTURE_WALLET,
+      photos: [{ id: '9', url: '/blobs/stage', takenAt: Date.parse('2026-10-25T04:12:00Z'), zoneName: 'Stage', caption: 'Opening', people: ['Jonah Chen'] }],
+    })
+    renderWallet()
+    const section = screen.getByRole('region', { name: 'Photographs of you' })
+    expect(within(section).getByRole('img', { name: 'Opening' })).toHaveAttribute('src', '/blobs/stage')
+    expect(within(section).getByText(/Stage · .* · With Jonah Chen/)).toBeInTheDocument()
+  })
+
+  it('buys a tee in the chosen size and ships it to the typed address', async () => {
     const user = userEvent.setup()
     renderWallet()
     const tee = FIXTURE_WALLET.suggestions.find((pick) => /tee/i.test(pick.title))!
     const card = screen.getAllByRole('listitem').find((item) => item.textContent?.includes(tee.title) && item.classList.contains('wallet-pick'))!
     await user.click(within(card).getByRole('button', { name: 'Buy with my band' }))
     const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByLabelText('M')).toBeChecked()
+    await user.click(within(sheet).getByLabelText('L'))
+    await user.type(within(sheet).getByLabelText('Shipping address'), 'Alex Guest, 1 Main St, Berkeley')
     await user.click(within(sheet).getByRole('button', { name: /^Buy for/ }))
-    expect(within(sheet).getByText('Choose a size.')).toBeInTheDocument()
+    expect(buyMerchWithShipping).toHaveBeenCalledWith(tee.templateId, tee.photoId, 'L', 'Alex Guest, 1 Main St, Berkeley')
     expect(buyMerch).not.toHaveBeenCalled()
-    await user.click(within(sheet).getByLabelText('M'))
-    await user.click(within(sheet).getByRole('button', { name: /^Buy for/ }))
-    expect(buyMerch).toHaveBeenCalledWith(tee.templateId, tee.photoId, 'M')
   })
 
   it('buys a poster with no size', async () => {
@@ -155,8 +176,9 @@ describe('the wallet', () => {
     await user.click(within(card).getByRole('button', { name: 'Buy with my band' }))
     const sheet = await screen.findByRole('dialog')
     expect(within(sheet).queryByText('Size')).toBeNull()
+    await user.type(within(sheet).getByLabelText('Shipping address'), 'Alex Guest, 1 Main St, Berkeley')
     await user.click(within(sheet).getByRole('button', { name: /^Buy for/ }))
-    expect(buyMerch).toHaveBeenCalledWith(poster.templateId, poster.photoId, '')
+    expect(buyMerchWithShipping).toHaveBeenCalledWith(poster.templateId, poster.photoId, '', 'Alex Guest, 1 Main St, Berkeley')
   })
 
   it('takes no card number anywhere', async () => {

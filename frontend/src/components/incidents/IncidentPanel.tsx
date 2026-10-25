@@ -10,7 +10,8 @@ import { incidentStatusText, incidentTitle, localizationText, observationText, s
 import { cn } from '@/lib/utils'
 import { mapController } from '@/map/controller'
 import { scriptedIncidentId, useHallDemo } from '@/booth/hallDemo'
-import { acknowledgeIncident, approveGuidance, cancelGuidance, pendingKey, previewGuidance } from '@/services/operatorCommands'
+import { DeskIncidentActions } from '@/components/incidents/DeskIncidentActions'
+import { acknowledgeIncident, approveGuidance, cancelGuidance, isModuleIncident, pendingKey, previewGuidance } from '@/services/operatorCommands'
 import { isLive, useConnection } from '@/stores/connection'
 import { useMapStats } from '@/stores/frames'
 import { useUi } from '@/stores/ui'
@@ -91,14 +92,15 @@ export function IncidentPanel() {
   const status = inc?.status
   const hasLocation = !!inc?.location
   useEffect(() => {
-    if (!incId || status !== 'acknowledged' || !hasLocation || cmds.length > 0) return
+    if (!incId || isModuleIncident(incId) || status !== 'acknowledged' || !hasLocation || cmds.length > 0) return
     const t = setTimeout(() => void previewGuidance(incId), 500)
     return () => clearTimeout(t)
   }, [incId, status, hasLocation, cmds.length])
 
   if (!inc) return null
   const local = rehearsal && inc.incidentId === scriptedIncidentId()
-  const canAct = linkUp || local
+  const onDesk = isModuleIncident(inc.incidentId)
+  const canAct = onDesk || linkUp || local
   const tz = venue?.timeZone
   const zoneName = venue?.zones.find((z) => z.zoneId === inc.candidateZone)?.name ?? 'Unknown zone'
   const reporter = inc.reportedByDeviceId ? devices[inc.reportedByDeviceId] : undefined
@@ -267,7 +269,12 @@ export function IncidentPanel() {
         </div>
       </div>
 
-      {inc.status !== 'resolved' && (
+      {inc.status !== 'resolved' && onDesk && (
+        <div className="flex flex-col gap-2 border-t border-dashed border-line-strong px-4 py-3">
+          <DeskIncidentActions incident={inc} />
+        </div>
+      )}
+      {inc.status !== 'resolved' && !onDesk && (
         <div className="flex flex-col gap-2 border-t border-dashed border-line-strong px-4 py-3">
           {!canAct && <p className="text-[12px] text-caution">Not connected. Actions are paused until the link is back.</p>}
           {inc.status === 'reported' && (

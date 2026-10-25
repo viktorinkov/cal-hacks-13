@@ -46,6 +46,15 @@ export function millis(value: unknown): number | null {
   return null
 }
 
+function namesOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const name = text((item as { name?: unknown }).name)
+    return name ? [name] : []
+  })
+}
+
 function strings(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.map((item) => (typeof item === 'bigint' || typeof item === 'number' ? idOf(item) : text(item))).filter(Boolean)
@@ -366,6 +375,27 @@ export interface DeskData {
   night: Night
 }
 
+/** A photograph the wearer is tagged in. `my_photos` is that list for the signed-in band. */
+export interface NightPhoto {
+  id: string
+  url: string
+  takenAt: number
+  zoneName: string
+  caption: string
+  people: string[]
+}
+
+export function readNightPhoto(row: Row): NightPhoto {
+  return {
+    id: idOf(row.photoId) || idOf(row.id),
+    url: text(row.url),
+    takenAt: millis(row.takenAt) ?? 0,
+    zoneName: text(row.zoneName),
+    caption: text(row.caption),
+    people: namesOf(row.people),
+  }
+}
+
 /** Everything the attendee wallet reads besides `my_wallet` and `my_band`, which live on the session. */
 export interface WalletData {
   entries: WalletEntry[]
@@ -373,6 +403,7 @@ export interface WalletData {
   orders: MerchOrder[]
   suggestions: MerchPick[]
   templates: Template[]
+  photos: NightPhoto[]
 }
 
 export const EMPTY_DESK: DeskData = {
@@ -380,4 +411,4 @@ export const EMPTY_DESK: DeskData = {
   night: { startsAt: null, endsAt: null },
 }
 
-export const EMPTY_WALLET: WalletData = { entries: [], charges: [], orders: [], suggestions: [], templates: [] }
+export const EMPTY_WALLET: WalletData = { entries: [], charges: [], orders: [], suggestions: [], templates: [], photos: [] }

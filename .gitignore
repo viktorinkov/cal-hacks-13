@@ -1,3 +1,4 @@
+# local secrets: never commit
 .env
 .env.*
 !.env.example
@@ -8,3 +9,8 @@ var/
 pipeline/data/
 __pycache__/
 *.pyc
+
+# installed deps, other checkouts, and the home-page image venv
+node_modules
+.worktrees
+.taste-skill/home/venv

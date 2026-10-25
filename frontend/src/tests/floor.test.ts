@@ -15,7 +15,7 @@ const input: FloorInput = {
     { id: 94, zone: 101, online: true, sos: false, fall: false, lastSeen: 1, hasMotor: false, hasMpu: false, wearer: null, xM: null, yM: null, boothId: 0, hasPosition: false, state: 0 },
     { id: 3, zone: 0, online: false, sos: false, fall: false, lastSeen: null, hasMotor: false, hasMpu: false, wearer: null, xM: null, yM: null, boothId: 0, hasPosition: false, state: 0 },
   ],
-  incidents: [{ id: '4', kind: 'fall', zoneId: '2', stationId: 101, bandId: 92, openedAt: 50, resolved: false }],
+  incidents: [{ id: '4', kind: 'fall', zoneId: '2', stationId: 101, bandId: 92, openedAt: 50, resolved: false, status: 'open' }],
 }
 
 describe('live floor', () => {

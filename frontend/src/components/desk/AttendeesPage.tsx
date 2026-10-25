@@ -1,16 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useCatalog } from '@/stdb/catalog'
-import { releaseBand, useSession } from '@/stdb/session'
+import { leaveEarly, releaseBand, useSession } from '@/stdb/session'
 import { DeskFrame, Figure, when } from './DeskFrame'
 
 /** The host's attendee list: who claimed a band, where they work, and whether the band can go back. */
 export function AttendeesPage() {
   const attendees = useCatalog((s) => s.attendees)
   const guests = useCatalog((s) => s.guests)
+  const departures = useCatalog((s) => s.departures)
+  const eventEnded = useCatalog((s) => s.eventEnded)
   const staff = useSession((s) => s.staff)
+  const owner = useSession((s) => s.owner)
+  const roles = useSession((s) => s.roles)
   const actionError = useSession((s) => s.actionError)
+  const ops = owner || roles.includes('ops')
   const [query, setQuery] = useState('')
   const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [leavingId, setLeavingId] = useState<string | null>(null)
+  const left = useMemo(() => new Map(departures.map((row) => [row.nodeId, row])), [departures])
   const people = useMemo(() => attendees.filter((person) => !person.simulated), [attendees])
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -56,26 +63,42 @@ export function AttendeesPage() {
               </p>
             </div>
             <p className="font-mono text-[13px] text-ink">{person.bandId > 0 ? person.bandId : '—'}</p>
-            <p className="text-[13px] text-ink-dim">{person.findable ? 'Findable' : 'Not findable'}</p>
+            <p className="text-[13px] text-ink-dim">{left.get(person.nodeId)?.leftAt ? `Left${left.get(person.nodeId)?.door ? ` by ${left.get(person.nodeId)?.door}` : ''}` : left.get(person.nodeId) ? 'Walking out' : person.findable ? 'Findable' : 'Not findable'}</p>
             <p className="text-[13px] text-ink-muted">{when(person.createdAt)}</p>
-            {staff && person.bandId > 0 && (
-              <div className="flex gap-3 text-[13px]">
-                {confirmId === person.bandId ? (
-                  <>
-                    <button type="button" className="text-ink hover:text-champagne" onClick={() => void releaseBand(person.bandId).then(() => setConfirmId(null))}>
-                      Take it back
-                    </button>
-                    <button type="button" className="text-ink-muted hover:text-ink" onClick={() => setConfirmId(null)}>
-                      Leave it
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className="text-ink-dim hover:text-ink" onClick={() => setConfirmId(person.bandId)}>
-                    Take the band back
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[13px]">
+            {ops && person.nodeId && !eventEnded && !left.has(person.nodeId) && (
+              leavingId === person.nodeId ? (
+                <>
+                  <button type="button" className="text-ink hover:text-champagne" onClick={() => void leaveEarly(person.nodeId).then(() => setLeavingId(null)).catch(() => setLeavingId(null))}>
+                    Send them home
                   </button>
-                )}
-              </div>
+                  <button type="button" className="text-ink-muted hover:text-ink" onClick={() => setLeavingId(null)}>
+                    Stay
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="text-ink-dim hover:text-ink" onClick={() => setLeavingId(person.nodeId)}>
+                  Leave early
+                </button>
+              )
             )}
+            {staff && person.bandId > 0 && (
+              confirmId === person.bandId ? (
+                <>
+                  <button type="button" className="text-ink hover:text-champagne" onClick={() => void releaseBand(person.bandId).then(() => setConfirmId(null))}>
+                    Take it back
+                  </button>
+                  <button type="button" className="text-ink-muted hover:text-ink" onClick={() => setConfirmId(null)}>
+                    Leave it
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="text-ink-dim hover:text-ink" onClick={() => setConfirmId(person.bandId)}>
+                  Take the band back
+                </button>
+              )
+            )}
+            </div>
           </li>
         ))}
       </ul>

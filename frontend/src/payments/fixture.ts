@@ -255,6 +255,7 @@ function build() {
     orders: sevenOrders.map((row) => readMerchOrder({ ...row, attendeeName: '', title: '' })),
     suggestions,
     templates,
+    photos: [],
   }
   const walletView: WalletView = { accountId: sevenWallet.accountId, balanceCents: sevenWallet.balanceCents }
   return { desk, wallet, walletView }

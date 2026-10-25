@@ -3,6 +3,7 @@ import { beginSignIn, finishSignIn, staffSignedIn } from '@/stdb/auth'
 import { loadHostConfig, type HostConfig } from '@/stdb/host'
 import { useRoute } from '@/cover/route'
 import { useSession } from '@/stdb/session'
+import { JoinOrganizerGate } from './JoinOrganizer'
 
 const gateButton =
   'rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5'
@@ -18,7 +19,8 @@ function GateCopy({ children }: { children: ReactNode }) {
 /** Email sign-in, the same client the live organizer portal uses. A `?as=` test identity skips it. */
 export function OrganizerGate({ children }: { children: ReactNode }) {
   const { path } = useRoute()
-  const frames = path === '/photo'
+  const photographer = path === '/photo'
+  const frames = photographer
   const [host, setHost] = useState<HostConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const as = new URLSearchParams(window.location.search).get('as')
@@ -40,7 +42,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
       <GateCopy>
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
         <p className="text-[15px] text-ink-dim" role="status">
-          Opening the organizer…
+          {photographer ? 'Opening the photographer…' : 'Opening the organizer…'}
         </p>
       </GateCopy>
     )
@@ -51,9 +53,11 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     return (
       <GateCopy>
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
-        <h1 className="font-display text-[28px] leading-none text-ink">{frames ? 'Photographer' : 'Organizer'}</h1>
+        <h1 className="font-display text-[28px] leading-none text-ink">{photographer ? 'Photographer' : 'Organizer'}</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">
-          {frames ? 'Sign in with your email to file frames from the night.' : 'Sign in with your email to run the event.'}
+          {photographer
+            ? 'Sign in with your staff email. Frames you file land on the organizer photos page.'
+            : 'Sign in with your staff email. This desk uses the same database as the live organizer portal.'}
         </p>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
@@ -106,7 +110,8 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     )
   }
 
-  return children
+  if (photographer) return children
+  return <JoinOrganizerGate>{children}</JoinOrganizerGate>
 }
 
 export function SignInCallback() {
@@ -128,7 +133,7 @@ export function SignInCallback() {
     return () => {
       cancel = true
     }
-  }, [go])
+  }, [])
 
   return (
     <GateCopy>

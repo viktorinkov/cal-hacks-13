@@ -29,6 +29,7 @@ import {
   type Speed,
 } from '@/venue/runs'
 import { DeskFrame, when } from './DeskFrame'
+import { PolicySection } from './PolicySection'
 
 const controlClass =
   'h-9 rounded-[4px] border border-line-strong bg-ground px-3 text-[14px] text-ink outline-none placeholder:text-ink-muted focus-visible:border-champagne'
@@ -448,6 +449,9 @@ function ModelPanel({ run, frame }: { run: Run; frame: RunFrame }) {
 
 export function VenuePage() {
   const setups = useVenueSetup((s) => s.setups)
+  const owner = useSession((s) => s.owner)
+  const roles = useSession((s) => s.roles)
+  const ops = owner || roles.includes('ops')
   const allSteps = useVenueSetup((s) => s.steps)
   const palace = useMemo(() => palaceRun(), [])
   const runs = useMemo(() => [palace, ...setups.filter((s) => s.id !== DEFAULT_SETUP_ID).map((s) => buildRun(s, allSteps))], [palace, setups, allSteps])
@@ -565,6 +569,7 @@ export function VenuePage() {
           </div>
         </div>
       </section>
+      {ops && <PolicySection />}
     </DeskFrame>
   )
 }

@@ -124,7 +124,7 @@ const LEFT_BOARD: Portrait[] = [
 
 const RIGHT_BOARD: Portrait[] = [
   { src: asset('/venue/people/luke.png'), name: 'Luke' },
-  { src: asset('/venue/people/edward.jpg'), name: 'Edward', focus: { x: 0.36, y: 0.34 } },
+  { src: asset('/venue/people/edward.jpg'), name: 'Edward', focus: { x: 0.46, y: 0.34 } },
 ]
 
 /** Drop only the high flat ceilings. Mezzanine tabletops sit around 5.6 m and have to stay. */

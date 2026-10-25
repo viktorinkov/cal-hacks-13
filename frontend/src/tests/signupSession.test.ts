@@ -176,4 +176,21 @@ describe('attendee session', () => {
     await store.getState().confirmMedicalCard()
     expect(conn.reducers.confirmMedicalCard).toHaveBeenCalledWith({})
   })
+
+  it('subscribes the night, and end_event is what closes it', async () => {
+    const session = await import('@/stdb/session')
+    session.startSession()
+    await vi.waitFor(() => expect(harness.subscriptions.map(({ query }) => query)).toEqual(expect.arrayContaining(['SELECT * FROM my_visits'])))
+    const floor = harness.subscriptions.find((item) => Array.isArray(item.query))
+    expect(floor?.query).toEqual(expect.arrayContaining(['SELECT * FROM event_state']))
+    expect(harness.subscriptions.map((item) => item.query)).toEqual(expect.arrayContaining([
+      'SELECT * FROM my_visits', 'SELECT * FROM my_encounters', 'SELECT * FROM my_handles',
+      'SELECT * FROM my_shared_visits', 'SELECT * FROM my_departure',
+    ]))
+    const conn = harness.conn as ReturnType<typeof connection>
+    const endEvent = vi.fn().mockResolvedValue(undefined)
+    Object.assign(conn.reducers, { endEvent })
+    await session.endEvent()
+    expect(endEvent).toHaveBeenCalledExactlyOnceWith({})
+  })
 })

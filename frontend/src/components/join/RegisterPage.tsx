@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { LeaveEvent } from '@/components/attendee/LeaveEvent'
+import { MedicTap } from '@/components/attendee/MedicTap'
+import { PlanLookup } from '@/components/attendee/PlanLookup'
+import { ProfileMatch } from '@/components/attendee/ProfileMatch'
+import { Socials } from '@/components/attendee/Socials'
 import { CoverSlip } from '@/components/cover/CoverSlip'
+import { Recap } from '@/components/recap/Recap'
+import { Button } from '@/components/ui/button'
 import { MOCK_BANDS, type MockBand } from '@/mock/bands'
 import { blankRegistration, getSavedRegistration, saveRegistration, type Registration } from '@/cover/registry'
 import { useRoute } from '@/cover/route'
 import { bandIdFromSearch, rememberBand } from '@/cover/tapLink'
+import { nightIsOver, nightKnown } from '@/recap/night'
+import { useIsMedic, useMedicOnBand } from '@/stdb/attendeeOps'
 import { useSession, type MedicalCardView } from '@/stdb/session'
 import { validateMedicalFile, type MedicalDocumentKind } from '@/stdb/uploads'
 
@@ -163,10 +171,13 @@ function RegistrationForm({ band }: { band: MockBand }) {
   const savedHeading = useRef<HTMLHeadingElement>(null)
   const uploadId = useRef(0)
   const attemptedClaim = useRef(false)
+  // A medic tapping someone else's band must never claim it.
+  const isMedic = useIsMedic()
   const mine = myBand?.bandId === Number(band.label) ? myBand : null
   const owned = mine?.status === 'claimed'
   const connected = session.phase === 'live'
   const linked = connected && !claimError
+  const over = nightIsOver(session.eventEnded, session.departure?.leftAt)
   // A retry creates a new row: show the newest attempt for a given document.
   const documents = [...medicalDocuments].sort((a, b) => b.uploadedAt - a.uploadedAt || Number(BigInt(b.id) - BigInt(a.id)))
     .filter((doc, index, all) => all.findIndex((item) => item.fileHash === doc.fileHash && item.kind === doc.kind) === index)
@@ -178,10 +189,10 @@ function RegistrationForm({ band }: { band: MockBand }) {
     || documents.some((doc) => doc.kind === kind && doc.status === 'reading')
 
   useEffect(() => {
-    if (!connected || !myBandReady || attemptedClaim.current || owned) return
+    if (over || !connected || !myBandReady || attemptedClaim.current || owned || isMedic) return
     attemptedClaim.current = true
     void claimBand(`BANDIT-${band.label}`).catch((error: unknown) => setClaimError(reason(error)))
-  }, [connected, myBandReady, claimBand, band.label, owned])
+  }, [over, connected, myBandReady, claimBand, band.label, owned, isMedic])
 
   useEffect(() => {
     if (!saved) return
@@ -259,6 +270,8 @@ function RegistrationForm({ band }: { band: MockBand }) {
     finally { setSaving(false) }
   }
 
+  if (over) return <main className="wallet-main"><Recap showWalletLink /></main>
+
   if (saved) return (
     <div className="signup-complete">
       <div>
@@ -266,6 +279,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
         <h1 ref={savedHeading} tabIndex={-1} className="signup-title">Saved on band {band.label}.</h1>
         <p className="mt-5 max-w-[40ch] text-[16px] leading-7 text-ink-dim">Your band is linked and your details are saved. Your medical card is ready for review at the aid station when it’s needed.</p>
         <WalletStatus />
+        <div className="mt-8"><ProfileMatch /><LeaveEvent /></div>
         <div className="mt-8 flex flex-wrap items-center gap-5">
           <Button type="button" className="signup-primary" onClick={() => setSaved(null)}>Edit this band</Button>
           <button type="button" onClick={() => go('/wallet')} className="min-h-11 text-[14px]">Open your wallet</button>
@@ -309,6 +323,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
             <Field id="emergency-phone" label="Emergency phone" type="tel" value={draft.emergencyPhone} onChange={set('emergencyPhone')} error={errors.emergencyPhone} autoComplete="section-emergency tel" inputMode="tel" />
           </div>
         </Step>
+        <Step sectionId="socials" title="Socials" note="People you spend time with can see these after the event."><Socials bare /></Step>
         <Step sectionId="shipping" title="Shipping" note="Where a replacement band or merch should go.">
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -329,6 +344,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
             <UploadArea kind="insurance" title="Insurance card" note="Front and back, together." disabled={!linked || uploadingKind('insurance')} onFiles={(files) => addFiles('insurance', files)} error={uploadErrors.insurance} />
             <UploadArea kind="history" title="Medical history" note="Your medical records." disabled={!linked || uploadingKind('history')} onFiles={(files) => addFiles('history', files)} error={uploadErrors.history} />
           </div>
+          <PlanLookup bare disabled={!linked} />
           <ul aria-label="Document status" aria-live="polite" className="mt-4 divide-y divide-line">
             {uploads.filter((item) => !item.hash || !documents.some((doc) => doc.fileHash === item.hash && doc.kind === item.kind)).map((item) => (
               <li key={`local-${item.id}`} className="py-3 text-[13px]">
@@ -385,22 +401,33 @@ export function RegisterPage() {
   const [lights, setLights] = useState(true)
   const { search } = useRoute()
   const band = bandFromLocation(search)
+  const medic = useMedicOnBand(band ? Number(band.label) : null)
   const fromLink = bandIdFromSearch(search)
   useEffect(() => {
     if (fromLink != null) rememberBand(fromLink)
   }, [fromLink])
+  const known = useSession((s) => nightKnown(s.eventReady, s.departureReady, s.recapViewErrors.my_departure))
+  const over = useSession((s) => nightIsOver(s.eventEnded, s.departure?.leftAt))
+  const bandPage = !known ? (
+    <div className="signup-tap" role="status">
+      <h1 className="signup-title">Opening your band…</h1>
+      <p className="mt-5 text-[16px] leading-7 text-ink-dim">Checking whether the night has ended.</p>
+    </div>
+  ) : over ? <main className="wallet-main"><Recap showWalletLink /></main>
+    : band && medic.show ? <main className="signup-main"><MedicTap bandId={Number(band.label)} /></main>
+    : band ? <RegistrationForm key={band.deviceId} band={band} /> : (
+      <div className="signup-tap">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
+        <h1 className="signup-title mt-8">Your wristband opens this page.</h1>
+        <p className="mt-5 text-[16px] leading-7 text-ink-dim">Tap it with your phone. The tag is that band’s link, so this page connects on its own.</p>
+      </div>
+    )
   return (
     <div data-page data-motif="signup" data-lights={lights ? 'on' : 'off'} className="desk-night signup-page h-full overflow-y-auto bg-ground text-ink">
       <ConcertLights enabled={lights} />
       <div className="signup-shell">
         <NightHeader lights={lights} onToggleLights={() => setLights((current) => !current)} />
-        {band ? <RegistrationForm key={band.deviceId} band={band} /> : (
-          <div className="signup-tap">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
-            <h1 className="signup-title mt-8">Your wristband opens this page.</h1>
-            <p className="mt-5 text-[16px] leading-7 text-ink-dim">Tap it with your phone. The tag is that band’s link, so this page connects on its own.</p>
-          </div>
-        )}
+        {bandPage}
       </div>
     </div>
   )

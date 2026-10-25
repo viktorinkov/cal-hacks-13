@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DeskTabs } from '@/components/desk/DeskTabs'
+import { NightControls } from '@/components/dashboard/NightControls'
 import { useVenuePlan, type VenuePlan } from '@/map/venuePlan'
 import { useOperatorName } from '@/stdb/operatorName'
 import { selectVenuePlan } from '@/services/runtime'
@@ -70,6 +71,7 @@ export function StatusHeader() {
           {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </div>
         <DeskTabs />
+        <NightControls />
       </div>
       <div className="flex gap-4">
         <span aria-hidden className={cn('mt-2 w-[3px] flex-none rounded-full', toneBar[h.tone])} />

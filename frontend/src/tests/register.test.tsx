@@ -41,6 +41,8 @@ beforeEach(() => {
   useSession.setState({
     ...initialSession,
     phase: 'live',
+    eventReady: true,
+    departureReady: true,
     myBand: { bandId: 5, status: 'claimed', expiresAt: null },
     myBandReady: true,
     medicalDocuments: [],

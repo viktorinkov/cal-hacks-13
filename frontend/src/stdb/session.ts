@@ -7,7 +7,17 @@ import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
 import { sha256, uploadBlob, uploadPhoto, validateMedicalFile, type MedicalDocumentKind } from './uploads'
 import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
+import { attachLink, currentLink, dropLink } from './link'
 import { schedulePayments } from '@/payments/store'
+import {
+  readNight,
+  type Handle,
+  type RecapDeparture,
+  type RecapEncounter,
+  type RecapPhoto,
+  type RecapShared,
+  type RecapVisit,
+} from '@/recap/night'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -19,6 +29,8 @@ const FLOOR_QUERIES = [
   'SELECT * FROM band',
   'SELECT * FROM booth',
   'SELECT * FROM command',
+  // Public. end_event writes this row, and every band's page reads it to flip to the recap.
+  'SELECT * FROM event_state',
 ]
 
 /**
@@ -54,6 +66,9 @@ const DESK_QUERIES = [
   'SELECT * FROM person',
   'SELECT * FROM social_photos',
   'SELECT * FROM event_graph',
+  'SELECT * FROM settings',
+  'SELECT * FROM event_state',
+  'SELECT * FROM departure',
 ]
 
 export interface Actor {
@@ -128,8 +143,28 @@ interface SessionState {
   chargesReady: boolean
   suggestionsReady: boolean
   merchOrdersReady: boolean
+  photosReady: boolean
   /** Refusals of the attendee's payment views, by view name. */
   walletViewErrors: Record<string, string>
+  /** True once the public floor subscription, which includes event_state, has applied. */
+  eventReady: boolean
+  /** True once the host's end_event has landed. The public event_state row. */
+  eventEnded: boolean
+  eventEndedAt: number | null
+  eventName: string
+  visits: RecapVisit[]
+  encounters: RecapEncounter[]
+  handles: Handle[]
+  sharedVisits: RecapShared[]
+  recapPhotos: RecapPhoto[]
+  departure: RecapDeparture | null
+  visitsReady: boolean
+  encountersReady: boolean
+  handlesReady: boolean
+  sharedVisitsReady: boolean
+  departureReady: boolean
+  /** Refusals of the recap views, by view name. */
+  recapViewErrors: Record<string, string>
   actors: Actor[]
   /** Whether the staff-only views subscribed. Empty tables still count as open. */
   staffViews: 'pending' | 'open' | 'refused'
@@ -178,6 +213,12 @@ type Reducers = {
   buyMerch(args: { templateId: bigint; photoId: bigint; size: string }): Promise<unknown>
   rerunShoppingAgent(args: Record<string, never>): Promise<unknown>
   registerPhoto(args: { url: string; takenAt: Timestamp; zoneId: bigint; caption: string }): Promise<unknown>
+  approveRuleProposal(args: { proposalId: bigint; ceilingSeenCents: bigint }): Promise<unknown>
+  rejectRuleProposal(args: { proposalId: bigint; reason: string }): Promise<unknown>
+  setLowVis(args: { on: boolean }): Promise<unknown>
+  endEvent(args: Record<string, never>): Promise<unknown>
+  reopenEvent(args: Record<string, never>): Promise<unknown>
+  leaveEarly(args: { nodeId: bigint }): Promise<unknown>
 }
 
 let conn: DbConnection | null = null
@@ -365,6 +406,7 @@ function publish() {
   }))
   const walletRow = rowsOf(db.myWallet)[0]
   const wallet = walletRow ? { accountId: text(walletRow.accountId), balanceCents: cents(walletRow.balanceCents) } : null
+  const night = readNight(db)
   useSession.setState({
     phase: 'live',
     error: null,
@@ -380,6 +422,15 @@ function publish() {
     medicalCard,
     medicalDocuments,
     wallet,
+    eventEnded: night.eventEnded,
+    eventEndedAt: night.eventEndedAt,
+    eventName: night.eventName,
+    visits: night.visits,
+    encounters: night.encounters,
+    handles: night.handles,
+    sharedVisits: night.sharedVisits,
+    recapPhotos: night.photos,
+    departure: night.departure,
   })
   syncFloor(db)
   scheduleCatalog(db)
@@ -412,6 +463,38 @@ export async function releaseBand(bandId: number): Promise<void> {
   await call(() => reducers().releaseBand({ bandId }))
 }
 
+/** Approve a proposed payment rule at the ceiling on screen. */
+export async function approveProposal(id: string, ceilingCents: number): Promise<void> {
+  await call(() => reducers().approveRuleProposal({ proposalId: BigInt(id), ceilingSeenCents: BigInt(ceilingCents) }))
+}
+
+/** Reject a proposed payment rule. The module keeps the reason. */
+export async function rejectProposal(id: string, reason: string): Promise<void> {
+  const trimmed = reason.trim()
+  if (!trimmed) throw new Error('A rejection needs a reason.')
+  await call(() => reducers().rejectRuleProposal({ proposalId: BigInt(id), reason: trimmed }))
+}
+
+/** Fire or smoke: every band guides its wearer to the exit colour of its zone. */
+export async function setLowVisibility(on: boolean): Promise<void> {
+  await call(() => reducers().setLowVis({ on }))
+}
+
+/** End the event. Every tap link switches to that person's recap. */
+export async function endEvent(): Promise<void> {
+  await call(() => reducers().endEvent({}))
+}
+
+/** Bring the live event back. */
+export async function reopenEvent(): Promise<void> {
+  await call(() => reducers().reopenEvent({}))
+}
+
+/** Send one attendee home before the doors close. Their recap opens once they are out. */
+export async function leaveEarly(nodeId: string): Promise<void> {
+  await call(() => reducers().leaveEarly({ nodeId: BigInt(nodeId) }))
+}
+
 function bandIdFromToken(token: string): number | null {
   const match = /^BANDIT-(\d{1,3})$/.exec(token)
   return match ? Number(match[1]) : null
@@ -441,6 +524,12 @@ function requireClaimedBand(bandId?: number | null): void {
   if (!mine || !connected || (bandId != null && mine.bandId !== bandId)) {
     throw new Error('This wristband is not connected yet.')
   }
+}
+
+/** The secret the ranking endpoints expect in `x-bandit-session`. It stays in memory. */
+export function attendeeApiSession(): Promise<string> {
+  if (!conn) return Promise.reject(new Error('The database is not connected.'))
+  return uploadSession()
 }
 
 /** The secret stays in memory. The database only receives its SHA-256. */
@@ -545,8 +634,15 @@ function subscribeAttendeeViews(next: DbConnection) {
     ['my_charges', 'chargesReady'],
     ['my_merch_suggestions', 'suggestionsReady'],
     ['my_merch_orders', 'merchOrdersReady'],
+    ['my_photos', 'photosReady'],
+    ['my_visits', 'visitsReady'],
+    ['my_encounters', 'encountersReady'],
+    ['my_handles', 'handlesReady'],
+    ['my_shared_visits', 'sharedVisitsReady'],
+    ['my_departure', 'departureReady'],
   ] as const
-  const paymentViews: readonly string[] = ['my_wallet_entries', 'my_charges', 'my_merch_suggestions', 'my_merch_orders']
+  const paymentViews: readonly string[] = ['my_wallet_entries', 'my_charges', 'my_merch_suggestions', 'my_merch_orders', 'my_photos']
+  const recapViews: readonly string[] = ['my_visits', 'my_encounters', 'my_handles', 'my_shared_visits', 'my_departure', 'my_photos']
   for (const [view, readiness] of views) {
     next.subscriptionBuilder()
       .onApplied(() => {
@@ -559,6 +655,7 @@ function subscribeAttendeeViews(next: DbConnection) {
         const reason = messageOf(args[1] ?? args[0])
         if (view === 'my_wallet') useSession.setState({ walletError: reason })
         else if (paymentViews.includes(view)) useSession.setState((state) => ({ walletViewErrors: { ...state.walletViewErrors, [view]: reason } }))
+        else if (recapViews.includes(view)) useSession.setState((state) => ({ recapViewErrors: { ...state.recapViewErrors, [view]: reason } }))
         else useSession.setState({ signupError: reason })
       })
       .subscribe(`SELECT * FROM ${view}`)
@@ -567,6 +664,8 @@ function subscribeAttendeeViews(next: DbConnection) {
 
 function connect(token: string | undefined, played: boolean, host: HostConfig) {
   const key = `bandit-token:${host.database}`
+  // The socket this call handed to the side modules, so a replaced socket closing late leaves the new one alone.
+  let linked: DbConnection | null = null
   return new Promise<void>((resolve, reject) => {
     console.info('[stdb] connecting', { database: host.database, anonymous: !token })
     DbConnection.builder()
@@ -594,8 +693,14 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
           medicalDocuments: [], medicalDocumentsReady: false,
           medicalCard: null, medicalCardReady: false,
           signupError: null, wallet: null, walletError: null,
-          walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false,
-          walletViewErrors: {}, staffRequested: Boolean(token), staffQueries: {},
+          walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false, photosReady: false,
+          walletViewErrors: {},
+          eventReady: false,
+          eventEnded: false, eventEndedAt: null, eventName: '',
+          visits: [], encounters: [], handles: [], sharedVisits: [], recapPhotos: [], departure: null,
+          visitsReady: false, encountersReady: false, handlesReady: false, sharedVisitsReady: false, departureReady: false,
+          recapViewErrors: {},
+          staffRequested: Boolean(token), staffQueries: {},
         })
         console.info('[stdb] connected', identity.toHexString())
         if (!played && newToken) window.localStorage.setItem(key, newToken)
@@ -606,8 +711,13 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
           .subscriptionBuilder()
           .onApplied(() => {
             console.info('[stdb] floor subscription applied')
+            if (conn === next) useSession.setState({ eventReady: true })
             safePublish()
             resolve()
+            if (conn === next && currentLink() !== next) {
+              linked = next
+              attachLink(next)
+            }
             // One query at a time. A view that never answers must not hold the rest of the desk.
             const pending = [...(token ? STAFF_QUERIES : []), ...DESK_QUERIES]
             const subscribeNext = () => {
@@ -653,6 +763,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
         conn = null
         apiSession = null
         dropVenueSetup()
+        if (linked && currentLink() === linked) dropLink()
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
         noteDisconnect('Connection lost.')
       })
@@ -734,7 +845,24 @@ export const useSession = create<SessionState>((set, get) => ({
   chargesReady: false,
   suggestionsReady: false,
   merchOrdersReady: false,
+  photosReady: false,
   walletViewErrors: {},
+  eventReady: false,
+  eventEnded: false,
+  eventEndedAt: null,
+  eventName: '',
+  visits: [],
+  encounters: [],
+  handles: [],
+  sharedVisits: [],
+  recapPhotos: [],
+  departure: null,
+  visitsReady: false,
+  encountersReady: false,
+  handlesReady: false,
+  sharedVisitsReady: false,
+  departureReady: false,
+  recapViewErrors: {},
   actors: [],
   staffViews: 'pending',
   staffError: null,
@@ -881,7 +1009,9 @@ export async function fileFrame(file: File, zoneId: string, takenAtMs: number, c
 noteDisconnect = (message) => useSession.setState({
   phase: 'error', error: message,
   myBandReady: false, medicalDocumentsReady: false, medicalCardReady: false,
-  walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false,
+  walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false, photosReady: false,
+  eventReady: false,
+  visitsReady: false, encountersReady: false, handlesReady: false, sharedVisitsReady: false, departureReady: false,
 })
 
 /** What the desk tests render. No database connection. */
@@ -889,7 +1019,9 @@ export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionS
   'staff' | 'owner' | 'insurer' | 'cards' | 'wallet' | 'phase' | 'me' | 'roles' |
   'myBand' | 'myBandReady' | 'medicalDocuments' | 'medicalDocumentsReady' |
   'medicalCard' | 'medicalCardReady' | 'signupError' | 'walletError' |
-  'walletEntriesReady' | 'chargesReady' | 'suggestionsReady' | 'merchOrdersReady' | 'walletViewErrors' |
+  'walletEntriesReady' | 'chargesReady' | 'suggestionsReady' | 'merchOrdersReady' | 'photosReady' | 'walletViewErrors' |
+  'eventReady' | 'eventEnded' | 'eventEndedAt' | 'eventName' | 'visits' | 'encounters' | 'handles' | 'sharedVisits' | 'recapPhotos' | 'departure' |
+  'visitsReady' | 'encountersReady' | 'handlesReady' | 'sharedVisitsReady' | 'departureReady' | 'recapViewErrors' |
   'staffViews' | 'staffError' | 'staffRequested' | 'staffQueries'
 >>) {
   useSession.setState({
@@ -914,7 +1046,24 @@ export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionS
     chargesReady: false,
     suggestionsReady: false,
     merchOrdersReady: false,
+    photosReady: false,
     walletViewErrors: {},
+    eventReady: true,
+    eventEnded: false,
+    eventEndedAt: null,
+    eventName: '',
+    visits: [],
+    encounters: [],
+    handles: [],
+    sharedVisits: [],
+    recapPhotos: [],
+    departure: null,
+    visitsReady: false,
+    encountersReady: false,
+    handlesReady: false,
+    sharedVisitsReady: false,
+    departureReady: true,
+    recapViewErrors: {},
     staffViews: 'pending',
     staffError: null,
     staffRequested: false,

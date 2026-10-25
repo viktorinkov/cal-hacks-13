@@ -7,6 +7,8 @@ import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from
 import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
+import { ClaimExtras } from '@/components/claims/ClaimExtras'
+import { ClaimFiling } from '@/components/claims/ClaimFiling'
 import { useSession } from '@/stdb/session'
 
 /**
@@ -93,7 +95,8 @@ export function ClaimsDesk() {
           </div>
 
           {selected && (
-            <Docket
+            <div>
+              <Docket
               claim={selected}
               narrow={narrow}
               busy={busy}
@@ -104,6 +107,8 @@ export function ClaimsDesk() {
               onRefuse={(reason) => void refuse(selected.id, reason)}
               onRead={(bandId) => setTapBand(bandId)}
             />
+              <ClaimFiling claimId={selected.id} />
+            </div>
           )}
         </div>
       </div>
@@ -278,6 +283,7 @@ function Docket({
           {`Read band ${claim.bandId}`}
         </button>
       )}
+      <ClaimExtras claimId={claim.id} />
     </section>
   )
 }
