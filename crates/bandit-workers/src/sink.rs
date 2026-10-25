@@ -24,6 +24,7 @@ pub enum Finish {
     MerchPaid { merchant_id: String, purchase_id: String },
     ChargePaid { customer_id: String, account_id: String, purchase_id: String },
     MedicalCard { card_json: String },
+    EventImport { bundle: EventBundle },
     VenueSetup { result: VenueSetupResult },
     PlanLookup { result: PlanLookupResult },
     VenuePolicyLookup { result: VenuePolicyLookupResult },
@@ -34,6 +35,7 @@ pub enum Finish {
     RuleProposal { proposal_json: String },
 }
 
+#[derive(Clone)]
 pub enum Sink {
     Db(Arc<DbConnection>),
     Print,
@@ -117,6 +119,17 @@ impl Sink {
         }
     }
 
+    /// Reports server event-import progress while checking the current job lease.
+    pub async fn import_step(&self, job_id: u64, name: String, detail: String) -> Result<()> {
+        match self {
+            Sink::Db(conn) => reduce!(conn, report_event_import_step_then(job_id, name, detail)),
+            Sink::Print => {
+                print_call("report_event_import_step", json!({"job_id": job_id, "name": name, "detail": detail}));
+                Ok(())
+            }
+        }
+    }
+
     /// Reports a step of a claim's investigation, so the decision history shows it as it happens.
     pub async fn claim_step(&self, job_id: u64, step: &bandit_insurance::decision::Step) -> Result<()> {
         let (actor, what, why) = (step.actor.clone(), step.summary.clone(), step.detail.clone());
@@ -133,7 +146,7 @@ impl Sink {
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
         // The venue setup and document reducers take no call record, so their last call is recorded too.
-        let last = if matches!(finish, Finish::VenueSetup { .. } | Finish::DocumentTerms { .. } | Finish::HospitalReport { .. }) { None } else { calls.pop() };
+        let last = if matches!(finish, Finish::EventImport { .. } | Finish::VenueSetup { .. } | Finish::DocumentTerms { .. } | Finish::HospitalReport { .. }) { None } else { calls.pop() };
         for call in calls {
             self.record_call(call).await?;
         }
@@ -159,6 +172,7 @@ impl Sink {
                 reduce!(conn, record_charge_payment_then(job_id, customer_id, account_id, purchase_id))
             }
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
+            Finish::EventImport { bundle } => reduce!(conn, finish_event_import_then(job_id, bundle)),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
             Finish::PlanLookup { result } => reduce!(conn, finish_plan_lookup_then(job_id, result, last)),
             Finish::VenuePolicyLookup { result } => reduce!(conn, finish_venue_policy_lookup_then(job_id, result, last)),
@@ -241,6 +255,11 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         Finish::ClinicReport { record_json, file_hash } => {
             ("file_clinic_report", json!({"record_json": parse_or_text(record_json), "file_hash": file_hash, "call": call}))
         }
+        Finish::EventImport { bundle } => (
+            "finish_event_import",
+            json!({"run_id": bundle.run_id, "event": bundle.venue.name, "organizations": bundle.organizations.len(),
+                "people": bundle.people.len(), "booths": bundle.booths.len(), "schedule": bundle.schedule.len()}),
+        ),
         Finish::VenueSetup { result: r } => (
             "finish_venue_setup",
             json!({

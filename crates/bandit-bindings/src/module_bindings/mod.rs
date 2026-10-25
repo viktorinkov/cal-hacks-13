@@ -22,6 +22,7 @@ pub mod approval_type;
 pub mod approve_charge_reducer;
 pub mod approve_claim_reducer;
 pub mod approve_rule_proposal_reducer;
+pub mod approve_rule_scope_review_reducer;
 pub mod assign_medic_reducer;
 pub mod attach_claim_letters_reducer;
 pub mod attach_recovery_letter_reducer;
@@ -156,6 +157,10 @@ pub mod end_live_run_reducer;
 pub mod evacuate_live_run_reducer;
 pub mod event_bundle_type;
 pub mod event_graph_table;
+pub mod event_import_step_table;
+pub mod event_import_step_type;
+pub mod event_import_table;
+pub mod event_import_type;
 pub mod event_kind_type;
 pub mod event_link_type;
 pub mod event_state_table;
@@ -174,6 +179,7 @@ pub mod fee_schedule_line_type;
 pub mod file_claim_for_wearer_reducer;
 pub mod file_claim_reducer;
 pub mod file_clinic_report_reducer;
+pub mod finish_event_import_reducer;
 pub mod finish_plan_lookup_reducer;
 pub mod finish_venue_policy_lookup_reducer;
 pub mod finish_venue_setup_reducer;
@@ -357,6 +363,7 @@ pub mod remove_social_handle_reducer;
 pub mod remove_staff_reducer;
 pub mod reopen_event_reducer;
 pub mod report_claim_step_reducer;
+pub mod report_event_import_step_reducer;
 pub mod report_property_event_reducer;
 pub mod report_test_band_reducer;
 pub mod report_venue_setup_step_reducer;
@@ -367,6 +374,7 @@ pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
 pub mod resume_live_run_reducer;
 pub mod retry_claim_payout_reducer;
+pub mod review_rule_scopes_reducer;
 pub mod revoke_role_reducer;
 pub mod rule_proposal_table;
 pub mod rule_proposal_type;
@@ -410,6 +418,7 @@ pub mod staff_member_type;
 pub mod staff_role_table;
 pub mod staff_role_type;
 pub mod start_crowd_reducer;
+pub mod start_event_import_reducer;
 pub mod start_find_reducer;
 pub mod start_job_reaper_reducer;
 pub mod start_live_run_reducer;
@@ -492,6 +501,7 @@ pub use approval_type::Approval;
 pub use approve_charge_reducer::approve_charge;
 pub use approve_claim_reducer::approve_claim;
 pub use approve_rule_proposal_reducer::approve_rule_proposal;
+pub use approve_rule_scope_review_reducer::approve_rule_scope_review;
 pub use assign_medic_reducer::assign_medic;
 pub use attach_claim_letters_reducer::attach_claim_letters;
 pub use attach_recovery_letter_reducer::attach_recovery_letter;
@@ -626,6 +636,10 @@ pub use end_live_run_reducer::end_live_run;
 pub use evacuate_live_run_reducer::evacuate_live_run;
 pub use event_bundle_type::EventBundle;
 pub use event_graph_table::*;
+pub use event_import_step_table::*;
+pub use event_import_step_type::EventImportStep;
+pub use event_import_table::*;
+pub use event_import_type::EventImport;
 pub use event_kind_type::EventKind;
 pub use event_link_type::EventLink;
 pub use event_state_table::*;
@@ -644,6 +658,7 @@ pub use fee_schedule_line_type::FeeScheduleLine;
 pub use file_claim_for_wearer_reducer::file_claim_for_wearer;
 pub use file_claim_reducer::file_claim;
 pub use file_clinic_report_reducer::file_clinic_report;
+pub use finish_event_import_reducer::finish_event_import;
 pub use finish_plan_lookup_reducer::finish_plan_lookup;
 pub use finish_venue_policy_lookup_reducer::finish_venue_policy_lookup;
 pub use finish_venue_setup_reducer::finish_venue_setup;
@@ -827,6 +842,7 @@ pub use remove_social_handle_reducer::remove_social_handle;
 pub use remove_staff_reducer::remove_staff;
 pub use reopen_event_reducer::reopen_event;
 pub use report_claim_step_reducer::report_claim_step;
+pub use report_event_import_step_reducer::report_event_import_step;
 pub use report_property_event_reducer::report_property_event;
 pub use report_test_band_reducer::report_test_band;
 pub use report_venue_setup_step_reducer::report_venue_setup_step;
@@ -837,6 +853,7 @@ pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
 pub use resume_live_run_reducer::resume_live_run;
 pub use retry_claim_payout_reducer::retry_claim_payout;
+pub use review_rule_scopes_reducer::review_rule_scopes;
 pub use revoke_role_reducer::revoke_role;
 pub use rule_proposal_table::*;
 pub use rule_proposal_type::RuleProposal;
@@ -880,6 +897,7 @@ pub use staff_member_type::StaffMember;
 pub use staff_role_table::*;
 pub use staff_role_type::StaffRole;
 pub use start_crowd_reducer::start_crowd;
+pub use start_event_import_reducer::start_event_import;
 pub use start_find_reducer::start_find;
 pub use start_job_reaper_reducer::start_job_reaper;
 pub use start_live_run_reducer::start_live_run;
@@ -996,6 +1014,11 @@ pub enum Reducer {
         proposal_id: u64,
         ceiling_seen_cents: u64,
     },
+    ApproveRuleScopeReview {
+        proposal_id: u64,
+        ceiling_seen_cents: u64,
+        scope_seen: String,
+    },
     AssignMedic {
         incident_id: u64,
     },
@@ -1103,6 +1126,10 @@ pub enum Reducer {
         record_json: String,
         file_hash: String,
         call: ModelCallIn,
+    },
+    FinishEventImport {
+        job_id: u64,
+        bundle: EventBundle,
     },
     FinishPlanLookup {
         job_id: u64,
@@ -1285,6 +1312,11 @@ pub enum Reducer {
         what: String,
         why: String,
     },
+    ReportEventImportStep {
+        job_id: u64,
+        name: String,
+        detail: String,
+    },
     ReportPropertyEvent {
         incident_id: u64,
         camera_id: u64,
@@ -1325,6 +1357,7 @@ pub enum Reducer {
     RetryClaimPayout {
         claim_id: u64,
     },
+    ReviewRuleScopes,
     RevokeRole {
         identity: __sdk::Identity,
         role: String,
@@ -1383,6 +1416,9 @@ pub enum Reducer {
     },
     StartCrowd {
         size: u16,
+    },
+    StartEventImport {
+        event_slug: String,
     },
     StartFind {
         seeker: u8,
@@ -1519,6 +1555,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApproveCharge { .. } => "approve_charge",
             Reducer::ApproveClaim { .. } => "approve_claim",
             Reducer::ApproveRuleProposal { .. } => "approve_rule_proposal",
+            Reducer::ApproveRuleScopeReview { .. } => "approve_rule_scope_review",
             Reducer::AssignMedic { .. } => "assign_medic",
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
@@ -1549,6 +1586,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FileClaim { .. } => "file_claim",
             Reducer::FileClaimForWearer { .. } => "file_claim_for_wearer",
             Reducer::FileClinicReport { .. } => "file_clinic_report",
+            Reducer::FinishEventImport { .. } => "finish_event_import",
             Reducer::FinishPlanLookup { .. } => "finish_plan_lookup",
             Reducer::FinishVenuePolicyLookup { .. } => "finish_venue_policy_lookup",
             Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
@@ -1593,6 +1631,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemoveStaff { .. } => "remove_staff",
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportClaimStep { .. } => "report_claim_step",
+            Reducer::ReportEventImportStep { .. } => "report_event_import_step",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportTestBand { .. } => "report_test_band",
             Reducer::ReportVenueSetupStep { .. } => "report_venue_setup_step",
@@ -1603,6 +1642,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ResolveIncident { .. } => "resolve_incident",
             Reducer::ResumeLiveRun => "resume_live_run",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
+            Reducer::ReviewRuleScopes => "review_rule_scopes",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
             Reducer::SetExit { .. } => "set_exit",
@@ -1617,6 +1657,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SleepBands { .. } => "sleep_bands",
             Reducer::SocialTick { .. } => "social_tick",
             Reducer::StartCrowd { .. } => "start_crowd",
+            Reducer::StartEventImport { .. } => "start_event_import",
             Reducer::StartFind { .. } => "start_find",
             Reducer::StartJobReaper => "start_job_reaper",
             Reducer::StartLiveRun { .. } => "start_live_run",
@@ -1721,6 +1762,17 @@ impl __sdk::Reducer for Reducer {
                 proposal_id: proposal_id.clone(),
                 ceiling_seen_cents: ceiling_seen_cents.clone(),
             }),
+            Reducer::ApproveRuleScopeReview {
+                proposal_id,
+                ceiling_seen_cents,
+                scope_seen,
+            } => __sats::bsatn::to_vec(
+                &approve_rule_scope_review_reducer::ApproveRuleScopeReviewArgs {
+                    proposal_id: proposal_id.clone(),
+                    ceiling_seen_cents: ceiling_seen_cents.clone(),
+                    scope_seen: scope_seen.clone(),
+                },
+            ),
             Reducer::AssignMedic { incident_id } => {
                 __sats::bsatn::to_vec(&assign_medic_reducer::AssignMedicArgs {
                     incident_id: incident_id.clone(),
@@ -1913,6 +1965,12 @@ impl __sdk::Reducer for Reducer {
                 file_hash: file_hash.clone(),
                 call: call.clone(),
             }),
+            Reducer::FinishEventImport { job_id, bundle } => {
+                __sats::bsatn::to_vec(&finish_event_import_reducer::FinishEventImportArgs {
+                    job_id: job_id.clone(),
+                    bundle: bundle.clone(),
+                })
+            }
             Reducer::FinishPlanLookup {
                 job_id,
                 result,
@@ -2233,6 +2291,17 @@ impl __sdk::Reducer for Reducer {
                 what: what.clone(),
                 why: why.clone(),
             }),
+            Reducer::ReportEventImportStep {
+                job_id,
+                name,
+                detail,
+            } => __sats::bsatn::to_vec(
+                &report_event_import_step_reducer::ReportEventImportStepArgs {
+                    job_id: job_id.clone(),
+                    name: name.clone(),
+                    detail: detail.clone(),
+                },
+            ),
             Reducer::ReportPropertyEvent {
                 incident_id,
                 camera_id,
@@ -2312,6 +2381,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),
                 })
+            }
+            Reducer::ReviewRuleScopes => {
+                __sats::bsatn::to_vec(&review_rule_scopes_reducer::ReviewRuleScopesArgs {})
             }
             Reducer::RevokeRole { identity, role } => {
                 __sats::bsatn::to_vec(&revoke_role_reducer::RevokeRoleArgs {
@@ -2405,6 +2477,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::StartCrowd { size } => {
                 __sats::bsatn::to_vec(&start_crowd_reducer::StartCrowdArgs { size: size.clone() })
+            }
+            Reducer::StartEventImport { event_slug } => {
+                __sats::bsatn::to_vec(&start_event_import_reducer::StartEventImportArgs {
+                    event_slug: event_slug.clone(),
+                })
             }
             Reducer::StartFind {
                 seeker,
@@ -2701,6 +2778,8 @@ pub struct DbUpdate {
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
     event_graph: __sdk::TableUpdate<EventLink>,
+    event_import: __sdk::TableUpdate<EventImport>,
+    event_import_step: __sdk::TableUpdate<EventImportStep>,
     event_state: __sdk::TableUpdate<EventState>,
     evidence_fact: __sdk::TableUpdate<EvidenceFact>,
     evidence_pack: __sdk::TableUpdate<EvidencePack>,
@@ -3030,6 +3109,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "event_graph" => db_update
                     .event_graph
                     .append(event_graph_table::parse_table_update(table_update)?),
+                "event_import" => db_update
+                    .event_import
+                    .append(event_import_table::parse_table_update(table_update)?),
+                "event_import_step" => db_update
+                    .event_import_step
+                    .append(event_import_step_table::parse_table_update(table_update)?),
                 "event_state" => db_update
                     .event_state
                     .append(event_state_table::parse_table_update(table_update)?),
@@ -3478,6 +3563,12 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.key);
         diff.event = cache
             .apply_diff_to_table::<Event>("event", &self.event)
+            .with_updates_by_pk(|row| &row.id);
+        diff.event_import = cache
+            .apply_diff_to_table::<EventImport>("event_import", &self.event_import)
+            .with_updates_by_pk(|row| &row.id);
+        diff.event_import_step = cache
+            .apply_diff_to_table::<EventImportStep>("event_import_step", &self.event_import_step)
             .with_updates_by_pk(|row| &row.id);
         diff.event_state = cache
             .apply_diff_to_table::<EventState>("event_state", &self.event_state)
@@ -4086,6 +4177,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "event_graph" => db_update
                     .event_graph
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "event_import" => db_update
+                    .event_import
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "event_import_step" => db_update
+                    .event_import_step
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "event_state" => db_update
                     .event_state
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4636,6 +4733,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "event_graph" => db_update
                     .event_graph
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "event_import" => db_update
+                    .event_import
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "event_import_step" => db_update
+                    .event_import_step
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "event_state" => db_update
                     .event_state
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -5046,6 +5149,8 @@ pub struct AppliedDiff<'r> {
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
     event_graph: __sdk::TableAppliedDiff<'r, EventLink>,
+    event_import: __sdk::TableAppliedDiff<'r, EventImport>,
+    event_import_step: __sdk::TableAppliedDiff<'r, EventImportStep>,
     event_state: __sdk::TableAppliedDiff<'r, EventState>,
     evidence_fact: __sdk::TableAppliedDiff<'r, EvidenceFact>,
     evidence_pack: __sdk::TableAppliedDiff<'r, EvidencePack>,
@@ -5410,6 +5515,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
         callbacks.invoke_table_row_callbacks::<EventLink>("event_graph", &self.event_graph, event);
+        callbacks.invoke_table_row_callbacks::<EventImport>(
+            "event_import",
+            &self.event_import,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<EventImportStep>(
+            "event_import_step",
+            &self.event_import_step,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<EventState>("event_state", &self.event_state, event);
         callbacks.invoke_table_row_callbacks::<EvidenceFact>(
             "evidence_fact",
@@ -6493,6 +6608,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
         event_graph_table::register_table(client_cache);
+        event_import_table::register_table(client_cache);
+        event_import_step_table::register_table(client_cache);
         event_state_table::register_table(client_cache);
         evidence_fact_table::register_table(client_cache);
         evidence_pack_table::register_table(client_cache);
@@ -6668,6 +6785,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "encounter",
         "event",
         "event_graph",
+        "event_import",
+        "event_import_step",
         "event_state",
         "evidence_fact",
         "evidence_pack",

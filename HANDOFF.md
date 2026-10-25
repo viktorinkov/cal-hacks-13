@@ -4,6 +4,14 @@ This file is for the coding agent that takes over Band1t (the repo still says Ba
 
 Snapshot: 2026-10-25 09:10 UTC, vik-e2e at `26ed950` plus this file, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
 
+## Verified follow-up, 25 October 2026
+
+- Elastic migration and explicit rule-scope review are deployed in `5029dca9414c1d4b665c1353992b6be1764dd9f2`, verified at 10:03:25 UTC. Worker model tasks use Elastic Workflows and Agent Builder, with Claude as a configured model. Older narrower-looking rules require explicit review; the automated runner cannot grant that approval. Eddie's latest frontend changes were preserved.
+- [The current 23-frame board](https://excalidraw.com/#json=RVs5MKFQ6Nqkq3atzgMFl,5aolZTUddATQge1NYA23Zw) uses colored fills and large original artwork, compact queues and decisions, the three supplied hardware additions, and Live views. The original hardware board is unchanged. See [saved versions](diagrams/HISTORY.md), [all 75 views](diagrams/views.md), and the [current gap audit](handoff/research/audits/diagram-review-2026-10-25.md).
+- Organizer-triggered full event import is approved and being tested in `vik-organizer-event-import`. It runs on server workers; an organizer must not run the importer on a laptop. Existing venue discovery/map setup is already a separate organizer action.
+- Automatic recap ranking uses booth interests among event-grounded candidates. Typed natural-language friend search is not implemented. The complete plain recap is on the dev site's attendee flow; the public attendee frontend has not integrated it.
+- `devpost.md` received targeted corrections and independent review. It remains intentionally untracked. The older snapshot and unfinished-work lists below are historical context; check the current audit and code before treating an item as still open.
+
 ## Read first
 
 | File | What it gives you |
@@ -77,7 +85,7 @@ These were the Claude project's instructions from Viktor, adapted for one agent.
 ### Design priorities
 
 - Design before code. The System Design docs and the Excalidraw board show the intended behavior. Settle them first, then write the code to match.
-- SpacetimeDB is the most important sponsor, but the goal is to show the unique strengths of both SpacetimeDB and Elastic. SpacetimeDB owns the live and exact state. Elastic ("the Evidence Engine") validates, extracts and organizes data and ranks by meaning. Claude agents make the important decisions (the insurance Decision Engine).
+- SpacetimeDB is the most important sponsor, but show the unique strengths of both SpacetimeDB and Elastic. SpacetimeDB owns live state, transactional coordination and settlement authority. Updated by Viktor on 2026-10-25: Elastic owns suitable model execution, including the Decision Engine investigation. Bounded tasks use Workflows; retrieval and investigation use Agent Builder with worker-controlled tools and code guards. Claude may be the model behind Elastic's connector; it is not a separate direct-call decision layer.
 - Elastic reads every insurance document: the venue's policy PDFs, each attendee's own policy PDFs and the medical records. Policy terms (minimum payout, limits, deductible) are per-event or per-attendee variables that drive the Decision Engine.
 - Show the human in the loop (the organizer's review) clearly.
 - Main focuses: the insurance and claims features (Hyphenate's track), merch, and Meta's track (connecting people, memories, photos).
@@ -118,7 +126,8 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - Dropped on 2026-10-25 as new work: alerts on the medics' phones, and a logged opening of medical cards in View as. Cancelled as Leo's work: camera sightings for falls and SOS, exit colors per zone, low visibility guiding every band, and SOS above the other ring states. No firmware changes.
 - The happy path is Cal Hacks, but the product must work for any venue.
 - No Instagram sign-in. The recap shows who is in each photo.
-- Cut from the recap as never requested: the Claude-written "story of the night", an "Is this you?" step on photos, "N min together" and minutes per booth, match scores on cards, and a "min at the sponsor booths" line on merch picks. Who counts as having met someone is Leo's (vision).
+- Cut from the recap as never requested: the Claude-written "story of the night", an "Is this you?" step on photos, match scores on cards, and a "min at the sponsor booths" line on merch picks. Who counts as having met someone is Leo's (vision).
+- Updated on 2026-10-25: keep the current minutes together and minutes per booth in the recap and diagrams. Viktor superseded only the earlier instruction to remove those values. `web/src/recap.ts` shows time together, each person's booth minutes and shared-place durations; Eddie's graph details in `frontend/src/components/desk/graphModel.ts` and `GraphPage.tsx` also show minutes for encounters and booth visits. Check current code before raising a mismatch; all other handoff decisions still apply.
 - "Also there with you" is a list of suggestions from the attendee's side, not a search: people they spent time with but didn't swap details with, and booths the same way. Never people they didn't meet.
 - The people graph shows memories (photos) together with people and companies, built on an existing graph library.
 - Tapping a band in a browser signed in as a medic opens that person's medical info. Everyone else gets the sign-in screen.
@@ -127,6 +136,7 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - A person who leaves early can buy merch right after leaving: the event has ended for them.
 - The organizer has a Merch tab with the templates and every order. Staff, photographers included, are added by email.
 - Venue setup: the organizer names the event and Bright Data scrapes the rest, with Cal Hacks as the default in a dropdown. Judges don't need a live scrape. Bright Data also finds the insurance policies on the web, the attendee's plan and the venue's policy, instead of agents fetching them by hand.
+- On 2026-10-25 Viktor explicitly rejected running the full event importer on the organizer's laptop. The approved flow is the organizer's app action, a queued server import, and live progress/results. Keep full event ingestion separate from name-based venue discovery and 3D capture; do not describe the configured Cal Hacks importer as arbitrary-event ingestion. The CLI is a maintainer tool.
 - Kibana syncs by itself, so no import buttons for it in the UI.
 - The crowd is 1,000 test bands, generated in code, not by a model.
 - The Live tab on Viktor's pages: a big venue map with side panels, plain style, many tables and buttons, tables that scroll and search, and the legend as a table. Run controls (pause, end the event) sit at the top of every screen, and the run writes to SpacetimeDB like the real system. Every attendee is in a search bar: pick one to act as them or open their portal, or click them on the map. A real band dragged onto a person shows as that attendee. Exit stations and sponsor names are marked on the map.
@@ -150,7 +160,7 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 
 ### Sponsors
 
-- SpacetimeDB is the most important sponsor, but show what both SpacetimeDB and Elastic do best: they solve different problems. Elastic's agents validate data, Claude's agents decide.
+- SpacetimeDB owns live state and enforced decisions. Elastic supplies indexed evidence, semantic ranking, cited checks, proposed rules and model orchestration. The old "Elastic validates, Claude decides" split was superseded by Viktor's 2026-10-25 migration decision. Medical history and insurance-card extraction, including scanned-page transcription, belong in private Elastic workflows; do not retain a direct model fallback after the image path has been verified.
 - Kibana dashboards stay, because they are visual for judges.
 - Use a sponsor's API only where it truly fits. The merch images were made by hand with an image model, since no sponsor fit.
 - The app's name is Band1t.

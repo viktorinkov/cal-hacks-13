@@ -13,6 +13,7 @@ import { act, date, field, h, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { PolicyDocument, PolicyTerm, VenuePolicyLookup, VenueSetup } from './module_bindings/types';
 import { VenueNames, type Spot } from './venue-names';
+import { eventImportSection } from './event-import';
 
 /** Setup 0: the venue that ships with the app. */
 const DEFAULT_SETUP = 0n;
@@ -639,6 +640,7 @@ export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   updatePicker(canSetUp);
   const runs = [...conn.db.venueSetup.iter()].sort((a, b) => Number(b.id - a.id));
   return [
+    eventImportSection(conn, canSetUp),
     shown(),
     startForm(canSetUp),
     canSetUp && policySection(),

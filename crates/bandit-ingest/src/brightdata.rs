@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use reqwest::blocking::Response;
 use serde_json::{Value, json};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const MCP_URL: &str = "https://mcp.brightdata.com/mcp";
 const PROTOCOL: &str = "2025-06-18";
@@ -37,7 +37,7 @@ impl Client {
         if !self.session.is_empty() {
             req = req.header("mcp-session-id", &self.session);
         }
-        Ok(req.send()?.error_for_status()?)
+        Ok(req.send().map_err(|e| e.without_url())?.error_for_status().map_err(|e| e.without_url())?)
     }
 
     pub fn call(&self, tool: &str, args: Value) -> Result<String> {
@@ -60,7 +60,11 @@ impl Client {
         let input: Vec<Value> = urls.iter().map(|u| json!({"url": u})).collect();
         let mut res = self.call_json("run_scraper", json!({"dataset_id": dataset_id, "method": "collect_by_url", "input": input}))?;
         let snapshot = res["snapshot_id"].as_str().with_context(|| format!("run_scraper gave no snapshot_id: {res}"))?.to_string();
+        let deadline = Instant::now() + Duration::from_secs(30 * 60);
         while res["status"] != "ready" {
+            if Instant::now() >= deadline {
+                bail!("dataset {dataset_id} did not finish within 30 minutes");
+            }
             std::thread::sleep(Duration::from_secs(30));
             let progress = self.call_json("get_scraper_progress", json!({"snapshot_id": snapshot}))?;
             match progress["status"].as_str() {

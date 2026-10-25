@@ -91,13 +91,19 @@ fn without_people(body: &str) -> Result<String> {
 }
 
 pub fn run(cfg: &Config) -> Result<()> {
+    run_with_progress(cfg, &mut |_, _| Ok(()))
+}
+
+pub fn run_with_progress(cfg: &Config, progress: &mut impl FnMut(&str, &str) -> Result<()>) -> Result<()> {
     let sources: Sources = serde_json::from_str(&std::fs::read_to_string(cfg.data_dir.join("sources.json"))?)?;
     let bd = brightdata::Client::connect(&cfg.brightdata_token)?;
     for p in &sources.pages {
+        progress("Fetching", &format!("Reading {}", p.url))?;
         let body = bd.call("scrape_as_markdown", json!({"url": p.url}))?;
         save(cfg, &p.source, &p.kind, &p.url, "web_unlocker", "scrape_as_markdown", body)?;
     }
     for d in &sources.datasets {
+        progress("Enriching", &format!("Fetching {} public records", d.source))?;
         let body = without_people(&bd.run_dataset(&d.dataset_id, &d.urls)?)?;
         save(cfg, &d.source, &d.kind, &format!("dataset:{}", d.dataset_id), "web_scraper_api", "run_scraper", body)?;
     }

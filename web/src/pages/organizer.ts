@@ -71,6 +71,8 @@ const QUERIES = [
   'SELECT * FROM board_merch_shipping',
   'SELECT * FROM board_wallets',
   'SELECT * FROM board_merch_picks',
+  'SELECT * FROM event_import',
+  'SELECT * FROM event_import_step',
   'SELECT * FROM venue_setup',
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
