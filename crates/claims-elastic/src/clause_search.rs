@@ -22,7 +22,7 @@ pub const CLAUSE_SECTIONS: [&str; 8] =
 /// | Kind | The policy and cover | Sections |
 /// |---|---|---|
 /// | `fall`, `sos` | the venue's medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (staff, pre-existing, off premises), conditions (service window), other insurance |
-/// | `property` | the venue's property cover | insuring agreement, limits and deductible, exclusions, subrogation |
+/// | `property` | the venue's property policy | insuring agreement, limits and deductible, exclusions, subrogation |
 /// | `theft` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions (such as property left unattended), theft, subrogation |
 /// | `breakage` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions, subrogation |
 ///

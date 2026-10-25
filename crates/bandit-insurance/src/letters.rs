@@ -162,20 +162,25 @@ fn kind_text(kind: &str) -> &str {
 pub fn fnol_template(d: &LetterData) -> String {
     let d = &plain(d);
     let a = d.amounts;
-    let cover = if d.incident_kind == "property" { "property" } else { "medical payments" };
+    let (form, line) = if d.incident_kind == "property" {
+        ("PROPERTY LOSS NOTICE (ACORD 1 layout)", "commercial property, the property part of the package policy")
+    } else {
+        ("LIABILITY NOTICE OF OCCURRENCE / CLAIM (ACORD 3 layout)", "general liability, medical payments cover")
+    };
     let mut t = format!(
-        "LIABILITY NOTICE OF OCCURRENCE / CLAIM (ACORD 3 layout)\nClaim {}\n\n\
+        "{}\nClaim {}\n\n\
          CARRIER\nInsurer: {}\nNotice to: {}\n\n\
-         POLICY\nPolicy number: {}\nLine of business: general liability, {} cover\n\n\
+         POLICY\nPolicy number: {}\nLine of business: {}\n\n\
          INSURED\nName: {}\n\n\
          OCCURRENCE\nDate and time: {}\nLocation: {}, {}\nDescription: {} recorded by BandIt wristbands and venue staff\n\n\
          INJURED / PROPERTY DAMAGED\nClaimant: {}\nCovered cost: {}\nPaid to the claimant: {}\nRecoverable under the policy: {}\nVenue share (deductible): {}\n\n\
          WITNESSES\n",
+        form,
         d.claim_id,
         d.insurer_name,
         d.fnol_contact,
         d.policy_number,
-        cover,
+        line,
         d.venue_name,
         d.incident_time,
         d.zone_name,
@@ -245,10 +250,15 @@ pub fn determination_template(d: &LetterData) -> String {
         "Medical charges are paid up to the venue's fee schedule for each service, for treatment on or after the incident date."
     };
     let limit = if a.payout_cents < a.cost_cents { " The payment is limited by the policy's per-claim or aggregate limit." } else { "" };
+    let which = match d.incident_kind.as_str() {
+        "property" => "the venue's property policy",
+        "theft" | "breakage" => "your own policy",
+        _ => "the venue's general liability policy",
+    };
     format!(
         "Dear {},\n\n\
-         This letter is about claim {}: {} in {}, {}, at {}. The claim was handled under the venue's general liability \
-         policy {} with {}.\n\n\
+         This letter is about claim {}: {} in {}, {}, at {}. The claim was handled under {which} \
+         {} with {}.\n\n\
          Your covered costs come to {}, and you will be paid {}.\n\n\
          Decision: {}.\n\n\
          Why: {}{}\n\n\

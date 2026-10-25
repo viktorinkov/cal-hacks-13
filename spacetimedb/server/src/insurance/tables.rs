@@ -21,7 +21,7 @@ pub enum ClaimStatus {
     Reconciled,
 }
 
-/// The venue's general liability policy for the event.
+/// The venue's package policy for the event: a general liability part (medical payments) and a property part.
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = insurance_policy)]
 pub struct InsurancePolicy {

@@ -9,9 +9,13 @@ This file lists the types in one place. The claim flow they share, the charges a
 | Type (`incident_kind`) | What happened | Who claims | Which policy pays | Who can be charged |
 |---|---|---|---|---|
 | `fall`, `sos` | an attendee is hurt | the attendee | the venue's policy, medical payments cover | nobody |
-| `property` | the venue's own equipment is broken | the venue | the venue's policy, property cover, above its deductible | the attendee who broke it, when staff named them |
+| `property` | the venue's own equipment is broken | the venue | the venue's property policy, above its deductible | the attendee who broke it, when staff named them |
 | `theft` | an attendee's belonging is stolen | the attendee | the attendee's own policy, personal property cover; the venue's policy excludes guests' property | the attendee who took it, when staff named them |
 | `breakage` | an attendee's belonging is broken by someone else | the attendee | the attendee's own policy, personal property cover; the venue's policy excludes guests' property | the attendee who broke it, when staff named them |
+
+## The venue's policy
+
+The venue holds one package policy with two parts. Its general liability part pays injuries (medical payments, no fault needed); a liability policy excludes property the venue owns, rents or occupies. Its property part, the venue's property policy, pays to repair or replace the venue's own equipment, above a deductible the venue carries.
 
 ## The attendee's own policy
 

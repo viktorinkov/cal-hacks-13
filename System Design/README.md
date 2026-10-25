@@ -41,7 +41,7 @@ One word for one thing in every doc. Code names stay as the code spells them, in
 | evidence pack | a claim's numbered facts, checks and fingerprint | evidence bundle |
 | The Evidence Engine | Elastic's part: reading the insurance documents and finding their clauses, checking claim copies, recap ranking, event setup and the raw data | evidence agent, search |
 | the insurance Decision Engine | the Anthropic Claude API plus the Rust code that decides insurance claims | claims agent, Decision Engine (alone) |
-| the venue's policy | the venue's general liability insurance policy, uploaded as a PDF at event setup | |
+| the venue's policy | the venue's package insurance policy, uploaded as a PDF at event setup: a general liability part (medical payments) and a property part (its own equipment) | |
 | policy terms | the limits, deductible, minimum payout, service window, fee schedule and exclusions read from the venue's policy, each quoting its clause | settings, config |
 | clause | one section of the wording of the venue's policy or the attendee's insurance card, as The Evidence Engine indexed it | rule, paragraph |
 | the guard | the code that holds Claude's decision to the policy terms and the checks | |

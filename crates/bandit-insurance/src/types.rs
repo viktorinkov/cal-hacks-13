@@ -79,8 +79,8 @@ impl CoverKind {
         }
     }
 
-    /// The venue's general liability policy pays injuries from medical-payments
-    /// cover and the venue's own equipment from property cover. It excludes
+    /// The venue's general liability pays injuries from medical-payments cover,
+    /// and the venue's property policy pays for its own equipment. Both exclude
     /// guests' property, so a theft or a breakage of an attendee's belonging is
     /// paid from the attendee's own policy, its personal property cover.
     pub fn for_incident(kind: IncidentKind) -> Self {

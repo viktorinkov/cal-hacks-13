@@ -504,7 +504,7 @@ fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
         )
     } else {
         format!(
-            "Venue general liability, property cover: pays repair or replacement of the venue's own equipment damaged during the event, up to {} per claim, after a {} deductible the venue carries.",
+            "The venue's property policy, the property part of its package policy: pays repair or replacement of the venue's own equipment damaged during the event, up to {} per claim, after a {} deductible the venue carries. The general liability part does not pay for property the venue owns.",
             f(r.per_claim_limit_cents),
             f(r.deductible_cents)
         )

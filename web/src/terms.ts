@@ -75,7 +75,7 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bper[- ]claim limit\b|\bup to \$[\d,]+(?:\.\d\d)? a claim\b/i, 'The most the policy pays on any one claim.'],
   [/\baggregate(?: limit)?\b|\$[\d,]+(?:\.\d\d)? left\b/i, 'The most the policy pays across all claims at the event, and what is left of it.'],
   [/\bmedical payments(?: cover)?\b/i, 'Cover that pays an injured attendee\'s medical bills, whoever was at fault.'],
-  [/\bproperty cover\b/i, 'Cover that pays to repair or replace the venue\'s own equipment.'],
+  [/\bproperty cover\b/i, 'The venue\'s property policy: it pays to repair or replace the venue\'s own equipment, above its deductible.'],
   [/\bfirst notice of loss\b/i, 'The first report of a claim, sent to the insurer.'],
   [/\bclaimants?\b/i, 'The person a claim pays.'],
   [/\bpayouts?\b/i, 'What the venue pays the claimant, or the repair vendor, on a claim.'],
