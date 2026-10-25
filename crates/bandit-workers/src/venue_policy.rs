@@ -3,8 +3,9 @@
 //! as CP 00 10. For each form Bright Data's search finds it, Claude picks it among the results
 //! (`venue_policy_find`), the Web Unlocker fetches it, and Claude reads the form number and title it
 //! prints (`venue_policy_check`). Code keeps only addresses the search gave, only real PDFs, and only a
-//! PDF whose printed form number holds the one typed. The forms are joined into one PDF, the liability
-//! form first, which goes to the blob store, and the module files it as the venue's policy.
+//! PDF whose printed form number holds the one typed. A form inside a longer PDF, such as a specimen
+//! policy, is cut out by the pages Claude gives. The forms are joined into one PDF, the liability form
+//! first, which goes to the blob store, and the module files it as the venue's policy.
 
 use bandit_bindings::{PolicyForm, VenuePolicyLookupResult};
 use claude_client::{Effort, MessageRequest};
@@ -12,7 +13,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::brightdata::{BrightData, err, urls_in};
-use crate::document::{join_pdfs, page_count};
+use crate::document::{join_pdfs, page_count, pdf_pages};
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::{Model, ask_twice};
 use crate::plan::{DOCUMENTS, MAX_PDF_BYTES, MAX_SEARCH_CHARS, check_find, find_schema, printed_item, short};
@@ -94,9 +95,11 @@ fn check_schema() -> Value {
         "properties": {
             "document": {"type": "string", "enum": ["liability_form", "property_form", "other"]},
             "form_number": printed_item(),
-            "title": printed_item()
+            "title": printed_item(),
+            "first_page": {"type": "integer"},
+            "last_page": {"type": "integer"}
         },
-        "required": ["document", "form_number", "title"],
+        "required": ["document", "form_number", "title", "first_page", "last_page"],
         "additionalProperties": false
     })
 }
@@ -105,9 +108,12 @@ fn check_prompt(p: &Payload, part: Part, pages: u32) -> String {
     format!(
         "The organizer typed the form number {:?}. This PDF was found on the web as {}. It has about {pages} page(s).\n\n\
 Say what the document is: `liability_form` for a commercial general liability coverage form, `property_form` for a commercial property coverage \
-form such as the building and personal property coverage form, `other` for anything else (an endorsement, a declarations page, an article, a \
-specimen policy of another kind). Copy the form number with its edition, such as \"CG 00 01 04 13\", and the form's title exactly as the document \
-prints them, each with the 1-based page it is printed on. Use an empty text and page 0 for anything it does not print.",
+form such as the building and personal property coverage form, also when the PDF holds that form among other pages, and `other` for anything \
+that does not hold it (an endorsement alone, a declarations page, an article, a policy without that form). Copy the form number with its edition, such as \"CG 00 01 04 13\", and the form's title exactly as the document \
+prints them, each with the 1-based page it is printed on. Use an empty text and page 0 for anything it does not print.\n\n\
+The PDF may hold more than the form, such as a whole specimen policy with declarations, endorsements and other forms. Give `first_page` and \
+`last_page`, the 1-based pages where the form itself starts and ends, and copy its form number from those pages, such as a page footer. Use 0 \
+and 0 when the document is `other`.",
         part.form,
         what(p, part)
     )
@@ -119,6 +125,9 @@ struct Printed {
     document: String,
     form_number: String,
     title: String,
+    /// The form's own pages in the PDF.
+    first_page: u32,
+    last_page: u32,
 }
 
 fn check_printed(v: &Value, pages: u32) -> Result<Printed, Vec<String>> {
@@ -131,7 +140,18 @@ fn check_printed(v: &Value, pages: u32) -> Result<Printed, Vec<String>> {
         }
         text.chars().take(120).collect()
     };
-    let printed = Printed { document: v["document"].as_str().unwrap_or("other").to_string(), form_number: item("form_number"), title: item("title") };
+    let (form_number, title) = (item("form_number"), item("title"));
+    let document = v["document"].as_str().unwrap_or("other").to_string();
+    let page = |k: &str| v[k].as_i64().unwrap_or(0).clamp(0, u32::MAX as i64) as u32;
+    let (first_page, last_page) = (page("first_page"), page("last_page"));
+    if document != "other" {
+        if first_page < 1 || first_page > last_page || last_page > pages {
+            problems.push(format!("first_page {first_page} and last_page {last_page} must be pages of the form within 1..={pages}"));
+        } else if !form_number.is_empty() && !(first_page..=last_page).contains(&(v["form_number"]["page"].as_i64().unwrap_or(0) as u32)) {
+            problems.push(format!("copy form_number from the form's own pages {first_page}..={last_page}"));
+        }
+    }
+    let printed = Printed { document, form_number, title, first_page, last_page };
     if problems.is_empty() { Ok(printed) } else { Err(problems) }
 }
 
@@ -160,6 +180,10 @@ fn mismatch(part: Part, d: &Printed) -> Option<String> {
     if !form_matches(part.form, &d.form_number) {
         return Some(format!("it is form {:?}, not {:?}", d.form_number, part.form));
     }
+    let pages = d.last_page.saturating_sub(d.first_page) + 1;
+    if pages > MAX_PAGES {
+        return Some(format!("the form runs {pages} pages, and the reading takes at most {MAX_PAGES}"));
+    }
     None
 }
 
@@ -184,7 +208,7 @@ async fn check_pdf<M: Model>(model: &M, p: &Payload, part: Part<'_>, pdf: &[u8],
     }
 }
 
-/// One form found: where, what it prints, and its bytes.
+/// One form found: where, what it prints, and its own pages.
 struct Found {
     part: &'static str,
     url: String,
@@ -192,7 +216,18 @@ struct Found {
     pdf: Vec<u8>,
 }
 
-/// What looking for one form gave: the form, or why not, and how many PDFs came back.
+/// The form's own pages: the whole PDF, or the pages cut out of a longer one, which is noted.
+fn form_pages(pdf: Vec<u8>, d: &Printed, url: &str, notes: &mut Vec<String>) -> anyhow::Result<Vec<u8>> {
+    let pages = page_count(&pdf);
+    if d.first_page == 1 && d.last_page == pages {
+        return Ok(pdf);
+    }
+    let form = pdf_pages(&pdf, d.first_page, d.last_page)?;
+    notes.push(format!("The form {} is pages {} to {} of the {pages} at {}.", d.form_number, d.first_page, d.last_page, short(url)));
+    Ok(form)
+}
+
+/// What looking for one form gave: the form and how it was cut out, or why not, and how many PDFs came back.
 struct Looked {
     found: Option<Found>,
     notes: Vec<String>,
@@ -250,12 +285,21 @@ async fn look_for(ctx: &Ctx, bd: &BrightData, p: &Payload, part: Part<'_>, calls
             }
         };
         looked.pdfs += 1;
-        match check_pdf(&ctx.claude, p, part, &pdf, calls).await {
-            Ok(printed) => {
+        let printed = match check_pdf(&ctx.claude, p, part, &pdf, calls).await {
+            Ok(printed) => printed,
+            Err(why) => {
+                looked.notes.push(format!("{}: {why}", short(url)));
+                continue;
+            }
+        };
+        let mut cut = Vec::new();
+        match form_pages(pdf, &printed, url, &mut cut) {
+            Ok(pdf) => {
                 looked.found = Some(Found { part: part.name, url: url.clone(), printed, pdf });
+                looked.notes = cut;
                 return Ok(looked);
             }
-            Err(why) => looked.notes.push(format!("{}: {why}", short(url))),
+            Err(e) => looked.notes.push(format!("{}: pages {} to {} could not be cut out ({e:#})", short(url), printed.first_page, printed.last_page)),
         }
     }
     Ok(looked)
@@ -306,6 +350,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
         match looked.found {
             Some(f) => {
                 tracing::info!(job_id = job.id, lookup_id = p.lookup_id, part = part.name, url = %f.url, form = %f.printed.form_number, "policy form found");
+                notes.extend(looked.notes);
                 found.push(f);
             }
             None => notes.push(format!("No {} form {} was found: {}.", part.name, part.form, looked.notes.join("; "))),
@@ -355,7 +400,7 @@ mod tests {
     }
 
     fn printed(document: &str, form_number: &str) -> Printed {
-        Printed { document: document.into(), form_number: form_number.into(), title: "COMMERCIAL GENERAL LIABILITY COVERAGE FORM".into() }
+        Printed { document: document.into(), form_number: form_number.into(), title: "COMMERCIAL GENERAL LIABILITY COVERAGE FORM".into(), first_page: 1, last_page: 16 }
     }
 
     #[test]
@@ -367,18 +412,34 @@ mod tests {
         assert!(mismatch(property, &printed("property_form", "CP 00 10 06 07")).unwrap().contains("not \"CP 00 10 10 12\""));
         assert!(mismatch(liability, &printed("property_form", "CG 00 01 04 13")).unwrap().contains("not a commercial general liability"));
         assert!(mismatch(liability, &printed("liability_form", "")).is_some());
+        let long = Printed { last_page: 70, ..printed("liability_form", "CG 00 01 04 13") };
+        assert!(mismatch(liability, &long).unwrap().contains("runs 70 pages"));
     }
 
     #[test]
     fn printed_items_need_a_page_on_the_document() {
-        let v = json!({"document": "liability_form", "form_number": {"text": "CG 00 01 04 13", "page": 17}, "title": {"text": "", "page": 0}});
+        let v = json!({"document": "liability_form", "form_number": {"text": "CG 00 01 04 13", "page": 17}, "title": {"text": "", "page": 0}, "first_page": 1, "last_page": 16});
         assert!(check_printed(&v, 16).unwrap_err()[0].contains("form_number page 17"));
+    }
+
+    #[test]
+    fn the_form_has_its_own_pages_in_the_pdf() {
+        let form = |first: i64, last: i64, at: i64| {
+            json!({"document": "liability_form", "form_number": {"text": "CG 00 01 04 13", "page": at}, "title": {"text": "", "page": 0}, "first_page": first, "last_page": last})
+        };
+        let d = check_printed(&form(12, 27, 27), 70).unwrap();
+        assert_eq!((d.first_page, d.last_page), (12, 27));
+        assert!(check_printed(&form(12, 71, 27), 70).unwrap_err()[0].contains("within 1..=70"));
+        assert!(check_printed(&form(27, 12, 27), 70).is_err());
+        assert!(check_printed(&form(12, 27, 3), 70).unwrap_err()[0].contains("own pages 12..=27"), "the forms schedule on the declarations is not the form");
+        let other = json!({"document": "other", "form_number": {"text": "", "page": 0}, "title": {"text": "", "page": 0}, "first_page": 0, "last_page": 0});
+        assert!(check_printed(&other, 70).is_ok());
     }
 
     #[tokio::test]
     async fn a_pdf_of_another_edition_is_passed_over() {
         let p = payload();
-        let other = json!({"document": "property_form", "form_number": {"text": "CP 00 10 06 07", "page": 1}, "title": {"text": "BUILDING AND PERSONAL PROPERTY COVERAGE FORM", "page": 1}});
+        let other = json!({"document": "property_form", "form_number": {"text": "CP 00 10 06 07", "page": 1}, "title": {"text": "BUILDING AND PERSONAL PROPERTY COVERAGE FORM", "page": 1}, "first_page": 1, "last_page": 1});
         let model = FakeModel::new(vec![Ok(other)]);
         let mut calls = Vec::new();
         let why = check_pdf(&model, &p, parts(&p)[1], b"%PDF-1.7 <</Type /Page>>", &mut calls).await.unwrap_err();
