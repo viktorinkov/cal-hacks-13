@@ -2,7 +2,7 @@
 
 This file is for the coding agent that takes over Band1t (the repo still says BandIt in many places) when the Claude setup stops. It holds only what the repository does not already say: Viktor's standing rules from outside the repo, his decisions from the chats, the work that was unfinished at handoff, the steps that only work on Viktor's Mac, where the credentials live, and the research. For how the system works, read the files under "Read first". Do not copy their content into this file.
 
-Snapshot: 2026-10-25 07:10 UTC, vik-e2e at `60ac3f5`, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
+Snapshot: 2026-10-25 07:15 UTC, vik-e2e at `86060eb` plus this file, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
 
 ## Read first
 
@@ -228,7 +228,6 @@ Refresh this table with `handoff/branches.sh`.
 
 | Branch | Commits not in vik-e2e | Last commit (UTC) | Author | What it is |
 | --- | --- | --- | --- | --- |
-| `vik-evacuate` | 1 | 10-25 06:56 | Viktor | in progress: an Evacuate button on the Live tab sends the live run's crowd to the exits (new reducer `evacuate_live_run`, table `live_evacuation`). Viktor asked for it at 06:45 for his dev pages only, as part of the scripted run. Publish the module before merging it |
 | `vik-medic-alerts` | 1 | 10-25 05:54 | Viktor | design only, dropped by Viktor: alerts on the medics' phones. Don't merge |
 | `vik-medical-view-as` | 1 | 10-25 05:55 | Viktor | design only, dropped by Viktor as new work: View as opens a medical card only through a logged opening. Don't merge |
 | `vik-security-sightings` | 1 | 10-25 05:55 | Viktor | design only, cancelled: Leo does the camera side. Don't merge |
@@ -246,7 +245,7 @@ Open PRs: #22 (vik-e2e into main, the team's PR), #41 (`vik-cloud-config` into m
 - **Attendee's plan to cut venue costs**: shipped (`54e3924`, merge `2787ead`). The attendee's plan pays first and the venue's excess cover pays only the copay the plan leaves. Left: check that devpost.md has its paragraph.
 - **Index fetched PDFs for search by meaning**: shipped (`443bb8f`, `7525163`). Fetched plan and venue PDFs are chunked into `bandit-policy-clauses` and each check cites the chunk it matched. A PDF that any lookup kept now stays in Elastic when another lookup passes it over.
 - **Reuse a plan**: shipped (merge `c2f0aae`) and published: Maincloud has `plan_lookup.reused_from`.
-- **Evacuate the live run**: the `vik-evacuate` branch above.
+- **Evacuate the live run**: shipped (merge `86060eb`) and published. An Evacuate button on Viktor's Live tab sends the live run's crowd to the exits (`evacuate_live_run`, `live_evacuation`). Left: watch one evacuation on dev.band1t.vip.
 - **Hospital report**: merged (`0de153d`) and published. Maincloud has `apply_hospital_report` and no longer `apply_medical_record`. Left: check that no claim is stuck in `ReadingRecord`, and apply its 12 Devpost edits.
 - **Queues**: once the hospital report is live (it is), move `claim_record_extract` to `document_read` under Elastic in the System Design docs, the Excalidraw board and the Devpost.
 - **Complicated claims**: shipped. Two complications are designed but not built: policies that disagree on who pays first, and two clauses that conflict. The venue-costs work above covers part of the first.
