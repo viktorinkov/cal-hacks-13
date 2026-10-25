@@ -146,7 +146,7 @@ impl Floor {
     pub fn snap(&self, p: P) -> P {
         let (c, r) = self.cell_of(p);
         if self.is_open(c, r) {
-            return p;
+            return self.clear_of_walls(c, r, p);
         }
         let mut best: Option<(f32, P)> = None;
         for ring in 1..=SNAP_CELLS {
@@ -189,6 +189,19 @@ impl Floor {
             }
         }
         far.map(|(_, cc, rr)| self.centre(cc, rr)).unwrap_or(p)
+    }
+
+    /// `p` in its open cell, a little away from the closed cells beside it, as a snapped point is, so a straight
+    /// line to it has a hair to spare on either side.
+    fn clear_of_walls(&self, c: i32, r: i32, (x, y): P) -> P {
+        let (cx, cy) = self.centre(c, r);
+        let h = self.cell * 0.45;
+        let side_closed = |dc: i32, dr: i32| (-1..=1).any(|k| if dc != 0 { !self.is_open(c + dc, r + k) } else { !self.is_open(c + k, r + dr) });
+        let x = if side_closed(-1, 0) { x.max(cx - h) } else { x };
+        let x = if side_closed(1, 0) { x.min(cx + h) } else { x };
+        let y = if side_closed(0, -1) { y.max(cy - h) } else { y };
+        let y = if side_closed(0, 1) { y.min(cy + h) } else { y };
+        (x, y)
     }
 
     /// True when the straight line from `a` to `b` crosses only walkable cells, with a hair to spare on either
