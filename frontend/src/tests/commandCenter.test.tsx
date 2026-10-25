@@ -80,15 +80,14 @@ afterEach(() => {
 describe('command center', () => {
   it('starts quiet and labels the crowd as simulated', async () => {
     await boot()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')
-    expect(screen.getByText(/people on site \(simulated\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/INC-\S+ open/)).not.toBeInTheDocument()
     expect(screen.getAllByText('Simulation').length).toBeGreaterThan(0)
   })
 
   it('an SOS creates an incident, opens it and focuses the map on it', async () => {
     await boot()
     await pressSos()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Someone pressed SOS.')
+    expect(screen.getByText(/INC-\S+ open/)).toBeInTheDocument()
     const panel = incidentPanel()
     expect(within(panel).getByText(/Needs a person/)).toBeInTheDocument()
     expect(within(panel).getByText(/Radio estimate ±6 m/)).toBeInTheDocument()
@@ -131,7 +130,7 @@ describe('command center', () => {
     // the panel asks for the preapproved path once acknowledged
     const approve = await screen.findByRole('button', { name: /Clear the path · signal ~?\d+ bands/ }, { timeout: 3000 })
     expect(screen.getByText('Path for First Aid, preview')).toBeInTheDocument()
-    expect(screen.getByText('Nothing changes on any band until you send it.')).toBeInTheDocument()
+    expect(screen.getByText('Nothing changes on any band until you send it')).toBeInTheDocument()
     await user.click(approve)
     await waitFor(() => expect(within(incidentPanel()).getByText('Responding')).toBeInTheDocument())
     expect(screen.getByText(/0 of \d+ demo bands confirmed so far/)).toBeInTheDocument()
@@ -139,7 +138,6 @@ describe('command center', () => {
     const cmd = Object.values(useWorld.getState().commands).find((c) => c.approvalStatus === 'approved')!
     expect(cmd.deliveryStatus).toBe('delivered')
     expect(screen.getByText(new RegExp(`${cmd.targets.length} of ${cmd.targets.length} demo bands confirmed$`))).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('A path is open.')
   })
 
   it('shows a partial delivery and lets the operator resend', async () => {
@@ -152,7 +150,7 @@ describe('command center', () => {
     await user.click(await screen.findByRole('button', { name: /Clear the path/ }, { timeout: 3000 }))
     await waitFor(() => expect(within(incidentPanel()).getByText('Responding')).toBeInTheDocument())
     await advance(4)
-    expect(screen.getByText(/did not confirm\. Its light has not changed\./)).toBeInTheDocument()
+    expect(screen.getByText(/did not confirm\. Its light has not changed/)).toBeInTheDocument()
     // the bands list lives in the folded bottom-left panel
     await user.click(screen.getByRole('button', { name: 'Open' }))
     expect(screen.getAllByText(/No confirmation/).length).toBeGreaterThan(0)
@@ -164,11 +162,9 @@ describe('command center', () => {
   it('degrades when the link drops and reloads state when it returns', async () => {
     await boot()
     await act(async () => adapter.demo.setLinkDown(true))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Connection lost.')
     expect(screen.getByRole('alert')).toHaveTextContent(/Not live\. Showing data from/)
     await act(async () => adapter.demo.setLinkDown(false))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).not.toHaveTextContent('Connection lost.'))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 
   it('resolves, then a reset returns to the initial state', async () => {
@@ -179,10 +175,9 @@ describe('command center', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByLabelText(/False alarm/)).toBeChecked()
     await user.click(within(dialog).getByRole('button', { name: /Resolve INC-/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Resolved.'))
+    await waitFor(() => expect(screen.queryByText(/INC-\S+ open/)).not.toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: 'Reset the simulation' }))
     await waitFor(() => expect(Object.keys(useWorld.getState().incidents)).toHaveLength(0))
     expect(useWorld.getState().scenario?.step).toBe('normal')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')
   })
 })

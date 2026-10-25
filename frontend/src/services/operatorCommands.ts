@@ -56,43 +56,43 @@ function mergeCommand(c: GuidanceCommand | null): GuidanceCommand | null {
 }
 
 export async function acknowledgeIncident(incidentId: string): Promise<Incident | null> {
-  const res = await run(pendingKey.ack(incidentId), 'Not acknowledged. The incident is still open.', () =>
+  const res = await run(pendingKey.ack(incidentId), 'Not acknowledged. The incident is still open', () =>
     getAdapter()!.acknowledgeIncident(incidentId),
   )
   return mergeIncident(res)
 }
 
 export async function resolveIncident(incidentId: string, reason: ResolutionReason): Promise<Incident | null> {
-  const res = await run(pendingKey.resolve(incidentId), 'Not resolved. The incident is still open.', () =>
+  const res = await run(pendingKey.resolve(incidentId), 'Not resolved. The incident is still open', () =>
     getAdapter()!.resolveIncident(incidentId, reason),
   )
   return mergeIncident(res)
 }
 
 export async function previewGuidance(incidentId: string, corridorId?: string): Promise<GuidanceCommand | null> {
-  const res = await run(pendingKey.preview(incidentId), 'Could not preview a path.', () =>
+  const res = await run(pendingKey.preview(incidentId), 'Could not preview a path', () =>
     getAdapter()!.previewGuidance({ incidentId, corridorId }),
   )
   return mergeCommand(res)
 }
 
 export async function approveGuidance(commandId: string): Promise<GuidanceCommand | null> {
-  const res = await run(pendingKey.approve(commandId), 'Not sent. No band has changed.', () => getAdapter()!.approveGuidance(commandId))
+  const res = await run(pendingKey.approve(commandId), 'Not sent. No band has changed', () => getAdapter()!.approveGuidance(commandId))
   return mergeCommand(res)
 }
 
 export async function cancelGuidance(commandId: string): Promise<GuidanceCommand | null> {
-  const res = await run(pendingKey.cancel(commandId), 'Could not stop the signals.', () => getAdapter()!.cancelGuidance(commandId))
+  const res = await run(pendingKey.cancel(commandId), 'Could not stop the signals', () => getAdapter()!.cancelGuidance(commandId))
   return mergeCommand(res)
 }
 
 export async function resendGuidance(commandId: string): Promise<GuidanceCommand | null> {
-  const res = await run(pendingKey.resend(commandId), 'Could not resend.', () => getAdapter()!.resendGuidance(commandId))
+  const res = await run(pendingKey.resend(commandId), 'Could not resend', () => getAdapter()!.resendGuidance(commandId))
   return mergeCommand(res)
 }
 
 export async function resetSimulation(): Promise<boolean> {
-  const res = await run(pendingKey.reset, 'Reset failed.', async () => {
+  const res = await run(pendingKey.reset, 'Reset failed', async () => {
     await getAdapter()!.resetSimulation()
     return true
   })

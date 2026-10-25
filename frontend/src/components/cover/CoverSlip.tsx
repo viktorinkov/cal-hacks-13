@@ -28,7 +28,7 @@ export function CoverSlip({ registration, bandLabel }: { registration: Registrat
       <div data-ui className="bg-raised px-5 py-5">
         <BandMark />
         <p className="mt-4 text-[13px] text-ink-dim">Band {bandLabel}</p>
-        <p className="mt-2 text-[16px] leading-6 text-ink">Nothing is stored on this band.</p>
+        <p className="mt-2 text-[16px] leading-6 text-ink">Nothing is stored on this band</p>
       </div>
     )
   }

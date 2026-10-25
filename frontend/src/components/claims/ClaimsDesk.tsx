@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button'
 import { DeskTabs } from '@/components/desk/DeskTabs'
 import { OPERATOR } from '@/mock/MockBackend'
 import { BandTapDialog } from '@/components/cover/BandTapDialog'
-import { boardHeadline, boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
+import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
 import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
-import { SPACETIME_DB, useSession } from '@/stdb/session'
+import { useSession } from '@/stdb/session'
 
 /**
  * Claims desk. The rows are the database's claims board. A routed claim still needs
@@ -18,7 +18,6 @@ export function ClaimsDesk() {
   const phase = useSession((state) => state.phase)
   const error = useSession((state) => state.error)
   const actionError = useSession((state) => state.actionError)
-  const staff = useSession((state) => state.staff)
   const owner = useSession((state) => state.owner)
   const me = useSession((state) => state.me)
   const roles = useSession((state) => state.roles)
@@ -30,21 +29,11 @@ export function ClaimsDesk() {
   const refuse = useSession((state) => state.refuse)
   const ordered = useMemo(() => sortBoard(claims), [claims])
   const summary = useMemo(() => boardSummary(claims), [claims])
-  const headline = boardHeadline(summary, insurer)
   const [selectedId, setSelectedId] = useState('')
   const [narrow, setNarrow] = useState(false)
   const [tapBand, setTapBand] = useState<number | null>(null)
   const docketRef = useRef<HTMLElement>(null)
   const selected = ordered.find((claim) => claim.id === selectedId) ?? ordered[0]
-  const title = phase === 'error' ? 'The database did not connect.' : phase === 'live' ? (staff || claims.length > 0 ? headline.title : 'The board is for the ops desk.') : 'Opening the claims board.'
-  const sentence =
-    phase === 'error'
-      ? (error ?? 'The connection failed.')
-      : phase === 'live'
-        ? staff || claims.length > 0
-          ? headline.sentence
-          : 'This connection is not staff, so the board stays empty. Play as the ops desk if the test identities are on.'
-        : `Connecting to ${SPACETIME_DB}.`
 
   useEffect(() => {
     if (!narrow || !window.matchMedia('(max-width: 767px)').matches) return
@@ -67,18 +56,13 @@ export function ClaimsDesk() {
           <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
         </header>
 
-        <div className="mt-8 max-w-[40rem]">
-          <h1 className="font-display text-[32px] leading-[1.05] tracking-[-0.02em] text-ink md:text-[40px]" aria-live="polite">
-            {title}
-          </h1>
-          <p className="mt-3 max-w-[46ch] text-[15px] leading-6 text-ink-dim">{sentence}</p>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
-            <ActorSelect actors={actors} />
-            <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
-              Wristbands
-            </button>
-          </div>
+        <div className="mt-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
+          <ActorSelect actors={actors} />
+          <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
+            Wristbands
+          </button>
         </div>
+        {phase === 'error' && <p className="mt-4 text-[14px] text-signal">{error ?? 'The database did not connect'}</p>}
 
         <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4 md:gap-0 md:divide-x md:divide-line">
           <Figure label="Needs a person" value={String(summary.waiting)} note={summary.detections === 0 ? 'nothing routed' : `of ${summary.detections} claims`} lead />
@@ -97,7 +81,7 @@ export function ClaimsDesk() {
               <span className="text-right">Payable</span>
             </div>
             {ordered.length === 0 ? (
-              <p className="mt-4 text-[14px] text-ink">{phase === 'live' ? 'No claims on this connection.' : 'Waiting for the board.'}</p>
+              <p className="mt-4 text-[14px] text-ink">{phase === 'live' ? 'No claims on this connection' : 'Waiting for the board'}</p>
             ) : (
               <ul className="mt-1" aria-label="Claims">
                 {ordered.map((claim) => (
@@ -267,8 +251,8 @@ function Docket({
         <dd className="pt-1 text-right text-[22px] tabular-nums leading-none text-ink">{formatCents(claim.payoutCents)}</dd>
       </dl>
 
-      <p className="mt-5 text-[15px] leading-6 text-ink">{claim.statusNote || 'No note on this claim.'}</p>
-      {claim.status === 'Routed' && claim.routedToName && <p className="mt-2 text-[13px] text-ink-dim">Waiting for {claim.routedToName}.</p>}
+      <p className="mt-5 text-[15px] leading-6 text-ink">{claim.statusNote || 'No note on this claim'}</p>
+      {claim.status === 'Routed' && claim.routedToName && <p className="mt-2 text-[13px] text-ink-dim">Waiting for {claim.routedToName}</p>}
 
       {claim.status === 'Routed' && canDecide && (
         <div className="mt-6 flex flex-col gap-3">

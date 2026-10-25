@@ -40,8 +40,8 @@ describe('claim totals', () => {
     expect(formatCents(summary.damageCents)).toBe('$2,155.00')
     expect(formatCents(summary.filedCents)).toBe('$930.00')
     expect(formatCents(0)).toBe('$0.00')
-    expect(claimsHeadline(summary).title).toBe('Two still need a person.')
-    expect(claimsHeadline(summary).sentence).toBe('$390.00 is still unfiled. $930.00 is already with Northline.')
+    expect(claimsHeadline(summary).title).toBe('Two still need a person')
+    expect(claimsHeadline(summary).sentence).toBe('$390.00 is still unfiled. $930.00 is already with Northline')
   })
 
   it('pays damage minus the deductible only when a band is named and the rider covers it', () => {
@@ -123,8 +123,8 @@ describe('live board', () => {
     expect(summary.unfiledCents).toBe(39_000)
     expect(summary.filedCents).toBe(93_000)
     expect(summary.damageCents).toBe(182_000)
-    expect(boardHeadline(summary, 'Northline').title).toBe('One still needs a person.')
-    expect(boardHeadline(summary, 'Northline').sentence).toBe('$390.00 is still unfiled. $930.00 is already with Northline.')
+    expect(boardHeadline(summary, 'Northline').title).toBe('One still needs a person')
+    expect(boardHeadline(summary, 'Northline').sentence).toBe('$390.00 is still unfiled. $930.00 is already with Northline')
   })
 
   it('approves the routed claim on the desk', async () => {
@@ -138,9 +138,7 @@ describe('live board', () => {
         <ClaimsDesk />
       </RouteProvider>,
     )
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('One still needs a person.')
     await user.click(screen.getByRole('button', { name: 'Approve $390.00' }))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The board is clear.')
     expect(screen.getByText('$1,320.00')).toBeInTheDocument()
   })
 })

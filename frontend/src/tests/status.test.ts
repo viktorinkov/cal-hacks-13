@@ -161,14 +161,14 @@ describe('headline', () => {
 
   it('leads with the SOS and says nothing changes until approval', () => {
     const h = headline({ ...base, incidents: [inc] })
-    expect(h.title).toBe('Someone pressed SOS.')
+    expect(h.title).toBe('Someone pressed SOS')
     expect(h.sentence).toMatch(/Front Left, band-03/)
     expect(h.sentence).toMatch(/until you approve/)
   })
 
   it('says plainly when the data is not live', () => {
     const h = headline({ ...base, incidents: [inc], linkUp: false, connection: { ...base.connection, phase: 'reconnecting' } })
-    expect(h.title).toBe('Connection lost.')
+    expect(h.title).toBe('Connection lost')
     expect(h.sentence).toMatch(/not live/)
   })
 

@@ -188,24 +188,24 @@ export function localizationText(i: Incident): string {
 }
 
 export function observationText(o: CameraObservation | undefined): { title: string; detail: string; tone: Tone } {
-  if (!o) return { title: 'No camera check', detail: 'No camera covers this spot.', tone: 'muted' }
+  if (!o) return { title: 'No camera check', detail: 'No camera covers this spot', tone: 'muted' }
   const pct = o.confidence !== undefined ? ` (${o.confidence.toFixed(2)})` : ''
   switch (o.status) {
     case 'pending':
-      return { title: `${o.cameraId} is looking`, detail: o.kind === 'sos_flash' ? 'Searching for the SOS flash pattern.' : 'Checking posture in the frame.', tone: 'neutral' }
+      return { title: `${o.cameraId} is looking`, detail: o.kind === 'sos_flash' ? 'Searching for the SOS flash pattern' : 'Checking posture in the frame', tone: 'neutral' }
     case 'detected':
       return {
         title: o.kind === 'sos_flash' ? `Flash pattern matched${pct}` : `Fall-like pose${pct}`,
         detail:
           o.kind === 'sos_flash'
-            ? 'The camera saw an SOS flash where the radio placed it. That locates a band, not a person’s identity.'
-            : 'Crouching or dancing can look like this. Check the frame.',
+            ? 'The camera saw an SOS flash where the radio placed it. That locates a band, not a person’s identity'
+            : 'Crouching or dancing can look like this. Check the frame',
         tone: o.kind === 'sos_flash' ? 'ok' : 'caution',
       }
     case 'ambiguous':
-      return { title: `Not matched${pct}`, detail: 'More than one flashing source in view. The location stays a radio estimate.', tone: 'caution' }
+      return { title: `Not matched${pct}`, detail: 'More than one flashing source in view. The location stays a radio estimate', tone: 'caution' }
     case 'not_visible':
-      return { title: `Not in ${o.cameraId}'s view`, detail: 'The location stays a radio estimate. The SOS still stands.', tone: 'muted' }
+      return { title: `Not in ${o.cameraId}'s view`, detail: 'The location stays a radio estimate. The SOS still stands', tone: 'muted' }
   }
 }
 
@@ -250,8 +250,8 @@ export function headline(args: {
   const { incidents, commands, zones, zoneNames } = args
   if (!args.linkUp && args.connection.phase !== 'idle') {
     return {
-      title: 'Connection lost.',
-      sentence: `Showing what we had at ${args.lastDataAt}. It is not live. Reconnecting.`,
+      title: 'Connection lost',
+      sentence: `Showing what we had at ${args.lastDataAt}. It is not live. Reconnecting`,
       tone: 'muted',
     }
   }
@@ -260,10 +260,10 @@ export function headline(args: {
   if (first) {
     const where = first.candidateZone ? zoneNames[first.candidateZone] ?? first.candidateZone : 'an unknown spot'
     const who = first.reportedByDeviceId ? bandName(first.reportedByDeviceId.replace('band-', '')) : 'staff'
-    const more = open.length > 1 ? ` ${open.length - 1} more open.` : ''
+    const more = open.length > 1 ? ` ${open.length - 1} more open` : ''
     if (first.status === 'reported') {
       return {
-        title: first.source === 'manual_sos' ? 'Someone pressed SOS.' : first.source === 'imu_suspicion' ? 'Someone may have fallen.' : 'Someone may need help.',
+        title: first.source === 'manual_sos' ? 'Someone pressed SOS' : first.source === 'imu_suspicion' ? 'Someone may have fallen' : 'Someone may need help',
         sentence:
           args.venueId === 'calhacks'
             ? `${where}, ${who}. Nearby wristbands are already red, and a path is clearing from the entrance.${more}`
@@ -277,7 +277,7 @@ export function headline(args: {
       const total = active.targets.length
       const crowd = simBandsFor(args.simulatedBands, active.commandId)
       return {
-        title: 'A path is open.',
+        title: 'A path is open',
         sentence: crowd
           ? `First Aid is on the way to ${where}. ${crowd.signalled} crowd bands told to move (simulated); ${confirmed} of ${total} demo bands confirmed.${more}`
           : `First Aid is on the way to ${where}. ${confirmed} of ${total} bands confirmed their signals.${more}`,
@@ -285,10 +285,10 @@ export function headline(args: {
       }
     }
     if (first.status === 'responding') {
-      return { title: 'Help is on the way.', sentence: `First Aid is heading to ${where}. The bands are back to ready.${more}`, tone: 'help' }
+      return { title: 'Help is on the way', sentence: `First Aid is heading to ${where}. The bands are back to ready.${more}`, tone: 'help' }
     }
     return {
-      title: 'You are on it.',
+      title: 'You are on it',
       sentence: `Review the path for First Aid to ${where}, then send it to the bands.${more}`,
       tone: 'caution',
     }
@@ -300,21 +300,21 @@ export function headline(args: {
     const z = (critical[0] ?? caution[0])!
     const name = zoneNames[z.zoneId] ?? z.zoneId
     return {
-      title: critical.length ? `${name} is packed.` : `Getting tight at ${name}.`,
-      sentence: `Peak ${z.peakDensity?.toFixed(1) ?? '—'} people per m²${sim}, above the venue's ${critical.length ? 'critical' : 'caution'} line.`,
+      title: critical.length ? `${name} is packed` : `Getting tight at ${name}`,
+      sentence: `Peak ${z.peakDensity?.toFixed(1) ?? '—'} people per m²${sim}, above the venue's ${critical.length ? 'critical' : 'caution'} line`,
       tone: critical.length ? 'critical' : 'caution',
     }
   }
   const recent = incidents.filter((i) => i.status === 'resolved').sort((a, b) => (b.resolvedAt ?? 0) - (a.resolvedAt ?? 0))[0]
   if (recent && recent.resolvedAt && args.now - recent.resolvedAt < 25_000) {
     // the latest resolution leads for a short while after the fact
-    return { title: 'Resolved.', sentence: `${recent.displayId} closed. Every band is back to ready.`, tone: 'ok' }
+    return { title: 'Resolved', sentence: `${recent.displayId} closed. Every band is back to ready`, tone: 'ok' }
   }
   const busiest = [...zones].sort((a, b) => (b.estimatedDensity ?? 0) - (a.estimatedDensity ?? 0))[0]
   const section = busiest ? args.zoneSections[busiest.zoneId] : undefined
   return {
-    title: 'All quiet.',
-    sentence: `${args.people.toLocaleString('en-US')} people on site${sim}. Busiest at ${section ? SECTION_NAMES[section] : 'the stage'}.`,
+    title: 'All quiet',
+    sentence: `${args.people.toLocaleString('en-US')} people on site${sim}. Busiest at ${section ? SECTION_NAMES[section] : 'the stage'}`,
     tone: 'ok',
   }
 }

@@ -47,7 +47,7 @@ export function LayerPanel({ onClose }: { onClose: () => void }) {
       </ul>
       <div className="mt-2 border-t border-line pt-3">
         <p className="text-[11.5px] text-ink-muted">Density glow · simulated</p>
-        <p className="mt-1 text-[11.5px] leading-snug text-ink-dim">Reddish amber where people gather, pale peach where they are packed. One person alone never glows.</p>
+        <p className="mt-1 text-[11.5px] leading-snug text-ink-dim">Reddish amber where people gather, pale peach where they are packed. One person alone never glows</p>
         <div
           className="mt-2 h-2.5 rounded-[2px]"
           aria-hidden

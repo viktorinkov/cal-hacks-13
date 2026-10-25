@@ -48,7 +48,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
         <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">
-          Sign in with your staff email. This desk uses the same database as the live organizer portal.
+          Sign in with your staff email. This desk uses the same database as the live organizer portal
         </p>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
@@ -56,7 +56,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
           className={gateButton}
           onClick={() => {
             setError(null)
-            void beginSignIn().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Sign-in did not start.'))
+            void beginSignIn().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Sign-in did not start'))
           }}
         >
           Sign in with email
@@ -67,7 +67,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
             <a className="text-ink underline underline-offset-2" href="https://band1t.vip/organizer">
               live portal
             </a>{' '}
-            or continue with the ops test identity.
+            or continue with the ops test identity
           </p>
         )}
         {!here && (
@@ -93,7 +93,7 @@ export function SignInCallback() {
         if (!cancel) go('/organizer')
       })
       .catch((reason: unknown) => {
-        if (!cancel) setError(reason instanceof Error ? reason.message : 'Sign-in did not complete.')
+        if (!cancel) setError(reason instanceof Error ? reason.message : 'Sign-in did not complete')
       })
     return () => {
       cancel = true
@@ -105,7 +105,7 @@ export function SignInCallback() {
       <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
       {error ? (
         <>
-          <p className="text-[15px] text-ink">Sign-in did not complete.</p>
+          <p className="text-[15px] text-ink">Sign-in did not complete</p>
           <p className="text-[13px] text-ink-muted">{error}</p>
           <button type="button" className={gateButton} onClick={() => go('/organizer')}>
             Back to the organizer

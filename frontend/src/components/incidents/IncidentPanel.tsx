@@ -252,7 +252,7 @@ export function IncidentPanel() {
                 <Loader2 className="size-3.5 animate-spin" /> Asking the backend for the preapproved path…
               </>
             ) : (
-              'No location yet, so no path can be previewed. Send staff by radio.'
+              'No location yet, so no path can be previewed. Send staff by radio'
             )}
           </p>
         )}
@@ -265,7 +265,7 @@ export function IncidentPanel() {
 
       {inc.status !== 'resolved' && (
         <div className="flex flex-col gap-2 border-t border-dashed border-line-strong px-4 py-3">
-          {!linkUp && <p className="text-[12px] text-caution">Not connected. Actions are paused until the link is back.</p>}
+          {!linkUp && <p className="text-[12px] text-caution">Not connected. Actions are paused until the link is back</p>}
           {inc.status === 'reported' && (
             <>
               <Button

@@ -39,7 +39,7 @@ export function ConnectionBanner() {
           Not live. Showing data from <span className="font-mono">{clock(lastEventAt, tz)}</span>.{' '}
           <span className="text-ink-dim">
             Reconnecting{connection.attempt ? `, attempt ${connection.attempt}` : ''}
-            {retryIn !== null ? `, next in ${retryIn} s` : ''}. Commands are paused.
+            {retryIn !== null ? `, next in ${retryIn} s` : ''}. Commands are paused
           </span>
         </span>
       )}

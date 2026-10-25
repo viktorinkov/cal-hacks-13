@@ -52,7 +52,7 @@ function Legend({ mode, legend }: { mode: Mode; legend: LegendLine[] }) {
               {line.label}
             </Swatch>
           ))
-        : [<span key="none">No memories yet.</span>]
+        : [<span key="none">No memories yet</span>]
   return (
     <div className="nc-panel flex max-w-[min(100%,46rem)] flex-col gap-1.5 px-3 py-2 text-[12px] text-ink-dim">
       <div className="flex flex-wrap gap-x-4 gap-y-1">{groups}</div>
@@ -188,8 +188,6 @@ export function GraphPage() {
 
   return (
     <DeskFrame
-      title={linkCount ? 'Who met, and where they stood.' : 'The event graph is empty.'}
-      sentence="Every meeting, booth visit, job and exhibit, live from the floor. Click a person to see the booths they stood at and the people they met."
       figures={
         <>
           <Figure lead label="Links" value={linkCount.toLocaleString('en-US')} note={linkCount > links.length ? `${links.length.toLocaleString('en-US')} drawn` : 'in the graph'} />
@@ -203,7 +201,7 @@ export function GraphPage() {
         <div ref={stage} className="absolute inset-0" />
         {!ready && (
           <p className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-ink-dim">
-            {failed ? 'This browser could not start the 3D view.' : linkCount ? 'Laying out the graph…' : 'The graph has not arrived from the live host yet.'}
+            {failed ? 'This browser could not start the 3D view' : linkCount ? 'Laying out the graph…' : 'The graph has not arrived from the live host yet'}
           </p>
         )}
         <div className="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">
@@ -227,7 +225,7 @@ export function GraphPage() {
         {selected && <Card summary={selected} onPick={(id) => engine.current?.select(id)} onClose={() => engine.current?.select(undefined)} />}
         <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-end justify-between gap-4">
           <Legend mode={mode} legend={legend} />
-          <p className="hidden shrink-0 pb-1 text-[12px] text-ink-muted lg:block">Drag to turn, scroll to zoom, click anything to see what it links to.</p>
+          <p className="hidden shrink-0 pb-1 text-[12px] text-ink-muted lg:block">Drag to turn, scroll to zoom, click anything to see what it links to</p>
         </div>
       </div>
     </DeskFrame>

@@ -34,7 +34,7 @@ export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: str
         <DialogHeader>
           <DialogTitle className="font-display text-[28px] font-normal text-ink">Band {label}</DialogTitle>
           <DialogDescription className="text-[14px] text-ink-dim">
-            {card ? 'The database released this card for an open incident.' : 'A medic can read the card only while an SOS or fall is open.'}
+            {card ? 'The database released this card for an open incident' : 'A medic can read the card only while an SOS or fall is open'}
           </DialogDescription>
         </DialogHeader>
         {card ? (
@@ -69,13 +69,13 @@ export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: str
           )}
           {actionError && <p className="text-[14px] text-signal">{actionError}</p>}
           {wallet ? (
-            <p className="text-[14px] text-ink">{`Wallet ${wallet.accountId.slice(0, 8)} · ${formatCents(wallet.balanceCents)} to spend.`}</p>
+            <p className="text-[14px] text-ink">{`Wallet ${wallet.accountId.slice(0, 8)} · ${formatCents(wallet.balanceCents)} to spend`}</p>
           ) : phase === 'live' ? (
             <Button type="button" variant="outline" className="h-11" disabled={busy} onClick={() => void connectWallet()}>
               Open the wallet
             </Button>
           ) : (
-            <p className="text-[13px] text-ink-dim">The wallet opens once the database is connected.</p>
+            <p className="text-[13px] text-ink-dim">The wallet opens once the database is connected</p>
           )}
           <button type="button" onClick={edit} className="self-start text-[14px] text-ink">
             {registration ? 'Edit this band' : 'Register this band'}

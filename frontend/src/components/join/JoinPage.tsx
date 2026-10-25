@@ -48,11 +48,8 @@ export function JoinPage() {
 
         <div className="mt-14 grid items-start gap-12 md:mt-20 md:grid-cols-2">
           <div>
-            <h1 className="font-display text-[clamp(40px,5vw,64px)] leading-[0.95] tracking-[-0.03em] text-ink">
-              The wristband holds the night.
-            </h1>
-            <p className="mt-6 max-w-[36ch] text-[16px] leading-7 text-ink">
-              Register it once. The aid station reads the medical record, the cameras file against the policy, and a tap charges the card.
+            <p className="max-w-[36ch] text-[16px] leading-7 text-ink">
+              Register it once. The aid station reads the medical record, the cameras file against the policy, and a tap charges the card
             </p>
             <Button type="button" className="mt-8 h-11 px-4" onClick={() => go(`/register?band=${bandId}`)}>
               Register this band
@@ -79,8 +76,8 @@ export function JoinPage() {
             </div>
             <p className="mt-4 text-[14px] leading-6 text-ink">
               {related
-                ? `${related.id} · ${statusLabel(related.status)} · ${formatCents(related.payoutCents)} payable.`
-                : 'No claim on this band tonight.'}
+                ? `${related.id} · ${statusLabel(related.status)} · ${formatCents(related.payoutCents)} payable`
+                : 'No claim on this band tonight'}
             </p>
             <button type="button" onClick={() => go('/claims')} className="mt-2 text-[14px] text-ink-dim hover:text-ink">
               See tonight's claims
@@ -88,39 +85,37 @@ export function JoinPage() {
           </div>
         </div>
 
-        <section className="mt-28">
-          <h2 className="font-display text-[32px] leading-none text-ink md:text-[40px]">What a tap reads</h2>
-          <div className="mt-10 grid gap-10 md:grid-cols-[12rem_minmax(0,1fr)] md:gap-y-12">
-            <h3 className="font-display text-[28px] leading-none text-ink">Medical</h3>
+        <section className="mt-28" aria-label="What a tap reads">
+          <div className="grid gap-10 md:grid-cols-[12rem_minmax(0,1fr)] md:gap-y-12">
+            <p className="pt-1 text-[13px] text-ink-dim">Medical</p>
             <p className="text-[16px] leading-7 text-ink">
-              Allergies, conditions, medications, and who to call. The aid station sees them when the band is tapped. They are not sent to Northline.
+              Allergies, conditions, medications, and who to call. The aid station sees them when the band is tapped. They are not sent to Northline
             </p>
-            <h3 className="font-display text-[28px] leading-none text-ink">Insurance</h3>
+            <p className="pt-1 text-[13px] text-ink-dim">Insurance</p>
             <p className="text-[16px] leading-7 text-ink">
-              CAM-01 and CAM-02 name what broke and which band was in the frame. Northline files what the rider covers and holds the rest for a person on the claims desk.
+              CAM-01 and CAM-02 name what broke and which band was in the frame. Northline files what the rider covers and holds the rest for a person on the claims desk
             </p>
-            <h3 className="font-display text-[28px] leading-none text-ink">Payment</h3>
+            <p className="pt-1 text-[13px] text-ink-dim">Payment</p>
             <p className="text-[16px] leading-7 text-ink">
-              The last four digits and the expiry stay on the registration. A tap charges that card. The full number is never stored here.
+              The last four digits and the expiry stay on the registration. A tap charges that card. The full number is never stored here
             </p>
           </div>
         </section>
 
-        <section className="mt-28">
-          <h2 className="font-display text-[32px] leading-none text-ink md:text-[40px]">How a claim is filed</h2>
-          <div className="mt-8 grid gap-8 md:grid-cols-2">
+        <section className="mt-28" aria-label="How a claim is filed">
+          <div className="grid gap-8 md:grid-cols-2">
             <p className="text-[16px] leading-7 text-ink">
-              The camera sees the damage. Vision names the person, and the band's last NFC read has to agree. If two people are in the frame, the filing waits until someone on the desk confirms the band.
+              The camera sees the damage. Vision names the person, and the band's last NFC read has to agree. If two people are in the frame, the filing waits until someone on the desk confirms the band
             </p>
             <p className="text-[16px] leading-7 text-ink">
-              Northline then applies the $250.00 deductible and the exclusions. A bent speaker can be filed. A scuffed rail under the deductible, or a chair the rider calls wear, is closed without a payment.
+              Northline then applies the $250.00 deductible and the exclusions. A bent speaker can be filed. A scuffed rail under the deductible, or a chair the rider calls wear, is closed without a payment
             </p>
           </div>
         </section>
 
         <footer className="mt-28 pb-16">
           <p className="font-display text-[48px] leading-none text-ink">BandIt</p>
-          <p className="mt-3 max-w-[36ch] text-[14px] leading-6 text-ink-dim">Main Stage. Sample records for bands 02, 04, 05 and 06 live in this browser.</p>
+          <p className="mt-3 max-w-[36ch] text-[14px] leading-6 text-ink-dim">Main Stage. Sample records for bands 02, 04, 05 and 06 live in this browser</p>
         </footer>
       </div>
     </div>

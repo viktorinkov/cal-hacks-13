@@ -32,7 +32,7 @@ function Boot() {
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
         {sync === 'error' ? (
           <>
-            <p className="text-[15px] text-ink">Could not load the venue from the backend.</p>
+            <p className="text-[15px] text-ink">Could not load the venue from the backend</p>
             <p className="text-[13px] text-ink-muted">{error}</p>
             <Button variant="outline" onClick={() => void getSync()?.resync()}>
               <RotateCw /> Try again

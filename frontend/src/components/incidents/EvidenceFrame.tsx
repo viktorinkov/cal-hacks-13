@@ -144,7 +144,7 @@ export function EvidenceFrame({ obs, compact = false }: { obs: CameraObservation
         <span>
           Not in {obs.cameraId}&rsquo;s view.
           <br />
-          No frame to show.
+          No frame to show
         </span>
       </div>
     )

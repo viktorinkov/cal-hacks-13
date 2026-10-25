@@ -65,13 +65,13 @@ export function boardSummary(claims: readonly BoardClaim[]): BoardSummary {
 export function boardHeadline(summary: BoardSummary, insurer: string): { title: string; sentence: string } {
   const title =
     summary.detections === 0
-      ? 'No claims yet.'
+      ? 'No claims yet'
       : summary.waiting === 0
-        ? 'The board is clear.'
+        ? 'The board is clear'
         : summary.waiting === 1
-          ? 'One still needs a person.'
-          : `${summary.waiting} still need a person.`
-  const sentence = `${formatCents(summary.unfiledCents)} is still unfiled. ${formatCents(summary.filedCents)} is already with ${insurer}.`
+          ? 'One still needs a person'
+          : `${summary.waiting} still need a person`
+  const sentence = `${formatCents(summary.unfiledCents)} is still unfiled. ${formatCents(summary.filedCents)} is already with ${insurer}`
   return { title, sentence }
 }
 

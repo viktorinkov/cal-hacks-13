@@ -193,7 +193,7 @@ export function DemoDock() {
               <li className="flex items-center justify-between gap-3 border-t border-line py-2.5">
                 <label htmlFor="opt-auto" className="flex flex-col">
                   <span className="text-[13px] text-ink">Autoplay the story</span>
-                  <span className="text-[11.5px] text-ink-muted">Acts as the operator, on a loop. For the booth.</span>
+                  <span className="text-[11.5px] text-ink-muted">Acts as the operator, on a loop. For the booth</span>
                 </label>
                 <Switch id="opt-auto" checked={scenario.autoplay} onCheckedChange={(on) => void demo.setAutoplay(on)} />
               </li>
@@ -217,7 +217,7 @@ export function DemoDock() {
           <p className="mt-2 border-t border-line pt-2.5 text-[11.5px] leading-relaxed text-ink-muted">
             Shortcuts: <span className="font-mono text-ink-dim">⇧1</span>–<span className="font-mono text-ink-dim">⇧7</span> steps,{' '}
             <span className="font-mono text-ink-dim">⇧P</span> pause, <span className="font-mono text-ink-dim">⇧F</span> fall,{' '}
-            <span className="font-mono text-ink-dim">⇧L</span> link.
+            <span className="font-mono text-ink-dim">⇧L</span> link
           </p>
         </div>
       )}

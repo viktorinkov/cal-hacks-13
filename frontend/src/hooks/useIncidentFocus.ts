@@ -73,6 +73,6 @@ export function useIncidentFocus(): string {
     if (!inc) return ''
     const zone = venue?.zones.find((z) => z.zoneId === inc.candidateZone)?.name ?? 'an unknown zone'
     const what = inc.source === 'manual_sos' ? 'SOS' : inc.source === 'imu_suspicion' ? 'Possible fall' : 'Alert'
-    return `${what} at ${zone}${inc.reportedByDeviceId ? `, ${inc.reportedByDeviceId}` : ''}. ${inc.displayId}.`
+    return `${what} at ${zone}${inc.reportedByDeviceId ? `, ${inc.reportedByDeviceId}` : ''}. ${inc.displayId}`
   }, [incidents, venue])
 }

@@ -146,7 +146,7 @@ export function ZoneInspector() {
           })}
         </ul>
         <p className="mt-2 flex items-center justify-between text-[11.5px] text-ink-muted">
-          <span>Click a zone on the map to inspect it.</span>
+          <span>Click a zone on the map to inspect it</span>
           <SourceChip tag={zoneSourceTag(Object.values(zones)[0])} />
         </p>
       </section>

@@ -137,8 +137,8 @@ export function GuidancePanel({
               </span>
               <span className="text-[12px] leading-snug text-ink-dim">
                 {preview
-                  ? `About ${crowd.signalled} in reach now; more as the lane opens. ${Math.round(compliance * 100)}% assumed to follow.`
-                  : `${crowd.following} moving aside, ${crowd.signalled - crowd.following} not following (${Math.round(compliance * 100)}% assumed to follow).`}
+                  ? `About ${crowd.signalled} in reach now; more as the lane opens. ${Math.round(compliance * 100)}% assumed to follow`
+                  : `${crowd.following} moving aside, ${crowd.signalled - crowd.following} not following (${Math.round(compliance * 100)}% assumed to follow)`}
               </span>
             </div>
             <span className="self-start font-mono text-[12.5px] tabular-nums text-ink">{preview ? `~${crowd.signalled}` : crowd.signalled}</span>
@@ -147,20 +147,20 @@ export function GuidancePanel({
       </ul>
 
       <div className="flex flex-col gap-1 text-[12px] text-ink-muted">
-        {anyHaptic && <span>Full bands on the path also vibrate once. Lite bands show light only.</span>}
+        {anyHaptic && <span>Full bands on the path also vibrate once. Lite bands show light only</span>}
         {untargeted.length > 0 && (
           <span>
-            {untargeted.map((d) => `band-${d.label}`).join(', ')} {untargeted.length === 1 ? 'has' : 'have'} no position and {untargeted.length === 1 ? 'is' : 'are'} not included.
+            {untargeted.map((d) => `band-${d.label}`).join(', ')} {untargeted.length === 1 ? 'has' : 'have'} no position and {untargeted.length === 1 ? 'is' : 'are'} not included
           </span>
         )}
-        {!preview && command.approvalStatus === 'approved' && <span>Signals stop when you resolve, or in {elapsed(Math.max(0, command.expiresAt - now))}.</span>}
-        {preview && <span>Nothing changes on any band until you send it.</span>}
+        {!preview && command.approvalStatus === 'approved' && <span>Signals stop when you resolve, or in {elapsed(Math.max(0, command.expiresAt - now))}</span>}
+        {preview && <span>Nothing changes on any band until you send it</span>}
       </div>
 
       {failed.length > 0 && command.approvalStatus === 'approved' && (
         <div role="status" className="flex items-center justify-between gap-3 rounded-[3px] px-3 py-2 text-[12.5px] text-ink shadow-[inset_0_0_0_1px_rgba(255,59,48,0.55)]">
           <span>
-            {failed.map((t) => `band-${devices[t.deviceId]?.label ?? t.deviceId}`).join(', ')} did not confirm. Its light has not changed.
+            {failed.map((t) => `band-${devices[t.deviceId]?.label ?? t.deviceId}`).join(', ')} did not confirm. Its light has not changed
           </span>
           <button
             type="button"

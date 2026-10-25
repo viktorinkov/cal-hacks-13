@@ -3,7 +3,7 @@ import { OPERATOR } from '@/mock/MockBackend'
 import { cn } from '@/lib/utils'
 import { DeskTabs } from './DeskTabs'
 
-export function DeskFrame({ title, sentence, figures, children }: { title: string; sentence: string; figures?: ReactNode; children: ReactNode }) {
+export function DeskFrame({ figures, children }: { figures?: ReactNode; children: ReactNode }) {
   return (
     <div className="h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1360px] px-5 py-6 md:px-10 md:py-8">
@@ -14,10 +14,6 @@ export function DeskFrame({ title, sentence, figures, children }: { title: strin
           </div>
           <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
         </header>
-        <div className="mt-8 max-w-[40rem]">
-          <h1 className="font-display text-[32px] leading-[1.05] tracking-[-0.02em] text-ink md:text-[40px]">{title}</h1>
-          <p className="mt-3 max-w-[52ch] text-[15px] leading-6 text-ink-dim">{sentence}</p>
-        </div>
         {figures && <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4 md:gap-0 md:divide-x md:divide-line">{figures}</div>}
         <div className="mt-10">{children}</div>
       </div>

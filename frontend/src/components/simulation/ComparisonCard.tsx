@@ -49,7 +49,7 @@ export function ComparisonCard() {
           <span className="text-[11.5px] text-ink-dim">same seed</span>
         </div>
       </div>
-      {gain !== null && gain > 0 && <p className="mt-2 text-[12.5px] text-ink">{gain} s sooner with the path cleared.</p>}
+      {gain !== null && gain > 0 && <p className="mt-2 text-[12.5px] text-ink">{gain} s sooner with the path cleared</p>}
 
       <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-muted">
         <span>In the lane</span>

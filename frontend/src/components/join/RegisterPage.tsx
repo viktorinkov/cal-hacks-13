@@ -38,13 +38,13 @@ function NightHeader({ lights, onToggleLights }: { lights: boolean; onToggleLigh
 
 function errorsFor(draft: Registration): Record<string, string> {
   const errors: Record<string, string> = {}
-  if (!draft.name.trim()) errors.name = 'Name the person wearing it.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Use an email address.'
-  if (!draft.emergencyName.trim()) errors.emergencyName = 'Name someone to call.'
-  if (!draft.emergencyPhone.trim()) errors.emergencyPhone = 'Give a phone number.'
-  if (!BRANDS.includes(draft.cardBrand)) errors.cardBrand = 'Choose a card brand.'
-  if (!/^\d{4}$/.test(draft.last4.trim())) errors.last4 = 'Last four is four digits.'
-  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(draft.exp.trim())) errors.exp = 'Use MM/YY, like 09/28.'
+  if (!draft.name.trim()) errors.name = 'Name the person wearing it'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Use an email address'
+  if (!draft.emergencyName.trim()) errors.emergencyName = 'Name someone to call'
+  if (!draft.emergencyPhone.trim()) errors.emergencyPhone = 'Give a phone number'
+  if (!BRANDS.includes(draft.cardBrand)) errors.cardBrand = 'Choose a card brand'
+  if (!/^\d{4}$/.test(draft.last4.trim())) errors.last4 = 'Last four is four digits'
+  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(draft.exp.trim())) errors.exp = 'Use MM/YY, like 09/28'
   return errors
 }
 
@@ -84,7 +84,7 @@ interface LocalUpload {
   error?: string
 }
 
-const reason = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+const reason = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again'
 
 function UploadArea({ kind, title, note, disabled, onFiles, error }: {
   kind: MedicalDocumentKind; title: string; note: string; disabled: boolean
@@ -98,7 +98,7 @@ function UploadArea({ kind, title, note, disabled, onFiles, error }: {
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => { event.preventDefault(); setDragging(false); if (!disabled) onFiles(Array.from(event.dataTransfer.files)) }}>
         <span className="signup-upload-copy"><span className="block text-[14px] font-medium">{title}</span>
-        <span id={`upload-${kind}-help`} className="text-[13px] leading-5 text-ink-dim">{note} PDF · up to 10 MB.</span></span>
+        <span id={`upload-${kind}-help`} className="text-[13px] leading-5 text-ink-dim">{note} PDF · up to 10 MB</span></span>
         <input id={`upload-${kind}`} type="file" accept="image/*,application/pdf" multiple disabled={disabled}
           aria-describedby={`upload-${kind}-help${error ? ` upload-${kind}-error` : ''}`} aria-invalid={error ? true : undefined}
           onChange={(event) => { onFiles(Array.from(event.target.files ?? [])); event.target.value = '' }}
@@ -121,14 +121,14 @@ function MedicalReview({ card, confirming, blocked, onConfirm }: { card: Medical
         {facts.map(([label, value]) => <div key={label}><dt className="text-ink-dim">{label}</dt><dd className="break-words">{value || 'Not found in documents'}</dd></div>)}
       </dl>
       {card.status === 'confirmed' && !blocked ? (
-        <p role="status" className="mt-6 flex items-center gap-2 text-[14px] text-teal"><CheckCheck size={17} aria-hidden="true" /> You confirmed this card.</p>
+        <p role="status" className="mt-6 flex items-center gap-2 text-[14px] text-teal"><CheckCheck size={17} aria-hidden="true" /> You confirmed this card</p>
       ) : (
         <Button type="button" className="signup-primary mt-6" disabled={confirming || blocked} onClick={onConfirm}>
           {confirming ? <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
           {confirming ? 'Confirming…' : 'This is right'}
         </Button>
       )}
-      <p className="mt-3 text-[12px] leading-5 text-ink-dim">Something missing or incorrect? Upload a corrected document before confirming.</p>
+      <p className="mt-3 text-[12px] leading-5 text-ink-dim">Something missing or incorrect? Upload a corrected document before confirming</p>
     </div>
   )
 }
@@ -155,7 +155,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
   const [uploads, setUploads] = useState<LocalUpload[]>([])
   const [uploadErrors, setUploadErrors] = useState<Partial<Record<MedicalDocumentKind, string>>>({})
   const [retrying, setRetrying] = useState<string[]>([])
-  const savedHeading = useRef<HTMLHeadingElement>(null)
+  const savedHeading = useRef<HTMLParagraphElement>(null)
   const uploadId = useRef(0)
   const attemptedClaim = useRef(false)
   const mine = myBand?.bandId === Number(band.label) ? myBand : null
@@ -218,11 +218,11 @@ function RegistrationForm({ band }: { band: MockBand }) {
     // The current backend always feeds bytes to a PDF reader and replaces same-kind fields.
     // Keep unsupported selections local until that contract supports images and merging.
     if (files.some((file) => file.type !== 'application/pdf')) {
-      setUploadErrors((current) => ({ ...current, [kind]: 'Photo reading is not available yet. Please use a PDF for now; no files were uploaded.' }))
+      setUploadErrors((current) => ({ ...current, [kind]: 'Photo reading is not available yet. Please use a PDF for now; no files were uploaded' }))
       return
     }
     if (files.length > 1) {
-      setUploadErrors((current) => ({ ...current, [kind]: 'Please combine these pages into one PDF. This reader currently replaces earlier documents of the same type; no files were uploaded.' }))
+      setUploadErrors((current) => ({ ...current, [kind]: 'Please combine these pages into one PDF. This reader currently replaces earlier documents of the same type; no files were uploaded' }))
       return
     }
     setUploadErrors((current) => ({ ...current, [kind]: '' }))
@@ -252,8 +252,8 @@ function RegistrationForm({ band }: { band: MockBand }) {
     const next = { ...draft, bandId: band.deviceId, name: draft.name.trim(), email: draft.email.trim(),
       emergencyName: draft.emergencyName.trim(), emergencyPhone: draft.emergencyPhone.trim(), last4: draft.last4.trim(), exp: draft.exp.trim() }
     const found = errorsFor(next)
-    if (!owned) found.form = 'Press the button on your band to confirm it belongs to you.'
-    else if (!confirmed) found.form = 'Review and confirm your medical card before saving.'
+    if (!owned) found.form = 'Press the button on your band to confirm it belongs to you'
+    else if (!confirmed) found.form = 'Review and confirm your medical card before saving'
     setErrors(found)
     if (Object.keys(found).length) return
     setSaving(true)
@@ -270,8 +270,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
     <div className="signup-complete">
       <div>
         <p className="mb-5 flex items-center gap-2 text-[13px] text-teal"><ShieldCheck size={18} aria-hidden="true" /> Ready for the night</p>
-        <h1 ref={savedHeading} tabIndex={-1} className="signup-title">Saved on band {band.label}.</h1>
-        <p className="mt-5 max-w-[40ch] text-[16px] leading-7 text-ink-dim">Your band is linked and your details are saved. Your medical card is ready for review at the aid station when it’s needed.</p>
+        <p ref={savedHeading} tabIndex={-1} className="max-w-[40ch] text-[16px] leading-7 text-ink-dim focus:outline-none">Band {band.label} is linked and your details are saved. Your medical card is ready for review at the aid station when it’s needed</p>
         <WalletStatus />
         <div className="mt-8 flex flex-wrap items-center gap-5">
           <Button type="button" className="signup-primary" onClick={() => setSaved(null)}>Edit this band</Button>
@@ -284,33 +283,29 @@ function RegistrationForm({ band }: { band: MockBand }) {
 
   return (
     <main className="signup-main">
-      <div className="signup-intro">
-        <h1 className="signup-title">Register your band.</h1>
-        <p>Add your details, then check what your documents say.</p>
-      </div>
       <div className="signup-band">
         <div className="signup-strap" aria-hidden="true"><span>{band.label}</span><i /></div>
         <div className="signup-band-status">
           <h2>You’re on band {band.label}</h2>
           <div role="status" className="signup-status">
             {owned ? <span className="flex items-center gap-2"><Check size={15} className="text-teal" aria-hidden="true" /> Claimed · ready for your details</span>
-              : waitingForPress ? <span className="text-champagne">Press the button on your band to make it yours.{mine?.expiresAt != null && ` ${Math.max(0, Math.ceil((mine.expiresAt - now) / 1000))} seconds left.`}</span>
-              : expired ? 'The button window expired. Try claiming your band again.'
+              : waitingForPress ? <span className="text-champagne">Press the button on your band to make it yours{mine?.expiresAt != null && ` ${Math.max(0, Math.ceil((mine.expiresAt - now) / 1000))} seconds left`}</span>
+              : expired ? 'The button window expired. Try claiming your band again'
               : claiming ? 'Claiming your band…'
               : !connected ? 'Connecting to your band…'
-              : !session.myBandReady ? 'Checking your band…' : 'Your band has not been confirmed yet.'}
+              : !session.myBandReady ? 'Checking your band…' : 'Your band has not been confirmed yet'}
           </div>
           {connected && session.myBandReady && !owned && !waitingForPress && !claiming && <Button type="button" className="signup-primary mt-3" onClick={() => void claim()}>Try claiming again</Button>}
         </div>
         <div className="signup-preview" role="group" aria-label="Band details preview">
           <p>{draft.name.trim() || 'Your name goes here'}</p>
-          <span><CreditCard size={15} aria-hidden="true" />{ /^\d{4}$/.test(draft.last4) ? `${draft.cardBrand} ···· ${draft.last4} · Demo` : 'No demo card added'}</span>
+          <span><CreditCard size={15} aria-hidden="true" />{ /^\d{4}$/.test(draft.last4) ? `${draft.cardBrand} ···· ${draft.last4} · Test` : 'No test card added'}</span>
         </div>
       </div>
 
       <form onSubmit={(event) => void save(event)} noValidate className="signup-form" aria-label={`Register band ${band.label}`}>
         {(errors.form || session.signupError || session.error) && <p role="alert" className="rounded border border-signal/30 bg-signal/5 p-4 text-[14px] leading-6 text-signal">{errors.form || session.signupError || session.error}</p>}
-        <Step sectionId="your-details" title="Your details" note="The person wearing the band, and someone to call.">
+        <Step sectionId="your-details" title="Your details" note="The person wearing the band, and someone to call">
           <div className="grid gap-5 sm:grid-cols-2">
             <Field id="name" label="Name" value={draft.name} onChange={set('name')} error={errors.name} autoComplete="name" />
             <Field id="email" label="Email" type="email" value={draft.email} onChange={set('email')} error={errors.email} autoComplete="email" inputMode="email" />
@@ -318,12 +313,12 @@ function RegistrationForm({ band }: { band: MockBand }) {
             <Field id="emergency-phone" label="Emergency phone" type="tel" value={draft.emergencyPhone} onChange={set('emergencyPhone')} error={errors.emergencyPhone} autoComplete="section-emergency tel" inputMode="tel" />
           </div>
         </Step>
-        <Step sectionId="your-documents" title="Documents" note="We’ll read the details, then you check them.">
-          {!owned && <p className="mb-4 text-[13px] leading-6 text-champagne">Confirm your band with its button to add documents.</p>}
-          <p className="mb-5 text-[13px] leading-6 text-ink-dim">One PDF per section. Include both sides of your insurance card in one file. Photos and separate files aren’t supported yet.</p>
+        <Step sectionId="your-documents" title="Documents" note="We’ll read the details, then you check them">
+          {!owned && <p className="mb-4 text-[13px] leading-6 text-champagne">Confirm your band with its button to add documents</p>}
+          <p className="mb-5 text-[13px] leading-6 text-ink-dim">One PDF per section. Include both sides of your insurance card in one file. Photos and separate files aren’t supported yet</p>
           <div className="grid gap-4">
-            <UploadArea kind="insurance" title="Insurance card" note="Front and back, together." disabled={!owned || !connected || uploadingKind('insurance')} onFiles={(files) => addFiles('insurance', files)} error={uploadErrors.insurance} />
-            <UploadArea kind="history" title="Medical history" note="Your medical records." disabled={!owned || !connected || uploadingKind('history')} onFiles={(files) => addFiles('history', files)} error={uploadErrors.history} />
+            <UploadArea kind="insurance" title="Insurance card" note="Front and back, together" disabled={!owned || !connected || uploadingKind('insurance')} onFiles={(files) => addFiles('insurance', files)} error={uploadErrors.insurance} />
+            <UploadArea kind="history" title="Medical history" note="Your medical records" disabled={!owned || !connected || uploadingKind('history')} onFiles={(files) => addFiles('history', files)} error={uploadErrors.history} />
           </div>
           <ul aria-label="Document status" aria-live="polite" className="mt-4 divide-y divide-line">
             {uploads.filter((item) => !item.hash || !documents.some((doc) => doc.fileHash === item.hash && doc.kind === item.kind)).map((item) => (
@@ -344,11 +339,11 @@ function RegistrationForm({ band }: { band: MockBand }) {
             })}
           </ul>
         </Step>
-        <Step sectionId="review-card" title="Review your card" note="Check what your documents told us.">
-          {!session.medicalCardReady || !session.medicalDocumentsReady || outstanding ? <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-dim"><LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Still reading your documents.</p> : !medicalCard ? <p className="text-[14px] leading-6 text-ink-dim">Your medical and insurance details will appear here after you upload your documents.</p> : null}
+        <Step sectionId="review-card" title="Review your card" note="Check what your documents told us">
+          {!session.medicalCardReady || !session.medicalDocumentsReady || outstanding ? <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-dim"><LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Still reading your documents</p> : !medicalCard ? <p className="text-[14px] leading-6 text-ink-dim">Your medical and insurance details will appear here after you upload your documents</p> : null}
           {session.medicalCardReady && medicalCard && <MedicalReview card={medicalCard} confirming={confirming} blocked={reviewBlocked} onConfirm={() => void confirm()} />}
         </Step>
-        <Step sectionId="payment" title="Payment" note="Mock payment details for this demo.">
+        <Step sectionId="payment" title="Payment" note="Test payment details">
           <div className="signup-payment-fields">
             <div>
               <label htmlFor="brand" className="mb-2 block text-[14px] font-medium">Card</label>
@@ -360,13 +355,13 @@ function RegistrationForm({ band }: { band: MockBand }) {
             <Field id="last4" label="Last four" value={draft.last4} onChange={set('last4')} error={errors.last4} inputMode="numeric" autoComplete="off" maxLength={4} />
             <Field id="exp" label="Expiry" value={draft.exp} onChange={set('exp')} error={errors.exp} autoComplete="off" maxLength={5} />
           </div>
-          <p className="mt-3 text-[13px] leading-5 text-ink-dim">Last four only. The full number never lands here.</p>
+          <p className="mt-3 text-[13px] leading-5 text-ink-dim">Last four only. The full number never lands here</p>
           <WalletStatus />
           <Button type="submit" className="signup-primary signup-save mt-6" disabled={saving || !owned || !confirmed || !connected}>{saving ? 'Saving…' : 'Save this band'}</Button>
-          {!confirmed && <p className="mt-3 text-[13px] leading-5 text-ink-dim">Confirm your band and review your medical card to finish.</p>}
+          {!confirmed && <p className="mt-3 text-[13px] leading-5 text-ink-dim">Confirm your band and review your medical card to finish</p>}
         </Step>
       </form>
-      <p className="signup-privacy"><ShieldCheck size={16} aria-hidden="true" /> Documents are read for your medical card. File contents stay out of this browser’s saved registration.</p>
+      <p className="signup-privacy"><ShieldCheck size={16} aria-hidden="true" /> Documents are read for your medical card. File contents stay out of this browser’s saved registration</p>
     </main>
   )
 }
@@ -374,7 +369,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
 function WalletStatus() {
   const wallet = useSession((state) => state.wallet)
   const error = useSession((state) => state.walletError)
-  return <p role="status" className="mt-4 break-words text-[13px] leading-5 text-ink-dim">{wallet ? `Wallet account ${wallet.accountId}` : error ? `Wallet pending: ${error} Your registration can still be saved.` : 'Your wallet account will appear here when it opens. It won’t hold up registration.'}</p>
+  return <p role="status" className="mt-4 break-words text-[13px] leading-5 text-ink-dim">{wallet ? `Wallet account ${wallet.accountId}` : error ? `Wallet pending: ${error} Your registration can still be saved` : 'Your wallet account will appear here when it opens. It won’t hold up registration'}</p>
 }
 
 export function RegisterPage() {
@@ -390,8 +385,7 @@ export function RegisterPage() {
           <div className="signup-tap-screen">
             <div className="signup-tap">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
-              <h1 className="signup-title mt-8">Tap your band to start.</h1>
-              <p className="mt-5 text-[16px] leading-7 text-ink-dim">Hold your phone near your band’s NFC tag and open the link. We’ll take you straight to your band.</p>
+              <p className="mt-8 text-[16px] leading-7 text-ink-dim">Hold your phone near your band’s NFC tag and open the link. We’ll take you straight to your band</p>
             </div>
             {/* Without a tag to hand, Next opens the first band, the same page its tag opens. */}
             <Button type="button" className="signup-primary signup-next" onClick={() => go(`/register?band=${MOCK_BANDS[0].deviceId}`)}>

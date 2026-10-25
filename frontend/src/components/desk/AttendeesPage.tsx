@@ -24,16 +24,8 @@ export function AttendeesPage() {
     if (!q) return rows
     return rows.filter((person) => `${person.displayName} ${person.organization} ${person.title} ${person.role}`.toLowerCase().includes(q))
   }, [guests, query])
-  const title = people.length
-    ? `${people.length.toLocaleString('en-US')} people have joined.`
-    : guests.length
-      ? `${guests.length.toLocaleString('en-US')} people on the import.`
-      : 'No one on the list yet.'
-
   return (
     <DeskFrame
-      title={title}
-      sentence="Who joined is listed first, with the wristband they claimed. The import is everyone the event already knew."
       figures={
         <>
           <Figure lead label="Joined" value={people.length.toLocaleString('en-US')} note="claimed a place" />
@@ -86,7 +78,7 @@ export function AttendeesPage() {
           </li>
         ))}
       </ul>
-      {shown.length === 0 && query && <p className="mt-6 text-[15px] text-ink-dim">No one who joined matches.</p>}
+      {shown.length === 0 && query && <p className="mt-6 text-[15px] text-ink-dim">No one who joined matches</p>}
       {imported.length > 0 && (
         <section className="mt-12">
           <h2 className="text-[13px] text-ink-dim">Imported</h2>
@@ -99,7 +91,7 @@ export function AttendeesPage() {
               </li>
             ))}
           </ul>
-          {imported.length > 400 && <p className="mt-4 text-[13px] text-ink-muted">Showing the first 400 of {imported.length.toLocaleString('en-US')}.</p>}
+          {imported.length > 400 && <p className="mt-4 text-[13px] text-ink-muted">Showing the first 400 of {imported.length.toLocaleString('en-US')}</p>}
         </section>
       )}
     </DeskFrame>

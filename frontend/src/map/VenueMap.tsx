@@ -46,7 +46,7 @@ export function VenueMap() {
         ref={hostRef}
         role="application"
         tabIndex={0}
-        aria-label="Venue map. Drag to pan, scroll to zoom, right-drag or shift-drag to rotate and tilt. Arrow keys pan, plus and minus zoom, Q and E rotate, 0 fits the venue."
+        aria-label="Venue map. Drag to pan, scroll to zoom, right-drag or shift-drag to rotate and tilt. Arrow keys pan, plus and minus zoom, Q and E rotate, 0 fits the venue"
         onKeyDown={onKeyDown}
         className="absolute inset-0 cursor-grab outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-champagne/60 active:cursor-grabbing"
       />
@@ -55,7 +55,7 @@ export function VenueMap() {
       {failed && (
         <div className="absolute inset-0 grid place-items-center">
           <div className="nc-panel max-w-sm p-6 text-sm text-ink-dim">
-            <p className="font-medium text-ink">The map could not start.</p>
+            <p className="font-medium text-ink">The map could not start</p>
             <p className="mt-2">WebGL is unavailable in this browser ({failed}). Incidents and bands still work from the panels.</p>
           </div>
         </div>

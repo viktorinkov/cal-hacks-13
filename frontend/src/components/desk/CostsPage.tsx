@@ -20,8 +20,6 @@ export function CostsPage() {
 
   return (
     <DeskFrame
-      title={empty ? 'No costs posted yet.' : `${formatCents(Math.max(debits, billed))} on the books.`}
-      sentence="Ledger postings and billed lines from the live host. A claim is still decided on Settlements."
       figures={
         <>
           <Figure lead label="Debits" value={formatCents(debits)} note="posted" />
@@ -32,7 +30,7 @@ export function CostsPage() {
       }
     >
       {empty ? (
-        <p className="text-[15px] text-ink-dim">The ledger has not arrived from the live host yet.</p>
+        <p className="text-[15px] text-ink-dim">The ledger has not arrived from the live host yet</p>
       ) : (
         <>
           {ledger.length > 0 && (

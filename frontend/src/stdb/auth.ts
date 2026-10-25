@@ -43,7 +43,7 @@ export function redirectUri(): string {
 /** Send the browser to the same email sign-in the organizer portal uses. */
 export async function beginSignIn(): Promise<void> {
   const host = await loadHostConfig()
-  if (!host.authClientId) throw new Error('This host has no staff sign-in.')
+  if (!host.authClientId) throw new Error('This host has no staff sign-in')
   const verifier = base64url(bytes(32))
   const state = base64url(bytes(32))
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
@@ -67,7 +67,7 @@ export async function finishSignIn(): Promise<void> {
   const query = new URLSearchParams(window.location.search)
   const pending = JSON.parse(window.sessionStorage.getItem(PENDING) ?? '{}') as Partial<PendingSignIn>
   const code = query.get('code')
-  if (!code || !pending.verifier || query.get('state') !== pending.state) throw new Error('Sign-in did not complete.')
+  if (!code || !pending.verifier || query.get('state') !== pending.state) throw new Error('Sign-in did not complete')
   const res = await fetch(`${AUTH}/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -82,7 +82,7 @@ export async function finishSignIn(): Promise<void> {
   const body: unknown = await res.json().catch(() => null)
   const row = body && typeof body === 'object' ? (body as { id_token?: unknown; error_description?: unknown; error?: unknown }) : {}
   if (typeof row.id_token !== 'string' || !row.id_token) {
-    const reason = typeof row.error_description === 'string' ? row.error_description : typeof row.error === 'string' ? row.error : 'Sign-in did not complete.'
+    const reason = typeof row.error_description === 'string' ? row.error_description : typeof row.error === 'string' ? row.error : 'Sign-in did not complete'
     throw new Error(reason)
   }
   window.localStorage.setItem(ID_TOKEN, row.id_token)

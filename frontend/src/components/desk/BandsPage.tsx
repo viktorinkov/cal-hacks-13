@@ -37,8 +37,6 @@ export function BandsPage() {
 
   return (
     <DeskFrame
-      title={alerts ? `${alerts} band${alerts === 1 ? '' : 's'} asking for help.` : `${online.toLocaleString('en-US')} bands online.`}
-      sentence="The roster from the live database. A band stays on the list even when this map is not drawing a pin for it."
       figures={
         <>
           <Figure lead label="Online" value={online.toLocaleString('en-US')} note={`of ${bands.length.toLocaleString('en-US')}`} />
@@ -85,9 +83,9 @@ export function BandsPage() {
           </li>
         ))}
       </ul>
-      {shown.length > 400 && <p className="mt-4 text-[13px] text-ink-muted">Showing the first 400 of {shown.length.toLocaleString('en-US')}. Narrow the list to see the rest.</p>}
-      {shown.length === 0 && <p className="mt-6 text-[15px] text-ink-dim">{bands.length === 0 ? 'The band table has not arrived yet.' : 'Nothing matches.'}</p>}
-      {shown.some((band) => band.lastSeen) && <p className="mt-6 text-[13px] text-ink-muted">Last heard {when(Math.max(...shown.map((band) => band.lastSeen)))}.</p>}
+      {shown.length > 400 && <p className="mt-4 text-[13px] text-ink-muted">Showing the first 400 of {shown.length.toLocaleString('en-US')}. Narrow the list to see the rest</p>}
+      {shown.length === 0 && <p className="mt-6 text-[15px] text-ink-dim">{bands.length === 0 ? 'The band table has not arrived yet' : 'Nothing matches'}</p>}
+      {shown.some((band) => band.lastSeen) && <p className="mt-6 text-[13px] text-ink-muted">Last heard {when(Math.max(...shown.map((band) => band.lastSeen)))}</p>}
     </DeskFrame>
   )
 }

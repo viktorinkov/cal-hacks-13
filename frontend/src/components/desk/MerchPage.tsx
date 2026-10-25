@@ -11,8 +11,6 @@ export function MerchPage() {
 
   return (
     <DeskFrame
-      title={merch.length ? `${merch.length} pieces in the case.` : 'The merch case is empty.'}
-      sentence="What the event is selling, with the price kept in cents. Orders shown here are the ones this sign-in can see."
       figures={
         <>
           <Figure lead label="Pieces" value={String(merch.length)} note="in the case" />
@@ -23,7 +21,7 @@ export function MerchPage() {
       }
     >
       {merch.length === 0 ? (
-        <p className="text-[15px] text-ink-dim">No merch has arrived from the live host yet.</p>
+        <p className="text-[15px] text-ink-dim">No merch has arrived from the live host yet</p>
       ) : (
         <ul className="grid gap-8 md:grid-cols-2">
           {merch.map((piece) => (

@@ -84,7 +84,7 @@ describe('band signup', () => {
       window.history.replaceState(null, '', path)
       renderRegistration()
 
-      expect(screen.getByRole('heading', { name: 'Tap your band to start.' })).toBeInTheDocument()
+      expect(screen.getByText(/Hold your phone near your band/)).toBeInTheDocument()
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
       expect(claimBand).not.toHaveBeenCalled()
     },
@@ -169,7 +169,7 @@ describe('band signup', () => {
     const insurance = screen.getByLabelText(/Insurance card/)
 
     await user.upload(insurance, new File(['plain text'], 'notes.txt', { type: 'text/plain' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose an image or PDF file.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an image or PDF file')
     expect(insurance).toHaveAttribute('aria-invalid', 'true')
     expect(insurance).toHaveAccessibleDescription(/Choose an image or PDF file/)
     expect(submitMedicalDocument).not.toHaveBeenCalled()
@@ -249,7 +249,7 @@ describe('band signup', () => {
     await fillPersonAndPayment(user)
     await user.click(screen.getByRole('button', { name: 'Save this band' }))
 
-    expect(await screen.findByRole('heading', { name: 'Saved on band 05.' })).toBeInTheDocument()
+    expect(await screen.findByText(/Band 05 is linked/)).toBeInTheDocument()
     expect(registerBand).toHaveBeenCalledExactlyOnceWith('BANDIT-05', 'Alex Guest')
     expect(screen.getByText('MEMBER-123')).toBeInTheDocument()
     expect(getSavedRegistration('band-05')).toMatchObject({ name: 'Alex Guest', last4: '4242', memberId: '' })
@@ -263,8 +263,8 @@ describe('band signup', () => {
 
     act(() => useSession.setState({ medicalCard: { ...extractedCard, status: 'confirmed' } }))
     await user.click(screen.getByRole('button', { name: 'Save this band' }))
-    expect(screen.getByLabelText('Name', { exact: true })).toHaveAccessibleDescription('Name the person wearing it.')
-    expect(screen.getByLabelText('Last four', { exact: true })).toHaveAccessibleDescription('Last four is four digits.')
+    expect(screen.getByLabelText('Name', { exact: true })).toHaveAccessibleDescription('Name the person wearing it')
+    expect(screen.getByLabelText('Last four', { exact: true })).toHaveAccessibleDescription('Last four is four digits')
     expect(registerBand).not.toHaveBeenCalled()
     expect(getSavedRegistration('band-05')).toBeNull()
   })
@@ -276,7 +276,7 @@ describe('band signup', () => {
     })
     renderRegistration()
     expect(screen.getByRole('button', { name: 'Save this band' })).toBeEnabled()
-    expect(screen.getByText(/Wallet pending:/)).toHaveTextContent('Your registration can still be saved.')
+    expect(screen.getByText(/Wallet pending:/)).toHaveTextContent('Your registration can still be saved')
 
     act(() => useSession.setState({ wallet: { accountId: 'wallet-05', balanceCents: 0 } }))
     await waitFor(() => expect(screen.getByText('Wallet account wallet-05')).toBeInTheDocument())

@@ -161,7 +161,7 @@ function messageOf(error: unknown): string {
     const message = (error as { message: unknown }).message
     if (typeof message === 'string' && message) return message
   }
-  return 'The database refused that.'
+  return 'The database refused that'
 }
 
 function cents(value: unknown): number {
@@ -365,7 +365,7 @@ async function call<T>(work: () => Promise<T>): Promise<T> {
 }
 
 function reducers(): Reducers {
-  if (!conn) throw new Error('The database is not connected.')
+  if (!conn) throw new Error('The database is not connected')
   return (conn as unknown as { reducers: Reducers }).reducers
 }
 
@@ -380,7 +380,7 @@ function bandIdFromToken(token: string): number | null {
 }
 
 async function claimTargetBand(token: string): Promise<void> {
-  if (!conn) throw new Error('The database is not connected.')
+  if (!conn) throw new Error('The database is not connected')
   const current = useSession.getState().myBand
   if (current?.bandId === bandIdFromToken(token)) {
     if (current.status === 'claimed') return
@@ -399,10 +399,10 @@ async function claimTargetBand(token: string): Promise<void> {
 
 function requireClaimedBand(bandId?: number | null): void {
   const state = useSession.getState()
-  if (!conn || state.phase !== 'live') throw new Error('The database is not connected.')
-  if (!state.myBandReady) throw new Error('Your band is still being checked. Try again in a moment.')
+  if (!conn || state.phase !== 'live') throw new Error('The database is not connected')
+  if (!state.myBandReady) throw new Error('Your band is still being checked. Try again in a moment')
   if (state.myBand?.status !== 'claimed' || (bandId != null && state.myBand.bandId !== bandId)) {
-    throw new Error('Press the button on your band to finish claiming it first.')
+    throw new Error('Press the button on your band to finish claiming it first')
   }
 }
 
@@ -551,7 +551,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
                   window.clearTimeout(timer)
                   const reason = messageOf(args[1] ?? args[0])
                   console.warn('[stdb] query refused', query, reason)
-                  if (token) useSession.setState({ staffError: reason || 'A staff view was refused.' })
+                  if (token) useSession.setState({ staffError: reason || 'A staff view was refused' })
                   go()
                 })
                 .subscribe(query)
@@ -560,7 +560,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
           })
           .onError(() => {
             console.warn('[stdb] floor subscription refused')
-            reject(new Error('The floor subscription was refused.'))
+            reject(new Error('The floor subscription was refused'))
           })
           .subscribe(FLOOR_QUERIES)
       })
@@ -572,7 +572,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
         conn = null
         apiSession = null
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
-        noteDisconnect('Connection lost.')
+        noteDisconnect('Connection lost')
       })
       .build()
   })
@@ -586,7 +586,7 @@ async function open() {
   useSession.setState({ actors })
   const played = actors.find((actor) => actor.name === as)
   if (as && !played) {
-    useSession.setState({ actionError: `No test identity named ${as}.` })
+    useSession.setState({ actionError: `No test identity named ${as}` })
   }
   const token = played?.token ?? storedToken(host.database)
   try {
@@ -642,11 +642,11 @@ export const useSession = create<SessionState>((set, get) => ({
     if (!claim) return
     if (!conn) {
       if (import.meta.env.MODE !== 'test') {
-        set({ actionError: 'The database is not connected.' })
+        set({ actionError: 'The database is not connected' })
         return
       }
       set({
-        claims: get().claims.map((item) => (item.id === id ? { ...item, status: 'Settled', statusNote: 'Approved from this desk.' } : item)),
+        claims: get().claims.map((item) => (item.id === id ? { ...item, status: 'Settled', statusNote: 'Approved from this desk' } : item)),
       })
       return
     }
@@ -664,12 +664,12 @@ export const useSession = create<SessionState>((set, get) => ({
     if (!claim) return
     const trimmed = reason.trim()
     if (!trimmed) {
-      set({ actionError: 'A refusal needs a reason.' })
+      set({ actionError: 'A refusal needs a reason' })
       return
     }
     if (!conn) {
       if (import.meta.env.MODE !== 'test') {
-        set({ actionError: 'The database is not connected.' })
+        set({ actionError: 'The database is not connected' })
         return
       }
       set({
@@ -713,17 +713,17 @@ export const useSession = create<SessionState>((set, get) => ({
     await call(async () => {
       requireClaimedBand()
       const doc = get().medicalDocuments.find((item) => item.id === id)
-      if (!doc) throw new Error('This document is no longer available. Choose the file again.')
-      if (doc.kind !== 'insurance' && doc.kind !== 'history') throw new Error('This document cannot be retried here.')
-      if (doc.status !== 'failed') throw new Error('This document has not failed. Wait for it to finish reading.')
+      if (!doc) throw new Error('This document is no longer available. Choose the file again')
+      if (doc.kind !== 'insurance' && doc.kind !== 'history') throw new Error('This document cannot be retried here')
+      if (doc.status !== 'failed') throw new Error('This document has not failed. Wait for it to finish reading')
       await reducers().submitMedicalDocument({ kind: doc.kind, fileHash: doc.fileHash, pageCount: doc.pageCount })
     })
   },
   confirmMedicalCard: async () => {
     await call(async () => {
       requireClaimedBand()
-      if (!get().medicalCardReady || !get().medicalCard) throw new Error('Still reading your documents. Wait for your card to arrive.')
-      if (get().medicalDocuments.some((doc) => doc.status === 'reading')) throw new Error('Still reading your documents. Wait for every document to finish.')
+      if (!get().medicalCardReady || !get().medicalCard) throw new Error('Still reading your documents. Wait for your card to arrive')
+      if (get().medicalDocuments.some((doc) => doc.status === 'reading')) throw new Error('Still reading your documents. Wait for every document to finish')
       await reducers().confirmMedicalCard({})
     })
   },

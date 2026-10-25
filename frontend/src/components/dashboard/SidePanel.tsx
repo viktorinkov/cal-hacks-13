@@ -178,7 +178,7 @@ export function SidePanel({ maxHeight }: { maxHeight: number }) {
       </div>
       <div
         role="separator"
-        aria-label="Resize the panel. Arrow keys change width and height."
+        aria-label="Resize the panel. Arrow keys change width and height"
         tabIndex={0}
         onPointerDown={resizeCorner}
         onKeyDown={cornerKeys}

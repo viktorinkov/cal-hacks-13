@@ -47,12 +47,12 @@ export const CLAIMS: readonly Claim[] = [
     bandId: 'band-02',
     guest: 'Judge B',
     status: 'filed',
-    hold: 'Filed. Vision, the band and the rider agreed.',
+    hold: 'Filed. Vision, the band and the rider agreed',
     steps: [
-      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-01 at Front Left, 21:06. A speaker cabinet was on its side.' },
-      { tool: 'Vision', state: 'done', mark: 'Named', result: '91% on one person. No second figure.' },
-      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-02, Judge B. Last NFC read at anchor st-05, 21:04.' },
-      { tool: 'Policy', state: 'done', mark: 'Filed', result: 'Northline accepted $930.00 after the $250.00 deductible. Filed at 21:09.' },
+      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-01 at Front Left, 21:06. A speaker cabinet was on its side' },
+      { tool: 'Vision', state: 'done', mark: 'Named', result: '91% on one person. No second figure' },
+      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-02, Judge B. Last NFC read at anchor st-05, 21:04' },
+      { tool: 'Policy', state: 'done', mark: 'Filed', result: 'Northline accepted $930.00 after the $250.00 deductible. Filed at 21:09' },
     ],
   },
   {
@@ -67,12 +67,12 @@ export const CLAIMS: readonly Claim[] = [
     bandId: 'band-04',
     guest: 'Judge C',
     status: 'closed',
-    hold: 'Closed. $85.00 is under the $250.00 deductible.',
+    hold: 'Closed. $85.00 is under the $250.00 deductible',
     steps: [
-      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at Concourse West, 21:11. The stand rail shows a fresh scuff.' },
-      { tool: 'Vision', state: 'done', mark: 'Named', result: '88% on one person against the rail.' },
-      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-04, Judge C. Last NFC read at anchor st-01, 21:10.' },
-      { tool: 'Policy', state: 'declined', mark: 'Closed', result: 'Closed. $85.00 is under the $250.00 deductible, so nothing is filed.' },
+      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at Concourse West, 21:11. The stand rail shows a fresh scuff' },
+      { tool: 'Vision', state: 'done', mark: 'Named', result: '88% on one person against the rail' },
+      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-04, Judge C. Last NFC read at anchor st-01, 21:10' },
+      { tool: 'Policy', state: 'declined', mark: 'Closed', result: 'Closed. $85.00 is under the $250.00 deductible, so nothing is filed' },
     ],
   },
   {
@@ -87,12 +87,12 @@ export const CLAIMS: readonly Claim[] = [
     bandId: 'band-06',
     guest: 'Judge E',
     status: 'closed',
-    hold: 'Closed. The rider excludes ordinary wear on furniture.',
+    hold: 'Closed. The rider excludes ordinary wear on furniture',
     steps: [
-      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-01 at Front Left, 21:14. A folding chair was bent.' },
-      { tool: 'Vision', state: 'done', mark: 'Named', result: '84% on one person, chair in hand.' },
-      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-06, Judge E. Last NFC read at anchor st-05, 21:13.' },
-      { tool: 'Policy', state: 'declined', mark: 'Closed', result: 'Closed. The rider excludes ordinary wear on furniture.' },
+      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-01 at Front Left, 21:14. A folding chair was bent' },
+      { tool: 'Vision', state: 'done', mark: 'Named', result: '84% on one person, chair in hand' },
+      { tool: 'Band', state: 'done', mark: 'Matched', result: 'band-06, Judge E. Last NFC read at anchor st-05, 21:13' },
+      { tool: 'Policy', state: 'declined', mark: 'Closed', result: 'Closed. The rider excludes ordinary wear on furniture' },
     ],
   },
   {
@@ -107,12 +107,12 @@ export const CLAIMS: readonly Claim[] = [
     bandId: 'band-05',
     guest: 'Judge D',
     status: 'needs_person',
-    hold: 'A second person was in the frame at 41%. Northline will not file until someone names the band.',
+    hold: 'A second person was in the frame at 41%. Northline will not file until someone names the band',
     steps: [
-      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at West Passage, 21:18. The barrier rail left its footing.' },
-      { tool: 'Vision', state: 'waiting', mark: 'Held', result: '86% on the person at the rail, 41% on a second figure.' },
-      { tool: 'Band', state: 'done', mark: 'In frame', result: 'band-05, Judge D. Last NFC read at anchor st-01, 21:17.' },
-      { tool: 'Policy', state: 'waiting', mark: 'Held', result: 'Northline covers accidental damage. It will not file while two people are candidates.' },
+      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at West Passage, 21:18. The barrier rail left its footing' },
+      { tool: 'Vision', state: 'waiting', mark: 'Held', result: '86% on the person at the rail, 41% on a second figure' },
+      { tool: 'Band', state: 'done', mark: 'In frame', result: 'band-05, Judge D. Last NFC read at anchor st-01, 21:17' },
+      { tool: 'Policy', state: 'waiting', mark: 'Held', result: 'Northline covers accidental damage. It will not file while two people are candidates' },
     ],
   },
   {
@@ -127,12 +127,12 @@ export const CLAIMS: readonly Claim[] = [
     bandId: null,
     guest: null,
     status: 'unmatched',
-    hold: 'No band was in the frame, and $210.00 is under the $250.00 deductible.',
+    hold: 'No band was in the frame, and $210.00 is under the $250.00 deductible',
     steps: [
-      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at West Passage, 21:22. A merch crate went over.' },
-      { tool: 'Vision', state: 'declined', mark: 'No band', result: 'People in the frame, and no band light.' },
-      { tool: 'Band', state: 'declined', mark: 'No read', result: 'No NFC read in West Passage in that minute.' },
-      { tool: 'Policy', state: 'waiting', mark: 'Held', result: 'No band to file against. $210.00 is also under the $250.00 deductible.' },
+      { tool: 'Camera', state: 'done', mark: 'Seen', result: 'CAM-02 at West Passage, 21:22. A merch crate went over' },
+      { tool: 'Vision', state: 'declined', mark: 'No band', result: 'People in the frame, and no band light' },
+      { tool: 'Band', state: 'declined', mark: 'No read', result: 'No NFC read in West Passage in that minute' },
+      { tool: 'Policy', state: 'waiting', mark: 'Held', result: 'No band to file against. $210.00 is also under the $250.00 deductible' },
     ],
   },
 ]
@@ -178,17 +178,17 @@ export function summarize(claims: readonly Claim[]): ClaimSummary {
 }
 
 export function claimsSentence(summary: ClaimSummary): string {
-  if (summary.waiting === 0) return `${formatCents(summary.filedCents)} is with Northline. Nothing is waiting.`
-  return `${formatCents(summary.unfiledCents)} is still unfiled. ${formatCents(summary.filedCents)} is already with Northline.`
+  if (summary.waiting === 0) return `${formatCents(summary.filedCents)} is with Northline. Nothing is waiting`
+  return `${formatCents(summary.unfiledCents)} is still unfiled. ${formatCents(summary.filedCents)} is already with Northline`
 }
 
 const WAITING_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
 
 export function claimsHeadline(summary: ClaimSummary): { title: string; sentence: string } {
-  if (summary.waiting <= 0) return { title: 'The night is filed.', sentence: claimsSentence(summary) }
-  if (summary.waiting === 1) return { title: 'One still needs a person.', sentence: claimsSentence(summary) }
+  if (summary.waiting <= 0) return { title: 'The night is filed', sentence: claimsSentence(summary) }
+  if (summary.waiting === 1) return { title: 'One still needs a person', sentence: claimsSentence(summary) }
   const word = WAITING_WORDS[summary.waiting] ?? String(summary.waiting)
-  return { title: `${word} still need a person.`, sentence: claimsSentence(summary) }
+  return { title: `${word} still need a person`, sentence: claimsSentence(summary) }
 }
 
 export function waitingNote(summary: ClaimSummary): string {
@@ -232,17 +232,17 @@ export function settleClaim(claim: Claim): Claim {
     return {
       ...claim,
       status: 'filed',
-      hold: `Filed. A person confirmed ${claim.guest}.`,
+      hold: `Filed. A person confirmed ${claim.guest}`,
       steps: claim.steps.map((step) => {
         if (step.tool === 'Vision') {
-          return { ...step, state: 'done', mark: 'Named', result: `A person confirmed ${claim.guest}. The second figure is dropped.` }
+          return { ...step, state: 'done', mark: 'Named', result: `A person confirmed ${claim.guest}. The second figure is dropped` }
         }
         if (step.tool === 'Policy') {
           return {
             ...step,
             state: 'done',
             mark: 'Filed',
-            result: `Northline accepted ${formatCents(claim.payableCents)} after the ${formatCents(claim.deductibleCents)} deductible.`,
+            result: `Northline accepted ${formatCents(claim.payableCents)} after the ${formatCents(claim.deductibleCents)} deductible`,
           }
         }
         return step
@@ -253,14 +253,14 @@ export function settleClaim(claim: Claim): Claim {
     return {
       ...claim,
       status: 'closed',
-      hold: `Closed. No band in the frame, and ${formatCents(claim.damageCents)} is under the deductible.`,
+      hold: `Closed. No band in the frame, and ${formatCents(claim.damageCents)} is under the deductible`,
       steps: claim.steps.map((step) =>
         step.tool === 'Policy'
           ? {
               ...step,
               state: 'declined',
               mark: 'Closed',
-              result: `Closed without a filing. ${formatCents(claim.damageCents)} is under the ${formatCents(claim.deductibleCents)} deductible, and no band was named.`,
+              result: `Closed without a filing. ${formatCents(claim.damageCents)} is under the ${formatCents(claim.deductibleCents)} deductible, and no band was named`,
             }
           : step,
       ),

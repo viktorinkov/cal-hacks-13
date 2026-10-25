@@ -10,8 +10,6 @@ export function PhotosPage() {
 
   return (
     <DeskFrame
-      title={photos.length ? `${photos.length.toLocaleString('en-US')} photographs.` : 'No photographs yet.'}
-      sentence="Frames from the event. A name under a picture is someone the desk already knows."
       figures={
         <>
           <Figure lead label="Frames" value={photos.length.toLocaleString('en-US')} note="in the album" />
@@ -22,7 +20,7 @@ export function PhotosPage() {
       }
     >
       {photos.length === 0 ? (
-        <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>
+        <p className="text-[15px] text-ink-dim">Nothing has been taken yet</p>
       ) : (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4">
           {photos.map((photo) => (

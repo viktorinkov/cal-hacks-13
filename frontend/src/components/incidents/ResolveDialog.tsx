@@ -7,10 +7,10 @@ import { pendingKey, resolveIncident } from '@/services/operatorCommands'
 import { useUi } from '@/stores/ui'
 
 const REASONS: { value: ResolutionReason; label: string; hint: string }[] = [
-  { value: 'assisted_on_scene', label: 'Assisted on scene', hint: 'The medic is with them and no transport is needed.' },
-  { value: 'handed_to_medical', label: 'Handed to medical', hint: 'Taken to First Aid or an ambulance.' },
-  { value: 'false_alarm', label: 'False alarm', hint: 'Pressed by accident, or not a fall.' },
-  { value: 'other', label: 'Other', hint: 'Closed for another reason.' },
+  { value: 'assisted_on_scene', label: 'Assisted on scene', hint: 'The medic is with them and no transport is needed' },
+  { value: 'handed_to_medical', label: 'Handed to medical', hint: 'Taken to First Aid or an ambulance' },
+  { value: 'false_alarm', label: 'False alarm', hint: 'Pressed by accident, or not a fall' },
+  { value: 'other', label: 'Other', hint: 'Closed for another reason' },
 ]
 
 export function ResolveDialog({
@@ -32,7 +32,7 @@ export function ResolveDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-[30px] font-normal leading-none">Resolve {incident.displayId}</DialogTitle>
           <DialogDescription className="text-[13px] text-ink-dim">
-            Every band goes back to ready once it confirms. This closes the incident for everyone.
+            Every band goes back to ready once it confirms. This closes the incident for everyone
           </DialogDescription>
         </DialogHeader>
         <fieldset className="flex flex-col gap-1.5">
