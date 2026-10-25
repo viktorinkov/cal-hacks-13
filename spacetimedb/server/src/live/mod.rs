@@ -31,8 +31,9 @@ use spacetimedb::rand::{Rng, SeedableRng};
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp};
 
 const TICK_MILLIS: u64 = 1_000;
-/// The first incident comes this soon after the doors open; the next ones this far apart, in seconds.
-const FIRST_INCIDENT_SECS: i64 = 35;
+/// The first incident comes once the crowd has reached its tables (a fall among people still walking in
+/// would have its circle in another zone); the next ones this far apart, in seconds.
+const FIRST_INCIDENT_SECS: i64 = 60;
 const INCIDENT_GAP_SECS: (i64, i64) = (70, 95);
 /// The crowd takes this long to walk out once the doors close, before the bands go quiet.
 const WALK_OUT_SECS: i64 = 25;
@@ -73,6 +74,17 @@ pub struct LiveRun {
     /// played again exactly.
     pub seed: u64,
     pub started_by: Identity,
+}
+
+/// One row, id 0, while the run is paused: the crowd stands still and no incident is staged. Resuming moves
+/// the run's clock on by the time it was paused.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = live_pause, public)]
+pub struct LivePause {
+    #[primary_key]
+    pub id: u8,
+    pub paused_at: Timestamp,
+    pub paused_by: Identity,
 }
 
 #[spacetimedb::table(accessor = live_run_timer, scheduled(crate::live::live_tick))]
@@ -152,6 +164,11 @@ pub fn run(ctx: &ReducerContext) -> Option<LiveRun> {
     ctx.db.live_run().id().find(0)
 }
 
+/// True while the run is paused.
+pub fn paused(ctx: &ReducerContext) -> bool {
+    ctx.db.live_pause().id().find(0).is_some()
+}
+
 /// How many times faster than the clock the crowd moves: the run's pace while the doors are open, else 1.
 pub fn pace(ctx: &ReducerContext) -> f32 {
     match run(ctx) {
@@ -227,6 +244,7 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
         }
         ctx.db.incident_marker().incident_id().update(IncidentMarker { status: "resolved".into(), resolved_at: Some(ctx.timestamp), ..m });
     }
+    ctx.db.live_pause().id().delete(0);
     crate::web::set_ended_by(ctx, false)?;
     crowd::start(ctx, crowd_size, pace.max(1) as f32)?;
     walk_in(ctx);
@@ -277,6 +295,46 @@ pub fn end_live_run(ctx: &ReducerContext) -> Result<(), String> {
         return Err("the doors are already closed".into());
     }
     close_doors(ctx, r);
+    Ok(())
+}
+
+/// Pauses the run: the crowd stands still, no new incident happens and the clock stops. The medic still
+/// finishes what is open.
+#[spacetimedb::reducer]
+pub fn pause_live_run(ctx: &ReducerContext) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let r = run(ctx).ok_or("no live run")?;
+    if !matches!(r.phase, LivePhase::Running | LivePhase::Closing) {
+        return Err("the run is not going".into());
+    }
+    if paused(ctx) {
+        return Err("the run is already paused".into());
+    }
+    ctx.db.live_pause().insert(LivePause { id: 0, paused_at: ctx.timestamp, paused_by: ctx.sender() });
+    record(ctx, 0, 0, "venue", &safety::caller_name(ctx), "Paused".into(), "the crowd stands still and no new incident happens until the run resumes".into());
+    Ok(())
+}
+
+/// Resumes a paused run where it stopped: the end time, the next incident and every team's next move move on
+/// by the time it was paused.
+#[spacetimedb::reducer]
+pub fn resume_live_run(ctx: &ReducerContext) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let p = ctx.db.live_pause().id().find(0).ok_or("the run is not paused")?;
+    ctx.db.live_pause().id().delete(0);
+    let gap = TimeDuration::from_micros(safety::micros_between(p.paused_at, ctx.timestamp));
+    if let Some(r) = run(ctx) {
+        ctx.db.live_run().id().update(LiveRun {
+            ends_at: r.ends_at + gap,
+            next_incident_at: r.next_incident_at + gap,
+            closing_at: r.closing_at.map(|t| t + gap),
+            ..r
+        });
+    }
+    for g in ctx.db.crowd_group().iter().collect::<Vec<_>>() {
+        ctx.db.crowd_group().id().update(CrowdGroup { next_move_at: g.next_move_at + gap, ..g });
+    }
+    record(ctx, 0, 0, "venue", &safety::caller_name(ctx), "Resumed".into(), format!("paused for {} s", gap.to_micros() / 1_000_000));
     Ok(())
 }
 
@@ -342,6 +400,9 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
     }
     let Some(r) = run(ctx) else { return Ok(()) };
     report_placed_test_bands(ctx);
+    if paused(ctx) {
+        return Ok(());
+    }
     match r.phase {
         LivePhase::Running if ctx.timestamp >= r.ends_at => close_doors(ctx, r),
         LivePhase::Running if ctx.timestamp >= r.next_incident_at => {

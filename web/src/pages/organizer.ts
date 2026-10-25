@@ -1,6 +1,7 @@
 // The organizer portal: the live event from the bands, alerts, who joined, settlements: who pays what on each
 // claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the event graph with its photos,
-// the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
+// the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and the live run
+// in the venue's 3D view with its start, pause and end of the event.
 // The owner also views the portal and the attendee pages as any person sees them, read-only.
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
@@ -15,6 +16,7 @@ import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
+import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -60,6 +62,11 @@ const QUERIES = [
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
   'SELECT * FROM board_staff',
+  'SELECT * FROM live_run',
+  'SELECT * FROM live_pause',
+  'SELECT * FROM incident_marker',
+  'SELECT * FROM decision',
+  'SELECT * FROM band_place',
   'SELECT * FROM view_as_people',
 ];
 
@@ -136,11 +143,8 @@ function header() {
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
     roles().has('medic') && h('p', {}, 'Tap a band with this phone to open the wearer\'s medical card.'),
-    can('ops') && h('p', {},
-      ended
-        ? [h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. ',
-          h('button', { onclick: () => act(() => conn.reducers.reopenEvent({})) }, 'Reopen the event')]
-        : h('button', { onclick: () => confirm('End the event? Every tap link switches to the recap.') && act(() => conn.reducers.endEvent({})) }, 'Event ended')),
+    ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap.'),
+    can(...STAFF_ROLES) && runBar(conn, can('ops')),
     h('nav', {}, tabs().map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
   ];
 }
@@ -182,6 +186,8 @@ function live() {
   const names = wearers();
   const wearer = (band: number) => names.has(band) ? ` (${names.get(band) || 'no name yet'})` : '';
   return [
+    // The 3D venue is the same for everyone, so a View as frame leaves it out.
+    !viewing() && liveRunSection(conn, can('ops')),
     (alerts.length > 0 || incidents.length > 0) && h('section', { class: 'alert' },
       h('h3', {}, 'Alerts'),
       h('ul', {},
@@ -1002,14 +1008,11 @@ function render() {
   const open = tabs();
   mount('head', header());
   if (!open.length) {
-    showLive3d(false);
     showViewAs(false);
     return mount('app', noRole());
   }
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  // The 3D venue is the same for everyone, so a View as frame leaves it out.
-  showLive3d(tab === 'live' && !viewing());
   showViewAs(tab === 'viewas');
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live();
   mount('app', body);
@@ -1017,14 +1020,6 @@ function render() {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
   }
-}
-
-/** The 3D venue on the Live tab loads the first time the tab shows, then stays loaded while hidden. */
-function showLive3d(on: boolean) {
-  const box = document.getElementById('live3d')!;
-  box.hidden = !on;
-  const frame = box.querySelector('iframe')!;
-  if (on && !frame.getAttribute('src')) frame.src = '/live' + location.search;
 }
 
 async function main() {

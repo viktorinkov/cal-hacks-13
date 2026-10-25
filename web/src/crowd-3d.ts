@@ -1,13 +1,11 @@
-// The crowd on the 3D floor: every band the page shows is one instance of one mesh, walking to the spot the
-// module last wrote for it instead of jumping. The colour is the band's light: calm, busy, very busy, the
-// light circle pulsing around someone down, and the person down lying flat in bright red with a pulsing ring.
-// Bands 1 to 99 are the presenters' real bands: bigger, blue, with a ring and their name above them.
+// The crowd in the venue's 3D view on the Live tab: every band is one instance of one mesh, walking to the
+// spot the module last wrote for it instead of jumping. The colour is the band's light: calm, busy, very busy,
+// the light circle pulsing around someone down, and the person down lying flat in bright red with a pulsing
+// ring. Bands 1 to 99 are our real bands: bigger and blue, with a ring.
 
 import * as THREE from 'three';
-import { bandCode } from '../band-code';
-import { present } from '../venue-map';
-import { drawTag, dropTag, tagSprite } from './labels';
-import type { Band } from './rows';
+import { present } from './venue-map';
+import type { Band } from './module_bindings/types';
 
 const MAX_BANDS = 2200;
 const MAX_RINGS = 256;
@@ -29,10 +27,6 @@ const DOWN_COLOUR = col('#ff1030');
 const CIRCLE_A = col('#ff2a3d');
 const CIRCLE_B = col('#ffffff');
 const PRESENTER_COLOUR = col('#3d8bff');
-export const CROWD_LEGEND: [string, string][] = [
-  ['#2fd27a', 'calm'], ['#ffb020', 'busy'], ['#ff5a2a', 'very busy'], ['#ff2a3d', 'light circle'],
-  ['#ff1030', 'down'], ['#3d8bff', 'our bands'],
-];
 
 type Walker = {
   band: Band;
@@ -42,7 +36,6 @@ type Walker = {
   at: number; ms: number;
   /** Metres per millisecond, steady per band. */
   speed: number;
-  tag?: THREE.Sprite;
 };
 
 /** The band's light is down: it fell or pressed SOS. */
@@ -62,11 +55,8 @@ export class Crowd {
   private list: Walker[] = [];
   /** The walker drawn in each instance this frame, for picking. */
   private slots: Walker[] = [];
-  private names = new Map<number, string>();
-  private scene: THREE.Scene;
 
-  constructor(scene: THREE.Scene) {
-    this.scene = scene;
+  constructor(scene: THREE.Object3D) {
     const body = new THREE.CapsuleGeometry(RADIUS_M, LENGTH_M, 3, 10);
     const material = new THREE.MeshLambertMaterial({ color: '#ffffff', toneMapped: false });
     this.bodies = new THREE.InstancedMesh(body, material, MAX_BANDS);
@@ -116,13 +106,6 @@ export class Crowd {
     if (!w) return;
     this.walkers.delete(id);
     this.list.splice(this.list.indexOf(w), 1);
-    if (w.tag) dropTag(w.tag);
-  }
-
-  /** The presenters' names from `band_place`, shown above their bands. */
-  setNames(names: Map<number, string>) {
-    this.names = names;
-    for (const w of this.list) if (w.tag) this.drawName(w);
   }
 
   /** Bands 1 to 99 drop off the floor 5 s after their last report, so they are checked again each second. */
@@ -148,24 +131,9 @@ export class Crowd {
     return { crowd, ours };
   }
 
-  /** The names above our bands on the floor. */
-  tags(): THREE.Sprite[] {
-    const out: THREE.Sprite[] = [];
-    for (const w of this.list) if (w.tag?.visible) out.push(w.tag);
-    return out;
-  }
-
   /** The band drawn in an instance, after a pick. */
   bandAt(instance: number): Band | undefined {
     return this.slots[instance]?.band;
-  }
-
-  private drawName(w: Walker) {
-    const name = this.names.get(w.band.id);
-    drawTag(w.tag!, {
-      lines: name ? [{ text: name, px: 13, bold: true, color: '#ffffff' }, { text: bandCode(w.band.id), px: 10, color: '#cfe0ff' }] : [{ text: bandCode(w.band.id), px: 12, bold: true, color: '#ffffff' }],
-      background: 'rgba(29, 92, 220, 0.92)',
-    });
   }
 
   /** Moves every band one frame along its walk and writes the instances. */
@@ -189,7 +157,6 @@ export class Crowd {
       }
       const b = w.band;
       const ours = isOurs(b.id);
-      if (ours) this.nameTag(w);
       if (!w.shown || n >= MAX_BANDS) continue;
       const down = isDown(b);
       const s = ours ? PRESENTER_SCALE : 1;
@@ -242,21 +209,6 @@ export class Crowd {
     // A pick recomputes the bounds from the moved instances.
     this.bodies.boundingSphere = null;
     this.bodies.boundingBox = null;
-  }
-
-  /** Our band's name floats above it while it is on the floor. */
-  private nameTag(w: Walker) {
-    if (!w.shown) {
-      if (w.tag) w.tag.visible = false;
-      return;
-    }
-    if (!w.tag) {
-      w.tag = tagSprite({ lines: [{ text: '', px: 12, color: '#fff' }] }, 12);
-      this.drawName(w);
-      this.scene.add(w.tag);
-    }
-    w.tag.visible = true;
-    w.tag.position.set(w.x, isDown(w.band) ? 1.4 : 3.3, w.z);
   }
 }
 
