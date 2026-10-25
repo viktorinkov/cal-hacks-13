@@ -2,6 +2,7 @@ import type { Device, Incident, SectionKind, Venue, VenueZone, WorldSnapshot, Zo
 import { rect } from '@/lib/geometry'
 import { CALHACKS_CAPACITY, calhacksHome, calhacksVenue } from '@/mock/calhacks'
 import { bindCrowdCast, crowdOccupancy, crowdSize, startCalhacksCrowd } from '@/mock/calhacksCrowd'
+import { isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
 import { setLiveBands } from '@/booth/place'
 import { currentPlan } from '@/map/venuePlan'
 import { resetServerTime, setClockRate } from '@/stores/clock'
@@ -42,6 +43,8 @@ export interface FloorBand {
   yM: number | null
   boothId: number
   hasPosition: boolean
+  /** Firmware state. 3 is SOS, 4 is a neighbour turned red. */
+  state: number
 }
 
 export interface FloorIncident {
@@ -117,6 +120,7 @@ export function bandFromRow(row: Record<string, unknown>, wearer: string | null)
     yM,
     boothId: num(row.boothId),
     hasPosition: xM != null && yM != null,
+    state: num(row.state),
   }
 }
 
@@ -366,11 +370,16 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   })
 
   const incidents: Incident[] = []
+  const ring = useDemoRing.getState()
+  const laid = layoutDemo(input?.bands ?? [], ring)
   for (const incident of input?.incidents ?? []) {
     const source = byId.get(incident.zoneId) ?? byStation.get(incident.stationId)
     const home = calhacksHome(source?.name ?? '')
     const place = calhacksVenue.zones.find((zone) => zone.zoneId === home)
     const kind = incident.kind || 'incident'
+    const subject = input?.bands.find((band) => band.id === incident.bandId)
+    const spot = laid.find((item) => item.band.id === incident.bandId)?.at
+    const inRing = (kind === 'sos' || kind === 'fall') && !!subject && isHardware(subject)
     incidents.push({
       incidentId: incident.id,
       displayId: `INC-${incident.id}`,
@@ -380,7 +389,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zoneId,
-      location: place?.labelAt,
+      location: inRing ? (spot ?? { x: ring.x, y: ring.y }) : place?.labelAt,
       localizationStatus: place ? 'estimated' : 'unknown',
       cameraObservations: [],
       timeline: [{ at: incident.openedAt ?? now, source: 'device', text: `${kind} on band ${incident.bandId || 'unknown'}` }],
@@ -388,6 +397,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       isSimulated: false,
     })
   }
+  const reported = mergeHardwareAlerts(incidents, input?.bands ?? [], ring, now)
 
   seq += 1
   return {
@@ -397,12 +407,12 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
     venue: calhacksVenue,
     zones,
     devices,
-    incidents,
+    incidents: reported,
     observations: [],
     commands: [],
     sources: [
       ...(input
-        ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${input.venueName} · band1t.vip` }]
+        ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live in the demo · ${input.venueName}` }]
         : []),
       ...(wandering
         ? [{ sourceId: 'crowd', kind: 'crowd' as const, label: 'Crowd', status: 'ok' as const, lastUpdateAt: now, isSimulated: true, detail: `${crowdSize().toLocaleString('en-US')} simulated attendees` }]

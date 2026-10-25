@@ -1,5 +1,6 @@
 import { Box, Circle, Crosshair, Layers, Map as MapIcon, Maximize, Minus, Plus, RotateCcw, RotateCw } from 'lucide-react'
 import { setBoothEditing, useBooth } from '@/booth/circle'
+import { setDemoRingEditing, useDemoRing } from '@/booth/demoRing'
 import type { ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -60,6 +61,7 @@ export function MapToolbar() {
     selection.kind === 'incident' ? selection.id : Object.values(incidents).find((i) => i.status !== 'resolved' && i.location)?.incidentId
   const venueId = useWorld((s) => s.venue?.venueId)
   const editingBooth = useBooth((s) => s.editing)
+  const editingRing = useDemoRing((s) => s.editing)
 
   return (
     <div className="pointer-events-auto relative flex items-start gap-2">
@@ -88,6 +90,11 @@ export function MapToolbar() {
         </ToolButton>
         {venueId === 'main-stage' && (
           <ToolButton label="Move the live booth" onClick={() => setBoothEditing(!editingBooth)} pressed={editingBooth}>
+            <Circle />
+          </ToolButton>
+        )}
+        {venueId === 'calhacks' && (
+          <ToolButton label="Move the demo ring" onClick={() => setDemoRingEditing(!editingRing)} pressed={editingRing}>
             <Circle />
           </ToolButton>
         )}

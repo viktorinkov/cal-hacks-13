@@ -5,6 +5,9 @@
  */
 import { Application, Container } from 'pixi.js'
 import { boothHandle, moveBooth, resizeBooth, saveBooth, useBooth } from '@/booth/circle'
+import { DEMO_LANE, demoCommand, demoDevices as layDemoDevices, demoIsActive, demoPath, demoRingHandle, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, useHardware, withDemoIncidents } from '@/booth/demoRing'
+import { demoReveal } from '@/mock/calhacksCrowd'
+import { presentCalhacks } from '@/stdb/floor'
 import type { Device, GuidanceCommand, Incident, LedPattern, Vec2, Venue } from '@/contracts/domain'
 import { EntityKind } from '@/contracts/domain'
 import { createElevation, type ElevationAt } from '@/lib/elevation'
@@ -346,9 +349,10 @@ export class MapEngine {
     // incidents, routes, classification
     const incidents = Object.values(world.incidents)
     const open = incidents.filter((i) => i.status !== 'resolved')
-    const focus = ui.selection.kind === 'incident' ? ui.selection.id : (open[0]?.incidentId ?? null)
+    const shown = this.venue.venueId === 'calhacks' ? withDemoIncidents(open, useHardware.getState().bands, useDemoRing.getState()) : open
+    const focus = ui.selection.kind === 'incident' ? ui.selection.id : (shown[0]?.incidentId ?? null)
     const routes = this.routes(world.commands, dt)
-    this.classify(n, open, routes, latest?.kinds)
+    this.classify(n, shown, routes, latest?.kinds)
 
     // density field every half second
     this.densityT -= dt
@@ -389,7 +393,7 @@ export class MapEngine {
       this.crowd.updateGhosts(this.cam, this.ghostPositions, gn, true)
     } else this.crowd.updateGhosts(this.cam, null, 0, false)
 
-    this.stage.draw(this.cam, this.time, dt, open.length > 0, animate, layers.structures)
+    this.stage.draw(this.cam, this.time, dt, shown.length > 0, animate, layers.structures)
 
     this.marks.draw(
       {
@@ -397,10 +401,15 @@ export class MapEngine {
         time: this.time,
         animate,
         layers,
-        incidents: open,
+        incidents: shown,
         focusIncidentId: focus,
         routes,
-        devices: this.showBandSignals() ? this.bandMarkers(world.devices, world.commands, dt) : this.clearBandSignals(),
+        devices:
+          this.venue.venueId === 'calhacks'
+            ? this.bandMarkers(this.demoDevices(), {}, dt)
+            : this.showBandSignals()
+              ? this.bandMarkers(world.devices, world.commands, dt)
+              : this.clearBandSignals(),
         observations: Object.values(world.observations),
         zones: world.zones,
         selectedZoneId: ui.selection.kind === 'zone' ? ui.selection.id : null,
@@ -411,7 +420,9 @@ export class MapEngine {
         booth:
           this.venue.venueId === 'main-stage'
             ? { ...useBooth.getState(), live: useSession.getState().phase === 'live' }
-            : undefined,
+            : this.venue.venueId === 'calhacks'
+              ? { ...useDemoRing.getState(), live: useSession.getState().phase === 'live', lost: useSession.getState().phase === 'error', demo: true }
+              : undefined,
       },
       dt,
     )
@@ -429,7 +440,9 @@ export class MapEngine {
     if (!marks) return out
     const booth = useBooth.getState()
     if (this.venue?.venueId === 'main-stage') marks.setBoothPath([{ x: 10.3, y: 56 }, { x: booth.x, y: booth.y }])
-    else marks.setBoothPath(null)
+    else if (this.venue?.venueId === 'calhacks' && demoIsActive(useHardware.getState().bands, Object.values(useWorld.getState().incidents))) {
+      marks.setBoothPath(demoPath(useDemoRing.getState()), 'COR-DEMO')
+    } else marks.setBoothPath(null)
     const seen = new Set<string>()
     for (const c of Object.values(commands)) {
       const path = marks.corridorPath(c.corridorId)
@@ -444,6 +457,10 @@ export class MapEngine {
       }
     }
     for (const k of [...this.reveal.keys()]) if (!seen.has(k)) this.reveal.delete(k)
+    if (this.venue?.venueId === 'calhacks') {
+      const path = marks.corridorPath('COR-DEMO')
+      if (path) out.push({ path, command: demoCommand(Math.round(path.length)), mode: 'active', reveal: demoReveal() })
+    }
     return out
   }
 
@@ -470,7 +487,8 @@ export class MapEngine {
       if (!c) {
         for (const r of active) {
           r.path.project(x, y, this.pr)
-          if (this.pr.distance <= LANE_HALF && this.pr.along <= r.reveal) {
+          const half = r.command.commandId === 'demo-path' ? DEMO_LANE : LANE_HALF
+          if (this.pr.distance <= half && this.pr.along <= r.reveal) {
             c = CLASS_LANE
             break
           }
@@ -503,6 +521,12 @@ export class MapEngine {
    * CalHacks keeps band ids in the roster. The floor draws a page of characters instead of a pin
    * per id. The concert demo still shows its bands.
    */
+  private demoDevices(): Record<string, Device> {
+    const devices: Record<string, Device> = {}
+    for (const device of layDemoDevices(useHardware.getState().bands, useDemoRing.getState())) devices[device.deviceId] = device
+    return devices
+  }
+
   private showBandSignals(): boolean {
     return useUi.getState().layers.bands && this.venue?.venueId !== 'calhacks'
   }
@@ -616,10 +640,13 @@ export class MapEngine {
     const down = (e: PointerEvent) => {
       const l = local(e)
       const booth = useBooth.getState()
+      const ring = useDemoRing.getState()
       let handle: 'move' | 'resize' | undefined
-      if (booth.editing && this.venue?.venueId === 'main-stage' && e.button === 0 && !e.shiftKey && !e.altKey) {
+      const editingBooth = booth.editing && this.venue?.venueId === 'main-stage'
+      const editingRing = ring.editing && this.venue?.venueId === 'calhacks'
+      if ((editingBooth || editingRing) && e.button === 0 && !e.shiftKey && !e.altKey) {
         const ground = unproject(this.cam, l.x, l.y)
-        handle = boothHandle(ground.x, ground.y, booth) ?? undefined
+        handle = (editingRing ? demoRingHandle(ground.x, ground.y, ring) : boothHandle(ground.x, ground.y, booth)) ?? undefined
       }
       this.drag = { x: l.x, y: l.y, moved: false, button: e.shiftKey || e.altKey ? 2 : e.button, id: e.pointerId, booth: handle }
       cv.setPointerCapture(e.pointerId)
@@ -635,9 +662,15 @@ export class MapEngine {
       this.userMoved = true
       if (this.drag.booth) {
         const ground = unproject(this.cam, l.x, l.y)
-        const booth = useBooth.getState()
-        if (this.drag.booth === 'move') moveBooth(ground.x, ground.y)
-        else resizeBooth(Math.hypot(ground.x - booth.x, ground.y - booth.y))
+        if (this.venue?.venueId === 'calhacks') {
+          const ring = useDemoRing.getState()
+          if (this.drag.booth === 'move') moveDemoRing(ground.x, ground.y)
+          else resizeDemoRing(Math.hypot(ground.x - ring.x, ground.y - ring.y))
+        } else {
+          const booth = useBooth.getState()
+          if (this.drag.booth === 'move') moveBooth(ground.x, ground.y)
+          else resizeBooth(Math.hypot(ground.x - booth.x, ground.y - booth.y))
+        }
         this.drag.x = l.x
         this.drag.y = l.y
         return
@@ -657,7 +690,12 @@ export class MapEngine {
       this.camDirty = true
     }
     const up = (e: PointerEvent) => {
-      if (this.drag?.booth && this.drag.moved) saveBooth()
+      if (this.drag?.booth && this.drag.moved) {
+        if (this.venue?.venueId === 'calhacks') {
+          saveDemoRing()
+          presentCalhacks()
+        } else saveBooth()
+      }
       else if (this.drag && !this.drag.moved && this.drag.button === 0) this.pick(local(e))
       this.drag = null
     }

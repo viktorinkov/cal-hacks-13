@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 export interface RouteApi {
   path: string
+  search: string
   go: (to: string) => void
 }
 
@@ -32,10 +33,11 @@ const TITLES: Record<string, string> = {
 }
 
 export function RouteProvider({ children }: { children: ReactNode }) {
-  const [path, setPath] = useState(currentPath)
+  const [location, setLocation] = useState(() => ({ path: currentPath(), search: window.location.search }))
+  const { path, search } = location
 
   useEffect(() => {
-    const sync = () => setPath(currentPath())
+    const sync = () => setLocation({ path: currentPath(), search: window.location.search })
     window.addEventListener('popstate', sync)
     return () => window.removeEventListener('popstate', sync)
   }, [])
@@ -50,10 +52,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     const search = url.search || window.location.search
     if (next === currentPath() && search === window.location.search) return
     window.history.pushState(null, '', `${next}${search}`)
-    setPath(next)
+    setLocation({ path: next, search })
   }, [])
 
-  const value = useMemo(() => ({ path, go }), [path, go])
+  const value = useMemo(() => ({ path, search, go }), [path, search, go])
   return <RouteContext.Provider value={value}>{children}</RouteContext.Provider>
 }
 
@@ -62,6 +64,7 @@ export function useRoute(): RouteApi {
   const fallback = useMemo<RouteApi>(
     () => ({
       path: typeof window === 'undefined' ? '/' : currentPath(),
+      search: typeof window === 'undefined' ? '' : window.location.search,
       go: (to: string) => {
         window.history.pushState(null, '', to)
         window.dispatchEvent(new PopStateEvent('popstate'))

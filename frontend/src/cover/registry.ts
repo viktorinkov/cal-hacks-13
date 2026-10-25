@@ -26,6 +26,19 @@ export interface Registration {
 
 const KEY = 'bandit.cover'
 
+type StoredRegistration = Pick<Registration,
+  | 'bandId'
+  | 'name'
+  | 'email'
+  | 'emergencyName'
+  | 'emergencyPhone'
+  | 'cardBrand'
+  | 'last4'
+  | 'exp'
+  | 'lastChargeCents'
+  | 'lastChargeAt'
+>
+
 const SEEDS: readonly Registration[] = [
   {
     bandId: 'band-02',
@@ -114,27 +127,71 @@ export function getCoverRevision() {
   return revision
 }
 
-function readStored(): Registration[] {
+/** Browser storage is only for typed contact details and the mock card. */
+function storedRegistration(value: unknown): StoredRegistration | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  if (typeof item.bandId !== 'string' || !item.bandId) return null
+  const stringField = (key: string) => typeof item[key] === 'string' ? item[key] : ''
+  const next: StoredRegistration = {
+    bandId: item.bandId,
+    name: stringField('name'),
+    email: stringField('email'),
+    emergencyName: stringField('emergencyName'),
+    emergencyPhone: stringField('emergencyPhone'),
+    cardBrand: stringField('cardBrand'),
+    last4: stringField('last4'),
+    exp: stringField('exp'),
+  }
+  for (const key of ['lastChargeCents', 'lastChargeAt'] as const) {
+    const amount = item[key]
+    if (typeof amount === 'number' && Number.isSafeInteger(amount) && amount >= 0) {
+      next[key] = amount
+    }
+  }
+  return next
+}
+
+function readStored(): StoredRegistration[] {
   try {
     const raw = window.localStorage.getItem(KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((item): item is Registration => !!item && typeof item === 'object' && typeof (item as Registration).bandId === 'string')
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      window.localStorage.removeItem(KEY)
+      return []
+    }
+    if (!Array.isArray(parsed)) {
+      window.localStorage.removeItem(KEY)
+      return []
+    }
+    const registrations = parsed.map(storedRegistration).filter((item) => item !== null)
+    const sanitized = JSON.stringify(registrations)
+    // Also remove medical/insurance fields written by older versions of the form.
+    if (raw !== sanitized) window.localStorage.setItem(KEY, sanitized)
+    return registrations
   } catch {
     return []
   }
 }
 
-export function getRegistration(bandId: string): Registration | null {
+/** For the signup form: an unsaved band must never inherit a demo identity. */
+export function getSavedRegistration(bandId: string): Registration | null {
   const stored = readStored().find((item) => item.bandId === bandId)
-  if (stored) return stored
-  return SEEDS.find((item) => item.bandId === bandId) ?? null
+  return stored ? { ...blankRegistration(bandId), ...stored } : null
+}
+
+export function getRegistration(bandId: string): Registration | null {
+  return getSavedRegistration(bandId) ?? SEEDS.find((item) => item.bandId === bandId) ?? null
 }
 
 export function saveRegistration(registration: Registration) {
   const next = readStored().filter((item) => item.bandId !== registration.bandId)
-  next.push(registration)
+  const stored = storedRegistration(registration)
+  if (!stored) return
+  next.push(stored)
   window.localStorage.setItem(KEY, JSON.stringify(next))
   emit()
 }
@@ -160,9 +217,9 @@ export function blankRegistration(bandId: string): Registration {
     medications: '',
     emergencyName: '',
     emergencyPhone: '',
-    carrier: 'Northline',
+    carrier: '',
     memberId: '',
-    groupId: 'NL-MAIN',
+    groupId: '',
     cardBrand: 'Visa',
     last4: '',
     exp: '',

@@ -40,8 +40,8 @@ export interface MarksInput {
   plainZones?: boolean
   stale: boolean
   laneArrows: { x: number; y: number; nx: number; ny: number; i: number }[]
-  /** The one live patch on the simulated floor. Absent on the CalHacks plan. */
-  booth?: { x: number; y: number; r: number; live: boolean; editing: boolean }
+  /** The live booth on the concert plan, or the demo ring on CalHacks. */
+  booth?: { x: number; y: number; r: number; live: boolean; editing: boolean; demo?: boolean; lost?: boolean }
 }
 
 const LED_PIXELS = 12
@@ -74,12 +74,12 @@ export class MarksLayer {
   }
 
   /** First Aid's walk to the live booth. Rebuilt when the circle moves. */
-  setBoothPath(points: Vec2[] | null): void {
+  setBoothPath(points: Vec2[] | null, id = 'COR-BOOTH'): void {
     if (!points) {
       this.extra = null
       return
     }
-    this.extra = { id: 'COR-BOOTH', path: new Path(points) }
+    this.extra = { id, path: new Path(points) }
   }
 
   corridorPath(id: string | undefined): Path | null {
@@ -107,9 +107,9 @@ export class MarksLayer {
     const booth = m.booth
     if (!booth) return
     const g = this.over
-    const color = booth.live ? px.green : px.grey
+    const color = booth.lost ? px.grey : booth.demo ? px.champagne : booth.live ? px.green : px.grey
     groundDisc(g, m.cam, booth.x, booth.y, booth.r, 48)
-    g.fill({ color, alpha: booth.live ? 0.16 : 0.08 })
+    g.fill({ color, alpha: booth.lost ? 0.08 : booth.demo ? 0.1 : booth.live ? 0.16 : 0.08 })
     groundCircle(g, m.cam, booth.x, booth.y, booth.r, 64)
     g.stroke({ width: booth.editing ? 2.4 : 1.75, color, alpha: booth.live ? 0.95 : 0.7 })
     if (booth.editing) {

@@ -19,6 +19,7 @@ function band(partial: Partial<FloorBand> & Pick<FloorBand, 'id'>): FloorBand {
     yM: null,
     boothId: 4,
     hasPosition: false,
+    state: 0,
     ...partial,
   }
 }
@@ -45,6 +46,8 @@ describe('live booth', () => {
     const unknown = deviceFromBand(band({ id: 8 }), booth)
     expect(unknown.location).toBeUndefined()
     expect(unknown.locationSource).toBe('unknown')
+    expect(deviceFromBand(band({ id: 5, state: 4 }), booth).currentPattern).toBe('steady_red')
+    expect(deviceFromBand(band({ id: 4, state: 3, sos: false }), booth).currentPattern).toBe('sos')
     expect(spotInBooth(band({ id: 9, xM: 40, yM: 40, hasPosition: true }), booth)).toBeNull()
     const sos = incidentAt(band({ id: 8, sos: true }), booth)
     expect(sos).toEqual({ at: { x: 78, y: 58 }, radius: 5 })

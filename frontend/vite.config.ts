@@ -37,6 +37,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Crowd simulations are CPU-heavy; too many parallel workers cause false timeouts.
+    maxWorkers: 1,
     globals: true,
     setupFiles: ['./src/tests/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],

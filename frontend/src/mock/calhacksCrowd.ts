@@ -4,10 +4,12 @@
  * They are not the concert simulator.
  */
 import { EntityKind, type EntityFrame, type VenueZone } from '@/contracts/domain'
-import { bbox, pointInPolygon } from '@/lib/geometry'
+import { bbox, newProjectResult, Path, pointInPolygon, type ProjectResult } from '@/lib/geometry'
 import { frames } from '@/stores/frames'
 import { useWorld } from '@/stores/world'
 import { currentCast, setCastRoster, turnCastPage, type CastBand } from '@/stdb/cast'
+import { DEMO_LANE, demoIsActive, demoPath, useDemoRing } from '@/booth/demoRing'
+import { liveBands } from '@/booth/place'
 import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
 import { Rng } from './sim/rng'
 
@@ -289,6 +291,12 @@ export class CalhacksCrowd {
   private nextGroup = 1
   private readonly byBand = new Map<number, Person>()
   readonly counts: Record<string, number> = {}
+  /** The demo ring. Simulated people are walked out of it. */
+  private keep: { x: number; y: number; r: number } | null = null
+  /** Cleared walk from the entrance, revealed from the door toward the ring. */
+  private lane: Path | null = null
+  private laneReveal = 0
+  private readonly hit: ProjectResult = newProjectResult()
 
   /** Point the characters at this page of band ids. Positions stay where the people already are. */
   assign(ids: number[]): void {
@@ -321,13 +329,39 @@ export class CalhacksCrowd {
     this.tally()
   }
 
+  /** Keep the ring empty, and while a hardware SOS is up, clear the entrance path as it draws in. */
+  setDemo(circle: { x: number; y: number; r: number } | null, points: { x: number; y: number }[] | null): void {
+    this.keep = circle
+    if (!points || points.length < 2) {
+      this.lane = null
+      this.laneReveal = 0
+      return
+    }
+    const same =
+      this.lane != null &&
+      this.lane.points.length === points.length &&
+      points.every((point, i) => Math.hypot(point.x - this.lane!.points[i]!.x, point.y - this.lane!.points[i]!.y) < 0.25)
+    if (!same) {
+      this.lane = new Path(points)
+      this.laneReveal = 0
+    }
+  }
+
+  /** How far the cleared path has been drawn, in metres. The map uses the same number for its arrows. */
+  revealed(): number {
+    return this.laneReveal
+  }
+
   spots(): CrowdSpot[] {
     return this.people.map((person) => ({ x: person.x, y: person.y, zoneId: rooms[person.zone]?.zoneId ?? 'atrium' }))
   }
 
   step(): void {
     this.t += DT * 1000
+    if (this.lane) this.laneReveal = Math.min(this.lane.length, this.laneReveal + 4)
     for (const person of this.people) {
+      if (this.yieldLane(person)) continue
+      if (this.leaveRing(person)) continue
       if (person.pose === SEATED) {
         person.vx = 0
         person.vy = 0
@@ -370,7 +404,7 @@ export class CalhacksCrowd {
       person.vy = (dy / dist) * pace
       const nx = person.x + person.vx * DT
       const ny = person.y + person.vy * DT
-      if (pointInPolygon(nx, ny, room.polygon) && walkable(nx, ny)) {
+      if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny)) {
         person.x = nx
         person.y = ny
       } else {
@@ -492,6 +526,78 @@ export class CalhacksCrowd {
     return 0
   }
 
+  private openSpot(x: number, y: number): boolean {
+    return walkable(x, y) && !this.insideRing(x, y) && !this.insideLane(x, y)
+  }
+
+  private insideRing(x: number, y: number): boolean {
+    const circle = this.keep
+    if (!circle) return false
+    return Math.hypot(x - circle.x, y - circle.y) < circle.r + 0.35
+  }
+
+  private insideLane(x: number, y: number): boolean {
+    const lane = this.lane
+    if (!lane || this.laneReveal <= 0) return false
+    lane.project(x, y, this.hit)
+    return this.hit.distance < DEMO_LANE && this.hit.along <= this.laneReveal + 0.4
+  }
+
+  /** Step sideways off the path. The arrow on the map points the same way. */
+  private yieldLane(person: Person): boolean {
+    const lane = this.lane
+    if (!lane || this.laneReveal <= 0) return false
+    lane.project(person.x, person.y, this.hit)
+    if (this.hit.distance >= DEMO_LANE || this.hit.along > this.laneReveal + 0.4) return false
+    const pace = 1.35
+    let nx = this.hit.nx
+    let ny = this.hit.ny
+    let tx = person.x + nx * pace * DT
+    let ty = person.y + ny * pace * DT
+    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') {
+      nx = -nx
+      ny = -ny
+      tx = person.x + nx * pace * DT
+      ty = person.y + ny * pace * DT
+    }
+    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') return false
+    person.x = tx
+    person.y = ty
+    person.vx = nx * pace
+    person.vy = ny * pace
+    person.pose = WALKING
+    person.holdUntil = 0
+    person.lane = null
+    return true
+  }
+
+  /**
+   * Step straight out of the demo ring. The ring is the hardware spot, so a table
+   * under it does not count as a wall — people on those chairs get up and leave.
+   */
+  private leaveRing(person: Person): boolean {
+    const circle = this.keep
+    if (!circle || !this.insideRing(person.x, person.y)) return false
+    const dx = person.x - circle.x
+    const dy = person.y - circle.y
+    const dist = Math.hypot(dx, dy)
+    const nx = dist > 0.05 ? dx / dist : Math.cos((person.bandId || 1) * 0.7)
+    const ny = dist > 0.05 ? dy / dist : Math.sin((person.bandId || 1) * 0.7)
+    const pace = 1.6
+    person.x += nx * pace * DT
+    person.y += ny * pace * DT
+    person.vx = nx * pace
+    person.vy = ny * pace
+    person.pose = WALKING
+    person.holdUntil = 0
+    person.lane = null
+    if (this.insideRing(person.gx, person.gy)) {
+      person.gx = person.x
+      person.gy = person.y
+    }
+    return true
+  }
+
   private retarget(person: Person): void {
     const lane = person.lane
     if (lane && lane.length > 0) {
@@ -511,8 +617,8 @@ export class CalhacksCrowd {
     const room = rooms[person.zone]
     if (!room) return
     let at = spotIn(room, this.rng)
-    for (let attempt = 0; attempt < 24 && !walkable(at.x, at.y); attempt++) at = spotIn(room, this.rng)
-    if (!walkable(at.x, at.y)) return
+    for (let attempt = 0; attempt < 24 && !this.openSpot(at.x, at.y); attempt++) at = spotIn(room, this.rng)
+    if (!this.openSpot(at.x, at.y)) return
     person.gx = at.x
     person.gy = at.y
   }
@@ -689,6 +795,11 @@ export function crowdSize(): number {
   return crowd?.people.length ?? 0
 }
 
+/** How far the demo path has opened. The map draws its arrows to the same point. */
+export function demoReveal(): number {
+  return crowd?.revealed() ?? 0
+}
+
 /** Starts the wanderers once. Safe to call on every CalHacks snapshot. */
 /** Remember the roster and point the characters at the current page. */
 export function bindCrowdCast(bands: CastBand[]): void {
@@ -713,6 +824,9 @@ export function startCalhacksCrowd(): void {
   frames.push(crowd.frame())
   timer = setInterval(() => {
     if (!crowd) return
+    const ring = useDemoRing.getState()
+    const active = demoIsActive(liveBands(), Object.values(useWorld.getState().incidents))
+    crowd.setDemo(ring, active ? demoPath(ring) : null)
     crowd.step()
     frames.push(crowd.frame())
     const now = Date.now()

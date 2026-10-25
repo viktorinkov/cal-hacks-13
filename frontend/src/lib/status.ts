@@ -244,6 +244,8 @@ export function headline(args: {
   now: number
   /** Bands the simulated crowd wears, when the scenario reports them. */
   simulatedBands?: SimulatedBands
+  /** CalHacks hardware lights its neighbours in firmware, without an approval step. */
+  venueId?: string
 }): Headline {
   const { incidents, commands, zones, zoneNames } = args
   if (!args.linkUp && args.connection.phase !== 'idle') {
@@ -262,7 +264,10 @@ export function headline(args: {
     if (first.status === 'reported') {
       return {
         title: first.source === 'manual_sos' ? 'Someone pressed SOS.' : first.source === 'imu_suspicion' ? 'Someone may have fallen.' : 'Someone may need help.',
-        sentence: `${where}, ${who}. Nothing changes on the bands until you approve.${more}`,
+        sentence:
+          args.venueId === 'calhacks'
+            ? `${where}, ${who}. Nearby wristbands are already red, and a path is clearing from the entrance.${more}`
+            : `${where}, ${who}. Nothing changes on the bands until you approve.${more}`,
         tone: 'critical',
       }
     }
