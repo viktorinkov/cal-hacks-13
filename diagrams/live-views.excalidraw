@@ -102,16 +102,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im23",
    "type": "image",
-   "x": 140.0,
-   "y": 1204.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 626.0,
+   "y": 1220.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -145,8 +147,8 @@
   {
    "id": "te24",
    "type": "text",
-   "x": 140.0,
-   "y": 1344.0,
+   "x": 631.12,
+   "y": 1492.0,
    "width": 249.76,
    "height": 60.0,
    "angle": 0,
@@ -172,7 +174,7 @@
    "originalText": "attendee",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -207,16 +209,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im30",
    "type": "image",
-   "x": 1814.0,
-   "y": 1204.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 2300.0,
+   "y": 1220.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -250,8 +254,8 @@
   {
    "id": "te31",
    "type": "text",
-   "x": 1814.0,
-   "y": 1344.0,
+   "x": 2351.2,
+   "y": 1492.0,
    "width": 157.6,
    "height": 60.0,
    "angle": 0,
@@ -277,7 +281,7 @@
    "originalText": "medic",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -312,16 +316,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im37",
    "type": "image",
-   "x": 3488.0,
-   "y": 1204.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 3974.0,
+   "y": 1220.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -355,8 +361,8 @@
   {
    "id": "te38",
    "type": "text",
-   "x": 3488.0,
-   "y": 1344.0,
+   "x": 3948.4,
+   "y": 1492.0,
    "width": 311.2,
    "height": 60.0,
    "angle": 0,
@@ -382,7 +388,7 @@
    "originalText": "staff desk",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -417,16 +423,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im44",
    "type": "image",
-   "x": 5162.0,
-   "y": 1204.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 5648.0,
+   "y": 1220.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -460,8 +468,8 @@
   {
    "id": "te45",
    "type": "text",
-   "x": 5162.0,
-   "y": 1344.0,
+   "x": 5576.32,
+   "y": 1492.0,
    "width": 403.36,
    "height": 60.0,
    "angle": 0,
@@ -487,7 +495,7 @@
    "originalText": "API + indexer",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -522,16 +530,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im51",
    "type": "image",
-   "x": 140.0,
-   "y": 2284.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 626.0,
+   "y": 2300.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -565,8 +575,8 @@
   {
    "id": "te52",
    "type": "text",
-   "x": 140.0,
-   "y": 2424.0,
+   "x": 646.48,
+   "y": 2572.0,
    "width": 219.04,
    "height": 60.0,
    "angle": 0,
@@ -592,7 +602,7 @@
    "originalText": "workers",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -627,16 +637,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im58",
    "type": "image",
-   "x": 1814.0,
-   "y": 2284.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 2300.0,
+   "y": 2300.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -670,8 +682,8 @@
   {
    "id": "te59",
    "type": "text",
-   "x": 1814.0,
-   "y": 2424.0,
+   "x": 2243.68,
+   "y": 2572.0,
    "width": 372.64,
    "height": 60.0,
    "angle": 0,
@@ -697,7 +709,7 @@
    "originalText": "shared graph",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -732,16 +744,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im65",
    "type": "image",
-   "x": 3488.0,
-   "y": 2284.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 3974.0,
+   "y": 2300.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -775,8 +789,8 @@
   {
    "id": "te66",
    "type": "text",
-   "x": 3488.0,
-   "y": 2424.0,
+   "x": 3917.68,
+   "y": 2572.0,
    "width": 372.64,
    "height": 60.0,
    "angle": 0,
@@ -802,7 +816,7 @@
    "originalText": "radio bridge",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -837,16 +851,18 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true,
+    "diagramHeaderArtworkHeight": 260
    }
   },
   {
    "id": "im72",
    "type": "image",
-   "x": 5162.0,
-   "y": 2284.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 5648.0,
+   "y": 2300.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -880,8 +896,8 @@
   {
    "id": "te73",
    "type": "text",
-   "x": 5162.0,
-   "y": 2424.0,
+   "x": 5484.16,
+   "y": 2572.0,
    "width": 587.6800000000001,
    "height": 60.0,
    "angle": 0,
@@ -907,7 +923,7 @@
    "originalText": "public venue tables",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -953,6 +969,8 @@
    "link": null,
    "locked": false,
    "customData": {
+    "diagramArtworkHeight": 260,
+    "diagramArtworkMaxWidth": 800,
     "diagramSourceColor": {
      "stroke": "#1864ab",
      "fill": "#a5d8ff"
@@ -963,7 +981,7 @@
    "id": "tx3",
    "type": "text",
    "x": 508.24,
-   "y": 616.0,
+   "y": 682.0,
    "width": 495.52,
    "height": 60.0,
    "angle": 0,
@@ -1000,10 +1018,10 @@
   {
    "id": "im4",
    "type": "image",
-   "x": 692.0,
-   "y": 476.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 626.0,
+   "y": 410.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -1080,6 +1098,8 @@
    "link": null,
    "locked": false,
    "customData": {
+    "diagramArtworkHeight": 260,
+    "diagramArtworkMaxWidth": 800,
     "diagramSourceColor": {
      "stroke": "#c92a2a",
      "fill": "#ffc9c9"
@@ -1090,7 +1110,7 @@
    "id": "tx6",
    "type": "text",
    "x": 2243.68,
-   "y": 616.0,
+   "y": 682.0,
    "width": 372.64,
    "height": 60.0,
    "angle": 0,
@@ -1127,10 +1147,10 @@
   {
    "id": "im7",
    "type": "image",
-   "x": 2366.0,
-   "y": 476.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 2300.0,
+   "y": 410.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -1211,6 +1231,8 @@
    "link": null,
    "locked": false,
    "customData": {
+    "diagramArtworkHeight": 260,
+    "diagramArtworkMaxWidth": 800,
     "diagramSourceColor": {
      "stroke": "#364fc7",
      "fill": "#ffffff"
@@ -1221,7 +1243,7 @@
    "id": "tx9",
    "type": "text",
    "x": 3902.32,
-   "y": 591.2452830188679,
+   "y": 612.377358490566,
    "width": 403.36,
    "height": 60.0,
    "angle": 0,
@@ -1258,10 +1280,10 @@
   {
    "id": "im10",
    "type": "image",
-   "x": 3844.0,
-   "y": 500.7547169811321,
-   "width": 520.0,
-   "height": 78.49056603773585,
+   "x": 3704.0,
+   "y": 479.62264150943395,
+   "width": 800.0,
+   "height": 120.75471698113208,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -1334,6 +1356,8 @@
    "link": null,
    "locked": false,
    "customData": {
+    "diagramArtworkHeight": 260,
+    "diagramArtworkMaxWidth": 800,
     "diagramSourceColor": {
      "stroke": "#1864ab",
      "fill": "#a5d8ff"
@@ -1344,7 +1368,7 @@
    "id": "tx12",
    "type": "text",
    "x": 5530.24,
-   "y": 616.0,
+   "y": 682.0,
    "width": 495.52,
    "height": 60.0,
    "angle": 0,
@@ -1381,10 +1405,10 @@
   {
    "id": "im13",
    "type": "image",
-   "x": 5714.0,
-   "y": 476.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 5648.0,
+   "y": 410.0,
+   "width": 260.0,
+   "height": 260,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",

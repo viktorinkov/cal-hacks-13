@@ -27,7 +27,7 @@ The current verified board has 21 diagrams, listed by title below. The single Ar
 | Jobs | Who queues, claims, executes and records work. |
 | Prepare the event | How the organizer starts server-side event preparation. |
 | Find people again | How typed reconnection uses recorded meeting and place evidence. |
-| Photos and Memories | How capture context becomes candidate tags, sharing and communities built from encounters and visits; minutes remain inside their parent cards. |
+| Memories engine | How capture context becomes candidate tags, sharing and communities built from encounters and visits; minutes remain inside their parent cards. |
 | Settle a claim | Who recommends, authorizes and pays. |
 | Policy amounts | How code derives medical and property amounts. |
 | Approve a reusable rule | How precedents become explicitly approved, code-guarded authority. |

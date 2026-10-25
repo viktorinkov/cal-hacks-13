@@ -28,6 +28,7 @@ Use one word for one thing in devpost.md and on the diagrams. Define each term o
 | claim | an insurance claim the attendee files after an incident | case, request |
 | evidence pack | a claim's numbered facts, checks and fingerprint | evidence bundle |
 | The Evidence Engine | Elastic's indexed evidence, cited retrieval and semantic ranking | Evidence agent, search |
+| Memories engine | photo tagging, sharing and event communities | Photos and Memories (diagram title) |
 | the insurance Decision Engine | Elastic investigation with code-enforced approvals and settlement; Decision Engine in diagram titles | claims agent |
 | Capital One Nessie | the bank sandbox behind each wallet | Nessie (alone) |
 | wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
@@ -41,7 +42,7 @@ The plain portal uses `/organizer` on `dev.band1t.vip` and `/portal` on the main
 
 Viktor's standing rule: write short paragraphs, never long ones.
 
-For Devpost only, use ordinary exact words and natural connected sentences; explain technical terms once, remove repeated explanations and mechanical first/second enumerations, and keep important facts. Preserve sponsor quotations, use one live-site URL in Try it out, and keep the closing disclosure brief. This writing preference does not override the diagram guide below.
+For Devpost only, use ordinary exact words and natural connected sentences; explain technical terms once, remove repeated explanations and mechanical first/second enumerations, and keep important facts. Preserve sponsor quotations and use one live-site URL in Try it out. This writing preference does not override the diagram guide below.
 
 Put “What it does” before “How it works.” Use product images and visuals in the first section, then technical diagrams and API suitability in the second. Keep the enclosure design in the technical hardware section.
 
@@ -52,6 +53,10 @@ For the Devpost narrative, introduce sign-up in the opening and group the recap 
 Name the final product section “Financial management for large events.” Keep its scope to the existing claims, charges, receipts, ledgers and merch booth accounting.
 
 State the actual actor and action positively. Remove unprompted explanations of what does not happen when readers would already assume it. Keep necessary limits and consent boundaries, preferably as the behavior the system enforces.
+
+Keep no more than three prose paragraphs between useful images in feature and technical explanations. Use a relevant diagram, product image or UI capture to explain the next part of the flow. A longer text run needs a specific reason recorded in the review notes; do not add decorative images just to break the text. Short individual track entries and reference lists can remain text when their points are already illustrated elsewhere.
+
+Preserve distinct product features when shortening text or images. Crowd-crush prevention, medic response and fire evacuation are separate behaviors; combine only repeated explanations of the same behavior. Meet the visual rhythm rule with a useful image or clearer grouping, never by deleting a feature.
 
 1. At most 3 sentences per paragraph.
 2. One idea per paragraph.

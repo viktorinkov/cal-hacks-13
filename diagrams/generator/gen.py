@@ -181,6 +181,8 @@ def spacetimedb(y0):
     reducer = B(990, 170, "Rust reducer", "rust", w=720, h=300, wordmark=RUST, mark_h=100)
     commit = SV(1920, 170, STDB, "atomic commit", kind="stdb", w=720, h=300)
     query = B(2850, 170, "SQL subscription", "web", w=720, h=300, wordmark=MONITOR, mark_h=100)
+    for card in (call, reducer, commit, query):
+        card.el.setdefault("customData", {}).update(diagramArtworkHeight=260, diagramArtworkMaxWidth=800)
     H(call, reducer, "invokes")
     H(reducer, commit, "writes together")
     H(query, commit, "selects rows")
@@ -199,7 +201,8 @@ def spacetimedb(y0):
         first = len(S.elements)
         parent = Z(x, y, 720, 520, who, kind, art)
         parent.el.update(backgroundColor="#e9edf2" if kind == "rust" else "#d0ebff", strokeColor="#b5bfca")
-        parent.el.setdefault("customData", {})["diagramComponent"] = True
+        parent.el.setdefault("customData", {}).update(diagramComponent=True, diagramCenteredHeader=True,
+                                                     diagramHeaderArtworkHeight=260)
         for element in S.elements[first:]:
             if element["type"] == "text":
                 element["strokeColor"] = "#1e1e1e"
@@ -561,7 +564,7 @@ def find_people(y0):
 
 
 def photo_memories(y0):
-    S.begin_frame("Photos and Memories", 0, y0, 3420, 1680)
+    S.begin_frame("Memories engine", 0, y0, 3420, 1680)
     photo = _social_component(60, 170, 570, 600, "photographer's photo", "web", CAMERA)
     _social_property(photo, 100, 390, 490, "capture zone", h=100)
     _social_property(photo, 100, 530, 490, "capture time", h=100)
