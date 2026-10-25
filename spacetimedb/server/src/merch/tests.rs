@@ -175,6 +175,8 @@ impl World {
             caption: String::new(),
             added_by: id("photographer"),
             created_at: self.t.clock.now(),
+            people_count: 0,
+            features_call_id: 0,
         });
         self.t.db.photo_tag().insert(PhotoTag { id: 0, photo_id: photo.id, attendee: id(name), status: String::new(), updated_at: self.t.clock.now() });
         self.t.clock.advance(TimeDuration::from_micros(60_000_000));
@@ -201,6 +203,37 @@ impl World {
     fn last_order(&self) -> MerchOrder {
         self.t.db.merch_order().iter().max_by_key(|o| o.id).unwrap()
     }
+
+    /// Also tags `name` in the photo.
+    fn tag(&self, photo_id: u64, name: &str) {
+        self.t.db.photo_tag().insert(PhotoTag { id: 0, photo_id, attendee: id(name), status: String::new(), updated_at: self.t.clock.now() });
+    }
+
+    /// The two spent 20 minutes close together: they met.
+    fn met(&self, a: &str, b: &str) {
+        let (a, b) = if id(a) < id(b) { (id(a), id(b)) } else { (id(b), id(a)) };
+        self.t.db.social_encounter().insert(SocialEncounter {
+            id: 0,
+            band_pair: self.t.db.social_encounter().iter().count() as u64 + 1,
+            attendee_a: a,
+            attendee_b: b,
+            zone_id: self.sponsor_row,
+            baseline_seconds: 0,
+            seconds_together: 1200,
+            started_at: self.t.clock.now(),
+            last_seen_at: self.t.clock.now(),
+            met: true,
+            updated_at: self.t.clock.now(),
+        });
+    }
+}
+
+fn pick(template_id: u64, photo_id: u64, line: &str) -> MerchPickIn {
+    MerchPickIn { template_id, photo_id, line: line.into(), reason: "You spent most of your night at the sponsor row.".into() }
+}
+
+fn call() -> ModelCallIn {
+    ModelCallIn { kind: KIND_MERCH_PICKS.into(), model_used: "claude-opus-5-5".into(), status: "ok".into(), ..Default::default() }
 }
 
 /// The six Cal Hacks 13.0 templates, as scripts/merch-setup sends them.
@@ -378,4 +411,73 @@ fn a_claim_payout_lands_in_the_wallet() {
     assert_eq!(w.balance("Maya Chen"), 38_000);
     let entry = my_wallet_entries(&w.view("Maya Chen")).pop().unwrap();
     assert_eq!((entry.kind.as_str(), entry.memo.as_str(), entry.nessie_id.as_str()), ("payout", "BandIt claim 7 payout", "deposit-1"));
+}
+
+#[test]
+fn suggestions_prefer_photos_with_the_people_you_met_and_tick_the_booths_you_visited() {
+    let w = World::new();
+    for name in ["Maya Chen", "Jordan Alvarez"] {
+        w.as_(name, |ctx| update_profile(ctx, name.into(), true));
+    }
+    w.visit("Maya Chen", w.sponsor_row, 30.0);
+    let together = w.photo("Maya Chen", w.sponsor_row);
+    w.tag(together, "Jordan Alvarez");
+    w.photo("Maya Chen", w.sponsor_row);
+    w.met("Maya Chen", "Jordan Alvarez");
+
+    let s = my_merch_suggestions(&w.view("Maya Chen"));
+    assert!(s.iter().all(|s| s.photo_id == together), "the photo with the person she met wins over the newer one");
+    assert_eq!(s[0].friends, ["Jordan Alvarez"]);
+    assert_eq!(s[0].line, "with Jordan Alvarez");
+    assert_eq!(s[0].reason, "");
+    let crawl = s.iter().find(|s| s.title == "Booth crawl poster").unwrap();
+    assert_eq!(crawl.ticks.len(), 6, "every sponsor booth in the zone she visited");
+    assert_eq!(friends_line(&["A".into(), "B".into(), "C".into(), "D".into()]), "with A, B & 2 more");
+    assert_eq!(friends_line(&["A".into(), "B".into(), "C".into()]), "with A, B & C");
+}
+
+#[test]
+fn the_shopping_agent_picks_replace_the_ranking_and_go_onto_the_order() {
+    let w = World::new();
+    w.sign_up("Maya Chen");
+    w.as_("Jordan Alvarez", |ctx| update_profile(ctx, "Jordan Alvarez".into(), true));
+    w.visit("Maya Chen", w.sponsor_row, 30.0);
+    let together = w.photo("Maya Chen", w.sponsor_row);
+    w.tag(together, "Jordan Alvarez");
+    let jordans = w.photo("Jordan Alvarez", w.food);
+    w.met("Maya Chen", "Jordan Alvarez");
+
+    w.end_event();
+    let jobs: Vec<Job> = w.t.db.job().kind().filter(KIND_MERCH_PICKS).collect();
+    assert_eq!(jobs.len(), 2, "one run for each attendee in a photo");
+    let maya_node = w.t.db.attendee().identity().find(id("Maya Chen")).unwrap().node_id;
+    let job = jobs.iter().find(|j| j.subject_id == maya_node).unwrap().clone();
+    let payload: serde_json::Value = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!(payload["attendee"], "Maya Chen");
+    assert_eq!(payload["photos"][0]["people_you_met_in_it"], serde_json::json!(["Jordan Alvarez"]));
+    assert_eq!(payload["products"].as_array().unwrap().len(), 6);
+    assert_eq!(payload["places"][0]["zone"], "Sponsor row");
+
+    w.as_("worker", |ctx| claim_job(ctx, job.id));
+    let mug = w.template("mug_elastic.png");
+    let picks = vec![
+        pick(mug.id, together, "Elastic booth crew with Jordan, and a line that runs far too long"),
+        pick(9_999, together, "no such template"),
+        pick(mug.id, together, "the same template twice"),
+        pick(w.template("tee.png").id, jordans, "not her photo"),
+        pick(w.template("poster_booth_crawl.png").id, together, "Booth crawl"),
+    ];
+    assert!(w.try_as("Maya Chen", |ctx| submit_merch_picks(ctx, job.id, picks.clone(), call())).is_err());
+    w.as_("worker", |ctx| submit_merch_picks(ctx, job.id, picks, call()));
+
+    let s = my_merch_suggestions(&w.view("Maya Chen"));
+    let titles: Vec<&str> = s.iter().map(|s| s.title.as_str()).collect();
+    assert_eq!(titles, ["Elastic mug", "Booth crawl poster"]);
+    assert_eq!(s[0].line.chars().count(), LINE_CHARS);
+    assert!(s[0].reason.starts_with("You spent"));
+    assert_eq!(board_merch_picks(&w.view("ops")).len(), 2);
+    assert!(board_merch_picks(&w.view("Maya Chen")).is_empty());
+
+    w.as_("Maya Chen", |ctx| buy_merch(ctx, mug.id, together, String::new()));
+    assert_eq!(w.last_order().line, s[0].line);
 }

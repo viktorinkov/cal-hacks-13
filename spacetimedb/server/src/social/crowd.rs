@@ -818,7 +818,8 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     }
 
     // A claimed test band that is live meets the crowd standing within radio range, in real time, and
-    // other test bands in its zone.
+    // other test bands in its zone. It stands at its zone's centre, which in a zone of booths is the aisle
+    // between them, so with nobody in range it joins the team standing closest to it in its zone.
     let testers: Vec<&Band> = others
         .iter()
         .filter(|b| radio_id(b.id).is_some_and(|id| crate::safety::TEST_BANDS.contains(&id)))
@@ -826,7 +827,15 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         .collect();
     let secs = (TICK_MILLIS / 1_000) as u32;
     for t in &testers {
-        for j in grid.near(&points, (t.x_m, t.y_m)).into_iter().filter(|&j| j < members.len()) {
+        let mut near: Vec<usize> = grid.near(&points, (t.x_m, t.y_m)).into_iter().filter(|&j| j < members.len()).collect();
+        if near.is_empty() {
+            let dist = |j: usize| (spots[j].2 - t.x_m).powi(2) + (spots[j].3 - t.y_m).powi(2);
+            if let Some(closest) = (0..members.len()).filter(|&j| spots[j].0 == t.zone).min_by(|&a, &b| dist(a).total_cmp(&dist(b))) {
+                let team = members[closest].group_id;
+                near = (0..members.len()).filter(|&j| members[j].group_id == team).collect();
+            }
+        }
+        for j in near {
             together(ctx, t.id, members[j].band_id, secs);
         }
     }

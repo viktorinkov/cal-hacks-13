@@ -202,6 +202,12 @@ pub struct Photo {
     pub caption: String,
     pub added_by: Identity,
     pub created_at: Timestamp,
+    /// The people Claude counted in the photo; the tags are capped at it. 0 until the photo is read.
+    #[default(0)]
+    pub people_count: u32,
+    /// The model call that read the photo, 0 until it is read.
+    #[default(0)]
+    pub features_call_id: u64,
 }
 
 /// A findable attendee whose band was in the photo's zone when it was taken.
