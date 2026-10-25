@@ -193,7 +193,7 @@ function people(value: unknown): string[] {
   })
 }
 
-const LINK_CAP = 1200
+const LINK_CAP = 6000
 
 export function readCatalog(db: unknown): Catalog {
   const tables = (db ?? {}) as Record<string, unknown>

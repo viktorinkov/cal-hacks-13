@@ -1,204 +1,235 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { useCatalog, type GraphLink } from '@/stdb/catalog'
+import { Expand, Maximize, Shrink, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
+import { useCatalog } from '@/stdb/catalog'
 import { DeskFrame, Figure } from './DeskFrame'
+import type { EventGraph } from './eventGraph'
+import type { Labels } from './graphModel'
+import { KIND_COLOURS, KIND_NAMES, LINK_COLOURS, LINK_NAMES, useGraphView, type Kind, type LegendLine, type Mode, type Summary } from './graphView'
 
-const NODE: Record<string, string> = {
-  person: '#85858b',
-  booth: '#6fb7ad',
-  company: '#dcc79f',
+const MODES: { mode: Mode; label: string }[] = [
+  { mode: 'kind', label: 'Kind' },
+  { mode: 'memories', label: 'Memories' },
+  { mode: 'company', label: 'Company' },
+]
+
+function Tool({ onClick, pressed, children }: { onClick: () => void; pressed?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-[3px] px-2.5 text-[13px] transition-colors [&_svg]:size-3.5 [&_svg]:stroke-[1.5]',
+        pressed ? 'bg-[rgba(236,235,230,0.09)] text-ink' : 'text-ink-dim hover:bg-accent hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
+  )
 }
 
-const LINK: Record<string, string> = {
-  met: 'rgba(220,199,159,0.35)',
-  visited: 'rgba(111,183,173,0.4)',
-  works_at: 'rgba(207,208,212,0.28)',
-  exhibits: 'rgba(184,166,255,0.45)',
+function Swatch({ colour, line = false, children }: { colour: string; line?: boolean; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <i aria-hidden className={cn('inline-block shrink-0 rounded-full', line ? 'h-0.5 w-3.5' : 'size-2')} style={{ background: colour }} />
+      {children}
+    </span>
+  )
 }
 
-const LINK_NAME: Record<string, string> = {
-  met: 'Met',
-  visited: 'Visited',
-  works_at: 'Works at',
-  exhibits: 'Exhibits',
+function Legend({ mode, legend }: { mode: Mode; legend: LegendLine[] }) {
+  const groups =
+    mode === 'kind'
+      ? (Object.keys(KIND_COLOURS) as Kind[]).map((kind) => (
+          <Swatch key={kind} colour={KIND_COLOURS[kind]}>
+            {KIND_NAMES[kind]}
+          </Swatch>
+        ))
+      : legend.length
+        ? legend.map((line) => (
+            <Swatch key={line.label} colour={line.colour}>
+              {line.label}
+            </Swatch>
+          ))
+        : [<span key="none">No memories yet.</span>]
+  return (
+    <div className="nc-panel flex max-w-[min(100%,46rem)] flex-col gap-1.5 px-3 py-2 text-[12px] text-ink-dim">
+      <div className="flex flex-wrap gap-x-4 gap-y-1">{groups}</div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {Object.entries(LINK_NAMES).map(([kind, label]) => (
+          <Swatch key={kind} colour={LINK_COLOURS[kind]} line>
+            {label}
+          </Swatch>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-interface Node {
-  id: string
-  kind: string
-  label: string
-  x: number
-  y: number
+/** The selected node: what it is, and every booth, company and person one link away. */
+function Card({ summary, onPick, onClose }: { summary: Summary; onPick: (id: string) => void; onClose: () => void }) {
+  return (
+    <aside
+      aria-label={summary.title}
+      className="nc-panel nc-scroll absolute inset-x-3 bottom-3 z-10 bg-panel max-h-[45%] overflow-y-auto p-4 md:inset-x-auto md:bottom-auto md:left-3 md:top-3 md:max-h-[calc(100%-7.5rem)] md:w-[300px]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12px] text-ink-dim">{summary.eyebrow}</p>
+        <button type="button" aria-label="Close" onClick={onClose} className="-m-1 grid size-6 shrink-0 place-items-center rounded-[3px] text-ink-muted hover:bg-accent hover:text-ink">
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <h2 className="mt-1 font-display text-[26px] leading-[1.05] text-ink">{summary.title}</h2>
+      <p className="mt-2 text-[13px] text-ink-dim">{summary.stats}</p>
+      {summary.sections.map((section) => (
+        <section key={section.title} className="mt-4">
+          <h3 className="text-[12px] text-ink-muted">{section.title}</h3>
+          <ul className="mt-1">
+            {section.items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(item.id)}
+                  className="-mx-1.5 flex w-[calc(100%+0.75rem)] items-center gap-2 rounded-[3px] px-1.5 py-1 text-left text-[13px] text-ink hover:bg-accent"
+                >
+                  <i aria-hidden className="inline-block size-1.5 shrink-0 rounded-full" style={{ background: KIND_COLOURS[item.kind] }} />
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.note && <span className="shrink-0 tabular-nums text-ink-muted">{item.note}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {section.more > 0 && <p className="mt-1 text-[12px] text-ink-muted">and {section.more} more</p>}
+        </section>
+      ))}
+    </aside>
+  )
 }
 
-function layout(links: GraphLink[], labelOf: (kind: string, id: string) => string): { nodes: Node[]; edges: { a: string; b: string; kind: string }[] } {
-  const nodes = new Map<string, Node>()
-  const edges: { a: string; b: string; kind: string }[] = []
-  const ensure = (kind: string, id: string) => {
-    const key = `${kind}:${id}`
-    if (!nodes.has(key) && nodes.size < 160) {
-      const angle = nodes.size * 2.399
-      nodes.set(key, { id: key, kind, label: labelOf(kind, id), x: Math.cos(angle) * 80, y: Math.sin(angle) * 80 })
-    }
-    return nodes.has(key) ? key : ''
-  }
-  for (const link of links) {
-    const from = ensure(link.fromKind, link.fromId)
-    const to = ensure(link.toKind, link.toId)
-    if (from && to) edges.push({ a: from, b: to, kind: link.kind })
-  }
-  const list = [...nodes.values()]
-  for (let step = 0; step < 70; step++) {
-    for (let i = 0; i < list.length; i++) {
-      for (let j = i + 1; j < list.length; j++) {
-        const a = list[i]
-        const b = list[j]
-        let dx = a.x - b.x
-        let dy = a.y - b.y
-        const dist = Math.max(8, Math.hypot(dx, dy))
-        const force = 420 / (dist * dist)
-        dx /= dist
-        dy /= dist
-        a.x += dx * force
-        a.y += dy * force
-        b.x -= dx * force
-        b.y -= dy * force
-      }
-    }
-    for (const edge of edges) {
-      const a = nodes.get(edge.a)
-      const b = nodes.get(edge.b)
-      if (!a || !b) continue
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      a.x += dx * 0.012
-      a.y += dy * 0.012
-      b.x -= dx * 0.012
-      b.y -= dy * 0.012
-    }
-    for (const node of list) {
-      node.x *= 0.96
-      node.y *= 0.96
-    }
-  }
-  return { nodes: list, edges }
-}
-
-/** People stay unnamed. Booths and companies keep their names. */
+/** The event graph in 3D: drag to turn, scroll to zoom, click a person to see the booths they stood at. */
 export function GraphPage() {
   const links = useCatalog((s) => s.links)
   const linkCount = useCatalog((s) => s.linkCount)
   const booths = useCatalog((s) => s.booths)
   const companies = useCatalog((s) => s.companies)
-  const canvas = useRef<HTMLCanvasElement>(null)
-  const names = useMemo(() => {
-    const booth = new Map(booths.map((item) => [item.id, item.name]))
-    const company = new Map(companies.map((item) => [item.id, item.name]))
-    return (kind: string, id: string) => (kind === 'booth' ? booth.get(id) : kind === 'company' ? company.get(id) : '') ?? ''
-  }, [booths, companies])
-  const graph = useMemo(() => layout(links, names), [links, names])
-  const counts = {
-    person: graph.nodes.filter((node) => node.kind === 'person').length,
-    booth: graph.nodes.filter((node) => node.kind === 'booth').length,
-    company: graph.nodes.filter((node) => node.kind === 'company').length,
-  }
-
-  useEffect(() => {
-    const el = canvas.current
-    if (!el) return
-    const draw = () => {
-      const rect = el.getBoundingClientRect()
-      const dpr = Math.min(2, window.devicePixelRatio || 1)
-      el.width = Math.max(1, Math.floor(rect.width * dpr))
-      el.height = Math.max(1, Math.floor(rect.height * dpr))
-      const ctx = el.getContext('2d')
-      if (!ctx) return
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.clearRect(0, 0, rect.width, rect.height)
-      if (graph.nodes.length === 0) return
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const node of graph.nodes) {
-        minX = Math.min(minX, node.x)
-        minY = Math.min(minY, node.y)
-        maxX = Math.max(maxX, node.x)
-        maxY = Math.max(maxY, node.y)
-      }
-      const span = Math.max(40, maxX - minX, maxY - minY)
-      const scale = (Math.min(rect.width, rect.height) - 80) / span
-      const cx = rect.width / 2
-      const cy = rect.height / 2
-      const midX = (minX + maxX) / 2
-      const midY = (minY + maxY) / 2
-      const at = (node: Node) => ({ x: cx + (node.x - midX) * scale, y: cy + (node.y - midY) * scale })
-      const byId = new Map(graph.nodes.map((node) => [node.id, node]))
-      for (const edge of graph.edges) {
-        const a = byId.get(edge.a)
-        const b = byId.get(edge.b)
-        if (!a || !b) continue
-        const pa = at(a)
-        const pb = at(b)
-        ctx.strokeStyle = LINK[edge.kind] ?? 'rgba(207,208,212,0.2)'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.moveTo(pa.x, pa.y)
-        ctx.lineTo(pb.x, pb.y)
-        ctx.stroke()
-      }
-      ctx.font = '13px "Instrument Serif", Georgia, serif'
-      ctx.textAlign = 'center'
-      const labeled: { x: number; y: number }[] = []
-      for (const node of graph.nodes) {
-        const p = at(node)
-        const r = node.kind === 'company' ? 5 : node.kind === 'booth' ? 3.5 : 2
-        ctx.fillStyle = NODE[node.kind] ?? '#85858b'
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-        ctx.fill()
-        if (!node.label) continue
-        const y = p.y - r - 6
-        if (labeled.some((mark) => Math.hypot(mark.x - p.x, mark.y - y) < 36)) continue
-        labeled.push({ x: p.x, y })
-        ctx.fillStyle = '#ecebe6'
-        ctx.fillText(node.label, p.x, y)
+  const attendees = useCatalog((s) => s.attendees)
+  const mode = useGraphView((s) => s.mode)
+  const legend = useGraphView((s) => s.legend)
+  const selected = useGraphView((s) => s.selected)
+  const ready = useGraphView((s) => s.ready)
+  const frame = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const engine = useRef<EventGraph | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [full, setFull] = useState(false)
+  const labels = useMemo<Labels>(
+    () => ({
+      person: new Map(attendees.filter((person) => person.nodeId && person.displayName).map((person) => [person.nodeId, person.displayName])),
+      booth: new Map(booths.map((item) => [item.id, item.name])),
+      company: new Map(companies.map((item) => [item.id, item.name])),
+    }),
+    [attendees, booths, companies],
+  )
+  const latest = useRef({ links, labels })
+  const counts = useMemo(() => {
+    const seen = new Set<string>()
+    const out = { person: 0, booth: 0, company: 0, named: 0 }
+    for (const link of links) {
+      for (const [kind, id] of [
+        [link.fromKind, link.fromId],
+        [link.toKind, link.toId],
+      ]) {
+        const key = `${kind}:${id}`
+        if (seen.has(key) || !(kind in KIND_COLOURS)) continue
+        seen.add(key)
+        out[kind as Kind] += 1
+        if (kind === 'person' && labels.person.has(id)) out.named += 1
       }
     }
-    draw()
-    const observer = new ResizeObserver(draw)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [graph])
+    return out
+  }, [links, labels])
+
+  useEffect(() => {
+    latest.current = { links, labels }
+    engine.current?.setData(links, labels)
+  }, [links, labels])
+
+  useEffect(() => {
+    let alive = true
+    import('./eventGraph')
+      .then(({ eventGraph }) => {
+        if (!alive || !stage.current) return
+        const graph = eventGraph()
+        graph.attach(stage.current)
+        engine.current = graph
+        graph.setData(latest.current.links, latest.current.labels)
+      })
+      .catch(() => {
+        if (alive) setFailed(true)
+      })
+    return () => {
+      alive = false
+      engine.current?.detach()
+      engine.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const onChange = () => setFull(document.fullscreenElement === frame.current)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFull = () => {
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void frame.current?.requestFullscreen?.()
+  }
 
   return (
     <DeskFrame
       title={linkCount ? 'Who met, and where they stood.' : 'The event graph is empty.'}
-      sentence="People stay anonymous on this screen. Booths and companies keep their names. A line is a meeting, a visit, a job, or a booth."
+      sentence="Every meeting, booth visit, job and exhibit, live from the floor. Click a person to see the booths they stood at and the people they met."
       figures={
         <>
           <Figure lead label="Links" value={linkCount.toLocaleString('en-US')} note={linkCount > links.length ? `${links.length.toLocaleString('en-US')} drawn` : 'in the graph'} />
-          <Figure label="People" value={String(counts.person)} note="unnamed dots" />
-          <Figure label="Booths" value={String(counts.booth)} note="named" />
-          <Figure label="Companies" value={String(counts.company)} note="named" />
+          <Figure label="People" value={counts.person.toLocaleString('en-US')} note={counts.named ? `${counts.named.toLocaleString('en-US')} named` : 'names open to staff'} />
+          <Figure label="Booths" value={counts.booth.toLocaleString('en-US')} note="named" />
+          <Figure label="Companies" value={counts.company.toLocaleString('en-US')} note="named" />
         </>
       }
     >
-      <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-ink-dim">
-        {Object.entries(NODE).map(([kind, color]) => (
-          <span key={kind} className="inline-flex items-center gap-2 capitalize">
-            <i aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: color }} />
-            {kind}
-          </span>
-        ))}
-        {Object.entries(LINK_NAME).map(([kind, label]) => (
-          <span key={kind} className="inline-flex items-center gap-2">
-            <i aria-hidden className="inline-block h-px w-3" style={{ background: LINK[kind] }} />
-            {label}
-          </span>
-        ))}
+      <div ref={frame} className="nc-graph relative h-[70vh] min-h-[520px] overflow-hidden rounded-[4px] bg-panel shadow-[0_0_0_1px_var(--nc-line)]">
+        <div ref={stage} className="absolute inset-0" />
+        {!ready && (
+          <p className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-ink-dim">
+            {failed ? 'This browser could not start the 3D view.' : linkCount ? 'Laying out the graph…' : 'The graph has not arrived from the live host yet.'}
+          </p>
+        )}
+        <div className="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">
+          <div role="group" aria-label="Colour by" className="nc-panel flex items-center gap-0.5 p-1">
+            <span className="px-2 text-[13px] text-ink-muted">Colour by</span>
+            {MODES.map((item) => (
+              <Tool key={item.mode} pressed={mode === item.mode} onClick={() => engine.current?.setMode(item.mode)}>
+                {item.label}
+              </Tool>
+            ))}
+          </div>
+          <div className="nc-panel flex items-center gap-0.5 p-1">
+            <Tool onClick={() => engine.current?.fit()}>
+              <Maximize /> Fit
+            </Tool>
+            <Tool onClick={toggleFull}>
+              {full ? <Shrink /> : <Expand />} {full ? 'Exit full screen' : 'Full screen'}
+            </Tool>
+          </div>
+        </div>
+        {selected && <Card summary={selected} onPick={(id) => engine.current?.select(id)} onClose={() => engine.current?.select(undefined)} />}
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-end justify-between gap-4">
+          <Legend mode={mode} legend={legend} />
+          <p className="hidden shrink-0 pb-1 text-[12px] text-ink-muted lg:block">Drag to turn, scroll to zoom, click anything to see what it links to.</p>
+        </div>
       </div>
-      <canvas ref={canvas} className="h-[560px] w-full" />
-      {linkCount === 0 && <p className="text-[15px] text-ink-dim">The graph has not arrived from the live host yet.</p>}
     </DeskFrame>
   )
 }

@@ -207,6 +207,26 @@
   }
 }
 
+/* The event graph's hover label, drawn by 3d-force-graph. Outside the layers so it beats the library's own style. */
+.nc-graph .float-tooltip-kap {
+  max-width: 260px;
+  padding: 7px 9px;
+  border-radius: 3px;
+  background: var(--popover);
+  color: var(--nc-ink);
+  box-shadow: 0 0 0 1px var(--nc-line-strong), 0 12px 32px rgba(0, 0, 0, 0.5);
+  font: 12px/1.45 var(--font-sans);
+}
+.nc-graph .float-tooltip-kap b {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.nc-graph .float-tooltip-kap span {
+  display: block;
+  color: var(--nc-ink-dim);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

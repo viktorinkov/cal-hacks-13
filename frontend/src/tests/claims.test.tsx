@@ -70,11 +70,12 @@ describe('claim totals', () => {
 })
 
 describe('registrations', () => {
-  it('keeps a saved record ahead of the sample', () => {
+  it('keeps typed saved details ahead of the sample without persisting medical fields', () => {
     expect(getRegistration('band-05')?.allergies).toBe('Penicillin')
     const current = getRegistration('band-05')!
-    saveRegistration({ ...current, allergies: 'Shellfish' })
-    expect(getRegistration('band-05')?.allergies).toBe('Shellfish')
+    saveRegistration({ ...current, name: 'New guest', allergies: 'Shellfish' })
+    expect(getRegistration('band-05')?.name).toBe('New guest')
+    expect(getRegistration('band-05')?.allergies).toBe('')
     expect(getRegistration('band-01')).toBeNull()
   })
 

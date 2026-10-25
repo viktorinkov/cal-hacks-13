@@ -1,6 +1,7 @@
 import type { Device, Vec2 } from '@/contracts/domain'
 import type { FloorBand } from '@/stdb/floor'
 import type { BoothCircle } from './circle'
+import { patternOf, rememberHardware, S_SOS } from './demoRing'
 
 /** Where a band sits inside the booth. Missing coordinates stay unplaced. */
 export function spotInBooth(band: FloorBand, booth: Pick<BoothCircle, 'x' | 'y' | 'r'>): Vec2 | null {
@@ -32,8 +33,8 @@ export function deviceFromBand(band: FloorBand, booth: Pick<BoothCircle, 'x' | '
     hardwareVariant: band.hasMpu ? 'full' : 'light',
     connectionStatus: band.online ? 'connected' : 'disconnected',
     lastSeenAt: band.lastSeen,
-    currentPattern: band.sos ? 'sos' : band.fall ? 'steady_red' : band.online ? 'ready' : 'off',
-    sosActive: band.sos,
+    currentPattern: patternOf(band),
+    sosActive: band.sos || band.state === S_SOS,
     location: spot ?? undefined,
     locationSource: spot ? 'station_estimate' : 'unknown',
     zoneId: spot ? 'GB' : undefined,
@@ -57,6 +58,7 @@ export function liveDevices(booth: Pick<BoothCircle, 'x' | 'y' | 'r'>): Device[]
 
 export function setLiveBands(bands: FloorBand[]): void {
   latest = bands
+  rememberHardware(bands)
   hear?.(bands)
 }
 

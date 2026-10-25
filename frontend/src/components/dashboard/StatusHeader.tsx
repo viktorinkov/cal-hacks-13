@@ -50,6 +50,7 @@ export function StatusHeader() {
       lastDataAt: clock(lastEventAt, tz),
       now,
       simulatedBands,
+      venueId: venue?.venueId,
     })
     // `now` only matters for the post-resolution window; 2 Hz is plenty
   }, [incidents, commands, zones, venue, mode, connection, linkUp, lastEventAt, tz, now, simulatedBands])

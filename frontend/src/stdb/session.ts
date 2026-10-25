@@ -4,6 +4,7 @@ import { scheduleCatalog } from './catalog'
 import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
+import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -64,7 +65,26 @@ export interface MedicalCardView {
   plan: string
   memberId: string
   groupNumber: string
+  insurerPhone?: string
+  notes?: string
   status: string
+}
+
+export interface MyBandView {
+  bandId: number
+  status: string
+  expiresAt: number | null
+}
+
+export interface MedicalDocumentView {
+  id: string
+  kind: string
+  fileHash: string
+  pageCount: number
+  status: string
+  jobId: string
+  dropped: string[]
+  uploadedAt: number
 }
 
 export interface WalletView {
@@ -84,7 +104,15 @@ interface SessionState {
   insurer: string
   claims: BoardClaim[]
   cards: MedicalCardView[]
+  myBand: MyBandView | null
+  myBandReady: boolean
+  medicalDocuments: MedicalDocumentView[]
+  medicalDocumentsReady: boolean
+  medicalCard: MedicalCardView | null
+  medicalCardReady: boolean
+  signupError: string | null
   wallet: WalletView | null
+  walletError: string | null
   actors: Actor[]
   /** Whether the staff-only views subscribed. Empty tables still count as open. */
   staffViews: 'pending' | 'open' | 'refused'
@@ -92,7 +120,11 @@ interface SessionState {
   approve: (id: string) => Promise<void>
   refuse: (id: string, reason: string) => Promise<void>
   requestCard: (bandId: number) => Promise<void>
+  claimBand: (token: string) => Promise<void>
   registerBand: (token: string, name: string) => Promise<void>
+  submitMedicalDocument: (file: File, kind: MedicalDocumentKind) => Promise<{ hash: string }>
+  retryMedicalDocument: (id: string) => Promise<void>
+  confirmMedicalCard: () => Promise<void>
   connectWallet: () => Promise<void>
 }
 
@@ -110,11 +142,17 @@ type Reducers = {
   updateProfile(args: { displayName: string; findable: boolean }): Promise<unknown>
   connectWallet(args: Record<string, never>): Promise<unknown>
   releaseBand(args: { bandId: number }): Promise<unknown>
+  openApiSession(args: { tokenHash: string }): Promise<unknown>
+  submitMedicalDocument(args: { kind: string; fileHash: string; pageCount: number }): Promise<unknown>
+  confirmMedicalCard(args: Record<string, never>): Promise<unknown>
 }
 
 let conn: DbConnection | null = null
 let opening: Promise<void> | null = null
 let noteDisconnect: (message: string) => void = () => {}
+let apiSession: Promise<string> | null = null
+let pendingActions = 0
+const claimRequests = new Map<string, Promise<void>>()
 
 function messageOf(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
@@ -159,6 +197,17 @@ function clockOf(value: unknown): string {
   return ''
 }
 
+function millisOf(value: unknown): number | null {
+  if (value && typeof value === 'object' && 'toDate' in value) {
+    const fn = (value as { toDate: unknown }).toDate
+    if (typeof fn === 'function') {
+      const time = (fn.call(value) as Date).getTime()
+      return Number.isFinite(time) ? time : null
+    }
+  }
+  return null
+}
+
 function list(value: unknown): string {
   if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean).join(', ')
   return text(value)
@@ -184,6 +233,8 @@ function cardView(row: Record<string, unknown>, bandId: number, name: string): M
     plan: text(row.plan),
     memberId: text(row.memberId),
     groupNumber: text(row.groupNumber),
+    insurerPhone: text(row.insurerPhone),
+    notes: text(row.notes),
     status: text(row.status),
   }
 }
@@ -257,11 +308,25 @@ function publish() {
     const card = readCard(row.card, cents(row.bandId), text(row.name))
     if (card) cards.push(card)
   }
+  const bandRow = rowsOf(db.myBand)[0]
+  const myBand: MyBandView | null = bandRow ? {
+    bandId: cents(bandRow.bandId),
+    status: text(bandRow.status),
+    expiresAt: millisOf(bandRow.expiresAt),
+  } : null
   const own = rowsOf(db.myMedicalCard)[0]
-  if (own) {
-    const card = cardView(own, 0, '')
-    if (!cards.some((item) => item.memberId === card.memberId && item.bloodType === card.bloodType)) cards.unshift(card)
-  }
+  const medicalCard = own ? cardView(own, myBand?.bandId ?? 0, '') : null
+  if (medicalCard && !cards.some((item) => item.memberId === medicalCard.memberId && item.bloodType === medicalCard.bloodType)) cards.unshift(medicalCard)
+  const medicalDocuments: MedicalDocumentView[] = rowsOf(db.myMedicalDocuments).map((row) => ({
+    id: String(row.id ?? ''),
+    kind: text(row.kind),
+    fileHash: text(row.fileHash),
+    pageCount: cents(row.pageCount),
+    status: text(row.status),
+    jobId: String(row.jobId ?? ''),
+    dropped: Array.isArray(row.dropped) ? row.dropped.map(text).filter(Boolean) : [],
+    uploadedAt: millisOf(row.uploadedAt) ?? 0,
+  }))
   const walletRow = rowsOf(db.myWallet)[0]
   const wallet = walletRow ? { accountId: text(walletRow.accountId), balanceCents: cents(walletRow.balanceCents) } : null
   useSession.setState({
@@ -274,22 +339,28 @@ function publish() {
     insurer: policy ? text(policy.insurerName) || 'the insurer' : 'the insurer',
     claims,
     cards,
+    myBand,
+    medicalCard,
+    medicalDocuments,
     wallet,
   })
   syncFloor(db)
   scheduleCatalog(db)
 }
 
-async function call(work: () => Promise<unknown>) {
+async function call<T>(work: () => Promise<T>): Promise<T> {
+  pendingActions += 1
   useSession.setState({ busy: true, actionError: null })
   try {
-    await work()
+    const result = await work()
     publish()
+    return result
   } catch (error) {
     useSession.setState({ actionError: messageOf(error) })
     throw error
   } finally {
-    useSession.setState({ busy: false })
+    pendingActions -= 1
+    useSession.setState({ busy: pendingActions > 0 })
   }
 }
 
@@ -299,8 +370,57 @@ function reducers(): Reducers {
 }
 
 /** Return a wristband to the pool. The attendee keeps their profile. */
-export function releaseBand(bandId: number): Promise<void> {
-  return call(() => reducers().releaseBand({ bandId }))
+export async function releaseBand(bandId: number): Promise<void> {
+  await call(() => reducers().releaseBand({ bandId }))
+}
+
+function bandIdFromToken(token: string): number | null {
+  const match = /^BANDIT-(\d{1,3})$/.exec(token)
+  return match ? Number(match[1]) : null
+}
+
+async function claimTargetBand(token: string): Promise<void> {
+  if (!conn) throw new Error('The database is not connected.')
+  const current = useSession.getState().myBand
+  if (current?.bandId === bandIdFromToken(token)) {
+    if (current.status === 'claimed') return
+    if (current.status === 'waiting_for_press' && (current.expiresAt === null || current.expiresAt > Date.now())) return
+  }
+  const pending = claimRequests.get(token)
+  if (pending) return pending
+  const request = (async () => { await reducers().claimBand({ token }); publish() })()
+  claimRequests.set(token, request)
+  try {
+    await request
+  } finally {
+    claimRequests.delete(token)
+  }
+}
+
+function requireClaimedBand(bandId?: number | null): void {
+  const state = useSession.getState()
+  if (!conn || state.phase !== 'live') throw new Error('The database is not connected.')
+  if (!state.myBandReady) throw new Error('Your band is still being checked. Try again in a moment.')
+  if (state.myBand?.status !== 'claimed' || (bandId != null && state.myBand.bandId !== bandId)) {
+    throw new Error('Press the button on your band to finish claiming it first.')
+  }
+}
+
+/** The secret stays in memory. The database only receives its SHA-256. */
+function uploadSession(): Promise<string> {
+  if (!apiSession) {
+    apiSession = (async () => {
+      const bytes = crypto.getRandomValues(new Uint8Array(32))
+      const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+      const tokenHash = await sha256(new TextEncoder().encode(token).buffer)
+      await reducers().openApiSession({ tokenHash })
+      return token
+    })().catch((error: unknown) => {
+      apiSession = null
+      throw error
+    })
+  }
+  return apiSession
 }
 
 async function loadActors(): Promise<Actor[]> {
@@ -353,6 +473,31 @@ export function sendBandPattern(bandId: number, pattern: string): void {
   })
 }
 
+/** Each attendee view is its own subscription, independent of the floor and every other view. */
+function subscribeAttendeeViews(next: DbConnection) {
+  const views = [
+    ['my_band', 'myBandReady'],
+    ['my_medical_documents', 'medicalDocumentsReady'],
+    ['my_medical_card', 'medicalCardReady'],
+    ['my_wallet', null],
+  ] as const
+  for (const [view, readiness] of views) {
+    next.subscriptionBuilder()
+      .onApplied(() => {
+        if (conn !== next) return
+        if (readiness) useSession.setState({ [readiness]: true })
+        safePublish()
+      })
+      .onError((...args: unknown[]) => {
+        if (conn !== next) return
+        const reason = messageOf(args[1] ?? args[0])
+        if (view === 'my_wallet') useSession.setState({ walletError: reason })
+        else useSession.setState({ signupError: reason })
+      })
+      .subscribe(`SELECT * FROM ${view}`)
+  }
+}
+
 function connect(token: string | undefined, played: boolean, host: HostConfig) {
   const key = `bandit-token:${host.database}`
   return new Promise<void>((resolve, reject) => {
@@ -363,13 +508,23 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .withToken(token)
       .onConnect((next, identity, newToken) => {
         conn = next
+        apiSession = null
+        claimRequests.clear()
+        useSession.setState({
+          phase: 'live', error: null, me: identity.toHexString(),
+          myBand: null, myBandReady: false,
+          medicalDocuments: [], medicalDocumentsReady: false,
+          medicalCard: null, medicalCardReady: false,
+          signupError: null, wallet: null, walletError: null,
+        })
         console.info('[stdb] connected', identity.toHexString())
         if (!played && newToken) window.localStorage.setItem(key, newToken)
+        wireTables(next.db)
+        subscribeAttendeeViews(next)
         next
           .subscriptionBuilder()
           .onApplied(() => {
             console.info('[stdb] floor subscription applied')
-            wireTables(next.db)
             safePublish()
             resolve()
             // One query at a time. A view that never answers must not hold the rest of the desk.
@@ -414,6 +569,8 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
         reject(error instanceof Error ? error : new Error(messageOf(error)))
       })
       .onDisconnect((_ctx, error) => {
+        conn = null
+        apiSession = null
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
         noteDisconnect('Connection lost.')
       })
@@ -468,7 +625,15 @@ export const useSession = create<SessionState>((set, get) => ({
   insurer: 'the insurer',
   claims: [],
   cards: [],
+  myBand: null,
+  myBandReady: false,
+  medicalDocuments: [],
+  medicalDocumentsReady: false,
+  medicalCard: null,
+  medicalCardReady: false,
+  signupError: null,
   wallet: null,
+  walletError: null,
   actors: [],
   staffViews: 'pending',
   staffError: null,
@@ -518,12 +683,48 @@ export const useSession = create<SessionState>((set, get) => ({
   requestCard: async (bandId) => {
     await call(() => reducers().requestMedicalCard({ bandId }))
   },
+  claimBand: async (token) => {
+    await call(() => claimTargetBand(token))
+  },
   registerBand: async (token, name) => {
-    if (!conn) throw new Error('The database is not connected.')
     await call(async () => {
-      await reducers().claimBand({ token })
+      await claimTargetBand(token)
+      requireClaimedBand(bandIdFromToken(token))
       await reducers().updateProfile({ displayName: name, findable: false })
-      await reducers().connectWallet({})
+      set({ walletError: null })
+      try {
+        await reducers().connectWallet({})
+      } catch (error) {
+        set({ walletError: messageOf(error) })
+      }
+    })
+  },
+  submitMedicalDocument: async (file, kind) => call(async () => {
+    requireClaimedBand()
+    const invalid = validateMedicalFile(file)
+    if (invalid) throw new Error(invalid)
+    const session = await uploadSession()
+    const blob = await uploadBlob(file, kind, session)
+    requireClaimedBand()
+    await reducers().submitMedicalDocument({ kind, fileHash: blob.hash, pageCount: blob.pageCount })
+    return { hash: blob.hash }
+  }),
+  retryMedicalDocument: async (id) => {
+    await call(async () => {
+      requireClaimedBand()
+      const doc = get().medicalDocuments.find((item) => item.id === id)
+      if (!doc) throw new Error('This document is no longer available. Choose the file again.')
+      if (doc.kind !== 'insurance' && doc.kind !== 'history') throw new Error('This document cannot be retried here.')
+      if (doc.status !== 'failed') throw new Error('This document has not failed. Wait for it to finish reading.')
+      await reducers().submitMedicalDocument({ kind: doc.kind, fileHash: doc.fileHash, pageCount: doc.pageCount })
+    })
+  },
+  confirmMedicalCard: async () => {
+    await call(async () => {
+      requireClaimedBand()
+      if (!get().medicalCardReady || !get().medicalCard) throw new Error('Still reading your documents. Wait for your card to arrive.')
+      if (get().medicalDocuments.some((doc) => doc.status === 'reading')) throw new Error('Still reading your documents. Wait for every document to finish.')
+      await reducers().confirmMedicalCard({})
     })
   },
   connectWallet: async () => {
@@ -531,10 +732,17 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 }))
 
-noteDisconnect = (message) => useSession.setState({ phase: 'error', error: message })
+noteDisconnect = (message) => useSession.setState({
+  phase: 'error', error: message,
+  myBandReady: false, medicalDocumentsReady: false, medicalCardReady: false,
+})
 
 /** What the desk tests render. No database connection. */
-export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionState, 'staff' | 'owner' | 'insurer' | 'cards' | 'wallet' | 'phase' | 'me' | 'roles'>>) {
+export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionState,
+  'staff' | 'owner' | 'insurer' | 'cards' | 'wallet' | 'phase' | 'me' | 'roles' |
+  'myBand' | 'myBandReady' | 'medicalDocuments' | 'medicalDocumentsReady' |
+  'medicalCard' | 'medicalCardReady' | 'signupError' | 'walletError'
+>>) {
   useSession.setState({
     phase: 'live',
     error: null,
@@ -545,6 +753,14 @@ export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionS
     claims,
     cards: [],
     wallet: null,
+    myBand: null,
+    myBandReady: false,
+    medicalDocuments: [],
+    medicalDocumentsReady: false,
+    medicalCard: null,
+    medicalCardReady: false,
+    signupError: null,
+    walletError: null,
     ...extras,
   })
 }
