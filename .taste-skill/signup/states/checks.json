@@ -1,0 +1,15 @@
+{
+  "result": "pass",
+  "checks": [
+    "live draft preview matches fields",
+    "medical review and confirmation",
+    "save and edit",
+    "320px overflow",
+    "keyboard focus",
+    "all header destinations",
+    "pending claim and disabled uploads",
+    "expired claim retry and error"
+  ],
+  "consoleErrors": [],
+  "fixtureOnly": true
+}
