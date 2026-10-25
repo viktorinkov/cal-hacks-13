@@ -66,11 +66,11 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 
 | Role | Who, on which device | What they do on the page |
 |---|---|---|
-| `medic` | a medic, on a phone | takes an incident with "Take it" (`assign_medic`), adds notes with a cost, and resolves it; reads the venue map and the zone table |
+| `medic` | a medic, on a phone | takes an incident with "Take it" (`assign_medic`), adds notes with a cost, and resolves it; reads the venue map and the zone table. During a shift the medic keeps the medic page (/medic) open instead, which rings for every new fall or SOS and has the same buttons ([Safety](../6-features/Safety.md)) |
 | `ops` | the organizer, on the venue laptop or a phone | the attendee list and its "Event ended" button (see Attendee list and Event ended below), the venue map, the zone table and the low-visibility button, the incident desk |
 | owner | the team member signed in with the identity that published the module | passes every role check, on the page as in the module; grants roles from the command line |
 
-- Medical-Card.md: the medic also opens the medical card with "Tap band <band code> for the medical card" (`request_medical_card`), or by tapping the band with their phone. The phone's medic view links back here with "Notes, cost and resolve on the incident desk". The granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the attendee confirms it.
+- Medical-Card.md: the medic also opens the medical card with "Tap band <band code> for the medical card" (`request_medical_card`), or by tapping the band with their phone. The phone's medic view links to the medic page with "Notes, cost and resolve on the medic page". The granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the attendee confirms it.
 - Insurance.md: after the event the organizer decides every claim no payment rule settled, in "Waiting for your decision" on the Claims tab. They approve or reject each rule Claude proposes on the Proposed rules tab.
 - Social.md: the Event graph and Photos tabs are for every staff member, like the other tabs. The `photographer` role has no screen here and uses the photographer route `/photo`, served with the tap page.
 
@@ -152,7 +152,7 @@ When the organizer presses "Event ended", `end_event` sets `event_state.ended`. 
 |---|---|---|---|
 | Venue map (Live tab, "Venue") | the zones and booths of `venue_plan`, and every band on the map as a dot where the module places it | `venue_plan`, `band` | none |
 | Zones (Live tab) | the low-visibility button, the status line, and the zone table: each zone's people, bands 1 to 99, their average neighbour count, level, capacity, exit colour and station marker | `zone`, `band`, `station`, `gateway`, `settings` | `set_low_vis` |
-| Incident desk (Claims tab, "Open incidents") | every open incident with its kind, zone, band and the attendee who wears it, status, opening time, who opened it, and its notes | `open_incidents`, `board_notes`, `board_attendees`, `zone` | `assign_medic` ("Take it"), `add_incident_note` ("Add note"), `resolve_incident` ("Resolve") |
+| Incident desk (Claims tab, "Open incidents") | every open incident with its kind, zone, band and the attendee who wears it, status, opening time, who opened it, whose phones showed its alert, and its notes | `open_incidents`, `board_notes`, `board_medic_alerts`, `board_attendees`, `zone` | `assign_medic` ("Take it"), `add_incident_note` ("Add note"), `resolve_incident` ("Resolve") |
 | Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), the Anthropic Claude API's causation explanation, the decision form for `ops` ("Approve $X"; Refuse with a reason; on a complicated claim, the line that it is decided one by one), and the stamp "Settled under rule vN, approved by <name>"; the ledger by account and policy; the accuracy-run scorecard (Test-Bands.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (`ops`) |
 | Insurance.md: "File the medical record" | on a claim waiting for its hospital report, for `medic` and `ops`: "Clinic PDF" and "File it, Claude reads it" | `medical_record` | the upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record` |
 | Medical-Card.md: Medical card | inside an incident in the incident desk: "Medical card: <name>, band <band code>", with " (not yet confirmed by the wearer)" until confirmed; blood type, allergies, conditions, medications, emergency contact, insurance and notes, or "No medical card on file." | `medic_medical_cards` | "Tap band <band code> for the medical card" (`request_medical_card`) |
@@ -245,7 +245,7 @@ The desk sits at the top of the Claims tab under the heading "Open incidents" an
 
 Each incident reads "Incident <id>: <Kind>" in bold, then " in <zone>, band <band code> (<name>), <Status>, opened <time> by <opened_by>", or "no band" when it has none. The kind is `Sos`, `Fall` or `Property`, the status `Open` or `Responding`, and `opened_by` is `band`, `ops` or `vision`.
 
-The name of the attendee who wears the band comes from `board_attendees`. Under it come the notes, each as "<time> <author_role>: <text> (<cost>)".
+The name of the attendee who wears the band comes from `board_attendees`. For a fall or SOS, the line "On medics' phones: <medic> after <n> s, ..." follows from `board_medic_alerts`, or "Not on any medic's phone yet" ([Safety](../6-features/Safety.md)). Under it come the notes, each as "<time> <author_role>: <text> (<cost>)".
 
 | Action | Reducer | Effect |
 |---|---|---|
@@ -470,7 +470,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | `venue_plan` | the venue map's zone rectangles and booth spots |
 | `band` | the map, the counts, the "Alerts" list, the zone table and each band's status |
 | `gateway`, `settings` | the Zones status line, each zone's level and the low-visibility button |
-| `open_incidents`, `board_notes` | the incident desk and the "Alerts" list |
+| `open_incidents`, `board_notes`, `board_medic_alerts` | the incident desk and the "Alerts" list |
 | `board_attendees` | the attendee list on the Attendees tab, and the name of the attendee who wears the band on an "Alerts" line or an incident |
 | `my_roles`, `my_owner` | the caller's own roles and whether they are the owner, for the header, the tabs and the hidden buttons |
 | `event_state` | the "Event ended" button |
@@ -541,7 +541,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | Insurance.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Insurance.md: the hospital report is filed on the claim that waits for it, by `medic` or `ops` | the claim says what it is waiting for, and the incident desk stays for the person in front of the medic |
 | A medic takes an incident with "Take it" (`assign_medic`); the organizer does not assign medics; medics wear no bands | the medic knows whether they are free, and the desk shows who took it |
-| Medical-Card.md: the medic opens the medical card from the incident desk or by tapping the band; notes, cost and resolve stay on the desk | the medic already works the incident there, and the card shows inside it; at the person, the tag is quicker |
+| Medical-Card.md: the medic opens the medical card from the incident desk or by tapping the band; notes, cost and resolve are on the desk and on the medic page | the medic already works the incident there, and the card shows inside it; at the person, the tag is quicker |
 | The page redraws at most every 500 ms, however many rows change, and the venue map glides its dots between redraws | one redraw takes every change at once; Test-Bands.md: the crowd's 1,000 bands change many rows every 2 s |
 | The venue map draws `venue_plan`, one anonymous view of zone rectangles and booth spots | every screen draws the same plan, computed once, and the bands' spots are in the same metres |
 | Merch.md: the Merch tab shows orders to `ops` only, through `board_merch_orders` | an order names the attendee who placed it; the medic needs none of it |

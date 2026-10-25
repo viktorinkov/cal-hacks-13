@@ -186,7 +186,7 @@ Downloads go through `GET /blobs/{hash}` on `bandit-api`, which serves the file 
 | Endpoint | Purpose | Owner |
 |---|---|---|
 | `GET /health` | liveness for `scripts/run`, with the roles this service holds, so the owner can see that `grant_role` landed | this file |
-| app files | the pages and their bundles: the organizer portal (`/organizer`), the tap page (`/t/<band code>` and the sign-in return `/callback`), the live view (`/live`) and the photographer page (`/photo`) | this file |
+| app files | the pages and their bundles: the organizer portal (`/organizer`), the tap page (`/t/<band code>` and the sign-in return `/callback`), the live view (`/live`), the medic page (`/medic`, with its notification worker `/js/medic-sw.js`) and the photographer page (`/photo`) | this file |
 | `POST /api/blobs` | take a file in, store it under its SHA-256 and call `register_blob` with the purpose's access class (Social.md: purpose `photo` as `shared`; Insurance.md: purpose `medical` as `staff`; Medical-Card.md: purposes `history` and `insurance` as `owner_only`, owned by the attendee whose API session sent the file); returns the hash, the page count of a PDF and the URL `/blobs/<sha256>` | this file |
 | `GET /blobs/{hash}` | serve a stored file by its hash, with its content type read from the file's first bytes | this file |
 | `GET /config.json` | where the pages connect: the SpacetimeDB WebSocket address, the database, the Elastic Kibana address for the Kibana tab, the SpacetimeDB SpacetimeAuth client and whether test mode is on | this file |

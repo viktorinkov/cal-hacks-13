@@ -52,6 +52,7 @@ Not responsible for:
 | Route | Who sees it | Purpose |
 |---|---|---|
 | `/t/{token}` | anyone | The only URL written on the tags, and the attendee's only route; the token is the band's code. Decides the screen from the sign-in, the band and the caller: band setup, then the thank-you screen during the event; the recap for the band's signed-in owner after the event, on any device. |
+| `/medic` | role `medic` | The medic page, served by `bandit-api` beside the tap page and kept open on the medic's phone during a shift: it rings for every new fall or SOS, then takes, notes and resolves it. Content in [Safety](../6-features/Safety.md). |
 | Social.md: `/photo` | role `photographer` | The photographer page, served by `bandit-api` beside the tap page: upload a photo through `POST /api/blobs` and call `register_photo`. Content in [Social](../6-features/Social.md). |
 
 `/t/{token}` shows the same thing to every attendee who taps: setup, the thank-you screen or the recap, for the caller's own band. Staff tools live in the [organizer portal](Organizer-Portal.md).

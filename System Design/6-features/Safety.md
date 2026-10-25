@@ -12,7 +12,7 @@ Responsibilities:
 
 - Define what a band does alone: its density colour, the light circle, SOS, fall and the press.
 - Define how `watch_bands` opens `sos` and `fall` incidents from band rows, what the snapshot freezes and which bands count as witnesses.
-- Define how a medic takes, notes and resolves an incident, and what resolving sends.
+- Define how a new fall or SOS reaches every medic's phone, and how a medic takes, notes and resolves an incident, and what resolving sends.
 - Define low visibility, the Live tab's level, calibration, the override and the forced states, as built.
 - Define where the exit markers stand and how a band's colour leads to its nearest door.
 - (TBD -- LEO) Define exit routing and the medic approach.
@@ -23,7 +23,7 @@ Non-responsibilities:
 - The band's firmware, its thresholds and its radio are in [Hardware](../4-devices/Hardware.md). This file relies on them.
 - How beacons become reducer calls, and `command` rows become radio commands, is in [Gateway-Bridge](../3-services/Gateway-Bridge.md).
 - Tables and reducers are defined in [SpacetimeDB](../2-data/SpacetimeDB.md); this file specifies the behaviour they carry.
-- The staff screens are in the [organizer portal](../5-apps/Organizer-Portal.md) (/organizer); medics work in its incident desk.
+- The staff screens are in the [organizer portal](../5-apps/Organizer-Portal.md) (/organizer); medics work in its incident desk and on the medic page (/medic) on their phones.
 - Medical-Card.md: the medical card.
 - Insurance.md: claims and evidence.
 - Vision.md (TBD -- LEO): what the security cameras and the security view do. This file states only where the camera count shows.
@@ -36,12 +36,14 @@ Non-responsibilities:
 | In | Test-Bands.md: the `bandit-claims` tool and `bandit-api`'s dev routes | the same fields for the test bands 90 to 99 | `band` through `report_test_band` ([Test-Bands](../3-services/Test-Bands.md)) | reducer |
 | In | Venue import | each zone's station marker, centre, area, capacity and exit colour | `zone` through `import_event`; `set_zone_station` | reducer |
 | In | Organizers (`ops`), Live tab | low visibility on or off | `set_low_vis` | TypeScript SDK |
-| In | Medics and organizers, incident desk | take, note and resolve | `assign_medic` (role `medic`); `add_incident_note`, `resolve_incident` (roles `ops`, `medic`) | TypeScript SDK |
+| In | Medics and organizers, incident desk and medic page | take, note and resolve | `assign_medic` (role `medic`); `add_incident_note`, `resolve_incident` (roles `ops`, `medic`) | TypeScript SDK |
+| In | Medics' phones, medic page (/medic) | the receipt of each alert, as it shows | `alert_shown` (role `medic`) | TypeScript SDK |
 | In | Organizers (`ops`), SpacetimeDB command line | starting the watch, thresholds, RSSI, override, forced states, `clear`, exit colours | `start_safety_watch`, `set_thresholds`, `set_rssi`, `set_override`, `force_state`, `clear`, `set_exit`, `send_command` | SpacetimeDB command line |
 | In | Vision.md: the `vision` role | property events and a camera sighting per incident, judged with the Anthropic Claude API | `report_property_event`, `submit_vision_assessment` ([Vision](../4-devices/Vision.md)) | reducer |
 | In | Vision.md (TBD -- LEO): `bandit-vision` | a people count per security camera's zone | `report_zone_count` | reducer |
 | Out | `band1t-bridge` | each one-shot command, once | `command` | subscription, then one gateway line |
-| Out | Organizer portal | bands, station markers, the gateway and the thresholds; open incidents and their notes | `band`, `station`, `gateway`, `settings`, `open_incidents`, `board_notes` | subscription |
+| Out | Organizer portal | bands, station markers, the gateway and the thresholds; open incidents, their notes and which medics' phones showed each alert | `band`, `station`, `gateway`, `settings`, `open_incidents`, `board_notes`, `board_medic_alerts` | subscription |
+| Out | Medics' phones, medic page (/medic) | each new fall or SOS, with the attendee's name, the place and the zone, and who took it | `open_incidents`, `incident_marker`, `zone` | subscription |
 | Out | Insurance.md | the resolved incident with its snapshot, witnesses and notes | the claim hook inside `resolve_incident` | in the module |
 
 ## Design
@@ -52,7 +54,8 @@ Non-responsibilities:
 |---|---|---|---|
 | Band (firmware) | its density colour (IDLE, YELLOW, GUIDE), SOS strobe and buzz, fall detection, joining the light circle, the low-visibility chase | under one beacon interval, about 100 ms | the venue laptop, the gateway and the module |
 | `band1t` module (`ingest_band`, `watch_bands`) | the latest row per band, incidents, snapshots, witnesses | `band1t-bridge` forwards a changed flag at once, and `watch_bands` runs every 500 ms | the organizer portal and every phone |
-| Staff (Live tab, incident desk, SpacetimeDB command line) | take, note and resolve; low visibility; thresholds, override, forced states, exit colours | human | nothing the bands do depends on them |
+| Medics' phones (medic page) | ring for each new fall or SOS | the row reaches the phone as `watch_bands` commits it, well under a second | the bands; the organizer portal |
+| Staff (Live tab, incident desk, medic page, SpacetimeDB command line) | take, note and resolve; low visibility; thresholds, override, forced states, exit colours | human | nothing the bands do depends on them |
 
 The band's precedence order matters for everything below. From the firmware, highest first: IDENT, SOS (the SOS or fall latch), PAID, PAY, FOUND_ME, FIND, CONNECT, the light circle (NEAR_SOS), a forced state, the override (shows IDLE), and the density state.
 
@@ -102,9 +105,24 @@ Test-Bands.md: the test bands 90 to 99 go through the same steps. The crowd's ba
 
 A forced state 3 from the command line shows the red strobe without the flag, so it opens no incident. Flags from an offline band are ignored.
 
+### Alerts on the medics' phones
+
+Medics keep the medic page (/medic) open on their phones during their shift, like a pager. It subscribes to `open_incidents`, so SpacetimeDB pushes each new fall or SOS to every medic's phone the moment `watch_bands` commits it, with no polling and no server in between.
+
+- **Start of the shift.** The medic signs in and presses "Start my shift". That one press lets the page play sound, asks the phone to allow notifications and keeps the screen on, so the connection stays up in a pocket.
+- **The alert.** For each `sos` or `fall` incident that appears after the page connected, the phone beeps, vibrates and shows the notification "<Kind>: <name> at <place>", with the zone and the band code. The page lists it at the top in red, from `open_incidents` and `incident_marker`: the kind, the attendee's name, the place, the zone, the band code and how long ago it opened.
+- **Every medic, until one takes it.** Medics wear no bands, so the module cannot tell who is nearest, and organizers do not dispatch: every medic's phone rings for every fall and SOS. It rings again every 4 s until that medic presses "Take it" or "Seen", or another medic takes it, which every phone then shows as "<medic> is on it".
+- **The receipt.** As the alert shows, the page calls `alert_shown(incident_id)`. The module writes one `medic_alert` row per medic and incident, with the time from the band raising the flag to the receipt. The first receipt also goes into the decision history as "Alert on the phone", "<n> s after the band raised it", and the incident desk shows whose phones showed it.
+- **At the person.** "Take it" calls `assign_medic`. Under each incident the medic took, "Treatment note", "Cost in dollars (optional)", "Add note" and "Resolve" call `add_incident_note` and `resolve_incident`, as on the incident desk.
+- Medical-Card.md: the band code links to the medic view of the tap page, the same page that tapping the band opens.
+
+`property`, `theft` and `breakage` incidents never ring and do not show on the medic page: they need an organizer, not a medic.
+
+The time on the receipt runs from the band raising the flag to the module receiving `alert_shown`. For a radio or test band that start is its `SosRaised` or `Fall` event row, which `ingest_band` and `report_test_band` write; for a crowd band it is the incident's `opened_at`. The receipt includes the phone's trip back, so the alert itself reached the phone sooner.
+
 ### Take it, notes and Resolve
 
-The Live tab lists every present band with SOS or fall under "Alerts", as "SOS on band <code> (<name>) in <zone>: the bands around it show the light circle.", together with each open incident ([Organizer-Portal](../5-apps/Organizer-Portal.md)). The incident desk, under "Open incidents", shows each incident from `open_incidents` with its zone, band, status, open time and who opened it, and its notes from `board_notes`. Medics do not wear bands; the blue ring in the venue is what the medic walks toward.
+The medic page rings every medic's phone first (above). The Live tab lists every present band with SOS or fall under "Alerts", as "SOS on band <code> (<name>) in <zone>: the bands around it show the light circle.", together with each open incident ([Organizer-Portal](../5-apps/Organizer-Portal.md)). The incident desk, under "Open incidents", shows each incident from `open_incidents` with its zone, band, status, open time and who opened it, and its notes from `board_notes`. Medics do not wear bands; the blue ring in the venue is what the medic walks toward.
 
 - **Take it.** A medic presses "Take it" on an `Open` incident. `assign_medic` sets the status to `Responding` and `assigned_medic` to the caller. Organizers do not assign medics, and a second medic who presses it takes the incident over.
 - Medical-Card.md: "Tap band <code> for the medical card" calls `request_medical_card`, which logs the read with the open incident, and the card shows on the desk.
@@ -129,7 +147,7 @@ sequenceDiagram
   participant BR as band1t-bridge
   participant M as band1t module
   participant D as Organizer portal
-  participant MD as Medic (incident desk)
+  participant MD as Medic's phone (/medic)
   B->>B: hold 3 s, or jolt then stillness: latch, strobe red, buzz
   B->>N: beacons with the SOS or fall flag, 10 a second
   N->>N: heard at -58 dBm or stronger: pulse blue (state 4)
@@ -140,6 +158,9 @@ sequenceDiagram
   M->>M: watch_bands within 500 ms: incident, snapshot, subject row
   M->>M: next passes: witness rows from the state 4 bands
   M-->>D: Alerts and the incident desk
+  M-->>MD: open_incidents row: beep, vibrate, notification
+  MD->>M: alert_shown
+  M->>M: medic_alert row, time since the flag
   MD->>M: assign_medic, the Take it button
   M->>M: status Responding
   MD->>M: add_incident_note
@@ -266,7 +287,8 @@ On the real bands, with nine attendees in one zone:
 | 1.2 m square | all nine stand inside the red tape | `neigh` reaches 5: red, with the exit colour chasing (blue unless `set_exit` sent another) | the same | "very busy" |
 | Step out | everyone walks out of the tape | amber, then green as `neigh` drops below 4 and then below 2 | the same | back to "calm" |
 | SOS | one attendee holds the button 3 s | red strobe and the SOS buzz; the bands around pulse blue | `watch_bands` opens an `sos` incident with its snapshot; the blue bands become witnesses | "Alerts" and the incident desk |
-| Medic | a teammate as the medic presses "Take it" and walks to the blue ring | the circle stays blue | status `Responding` | the desk shows the new status |
+| Alert | every medic's phone beeps and vibrates: "SOS: <name> at <place>" | nothing changes | each phone's `alert_shown` writes a `medic_alert` row | the desk shows whose phones showed it |
+| Medic | a teammate as the medic presses "Take it" on the phone and walks to the blue ring | the circle stays blue | status `Responding` | the desk shows the new status |
 | Medical-Card.md: medical card | the medic taps "Tap band <code> for the medical card" | nothing changes | `request_medical_card` logs the read with the incident | the card shows on the desk |
 | Resolve | the medic adds a note and presses "Resolve" | the `clear` arrives: the strobe stops and the blue fades within 1.5 s | status `Resolved` | the incident leaves the desk |
 | Low visibility | an organizer presses the button and confirms | a band in GUIDE chases faster as it nears the exit marker glowing its colour, and pulses every 2 s; the others stay as they are | `settings.low_vis` on, one `lowvis 1` | "Low visibility is on" |
@@ -280,6 +302,8 @@ Test-Bands.md: the Bands tab's "Fall here" runs the same `fall` through `bandit-
 | Failure | Effect | Design answer |
 |---|---|---|
 | `watch_bands` was never started | flags reach the `band` rows but no incident opens | `start_safety_watch` is a setup step, and calling it again changes nothing |
+| A medic's phone loses its connection | that phone misses alerts | the page reloads 3 s after a drop and lists every open incident again; the other medics' phones and the incident desk still ring and show it, and the desk shows whose phones showed each alert |
+| The phone blocks sound or notifications | a silent alert | the screen stays on with the incident in red at the top, and vibration needs no permission |
 | An SOS reopens right after resolve | a duplicate incident | 10 s of grace after the resolve while the `clear` reaches the band |
 | The attendee cancels with the 3 s hold | the band leaves "Alerts", the incident stays open | staff check on the attendee and resolve it |
 | A fall fires on a jump | a false `fall` incident | the medic resolves it without a note |
@@ -314,6 +338,10 @@ Test-Bands.md: the Bands tab's "Fall here" runs the same `fall` through `bandit-
 | A witness is any online band in state 4, attached to the newest open band incident in its own zone, or else the newest anywhere | the band already decided by radio that it is in the circle; the zone only picks the incident when two are open |
 | The attendee's 3 s cancel leaves the incident open | someone who called for help is checked on before staff close it |
 | A medic takes an incident with "Take it" (`assign_medic`, role `medic`); organizers do not assign medics; medics do not wear bands | the medic knows whether they are free |
+| A new fall or SOS reaches the medics' phones through the medic page's subscription to `open_incidents`, with no push server | the alert is the incident row itself, so it reaches the phone as soon as `watch_bands` commits it, with nothing in between to fail |
+| Every medic's phone rings for every fall and SOS until one medic takes it | medics wear no bands, so the module cannot tell who is nearest, and each medic knows whether they are free |
+| The medic page keeps the screen on during a shift | a phone browser drops the connection of a page in the background; a page in front keeps it |
+| Each phone reports its alert with `alert_shown`, and the module times it from the band's flag | the time from an SOS to the medics' phones is measured on every alert, not estimated |
 | Resolving sends one `clear` to the subject band and nothing else | it releases the latch without the attendee holding the button again; the witness bands leave the circle by themselves within 1.5 s |
 | Low visibility is one venue-wide `lowvis` command that each band saves | a band keeps it through a reboot, and keeps it when the venue laptop goes down after the command |
 | The Live tab computes each zone's level in the browser from the mean `neigh` against `settings.yellow` and `settings.red` | the same thresholds the bands use, with no module tick to fall behind |

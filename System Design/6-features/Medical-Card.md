@@ -139,7 +139,7 @@ A medic opens a card in two places, and both call `request_medical_card(band_id)
 
 It subscribes to `my_roles`, `open_incidents` and `medic_medical_cards`. The card shows as soon as the module answers; no incident is needed.
 
-When the band has an open `sos` or `fall` incident, the view also shows the incident line "<Kind> incident <id>, <status>, opened <time> by <who>.", "Take it" while the incident is still `open` (`assign_medic`, [Safety](Safety.md)), and the link "Notes, cost and resolve on the incident desk" to the organizer portal's Claims tab. A band nobody wears shows "Nobody wears band <band code>." with "Tap again".
+When the band has an open `sos` or `fall` incident, the view also shows the incident line "<Kind> incident <id>, <status>, opened <time> by <who>.", "Take it" while the incident is still `open` (`assign_medic`, [Safety](Safety.md)), and the link "Notes, cost and resolve on the medic page" to the medic page (/medic, [Safety](Safety.md)). A band nobody wears shows "Nobody wears band <band code>." with "Tap again".
 
 **The incident desk.** In the organizer portal's Claims tab, each open incident with a band shows "Tap band <band code> for the medical card", which calls `request_medical_card` with the incident's band ([Organizer-Portal](../5-apps/Organizer-Portal.md)). That tap is tied to the incident, so the card shows inside it.
 

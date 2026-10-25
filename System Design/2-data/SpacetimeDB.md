@@ -431,6 +431,16 @@ Public, and not copied. Read by `social_tick`; not used for safety. Fields `key`
 | `cost_cents` | integer, optional | the treatment or repair cost in USD cents (Insurance.md reads it) |
 | `created_at` | timestamp | when |
 
+`medic_alert`: a medic's phone showed the alert of a fall or SOS. Written by `alert_shown`, once per medic and incident. Private, read through `board_medic_alerts` (staff), and not copied.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | auto id | the row |
+| `incident_id` | incident id, indexed | which incident |
+| `medic`, `medic_name` | identity, text | whose phone, and their staff label ("Ari Ramos") |
+| `shown_at` | timestamp | when the module received the receipt |
+| `after_micros` | integer | microseconds from the band raising the flag (its `SosRaised` or `Fall` event, else the incident's `opened_at`) to `shown_at` |
+
 #### Work and files group
 
 `job`: one unit of slow or external work, the job queue. Queued by feature reducers through the module's internal enqueue function, never by a client; changed by the job reducers (role `worker`) and `job_reaper`. [Architecture: Queues](../1-overview/Architecture.md#queues) lists all 18 job kinds, the reducer that queues each one and the reducer that takes its result.
@@ -793,6 +803,7 @@ An organizer (`ops`) ends the event from the organizer portal ([Organizer-Portal
 |---|---|---|---|
 | `open_incident` | `ops`, `medic` | opens an `sos`, `fall` or `property` incident by hand in a zone, with an optional band and note, and the same snapshot; `opened_by` `ops`. No page calls it; Test-Bands.md: `bandit-claims property` does | `incident`, `incident_snapshot`, `incident_band`, `incident_note` |
 | `assign_medic` | `medic` | the caller takes the incident: refuses a resolved incident, sets status `Responding` and `assigned_medic` to the caller | `incident` |
+| `alert_shown` | `medic` | the medic page reports that the alert of an `sos` or `fall` incident showed on the caller's phone: refuses other kinds; a second receipt from the same medic changes nothing; the first receipt of the incident also writes a `decision` row, "Alert on the phone" | `medic_alert`, `decision` |
 | `add_incident_note` | `ops`, `medic` | appends a note with the author's role and an optional cost in cents; refuses blank text | `incident_note` |
 | `resolve_incident` | `ops`, `medic` | refuses an incident already resolved; sets status `Resolved` with the resolution text; writes one `clear` for the subject band unless it is 0 or a test band. Insurance.md: ends with the claim hook: an `sos` or `fall` incident with at least one note, or a `property` incident with a note whose cost is above 0, opens a claim | `incident`, `command` |
 
@@ -833,8 +844,8 @@ There is no separate role for running the event: an organizer is a staff member 
 | Role | May call | May read (beyond public tables) |
 |---|---|---|
 | `owner` | everything; it alone may call `grant_role`, `revoke_role`, `add_owner`, `add_staff`, `remove_staff` and `reset_bridge` | everything the staff views return, and `board_staff` |
-| `ops` | `import_event`, `set_zone_station`, `place_booth`, `register_blob`, `start_safety_watch`, `start_job_reaper`, the Commands and Settings reducers, `open_incident`, `add_incident_note`, `resolve_incident`, `release_band`, `end_event`, `reopen_event`; Bright-Data.md: `load_venue_spots`; Merch.md: `load_merch_templates`; Test-Bands.md: `start_crowd`, `stop_crowd`; Insurance.md: the organizer's reducers, among them `approve_claim` and `refuse_claim` | `open_incidents`, `incident_bands`, `board_notes`, `board_attendees`; Medical-Card.md: `board_medical_access`; Merch.md: `board_merch_orders`; Social.md: `board_photos` |
-| `medic` | `assign_medic`, `add_incident_note`, `open_incident`, `resolve_incident`, `register_blob`; Medical-Card.md: `request_medical_card`; Insurance.md: `file_claim_for_wearer`, `submit_medical_record` | `open_incidents`, `incident_bands`, `board_notes`, `board_attendees`; Medical-Card.md: `medic_medical_cards` and `board_medical_access`; Social.md: `board_photos` |
+| `ops` | `import_event`, `set_zone_station`, `place_booth`, `register_blob`, `start_safety_watch`, `start_job_reaper`, the Commands and Settings reducers, `open_incident`, `add_incident_note`, `resolve_incident`, `release_band`, `end_event`, `reopen_event`; Bright-Data.md: `load_venue_spots`; Merch.md: `load_merch_templates`; Test-Bands.md: `start_crowd`, `stop_crowd`; Insurance.md: the organizer's reducers, among them `approve_claim` and `refuse_claim` | `open_incidents`, `incident_bands`, `board_notes`, `board_medic_alerts`, `board_attendees`; Medical-Card.md: `board_medical_access`; Merch.md: `board_merch_orders`; Social.md: `board_photos` |
+| `medic` | `alert_shown`, `assign_medic`, `add_incident_note`, `open_incident`, `resolve_incident`, `register_blob`; Medical-Card.md: `request_medical_card`; Insurance.md: `file_claim_for_wearer`, `submit_medical_record` | `open_incidents`, `incident_bands`, `board_notes`, `board_medic_alerts`, `board_attendees`; Medical-Card.md: `medic_medical_cards` and `board_medical_access`; Social.md: `board_photos` |
 | Social.md: `photographer` | `register_photo` | feature views only |
 | `band1t-bridge` (no role) | `ingest_band`, `ingest_station`, `ingest_heard`, `gateway_up`, `command_sent` | public tables |
 | Test-Bands.md: `tester` | `report_test_band`, `start_crowd`, `stop_crowd` | public tables |
@@ -867,6 +878,7 @@ Views use indexed lookups, so per-caller views are cheap at event scale: a few s
 | `open_incidents` | staff | every incident not yet resolved |
 | `incident_bands(incident_id)` | staff | the subject and witness rows of one incident |
 | `board_notes` | staff | every `incident_note` |
+| `board_medic_alerts` | staff | every `medic_alert`: whose phones showed each alert, and how long after the band's flag |
 | `board_staff` | `owner` | every `staff_member` row, for the Staff tab |
 | `worker_jobs` | `worker` | every `Queued` or `Leased` job |
 | `api_sessions` | `api` | every `api_session` row |
@@ -879,8 +891,9 @@ No view exposes `incident_snapshot`, resolved incidents, `band_owner` or `band_c
 |---|---|---|
 | `band1t-bridge` | `command` rows with `pending` true, its one query | the commands to send; it reads no settings, zones, station markers or bands |
 | Test-Bands.md: the `bandit-claims` command-line tool | as the module owner: `band`, `band_owner`, `attendee`, `zone`, `booth`, `venue`, the incident tables; Insurance.md: the claim tables | drive the test bands and the claims flow, and wait for the rows each step produces |
-| Organizer portal | `band`, `station`, `gateway`, `settings`, `zone`, `booth`, `venue`, `event_state`, `my_roles`, `my_owner`, `open_incidents`, `board_notes`, `board_attendees`, `board_staff`; Bright-Data.md: `organization`, `venue_setup`, `venue_setup_step`, `chosen_venue`; Social.md: `event_graph`, `board_photos`; Medical-Card.md: `medic_medical_cards`; Merch.md: `merch_template`, `board_merch_orders`, `board_merch_picks`; Capital-One-Nessie.md: `board_wallets`; Insurance.md: `claims_board`, `unclaimed_injuries` and the `board_*` claim views | the Live tab, the incident desk, the attendee list, the claims desk, the event graph with its photos on the big screen, the Photos tab, the Merch tab, the Venue setup tab, the Staff tab ([Organizer-Portal](../5-apps/Organizer-Portal.md)) |
+| Organizer portal | `band`, `station`, `gateway`, `settings`, `zone`, `booth`, `venue`, `event_state`, `my_roles`, `my_owner`, `open_incidents`, `board_notes`, `board_medic_alerts`, `board_attendees`, `board_staff`; Bright-Data.md: `organization`, `venue_setup`, `venue_setup_step`, `chosen_venue`; Social.md: `event_graph`, `board_photos`; Medical-Card.md: `medic_medical_cards`; Merch.md: `merch_template`, `board_merch_orders`, `board_merch_picks`; Capital-One-Nessie.md: `board_wallets`; Insurance.md: `claims_board`, `unclaimed_injuries` and the `board_*` claim views | the Live tab, the incident desk, the attendee list, the claims desk, the event graph with its photos on the big screen, the Photos tab, the Merch tab, the Venue setup tab, the Staff tab ([Organizer-Portal](../5-apps/Organizer-Portal.md)) |
 | Live view (`/live`) | `band`, `event_state`, `my_roles`, `my_owner`; Bright-Data.md: `venue_spot`; Insurance.md: `claims_board`; the live run's `live_run`, `band_place`, `decision` and `incident_marker` | the bands on the venue's 3D floor |
+| Medic page (`/medic`) | `my_roles`, `my_owner`, `zone`, `open_incidents`, `incident_marker`, `board_notes` | ring each medic's phone for every new fall or SOS, take it, note it and resolve it ([Safety](../6-features/Safety.md)) |
 | Tap page | `event_state`, `venue`, the tapped band's `band` row, `my_attendee`, `my_band`, `my_roles`; Social.md: `my_handles`, `my_visits`, `my_encounters`, `my_photos`; Bright-Data.md: `person`, `organization`, `claimed_people`; Medical-Card.md: `my_medical_documents`, `my_medical_card`, and `open_incidents` and `medic_medical_cards` for the medic's view of a tap; Capital-One-Nessie.md: `my_wallet`, `my_wallet_entries`; Merch.md: `merch_template`, `my_merch_suggestions`, `my_merch_orders`; Insurance.md: `my_incidents`, `my_claims` | band setup, the thank-you screen, the switch to the recap, the recap ([Tap-Page](../5-apps/Tap-Page.md)) |
 | `bandit-workers` | `worker_jobs`, plus the feature tables each kind reads | claim and run jobs |
 | `bandit-api` | `api_sessions`, `band`, `event_state`, `zone`, `booth`, `my_roles`; Social.md: `social_attendees`, `social_handles`, `social_visits`, `social_encounters`, `social_shared_visits`, `social_photos`, `social_photo_tags` | authenticate HTTP callers; Elastic.md: build the recap for `GET /api/recap`; Test-Bands.md: keep the test bands it moved alive and stop their 2 s reports once the event ends |
