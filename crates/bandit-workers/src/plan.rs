@@ -1,20 +1,25 @@
 //! `plan_lookup`: finds the public Summary of Benefits and Coverage of the health plan an attendee
 //! named. Bright Data's search finds the plan's document, Claude picks it among the results
-//! (`plan_find`), the Web Unlocker fetches it, and Claude reads the insurer, plan and year it prints
-//! (`plan_check`). Code keeps only addresses the search gave, only real PDFs, and only a PDF whose
-//! printed insurer and plan hold most of the words the attendee typed. The PDF goes to the blob
-//! store, and the module lands it like an upload.
+//! (`plan_find`), the Web Unlocker fetches it, and the Evidence Engine reads it like an upload,
+//! together with the insurer, plan and year it prints. Code keeps only addresses the search gave,
+//! only real PDFs, and only a PDF whose printed insurer and plan are on their pages and hold most of
+//! the words the attendee typed. The PDF goes to the blob store, and the module lands it like an
+//! upload; its reading is already saved, so it is read once.
 
 use std::collections::HashSet;
 
-use bandit_bindings::PlanLookupResult;
+use bandit_bindings::{ModelCallIn, PlanLookupResult};
+use bandit_common::sha256_hex;
+use bandit_insurance::policy::HEALTH_PLAN;
+use bandit_insurance::printed::PlanPrinted;
 use claude_client::{Effort, MessageRequest};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::brightdata::{BrightData, err, urls_in};
+use crate::document::{self, MAX_CHECK_PAGES};
 use crate::jobs::{Ctx, JobError, JobIn};
-use crate::model::{Model, ask_twice};
+use crate::model::ask_twice;
 use crate::sink::Finish;
 
 pub const KIND: &str = "plan_lookup";
@@ -106,36 +111,7 @@ pub(crate) fn check_find(v: &Value, urls: &HashSet<String>, max: usize) -> Resul
     if problems.is_empty() { Ok(picked) } else { Err(problems) }
 }
 
-pub(crate) fn printed_item() -> Value {
-    json!({"type": "object", "properties": {"text": {"type": "string"}, "page": {"type": "integer"}}, "required": ["text", "page"], "additionalProperties": false})
-}
-
-fn check_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "document": {"type": "string", "enum": ["sbc", "other"]},
-            "insurer": printed_item(),
-            "plan": printed_item(),
-            "plan_year": printed_item()
-        },
-        "required": ["document", "insurer", "plan", "plan_year"],
-        "additionalProperties": false
-    })
-}
-
-fn check_prompt(p: &Payload, pages: u32) -> String {
-    format!(
-        "The attendee typed the insurer {:?} and the plan {:?}. This PDF was found on the web as {}. It has about {pages} page(s).\n\n\
-Say what the document is: `sbc` for a Summary of Benefits and Coverage, `other` for anything else (a brochure, a comparison, a provider \
-directory, a claim form). Copy the insurer's name, the plan's name and the plan year exactly as the document prints them, each with the 1-based page it is printed on. Use an empty text and page 0 for anything it does not print.",
-        p.insurer,
-        p.plan,
-        what(p, current_year())
-    )
-}
-
-/// What a fetched PDF prints, checked against its pages.
+/// What a fetched PDF prints, as code found it on its pages.
 #[derive(Clone, Debug, PartialEq)]
 struct Printed {
     document: String,
@@ -144,19 +120,10 @@ struct Printed {
     year: String,
 }
 
-fn check_printed(v: &Value, pages: u32) -> Result<Printed, Vec<String>> {
-    let mut problems = Vec::new();
-    let mut item = |k: &str| -> String {
-        let text = v[k]["text"].as_str().unwrap_or("").trim().to_string();
-        let page = v[k]["page"].as_i64().unwrap_or(0);
-        // Compressed PDFs hide their page objects, so a count of 1 only means "unknown".
-        if !text.is_empty() && (page < 1 || (pages > 1 && page > pages as i64)) {
-            problems.push(format!("{k} page {page} is outside 1..={pages}"));
-        }
-        text.chars().take(120).collect()
-    };
-    let printed = Printed { document: v["document"].as_str().unwrap_or("other").to_string(), insurer: item("insurer"), plan: item("plan"), year: item("plan_year") };
-    if problems.is_empty() { Ok(printed) } else { Err(problems) }
+impl From<PlanPrinted> for Printed {
+    fn from(p: PlanPrinted) -> Self {
+        Printed { document: p.document, insurer: p.insurer.text, plan: p.plan.text, year: p.plan_year.text }
+    }
 }
 
 // --- Code's check ----------------------------------------------------------------------------
@@ -201,23 +168,31 @@ pub(crate) fn short(url: &str) -> &str {
 
 // --- The run ---------------------------------------------------------------------------------
 
-/// Claude's reading of one fetched PDF, and whether code took it.
-async fn check_pdf<M: Model>(model: &M, p: &Payload, pdf: &[u8], calls: &mut Vec<bandit_bindings::ModelCallIn>) -> Result<Printed, String> {
-    let pages = crate::document::page_count(pdf);
-    let request = || MessageRequest::new().system(SYSTEM).pdf(pdf).text(check_prompt(p, pages)).json_schema(check_schema());
-    let tries = match ask_twice(model, "plan_check", Effort::Low, request, |v| check_printed(v, pages)).await {
-        Ok(t) => t,
-        Err(e) => {
-            calls.extend(e.calls);
-            return Err(format!("could not be read: {}", e.error));
-        }
-    };
-    calls.extend(tries.calls);
-    let printed = tries.checked.map_err(|e| e.join("; "))?;
+/// What the Evidence Engine read a PDF to print, as code finds it on the pages, or why it is not the plan.
+fn judge(p: &Payload, read: &Value, texts: &[String]) -> Result<Printed, String> {
+    let printed = Printed::from(PlanPrinted::from_read(read).checked(texts)?);
     match mismatch(p, &printed) {
         Some(why) => Err(why),
         None => Ok(printed),
     }
+}
+
+/// The Evidence Engine reads one fetched PDF as the attendee's plan, and code checks what it prints.
+/// A PDF that is not the plan leaves Elastic again; the plan's own reading stays for `document_read`.
+async fn check_pdf(ctx: &Ctx, job: &JobIn, p: &Payload, pdf: &[u8], calls: &mut Vec<ModelCallIn>) -> Result<Printed, String> {
+    let pages = document::split_pages(pdf).map_err(|e| format!("its pages could not be split ({e:#})"))?;
+    if pages.len() > MAX_CHECK_PAGES {
+        return Err(format!("it has {} pages, and the check reads at most {MAX_CHECK_PAGES}", pages.len()));
+    }
+    let hash = sha256_hex(pdf);
+    let checked = match document::read_pdf(ctx, job, &hash, HEALTH_PLAN, &pages, calls).await {
+        Ok(read) => judge(p, &read.answer["read"], &read.texts),
+        Err(e) => Err(format!("could not be read: {e:#}")),
+    };
+    if checked.is_err() {
+        document::forget(ctx, &hash).await;
+    }
+    checked
 }
 
 pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
@@ -272,7 +247,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
             }
         };
         pdfs += 1;
-        match check_pdf(&ctx.claude, &p, &pdf, &mut calls).await {
+        match check_pdf(ctx, job, &p, &pdf, &mut calls).await {
             Ok(printed) => {
                 let blob = ctx.blobs.put(&pdf).map_err(|e| err("storing the PDF", e))?;
                 tracing::info!(job_id = job.id, lookup_id = p.lookup_id, %url, insurer = %printed.insurer, plan = %printed.plan, "plan found");
@@ -284,7 +259,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
                     plan_year: printed.year,
                     file_hash: blob.sha256,
                     size_bytes: blob.size_bytes,
-                    page_count: crate::document::page_count(&pdf),
+                    page_count: document::page_count(&pdf),
                     note: String::new(),
                 };
                 ctx.sink.finish(job.id, Finish::PlanLookup { result }, calls).await?;
@@ -316,7 +291,6 @@ fn empty() -> PlanLookupResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::fake::FakeModel;
 
     fn payload(insurer: &str, plan: &str) -> Payload {
         Payload { lookup_id: 1, insurer: insurer.into(), plan: plan.into(), state: "CA".into() }
@@ -334,7 +308,7 @@ mod tests {
     fn the_module_payload_parses() {
         let p: Payload = serde_json::from_value(json!({"lookup_id": 7, "kind": "health", "insurer": "Kaiser Permanente", "plan": "Bronze 60 HMO", "state": "CA"})).unwrap();
         assert_eq!((p.lookup_id, p.plan.as_str()), (7, "Bronze 60 HMO"));
-        assert_eq!(check_schema()["properties"]["document"]["enum"], json!(["sbc", "other"]));
+        assert_eq!(bandit_insurance::printed::plan_schema()["properties"]["document"]["enum"], json!(["sbc", "other"]));
     }
 
     #[test]
@@ -360,23 +334,26 @@ mod tests {
         assert!(mismatch(&p, &printed("sbc", "Blue Shield of California", "Gold 80 PPO")).unwrap().contains("Gold 80 PPO"));
     }
 
-    #[test]
-    fn printed_names_need_a_page_on_the_document() {
-        let v = json!({"document": "sbc", "insurer": {"text": "Kaiser Permanente", "page": 1}, "plan": {"text": "Bronze 60 HMO", "page": 9}, "plan_year": {"text": "", "page": 0}});
-        assert!(check_printed(&v, 8).unwrap_err()[0].contains("plan page 9"));
-        assert_eq!(check_printed(&v, 1).unwrap().plan, "Bronze 60 HMO", "a count of 1 means the pages are unknown");
+    /// The text of a two-page SBC, and the reader's answer for it naming `plan` on page `page`.
+    fn sbc(plan: &str, page: u32) -> (Vec<String>, Value) {
+        let texts = vec![
+            "Kaiser Permanente: Bronze 60 HMO Coverage Period: 01/01/2026 - 12/31/2026\nSummary of Benefits and Coverage".into(),
+            "Kaiser Permanente: Gold 80 HMO is a different plan.".into(),
+        ];
+        let read = json!({"clauses": [], "printed": {"document": "sbc", "insurer": {"text": "Kaiser Permanente", "page": 1}, "plan": {"text": plan, "page": page}, "plan_year": {"text": "01/01/2026 - 12/31/2026", "page": 1}}});
+        (texts, read)
     }
 
-    #[tokio::test]
-    async fn a_pdf_of_another_plan_is_passed_over() {
+    #[test]
+    fn the_reading_must_print_the_typed_plan_on_its_page() {
         let p = payload("Kaiser Permanente", "Bronze 60 HMO");
-        let other = json!({"document": "sbc", "insurer": {"text": "Kaiser Permanente", "page": 1}, "plan": {"text": "Gold 80 HMO", "page": 1}, "plan_year": {"text": "2026", "page": 1}});
-        let model = FakeModel::new(vec![Ok(other)]);
-        let mut calls = Vec::new();
-        let why = check_pdf(&model, &p, b"%PDF-1.7 <</Type /Page>>", &mut calls).await.unwrap_err();
-        assert!(why.contains("Gold 80 HMO"), "{why}");
-        assert_eq!(calls.len(), 1);
-        let body = &model.seen.lock().unwrap()[0].1;
-        assert_eq!(body["messages"][0]["content"][0]["type"], "document");
+        let (texts, read) = sbc("Bronze 60 HMO", 1);
+        let printed = judge(&p, &read, &texts).unwrap();
+        assert_eq!((printed.insurer.as_str(), printed.plan.as_str(), printed.year.as_str()), ("Kaiser Permanente", "Bronze 60 HMO", "01/01/2026 - 12/31/2026"));
+        let (texts, read) = sbc("Gold 80 HMO", 2);
+        assert!(judge(&p, &read, &texts).unwrap_err().contains("Gold 80 HMO"), "another plan's document is passed over");
+        let (texts, read) = sbc("Bronze 60 HMO", 2);
+        assert_eq!(judge(&p, &read, &texts).unwrap_err(), "the plan \"Bronze 60 HMO\" is not on page 2");
+        assert!(judge(&p, &json!({"clauses": []}), &texts).unwrap_err().contains("not a Summary of Benefits"), "a reading without printed names");
     }
 }

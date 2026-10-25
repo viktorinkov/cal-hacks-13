@@ -690,8 +690,9 @@ pub fn venue_policy_schema() -> serde_json::Value {
 }
 
 /// The JSON schema `bandit-read-document` gives the reader for `kind`: the
-/// venue policy's terms and clauses, a hospital report's record, or only the
-/// clauses of an attendee's health plan or own policy.
+/// venue policy's terms and clauses; what an attendee's health plan prints
+/// about itself, and its clauses; the coverage forms a PDF that a venue
+/// policy lookup fetched holds; or a hospital report's record.
 pub fn document_schema(kind: &str) -> serde_json::Value {
     if kind == crate::report::HOSPITAL_REPORT {
         return crate::report::report_schema();
@@ -700,10 +701,13 @@ pub fn document_schema(kind: &str) -> serde_json::Value {
     if kind == VENUE_POLICY {
         return venue;
     }
+    if kind == crate::printed::COVERAGE_FORM {
+        return crate::printed::form_schema();
+    }
     serde_json::json!({
         "type": "object",
-        "required": ["clauses"],
-        "properties": {"clauses": venue["properties"]["clauses"].clone()}
+        "required": ["printed", "clauses"],
+        "properties": {"printed": crate::printed::plan_schema(), "clauses": venue["properties"]["clauses"].clone()}
     })
 }
 
@@ -913,14 +917,16 @@ mod tests {
     }
 
     #[test]
-    fn an_attendee_document_is_read_for_its_clauses_only() {
+    fn a_health_plan_is_read_for_what_it_prints_and_its_clauses() {
         assert_eq!(document_schema(VENUE_POLICY), venue_policy_schema());
         for kind in [HEALTH_PLAN] {
             let s = document_schema(kind);
-            assert_eq!(s["required"], serde_json::json!(["clauses"]));
-            assert_eq!(s["properties"].as_object().unwrap().len(), 1);
+            assert_eq!(s["required"], serde_json::json!(["printed", "clauses"]));
+            assert_eq!(s["properties"]["printed"], crate::printed::plan_schema());
             assert_eq!(s["properties"]["clauses"], venue_policy_schema()["properties"]["clauses"]);
         }
+        assert_eq!(document_schema(crate::printed::COVERAGE_FORM), crate::printed::form_schema());
+        assert!(!DOCUMENT_KINDS.contains(&crate::printed::COVERAGE_FORM), "the module never files a fetched coverage form");
         let read: PolicyRead = serde_json::from_value(serde_json::json!({"clauses": [{"section": "limits", "page": 1, "text": "x"}]})).unwrap();
         assert_eq!((read.terms.len(), read.clauses.len()), (0, 1));
     }

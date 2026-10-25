@@ -11,8 +11,8 @@ use serde_json::{Value, json};
 
 use crate::{ClaimsIndex, INFERENCE_ID, check_id, hits};
 
-/// Most pages a document can have (the module accepts 1 to 50).
-const MAX_PAGES: usize = 50;
+/// Most pages a document can have: the module files 1 to 50, and a lookup checks a fetched PDF of up to 100.
+pub const MAX_DOCUMENT_PAGES: usize = 100;
 
 /// One page as stored, after the pipeline.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -65,7 +65,7 @@ impl ClaimsIndex {
     /// Every stored page of a document, in page order.
     pub async fn document_pages(&self, document_hash: &str) -> Result<Vec<StoredPage>> {
         let query = json!({
-            "size": MAX_PAGES,
+            "size": MAX_DOCUMENT_PAGES,
             "query": { "term": { "document_hash": document_hash } },
             "sort": [{ "page": "asc" }],
             "_source": ["page", "text", "needs_transcription"]
@@ -76,12 +76,28 @@ impl ClaimsIndex {
 
     /// The workflow's answer for a document.
     pub async fn document_terms(&self, document_hash: &str) -> Result<Value> {
-        check_id(document_hash)?;
-        let v = self.call(Method::GET, &format!("{}/_doc/{document_hash}", self.terms_index()), None).await?;
-        if v["found"] != true {
-            bail!("{} has no answer for {document_hash}", self.terms_index());
+        match self.saved_terms(document_hash).await? {
+            Some(answer) => Ok(answer),
+            None => bail!("{} has no answer for {document_hash}", self.terms_index()),
         }
-        Ok(v["_source"].clone())
+    }
+
+    /// The workflow's answer for a document, if one is saved.
+    pub async fn saved_terms(&self, document_hash: &str) -> Result<Option<Value>> {
+        check_id(document_hash)?;
+        let query = json!({ "size": 1, "query": { "ids": { "values": [document_hash] } } });
+        let v = self.call(Method::POST, &format!("{}/_search", self.terms_index()), Some(query)).await?;
+        Ok(hits(&v).next().map(|h| h["_source"].clone()))
+    }
+
+    /// Deletes a document's pages and answer, for a PDF a lookup only checked.
+    pub async fn delete_document(&self, document_hash: &str) -> Result<()> {
+        check_id(document_hash)?;
+        let body = json!({ "query": { "term": { "document_hash": document_hash } } });
+        for index in [self.documents_index(), self.terms_index()] {
+            self.call(Method::POST, &format!("{index}/_delete_by_query?refresh=true"), Some(body.clone())).await?;
+        }
+        Ok(())
     }
 }
 
@@ -145,7 +161,7 @@ fn terms_mappings() -> Value {
     json!({
         "dynamic": false,
         "properties": {
-            "document_hash": kw, "kind": kw, "model": kw, "pages_indexed": { "type": "integer" },
+            "document_hash": kw, "kind": kw, "reader": kw, "model": kw, "pages_indexed": { "type": "integer" },
             "read": { "type": "object", "enabled": false }
         }
     })

@@ -433,7 +433,7 @@ Public, and not copied. Read by `social_tick`; not used for safety. Fields `key`
 
 #### Work and files group
 
-`job`: one unit of slow or external work, the job queue. Queued by feature reducers through the module's internal enqueue function, never by a client; changed by the job reducers (role `worker`) and `job_reaper`. [Architecture: Queues](../1-overview/Architecture.md#queues) lists all 18 job kinds, the reducer that queues each one and the reducer that takes its result.
+`job`: one unit of slow or external work, the job queue. Queued by feature reducers through the module's internal enqueue function, never by a client; changed by the job reducers (role `worker`) and `job_reaper`. [Architecture: Queues](../1-overview/Architecture.md#queues) lists all 17 job kinds, the reducer that queues each one and the reducer that takes its result.
 
 Private; read through `worker_jobs` (workers). Not copied.
 

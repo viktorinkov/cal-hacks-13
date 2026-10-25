@@ -25,7 +25,7 @@ pub mod proposer;
 pub mod reader;
 pub use clause_search::{CLAUSE_SECTIONS, ClauseHit, sections_for_kind};
 pub use clauses::PolicyClause;
-pub use documents::StoredPage;
+pub use documents::{MAX_DOCUMENT_PAGES, StoredPage};
 pub use proposer::ClaimCopy;
 pub use reader::Kibana;
 

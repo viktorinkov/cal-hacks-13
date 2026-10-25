@@ -391,19 +391,19 @@ def insurance(y0):
     att_pdf = B(Bx, 0, "attendee policy\nhealth plan, belongings\nPDF", "note", w=460, h=260, wordmark=FILE,
                 mark_h=100, cy=p[3])
     lookup = B(A, 0, "plan lookup\nfinds policy PDFs", "ext", w=400, h=220, wordmark=BRIGHT, mark_h=56, cy=p[2], **mk)
-    pick = B(A, 0, "Claude\npicks, checks plan", "claude", w=400, h=240, wordmark=CLAUDE, mark_h=90, cy=p[3], **mk)
+    pick = B(A, 0, "Claude\npicks plan PDF", "claude", w=400, h=240, wordmark=CLAUDE, mark_h=90, cy=p[3], **mk)
     H(organizer, venue_pdf, "uploads at setup")
     H(attendee, report, "uploads with claim")
     V(attendee, lookup, "names plan", x=attendee.cx)
     V(lookup, pick, "policy PDFs", x=lookup.cx)
-    H(pick, att_pdf, "checked plan", y=att_pdf.cy)
+    H(pick, att_pdf, "picked PDF", y=att_pdf.cy)
 
     # 2. the Evidence Engine reads every PDF
     top, bot = p[0] - 130, p[3] + 130
     Z(C1 - 40, top - 70, C2 + 560 - C1 + 80, bot + 40 - top + 70, "Evidence Engine", "ext", logo_=ELASTIC)
     ingest = B(C1, top, "ingest pipeline\nPDF text, pages", "ext", w=520, h=bot - top, wordmark=ELASTIC,
                mark_h=70, **mk)
-    reader = B(C2, top, "Agent Builder\nWorkflows\nreads PDFs", "ext", w=520, h=p[1] + 130 - top, wordmark=ELASTIC,
+    reader = B(C2, top, "Agent Builder\nWorkflows\nreads, checks PDFs", "ext", w=520, h=p[1] + 130 - top, wordmark=ELASTIC,
                mark_h=70, **mk)
     clauses = B(C2, 860, "policy clauses\nfall, SOS, property\ntheft, breakage", "ext", w=520, h=370, wordmark=HEART,
                 mark_h=90, **mk)
@@ -557,7 +557,6 @@ def insurance(y0):
 # ---------------------------------------------------------------- Queues
 CLAUDE_JOBS = [  # job kind, result reducer, what Claude does
     ("medical_extract", "apply_medical_extract", "reads medical PDF"),
-    ("claim_record_extract", "apply_medical_record", "reads hospital report"),
     ("clinic_report", "file_clinic_report", "writes hospital report"),
     ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
     ("claim_draft", "attach_claim_letters", "drafts letters"),
