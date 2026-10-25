@@ -11,7 +11,7 @@
         "x": 0,
         "y": 0,
         "w": 16,
-        "h": 11
+        "h": 14
       },
       "type": "markdown",
       "config": {
@@ -23,7 +23,7 @@
         "x": 16,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -46,7 +46,7 @@
         "x": 24,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -69,7 +69,7 @@
         "x": 32,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -92,7 +92,7 @@
         "x": 40,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -113,7 +113,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 11,
+        "y": 14,
         "w": 48,
         "h": 14
       },
@@ -161,7 +161,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 25,
+        "y": 28,
         "w": 24,
         "h": 14
       },
@@ -171,10 +171,10 @@
         "title": "Outcomes, tonight and past",
         "layers": [
           {
-            "type": "bar_stacked",
+            "type": "bar_horizontal",
             "data_source": {
               "type": "esql",
-              "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\"), outcome = CASE(outcome == \"\" OR outcome IS NULL, \"open\", outcome) | STATS docs = COUNT() BY outcome, claims"
+              "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\"), outcome = CASE(outcome == \"\" OR outcome IS NULL, \"open\", outcome) | STATS docs = COUNT() BY outcome, claims | EVAL outcome = CONCAT(outcome, \", \", claims) | SORT outcome"
             },
             "x": {
               "column": "outcome"
@@ -183,10 +183,7 @@
               {
                 "column": "docs"
               }
-            ],
-            "breakdown_by": {
-              "column": "claims"
-            }
+            ]
           }
         ]
       }
@@ -194,7 +191,7 @@
     {
       "grid": {
         "x": 24,
-        "y": 25,
+        "y": 28,
         "w": 24,
         "h": 14
       },
@@ -204,22 +201,19 @@
         "title": "Incident kinds, tonight and past",
         "layers": [
           {
-            "type": "bar_stacked",
+            "type": "bar_horizontal",
             "data_source": {
               "type": "esql",
-              "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\") | STATS docs = COUNT() BY incident_kind, claims"
+              "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\") | STATS docs = COUNT() BY incident_kind, claims | EVAL incident = CONCAT(incident_kind, \", \", claims) | SORT incident"
             },
             "x": {
-              "column": "incident_kind"
+              "column": "incident"
             },
             "y": [
               {
                 "column": "docs"
               }
-            ],
-            "breakdown_by": {
-              "column": "claims"
-            }
+            ]
           }
         ]
       }
@@ -227,7 +221,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 39,
+        "y": 42,
         "w": 24,
         "h": 14
       },
@@ -257,7 +251,7 @@
     {
       "grid": {
         "x": 24,
-        "y": 39,
+        "y": 42,
         "w": 24,
         "h": 14
       },
@@ -267,7 +261,7 @@
         "title": "Validation on the way in",
         "data_source": {
           "type": "esql",
-          "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\"), result = CASE(validation.valid, \"valid\", \"flagged\"), errors = COALESCE(MV_CONCAT(validation.errors, \", \"), \"\") | STATS docs = COUNT() BY result, errors, claims | SORT result, claims"
+          "query": "FROM bandit-claims | EVAL claims = CASE(source == \"live\", \"tonight\", \"past\"), result = CASE(validation.valid, \"valid\", \"flagged\"), errors = COALESCE(MV_CONCAT(validation.errors, \", \"), \"none\") | STATS docs = COUNT() BY result, errors, claims | SORT result, claims"
         },
         "rows": [
           {
