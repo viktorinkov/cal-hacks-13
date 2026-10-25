@@ -2,7 +2,7 @@
 
 This file is for the coding agent that takes over Band1t (the repo still says BandIt in many places) when the Claude setup stops. It holds only what the repository does not already say: Viktor's standing rules from outside the repo, his decisions from the chats, the work that was unfinished at handoff, the steps that only work on Viktor's Mac, where the credentials live, and the research. For how the system works, read the files under "Read first". Do not copy their content into this file.
 
-Snapshot: 2026-10-25 07:15 UTC, vik-e2e at `86060eb` plus this file, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
+Snapshot: 2026-10-25 09:10 UTC, vik-e2e at `26ed950` plus this file, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
 
 ## Read first
 
@@ -15,7 +15,7 @@ Snapshot: 2026-10-25 07:15 UTC, vik-e2e at `86060eb` plus this file, deployed on
 | `scripts/e2e/README.md` | how to start everything, publish the module, set up the database and walk the happy path |
 | `LINKS.md` | the live links, band codes, Kibana dashboards and the current Excalidraw board link |
 | `deploy/setup.sh`, `deploy/autodeploy.sh`, `scripts/deploy-vm` | the Vultr VM, Caddy (band1t.vip and dev.band1t.vip), systemd and the auto-deploy of vik-e2e |
-| `deploy/cloud-setup.sh` | the old Claude cloud environment, useful if you build a Linux environment for Codex |
+| `deploy/cloud-setup.sh` | the old Claude cloud environment, useful if you build a Linux environment for Codex. It installs `spacetimedb-standalone` next to the SpacetimeDB 2.13 CLI, which builds the module through `--module-path` (see `crates/bandit-bindings/regen.sh`) |
 | `frontend/README.md` | Eddie's desk (the command center) |
 | `diagrams/generator/LABELS.md`, `handoff/research/devpost/TERMS.md` | the wording rules for diagrams and for the Devpost |
 
@@ -246,6 +246,10 @@ Open PRs: #22 (vik-e2e into main, the team's PR), #41 (`vik-cloud-config` into m
 - **Index fetched PDFs for search by meaning**: shipped (`443bb8f`, `7525163`). Fetched plan and venue PDFs are chunked into `bandit-policy-clauses` and each check cites the chunk it matched. A PDF that any lookup kept now stays in Elastic when another lookup passes it over.
 - **Reuse a plan**: shipped (merge `c2f0aae`) and published: Maincloud has `plan_lookup.reused_from`.
 - **Evacuate the live run**: shipped (merge `86060eb`) and published. An Evacuate button on Viktor's Live tab sends the live run's crowd to the exits (`evacuate_live_run`, `live_evacuation`). Left: watch one evacuation on dev.band1t.vip.
+- **Shipped between 07:15 and 09:10**: crowd purchases during live runs (`8b63c89`), the event finance dashboard and merch shipping addresses (`530820a`), unified diagram styling with the app screenshots replaced (`7c7a6f1`, `831d901`), a sponsor booth no longer counts as a shared interest in the recap (`54d546a`), and unscripted falls now get the left-wrist urgent care record (`26ed950`). Eddie added signup with a shipping address and medical uploads, the 3D event graph and the hardware ring on the floor (`48dea26`, `fa04be8`).
+- **Venue policy**: re-filed on Maincloud with the excess wording, as `policy_document` 8 (`NWM-GL-2026-0413`, excess cover).
+- **Clinic records for test claims**: file them through `POST /api/dev/record/{claim}/{template}` (test mode on), which renders the record for the claim's incident date and files it as the medic. The Claims tab calls it.
+- **Board link**: `README.md` now links the board and `diagrams/bandit-system-design.excalidraw`, but its link (`EUInNms8MAMRyj9i6BWbt`, 07:10) is older than the one in `LINKS.md` (`7jt0ksYhCcCFpyw2cyPcR`, 08:34). The README is Viktor's file, so tell him rather than editing it.
 - **Hospital report**: merged (`0de153d`) and published. Maincloud has `apply_hospital_report` and no longer `apply_medical_record`. Left: check that no claim is stuck in `ReadingRecord`, and apply its 12 Devpost edits.
 - **Queues**: once the hospital report is live (it is), move `claim_record_extract` to `document_read` under Elastic in the System Design docs, the Excalidraw board and the Devpost.
 - **Complicated claims**: shipped. Two complications are designed but not built: policies that disagree on who pays first, and two clauses that conflict. The venue-costs work above covers part of the first.
@@ -274,15 +278,16 @@ Open PRs: #22 (vik-e2e into main, the team's PR), #41 (`vik-cloud-config` into m
 
 ## Pending verifications
 
+Verified live by 09:05: plan reuse, and the recap reason lines in "Also there with you". That list is empty by design for crowd bands.
+
 Nobody confirmed these:
 
 - No claim on Maincloud is stuck in `ReadingRecord` after the hospital report change.
-- "Also there with you" ranks by shared interests on the live database. The check: reopen the event, move test bands 90, 92 and 93 to the sponsor row (station 103) for 6.5 minutes with no run, move 92 and 93 to station 0, start an 8-minute Live run (1,000 people, speed 8, Start fresh off) with band 90 still at the sponsor row, then read the recaps for Jordan, Sam and Lee through `/api/recap` and check each reason line.
 - A rule proposal reaches "proposed" after the next scripted claims run: `spacetime sql bandit-calhacks13-sp82j "SELECT id, status, ceiling_cents, rule FROM rule_proposal"`.
-- The plan and venue checks on the VM (in `/opt/bandit` with `BANDIT_DATA_DIR=/var/lib/bandit ./target/debug/bandit-workers --once`): `plan_lookup` for Blue Shield of California, Silver 70 PPO, CA; then `document_read` with the returned file hash, which should say the reader read this PDF already; then `venue_policy_lookup` for Harborline Casualty, CG 00 01 and CP 00 10.
+- The venue check on the VM (in `/opt/bandit` with `BANDIT_DATA_DIR=/var/lib/bandit ./target/debug/bandit-workers --once`): `venue_policy_lookup` for Harborline Casualty, CG 00 01 and CP 00 10.
 - A whole claim on band1t.vip in Viktor's Chrome: file as the attendee, the evidence timeline, Claude's decision, the organizer's review and the payout.
 - The one-time venue floor load for realistic movement ran on Maincloud.
-- dev.band1t.vip/cc/ serves Eddie's desk now that `frontend/` is on vik-e2e. It returned 404 at 06:35.
+- dev.band1t.vip/cc/ serves Eddie's desk now that `frontend/` is on vik-e2e. It still returned 404 at 09:10, while band1t.vip/cc/ works.
 
 ## Research
 
