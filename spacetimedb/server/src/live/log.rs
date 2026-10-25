@@ -1,6 +1,6 @@
 //! The decision history: one row each time someone or something decides about an incident or its claim, with
 //! who decided, what and why. Bands raise incidents, the medic treats, Claude reads the clinic record, the
-//! Evidence Engine checks the evidence against past claims, Claude investigates it source by source and
+//! Evidence Engine checks the evidence and finds the policy clauses, Claude investigates it source by source and
 //! decides, the Decision Engine holds that decision to its limits in code, and the organizer approves and
 //! teaches a rule. The 3D page lists it live.
 
@@ -66,8 +66,8 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         return;
     }
     let (actor, who, what, why): (&str, String, String, String) = match c.status {
-        // A property claim is saved once before its evidence is read; it opens on the next save.
-        ClaimStatus::AwaitingRecord if c.cover_kind == "property" => return,
+        // A claim with no hospital report is saved once before its evidence is read; it opens on the next save.
+        ClaimStatus::AwaitingRecord if c.cover_kind != "medical_payments" => return,
         ClaimStatus::AwaitingRecord => (
             "Decision Engine",
             format!("claim {}", c.id),
@@ -75,7 +75,19 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
             "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
         ),
         ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
-        ClaimStatus::Verifying if c.cover_kind == "property" => (
+        ClaimStatus::Verifying if c.incident_kind == "theft" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
+            "Decision Engine",
+            format!("claim {}", c.id),
+            format!("Theft claim opened for {}", format_cents(c.cost_cents)),
+            "venue property taken: the venue's property cover answers it where its theft clause covers the loss".into(),
+        ),
+        ClaimStatus::Verifying if c.incident_kind == "belongings" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
+            "Decision Engine",
+            format!("claim {}", c.id),
+            format!("Claim opened for {}'s own things: {}", person(c), format_cents(c.cost_cents)),
+            "the venue's policy excludes property in its care; the attendee's own policy answers it".into(),
+        ),
+        ClaimStatus::Verifying if c.cover_kind == "property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
             format!("claim {}", c.id),
             format!("Property claim opened for {}", format_cents(c.payout_cents)),
@@ -104,6 +116,9 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
                 ),
                 _ => ("organizer", c.routed_to_name.clone(), format!("Approved: {} to {}", format_cents(c.payout_cents), person(c)), paying.into()),
             }
+        }
+        ClaimStatus::Settled if c.incident_kind == "theft" => {
+            ("wallet", "Ledger".into(), format!("Stolen property paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
         }
         ClaimStatus::Settled if c.cover_kind == "property" => {
             ("wallet", "Ledger".into(), format!("Repair paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
@@ -137,10 +152,11 @@ pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
     );
 }
 
-/// The Evidence Engine's checks and the similar past claims it found.
-pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], precedents: usize) {
+/// The Evidence Engine's checks and the policy clauses it found.
+pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], clauses: usize) {
     let what = if failed.is_empty() { "Checked the evidence: nothing failed".to_string() } else { format!("Flagged: {}", failed.join(", ")) };
-    record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{precedents} similar past claims found"));
+    let policies = if c.cover_kind == "personal_property" { "the venue's policy and the attendee's own" } else { "the venue's policy" };
+    record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{clauses} clauses of {policies} bear on this {} claim", c.incident_kind));
 }
 
 /// Code set Claude's decision aside: it failed validation even after one more try.

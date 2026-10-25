@@ -1,27 +1,28 @@
 //! Elastic side of BandIt's insurance claims flow.
 //!
 //! SpacetimeDB holds every claim and decides every action. This crate keeps a
-//! one-way, de-identified copy of each claim pack in the `bandit-claims` index:
-//! the `bandit-claims-validate` ingest pipeline checks each evidence document on
-//! the way in, and a semantic query on the narrative ranks similar past claims
-//! as precedents. Only codes, amounts, zones, times and a narrative built by
-//! [`narrative_for`] go in; never names or medical free text.
+//! one-way, de-identified copy of each claim pack in the `bandit-claims` index,
+//! which the `bandit-claims-validate` ingest pipeline checks on the way in, and
+//! searches the clauses of the venue's and the attendee's policies that bear on
+//! a claim ([`ClaimsIndex::search_clauses`], in `clause_search.rs`). Only codes,
+//! amounts, zones, times and a narrative built by [`narrative_for`] go into the
+//! copy; never names or free text a person typed.
 
 use std::fmt;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue};
+use reqwest::header::{AUTHORIZATION, HeaderValue};
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-mod history;
-pub use history::history_claims;
+mod clause_search;
+pub use clause_search::{CLAUSE_SECTIONS, ClauseHit, sections_for_kind};
 
 /// Index prefix used when `ELASTIC_INDEX_PREFIX` is not set (Maincloud).
 pub const DEFAULT_PREFIX: &str = "bandit";
-/// Index holding live and historical claim documents, under the default prefix.
+/// Index holding the claim copies, under the default prefix.
 pub const INDEX: &str = "bandit-claims";
 /// Ingest pipeline that validates every claim document without rejecting it, under the default prefix.
 pub const PIPELINE: &str = "bandit-claims-validate";
@@ -30,6 +31,18 @@ pub const PIPELINE: &str = "bandit-claims-validate";
 pub const INFERENCE_ID: &str = ".jina-embeddings-v5-text-small";
 /// Outcomes a decided claim can carry. Open claims have an empty outcome.
 pub const OUTCOMES: [&str; 3] = ["auto_settled", "approved", "refused"];
+/// Every incident kind, and the cover that answers it: injuries from the
+/// venue's medical payments cover, broken or taken venue property from its
+/// property cover, an attendee's own things from the attendee's own policy.
+pub const KIND_COVERS: [(&str, &str); 5] = [
+    ("sos", "medical_payments"),
+    ("fall", "medical_payments"),
+    ("property", "property"),
+    ("theft", "property"),
+    ("belongings", "personal_property"),
+];
+/// The kinds that are a loss of property, whose copy must carry the loss staff logged.
+pub const LOSS_KINDS: [&str; 3] = ["property", "theft", "belongings"];
 
 const VALIDATE_SCRIPT: &str = include_str!("validate.painless");
 
@@ -37,17 +50,16 @@ const VALIDATE_SCRIPT: &str = include_str!("validate.painless");
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClaimDoc {
-    /// `claim-<claim_id>-v<pack_version>` for live claims ([`ClaimDoc::live_id`]),
-    /// `history-NN` for seeded ones.
+    /// `claim-<claim_id>-v<pack_version>` ([`ClaimDoc::live_id`]).
     pub doc_id: String,
     pub claim_id: i64,
     pub pack_version: i32,
-    /// `live` or `history`.
+    /// Always `live`: every copy is a claim of this event.
     pub source: String,
     pub venue: String,
-    /// `sos`, `fall` or `property`.
+    /// One of [`KIND_COVERS`]: `sos`, `fall`, `property`, `theft` or `belongings`.
     pub incident_kind: String,
-    /// `medical_payments` or `property`.
+    /// `medical_payments`, `property` or `personal_property`.
     pub cover_kind: String,
     pub zone_id: i64,
     pub zone_name: String,
@@ -66,6 +78,11 @@ pub struct ClaimDoc {
     pub billed_cents: i64,
     pub covered_cents: i64,
     pub payout_cents: i64,
+    /// The loss staff logged for a property, theft or belongings claim: the
+    /// repair cost or the item's value. 0 for an injury.
+    pub cost_cents: i64,
+    /// Staff named the attendee who broke or took it.
+    pub responsible_named: bool,
     /// Empty while open, then one of [`OUTCOMES`].
     pub outcome: String,
     /// De-identified text built by [`narrative_for`].
@@ -87,93 +104,117 @@ pub struct ValidationResult {
     pub errors: Vec<String>,
 }
 
-/// A decided claim ranked by narrative meaning.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SimilarClaim {
-    pub doc_id: String,
-    pub claim_id: i64,
-    pub source: String,
-    pub incident_kind: String,
-    pub zone_name: String,
-    pub narrative: String,
-    pub outcome: String,
-    pub payout_cents: i64,
-    pub score: f64,
-}
-
-/// How the decided claims of one incident kind ended, from ES|QL.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct OutcomeStats {
-    pub outcome: String,
-    pub claims: i64,
-    pub median_paid_cents: i64,
-    pub max_paid_cents: i64,
-}
-
 /// Plain inputs for [`narrative_for`]. Every text is a code-built phrase, never
 /// a name or free text typed by a person.
 #[derive(Clone, Debug, Default)]
 pub struct NarrativeParts<'a> {
-    /// `sos`, `fall` or `property`.
+    /// `sos`, `fall`, `property`, `theft` or `belongings`.
     pub incident_kind: &'a str,
     pub zone_name: &'a str,
     /// Local time `HH:MM`.
     pub local_time: &'a str,
     /// Generic schedule context, for example "during a headline set".
     pub setting: Option<&'a str>,
-    /// Light-circle witnesses in the same zone (not used for property).
+    /// Light-circle witnesses in the same zone (injuries only).
     pub witnesses_in_zone: u32,
     /// Minutes from the incident to the first staff note.
     pub minutes_to_staff_note: Option<u32>,
-    /// `(code, short description)`, for example `("S63.501A", "right wrist sprain")`.
+    /// `(code, short description)`, for example `("S63.501A", "right wrist sprain")` (injuries only).
     pub diagnoses: &'a [(&'a str, &'a str)],
-    /// What was damaged, for property claims.
+    /// A code-built phrase for what was broken or taken; the kind's own wording when empty.
     pub property: Option<&'a str>,
+    /// The loss staff logged for a property, theft or belongings claim, in cents.
+    pub loss_cents: Option<u64>,
+    /// Staff named the attendee who broke or took it (every kind but an injury).
+    pub responsible_named: bool,
     /// Cost text, for example "first aid only" or "repair estimate attached".
     pub cost: Option<&'a str>,
     /// A finding from the checks, for example where the witnesses actually were.
     pub finding: Option<&'a str>,
 }
 
-/// Builds the de-identified narrative stored in `narrative`, for example
-/// "Fall in zone Main stage left at 22:10 during a headline set; 3 light-circle
-/// witnesses in the same zone; medic note within 12 minutes; right wrist sprain
-/// S63.501A; first aid only."
+/// Builds the de-identified narrative stored in `narrative`, one template per
+/// incident kind, for example:
+///
+/// - "Fall in zone Main stage left at 22:10 during a headline set; 3
+///   light-circle witnesses in the same zone; medic note within 12 minutes;
+///   right wrist sprain S63.501A; first aid only."
+/// - "Theft in zone Sponsor row at 21:10: venue or sponsor property taken;
+///   staff note within 4 minutes; loss $1,199.00 logged by staff; staff named
+///   an attendee."
+///
+/// The narrative is also the query text of the policy clause search, so each
+/// template uses the words a policy uses for that kind of loss.
 pub fn narrative_for(p: &NarrativeParts) -> String {
     let setting = p.setting.map(|s| format!(" {s}")).unwrap_or_default();
+    let at = format!("in zone {} at {}{setting}", p.zone_name, p.local_time);
     let note = |who: &str| match p.minutes_to_staff_note {
         Some(1) => format!("{who} note within 1 minute"),
         Some(m) => format!("{who} note within {m} minutes"),
         None => format!("no {who} note"),
     };
+    let what = |default: &'static str| p.property.filter(|s| !s.trim().is_empty()).unwrap_or(default);
     let mut parts = Vec::new();
-    if p.incident_kind == "property" {
-        let what = p.property.unwrap_or("equipment damaged");
-        parts.push(format!("Property damage in zone {} at {}{setting}: {what}", p.zone_name, p.local_time));
-        parts.push(note("staff"));
-    } else {
-        let head = match p.incident_kind {
-            "sos" => "SOS",
-            "fall" => "Fall",
-            _ => "Incident",
-        };
-        parts.push(format!("{head} in zone {} at {}{setting}", p.zone_name, p.local_time));
-        parts.push(match p.witnesses_in_zone {
-            0 => "no light-circle witnesses in the same zone".to_string(),
-            1 => "1 light-circle witness in the same zone".to_string(),
-            n => format!("{n} light-circle witnesses in the same zone"),
-        });
-        parts.push(note("medic"));
-        parts.push(if p.diagnoses.is_empty() {
-            "no diagnosis recorded".to_string()
-        } else {
-            p.diagnoses.iter().map(|(code, what)| format!("{what} {code}")).collect::<Vec<_>>().join(", ")
-        });
+    let loss = |label: &str| match p.loss_cents {
+        Some(c) if c > 0 => format!("{label} {} logged by staff", dollars(c)),
+        _ => "no cost logged".to_string(),
+    };
+    let named = if p.responsible_named { "staff named an attendee" } else { "no attendee named" };
+    match p.incident_kind {
+        "property" => {
+            parts.push(format!("Property damage {at}: {}", what("venue or sponsor equipment broken")));
+            parts.push(note("staff"));
+            parts.push(loss("repair cost"));
+            parts.push(named.to_string());
+        }
+        "theft" => {
+            parts.push(format!("Theft {at}: {}", what("venue or sponsor property taken")));
+            parts.push(note("staff"));
+            parts.push(loss("loss"));
+            parts.push(named.to_string());
+        }
+        "belongings" => {
+            parts.push(format!("An attendee's own things lost, stolen or broken {at}: {}", what("personal property of a guest")));
+            parts.push(note("staff"));
+            parts.push(loss("value"));
+            parts.push(named.to_string());
+        }
+        kind => {
+            let head = match kind {
+                "sos" => "SOS",
+                "fall" => "Fall",
+                _ => "Incident",
+            };
+            parts.push(format!("{head} {at}"));
+            parts.push(match p.witnesses_in_zone {
+                0 => "no light-circle witnesses in the same zone".to_string(),
+                1 => "1 light-circle witness in the same zone".to_string(),
+                n => format!("{n} light-circle witnesses in the same zone"),
+            });
+            parts.push(note("medic"));
+            parts.push(if p.diagnoses.is_empty() {
+                "no diagnosis recorded".to_string()
+            } else {
+                p.diagnoses.iter().map(|(code, what)| format!("{what} {code}")).collect::<Vec<_>>().join(", ")
+            });
+        }
     }
     parts.extend(p.cost.map(str::to_string));
     parts.extend(p.finding.map(str::to_string));
     format!("{}.", parts.join("; "))
+}
+
+/// `$1,199.00` from 119900.
+fn dollars(cents: u64) -> String {
+    let whole = (cents / 100).to_string();
+    let mut grouped = String::new();
+    for (i, c) in whole.chars().enumerate() {
+        if i > 0 && (whole.len() - i) % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(c);
+    }
+    format!("${grouped}.{:02}", cents % 100)
 }
 
 /// Client for the `<prefix>-claims` index. Debug output never shows the API key.
@@ -202,8 +243,9 @@ impl ClaimsIndex {
             .with_prefix(DEFAULT_PREFIX))
     }
 
-    /// Uses `<prefix>-claims` and `<prefix>-claims-validate`, so a local run
-    /// (`bandit-e2e`) never mixes its claims into the live index's precedents.
+    /// Uses `<prefix>-claims`, `<prefix>-claims-validate` and
+    /// `<prefix>-policy-clauses`, so a local run (`bandit-e2e`) never mixes its
+    /// claims or clauses into the live indices.
     pub fn with_prefix(mut self, prefix: &str) -> Self {
         let prefix = prefix.trim().trim_end_matches('-');
         self.index = format!("{prefix}-claims");
@@ -225,14 +267,16 @@ impl ClaimsIndex {
         Ok(Self::new(&url, &key)?.with_prefix(prefix.as_deref().unwrap_or(DEFAULT_PREFIX)))
     }
 
-    /// Creates or updates the pipeline, and creates the index if it is missing
-    /// (an existing index gets the current mapping, which only adds fields).
+    /// Creates or updates the pipeline, and creates the index if it is missing.
+    /// An existing index gets the current mapping, which only adds fields, and
+    /// loses the past claims an earlier build seeded into it.
     pub async fn ensure_setup(&self) -> Result<()> {
         self.call(Method::PUT, &format!("_ingest/pipeline/{}", self.pipeline), Some(pipeline_body())).await?;
         let (status, _) = self.send(self.req(Method::HEAD, &self.index)).await?;
         match status {
             StatusCode::OK => {
                 self.call(Method::PUT, &format!("{}/_mapping", self.index), Some(mappings())).await?;
+                self.delete_past_claims().await?;
             }
             StatusCode::NOT_FOUND => {
                 let body = json!({ "settings": { "index.default_pipeline": self.pipeline }, "mappings": mappings() });
@@ -240,7 +284,6 @@ impl ClaimsIndex {
                 if !status.is_success() && v["error"]["type"] != "resource_already_exists_exception" {
                     bail!("PUT {} returned {status}: {}", self.index, short(&v));
                 }
-                self.seed_history().await?;
             }
             other => bail!("HEAD {} returned {other}", self.index),
         }
@@ -257,53 +300,6 @@ impl ClaimsIndex {
         serde_json::from_value(got["_source"]["validation"].clone()).context("stored document has no validation")
     }
 
-    /// Decided claims whose narrative is closest in meaning to `narrative`, best
-    /// first, at most one document per claim. Skips `exclude_claim_id` (pass 0
-    /// to skip nothing) and every claim that is still open.
-    pub async fn similar_claims(&self, narrative: &str, exclude_claim_id: i64, k: usize) -> Result<Vec<SimilarClaim>> {
-        let query = json!({
-            // Over-fetch so the exclusions cannot starve the vector candidates.
-            "size": (k * 4).max(20),
-            "query": { "bool": {
-                "must": { "semantic": { "field": "narrative", "query": narrative } },
-                "filter": { "exists": { "field": "outcome" } },
-                "must_not": [
-                    { "term": { "claim_id": exclude_claim_id } },
-                    { "term": { "outcome": "" } },
-                    // Precedents are decided claims from earlier events, never tonight's other claims.
-                    { "bool": { "filter": [
-                        { "term": { "source": "live" } },
-                        { "range": { "incident_at": { "gte": "now-24h" } } }
-                    ]}}
-                ]
-            }},
-            "collapse": { "field": "claim_id" },
-            "_source": ["doc_id", "claim_id", "source", "incident_kind", "zone_name", "narrative", "outcome", "payout_cents"]
-        });
-        let v = self.call(Method::POST, &format!("{}/_search", self.index), Some(query)).await?;
-        hits(&v)
-            .take(k)
-            .map(|h| {
-                let mut c: SimilarClaim = serde_json::from_value(h["_source"].clone())?;
-                c.score = h["_score"].as_f64().unwrap_or_default();
-                Ok(c)
-            })
-            .collect()
-    }
-
-    /// Counts the decided claims of `incident_kind` by outcome with ES|QL, with
-    /// the median and largest payout of each, for example 12 approved, median $180.00.
-    pub async fn outcome_stats(&self, incident_kind: &str) -> Result<Vec<OutcomeStats>> {
-        let query = format!(
-            "FROM {} | WHERE outcome != \"\" AND incident_kind == ? \
-             | STATS claims = COUNT(*), median_paid_cents = MEDIAN(payout_cents), max_paid_cents = MAX(payout_cents) BY outcome \
-             | SORT claims DESC",
-            self.index
-        );
-        let v = self.call(Method::POST, "_query", Some(json!({ "query": query, "params": [incident_kind] }))).await?;
-        outcome_rows(&v)
-    }
-
     /// Records the decision on an indexed live claim pack version.
     pub async fn set_outcome(&self, claim_id: i64, pack_version: i32, outcome: &str, payout_cents: u64) -> Result<()> {
         if !OUTCOMES.contains(&outcome) {
@@ -315,39 +311,13 @@ impl ClaimsIndex {
         Ok(())
     }
 
-    /// Indexes the synthetic past claims from [`history_claims`] through the
-    /// pipeline (same ids every time, so re-running overwrites) and checks that
-    /// every one of them passed validation. Returns how many were indexed.
-    pub async fn seed_history(&self) -> Result<usize> {
-        let docs = history_claims();
-        let mut body = String::new();
-        for d in &docs {
-            body.push_str(&json!({ "index": { "_index": self.index, "_id": d.doc_id } }).to_string());
-            body.push('\n');
-            body.push_str(&serde_json::to_string(d)?);
-            body.push('\n');
-        }
-        let path = format!("_bulk?pipeline={}&refresh=wait_for", self.pipeline);
-        let req = self.req(Method::POST, &path).header(CONTENT_TYPE, "application/x-ndjson").body(body);
-        let (status, v) = self.send(req).await?;
-        if !status.is_success() || v["errors"] == true {
-            let first = v["items"].as_array().and_then(|items| items.iter().find(|i| i["index"]["error"].is_object()));
-            bail!("bulk seeding returned {status}: {}", short(first.unwrap_or(&v)));
-        }
-        let query = json!({
-            "size": docs.len(),
-            "_source": ["doc_id", "validation.errors"],
-            "query": { "bool": { "filter": [
-                { "term": { "source": "history" } },
-                { "term": { "validation.valid": false } }
-            ]}}
-        });
-        let v = self.call(Method::POST, &format!("{}/_search", self.index), Some(query)).await?;
-        let invalid: Vec<String> = hits(&v).map(|h| h["_source"].to_string()).collect();
-        if !invalid.is_empty() {
-            bail!("seeded history failed validation: {}", invalid.join(", "));
-        }
-        Ok(docs.len())
+    /// Deletes the synthetic past claims (`source` `history`) an earlier build
+    /// seeded: claims are matched to the policy clauses now, never to past
+    /// claims. Returns how many were deleted; 0 once they are gone.
+    pub async fn delete_past_claims(&self) -> Result<u64> {
+        let path = format!("{}/_delete_by_query?refresh=true&conflicts=proceed", self.index);
+        let v = self.call(Method::POST, &path, Some(json!({ "query": { "term": { "source": "history" } } }))).await?;
+        Ok(v["deleted"].as_u64().unwrap_or(0))
     }
 
     /// Deletes one document by id. Returns false when it did not exist.
@@ -386,6 +356,7 @@ impl ClaimsIndex {
 }
 
 fn pipeline_body() -> Value {
+    let covers: serde_json::Map<String, Value> = KIND_COVERS.iter().map(|(k, c)| (k.to_string(), json!(c))).collect();
     json!({
         "description": "BandIt claims: validates each claim document and records problems in validation.*; never rejects",
         "processors": [{ "script": {
@@ -393,8 +364,9 @@ fn pipeline_body() -> Value {
             "source": VALIDATE_SCRIPT,
             "params": {
                 "required": ["claim_id", "pack_version", "incident_kind", "cover_kind", "incident_at", "narrative"],
-                "kinds": ["sos", "fall", "property"],
-                "cents": ["billed_cents", "covered_cents", "payout_cents"],
+                "covers": covers,
+                "losses": LOSS_KINDS,
+                "cents": ["billed_cents", "covered_cents", "payout_cents", "cost_cents"],
                 "skew_ms": 60000
             }
         }}],
@@ -419,31 +391,13 @@ fn mappings() -> Value {
             "incident_kind": kw, "cover_kind": kw, "zone_id": long, "zone_name": kw,
             "incident_at": date, "corroboration": kw, "witness_count": int,
             "diagnosis_codes": kw, "service_codes": kw, "record_sha256": kw,
-            "billed_cents": long, "covered_cents": long, "payout_cents": long, "outcome": kw,
+            "billed_cents": long, "covered_cents": long, "payout_cents": long,
+            "cost_cents": long, "responsible_named": { "type": "boolean" }, "outcome": kw,
             "narrative": { "type": "semantic_text", "inference_id": INFERENCE_ID },
             "validation": { "properties": { "valid": { "type": "boolean" }, "errors": kw } },
             "indexed_at": date
         }
     })
-}
-
-/// Reads ES|QL `columns` and `values` into [`OutcomeStats`] by column name.
-fn outcome_rows(v: &Value) -> Result<Vec<OutcomeStats>> {
-    let columns: Vec<&str> = v["columns"].as_array().context("ES|QL answer has no columns")?.iter().filter_map(|c| c["name"].as_str()).collect();
-    let at = |name: &str| columns.iter().position(|c| *c == name).with_context(|| format!("ES|QL answer has no {name} column"));
-    let (outcome, claims, median, max) = (at("outcome")?, at("claims")?, at("median_paid_cents")?, at("max_paid_cents")?);
-    let number = |x: &Value| x.as_i64().or_else(|| x.as_f64().map(|f| f.round() as i64)).unwrap_or(0);
-    Ok(v["values"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|row| OutcomeStats {
-            outcome: row[outcome].as_str().unwrap_or_default().to_string(),
-            claims: number(&row[claims]),
-            median_paid_cents: number(&row[median]),
-            max_paid_cents: number(&row[max]),
-        })
-        .collect())
 }
 
 fn hits(v: &Value) -> impl Iterator<Item = &Value> {
@@ -465,18 +419,6 @@ fn short(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn esql_rows_by_column_name() {
-        let v = json!({
-            "columns": [{"name": "claims", "type": "long"}, {"name": "median_paid_cents", "type": "double"}, {"name": "max_paid_cents", "type": "long"}, {"name": "outcome", "type": "keyword"}],
-            "values": [[12, 18000.0, 89500, "approved"], [3, 0.0, 0, "refused"]]
-        });
-        let rows = outcome_rows(&v).unwrap();
-        assert_eq!(rows[0], OutcomeStats { outcome: "approved".into(), claims: 12, median_paid_cents: 18_000, max_paid_cents: 89_500 });
-        assert_eq!((rows[1].outcome.as_str(), rows[1].claims), ("refused", 3));
-        assert!(outcome_rows(&json!({"columns": [], "values": []})).is_err());
-    }
 
     #[test]
     fn fall_narrative() {
@@ -521,14 +463,65 @@ mod tests {
             witnesses_in_zone: 4,
             minutes_to_staff_note: Some(1),
             property: Some("speaker knocked off its stand during load-out"),
-            cost: Some("repair estimate attached"),
+            loss_cents: Some(240_000),
             ..Default::default()
         });
         assert_eq!(
             property,
             "Property damage in zone Stage B at 23:40: speaker knocked off its stand during load-out; \
-             staff note within 1 minute; repair estimate attached."
+             staff note within 1 minute; repair cost $2,400.00 logged by staff; no attendee named."
         );
+    }
+
+    #[test]
+    fn theft_and_belongings_narratives() {
+        let theft = narrative_for(&NarrativeParts {
+            incident_kind: "theft",
+            zone_name: "Sponsor row",
+            local_time: "21:10",
+            minutes_to_staff_note: Some(4),
+            loss_cents: Some(119_900),
+            responsible_named: true,
+            ..Default::default()
+        });
+        assert_eq!(
+            theft,
+            "Theft in zone Sponsor row at 21:10: venue or sponsor property taken; staff note within 4 minutes; \
+             loss $1,199.00 logged by staff; staff named an attendee."
+        );
+        let belongings = narrative_for(&NarrativeParts {
+            incident_kind: "belongings",
+            zone_name: "Hacking floor",
+            local_time: "02:30",
+            loss_cents: Some(85_000),
+            finding: Some("no second source"),
+            ..Default::default()
+        });
+        assert_eq!(
+            belongings,
+            "An attendee's own things lost, stolen or broken in zone Hacking floor at 02:30: personal property of a guest; \
+             no staff note; value $850.00 logged by staff; no attendee named; no second source."
+        );
+        let unpriced = narrative_for(&NarrativeParts { incident_kind: "theft", zone_name: "Gate", local_time: "20:00", ..Default::default() });
+        assert!(unpriced.contains("; no cost logged; "), "{unpriced}");
+    }
+
+    #[test]
+    fn dollars_group_thousands() {
+        assert_eq!(dollars(0), "$0.00");
+        assert_eq!(dollars(9_905), "$99.05");
+        assert_eq!(dollars(119_900), "$1,199.00");
+        assert_eq!(dollars(123_456_789), "$1,234,567.89");
+    }
+
+    #[test]
+    fn every_kind_has_its_cover_and_the_pipeline_knows_them() {
+        let params = &pipeline_body()["processors"][0]["script"]["params"];
+        for (kind, cover) in KIND_COVERS {
+            assert_eq!(params["covers"][kind], cover);
+        }
+        assert_eq!(params["losses"], json!(["property", "theft", "belongings"]));
+        assert!(params["cents"].as_array().unwrap().contains(&json!("cost_cents")));
     }
 
     #[test]
@@ -538,14 +531,17 @@ mod tests {
             claim_id: 12,
             pack_version: 2,
             source: "live".into(),
-            incident_kind: "fall".into(),
+            incident_kind: "theft".into(),
             diagnosis_codes: vec!["S63.501A".into()],
             billed_cents: 18000,
+            cost_cents: 119_900,
+            responsible_named: true,
             ..Default::default()
         };
         let v = serde_json::to_value(&doc).unwrap();
         assert_eq!(v["doc_id"], "claim-12-v2");
         assert_eq!(v["diagnosis_codes"], json!(["S63.501A"]));
+        assert_eq!((v["cost_cents"].clone(), v["responsible_named"].clone()), (json!(119_900), json!(true)));
         assert_eq!(v["outcome"], "");
         let mapped = mappings();
         for key in v.as_object().unwrap().keys() {
@@ -553,15 +549,13 @@ mod tests {
         }
         assert_eq!(serde_json::from_value::<ClaimDoc>(v).unwrap(), doc);
         let partial: ClaimDoc = serde_json::from_value(json!({ "claim_id": 7 })).unwrap();
-        assert_eq!(partial.claim_id, 7);
+        assert_eq!((partial.claim_id, partial.cost_cents, partial.responsible_named), (7, 0, false));
     }
 
     #[test]
-    fn validation_and_similar_claim_deserialize() {
+    fn validation_deserializes() {
         let r: ValidationResult = serde_json::from_value(json!({ "valid": false, "errors": ["missing:narrative"] })).unwrap();
         assert_eq!(r.errors, vec!["missing:narrative"]);
-        let c: SimilarClaim = serde_json::from_value(json!({ "claim_id": 3, "outcome": "approved" })).unwrap();
-        assert_eq!((c.claim_id, c.score), (3, 0.0));
     }
 
     #[test]

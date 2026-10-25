@@ -18,9 +18,15 @@ for (String f : params.required) {
   }
 }
 
+// params.covers maps every incident kind to the cover that answers it.
 def kind = ctx.incident_kind;
-if (!blank(kind) && !params.kinds.contains(kind)) {
+boolean known = !blank(kind) && params.covers.containsKey(kind);
+if (!blank(kind) && !known) {
   errors.add('bad_incident_kind:' + kind);
+}
+def cover = ctx.cover_kind;
+if (known && !blank(cover) && params.covers[kind] != cover) {
+  errors.add('cover_kind_mismatch:' + cover);
 }
 if (kind == 'sos' || kind == 'fall') {
   if (!whole(ctx.zone_id) || ctx.zone_id <= 0) {
@@ -28,6 +34,12 @@ if (kind == 'sos' || kind == 'fall') {
   }
   if (!whole(ctx.witness_count) || ctx.witness_count < 0) {
     errors.add('injury_needs_witness_count');
+  }
+}
+// Broken, taken or lost property: the copy carries the loss staff logged.
+if (known && params.losses.contains(kind)) {
+  if (!whole(ctx.cost_cents) || ctx.cost_cents <= 0) {
+    errors.add('loss_needs_cost_cents');
   }
 }
 

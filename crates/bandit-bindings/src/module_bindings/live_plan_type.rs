@@ -13,6 +13,8 @@ pub struct LivePlan {
     pub resolution: String,
     pub cost_cents: u64,
     pub camera: bool,
+    pub culprit_band: u32,
+    pub naming: String,
 }
 
 impl __sdk::InModule for LivePlan {
@@ -29,6 +31,8 @@ pub struct LivePlanCols {
     pub resolution: __sdk::__query_builder::Col<LivePlan, String>,
     pub cost_cents: __sdk::__query_builder::Col<LivePlan, u64>,
     pub camera: __sdk::__query_builder::Col<LivePlan, bool>,
+    pub culprit_band: __sdk::__query_builder::Col<LivePlan, u32>,
+    pub naming: __sdk::__query_builder::Col<LivePlan, String>,
 }
 
 impl __sdk::__query_builder::HasCols for LivePlan {
@@ -41,6 +45,8 @@ impl __sdk::__query_builder::HasCols for LivePlan {
             resolution: __sdk::__query_builder::Col::new(table_name, "resolution"),
             cost_cents: __sdk::__query_builder::Col::new(table_name, "cost_cents"),
             camera: __sdk::__query_builder::Col::new(table_name, "camera"),
+            culprit_band: __sdk::__query_builder::Col::new(table_name, "culprit_band"),
+            naming: __sdk::__query_builder::Col::new(table_name, "naming"),
         }
     }
 }

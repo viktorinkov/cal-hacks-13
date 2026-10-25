@@ -1,15 +1,19 @@
 //! Incident to claim (Hyphenate track). The attendee files a claim for an
-//! injury on their band in their own words (property damage opens the venue's
-//! claim on resolve); the claim gets a hashed evidence pack; the hospital
-//! report arrives as drawn by the seeded generator, or Claude reads a filed
-//! record; Elastic validates the evidence and finds similar claims, the claims
-//! agent reviews the pack, and code decides coverage, amounts and the route:
-//! settle under a learned rule, send to the organizer, or refuse and show every
-//! check. Money moves on a double-entry ledger.
+//! injury on their band in their own words; broken or taken property and an
+//! attendee's own things open their claim on resolve. The claim gets a hashed
+//! evidence pack; the hospital report arrives as drawn by the seeded generator,
+//! or Claude reads a filed record; Elastic validates the evidence and finds the
+//! policy clauses that bear on it, Claude investigates and decides, and code
+//! decides coverage, amounts and the route: settle under a learned rule, send
+//! to the organizer, or refuse and show every check. Whoever broke or took
+//! something can be charged for it (`charges`). Money moves on a double-entry
+//! ledger.
 
+pub mod charges;
 pub mod evidence;
 pub mod filing;
 pub mod flow;
+pub mod own_policy;
 pub mod people;
 pub mod setup;
 pub mod tables;
@@ -19,6 +23,8 @@ pub mod views;
 mod tests;
 
 pub use flow::{on_incident_resolved, on_job_dead};
+pub use charges::*;
+pub use own_policy::*;
 pub use tables::*;
 
 use spacetimedb::{ReducerContext, Table, Timestamp};

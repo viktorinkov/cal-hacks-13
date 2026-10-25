@@ -24,7 +24,7 @@ pub struct WalletEntry {
     pub id: u64,
     #[index(btree)]
     pub identity: Identity,
-    /// `opening`, `purchase` or `payout`.
+    /// `opening`, `purchase`, `payout` or `charge`.
     pub kind: String,
     /// Money in is positive, money out negative.
     pub amount_cents: i64,
@@ -84,7 +84,7 @@ pub fn add_entry(ctx: &ReducerContext, identity: Identity, kind: &str, amount_ce
 /// What the wallet can still spend: its entries less the merch orders being paid.
 pub fn spendable(ctx: &ReducerContext, who: Identity) -> i64 {
     let entries: i64 = ctx.db.wallet_entry().identity().filter(who).map(|e| e.amount_cents).sum();
-    entries - crate::merch::held_cents(ctx, who)
+    entries - crate::merch::held_cents(ctx, who) - crate::insurance::charges::held_cents(ctx, who)
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -104,7 +104,7 @@ pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet> {
 
 fn balance(ctx: &ViewContext, who: Identity) -> i64 {
     let entries: i64 = ctx.db.wallet_entry().identity().filter(who).map(|e| e.amount_cents).sum();
-    entries - crate::merch::my_held_cents(ctx, who)
+    entries - crate::merch::my_held_cents(ctx, who) - crate::insurance::charges::my_held_cents(ctx, who)
 }
 
 /// One attendee's wallet, for the organizer buying merch as them.

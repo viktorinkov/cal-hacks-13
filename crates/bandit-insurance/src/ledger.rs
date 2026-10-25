@@ -104,6 +104,11 @@ pub fn charge_approved(amount_cents: Cents) -> Journal {
     pair("J5 charge", Account::AttendeeReceivable, Account::Recoveries, amount_cents, "charge to the attendee responsible")
 }
 
+/// J5r when the organizer waives an approved charge: debit `recoveries`, credit `attendee_receivable`.
+pub fn charge_waived(amount_cents: Cents) -> Journal {
+    pair("J5r charge waived", Account::Recoveries, Account::AttendeeReceivable, amount_cents, "charge waived")
+}
+
 /// J6 when the attendee pays the charge from their wallet: debit `cash`, credit `attendee_receivable`.
 pub fn charge_paid(amount_cents: Cents) -> Journal {
     pair("J6 charge payment", Account::Cash, Account::AttendeeReceivable, amount_cents, "charge paid from the attendee's wallet")

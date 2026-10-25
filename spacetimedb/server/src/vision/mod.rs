@@ -152,8 +152,8 @@ pub fn report_property_event(
         safety::open(ctx, IncidentKind::Property, cam.zone_id, station_id, 0, "vision", None).id
     } else {
         let i = ctx.db.incident().id().find(incident_id).ok_or_else(|| format!("no incident {incident_id}"))?;
-        if i.kind != IncidentKind::Property {
-            return Err(format!("incident {incident_id} is not a property incident"));
+        if i.kind.is_injury() {
+            return Err(format!("incident {incident_id} is an injury, not broken or taken property"));
         }
         i.id
     };

@@ -69,6 +69,21 @@ export const AttendeeOut = __t.object("AttendeeOut", {
 });
 export type AttendeeOut = __Infer<typeof AttendeeOut>;
 
+export const AttendeePolicy = __t.object("AttendeePolicy", {
+  id: __t.u64(),
+  holder: __t.identity(),
+  insurerName: __t.string(),
+  policyNumber: __t.string(),
+  perClaimLimitCents: __t.u64(),
+  aggregateLimitCents: __t.u64(),
+  deductibleCents: __t.u64(),
+  usedCents: __t.u64(),
+  source: __t.string(),
+  documentHash: __t.string(),
+  updatedAt: __t.timestamp(),
+});
+export type AttendeePolicy = __Infer<typeof AttendeePolicy>;
+
 export const AuthorityLimitRow = __t.object("AuthorityLimitRow", {
   role: __t.string(),
   rank: __t.u8(),
@@ -259,6 +274,36 @@ export const Camera = __t.object("Camera", {
 });
 export type Camera = __Infer<typeof Camera>;
 
+export const Charge = __t.object("Charge", {
+  id: __t.u64(),
+  incidentId: __t.u64(),
+  claimId: __t.u64(),
+  attendee: __t.identity(),
+  attendeeName: __t.string(),
+  bandId: __t.u32(),
+  namedBy: __t.identity(),
+  namedByName: __t.string(),
+  namedByRole: __t.string(),
+  note: __t.string(),
+  amountCents: __t.u64(),
+  packHash: __t.string(),
+  checks: __t.array(__t.string()),
+  checksPassed: __t.bool(),
+  recommendation: __t.string(),
+  recommendationReason: __t.string(),
+  clauseIds: __t.array(__t.string()),
+  status: __t.string(),
+  disputeText: __t.string(),
+  approvedByName: __t.string(),
+  waiveReason: __t.string(),
+  paymentReference: __t.string(),
+  createdAt: __t.timestamp(),
+  decidedAt: __t.option(__t.timestamp()),
+  paidAt: __t.option(__t.timestamp()),
+  updatedAt: __t.timestamp(),
+});
+export type Charge = __Infer<typeof Charge>;
+
 export const CheckIn = __t.object("CheckIn", {
   name: __t.string(),
   result: __t.string(),
@@ -330,6 +375,19 @@ export const ClaimCheck = __t.object("ClaimCheck", {
   createdAt: __t.timestamp(),
 });
 export type ClaimCheck = __Infer<typeof ClaimCheck>;
+
+export const ClaimClause = __t.object("ClaimClause", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  packVersion: __t.u32(),
+  clauseId: __t.string(),
+  policy: __t.string(),
+  section: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ClaimClause = __Infer<typeof ClaimClause>;
 
 export const ClaimLine = __t.object("ClaimLine", {
   id: __t.u64(),
@@ -404,6 +462,16 @@ export const ClaimedPerson = __t.object("ClaimedPerson", {
   personId: __t.u64(),
 });
 export type ClaimedPerson = __Infer<typeof ClaimedPerson>;
+
+export const ClauseIn = __t.object("ClauseIn", {
+  clauseId: __t.string(),
+  policy: __t.string(),
+  section: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ClauseIn = __Infer<typeof ClauseIn>;
 
 export const ClinicReport = __t.object("ClinicReport", {
   id: __t.u64(),
@@ -702,6 +770,8 @@ export const IncidentKind = __t.enum("IncidentKind", {
   Sos: __t.unit(),
   Fall: __t.unit(),
   Property: __t.unit(),
+  Theft: __t.unit(),
+  Belongings: __t.unit(),
 });
 export type IncidentKind = __Infer<typeof IncidentKind>;
 
@@ -868,6 +938,8 @@ export const LivePlan = __t.object("LivePlan", {
   resolution: __t.string(),
   costCents: __t.u64(),
   camera: __t.bool(),
+  culpritBand: __t.u32(),
+  naming: __t.string(),
 });
 export type LivePlan = __Infer<typeof LivePlan>;
 
@@ -1115,6 +1187,21 @@ export const MyBand = __t.object("MyBand", {
 });
 export type MyBand = __Infer<typeof MyBand>;
 
+export const MyCharge = __t.object("MyCharge", {
+  id: __t.u64(),
+  incidentId: __t.u64(),
+  incidentKind: __t.string(),
+  zoneName: __t.string(),
+  happenedAt: __t.timestamp(),
+  amountCents: __t.u64(),
+  status: __t.string(),
+  why: __t.string(),
+  clause: __t.string(),
+  disputeText: __t.string(),
+  paidAt: __t.option(__t.timestamp()),
+});
+export type MyCharge = __Infer<typeof MyCharge>;
+
 export const MyClaim = __t.object("MyClaim", {
   id: __t.u64(),
   incidentKind: __t.string(),
@@ -1355,15 +1442,6 @@ export const PlanArea = __t.object("PlanArea", {
   y1M: __t.f32(),
 });
 export type PlanArea = __Infer<typeof PlanArea>;
-
-export const PrecedentIn = __t.object("PrecedentIn", {
-  reference: __t.string(),
-  outcome: __t.string(),
-  payoutCents: __t.u64(),
-  narrative: __t.string(),
-  score: __t.f32(),
-});
-export type PrecedentIn = __Infer<typeof PrecedentIn>;
 
 export const PropertyEvent = __t.object("PropertyEvent", {
   id: __t.u64(),

@@ -1,12 +1,11 @@
 //! Runs against the real Elastic project. Opt in with `CLAIMS_ELASTIC_IT=1`.
-//! The seeded history stays in place; the test docs (claim ids 900001-900003)
-//! are deleted at the start and at the end.
+//! The test docs (claim ids 900001-900005) are deleted at the start and at the end.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use claims_elastic::{ClaimDoc, ClaimsIndex, NarrativeParts, narrative_for};
+use claims_elastic::{ClaimDoc, ClaimsIndex, NarrativeParts, narrative_for, sections_for_kind};
 
-const TEST_IDS: [&str; 3] = ["claim-900001-v1", "claim-900002-v1", "claim-900003-v1"];
+const TEST_IDS: [&str; 5] = ["claim-900001-v1", "claim-900002-v1", "claim-900003-v1", "claim-900004-v1", "claim-900005-v1"];
 
 fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as i64
@@ -46,6 +45,37 @@ fn wrist_sprain_fall() -> ClaimDoc {
     }
 }
 
+fn laptop_theft() -> ClaimDoc {
+    let narrative = narrative_for(&NarrativeParts {
+        incident_kind: "theft",
+        zone_name: "Sponsor row",
+        local_time: "21:10",
+        minutes_to_staff_note: Some(4),
+        loss_cents: Some(119_900),
+        responsible_named: true,
+        ..Default::default()
+    });
+    ClaimDoc {
+        doc_id: ClaimDoc::live_id(900004, 1),
+        claim_id: 900004,
+        incident_kind: "theft".into(),
+        cover_kind: "property".into(),
+        zone_id: 104,
+        zone_name: "Sponsor row".into(),
+        witness_count: 0,
+        diagnosis_codes: vec![],
+        service_codes: vec![],
+        record_sha256: String::new(),
+        billed_cents: 0,
+        covered_cents: 0,
+        payout_cents: 119_900,
+        cost_cents: 119_900,
+        responsible_named: true,
+        narrative,
+        ..wrist_sprain_fall()
+    }
+}
+
 fn sorted(mut v: Vec<String>) -> Vec<String> {
     v.sort();
     v
@@ -60,7 +90,7 @@ async fn claims_round_trip() -> anyhow::Result<()> {
     let es = ClaimsIndex::from_env()?;
     es.ensure_setup().await?;
     es.ensure_setup().await?; // idempotent
-    assert_eq!(es.seed_history().await?, 30);
+    assert_eq!(es.delete_past_claims().await?, 0, "ensure_setup already removed the seeded past claims");
     for id in TEST_IDS {
         es.delete_doc(id).await?;
     }
@@ -115,19 +145,37 @@ async fn claims_round_trip() -> anyhow::Result<()> {
     let r = es.index_claim(&odd).await?;
     assert_eq!((r.valid, r.errors), (false, vec!["bad_incident_kind:slip".to_string()]));
 
-    let similar = es.similar_claims(&valid.narrative, valid.claim_id, 5).await?;
-    for (i, c) in similar.iter().enumerate() {
-        eprintln!("#{} {:.4} {} {} {} {} | {}", i + 1, c.score, c.doc_id, c.incident_kind, c.outcome, c.payout_cents, c.narrative);
-    }
-    assert_eq!(similar.len(), 5);
-    assert_eq!((similar[0].source.as_str(), similar[0].incident_kind.as_str()), ("history", "fall"));
-    assert!(similar.iter().all(|c| c.claim_id < 900000 && !c.outcome.is_empty()));
-    assert!(similar.windows(2).all(|w| w[0].score >= w[1].score));
+    // A theft is valid with its loss and its property cover.
+    let theft = laptop_theft();
+    let r = es.index_claim(&theft).await?;
+    assert!(r.valid && r.errors.is_empty(), "{:?}", r.errors);
 
-    // Once decided, the test claim becomes a precedent for its own narrative.
+    // An attendee's own things need a value and the attendee's own cover.
+    let lost = ClaimDoc {
+        doc_id: ClaimDoc::live_id(900005, 1),
+        claim_id: 900005,
+        incident_kind: "belongings".into(),
+        cost_cents: 0,
+        ..theft.clone()
+    };
+    let r = es.index_claim(&lost).await?;
+    assert_eq!(sorted(r.errors), sorted(vec!["cover_kind_mismatch:property".to_string(), "loss_needs_cost_cents".to_string()]));
+
+    // The clause search answers, or is empty when no policy is read yet; it never fails the claim.
+    let clauses = es.search_clauses(&theft.narrative, None, None, sections_for_kind("theft"), 5).await?;
+    for (i, c) in clauses.iter().enumerate() {
+        eprintln!("#{} {:.4} {} {} p{} | {}", i + 1, c.score, c.clause_id, c.section, c.page, c.text);
+    }
+    assert!(clauses.len() <= 5);
+    assert!(clauses.iter().all(|c| c.policy == "venue" && sections_for_kind("theft").contains(&c.section.as_str())));
+    assert!(clauses.windows(2).all(|w| w[0].score >= w[1].score));
+    if let Some(first) = clauses.first() {
+        let read = es.read_clause(&first.clause_id).await?.expect("a clause the search found can be read");
+        assert_eq!((read.clause_id.as_str(), read.text.as_str()), (first.clause_id.as_str(), first.text.as_str()));
+    }
+    assert!(es.read_clause("no-such-clause-c0").await?.is_none());
+
     es.set_outcome(900001, 1, "approved", 18000).await?;
-    let top = &es.similar_claims(&valid.narrative, 0, 3).await?[0];
-    assert_eq!((top.claim_id, top.outcome.as_str(), top.payout_cents), (900001, "approved", 18000));
     assert!(es.set_outcome(900001, 1, "paid", 1).await.is_err());
 
     for id in TEST_IDS {

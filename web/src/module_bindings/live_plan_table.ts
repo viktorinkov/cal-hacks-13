@@ -17,4 +17,6 @@ export default __t.row({
   resolution: __t.string(),
   costCents: __t.u64().name("cost_cents"),
   camera: __t.bool(),
+  culpritBand: __t.u32().name("culprit_band"),
+  naming: __t.string(),
 });

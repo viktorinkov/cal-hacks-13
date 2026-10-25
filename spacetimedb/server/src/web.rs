@@ -238,7 +238,7 @@ pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident> {
         .incident()
         .subject_band()
         .filter(u32::from(own.band_id))
-        .filter(|i| i.kind != IncidentKind::Property && i.opened_at >= own.claimed_at)
+        .filter(|i| i.kind.is_injury() && i.opened_at >= own.claimed_at)
         .map(|i| MyIncident {
             incident_id: i.id,
             kind: kind_name(i.kind),
@@ -276,7 +276,7 @@ pub fn unclaimed_injuries(ctx: &ViewContext) -> Vec<UnclaimedInjury> {
         .incident()
         .subject_band()
         .filter(1u32..)
-        .filter(|i| i.resolved && i.kind != IncidentKind::Property && claim_id_for(ctx, i.id) == 0)
+        .filter(|i| i.resolved && i.kind.is_injury() && claim_id_for(ctx, i.id) == 0)
         .filter_map(|i| {
             let wearer = ctx.db.band_owner().band_id().find(radio_id(i.subject_band)?).filter(|o| o.claimed_at <= i.opened_at)?;
             let mut notes: Vec<IncidentNote> = ctx.db.incident_note().incident_id().filter(i.id).collect();

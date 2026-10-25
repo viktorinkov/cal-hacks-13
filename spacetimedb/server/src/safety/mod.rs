@@ -29,7 +29,12 @@ pub const TEST_BANDS: std::ops::RangeInclusive<u8> = 90..=99;
 pub enum IncidentKind {
     Sos,
     Fall,
+    /// Venue or sponsor equipment broken.
     Property,
+    /// Venue or sponsor property taken.
+    Theft,
+    /// An attendee's own things lost, stolen or broken.
+    Belongings,
 }
 
 impl IncidentKind {
@@ -38,7 +43,18 @@ impl IncidentKind {
             IncidentKind::Sos => bandit_insurance::IncidentKind::Sos,
             IncidentKind::Fall => bandit_insurance::IncidentKind::Fall,
             IncidentKind::Property => bandit_insurance::IncidentKind::Property,
+            IncidentKind::Theft => bandit_insurance::IncidentKind::Theft,
+            IncidentKind::Belongings => bandit_insurance::IncidentKind::Belongings,
         }
+    }
+
+    /// A fall or an SOS: a person who needs help, whose band the light circle forms around.
+    pub fn is_injury(self) -> bool {
+        matches!(self, IncidentKind::Sos | IncidentKind::Fall)
+    }
+
+    pub fn as_str(self) -> &'static str {
+        self.core().as_str()
     }
 
     pub fn parse(s: &str) -> Option<Self> {
@@ -46,6 +62,8 @@ impl IncidentKind {
             "sos" => Some(IncidentKind::Sos),
             "fall" => Some(IncidentKind::Fall),
             "property" => Some(IncidentKind::Property),
+            "theft" => Some(IncidentKind::Theft),
+            "belongings" => Some(IncidentKind::Belongings),
             _ => None,
         }
     }
@@ -262,7 +280,7 @@ fn active_band_incident(ctx: &ReducerContext, band_id: u32) -> Option<Incident> 
         .incident()
         .subject_band()
         .filter(band_id)
-        .filter(|i| !i.resolved && i.kind != IncidentKind::Property)
+        .filter(|i| !i.resolved && i.kind.is_injury())
         .max_by_key(|i| i.id)
 }
 
@@ -301,7 +319,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
         .incident()
         .resolved()
         .filter(false)
-        .filter(|i| i.kind != IncidentKind::Property && i.subject_band != 0)
+        .filter(|i| i.kind.is_injury() && i.subject_band != 0)
         .collect();
     if active.is_empty() {
         return Ok(());
@@ -418,6 +436,8 @@ pub fn open_incident(ctx: &ReducerContext, kind: String, zone_id: u64, band_id: 
     let incident = open(ctx, kind, zone.id, zone.station_id, band_id, "ops", None);
     let what = match kind {
         IncidentKind::Property => format!("Damage reported in {}", zone.name),
+        IncidentKind::Theft => format!("Theft reported in {}", zone.name),
+        IncidentKind::Belongings => format!("An attendee's things reported lost, stolen or broken in {}", zone.name),
         _ => format!("Injury reported in {}", zone.name),
     };
     crate::live::record(ctx, incident.id, 0, "organizer", &caller_name(ctx), what, note.clone());
@@ -483,8 +503,9 @@ pub fn add_incident_note(ctx: &ReducerContext, incident_id: u64, text: String, c
 }
 
 /// Closes the incident, releases the subject band's SOS latch, and opens the
-/// venue's property claim when a repair cost was logged. SOS and fall claims
-/// are not opened here: the wearer files them (`file_claim`).
+/// claim for broken or taken property and for an attendee's own things when a
+/// cost was logged. SOS and fall claims are not opened here: the wearer files
+/// them (`file_claim`).
 #[spacetimedb::reducer]
 pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: String) -> Result<(), String> {
     require_role(ctx, &["ops", "medic"])?;
@@ -502,7 +523,7 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
         ..i
     });
     crate::live::resolved(ctx, incident_id, &caller_name(ctx), &caller_role(ctx, STAFF_ROLES), &resolution);
-    if let Some(radio) = radio_id(band_id).filter(|b| *b != 0 && !TEST_BANDS.contains(b)) {
+    if let Some(radio) = radio_id(band_id).filter(|b| *b != 0 && !TEST_BANDS.contains(b) && resolved.kind.is_injury()) {
         crate::commands::enqueue(ctx, radio, "clear", 0, 0);
     }
     crate::insurance::on_incident_resolved(ctx, &resolved)
