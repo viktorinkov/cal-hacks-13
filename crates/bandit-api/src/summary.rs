@@ -7,6 +7,7 @@ use bandit_bindings::{
     Attendee, Booth, Photo, PhotoTag, SharedVisit, SocialEncounter, SocialHandle, Visit, Zone,
 };
 use serde::Serialize;
+use serde_json::{Value, json};
 use spacetimedb_sdk::{Identity, Timestamp};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -437,6 +438,29 @@ pub fn apply_ranking(s: &mut Summary, people: &[(u64, f64)], booths: &[(u64, f64
     s.suggestions_ranked = true;
 }
 
+/// The Kibana record of a ranked recap: the zones and booths the interests text names (each line
+/// starts with one), the order Elastic chose, and the booth that minutes alone put first
+/// (`first_by_minutes`, taken before `apply_ranking`).
+pub fn ranking_doc(s: &Summary, interests: &str, first_by_minutes: Option<&str>, at_ms: u64) -> Value {
+    let person = s.suggested_people.first();
+    let booth = s.suggested_booths.first();
+    let spots: Vec<&str> = interests.lines().filter_map(|l| l.split(':').next()).map(str::trim).filter(|l| !l.is_empty()).collect();
+    json!({
+        "@timestamp": at_ms,
+        "attendee": s.display_name,
+        "top_spots": spots,
+        "people": s.suggested_people.iter().map(|p| &p.name).collect::<Vec<_>>(),
+        "booths": s.suggested_booths.iter().map(|b| &b.name).collect::<Vec<_>>(),
+        "first_person": person.map(|p| &p.name),
+        "first_person_score": person.and_then(|p| p.score),
+        "first_booth": booth.map(|b| &b.name),
+        "first_booth_zone": booth.map(|b| &b.zone_name),
+        "first_booth_score": booth.and_then(|b| b.score),
+        "first_booth_by_minutes": first_by_minutes,
+        "reordered": booth.map(|b| b.name.as_str()) != first_by_minutes,
+    })
+}
+
 fn order_by<T>(
     items: &mut [T],
     scores: &[(u64, f64)],
@@ -824,6 +848,20 @@ mod tests {
             .map(|b| (b.booth_id, b.score))
             .collect();
         assert_eq!(booths, vec![(12, Some(0.8)), (10, Some(0.5)), (11, None)]);
+    }
+
+    #[test]
+    fn ranking_doc_shows_the_order_next_to_minutes() {
+        let mut s = summary(&rows(), who(1)).unwrap();
+        let by_minutes = s.suggested_booths[0].name.clone();
+        apply_ranking(&mut s, &[(2, 0.9)], &[(12, 0.8), (10, 0.5)]);
+        let doc = ranking_doc(&s, "Stage\nDrone show: Drone show showcases. (drones)", Some(&by_minutes), 7);
+        assert_eq!(doc["top_spots"], json!(["Stage", "Drone show"]));
+        assert_eq!(doc["first_booth"], s.suggested_booths[0].name.as_str());
+        assert_eq!(doc["first_booth_score"], 0.8);
+        assert_eq!(doc["first_booth_by_minutes"], by_minutes.as_str());
+        assert_eq!(doc["reordered"], s.suggested_booths[0].name != by_minutes);
+        assert_eq!(doc["booths"].as_array().unwrap().len(), 3);
     }
 
     #[test]

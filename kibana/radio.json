@@ -1,0 +1,345 @@
+{
+  "title": "BandIt band radio and photos",
+  "description": "Every packet the venue gateway heard from the bands and the station markers, and every photo's record, as the venue laptop's recorders wrote them. Kept for after the event; nothing live reads them.",
+  "time_range": {
+    "from": "2026-10-01T00:00:00.000Z",
+    "to": "now+1d"
+  },
+  "panels": [
+    {
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 11
+      },
+      "type": "markdown",
+      "config": {
+        "content": "## Band radio and photos\n\nThe recorders on the venue laptop write every line the gateway hears, with an id from its content, so a second upload adds nothing.\n\n- `bandit-raw-radio`: each beacon from a band or a station marker, with its zone and its SOS, fall and button flags\n- `bandit-raw-heard`: each band's list of the bands and station markers it heard, with their signal strength\n- `bandit-raw-photos`: each photo's camera, time and place, never the image\n\nKept for after the event. The live screen reads SpacetimeDB, never these."
+      }
+    },
+    {
+      "grid": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Beacons heard",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-radio | STATS beacons = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "beacons"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Bands heard",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-radio | WHERE kind == \"band\" | STATS bands = COUNT_DISTINCT(id)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "bands"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 32,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Heard lists from the bands",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-heard | STATS lists = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "lists"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 40,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Photos recorded",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-photos | STATS photos = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "photos"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 11,
+        "w": 48,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Beacons every 10 seconds, from bands and station markers",
+        "layers": [
+          {
+            "type": "bar_stacked",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-raw-radio | STATS beacons = COUNT() BY time = BUCKET(@timestamp, 10 seconds), kind | SORT time"
+            },
+            "x": {
+              "column": "time"
+            },
+            "y": [
+              {
+                "column": "beacons"
+              }
+            ],
+            "breakdown_by": {
+              "column": "kind"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Each band and station marker: beacons and signal at the gateway (dBm)",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-radio | STATS beacons = COUNT(), signal = ROUND(AVG(rssi_gateway), 1) BY kind, id | SORT kind, id"
+        },
+        "rows": [
+          {
+            "column": "kind"
+          },
+          {
+            "column": "id"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "beacons"
+          },
+          {
+            "column": "signal"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 25,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Band beacons by zone",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-raw-radio | WHERE kind == \"band\" AND zone IS NOT NULL | EVAL zone = TO_STRING(zone) | STATS beacons = COUNT() BY zone | SORT beacons DESC"
+            },
+            "x": {
+              "column": "zone"
+            },
+            "y": [
+              {
+                "column": "beacons"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 12
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Band beacons by flag: SOS, fall, button press",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-raw-radio | WHERE kind == \"band\" | EVAL flag = CASE(sos, \"SOS\", fall, \"fall\", pressed, \"button press\", \"none\") | STATS beacons = COUNT() BY flag | SORT beacons DESC"
+            },
+            "x": {
+              "column": "flag"
+            },
+            "y": [
+              {
+                "column": "beacons"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 39,
+        "w": 24,
+        "h": 12
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Heard lists per band",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-heard | STATS lists = COUNT(), signal = ROUND(AVG(rssi_gateway), 1) BY band = id | SORT band"
+        },
+        "rows": [
+          {
+            "column": "band"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "lists"
+          },
+          {
+            "column": "signal"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 51,
+        "w": 48,
+        "h": 12
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Recording sessions",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-radio, bandit-raw-heard, bandit-raw-gateway, bandit-raw-photos METADATA _index | STATS records = COUNT(), started = MIN(@timestamp), ended = MAX(@timestamp) BY session, index = _index | SORT started, index"
+        },
+        "rows": [
+          {
+            "column": "session"
+          },
+          {
+            "column": "index"
+          },
+          {
+            "column": "started"
+          },
+          {
+            "column": "ended"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "records"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 63,
+        "w": 48,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Photo records",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-raw-photos | EVAL camera = CONCAT(COALESCE(make, \"\"), \" \", COALESCE(model, \"\")) | STATS photos = COUNT() BY taken = @timestamp, file, camera, source, session | SORT taken DESC | LIMIT 200"
+        },
+        "rows": [
+          {
+            "column": "taken"
+          },
+          {
+            "column": "file"
+          },
+          {
+            "column": "camera"
+          },
+          {
+            "column": "source"
+          },
+          {
+            "column": "session"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "photos"
+          }
+        ]
+      }
+    }
+  ]
+}

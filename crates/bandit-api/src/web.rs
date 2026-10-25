@@ -79,24 +79,14 @@ fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>
 
 type ApiResult<T> = Result<T, (StatusCode, Json<Value>)>;
 
-/// Where the pages connect: the WebSocket form of the SpacetimeDB URL, and the Kibana dashboards.
+/// Where the pages connect: the WebSocket form of the SpacetimeDB URL, and Kibana for the Kibana tab.
 async fn config(State(app): AppState) -> Json<Value> {
     let w = &app.web;
     let ws = w.spacetimedb_url.replacen("https://", "wss://", 1).replacen("http://", "ws://", 1);
-    let kibana = w.kibana_url.trim_end_matches('/');
-    let dashboards: Vec<Value> = [
-        ("Scrape pipeline", "bandit-pipeline-calhacks-13"),
-        ("Sponsors and prizes", "bandit-event-calhacks-13"),
-        ("Claims", "bandit-claims"),
-    ]
-    .iter()
-    .map(|(title, id)| json!({ "title": title, "url": format!("{kibana}/app/dashboards#/view/{id}") }))
-    .collect();
     Json(json!({
         "spacetimedb_url": ws,
         "database": w.database,
-        "kibana_url": kibana,
-        "dashboards": dashboards,
+        "kibana_url": w.kibana_url.trim_end_matches('/'),
         "auth_client_id": w.auth_client_id,
         "test_mode": w.test_mode,
     }))

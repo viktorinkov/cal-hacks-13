@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
 // medic's filing to the named approver's decision, the event graph with its photos, the merch templates
-// and orders, the Kibana dashboards, the venue setup from the event's name, and "Event ended".
+// and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -608,8 +608,45 @@ function merchTab() {
 
 // --- Kibana ---------------------------------------------------------------------------------
 
+/** Elastic's jobs in the order of the event, each with what it does and the Kibana views that show it. */
+const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[] = [
+  {
+    job: 'Before the event: organizing the scraped event data',
+    what: 'Bright Data scraped the event pages and the sponsors\' company profiles into raw indices. The workflow bandit-organize joins the exact matches with ES|QL LOOKUP JOIN, and the agent bandit-organizer resolves the rest and gives a reason for every merge. Rust checks the bundle and loads it into SpacetimeDB in one transaction: the venue, zones, sponsors, booths and schedule on the other tabs.',
+    views: [
+      ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
+      ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
+      ['bandit-organize runs, step by step', '/app/workflows'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+    ],
+  },
+  {
+    job: 'During the event: the bands\' radio log and the photos',
+    what: 'The venue laptop records every packet the gateway hears from the bands and the station markers: zone, battery, SOS, fall and button presses, and the signal strength of every band nearby. It also records every photo\'s camera, time and place, never the image. The log is kept for after the event; nothing live reads it, since the Live tab comes from SpacetimeDB.',
+    views: [['Band radio and photos', '/app/dashboards#/view/bandit-radio']],
+  },
+  {
+    job: 'After the event: ordering the recap\'s suggestions',
+    what: 'Each recap suggests the people an attendee hung out with and the booths where they spent time. SpacetimeDB decides who and what is on the list; Elastic only orders it by meaning, matching the attendee\'s interests against each person\'s interests and each booth\'s description.',
+    views: [['Recap suggestions: each attendee\'s latest ranking next to the minutes order', '/app/dashboards#/view/bandit-recap']],
+  },
+  {
+    job: 'Claims: checking the evidence',
+    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the most similar past claims. Both come back to the claim as checks on the Claims tab; they never change an amount.',
+    views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
+  },
+];
+
 function kibana() {
-  return [h('section', {}, h('ul', {}, cfg.dashboards.map(d => h('li', {}, h('a', { href: d.url, target: '_blank' }, d.title)))))];
+  return [
+    h('section', {},
+      h('h3', {}, 'Elastic, the Evidence Engine'),
+      h('p', {}, 'Elastic works in the background: it organizes and validates data and orders it by meaning. It never holds live state and never decides; SpacetimeDB owns the live event and Claude makes the decisions. Each view opens in Kibana, signed in to the Elastic Cloud project.')),
+    EVIDENCE_ENGINE.map(({ job, what, views }) => h('section', {},
+      h('h3', {}, job),
+      h('p', {}, what),
+      h('ul', {}, views.map(([title, path]) => h('li', {}, h('a', { href: `${cfg.kibana_url}${path}`, target: '_blank' }, title)))))),
+  ];
 }
 
 // The page redraws on every change and every second; holding off while a button is pressed keeps a
