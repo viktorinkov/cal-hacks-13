@@ -36,6 +36,7 @@ import {
 // Import all reducer arg schemas
 import AddIncidentNoteReducer from "./add_incident_note_reducer";
 import AddOwnerReducer from "./add_owner_reducer";
+import AddStaffReducer from "./add_staff_reducer";
 import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
@@ -79,6 +80,7 @@ import RegisterBridgeReducer from "./register_bridge_reducer";
 import RegisterPhotoReducer from "./register_photo_reducer";
 import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
+import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
@@ -137,6 +139,7 @@ import BoardPrecedentsRow from "./board_precedents_table";
 import BoardRecordsRow from "./board_records_table";
 import BoardReviewsRow from "./board_reviews_table";
 import BoardRulesRow from "./board_rules_table";
+import BoardStaffRow from "./board_staff_table";
 import BoothRow from "./booth_table";
 import CameraRow from "./camera_table";
 import ChosenVenueRow from "./chosen_venue_table";
@@ -653,6 +656,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardRulesRow),
+  boardStaff: __table({
+    name: 'board_staff',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardStaffRow),
   claimChecks: __table({
     name: 'claim_checks',
     indexes: [
@@ -925,6 +935,7 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("add_incident_note", AddIncidentNoteReducer),
   __reducerSchema("add_owner", AddOwnerReducer),
+  __reducerSchema("add_staff", AddStaffReducer),
   __reducerSchema("apply_medical_extract", ApplyMedicalExtractReducer),
   __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
@@ -968,6 +979,7 @@ const reducersSchema = __reducers(
   __reducerSchema("register_photo", RegisterPhotoReducer),
   __reducerSchema("release_band", ReleaseBandReducer),
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
+  __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
@@ -1061,6 +1073,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_reviews": Omit<typeof tablesSchema.schemaType.tables["boardReviews"], "accessorName"> & { readonly accessorName: "board_reviews" };
     /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
+    /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+    readonly "board_staff": Omit<typeof tablesSchema.schemaType.tables["boardStaff"], "accessorName"> & { readonly accessorName: "board_staff" };
     /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
     readonly "claim_checks": Omit<typeof tablesSchema.schemaType.tables["claimChecks"], "accessorName"> & { readonly accessorName: "claim_checks" };
     /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
@@ -1180,6 +1194,7 @@ const tableAccessorAliases = {
   "board_records": "boardRecords",
   "board_reviews": "boardReviews",
   "board_rules": "boardRules",
+  "board_staff": "boardStaff",
   "claim_checks": "claimChecks",
   "claim_facts": "claimFacts",
   "claim_ledger": "claimLedger",
@@ -1286,6 +1301,8 @@ export type DbView = __DbViewBase & {
   readonly "board_reviews": __DbViewBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __DbViewBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __DbViewBase["boardStaff"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __DbViewBase["claimChecks"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
@@ -1414,6 +1431,8 @@ export type Tables = __TablesBase & {
   readonly "board_reviews": __TablesBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __TablesBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __TablesBase["boardStaff"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __TablesBase["claimChecks"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */

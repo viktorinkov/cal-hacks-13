@@ -1313,6 +1313,17 @@ export const SocialTickTimer = __t.object("SocialTickTimer", {
 });
 export type SocialTickTimer = __Infer<typeof SocialTickTimer>;
 
+export const StaffMember = __t.object("StaffMember", {
+  id: __t.u64(),
+  email: __t.string(),
+  role: __t.string(),
+  name: __t.string(),
+  account: __t.option(__t.identity()),
+  addedBy: __t.identity(),
+  addedAt: __t.timestamp(),
+});
+export type StaffMember = __Infer<typeof StaffMember>;
+
 export const StaffRole = __t.object("StaffRole", {
   id: __t.u64(),
   identity: __t.identity(),
