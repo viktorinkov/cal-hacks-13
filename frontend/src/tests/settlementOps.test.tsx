@@ -300,7 +300,7 @@ describe('merch desk', () => {
     useSession.setState({ phase: 'live', owner: true, roles: [], eventEnded: true })
     render(<MerchExtras />)
 
-    await user.click(screen.getByRole('button', { name: /^Ada · Band 07/ }))
+    await user.click(screen.getByRole('button', { name: /^Ada · Band QY1G-XHXT/ }))
     const form = screen.getByRole('form', { name: 'Buy Night tee as Ada' })
     expect(within(form).getByLabelText('Size')).toHaveValue('M')
     const address = within(form).getByLabelText('Shipping address')
@@ -318,7 +318,7 @@ describe('merch desk', () => {
       shippingAddress: 'Ada Park, 2 Pier Rd, Oakland, CA 94607, US',
     })
 
-    await user.click(screen.getByRole('button', { name: /^Ben · Band 08/ }))
+    await user.click(screen.getByRole('button', { name: /^Ben · Band GBHE-TYN5/ }))
     expect(screen.getByRole('button', { name: 'Buy as Ben' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Run the shopping agent again' }))

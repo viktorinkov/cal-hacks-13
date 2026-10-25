@@ -799,6 +799,34 @@ pub fn stop_crowd(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+/// Wake the crowd where it froze: the tick runs again and every team's next move moves on by the time it
+/// stood still. Nobody is reseeded; the first tick marks the bands heard again.
+#[spacetimedb::reducer]
+pub fn wake_crowd(ctx: &ReducerContext) -> Result<(), String> {
+    require_role(ctx, &["ops", "tester"])?;
+    if ctx.db.crowd_member().count() == 0 {
+        return Err("there is no crowd to wake".into());
+    }
+    if ctx.db.crowd_timer().count() == 0 {
+        ctx.db.crowd_timer().insert(CrowdTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Interval(std::time::Duration::from_millis(TICK_MILLIS).into()),
+        });
+    }
+    // stop wrote the freeze time as each band's last_seen, so the teams resume from there.
+    let froze = ctx
+        .db
+        .band()
+        .iter()
+        .filter(|b| b.id >= FIRST_CROWD_BAND)
+        .map(|b| micros(b.last_seen))
+        .max();
+    if let Some(at) = froze {
+        resume(ctx, TimeDuration::from_micros(safety::micros_between(Timestamp::from_micros_since_unix_epoch(at), ctx.timestamp)));
+    }
+    Ok(())
+}
+
 /// Where a member of the crowd stands now: along their walk, else at their band's spot.
 fn standing(ctx: &ReducerContext, m: &CrowdMember) -> Option<P> {
     if let Some(w) = ctx.db.crowd_walk().band_id().find(m.band_id) {

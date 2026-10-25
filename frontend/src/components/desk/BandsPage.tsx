@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { MerchThumb } from '@/components/payments/MerchThumb'
 import { formatCents } from '@/cover/money'
+import { bandCode } from '@/lib/bandCode'
 import { usePayments } from '@/payments/store'
 import { useCatalog, type Photo } from '@/stdb/catalog'
 import { DeskFrame, Figure, when } from './DeskFrame'
@@ -95,7 +96,7 @@ export function BandsPage() {
       .filter((band) => {
         if (!q) return true
         const name = wearer.get(band.id)?.name ?? ''
-        return `${band.id} ${name} ${zoneName.get(band.zone) ?? ''}`.toLowerCase().includes(q)
+        return `${band.id} ${bandCode(band.id)} ${name} ${zoneName.get(band.zone) ?? ''}`.toLowerCase().includes(q)
       })
       .sort((a, b) => Number(b.sos || b.fall) - Number(a.sos || a.fall) || Number(b.online) - Number(a.online) || a.id - b.id)
   }, [bands, filter, query, wearer, zoneName])
@@ -108,7 +109,7 @@ export function BandsPage() {
           <Figure lead label="Online" value={online.toLocaleString('en-US')} note={`of ${bands.length.toLocaleString('en-US')}`} />
           <Figure label="Alerts" value={String(alerts)} note="SOS or fall" />
           <Figure label="Named" value={String([...wearer.values()].filter((person) => person.name).length)} note="matched to an attendee" />
-          <Figure label="Quiet" value={(bands.length - online).toLocaleString('en-US')} note="not currently online" />
+          <Figure label="Offline" value={(bands.length - online).toLocaleString('en-US')} note="not currently online" />
         </>
       }
     >
@@ -147,13 +148,13 @@ export function BandsPage() {
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpenId(open ? null : band.id)}
-                className="desk-row grid w-full grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,8rem)_5.5rem] items-baseline gap-3 text-left"
+                className="desk-row grid w-full grid-cols-[7rem_minmax(0,1fr)_minmax(0,8rem)_5.5rem] items-baseline gap-3 text-left"
               >
-                <span className="font-mono text-[13px] text-ink">{band.id}</span>
-                <span className="min-w-0 truncate text-[14px] text-ink">{person?.name || 'No name yet'}</span>
+                <span className="font-mono text-[13px] text-ink">{bandCode(band.id)}</span>
+                <span className="min-w-0 truncate text-[14px] text-ink">{person?.name || 'Unclaimed'}</span>
                 <span className="truncate text-[13px] text-ink-dim">{zoneName.get(band.zone) || (band.zone ? `Station ${band.zone}` : 'No zone')}</span>
                 <span className={band.sos || band.fall ? 'text-[13px] text-signal' : band.online ? 'text-[13px] text-teal' : 'text-[13px] text-ink-muted'}>
-                  {band.fall ? 'Fall' : band.sos ? 'SOS' : band.online ? 'Online' : 'Quiet'}
+                  {band.fall ? 'Fall' : band.sos ? 'SOS' : band.online ? 'Online' : 'Offline'}
                 </span>
               </button>
               {open && (
@@ -168,7 +169,7 @@ export function BandsPage() {
         })}
       </ul>
       {shown.length > 400 && <p className="mt-4 text-[13px] text-ink-muted">Showing the first 400 of {shown.length.toLocaleString('en-US')}. Narrow the list to see the rest.</p>}
-      {shown.length === 0 && <p className="mt-6 text-[15px] text-ink-dim">{bands.length === 0 ? 'The band table has not arrived yet.' : 'Nothing matches.'}</p>}
+      {shown.length === 0 && <p className="mt-6 text-[15px] text-ink-dim">{bands.length === 0 ? 'No band data yet.' : 'Nothing matches.'}</p>}
       {shown.some((band) => band.lastSeen) && <p className="mt-6 text-[13px] text-ink-muted">Last heard {when(Math.max(...shown.map((band) => band.lastSeen)))}.</p>}
     </DeskFrame>
   )

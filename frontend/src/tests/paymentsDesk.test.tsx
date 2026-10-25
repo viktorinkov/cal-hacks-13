@@ -58,11 +58,11 @@ describe('the payments desk', () => {
     const user = userEvent.setup()
     renderDesk()
     await user.type(screen.getByRole('searchbox'), '07')
-    const card = screen.getByLabelText('Band 07 wallet')
+    const card = screen.getByLabelText('Band QY1G-XHXT wallet')
     expect(card).toHaveTextContent('$60.00')
     const rows = within(screen.getByRole('table')).getAllByRole('row').filter((row) => row.tabIndex === 0)
     expect(rows.length).toBeGreaterThan(0)
-    for (const row of rows) expect(row).toHaveTextContent('Band 07')
+    for (const row of rows) expect(row).toHaveTextContent('Band QY1G-XHXT')
   })
 
   it('approves with exactly the amount and pack hash it showed', async () => {
@@ -133,7 +133,7 @@ describe('the payments desk', () => {
     const user = userEvent.setup()
     renderDesk()
     await user.type(screen.getByRole('searchbox'), '07')
-    await act(async () => { await user.click(screen.getAllByRole('button', { name: 'Buy for Band 07' })[0]) })
+    await act(async () => { await user.click(screen.getAllByRole('button', { name: 'Buy for Band QY1G-XHXT' })[0]) })
     for (const input of document.querySelectorAll('input, textarea')) {
       expect(input.getAttribute('autocomplete') ?? '').not.toMatch(/^cc-/)
       expect(`${input.getAttribute('name') ?? ''} ${input.id} ${input.getAttribute('placeholder') ?? ''}`).not.toMatch(/card|cvc|cvv|expir/i)

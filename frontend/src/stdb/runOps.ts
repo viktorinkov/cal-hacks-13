@@ -268,6 +268,7 @@ type RunReducers = {
   reopenEvent(args: Record<string, never>): Promise<unknown>
   startCrowd(args: { size: number }): Promise<unknown>
   stopCrowd(args: Record<string, never>): Promise<unknown>
+  wakeCrowd(args: Record<string, never>): Promise<unknown>
   approveClaim(args: { claimId: bigint; amountSeenCents: bigint; packHashSeen: string }): Promise<unknown>
   giveBand(args: { bandId: number; nodeId: bigint; name: string }): Promise<unknown>
   placeBand(args: { bandId: number; xM: number; yM: number; label: string }): Promise<unknown>
@@ -553,13 +554,17 @@ export interface StartInput {
   minutes: number
   pace: number
   fresh: boolean
+  /** 0 picks a new seed; the same seed sends the same people to the same spots and stages the same incidents. */
+  seed?: bigint
 }
 
 export function startRun(input: StartInput): Promise<boolean> {
   if (!whole(input.crowd, RUN_LIMITS.crowd)) return Promise.resolve(refuse('start', 'People must be a whole number from 1 to 2,000.'))
   if (!whole(input.minutes, RUN_LIMITS.minutes)) return Promise.resolve(refuse('start', 'Minutes must be a whole number from 1 to 240.'))
   if (!whole(input.pace, RUN_LIMITS.pace)) return Promise.resolve(refuse('start', 'Speed must be a whole number from 1 to 30.'))
-  return call('start', (r) => r.startLiveRun({ crowdSize: input.crowd, minutes: input.minutes, pace: input.pace, fresh: input.fresh, seed: 0n }))
+  const seed = input.seed ?? 0n
+  if (seed < 0n) return Promise.resolve(refuse('start', 'The seed cannot be negative.'))
+  return call('start', (r) => r.startLiveRun({ crowdSize: input.crowd, minutes: input.minutes, pace: input.pace, fresh: input.fresh, seed }))
 }
 
 export function pauseRun(): Promise<boolean> {
@@ -595,6 +600,11 @@ export function reopenEventRun(): Promise<boolean> {
 export function restartCrowd(size: number): Promise<boolean> {
   if (!whole(size, RUN_LIMITS.crowd)) return Promise.resolve(refuse('crowd', 'The crowd must be a whole number from 1 to 2,000.'))
   return call('crowd', (r) => r.startCrowd({ size }))
+}
+
+/** Resumes the crowd's backend ticker where it froze, without reseeding anyone. */
+export function wakeCrowd(): Promise<boolean> {
+  return call('crowd', (r) => r.wakeCrowd({}))
 }
 
 /** Freezes the crowd where it stands. */
@@ -665,8 +675,8 @@ export function isOnline(band: RunBand, now: number): boolean {
   return band.online && (band.id >= CROWD_FROM || now - band.lastSeen < 5000)
 }
 
-export function levelOf(average: number, yellow: number, red: number): 'calm' | 'busy' | 'very busy' {
-  return average >= red ? 'very busy' : average >= yellow ? 'busy' : 'calm'
+export function levelOf(average: number, yellow: number, red: number): 'normal' | 'busy' | 'very busy' {
+  return average >= red ? 'very busy' : average >= yellow ? 'busy' : 'normal'
 }
 
 export function markerKind(kind: string): string {
@@ -788,7 +798,7 @@ export interface ZoneRow {
   people: number
   hardware: number
   neighbours: number
-  level: 'calm' | 'busy' | 'very busy'
+  level: 'normal' | 'busy' | 'very busy'
   capacity: number
   exit: string
   stationOnline: boolean

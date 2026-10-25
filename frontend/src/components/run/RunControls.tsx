@@ -13,6 +13,7 @@ import {
   setRunLowVis,
   startRun,
   stopCrowdNow,
+  wakeCrowd,
   useRun,
   type RunSummary,
 } from '@/stdb/runOps'
@@ -58,10 +59,17 @@ function StartForm() {
   const [crowd, setCrowd] = useState(String(RUN_DEFAULTS.crowd))
   const [minutes, setMinutes] = useState(String(RUN_DEFAULTS.minutes))
   const [pace, setPace] = useState(String(RUN_DEFAULTS.pace))
+  const [seed, setSeed] = useState('')
   const [fresh, setFresh] = useState(true)
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    void startRun({ crowd: Number(crowd), minutes: Number(minutes), pace: Number(pace), fresh })
+    let parsed = 0n
+    try {
+      parsed = seed.trim() === '' ? 0n : BigInt(seed.trim())
+    } catch {
+      return
+    }
+    void startRun({ crowd: Number(crowd), minutes: Number(minutes), pace: Number(pace), fresh, seed: parsed })
   }
   return (
     <form onSubmit={submit} aria-label="Start the event" className="grid gap-4">
@@ -82,6 +90,11 @@ function StartForm() {
           </span>
         </label>
       </div>
+      <label className="text-[13px] text-ink-dim">
+        Seed
+        <input type="number" inputMode="numeric" min={0} placeholder="New" value={seed} onChange={(event) => setSeed(event.target.value)} className={`${field} mt-1 w-full tabular-nums`} />
+        <span className="mt-1 block text-[13px] leading-5 text-ink-dim">Blank picks a new one; a seed replays the same night.</span>
+      </label>
       <label className="flex items-start gap-3 text-[14px] text-ink">
         <input type="checkbox" checked={fresh} onChange={(event) => setFresh(event.target.checked)} className="mt-1 size-4 shrink-0 accent-[var(--color-champagne)]" />
         <span>
@@ -153,12 +166,22 @@ function EventExtras({ summary }: { summary: RunSummary }) {
   const crowd = summary.crowd || RUN_DEFAULTS.crowd
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <button type="button" disabled={busy != null} className={pill} onClick={() => void restartCrowd(crowd)}>
-        {busy === 'crowd' ? 'Working…' : 'Restart the crowd'}
+      <button type="button" disabled={busy != null} className={pill} onClick={() => void wakeCrowd()}>
+        {busy === 'crowd' ? 'Working…' : 'Resume the crowd'}
       </button>
       <TwoStep
+        label="Restart the crowd"
+        question="Restart the crowd? Everyone is reseeded: new spots, new teams."
+        confirm="Restart it"
+        working="Restarting…"
+        cancel="Keep this crowd"
+        busy={busy === 'crowd'}
+        disabled={busy != null}
+        onConfirm={() => restartCrowd(crowd)}
+      />
+      <TwoStep
         label="Stop the crowd"
-        question="Stop the crowd? Everyone freezes where they stand until you restart it."
+        question="Stop the crowd? Everyone freezes where they stand until you resume it."
         confirm="Stop it"
         working="Stopping…"
         cancel="Keep it moving"

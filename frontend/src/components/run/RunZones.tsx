@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CROWD_FROM, TEST_BANDS, clock, isOnline, setRunLowVis, useRun, zoneRows } from '@/stdb/runOps'
 import { Refusal, Section, TwoStep, pill } from './parts'
 
-const LEVEL_TONE = { calm: 'text-teal', busy: 'text-amber', 'very busy': 'text-signal' } as const
+const LEVEL_TONE = { normal: 'text-teal', busy: 'text-amber', 'very busy': 'text-signal' } as const
 const columns = 'md:grid-cols-[minmax(0,1.3fr)_5.5rem_6rem_6.5rem_5.5rem_5.5rem_5rem_minmax(0,7rem)]'
 
 /** Every zone now: who is in it, how close they stand, its exit colour and its station. */
@@ -54,7 +54,7 @@ export function RunZones({ now, ops }: { now: number; ops: boolean }) {
         {`${inZone.toLocaleString('en-US')} of the ${online.length.toLocaleString('en-US')} bands are in a zone right now. The gateway, which receives the hardware bands, is ${gateway?.online ? 'online' : 'offline'}${gateway ? `, last heard at ${clock(gateway.lastLine)}` : ''}. A zone is busy when its bands have ${yellow} other bands close by on average, very busy at ${red}.`}
       </p>
       {rows.length === 0 ? (
-        <p className="mt-6 text-[15px] text-ink-dim">The zone table has not arrived yet.</p>
+        <p className="mt-6 text-[15px] text-ink-dim">No zone data yet.</p>
       ) : (
         <>
           <div aria-hidden className={`mt-6 hidden gap-3 px-4 text-[13px] text-ink-dim md:grid ${columns}`}>

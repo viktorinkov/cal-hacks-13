@@ -43,7 +43,7 @@ export function CostsPage() {
     >
       {error && <p role="alert" className="mb-6 text-[14px] text-rust">{error}</p>}
       {empty ? (
-        <p className="text-[15px] text-ink-dim">No claims or paid orders have arrived yet.</p>
+        <p className="text-[15px] text-ink-dim">No claims or paid orders yet.</p>
       ) : (
         <>
           <p className="max-w-[72ch] text-[14px] leading-6 text-ink-dim">Net cost uses booked claim expenses and recovery credits. Payments received and amounts still owed are shown separately below.</p>

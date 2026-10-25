@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { BandTapDialog } from '@/components/cover/BandTapDialog'
 import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
 import { formatCents } from '@/cover/money'
+import { bandCode } from '@/lib/bandCode'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
 import { ClaimExtras } from '@/components/claims/ClaimExtras'
@@ -156,7 +157,7 @@ function Figure({ label, value, note, lead = false }: { label: string; value: st
 }
 
 function ClaimRow({ claim, selected, onChoose }: { claim: BoardClaim; selected: boolean; onChoose: () => void }) {
-  const who = claim.claimantName || (claim.bandId ? `band ${claim.bandId}` : 'no claimant')
+  const who = claim.claimantName || (claim.bandId ? `band ${bandCode(claim.bandId)}` : 'no claimant')
   const note = `${claim.zoneName} · ${claim.openedAt} · ${who} · ${statusLabel(claim.status)}`
   return (
     <button
@@ -270,7 +271,7 @@ function Docket({
 
       {claim.bandId > 0 && (
         <button type="button" onClick={() => onRead(claim.bandId)} className="mt-4 h-11 text-[14px] text-ink">
-          {`Read band ${claim.bandId}`}
+          {`Read band ${bandCode(claim.bandId)}`}
         </button>
       )}
       <ClaimExtras claimId={claim.id} />

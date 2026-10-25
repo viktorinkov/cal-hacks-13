@@ -57,7 +57,7 @@ afterEach(() => {
 describe('the wallet', () => {
   it('shows the balance as the largest figure, beside the strap', () => {
     renderWallet()
-    const hero = screen.getByLabelText('Band 07 wallet')
+    const hero = screen.getByLabelText('Band QY1G-XHXT wallet')
     expect(within(hero).getByText('$60.00')).toHaveClass('wallet-balance')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('$40.00 paid.')
   })
@@ -106,7 +106,7 @@ describe('the wallet', () => {
     seedSession([], { myBand: null, myBandReady: true, wallet: null })
     useSession.setState({ claimBand, connectWallet })
     renderWallet('/wallet?band=band-12')
-    expect(screen.getByLabelText('Band 12 wallet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Band 3VC8-948S wallet')).toBeInTheDocument()
     await waitFor(() => expect(claimBand).toHaveBeenCalledWith('BANDIT-12'))
     await waitFor(() => expect(connectWallet).toHaveBeenCalled())
   })
@@ -115,7 +115,7 @@ describe('the wallet', () => {
     seedSession([], { myBand: { bandId: 12, status: 'waiting_for_press', expiresAt: null }, myBandReady: true, wallet: null })
     useSession.setState({ claimBand, connectWallet })
     renderWallet('/wallet?band=band-12')
-    expect(screen.getByLabelText('Band 12 wallet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Band 3VC8-948S wallet')).toBeInTheDocument()
     await waitFor(() => expect(connectWallet).toHaveBeenCalled())
     expect(claimBand).not.toHaveBeenCalled()
   })
@@ -125,7 +125,7 @@ describe('the wallet', () => {
     seedSession([], { myBand: null, myBandReady: true, wallet: null })
     useSession.setState({ claimBand, connectWallet })
     renderWallet('/wallet')
-    expect(screen.getByLabelText('Band 08 wallet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Band GBHE-TYN5 wallet')).toBeInTheDocument()
     await waitFor(() => expect(claimBand).toHaveBeenCalledWith('BANDIT-08'))
   })
 

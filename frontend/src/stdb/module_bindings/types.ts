@@ -644,6 +644,32 @@ export const EventBundle = __t.object("EventBundle", {
 });
 export type EventBundle = __Infer<typeof EventBundle>;
 
+export const EventImport = __t.object("EventImport", {
+  id: __t.u64(),
+  eventSlug: __t.string(),
+  eventName: __t.string(),
+  runId: __t.string(),
+  status: __t.string(),
+  error: __t.string(),
+  venueId: __t.u64(),
+  get counts() {
+    return __t.array(SectionCount);
+  },
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type EventImport = __Infer<typeof EventImport>;
+
+export const EventImportStep = __t.object("EventImportStep", {
+  id: __t.u64(),
+  importId: __t.u64(),
+  step: __t.string(),
+  detail: __t.string(),
+  at: __t.timestamp(),
+});
+export type EventImportStep = __Infer<typeof EventImportStep>;
+
 // The tagged union or sum type for the algebraic type `EventKind`.
 export const EventKind = __t.enum("EventKind", {
   Online: __t.unit(),

@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRoute } from '@/cover/route'
 import { formatCents } from '@/cover/money'
+import { bandCode } from '@/lib/bandCode'
 import { useSession } from '@/stdb/session'
 
 /** A tap reads the medical card the database will release, and this person's wallet. */
@@ -27,7 +28,7 @@ export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: str
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-popover text-ink sm:max-w-[420px]">
         <DialogHeader>
-          <DialogTitle className="font-display text-[28px] font-normal text-ink">Band {label}</DialogTitle>
+          <DialogTitle className="font-display text-[28px] font-normal text-ink">Band {number > 0 ? bandCode(number) : label}</DialogTitle>
           <DialogDescription className="text-[14px] text-ink-dim">
             {card ? 'The database released this card for an open incident.' : 'A medic can read the card only while an SOS or fall is open.'}
           </DialogDescription>

@@ -1,7 +1,8 @@
 import { isViewing } from '@/stdb/viewing'
 import { useEffect, useRef } from 'react'
 import { useRoute } from '@/cover/route'
-import { bandDigits, clock } from '@/payments/model'
+import { bandCode } from '@/lib/bandCode'
+import { clock } from '@/payments/model'
 import {
   assignMedic, KEYS, medicCardFor, requestMedicalCard, useAttendee, useMedicOnBand, type MedicCard, type OpenIncident,
 } from '@/stdb/attendeeOps'
@@ -90,7 +91,7 @@ export function MedicTap({ bandId }: { bandId: number }) {
   }, [show, incidentId, bandId])
 
   if (!show || !incident) return null
-  const band = bandDigits(bandId)
+  const band = bandCode(bandId)
   const card = medicCardFor(cards, bandId, incident.id)
   const opened = clock(incident.openedAt)
   const refused = request?.state === 'refused' ? request.message : ''

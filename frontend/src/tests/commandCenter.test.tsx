@@ -80,7 +80,7 @@ afterEach(() => {
 describe('command center', () => {
   it('starts quiet', async () => {
     await boot()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('No open incidents.')
   })
 
   it('an SOS creates an incident, opens it and focuses the map on it', async () => {
@@ -181,6 +181,6 @@ describe('command center', () => {
     await act(async () => adapter.resetSimulation())
     await waitFor(() => expect(Object.keys(useWorld.getState().incidents)).toHaveLength(0))
     expect(useWorld.getState().scenario?.step).toBe('normal')
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('No open incidents.')
   })
 })
