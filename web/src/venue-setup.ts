@@ -1,14 +1,15 @@
 // The Venue tab of the organizer portal. The organizer types the event's name, and a worker finds the
 // event's site, its venue and any public 3D map of it, then saves the venue's model; each step shows here
 // as it happens. The organizer picks the venue the portal shows. The Cal Hacks 13.0 model at the Palace of
-// Fine Arts ships with the app and is the default.
+// Fine Arts ships with the app and is the default. The organizer also uploads the venue's insurance policy
+// here: each term read from it shows with its quote and page, and once confirmed it sets the claims' limits.
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { act, date, field, h, time } from './lib';
+import { act, date, field, h, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
-import type { VenueSetup } from './module_bindings/types';
+import type { PolicyDocument, PolicyTerm, VenueSetup } from './module_bindings/types';
 
 /** Setup 0: the venue that ships with the app. */
 const DEFAULT_SETUP = 0n;
@@ -185,6 +186,155 @@ function run(s: VenueSetup) {
     h('p', { class: 'muted' }, `Started ${date(s.createdAt)}`));
 }
 
+// --- The insurance policy ---------------------------------------------------------------------
+
+const DOC_STATUS: Record<string, string> = { reading: 'Reading', read: 'Read, waiting for you to confirm', confirmed: 'In use for the event', failed: 'Failed' };
+
+const TERM_WORDS: Record<string, string> = {
+  insurer_name: 'Insurer',
+  policy_number: 'Policy number',
+  fnol_contact: 'Claims reporting contact',
+  period_start: 'Policy period starts',
+  period_end: 'Policy period ends',
+  other_insurance: 'Other insurance',
+  per_claim_limit: 'Per-claim limit',
+  aggregate_limit: 'Aggregate limit',
+  deductible: 'Deductible',
+  minimum_payout: 'Minimum payout',
+  service_window_days: 'Service window',
+};
+
+const EXCLUSION_WORDS: Record<string, string> = {
+  staff: 'Employees and volunteers of the venue',
+  pre_existing: 'An injury that began before the event',
+  off_premises: 'An injury away from the premises',
+  care_custody_control: "Property in the venue's care, custody or control",
+  other: 'Other exclusion',
+};
+
+const OTHER_INSURANCE_WORDS: Record<string, string> = {
+  primary: "primary: the venue's policy pays first",
+  excess: "excess: the venue's policy pays what the attendee's own insurance leaves",
+};
+
+/** A fee cap's read value is the description the policy printed, then the cap. */
+function feeRead(t: PolicyTerm): [string, string] {
+  const at = t.readValue.lastIndexOf(' ');
+  return at < 0 ? ['', t.readValue] : [t.readValue.slice(0, at), t.readValue.slice(at + 1)];
+}
+
+function termLabel(t: PolicyTerm) {
+  if (t.name === 'exclusion') return EXCLUSION_WORDS[t.code] ?? t.code;
+  if (t.name === 'fee_cap') return `${t.code} ${feeRead(t)[0]}`.trim();
+  return TERM_WORDS[t.name] ?? t.name;
+}
+
+const TERM_GROUPS: [string, (t: PolicyTerm) => boolean][] = [
+  ['Policy', t => !t.coverKind && t.name !== 'exclusion'],
+  ['Medical payments', t => t.coverKind === 'medical_payments' && t.name !== 'fee_cap'],
+  ['Property', t => t.coverKind === 'property'],
+  ['Schedule of benefits', t => t.name === 'fee_cap'],
+  ['Exclusions', t => t.name === 'exclusion'],
+];
+
+/** The venue's policy documents, newest first. */
+function policyDocs(): PolicyDocument[] {
+  return [...conn.db.boardPolicyDocuments.iter()].filter(d => d.kind === 'venue_policy').sort((a, b) => Number(b.id - a.id));
+}
+
+async function uploadPolicy(form: HTMLFormElement) {
+  const input = form.querySelector('input[type=file]') as HTMLInputElement;
+  const bytes = await input.files?.[0]?.arrayBuffer();
+  if (!bytes) throw new Error('choose the policy PDF');
+  const res = await fetch('/api/blobs?purpose=policy', { method: 'POST', headers: { 'content-type': 'application/pdf' }, body: bytes });
+  const blob = await res.json();
+  if (!res.ok) throw new Error(blob.error);
+  await conn.reducers.submitPolicyDocument({ fileHash: blob.hash, pageCount: blob.pages });
+  input.value = '';
+}
+
+function policyDoc(d: PolicyDocument) {
+  const cls = d.status === 'confirmed' ? 'pass' : d.status === 'failed' ? 'fail' : '';
+  return h('li', {},
+    h('a', { href: `/blobs/${d.fileHash}`, target: '_blank', rel: 'noreferrer' }, `Policy PDF, ${d.pageCount} pages`),
+    `, uploaded ${date(d.uploadedAt)} `, h('span', { class: cls }, `· ${DOC_STATUS[d.status] ?? d.status}`),
+    d.status !== 'reading' && d.status !== 'failed' && `. ${d.clauseCount} clauses checked word for word on their pages`,
+    d.confirmedAt && `. Confirmed ${date(d.confirmedAt)}`,
+    d.error && h('p', { class: 'fail' }, d.error),
+    d.dropped.length > 0 && h('details', {}, h('summary', {}, `Dropped (${d.dropped.length})`), h('ul', {}, d.dropped.map(x => h('li', {}, x)))));
+}
+
+function termRow(t: PolicyTerm) {
+  const cls = t.status === 'read' ? 'pass' : t.status === 'flagged' ? 'fail' : 'muted';
+  return h('tr', {},
+    h('td', {}, termLabel(t)),
+    h('td', {}, t.shown),
+    h('td', {}, t.name === 'fee_cap' ? feeRead(t)[1] : t.readValue),
+    h('td', { class: 'muted' }, t.quote),
+    h('td', {}, t.page || ''),
+    h('td', { class: cls }, t.status),
+    h('td', {}, t.problem));
+}
+
+function termsTable(d: PolicyDocument) {
+  const terms = [...conn.db.boardPolicyTerms.iter()].filter(t => t.documentId === d.id).sort((a, b) => Number(a.id - b.id));
+  const flagged = terms.filter(t => t.status === 'flagged').length;
+  return [
+    h('h4', {}, `Terms read from the policy uploaded ${date(d.uploadedAt)}`),
+    h('p', { class: 'muted' }, `${terms.length} terms, ${flagged} flagged. "read": read from the policy and checked. "flagged": a check failed, so the default stays. "default": the policy does not state it.`),
+    h('table', {},
+      h('tr', {}, ['Term', 'In effect', 'Read from the policy', 'Quote', 'Page', 'Status', 'Problem'].map(c => h('th', {}, c))),
+      TERM_GROUPS.map(([group, inGroup]) => {
+        const rows = terms.filter(inGroup);
+        return rows.length > 0 && [h('tr', {}, h('th', { colspan: 7 }, group)), rows.map(termRow)];
+      })),
+    d.status === 'read' && h('p', {}, h('button', { onclick: () => act(() => conn.reducers.confirmPolicyTerms({ documentId: d.id })) }, 'Use these terms for the event')),
+  ];
+}
+
+/** The policy claims take now: the newest confirmed venue policy's, else the newest policy row. */
+function inEffect() {
+  const confirmed = policyDocs().filter(d => d.status === 'confirmed' && d.confirmedAt)
+    .sort((a, b) => Number(b.confirmedAt!.microsSinceUnixEpoch - a.confirmedAt!.microsSinceUnixEpoch))[0];
+  const policies = [...conn.db.boardPolicies.iter()];
+  const p = policies.find(x => confirmed && x.id === confirmed.policyId) ?? policies.sort((a, b) => Number(b.id - a.id))[0];
+  if (!p) return h('p', { class: 'muted' }, 'No policy in effect yet.');
+  const day = (ms: number) => new Date(ms).toLocaleDateString('en-CA');
+  // The period's end is stored as the midnight after its last day.
+  const period = p.periodChecked
+    ? `${day(p.periodStart.toDate().getTime())} to ${day(p.periodEnd.toDate().getTime() - 1)}`
+    : 'not stated, so not checked';
+  const covers = [...conn.db.boardCovers.iter()].filter(c => c.policyId === p.id).sort((a, b) => a.coverKind.localeCompare(b.coverKind));
+  const codes = [...conn.db.boardFeeSchedule.iter()].filter(l => l.policyId === p.id).length;
+  return [
+    h('h4', {}, 'In effect now'),
+    h('p', {}, h('b', {}, `Policy ${p.policyNumber}`), ` with ${p.insurerName}. Period ${period}. Other insurance: ${OTHER_INSURANCE_WORDS[p.otherInsurance] ?? p.otherInsurance}.`,
+      ` Claims reported to ${p.fnolContact}.`, p.staffExcluded && ' Employees and volunteers are excluded.'),
+    h('table', {},
+      h('tr', {}, ['Cover', 'Per-claim limit', 'Aggregate limit', 'Deductible', 'Minimum payout', 'Service window'].map(c => h('th', {}, c))),
+      covers.map(c => h('tr', {},
+        h('td', {}, c.coverKind === 'medical_payments' ? 'Medical payments' : c.coverKind === 'property' ? 'Property' : c.coverKind),
+        h('td', {}, money(c.perClaimLimitCents)), h('td', {}, money(c.aggregateLimitCents)), h('td', {}, money(c.deductibleCents)),
+        h('td', {}, money(c.minimumPayoutCents)), h('td', {}, c.serviceWindowDays ? `${c.serviceWindowDays} days` : 'none')))),
+    h('p', {}, 'Schedule of benefits: ', codes ? `${codes} codes from the policy` : 'default schedule, 21 codes', '.'),
+  ];
+}
+
+/** Shown to the organizer only. */
+function policySection() {
+  const docs = policyDocs();
+  const shownDoc = docs.find(d => d.status === 'read' || d.status === 'confirmed');
+  return h('section', {},
+    h('h3', {}, 'Insurance policy'),
+    h('p', { class: 'muted' }, "Upload the venue's insurance policy PDF. Each term is read from the policy with its quote and page, then checked. Until you confirm the terms, claims use the defaults."),
+    h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => uploadPolicy(e.target as HTMLFormElement)); } },
+      h('input', { type: 'file', name: 'policy-pdf', accept: 'application/pdf' }), ' ',
+      h('button', {}, 'Upload and read')),
+    docs.length > 0 && [h('h4', {}, `Uploaded (${docs.length})`), h('ul', {}, docs.map(policyDoc))],
+    shownDoc && termsTable(shownDoc),
+    inEffect());
+}
+
 export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   conn = c;
   if (!view) makeView();
@@ -193,6 +343,7 @@ export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   return [
     shown(),
     startForm(canSetUp),
+    canSetUp && policySection(),
     runs.length > 0 && h('section', {}, h('h3', {}, `Setups (${runs.length})`), runs.map(run)),
   ];
 }

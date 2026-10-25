@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, settlements: who pays what on each
 // claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the event graph with its photos,
-// the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
+// the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name with the venue's insurance policy, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -47,6 +47,10 @@ const QUERIES = [
   'SELECT * FROM board_ledger',
   'SELECT * FROM board_rules',
   'SELECT * FROM board_policies',
+  'SELECT * FROM board_covers',
+  'SELECT * FROM board_policy_documents',
+  'SELECT * FROM board_policy_terms',
+  'SELECT * FROM board_fee_schedule',
   'SELECT * FROM medic_medical_cards',
   'SELECT * FROM event_graph',
   'SELECT * FROM board_photos',
