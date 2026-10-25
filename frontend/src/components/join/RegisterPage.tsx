@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
+import { ArrowRight, Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CoverSlip } from '@/components/cover/CoverSlip'
 import { MOCK_BANDS, type MockBand } from '@/mock/bands'
@@ -379,7 +379,7 @@ function WalletStatus() {
 
 export function RegisterPage() {
   const [lights, setLights] = useState(true)
-  const { search } = useRoute()
+  const { search, go } = useRoute()
   const band = bandFromLocation(search)
   return (
     <div data-page data-lights={lights ? 'on' : 'off'} className="signup-page h-full overflow-y-auto bg-ground text-ink">
@@ -387,10 +387,16 @@ export function RegisterPage() {
       <div className="signup-shell">
         <NightHeader lights={lights} onToggleLights={() => setLights((current) => !current)} />
         {band ? <RegistrationForm key={band.deviceId} band={band} /> : (
-          <div className="signup-tap">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
-            <h1 className="signup-title mt-8">Tap your band to start.</h1>
-            <p className="mt-5 text-[16px] leading-7 text-ink-dim">Hold your phone near your band’s NFC tag and open the link. We’ll take you straight to your band.</p>
+          <div className="signup-tap-screen">
+            <div className="signup-tap">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
+              <h1 className="signup-title mt-8">Tap your band to start.</h1>
+              <p className="mt-5 text-[16px] leading-7 text-ink-dim">Hold your phone near your band’s NFC tag and open the link. We’ll take you straight to your band.</p>
+            </div>
+            {/* Without a tag to hand, Next opens the first band, the same page its tag opens. */}
+            <Button type="button" className="signup-primary signup-next" onClick={() => go(`/register?band=${MOCK_BANDS[0].deviceId}`)}>
+              Next <ArrowRight size={16} aria-hidden="true" />
+            </Button>
           </div>
         )}
       </div>
