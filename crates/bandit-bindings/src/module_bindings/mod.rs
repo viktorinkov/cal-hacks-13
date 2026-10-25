@@ -58,11 +58,14 @@ pub mod board_records_table;
 pub mod board_reviews_table;
 pub mod board_rules_table;
 pub mod board_staff_table;
+pub mod board_wallet_type;
+pub mod board_wallets_table;
 pub mod booth_in_type;
 pub mod booth_table;
 pub mod booth_type;
 pub mod bridge_table;
 pub mod bridge_type;
+pub mod buy_merch_as_reducer;
 pub mod buy_merch_reducer;
 pub mod camera_table;
 pub mod camera_type;
@@ -428,11 +431,14 @@ pub use board_records_table::*;
 pub use board_reviews_table::*;
 pub use board_rules_table::*;
 pub use board_staff_table::*;
+pub use board_wallet_type::BoardWallet;
+pub use board_wallets_table::*;
 pub use booth_in_type::BoothIn;
 pub use booth_table::*;
 pub use booth_type::Booth;
 pub use bridge_table::*;
 pub use bridge_type::Bridge;
+pub use buy_merch_as_reducer::buy_merch_as;
 pub use buy_merch_reducer::buy_merch;
 pub use camera_table::*;
 pub use camera_type::Camera;
@@ -800,6 +806,12 @@ pub enum Reducer {
         call: Option<ModelCallIn>,
     },
     BuyMerch {
+        template_id: u64,
+        photo_id: u64,
+        size: String,
+    },
+    BuyMerchAs {
+        node_id: u64,
         template_id: u64,
         photo_id: u64,
         size: String,
@@ -1183,6 +1195,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
             Reducer::BuyMerch { .. } => "buy_merch",
+            Reducer::BuyMerchAs { .. } => "buy_merch_as",
             Reducer::ChooseVenue { .. } => "choose_venue",
             Reducer::ClaimBand { .. } => "claim_band",
             Reducer::ClaimJob { .. } => "claim_job",
@@ -1363,6 +1376,17 @@ impl __sdk::Reducer for Reducer {
                 photo_id,
                 size,
             } => __sats::bsatn::to_vec(&buy_merch_reducer::BuyMerchArgs {
+                template_id: template_id.clone(),
+                photo_id: photo_id.clone(),
+                size: size.clone(),
+            }),
+            Reducer::BuyMerchAs {
+                node_id,
+                template_id,
+                photo_id,
+                size,
+            } => __sats::bsatn::to_vec(&buy_merch_as_reducer::BuyMerchAsArgs {
+                node_id: node_id.clone(),
                 template_id: template_id.clone(),
                 photo_id: photo_id.clone(),
                 size: size.clone(),
@@ -2041,6 +2065,7 @@ pub struct DbUpdate {
     board_reviews: __sdk::TableUpdate<ClaimReview>,
     board_rules: __sdk::TableUpdate<SettlementRuleRow>,
     board_staff: __sdk::TableUpdate<StaffMember>,
+    board_wallets: __sdk::TableUpdate<BoardWallet>,
     booth: __sdk::TableUpdate<Booth>,
     bridge: __sdk::TableUpdate<Bridge>,
     camera: __sdk::TableUpdate<Camera>,
@@ -2246,6 +2271,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_staff" => db_update
                     .board_staff
                     .append(board_staff_table::parse_table_update(table_update)?),
+                "board_wallets" => db_update
+                    .board_wallets
+                    .append(board_wallets_table::parse_table_update(table_update)?),
                 "booth" => db_update
                     .booth
                     .append(booth_table::parse_table_update(table_update)?),
@@ -2912,6 +2940,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.board_staff = cache
             .apply_diff_to_table::<StaffMember>("board_staff", &self.board_staff)
             .with_updates_by_pk(|row| &row.id);
+        diff.board_wallets =
+            cache.apply_diff_to_table::<BoardWallet>("board_wallets", &self.board_wallets);
         diff.claim_checks =
             cache.apply_diff_to_table::<ClaimCheck>("claim_checks", &self.claim_checks);
         diff.claim_facts =
@@ -3067,6 +3097,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_staff" => db_update
                     .board_staff
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_wallets" => db_update
+                    .board_wallets
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "booth" => db_update
                     .booth
@@ -3504,6 +3537,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_staff" => db_update
                     .board_staff
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_wallets" => db_update
+                    .board_wallets
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "booth" => db_update
                     .booth
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3886,6 +3922,7 @@ pub struct AppliedDiff<'r> {
     board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
     board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
     board_staff: __sdk::TableAppliedDiff<'r, StaffMember>,
+    board_wallets: __sdk::TableAppliedDiff<'r, BoardWallet>,
     booth: __sdk::TableAppliedDiff<'r, Booth>,
     bridge: __sdk::TableAppliedDiff<'r, Bridge>,
     camera: __sdk::TableAppliedDiff<'r, Camera>,
@@ -4114,6 +4151,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<StaffMember>(
             "board_staff",
             &self.board_staff,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<BoardWallet>(
+            "board_wallets",
+            &self.board_wallets,
             event,
         );
         callbacks.invoke_table_row_callbacks::<Booth>("booth", &self.booth, event);
@@ -5145,6 +5187,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_reviews_table::register_table(client_cache);
         board_rules_table::register_table(client_cache);
         board_staff_table::register_table(client_cache);
+        board_wallets_table::register_table(client_cache);
         booth_table::register_table(client_cache);
         bridge_table::register_table(client_cache);
         camera_table::register_table(client_cache);
@@ -5288,6 +5331,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_reviews",
         "board_rules",
         "board_staff",
+        "board_wallets",
         "booth",
         "bridge",
         "camera",

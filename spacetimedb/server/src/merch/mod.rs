@@ -192,10 +192,22 @@ pub fn load_merch_templates(ctx: &ReducerContext, templates: Vec<MerchTemplateIn
 /// Buys one template with one of the caller's photos, paid from their wallet.
 #[spacetimedb::reducer]
 pub fn buy_merch(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
+    place_order(ctx, ctx.sender(), template_id, photo_id, size)
+}
+
+/// The organizer buys for an attendee exactly as the attendee would from their recap: the same
+/// checks, paid from the attendee's wallet.
+#[spacetimedb::reducer]
+pub fn buy_merch_as(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let a = ctx.db.attendee().node_id().find(node_id).ok_or("no such attendee")?;
+    place_order(ctx, a.identity, template_id, photo_id, size)
+}
+
+fn place_order(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
     if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) {
         return Err("merch opens in your recap once the event ends".into());
     }
-    let me = ctx.sender();
     let t = ctx.db.merch_template().id().find(template_id).ok_or("no such template")?;
     let size = match t.kind.as_str() {
         "tee" if TEE_SIZES.contains(&size.as_str()) => size,

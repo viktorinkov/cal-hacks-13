@@ -13,8 +13,9 @@ import { bandCode } from '../band-code';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
+import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
-import type { Claim } from '../module_bindings/types';
+import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
@@ -48,6 +49,7 @@ const QUERIES = [
   'SELECT * FROM board_photos',
   'SELECT * FROM merch_template',
   'SELECT * FROM board_merch_orders',
+  'SELECT * FROM board_wallets',
   'SELECT * FROM board_merch_picks',
   'SELECT * FROM venue_setup',
   'SELECT * FROM venue_setup_step',
@@ -542,12 +544,114 @@ function photosTab() {
 
 // --- Merch --------------------------------------------------------------------------------
 
-/** Template thumbnails, kept across redraws so the images don't blank out each second. */
+/** Thumbnails, kept across redraws so the images don't blank out each second. One element can sit in
+ *  one place only, so each is kept per `slot`, the row it shows in. */
 const thumbs = new Map<string, HTMLElement>();
 
-function thumb(url: string, title: string) {
-  if (!thumbs.has(url)) thumbs.set(url, h('a', { href: url, target: '_blank' }, h('img', { src: url, width: 64, alt: title })));
-  return thumbs.get(url)!;
+function thumb(url: string, title: string, slot: string) {
+  const key = `${slot} ${url}`;
+  if (!thumbs.has(key)) thumbs.set(key, h('a', { href: url, target: '_blank' }, h('img', { src: url, width: 64, alt: title })));
+  return thumbs.get(key)!;
+}
+
+/** The attendee the organizer is buying as, by node id. */
+let shopper: bigint | undefined;
+
+/** How a photo becomes merch, with how far tonight's event has got at each step. */
+function merchFlow() {
+  const photos = [...conn.db.boardPhotos.iter()];
+  const picked = new Set([...conn.db.boardMerchPicks.iter()].map(p => p.nodeId));
+  const orders = [...conn.db.boardMerchOrders.iter()];
+  const steps: [string, string, string][] = [
+    [`${photos.length} photos`, 'A photographer takes a photo', 'The people whose bands stood together in that zone at that moment are tagged.'],
+    [`${photos.filter(p => p.read).length} read`, 'Claude reads the photo', 'It counts the people and writes a caption; the tags keep that many, the ones standing closest.'],
+    [`${picked.size} people`, 'The shopping agent picks', 'When the event ends, Claude picks three products for each person in a photo, from the booths they stayed at, on the photo with the people they met, with a line to print.'],
+    [`${orders.length} order${orders.length === 1 ? '' : 's'}`, 'The attendee buys', 'One tap in their recap pays from their BandIt wallet, which holds the money until the purchase goes through.'],
+    [`${orders.filter(o => o.status === 'paid').length} paid`, 'Capital One records it', 'The worker makes the Nessie purchase at the merch shop and the order keeps its receipt.'],
+  ];
+  return h('section', {},
+    h('h3', {}, 'How merch works'),
+    h('div', { class: 'flow' }, steps.map(([count, title, detail], i) => [
+      i > 0 && h('span', { class: 'arrow' }, '→'),
+      h('div', { class: 'step' }, h('div', { class: 'count' }, count), h('b', {}, title), h('div', { class: 'muted' }, detail))])));
+}
+
+/** A button for every attendee with a wallet; the chosen one's shop follows, laid out as the same steps. */
+function buyAs() {
+  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const people = new Map([...conn.db.boardAttendees.iter()].map(a => [a.nodeId, a.displayName || 'no name yet']));
+  const wallets = [...conn.db.boardWallets.iter()].filter(w => people.has(w.nodeId))
+    .sort((a, b) => people.get(a.nodeId)!.localeCompare(people.get(b.nodeId)!));
+  const chosen = wallets.find(w => w.nodeId === shopper);
+  return h('section', {},
+    h('h3', {}, 'Buy as an attendee'),
+    h('p', { class: 'muted' }, ended
+      ? 'Pick someone to see their shop as their recap shows it, and buy for them from their own wallet.'
+      : 'Merch is sold once the event ends. Until then this shows each wallet.'),
+    !wallets.length && h('p', { class: 'muted' }, 'Nobody has a wallet yet. Attendees connect one at band setup.'),
+    h('p', {}, wallets.map(w => h('button', { class: w.nodeId === shopper ? 'on' : '', onclick: () => { shopper = w.nodeId; render(); } },
+      `${people.get(w.nodeId)} · ${money(w.balanceCents)}`))),
+    chosen && shopFor(chosen, people, ended));
+}
+
+/** The pick as the recap draws it. The booth crawl ticks come from the attendee's own view, so none show here. */
+function pickMockup(p: BoardMerchPick, t: MerchTemplate) {
+  const key = `${p.nodeId} ${p.templateId} ${p.photoId}`;
+  if (!pickMockups.has(key)) pickMockups.set(key, mockup({ ...t, rank: p.rank, templateId: t.id, photoId: p.photoId, photoUrl: p.photoUrl, line: p.line, reason: p.reason, friends: [], ticks: [] }));
+  return pickMockups.get(key)!;
+}
+
+const pickMockups = new Map<string, HTMLCanvasElement>();
+
+function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
+  const who = people.get(w.nodeId)!;
+  const picks = [...conn.db.boardMerchPicks.iter()].filter(p => p.nodeId === w.nodeId).sort((a, b) => a.rank - b.rank);
+  const orders = [...conn.db.boardMerchOrders.iter()].filter(o => o.nodeId === w.nodeId).sort((a, b) => Number(b.id - a.id));
+  const photoIds = new Set(picks.map(p => p.photoId));
+  const photos = [...conn.db.boardPhotos.iter()].filter(p => photoIds.has(p.id));
+  const buy = (e: Event, p: BoardMerchPick, kind: string) => {
+    e.preventDefault();
+    const size = kind === 'tee' ? field(e.target as HTMLElement, `as-size-${p.templateId}`) : '';
+    act(() => conn.reducers.buyMerchAs({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size }));
+  };
+  return h('div', { class: 'flow down' },
+    h('div', { class: 'step' },
+      h('b', {}, `1. ${who}'s photo`),
+      !photos.length && h('p', { class: 'muted' }, 'None picked yet.'),
+      photos.map(p => [picture(p.url),
+        h('div', {}, p.caption || 'Event photo'),
+        h('div', { class: 'muted' }, `${p.zoneName}, ${date(p.takenAt)}${p.read ? `, ${p.peopleCount} people counted` : ''}`),
+        h('div', {}, `With ${p.nodeIds.filter(id => id !== w.nodeId).map(id => people.get(id) ?? 'no name yet').join(', ') || 'nobody else tagged'}`)])),
+    h('span', { class: 'arrow' }, '↓'),
+    h('div', { class: 'step' },
+      h('b', {}, '2. The shopping agent\'s picks'),
+      !picks.length && h('p', { class: 'muted' }, ended ? 'No picks for them yet: the agent picks for everyone in a photo.' : 'The agent picks when the event ends.'),
+      h('div', { class: 'merch' }, picks.map(p => {
+        const t = conn.db.merchTemplate.id.find(p.templateId);
+        if (!t) return null;
+        return h('figure', {}, pickMockup(p, t),
+          h('figcaption', {},
+            h('b', {}, `${p.rank}. ${t.title}`), ` · ${money(t.priceCents)}`,
+            p.reason && h('div', { class: 'muted' }, p.reason),
+            h('form', { onsubmit: (e: Event) => buy(e, p, t.kind) },
+              t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `as-size-${p.templateId}` },
+                ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
+              h('button', { disabled: !ended || w.balanceCents < t.priceCents || undefined }, `Buy as ${who}`))));
+      }))),
+    h('span', { class: 'arrow' }, '↓'),
+    h('div', { class: 'step' },
+      h('b', {}, '3. Their wallet'),
+      h('div', { class: 'count' }, money(w.balanceCents)),
+      h('div', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}`)),
+    h('span', { class: 'arrow' }, '↓'),
+    h('div', { class: 'step' },
+      h('b', {}, '4. Paid on Nessie'),
+      !orders.length && h('p', { class: 'muted' }, 'No orders yet.'),
+      orders.map(o => h('p', {},
+        `#${o.id} ${o.title}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: `,
+        h('span', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status),
+        o.nessiePurchaseId && h('div', { class: 'muted' }, 'Nessie purchase ', h('code', {}, o.nessiePurchaseId)),
+        o.failure && h('div', { class: 'muted' }, o.failure)))));
 }
 
 /** The shopping agent's three picks for each attendee, with the photo, the line and why. */
@@ -565,20 +669,22 @@ function merchPicks() {
         const t = titles.get(p.templateId);
         return h('tr', {},
           h('td', {}, p.attendeeName || '(no name yet)'), h('td', {}, String(p.rank)),
-          h('td', {}, t ? [thumb(t.imageUrl, t.title), h('div', {}, t.title)] : `template ${p.templateId}`),
-          h('td', {}, thumb(p.photoUrl, 'photo')),
+          h('td', {}, t ? [thumb(t.imageUrl, t.title, `pick ${p.id}`), h('div', {}, t.title)] : `template ${p.templateId}`),
+          h('td', {}, thumb(p.photoUrl, 'photo', `pick ${p.id}`)),
           h('td', {}, p.line || h('span', { class: 'muted' }, 'none')),
           h('td', {}, p.reason));
       })));
 }
 
-/** The shopping agent's picks, the loaded templates and every attendee's order. */
+/** How merch works, buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
   const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
   const paid = orders.filter(o => o.status === 'paid');
   const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
   return [
+    merchFlow(),
+    can('ops') && buyAs(),
     merchPicks(),
     h('section', {},
       h('h3', {}, `Orders: ${orders.length}, of which ${paid.length} paid for ${money(paid.reduce((s, o) => s + o.amountCents, 0n))}`),
@@ -588,7 +694,7 @@ function merchTab() {
         h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
         orders.map(o => h('tr', {},
           h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title),
-          h('td', {}, o.photoUrl ? thumb(o.photoUrl, 'photo') : ''), h('td', {}, o.line || '—'), h('td', {}, o.size || '—'),
+          h('td', {}, o.photoUrl ? thumb(o.photoUrl, 'photo', `order ${o.id}`) : ''), h('td', {}, o.line || '—'), h('td', {}, o.size || '—'),
           h('td', {}, money(o.amountCents)),
           h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
           h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
@@ -599,7 +705,7 @@ function merchTab() {
       templates.length > 0 && h('table', {},
         h('tr', {}, h('th', {}, 'Image'), h('th', {}, 'Title'), h('th', {}, 'Kind'), h('th', {}, 'Price'), h('th', {}, 'Photo area'), h('th', {}, 'Sponsor booths')),
         templates.map(t => h('tr', {},
-          h('td', {}, thumb(t.imageUrl, t.title)),
+          h('td', {}, thumb(t.imageUrl, t.title, 'template')),
           h('td', {}, t.title, h('div', { class: 'muted' }, t.name)), h('td', {}, t.kind), h('td', {}, money(t.priceCents)),
           h('td', {}, `${t.photoW}×${t.photoH} at ${t.photoX},${t.photoY}`),
           h('td', {}, t.boothIds.length ? booths(t.boothIds) : h('span', { class: 'muted' }, 'plain')))))),
@@ -673,7 +779,7 @@ async function main() {
   if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
   window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
-  setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement)) render(); }, 1000);
+  setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLSelectElement)) render(); }, 1000);
 }
 
 main().catch(e => mount('app', h('p', { class: 'error' }, String(e?.message ?? e))));

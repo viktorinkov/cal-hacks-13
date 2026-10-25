@@ -224,7 +224,7 @@ const picture = (src: string) => new Promise<HTMLImageElement>((ok, fail) => {
  * The template image with the photo cover-cropped into its green photo box, the printed line in a strip
  * along the bottom of the photo, and a tick in the box of each sponsor whose booth you visited. Scaled by CSS.
  */
-function mockup(t: MerchSuggestion) {
+export function mockup(t: MerchSuggestion) {
   const canvas = h('canvas', { class: 'mockup', width: t.width, height: t.height }) as HTMLCanvasElement;
   Promise.all([picture(t.imageUrl), picture(t.photoUrl), checkBoxes()]).then(([base, img, checks]) => {
     const ctx = canvas.getContext('2d')!;

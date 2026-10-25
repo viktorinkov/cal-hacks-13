@@ -414,6 +414,27 @@ fn a_claim_payout_lands_in_the_wallet() {
 }
 
 #[test]
+fn the_organizer_buys_as_an_attendee_from_their_wallet() {
+    let w = World::new();
+    w.sign_up("Maya Chen");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
+    let tee = w.template("tee_spacetimedb.png");
+    let maya = w.t.db.attendee().identity().find(id("Maya Chen")).unwrap().node_id;
+    w.end_event();
+
+    assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch_as(ctx, maya, tee.id, photo, "M".into())).unwrap_err().contains("roles"));
+    assert!(w.try_as("ops", |ctx| buy_merch_as(ctx, maya + 99, tee.id, photo, "M".into())).unwrap_err().contains("no such attendee"));
+    w.as_("ops", |ctx| buy_merch_as(ctx, maya, tee.id, photo, "L".into()));
+    let order = w.last_order();
+    assert_eq!((order.attendee, order.size.as_str(), order.status.as_str()), (id("Maya Chen"), "L", PAYING));
+    assert_eq!(w.balance("Maya Chen"), 17_500);
+
+    let wallets = crate::wallet::board_wallets(&w.view("ops"));
+    assert_eq!(wallets.iter().map(|x| (x.node_id, x.balance_cents)).collect::<Vec<_>>(), [(maya, 17_500)]);
+    assert!(crate::wallet::board_wallets(&w.view("Maya Chen")).is_empty());
+}
+
+#[test]
 fn suggestions_prefer_photos_with_the_people_you_met_and_tick_the_booths_you_visited() {
     let w = World::new();
     for name in ["Maya Chen", "Jordan Alvarez"] {
