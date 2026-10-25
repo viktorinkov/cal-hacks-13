@@ -126,7 +126,7 @@
             "type": "bar_stacked",
             "data_source": {
               "type": "esql",
-              "query": "FROM bandit-raw-radio | EVAL time = DATE_FORMAT(\"yyyy-MM-dd HH:mm:ss\", BUCKET(@timestamp, 10 seconds)) | STATS beacons = COUNT() BY time, kind | SORT time"
+              "query": "FROM bandit-raw-radio | EVAL time = DATE_FORMAT(\"yyyy-MM-dd HH:mm:ss\", DATE_TRUNC(10 seconds, @timestamp)) | STATS beacons = COUNT() BY time, kind | SORT time"
             },
             "x": {
               "column": "time"
