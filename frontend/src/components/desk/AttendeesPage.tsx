@@ -58,7 +58,7 @@ export function AttendeesPage() {
               <p className="truncate text-[15px] text-ink">{person.displayName || 'No name yet'}</p>
               <p className="mt-1 truncate text-[13px] text-ink-dim">
                 {person.organization || 'No company'}
-                {person.simulated ? ' · simulated' : ''}
+                {person.simulated ? ' · test' : ''}
                 {person.handles.length ? ` · ${person.handles.map((item) => item.handle).join(', ')}` : ''}
               </p>
             </div>

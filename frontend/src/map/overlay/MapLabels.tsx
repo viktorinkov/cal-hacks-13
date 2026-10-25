@@ -358,7 +358,7 @@ function DemoRingTag({ engine }: { engine: MapEngine }) {
   const lost = phase === 'error'
   const alerting = scripted || demoIsActive(bands, Object.values(incidents))
   return (
-    <Anchored engine={engine} id="demo-ring" resolve={() => ({ x: ring.x, y: ring.y, z: 1.2 })} className="-translate-x-1/2 -translate-y-full">
+    <Anchored engine={engine} id="ring" resolve={() => ({ x: ring.x, y: ring.y, z: 1.2 })} className="-translate-x-1/2 -translate-y-full">
       <span
         className={cn(
           'block rounded-[3px] px-2 py-1 text-[12px] font-medium',
@@ -369,7 +369,7 @@ function DemoRingTag({ engine }: { engine: MapEngine }) {
               : 'bg-[rgba(20,18,14,0.9)] text-champagne shadow-[inset_0_0_0_1px_rgba(220,199,159,0.7)]',
         )}
       >
-        {alerting ? 'SOS' : lost ? 'Connection lost' : live ? 'LIVE · demo' : 'Demo'}
+        {alerting ? 'SOS' : lost ? 'Connection lost' : live ? 'LIVE · test ring' : 'Test ring'}
         {ring.editing && <span className="ml-1.5 font-mono text-[10px] text-ink-dim">drag</span>}
       </span>
     </Anchored>
@@ -392,13 +392,12 @@ function DemoPathTag({ engine }: { engine: MapEngine }) {
   const open = pathOpen && demoReveal() > 1
   const count = scripted ? bandsOnFloor().length : hardware.length
   return (
-    <Anchored engine={engine} id="demo-path" resolve={() => ({ x: mid.x, y: mid.y, z: 0.2 })} className="translate-x-4 -translate-y-1/2">
+    <Anchored engine={engine} id="ring-path" resolve={() => ({ x: mid.x, y: mid.y, z: 0.2 })} className="translate-x-4 -translate-y-1/2">
       <span className="flex flex-col gap-0.5 rounded-[3px] bg-[rgba(28,20,10,0.9)] px-2.5 py-1.5 shadow-[inset_0_0_0_1px_rgba(255,181,71,0.75)]">
         <span className="text-[12px] font-medium text-aside">{pathOpen ? `Clear path · ${lengthM} m` : `Path ready · ${lengthM} m`}</span>
         <span className="text-[11px] text-ink-dim">{count} in the ring</span>
         <span className="text-[11px] text-ink-dim">
-          {pathOpen ? (open ? `${onPath} still on the path` : 'Opening from the entrance') : 'Opens when you clear it'}{' '}
-          <span className="font-mono text-ink-muted">sim</span>
+          {pathOpen ? (open ? `${onPath} still on the path` : 'Opening from the entrance') : 'Opens when you clear it'}
         </span>
       </span>
     </Anchored>
@@ -420,7 +419,7 @@ function DemoBandLabels({ engine }: { engine: MapEngine }) {
         <Anchored
           key={item.band.id}
           engine={engine}
-          id={`demo-band:${item.band.id}`}
+          id={`ring-band:${item.band.id}`}
           resolve={() => {
             const at = engine.deviceAt(`band-${item.band.id}`) ?? item.at
             return { x: at.x, y: at.y, z: BAND_Z + 0.4 }

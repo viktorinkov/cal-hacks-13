@@ -70,7 +70,7 @@ function openLiveIncidents(): void {
   }
 }
 
-/** On the concert map, live bands replace the demo wristbands while SpacetimeDB is up. */
+/** On the concert map, live bands replace the staged wristbands while SpacetimeDB is up. */
 function stampLiveBooth(): void {
   if (currentPlan() !== 'simulation') {
     boothStamp = ''

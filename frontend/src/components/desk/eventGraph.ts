@@ -427,7 +427,7 @@ function create(): EventGraph {
   const degree = (x: string | GNode) => adjacent.get(end(x))?.length ?? 1
   linkForce
     ?.distance((link) => LINK_LENGTHS[link.kind] ?? 30)
-    // d3's usual pull, except that a hub (a demo band that walked every booth) pulls each link weakly, so it
+    // d3's usual pull, except that a hub (a test band that walked every booth) pulls each link weakly, so it
     // cannot drag the whole floor into one knot.
     .strength((link) => {
       const most = Math.max(degree(link.source), degree(link.target))

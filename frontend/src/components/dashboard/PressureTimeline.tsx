@@ -84,7 +84,7 @@ export function PressureTimeline() {
         )}
       >
         <span aria-hidden className={cn('size-[6px] rounded-full', !linkUp ? 'bg-ink-muted' : mode === 'live' ? 'bg-teal animate-breath' : 'nc-sim-stripes')} />
-        {!linkUp ? 'Paused' : mode === 'live' ? 'Live' : 'Simulated'}
+        {!linkUp ? 'Paused' : mode === 'live' ? 'Live' : 'Local'}
       </span>
     </section>
   )

@@ -1,6 +1,6 @@
 /**
  * BackendAdapter over the in-browser MockBackend. It behaves like a remote service on purpose:
- * commands resolve after a network-like delay, results are deep copies, and the demo "link down"
+ * commands resolve after a network-like delay, results are deep copies, and the staged "link down"
  * switch drops events and refuses commands exactly as a dead WebSocket would, then resynchronises.
  */
 import type { ConnectionState, EntityFrame, GuidanceCommand, GuidancePreviewRequest, Incident, ResolutionReason, StreamEvent, WorldSnapshot } from '@/contracts/domain'
@@ -28,7 +28,7 @@ const ALL_CAPS: DemoCapability[] = [
 
 export class MockBackendAdapter implements BackendAdapter {
   readonly kind = 'mock' as const
-  readonly label = 'Simulation'
+  readonly label = 'Local backend'
   readonly backend: MockBackend
   readonly demo: DemoControls
 
@@ -172,7 +172,7 @@ export class MockBackendAdapter implements BackendAdapter {
     this.linkDown = on
     this.backend.setLinkDown(on)
     if (on) {
-      this.setConnection({ phase: 'reconnecting', attempt: 1, error: 'Connection to backend lost (simulated)', nextRetryAt: Date.now() + 1500 })
+      this.setConnection({ phase: 'reconnecting', attempt: 1, error: 'Connection to backend lost (local)', nextRetryAt: Date.now() + 1500 })
       this.retryTimer = setInterval(() => {
         this.setConnection({ attempt: this.connection.attempt + 1, nextRetryAt: Date.now() + 1500 })
       }, 1500)

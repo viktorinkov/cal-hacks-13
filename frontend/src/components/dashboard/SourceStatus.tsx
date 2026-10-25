@@ -71,7 +71,7 @@ export function SourceStatus() {
         <ul id="feeds" className="nc-panel absolute right-0 top-9 z-10 flex min-w-64 flex-col gap-2 p-3 text-[12px] text-ink-dim" aria-label="Feeds">
           <li className="inline-flex items-center gap-1.5">
             <span aria-hidden className={cn('size-[6px] rounded-full', linkUp ? 'bg-teal' : connection.phase === 'reconnecting' ? 'bg-caution animate-blink' : 'bg-signal')} />
-            {plan === 'simulation' ? 'Mock backend' : 'Backend'} · {linkText}
+            {plan === 'simulation' ? 'Local backend' : 'Backend'} · {linkText}
             {!linkUp && lastDataAt ? <span className="text-ink-muted"> · data {ago(wall - lastDataAt)}</span> : null}
           </li>
           {sources.spacetimedb && (
@@ -85,7 +85,7 @@ export function SourceStatus() {
             <li key={x.sourceId} className="inline-flex items-center gap-1.5" title={x.detail}>
               <span aria-hidden className={cn('size-[6px] rounded-full', linkUp ? dot[x.status] : 'bg-ink-muted')} />
               {x.label}
-              {x.isSimulated && <span className="font-mono text-[10.5px] text-[#cfc4ff]">sim</span>}
+              {x.isSimulated && <span className="font-mono text-[10.5px] text-[#cfc4ff]">local</span>}
               {x.detail && x.status !== 'ok' && <span className="text-ink-muted"> · {x.detail}</span>}
             </li>
           ))}

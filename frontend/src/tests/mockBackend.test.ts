@@ -65,7 +65,7 @@ describe('mock backend scenario', () => {
     expect(b.commands.get(cmd.commandId)!.deliveryStatus).toBe('delivered')
   })
 
-  it('counts the simulated crowd bands a path reaches, apart from the demo bands', () => {
+  it('counts the local crowd bands a path reaches, apart from the test bands', () => {
     const b = new MockBackend({ crowdSize: 1200, warmupS: 10 })
     b.triggerCongestion()
     run(b, 10)
@@ -86,7 +86,7 @@ describe('mock backend scenario', () => {
     expect(live.signalled).toBeGreaterThan(cmd.targets.length)
     expect(live.following).toBeLessThanOrEqual(live.signalled)
     expect(live.following).toBeGreaterThan(0)
-    // the demo bands stay the command's own targets
+    // the test bands stay the command's own targets
     expect(b.commands.get(cmd.commandId)!.targets).toHaveLength(cmd.targets.length)
   })
 

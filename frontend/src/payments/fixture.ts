@@ -162,7 +162,7 @@ function build() {
   })
   const chargeRows = [
     charge(1, FIXTURE_BAND, '41', 4_500, 'recommended', at(22, 18), {
-      note: 'A drink went over the Elastic booth’s demo laptop.',
+      note: 'A drink went over the Elastic booth’s test laptop.',
       recommendation: 'Charge $45.00', recommendationReason: 'The laptop needs a new keyboard; the booth’s receipt is in the pack.', clauseIds: ['F-01'],
     }),
     charge(2, 23, '42', 8_500, 'recommended', at(23, 40), {
@@ -182,7 +182,7 @@ function build() {
       approvedByName: 'Dana Ortiz', decidedAt: at(21, 20), paidAt: at(21, 21), paymentReference: hex(rng, 24), claimId: 4n, insurerCents: 6_000n,
     }),
     charge(6, 95, '46', 6_000, 'paid', at(22, 47), {
-      note: 'Coffee across the Microsoft booth’s demo tablet.', recommendation: 'Charge $60.00', recommendationReason: 'At the cap; the tablet still works.', clauseIds: ['F-01'],
+      note: 'Coffee across the Microsoft booth’s test tablet.', recommendation: 'Charge $60.00', recommendationReason: 'At the cap; the tablet still works.', clauseIds: ['F-01'],
       approvedByName: 'Theo Brooks', decidedAt: at(22, 58), paidAt: at(22, 59), paymentReference: hex(rng, 24),
     }),
     charge(7, 201, '47', 8_500, 'waived', at(23, 2), {
@@ -249,7 +249,7 @@ function build() {
     ].map(readWalletEntry),
     charges: [{
       id: 1n, incidentId: 41n, incidentKind: 'spill', zoneName: 'Sponsor row', happenedAt: at(22, 14), amountCents: 4_500n, status: 'recommended',
-      why: 'A drink went over the Elastic booth’s demo laptop, and the camera puts your band at the counter at 22:14.',
+      why: 'A drink went over the Elastic booth’s test laptop, and the camera puts your band at the counter at 22:14.',
       clause: 'F-01 · Spilled drink on equipment, up to $60.00', disputeText: '', paidAt: undefined,
     }].map(readMyCharge),
     orders: sevenOrders.map((row) => readMerchOrder({ ...row, attendeeName: '', title: '' })),

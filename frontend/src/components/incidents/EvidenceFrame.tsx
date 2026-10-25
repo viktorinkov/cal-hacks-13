@@ -177,7 +177,7 @@ export function EvidenceFrame({ obs, compact = false }: { obs: CameraObservation
         <canvas
           ref={ref}
           role="img"
-          aria-label={`Simulated ${obs.cameraId} frame at ${clock(obs.timestamp)}, ${obs.status === 'detected' ? 'detection box drawn' : 'two candidates, not matched'}`}
+          aria-label={`Local ${obs.cameraId} frame at ${clock(obs.timestamp)}, ${obs.status === 'detected' ? 'detection box drawn' : 'two candidates, not matched'}`}
           className={cn('block w-full rounded-[2px]', h)}
         />
       )}
@@ -188,7 +188,7 @@ export function EvidenceFrame({ obs, compact = false }: { obs: CameraObservation
           )}
         >
           <span aria-hidden className="nc-sim-bar h-full w-2" />
-          Simulated frame
+          Local frame
         </figcaption>
       )}
     </figure>

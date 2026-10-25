@@ -6,8 +6,8 @@ import { calhacksVenue } from '@/mock/calhacks'
 import { boothHandle } from './circle'
 
 /**
- * The clear patch on the CalHacks floor where the hardware demo stands.
- * Simulated people stay outside it. A distress turns the ring red.
+ * The clear patch on the CalHacks floor where the test hardware stands.
+ * Local people stay outside it. A distress turns the ring red.
  * The operator opens the path from the entrance.
  */
 export interface DemoRing {
@@ -25,7 +25,7 @@ const VENUE_H = 228
 export const S_SOS = 3
 export const S_NEAR_SOS = 4
 
-/** Radio and test bands. The simulated crowd starts at 100 and is not drawn as wristbands. */
+/** Radio and test bands. The local crowd starts at 100 and is not drawn as wristbands. */
 export const HARDWARE_ID_MAX = 99
 
 /** Metres either side of the cleared path. People inside it step away. */
@@ -202,7 +202,7 @@ export function demoDevices(bands: FloorBand[], ring: Pick<DemoRing, 'x' | 'y' |
     sosActive: band.sos || band.state === S_SOS,
     location: at,
     locationSource: 'manually_assigned',
-    zoneId: zoneNear(at) ?? 'demo',
+    zoneId: zoneNear(at) ?? 'ring',
     hapticsSupported: band.hasMotor,
     imuSupported: band.hasMpu,
     pendingCommandIds: [],
@@ -298,10 +298,10 @@ export function demoCommand(lengthM: number): GuidanceCommand {
     targetDeviceIds: [],
     targets: [],
     patternCode: 'step_aside',
-    reason: 'Clear a path from the entrance to the demo',
+    reason: 'Clear a path from the entrance to the test ring',
     preview: {
       corridorId: 'COR-DEMO',
-      corridorName: 'Entrance to the demo',
+      corridorName: 'Entrance to the test ring',
       lengthM,
       groups: [],
       advisoryCode: '',

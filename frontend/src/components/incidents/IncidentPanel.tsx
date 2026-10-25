@@ -108,7 +108,7 @@ export function IncidentPanel() {
   const ot = observationText(obs)
   const corridors = venue?.responderCorridors ?? []
   const busy = (k: string) => !!pending[k]
-  const kindLabel = inc.source === 'imu_suspicion' ? 'Experimental' : inc.isSimulated ? 'Simulated SOS' : 'From a band'
+  const kindLabel = inc.source === 'imu_suspicion' ? 'Experimental' : inc.isSimulated ? 'Test SOS' : 'From a band'
   const openPanel = () => {
     setExpanded(true)
     // recentre once the panel has taken its space

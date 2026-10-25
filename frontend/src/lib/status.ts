@@ -16,7 +16,7 @@ import type {
 } from '@/contracts/domain'
 import { bandName } from './format'
 
-/** The simulated crowd's bands for this command, if the scenario reports them (simulation only). */
+/** The local crowd's bands for this command, if the scenario reports them (local backend only). */
 export function simBandsFor(sim: SimulatedBands | undefined, commandId: string | undefined): SimulatedBands | null {
   return sim && commandId && sim.commandId === commandId ? sim : null
 }
@@ -42,7 +42,7 @@ export function zoneSourceTag(z: ZoneState | undefined): SourceTag {
 }
 
 export const sourceTagText: Record<SourceTag, string> = {
-  sim: 'sim',
+  sim: 'local',
   live: 'live',
   camera: 'camera',
   estimate: 'estimate',
@@ -61,7 +61,7 @@ export function locationSourceText(d: Device): string {
     case 'manually_assigned':
       return 'placed by staff'
     case 'simulated':
-      return 'simulated position'
+      return 'local position'
     case 'unknown':
       return 'position unknown'
   }
@@ -276,7 +276,7 @@ export function headline(args: {
       return {
         title: 'A path is open.',
         sentence: crowd
-          ? `First Aid is on the way to ${where}. ${crowd.signalled} crowd bands told to move (simulated); ${confirmed} of ${total} demo bands confirmed.${more}`
+          ? `First Aid is on the way to ${where}. ${crowd.signalled} crowd bands told to move; ${confirmed} of ${total} test bands confirmed.${more}`
           : `First Aid is on the way to ${where}. ${confirmed} of ${total} bands confirmed their signals.${more}`,
         tone: 'help',
       }
@@ -299,7 +299,7 @@ export function headline(args: {
   }
   const critical = zones.filter((z) => z.congestionStatus === 'critical')
   const caution = zones.filter((z) => z.congestionStatus === 'caution')
-  const sim = args.simulated ? ' (simulated)' : ''
+  const sim = args.simulated ? ' (estimate)' : ''
   if (critical.length || caution.length) {
     const z = (critical[0] ?? caution[0])!
     const name = zoneNames[z.zoneId] ?? z.zoneId

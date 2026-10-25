@@ -309,7 +309,7 @@ export class CalhacksCrowd {
   private nextGroup = 1
   private readonly byBand = new Map<number, Person>()
   readonly counts: Record<string, number> = {}
-  /** The demo ring. Simulated people are walked out of it. */
+  /** The test ring. Local people are walked out of it. */
   private keep: { x: number; y: number; r: number } | null = null
   /** Cleared walk from the entrance, revealed from the door toward the ring. */
   private lane: Path | null = null
@@ -705,7 +705,7 @@ export class CalhacksCrowd {
   }
 
   /**
-   * Step straight out of the demo ring. The ring is the hardware spot, so a table
+   * Step straight out of the test ring. The ring is the hardware spot, so a table
    * under it does not count as a wall — people on those chairs get up and leave.
    */
   private leaveRing(person: Person): boolean {
@@ -1061,7 +1061,7 @@ export function crowdIsSeeded(): boolean {
   return crowd?.seeded() ?? false
 }
 
-/** How far the demo path has opened. The map draws its arrows to the same point. */
+/** How far the test path has opened. The map draws its arrows to the same point. */
 export function demoReveal(): number {
   return crowd?.revealed() ?? 0
 }

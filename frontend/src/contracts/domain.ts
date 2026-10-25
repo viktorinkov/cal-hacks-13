@@ -421,7 +421,7 @@ export type ScenarioStep = 'normal' | 'congestion' | 'sos' | 'camera' | 'acknowl
 
 export type CameraOutcome = 'detected' | 'ambiguous' | 'not_visible'
 
-/** Demo director state. Only present when a demo service is running. */
+/** Scripted-run state. Only present when a presentation service is running. */
 export interface ScenarioState {
   seed: number
   step: ScenarioStep
@@ -435,7 +435,7 @@ export interface ScenarioState {
   /** Share of simulated attendees assumed to follow their band. */
   compliance: number
   comparison?: ComparisonResult
-  /** Simulated attendees' bands that guidance reaches. The physical demo bands are the command's own targets. */
+  /** Local attendees' bands that guidance reaches. The physical test bands are the command's own targets. */
   simulatedBands?: SimulatedBands
 }
 

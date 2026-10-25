@@ -467,7 +467,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
     commands: guided.commands,
     sources: [
       ...(input
-        ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live in the demo · ${input.venueName}` }]
+        ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live on the floor · ${input.venueName}` }]
         : []),
       ...(wandering
         ? [{
@@ -479,7 +479,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
             isSimulated: !crowdIsSeeded(),
             detail: crowdIsSeeded()
               ? `${crowdSize().toLocaleString('en-US')} people seeded from the venue`
-              : `${crowdSize().toLocaleString('en-US')} simulated attendees`,
+              : `${crowdSize().toLocaleString('en-US')} local attendees`,
           }]
         : []),
     ],

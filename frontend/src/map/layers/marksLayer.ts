@@ -41,7 +41,7 @@ export interface MarksInput {
   plainZones?: boolean
   stale: boolean
   laneArrows: { x: number; y: number; nx: number; ny: number; i: number }[]
-  /** The live booth on the concert plan, or the demo ring on CalHacks. */
+  /** The live booth on the concert plan, or the test ring on CalHacks. */
   booth?: { x: number; y: number; r: number; live: boolean; editing: boolean; demo?: boolean; lost?: boolean; alert?: boolean }
 }
 

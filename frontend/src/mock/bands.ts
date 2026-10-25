@@ -10,8 +10,8 @@ export interface MockBand {
 }
 
 /**
- * The nine demo bands. All have LEDs and an SOS button; only the three full bands carry the IMU
- * and vibration motor. Judges wear 01-06 at the demo table; 09 sits in the charging case.
+ * The nine test bands. All have LEDs and an SOS button; only the three full bands carry the IMU
+ * and vibration motor. Judges wear 01-06 at the test table; 09 sits in the charging case.
  */
 export const MOCK_BANDS: MockBand[] = [
   { deviceId: 'band-01', label: '01', variant: 'full', wearer: 'Judge A', anchor: { x: 16, y: 47.5 } },
