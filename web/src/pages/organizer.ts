@@ -722,25 +722,6 @@ function thumb(url: string, title: string, slot: string) {
 /** The attendee the organizer is buying as, by node id. */
 let shopper: bigint | undefined;
 
-/** How a photo becomes merch, with how far tonight's event has got at each step. */
-function merchFlow() {
-  const photos = [...conn.db.boardPhotos.iter()];
-  const picked = new Set([...conn.db.boardMerchPicks.iter()].map(p => p.nodeId));
-  const orders = [...conn.db.boardMerchOrders.iter()];
-  const steps: [string, string, string][] = [
-    [`${photos.length} photos`, 'A photographer takes a photo', 'The people whose bands stood together in that zone at that moment are tagged.'],
-    [`${photos.filter(p => p.read).length} read`, 'Claude reads the photo', 'It counts the people and writes a caption; the tags keep that many, the ones standing closest.'],
-    [`${picked.size} people`, 'The shopping agent picks', 'When the event ends, Claude picks three products for each person in a photo, from the booths they stayed at, on the photo with the people they met, with a line to print.'],
-    [`${orders.length} order${orders.length === 1 ? '' : 's'}`, 'The attendee buys', 'One tap in their recap pays from their BandIt wallet, which holds the money until the purchase goes through.'],
-    [`${orders.filter(o => o.status === 'paid').length} paid`, 'Capital One records it', 'The worker makes the Nessie purchase at the merch shop and the order keeps its receipt.'],
-  ];
-  return h('section', {},
-    h('h3', {}, 'How merch works'),
-    h('div', { class: 'flow' }, steps.map(([count, title, detail], i) => [
-      i > 0 && h('span', { class: 'arrow' }, '→'),
-      h('div', { class: 'step' }, h('div', { class: 'count' }, count), h('b', {}, title), h('div', { class: 'muted' }, detail))])));
-}
-
 /** A button for every attendee with a wallet; the chosen one's shop follows, laid out as the same steps. */
 function buyAs() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
@@ -779,7 +760,7 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
     const size = kind === 'tee' ? field(e.target as HTMLElement, `as-size-${p.templateId}`) : '';
     act(() => conn.reducers.buyMerchAs({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size }));
   };
-  return h('div', { class: 'flow down' },
+  return h('div', { class: 'flow' },
     h('div', { class: 'step' },
       h('b', {}, `1. ${who}'s photo`),
       !photos.length && h('p', { class: 'muted' }, 'None picked yet.'),
@@ -841,14 +822,13 @@ function merchPicks() {
       })));
 }
 
-/** How merch works, buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
+/** Buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
   const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
   const paid = orders.filter(o => o.status === 'paid');
   const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
   return [
-    merchFlow(),
     can('ops') && buyAs(),
     merchPicks(),
     h('section', {},

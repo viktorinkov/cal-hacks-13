@@ -8,6 +8,7 @@ Wants=network-online.target
 [Service]
 WorkingDirectory=/opt/bandit
 ExecStart=/opt/bandit/target/debug/bandit-claims live
+EnvironmentFile=/opt/bandit/.env
 Environment=BANDIT_DATA_DIR=/var/lib/bandit BANDIT_TEST_MODE=1 CHROME=/usr/local/bin/chrome
 Restart=always
 RestartSec=3
