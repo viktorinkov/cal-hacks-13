@@ -14,6 +14,38 @@ ARROW_SIZE = 40
 ZONE_SIZE = 48
 LINE_HEIGHT = 1.25
 
+# Fills carry the grouping; borders only separate neighbouring cards.
+CARD_COLORS = {
+    "#d9480f": ("#ffe8cc", "#d8b68e"),  # devices
+    "#c92a2a": ("#e9edf2", "#b5bfca"),  # workers and code
+    "#364fc7": ("#dbe4ff", "#aab8df"),  # database state
+    "#1864ab": ("#d0ebff", "#9cbfd9"),  # people and screens
+    "#087f5b": ("#c3fae8", "#95c8b7"),  # external services
+    "#868e96": ("#edf0f3", "#bcc5ce"),
+    "#495057": ("#edf0f3", "#bcc5ce"),
+    "#e67700": ("#fff3bf", "#d4c38b"),  # evidence and notes
+    "#2b8a3e": ("#d3f9d8", "#a1c8a8"),  # successful outcomes
+    "#d97757": ("#fce1d4", "#d2b0a1"),
+}
+
+
+def _color_cards(children):
+    """Recolor cards without changing an already styled frame's geometry."""
+    for card in children:
+        if card["type"] not in ("rectangle", "diamond", "ellipse"):
+            continue
+        if not any(item["type"] == "text" for item in card.get("boundElements") or []):
+            continue
+        source = card.setdefault("customData", {}).setdefault("diagramSourceColor", {
+            "stroke": card.get("strokeColor"), "fill": card.get("backgroundColor")})
+        colors = CARD_COLORS.get(source["stroke"])
+        if source["stroke"] == "#c92a2a" and source["fill"] in ("#ffe3e3", "#ff8787"):
+            colors = ("#ffe3e3", "#d4a3a3")
+        if colors:
+            card["backgroundColor"], card["strokeColor"] = colors
+            card["fillStyle"] = "solid"
+            card["strokeWidth"] = 1
+
 FRAME_NAMES = (
     ("Band1t", "Overview"),
     ("Architecture",),
@@ -22,8 +54,8 @@ FRAME_NAMES = (
     ("Vision",),
     ("Event data", "Event data pipeline"),
     ("Evidence Engine", "The Evidence Engine"),
-    ("Claim Settlement",),
-    ("Claude", "Claude jobs"),
+    ("Decision Engine", "Claim Settlement"),
+    ("Elastic workflows", "Claude", "Claude jobs"),
     ("Social",),
     ("Interests",),
     ("Merch and wallet",),
@@ -34,6 +66,10 @@ FRAME_NAMES = (
     ("Medic walk",),
     ("Light circle",),
     ("Exits",),
+    ("Band wiring",),
+    ("Exit markers and gateway",),
+    ("Band firmware",),
+    ("Live views",),
 )
 FRAME_LOOKUP = {
     alias: (number, names[0])
@@ -101,6 +137,39 @@ def _image_size(image, max_height, max_width):
     aspect = image["width"] / image["height"]
     height = min(max_height, max_width / aspect)
     return height * aspect, height
+
+
+def _insert_vertical_space(children, cards, card_images, old_boxes, by_id, at, amount):
+    """Open a full-width row while keeping card artwork and routed arrows intact."""
+    def move(y):
+        return y + amount if y >= at - 0.01 else y
+
+    card_content = {item["id"] for card in cards
+                    for item in _bound_text(card, by_id) + card_images[card["id"]]}
+    card_ids = {card["id"] for card in cards}
+    for element in children:
+        if element["id"] in card_content or (element["type"] == "text" and element.get("containerId")):
+            continue
+        if element.get("points"):
+            points = [[element["x"] + x, move(element["y"] + y)] for x, y in element["points"]]
+            element["x"], element["y"] = points[0]
+            element["points"] = [[x - element["x"], y - element["y"]] for x, y in points]
+            element["height"] = max(y for _, y in points) - min(y for _, y in points)
+        elif element["type"] in ("text", "image"):
+            element["y"] = move(element["y"])
+        else:
+            old_center = element["y"] + element["height"] / 2
+            bottom = move(element["y"] + element["height"])
+            element["y"] = move(element["y"])
+            element["height"] = bottom - element["y"]
+            if element["id"] in card_ids:
+                delta = element["y"] + element["height"] / 2 - old_center
+                for item in _bound_text(element, by_id) + card_images[element["id"]]:
+                    item["y"] += delta
+    for box in old_boxes.values():
+        bottom = move(box["y"] + box["height"])
+        box["y"] = move(box["y"])
+        box["height"] = bottom - box["y"]
 
 
 def _position_arrow(arrow, old_boxes, by_id):
@@ -199,8 +268,6 @@ def _style_frame(frame, children, target_y):
 
     handled_text = set()
     for card in cards:
-        if card.get("strokeColor") not in ("#c92a2a", "#2b8a3e") or card.get("backgroundColor") == "#ffc9c9":
-            card["backgroundColor"] = "#ffffff"
         labels = _bound_text(card, by_id)
         label = labels[0]
         usable_width = card["width"] * (0.62 if card["type"] == "diamond" else 1) - 64
@@ -212,7 +279,8 @@ def _style_frame(frame, children, target_y):
         sizes = []
         if images:
             max_height = 200 if card["height"] >= 600 else 128
-            sizes = [_image_size(im, max_height, min(520, usable_width)) for im in images]
+            sizes = [_image_size(im, min(max_height, 128) if im["width"] / im["height"] >= 2 else max_height,
+                                 min(520, usable_width)) for im in images]
             row_width = sum(w for w, _ in sizes) + gap * (len(images) - 1)
             if row_width > usable_width:
                 ratio = (usable_width - gap * (len(images) - 1)) / sum(w for w, _ in sizes)
@@ -239,23 +307,43 @@ def _style_frame(frame, children, target_y):
         label["verticalAlign"] = "bottom" if images else "middle"
         handled_text.add(label["id"])
 
+    # Zone logos follow the same artwork-above-label rule as cards. Reserve a
+    # whole row so enlarging a header cannot overlap its first card or nested zone.
+    zone_headers = {}
+    for zone in sorted(zones, key=lambda item: item["y"]):
+        images = zone_images[zone["id"]]
+        labels = [by_id[label_id] for label_id, owner in zone_labels.items() if owner["id"] == zone["id"]]
+        sizes = [_image_size(image, 128, min(520, zone["width"] - 64)) for image in images]
+        image_height = max((height for _, height in sizes), default=0)
+        label_height = max((_text(label, ZONE_SIZE, width=zone["width"] - 64, align="left")[1]
+                            for label in labels), default=0)
+        zone_headers[zone["id"]] = sizes, image_height
+        if not images:
+            continue
+        contents = [card for card in cards
+                    if zone["x"] < card["x"] + card["width"] / 2 < zone["x"] + zone["width"]
+                    and zone["y"] < card["y"] + card["height"] / 2 < zone["y"] + zone["height"]]
+        contents += [other for other in zones if other is not zone and _contains(zone, other)]
+        first_row = min((item["y"] for item in contents), default=zone["y"] + zone["height"])
+        required = zone["y"] + 16 + image_height + 12 + label_height + 24
+        if first_row < required:
+            amount = required - first_row
+            _insert_vertical_space(children, cards, card_images, old_boxes, by_id, first_row, amount)
+            frame["height"] += amount
+
     for zone in zones:
-        left = zone["x"] + 32
-        first_row = min((card["y"] for card in cards
-                         if zone["x"] < card["x"] + card["width"] / 2 < zone["x"] + zone["width"]
-                         and zone["y"] < card["y"] + card["height"] / 2 < zone["y"] + zone["height"]),
-                        default=zone["y"] + 128)
-        header_height = max(32, min(96, first_row - zone["y"] - 26))
-        for image in zone_images[zone["id"]]:
-            width, height = _image_size(image, header_height, 400)
-            image.update(x=left, y=zone["y"] + 16, width=width, height=height)
-            left += width + 16
+        left, top = zone["x"] + 32, zone["y"] + 16
+        sizes, image_height = zone_headers[zone["id"]]
+        for image, (width, height) in zip(zone_images[zone["id"]], sizes):
+            image.update(x=left, y=top, width=width, height=height)
+            left += width + 20
+        label_top = top + image_height + 12 if sizes else top
         for label_id, owner in zone_labels.items():
             if owner["id"] != zone["id"]:
                 continue
             label = by_id[label_id]
-            _text(label, ZONE_SIZE, width=zone["x"] + zone["width"] - left - 24,
-                  position=(left, zone["y"] + 16), align="left")
+            _text(label, ZONE_SIZE, width=zone["width"] - 64,
+                  position=(zone["x"] + 32, label_top), align="left")
             handled_text.add(label_id)
 
     for image in unattached_images:
@@ -305,6 +393,7 @@ def style_scene(scene, start_number=1):
             frame["y"] = y
         else:
             children = _style_frame(frame, children, y)
+        _color_cards(children)
         frame["name"] = f"{number:02d} · {name}"
         output.extend(children)
         output.append(frame)
