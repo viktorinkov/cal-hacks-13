@@ -28,6 +28,7 @@ function NightHeader({ lights, onToggleLights }: { lights: boolean; onToggleLigh
         <button type="button" className="signup-light-toggle" aria-pressed={lights} aria-label="Concert lights" onClick={onToggleLights}>
           <Sparkles size={15} aria-hidden="true" /><span>Lights</span>
         </button>
+        <button type="button" onClick={() => go('/wallet')} className="text-ink-dim hover:text-ink">Wallet</button>
         <button type="button" onClick={() => go('/')} className="text-ink-dim hover:text-ink">Map</button>
         <button type="button" onClick={() => go('/claims')} className="text-ink-dim hover:text-ink">Claims</button>
       </nav>
