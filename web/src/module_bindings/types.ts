@@ -437,6 +437,15 @@ export const Command = __t.object("Command", {
 });
 export type Command = __Infer<typeof Command>;
 
+export const CrowdWalk = __t.object("CrowdWalk", {
+  bandId: __t.u32(),
+  path: __t.array(__t.f32()),
+  startedAt: __t.timestamp(),
+  arrivesAt: __t.timestamp(),
+  speedMps: __t.f32(),
+});
+export type CrowdWalk = __Infer<typeof CrowdWalk>;
+
 export const CoverageRuleRow = __t.object("CoverageRuleRow", {
   id: __t.u64(),
   policyId: __t.u64(),

@@ -45,6 +45,16 @@ function setUp(c: DbConnection) {
   conn.db.band.onInsert((_ctx, b) => crowd.upsert(b));
   conn.db.band.onUpdate((_ctx, _old, b) => crowd.upsert(b));
   conn.db.band.onDelete((_ctx, b) => crowd.remove(b.id));
+  // The crowd's walks, and the run's pause, which holds everyone where they are. The walks have their own
+  // subscription, so a module without them leaves the rest of the page working.
+  conn.subscriptionBuilder().onError(() => console.warn('no crowd walks: the crowd walks to its spots')).subscribe(['SELECT * FROM crowd_walk']);
+  conn.db.crowdWalk.onInsert((_ctx, w) => crowd.walk(w));
+  conn.db.crowdWalk.onUpdate((_ctx, _old, w) => crowd.walk(w));
+  conn.db.crowdWalk.onDelete((_ctx, w) => crowd.unwalk(w.bandId));
+  const pause = () => crowd.setPaused(conn.db.livePause.id.find(0)?.pausedAt.toDate().getTime());
+  conn.db.livePause.onInsert(pause);
+  conn.db.livePause.onDelete(pause);
+  pause();
   v.onFrame(now => crowd.frame(now));
   dropPin.visible = false;
   v.layer.add(dropPin);
