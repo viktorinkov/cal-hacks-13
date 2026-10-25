@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { useRoute } from '@/cover/route'
 import { useSession } from '@/stdb/session'
@@ -26,14 +27,25 @@ const ITEMS: { to: string; label: string; on: (path: string) => boolean; ownerOn
 export function DeskTabs() {
   const { path, go } = useRoute()
   const owner = useSession((s) => s.owner)
+  const nav = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const el = nav.current
+    const active = el?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!el || !active) return
+    const container = el.getBoundingClientRect()
+    const item = active.getBoundingClientRect()
+    if (item.left < container.left) el.scrollTo({ left: el.scrollLeft + item.left - container.left - 8 })
+    else if (item.right > container.right) el.scrollTo({ left: el.scrollLeft + item.right - container.right + 8 })
+  }, [path, owner])
   return (
-    <nav aria-label="Desk" className="flex min-w-0 max-w-full flex-wrap items-center gap-x-4 gap-y-2">
+    <nav ref={nav} aria-label="Desk" className="flex min-w-0 flex-1 flex-nowrap items-center gap-5 overflow-x-auto overscroll-x-contain py-2">
       {ITEMS.filter((item) => !item.ownerOnly || owner).map((item) => {
         const on = item.on(path)
         const liveHost = window.location.hostname === 'band1t.vip'
         const target = item.to === '/' && (path === '/organizer' || liveHost) ? '/organizer' : item.to
         return (
-          <button key={item.label} type="button" aria-current={on ? 'page' : undefined} onClick={() => go(target)} className="py-1 text-[13px] leading-none">
+          <button key={item.label} type="button" aria-current={on ? 'page' : undefined} onClick={() => go(target)} className="shrink-0 py-1 text-[13px] leading-none">
             <span className={cn('relative whitespace-nowrap', on ? 'text-ink' : 'text-ink-muted hover:text-ink')}>
               {item.label}
               {on && <span aria-hidden className="absolute -bottom-1.5 left-0 right-0 h-px bg-champagne" />}

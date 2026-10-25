@@ -6,6 +6,7 @@ import { CommandCenter } from '@/components/dashboard/CommandCenter'
 import { AttendeesPage } from '@/components/desk/AttendeesPage'
 import { BandsPage } from '@/components/desk/BandsPage'
 import { CamerasPage } from '@/components/desk/CamerasPage'
+import { DeskShell } from '@/components/desk/DeskShell'
 import { CostsPage } from '@/components/desk/CostsPage'
 import { RulesPage } from '@/components/desk/RulesPage'
 import { GraphPage } from '@/components/desk/GraphPage'
@@ -103,10 +104,10 @@ function Shell() {
     <Connected>
       {path === '/organizer' || (window.location.hostname === 'band1t.vip' && !attendeePage) ? (
         <OrganizerGate>
-          <Pages />
+          <DeskShell><Pages /></DeskShell>
         </OrganizerGate>
       ) : (
-        <Pages />
+        <DeskShell><Pages /></DeskShell>
       )}
     </Connected>
   )

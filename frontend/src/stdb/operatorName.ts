@@ -22,21 +22,20 @@ export function signedInPerson(): { name: string; email: string } {
   if (!token) return { name: '', email: '' }
   const claims = claimsOf(token)
   const exp = claims.exp
-  if (typeof exp === 'number' && exp * 1000 <= Date.now() + 60_000) return { name: '', email: '' }
+  if (typeof exp !== 'number' || exp * 1000 <= Date.now() + 60_000) return { name: '', email: '' }
   const named = text(claims.name)
   const given = [text(claims.given_name), text(claims.family_name)].filter(Boolean).join(' ')
   const name = named && !named.includes('@') ? named : given
   return { name, email: text(claims.email) }
 }
 
-/** Who this desk is signed in as: the test identity, the email account, or the staff name. */
+/** The explicitly selected test identity or the authenticated account, never a stale staff label. */
 export function useOperatorName(): string {
   const actors = useSession((s) => s.actors)
-  const roleLabel = useSession((s) => s.roleLabel)
-  if (isViewing()) return roleLabel
+  if (isViewing()) return ''
   const played = typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('as') ?? '')
   const actor = played ? actors.find((item) => item.name === played) : undefined
   if (actor?.label) return actor.label
   const person = signedInPerson()
-  return person.name || roleLabel || person.email
+  return person.name || person.email
 }
