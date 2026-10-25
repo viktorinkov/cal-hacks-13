@@ -181,6 +181,13 @@ export const BoardPhoto = __t.object("BoardPhoto", {
 });
 export type BoardPhoto = __Infer<typeof BoardPhoto>;
 
+export const BoardWallet = __t.object("BoardWallet", {
+  nodeId: __t.u64(),
+  accountId: __t.string(),
+  balanceCents: __t.i64(),
+});
+export type BoardWallet = __Infer<typeof BoardWallet>;
+
 export const Booth = __t.object("Booth", {
   id: __t.u64(),
   sourceKey: __t.string(),

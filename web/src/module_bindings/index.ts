@@ -43,6 +43,7 @@ import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
 import BuyMerchReducer from "./buy_merch_reducer";
+import BuyMerchAsReducer from "./buy_merch_as_reducer";
 import ChooseVenueReducer from "./choose_venue_reducer";
 import ClaimBandReducer from "./claim_band_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
@@ -141,6 +142,7 @@ import BoardPrecedentsRow from "./board_precedents_table";
 import BoardRecordsRow from "./board_records_table";
 import BoardReviewsRow from "./board_reviews_table";
 import BoardRulesRow from "./board_rules_table";
+import BoardWalletsRow from "./board_wallets_table";
 import BoothRow from "./booth_table";
 import CameraRow from "./camera_table";
 import ChosenVenueRow from "./chosen_venue_table";
@@ -664,6 +666,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardRulesRow),
+  boardWallets: __table({
+    name: 'board_wallets',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardWalletsRow),
   claimChecks: __table({
     name: 'claim_checks',
     indexes: [
@@ -943,6 +952,7 @@ const reducersSchema = __reducers(
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
   __reducerSchema("buy_merch", BuyMerchReducer),
+  __reducerSchema("buy_merch_as", BuyMerchAsReducer),
   __reducerSchema("choose_venue", ChooseVenueReducer),
   __reducerSchema("claim_band", ClaimBandReducer),
   __reducerSchema("claim_job", ClaimJobReducer),
@@ -1077,6 +1087,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_reviews": Omit<typeof tablesSchema.schemaType.tables["boardReviews"], "accessorName"> & { readonly accessorName: "board_reviews" };
     /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
+    /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+    readonly "board_wallets": Omit<typeof tablesSchema.schemaType.tables["boardWallets"], "accessorName"> & { readonly accessorName: "board_wallets" };
     /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
     readonly "claim_checks": Omit<typeof tablesSchema.schemaType.tables["claimChecks"], "accessorName"> & { readonly accessorName: "claim_checks" };
     /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
@@ -1197,6 +1209,7 @@ const tableAccessorAliases = {
   "board_records": "boardRecords",
   "board_reviews": "boardReviews",
   "board_rules": "boardRules",
+  "board_wallets": "boardWallets",
   "claim_checks": "claimChecks",
   "claim_facts": "claimFacts",
   "claim_ledger": "claimLedger",
@@ -1305,6 +1318,8 @@ export type DbView = __DbViewBase & {
   readonly "board_reviews": __DbViewBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __DbViewBase["boardRules"];
+  /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+  readonly "board_wallets": __DbViewBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __DbViewBase["claimChecks"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
@@ -1435,6 +1450,8 @@ export type Tables = __TablesBase & {
   readonly "board_reviews": __TablesBase["boardReviews"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __TablesBase["boardRules"];
+  /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+  readonly "board_wallets": __TablesBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __TablesBase["claimChecks"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
