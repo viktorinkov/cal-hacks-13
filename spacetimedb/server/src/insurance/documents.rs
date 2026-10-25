@@ -1,5 +1,5 @@
 //! Insurance PDFs the Evidence Engine reads: the venue's policy at event
-//! setup, and an attendee's health plan or own policy. `document_read` splits
+//! setup, and an attendee's health plan. `document_read` splits
 //! the PDF into pages, Elastic reads every term with the clause and page it
 //! came from, and code checks each term again here before storing it. The
 //! organizer confirms the venue's terms, and only then do they set the
@@ -21,7 +21,7 @@ pub struct PolicyDocument {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    /// `venue_policy`, `health_plan` or `attendee_policy`.
+    /// `venue_policy` or `health_plan`.
     pub kind: String,
     /// Whose document it is; `None` for the venue's policy.
     pub attendee: Option<Identity>,

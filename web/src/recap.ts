@@ -1,6 +1,6 @@
 // The recap the tap link shows once the host ends the event or the attendee leaves early, top to bottom: where you were and when
-// (live from SpacetimeDB), the people and booths you spent time with (ranked by Elastic through
-// bandit-api) and who else was there, your photos with the people in them and tap-to-share, then merch
+// (live from SpacetimeDB), the people and booths you spent time with and the people you were near but
+// never met (ranked by Elastic through bandit-api, each person with why they are there), your photos with the people in them and tap-to-share, then merch
 // made from them, paid from the Nessie wallet.
 
 import { act, api, apiSession, date, field, h, handleLinks, money, time } from './lib';
@@ -12,14 +12,23 @@ type Person = { node_id: number; name: string; photo_url: string; handles: Recor
 /** A booth someone's band stood at, with their minutes and yours; `shared` when you both stood there. */
 type Interest = { booth_id: number; name: string; minutes: number; your_minutes: number; shared: boolean };
 
+/** When you share no booth: their booth closest to your interests, yours closest to it, and a tag both carry (or ''). */
+type Similar = { your_booth: string; their_booth: string; topic: string };
+
 /** Someone you spent time with, how you met, and their interests, the shared ones first. */
-type Suggested = Person & { minutes: number; met_zone_name: string; met_at: string; interests: Interest[]; photos_together: number };
+type Suggested = Person & { minutes: number; met_zone_name: string; met_at: string; interests: Interest[]; photos_together: number; similar: Similar | null };
+
+/** One place you were both in, from when and for how long. */
+type Place = { zone_name: string; started_at: string; minutes: number };
+
+/** Someone you were near but never met: every place you shared, most minutes first, and their interests. */
+type Near = Person & { minutes: number; places: Place[]; interests: Interest[]; similar: Similar | null };
 
 export type Recap = {
   display_name: string;
   suggested_people: Suggested[];
+  also_there: Near[];
   suggested_booths: { booth_id: number; name: string; zone_name: string }[];
-  shared_visits: { person: Person; zone_name: string; started_at: string; overlap_minutes: number }[];
 };
 
 let data: Recap | undefined;
@@ -128,18 +137,53 @@ function socials(p: Person) {
 
 const and = (xs: string[]) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs.join('');
 
-/** "Met at Stage at 09:40 PM · 25 min together · 2 shared interests · 2 photos together", leaving out what is empty. */
-function howYouMet(p: Suggested) {
+/**
+ * "Met at Stage at 09:40 PM · 25 min together · 2 shared interests · 2 photos together", leaving out what is
+ * empty, and the place and minutes when the line above already says them (`said`).
+ */
+function howYouMet(p: Suggested, said: boolean) {
   const min = Math.round(p.minutes), n = p.photos_together, shared = p.interests.filter(i => i.shared).length;
   return [
-    p.met_at && `Met${p.met_zone_name ? ` at ${p.met_zone_name}` : ''} at ${clock(Date.parse(p.met_at))}`,
-    min > 0 && `${min} min together`,
+    p.met_at && `Met${p.met_zone_name && !said ? ` at ${p.met_zone_name}` : ''} at ${clock(Date.parse(p.met_at))}`,
+    min > 0 && !said && `${min} min together`,
     shared > 0 && `${shared} shared interest${shared > 1 ? 's' : ''}`,
     n > 0 && `${n} photo${n > 1 ? 's' : ''} together`,
   ].filter(Boolean).join(' · ');
 }
 
 const mins = (m: number) => `${Math.max(1, Math.round(m))} min`;
+const firstName = (name: string) => name.split(' ')[0];
+
+/** "the Visa booth", "the Visa and Elastic booths". */
+function boothPhrase(names: string[]) {
+  return `the ${and(names.map(n => n.replace(/\s+booth$/i, '')))} booth${names.length > 1 ? 's' : ''}`;
+}
+
+/**
+ * Why this person is on your recap, read off the booths: the ones you both hung out at, else the closest
+ * pair by meaning, else `place` (null when there is none of these).
+ */
+function why(p: { name: string; interests: Interest[]; similar: Similar | null }, never: boolean, place: string | false) {
+  const shared = p.interests.filter(i => i.shared), end = never ? ' but never met' : '';
+  if (shared.length === 1) {
+    const i = shared[0];
+    return `You both hung out at ${boothPhrase([i.name])} (${mins(i.your_minutes)} you, ${mins(i.minutes)} ${firstName(p.name)})${end}`;
+  }
+  if (shared.length > 1) return `You both hung out at ${boothPhrase(shared.slice(0, 3).map(i => i.name))}${end}`;
+  if (p.similar) {
+    const s = p.similar, pair = `you stood at ${s.your_booth}, ${firstName(p.name)} at ${s.their_booth}`;
+    const topic = /^[A-Z0-9]+$/.test(s.topic) ? s.topic : s.topic.toLowerCase();
+    return topic ? `You're both into ${topic}: ${pair}` : `Close interests: ${pair}`;
+  }
+  return place || null;
+}
+
+/** "Into: Visa 8 min, Elastic 3 min", their top booths, the ones you both stood at first and in bold. */
+function into(p: Near) {
+  if (!p.interests.length) return false;
+  const top = p.interests.slice(0, 5);
+  return h('div', {}, 'Into: ', top.flatMap((i, k) => [k > 0 ? ', ' : '', i.shared ? h('b', {}, `${i.name} ${mins(i.minutes)}`) : `${i.name} ${mins(i.minutes)}`]));
+}
 
 /** The booths they stood at, with their minutes and yours: the ones you both stood at first, in bold. */
 function interests(p: Suggested) {
@@ -154,24 +198,41 @@ function interests(p: Suggested) {
 function people() {
   if (!data) return h('p', { class: 'muted' }, 'Loading…');
   if (!data.suggested_people.length) return h('p', { class: 'muted' }, 'Nobody stayed close to you long enough to count.');
-  return h('ul', { class: 'cards' }, data.suggested_people.map(p => h('li', {},
-    p.photo_url && h('img', { class: 'face', src: p.photo_url }),
-    h('b', {}, p.name),
-    h('div', { class: 'muted' }, howYouMet(p)),
-    interests(p),
-    socials(p))));
+  return h('ul', { class: 'cards' }, data.suggested_people.map(p => {
+    const place = p.met_zone_name && `You spent ${mins(p.minutes)} together at ${p.met_zone_name}`;
+    const reason = why(p, false, place);
+    return h('li', {},
+      p.photo_url && h('img', { class: 'face', src: p.photo_url }),
+      h('b', {}, p.name),
+      reason && h('div', {}, reason),
+      h('div', { class: 'muted' }, howYouMet(p, !!place && reason === place)),
+      interests(p),
+      socials(p));
+  }));
 }
 
-/** The people who were in the same place as you, other than the ones you spent time with. */
+const at = (pl: Place) => `${pl.zone_name} for ${mins(pl.minutes)} from ${clock(Date.parse(pl.started_at))}`;
+
+/** The people you were in the same place with for a while but never met, best match for your interests first. */
 function alsoThere() {
   if (!data) return h('p', { class: 'muted' }, 'Loading…');
-  const known = new Set(data.suggested_people.map(p => p.node_id));
-  const others = data.shared_visits.filter(v => !known.has(v.person.node_id));
-  if (!others.length) return h('p', { class: 'muted' }, 'Nobody else was in the same place as you for long.');
-  return h('ul', { class: 'cards' }, others.map(v => h('li', {},
-    h('b', {}, v.person.name),
-    ` at ${v.zone_name} for ${Math.max(1, Math.round(v.overlap_minutes))} min from ${clock(Date.parse(v.started_at))}`,
-    socials(v.person))));
+  if (!data.also_there.length) return h('p', { class: 'muted' }, 'Nobody else was in the same place as you for long.');
+  return h('ul', { class: 'cards' }, data.also_there.map(p => {
+    const place = p.places.length > 0 && `You were both at ${at(p.places[0])} but never met`;
+    const reason = why(p, true, place);
+    const shared = p.interests.filter(i => i.shared).length;
+    const facts = [
+      ...p.places.slice(reason === place ? 1 : 0).map(pl => `At ${at(pl)}`),
+      shared > 0 && `${shared} shared interest${shared > 1 ? 's' : ''}`,
+    ].filter(Boolean).join(' · ');
+    return h('li', {},
+      p.photo_url && h('img', { class: 'face', src: p.photo_url }),
+      h('b', {}, p.name),
+      reason && h('div', {}, reason),
+      facts && h('div', { class: 'muted' }, facts),
+      into(p),
+      socials(p));
+  }));
 }
 
 function booths() {
@@ -201,11 +262,15 @@ async function share(p: MyPhoto, event: string) {
   }
 }
 
+/** Everyone the bands put in the photo with you, by name and socials. */
 function who(p: MyPhoto) {
-  if (!p.people.length) return 'Just you';
-  const named = p.people.filter(x => x.nodeId !== 0n).map(x => x.name);
-  const others = p.people.length - named.length;
-  return `You with ${[...named, others && `${others} other${others > 1 ? 's' : ''}`].filter(Boolean).join(', ')}`;
+  if (!p.people.length) return h('div', { class: 'muted' }, 'Just you');
+  return [
+    h('div', {}, 'You with:'),
+    h('ul', {}, p.people.map(x => h('li', {},
+      h('b', {}, x.name), ' ',
+      x.handles.length ? handleLinks(x.handles) : h('span', { class: 'muted' }, 'no socials shared')))),
+  ];
 }
 
 function photos(conn: DbConnection, event: string) {
@@ -215,7 +280,7 @@ function photos(conn: DbConnection, event: string) {
     h('img', { src: p.url }),
     h('figcaption', {},
       h('b', {}, p.caption || p.zoneName), ` · ${p.zoneName} · ${time(p.takenAt)}`,
-      h('div', {}, who(p)),
+      who(p),
       h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
 }
 
@@ -297,12 +362,16 @@ function balance(conn: DbConnection) {
   return h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w.accountId.slice(0, 8)}`));
 }
 
-const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid in for your claim', charge: 'Charge paid', refund: 'Your deductible back' };
+const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid in for your claim', charge: 'Charge paid' };
 
 /** The wallet's movements, newest first: payouts in, charges and merch out. */
 export function movements(conn: DbConnection) {
   const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
-  const what = (kind: string, memo: string) => kind === 'purchase' ? memo.replace(/^BandIt merch: /, 'Merch: ') : MOVES[kind] ?? (memo || kind);
+  const what = (kind: string, memo: string) => {
+    if (kind === 'purchase') return memo.replace(/^BandIt merch: /, 'Merch: ');
+    const claim = kind === 'payout' && memo.match(/claim (\d+)/)?.[1];
+    return claim ? `Paid in for claim ${claim}` : MOVES[kind] ?? (memo || kind);
+  };
   return entries.length > 0 && [h('h4', {}, 'Wallet activity'), h('table', {}, entries.map(e => h('tr', {},
     h('td', {}, date(e.createdAt)), h('td', {}, what(e.kind, e.memo)),
     h('td', { class: e.amountCents < 0n ? '' : 'pass' }, `${e.amountCents < 0n ? 'out' : 'in'} ${money(e.amountCents < 0n ? -e.amountCents : e.amountCents)}`))))];

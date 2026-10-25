@@ -19,10 +19,12 @@ use bandit_bindings::{
     ZoneTableAccess, connect,
 };
 use bandit_common::{BlobStore, Config, TokenStore};
+use futures_util::future::join_all;
 use search::Elastic;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use spacetimedb_sdk::{DbContext, Identity, Table};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tower_http::cors::CorsLayer;
@@ -53,6 +55,10 @@ pub struct App {
 }
 
 pub type AppState = State<Arc<App>>;
+
+/// At most this many of the people who share no booth with the caller get a closest booth of their own,
+/// one Elastic call each; the rest fall back to the place and minutes.
+const MAX_PAIRS: usize = 12;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -147,8 +153,9 @@ async fn health(State(app): AppState) -> Json<Value> {
     Json(json!({ "status": "ok", "roles": roles }))
 }
 
-/// The summary of `who` from the subscription cache, with the suggestions in Elastic's order.
-/// When Elastic cannot rank, the suggestions keep their minutes order and say so.
+/// The summary of `who` from the subscription cache, with the suggestions in Elastic's order and, for
+/// each person who shares no booth with `who`, the closest pair of booths by meaning. When Elastic
+/// cannot rank, the suggestions keep their minutes order and say so.
 pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary> {
     let db = &app.conn.db;
     let rows = summary::Rows {
@@ -163,14 +170,40 @@ pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary
         photo_tags: db.social_photo_tags().iter().collect(),
     };
     let mut recap = summary::summary(&rows, who)?;
-    let people: Vec<u64> = recap.suggested_people.iter().map(|p| p.node_id).collect();
+    let people: Vec<u64> = recap
+        .suggested_people
+        .iter()
+        .map(|p| p.node_id)
+        .chain(recap.also_there.iter().map(|p| p.node_id))
+        .collect();
     let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
     let fallback = summary::visited_text(&rows, who);
     let attendee_id = who.to_hex().to_string();
     let first_by_minutes = recap.suggested_booths.first().map(|b| b.name.clone());
-    match app.es.rank(&attendee_id, &fallback, &people, &booths).await {
+    let mine = summary::booths_of(&rows, who);
+    let theirs = if mine.is_empty() { Vec::new() } else { summary::unshared_booths(&recap) };
+    match app.es.rank(&attendee_id, &fallback, &people, &booths, &theirs).await {
         Ok(ranking) => {
             summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths);
+            let picks = summary::their_best_booths(&recap, &ranking.theirs, MAX_PAIRS);
+            let answers = join_all(picks.iter().map(|&id| {
+                let text = summary::booth_text(&rows.booths, id);
+                let mine = &mine;
+                async move { app.es.closest(&text, mine).await }
+            }))
+            .await;
+            let mut yours = BTreeMap::new();
+            for (id, answer) in picks.into_iter().zip(answers) {
+                match answer {
+                    Ok(hits) => {
+                        if let Some(first) = hits.into_iter().next() {
+                            yours.insert(id, first);
+                        }
+                    }
+                    Err(e) => eprintln!("no closest booth for booth {id}: {e:#}"),
+                }
+            }
+            summary::apply_similar(&mut recap, &rows.booths, &ranking.theirs, &yours);
             let at_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
             let doc = summary::ranking_doc(&recap, &ranking.interests, first_by_minutes.as_deref(), at_ms);
             if let Err(e) = app.es.log_ranking(&attendee_id, &doc).await {

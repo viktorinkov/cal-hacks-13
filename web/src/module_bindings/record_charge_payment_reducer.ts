@@ -15,7 +15,4 @@ export default {
   customerId: __t.string(),
   accountId: __t.string(),
   purchaseId: __t.string(),
-  refundCustomerId: __t.string(),
-  refundAccountId: __t.string(),
-  refundDepositId: __t.string(),
 };

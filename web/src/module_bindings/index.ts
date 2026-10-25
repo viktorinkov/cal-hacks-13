@@ -150,7 +150,6 @@ import SubmitRuleProposalReducer from "./submit_rule_proposal_reducer";
 import SubmitVisionAssessmentReducer from "./submit_vision_assessment_reducer";
 import UnplaceBandReducer from "./unplace_band_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
-import UpsertAttendeePolicyReducer from "./upsert_attendee_policy_reducer";
 import UpsertCameraReducer from "./upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "./upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "./upsert_insurance_policy_reducer";
@@ -164,7 +163,6 @@ import ApiSessionsRow from "./api_sessions_table";
 import BandRow from "./band_table";
 import BandPlaceRow from "./band_place_table";
 import BoardApprovalsRow from "./board_approvals_table";
-import BoardAttendeePoliciesRow from "./board_attendee_policies_table";
 import BoardAttendeesRow from "./board_attendees_table";
 import BoardChargesRow from "./board_charges_table";
 import BoardChecksRow from "./board_checks_table";
@@ -221,7 +219,6 @@ import LiveRunRow from "./live_run_table";
 import MedicMedicalCardsRow from "./medic_medical_cards_table";
 import MerchTemplateRow from "./merch_template_table";
 import MyAttendeeRow from "./my_attendee_table";
-import MyAttendeePolicyRow from "./my_attendee_policy_table";
 import MyBandRow from "./my_band_table";
 import MyChargesRow from "./my_charges_table";
 import MyClaimQueueRow from "./my_claim_queue_table";
@@ -745,13 +742,6 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardApprovalsRow),
-  boardAttendeePolicies: __table({
-    name: 'board_attendee_policies',
-    indexes: [
-    ],
-    constraints: [
-    ],
-  }, BoardAttendeePoliciesRow),
   boardAttendees: __table({
     name: 'board_attendees',
     indexes: [
@@ -1018,13 +1008,6 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyAttendeeRow),
-  myAttendeePolicy: __table({
-    name: 'my_attendee_policy',
-    indexes: [
-    ],
-    constraints: [
-    ],
-  }, MyAttendeePolicyRow),
   myBand: __table({
     name: 'my_band',
     indexes: [
@@ -1376,7 +1359,6 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_vision_assessment", SubmitVisionAssessmentReducer),
   __reducerSchema("unplace_band", UnplaceBandReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
-  __reducerSchema("upsert_attendee_policy", UpsertAttendeePolicyReducer),
   __reducerSchema("upsert_camera", UpsertCameraReducer),
   __reducerSchema("upsert_coverage_rule", UpsertCoverageRuleReducer),
   __reducerSchema("upsert_insurance_policy", UpsertInsurancePolicyReducer),
@@ -1424,8 +1406,6 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "api_sessions": Omit<typeof tablesSchema.schemaType.tables["apiSessions"], "accessorName"> & { readonly accessorName: "api_sessions" };
     /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
     readonly "board_approvals": Omit<typeof tablesSchema.schemaType.tables["boardApprovals"], "accessorName"> & { readonly accessorName: "board_approvals" };
-    /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
-    readonly "board_attendee_policies": Omit<typeof tablesSchema.schemaType.tables["boardAttendeePolicies"], "accessorName"> & { readonly accessorName: "board_attendee_policies" };
     /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
     readonly "board_attendees": Omit<typeof tablesSchema.schemaType.tables["boardAttendees"], "accessorName"> & { readonly accessorName: "board_attendees" };
     /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
@@ -1502,8 +1482,6 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "medic_medical_cards": Omit<typeof tablesSchema.schemaType.tables["medicMedicalCards"], "accessorName"> & { readonly accessorName: "medic_medical_cards" };
     /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
     readonly "my_attendee": Omit<typeof tablesSchema.schemaType.tables["myAttendee"], "accessorName"> & { readonly accessorName: "my_attendee" };
-    /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
-    readonly "my_attendee_policy": Omit<typeof tablesSchema.schemaType.tables["myAttendeePolicy"], "accessorName"> & { readonly accessorName: "my_attendee_policy" };
     /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
     readonly "my_band": Omit<typeof tablesSchema.schemaType.tables["myBand"], "accessorName"> & { readonly accessorName: "my_band" };
     /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */
@@ -1606,7 +1584,6 @@ const tableAccessorAliases = {
   "zone_visit": "zoneVisit",
   "api_sessions": "apiSessions",
   "board_approvals": "boardApprovals",
-  "board_attendee_policies": "boardAttendeePolicies",
   "board_attendees": "boardAttendees",
   "board_charges": "boardCharges",
   "board_checks": "boardChecks",
@@ -1645,7 +1622,6 @@ const tableAccessorAliases = {
   "incident_bands": "incidentBands",
   "medic_medical_cards": "medicMedicalCards",
   "my_attendee": "myAttendee",
-  "my_attendee_policy": "myAttendeePolicy",
   "my_band": "myBand",
   "my_charges": "myCharges",
   "my_claim_queue": "myClaimQueue",
@@ -1733,8 +1709,6 @@ export type DbView = __DbViewBase & {
   readonly "api_sessions": __DbViewBase["apiSessions"];
   /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
   readonly "board_approvals": __DbViewBase["boardApprovals"];
-  /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
-  readonly "board_attendee_policies": __DbViewBase["boardAttendeePolicies"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __DbViewBase["boardAttendees"];
   /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
@@ -1811,8 +1785,6 @@ export type DbView = __DbViewBase & {
   readonly "medic_medical_cards": __DbViewBase["medicMedicalCards"];
   /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
   readonly "my_attendee": __DbViewBase["myAttendee"];
-  /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
-  readonly "my_attendee_policy": __DbViewBase["myAttendeePolicy"];
   /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
   readonly "my_band": __DbViewBase["myBand"];
   /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */
@@ -1917,8 +1889,6 @@ export type Tables = __TablesBase & {
   readonly "api_sessions": __TablesBase["apiSessions"];
   /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
   readonly "board_approvals": __TablesBase["boardApprovals"];
-  /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
-  readonly "board_attendee_policies": __TablesBase["boardAttendeePolicies"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __TablesBase["boardAttendees"];
   /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
@@ -1995,8 +1965,6 @@ export type Tables = __TablesBase & {
   readonly "medic_medical_cards": __TablesBase["medicMedicalCards"];
   /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
   readonly "my_attendee": __TablesBase["myAttendee"];
-  /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
-  readonly "my_attendee_policy": __TablesBase["myAttendeePolicy"];
   /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
   readonly "my_band": __TablesBase["myBand"];
   /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */

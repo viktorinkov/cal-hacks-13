@@ -251,7 +251,7 @@ async fn transcribe<M: Model>(model: &M, page: &[u8], calls: &mut Vec<ModelCallI
 mod tests {
     use super::*;
     use crate::model::fake::FakeModel;
-    use bandit_insurance::policy::ATTENDEE_POLICY;
+    use bandit_insurance::policy::HEALTH_PLAN;
     use lopdf::content::{Content, Operation};
     use lopdf::{Document, Object, Stream, dictionary};
 
@@ -363,7 +363,7 @@ mod tests {
         assert_eq!((docs[1].clause_id.as_str(), docs[1].policy.as_str(), docs[1].page), ("ab12-c2", "venue", 2));
         let staff = checked.terms.iter().find(|t| t.code == "staff").unwrap();
         assert_eq!(docs[staff.clause as usize - 1].section, "exclusions");
-        assert!(clause_docs(&payload(ATTENDEE_POLICY), &checked).iter().all(|c| c.policy == "attendee"));
+        assert!(clause_docs(&payload(HEALTH_PLAN), &checked).iter().all(|c| c.policy == "attendee"), "a health plan's clauses are the attendee's");
     }
 
     #[test]

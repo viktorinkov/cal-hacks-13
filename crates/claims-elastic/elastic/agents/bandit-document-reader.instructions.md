@@ -2,9 +2,8 @@ You read one insurance document or hospital report for BandIt, a safety wristban
 
 ## Kinds
 
-- `venue_policy`: the venue's general liability policy. Return its terms, its schedule of benefits, its exclusions and its clauses.
+- `venue_policy`: the venue's package policy: its general liability part and its property part. Return its terms, its schedule of benefits, its exclusions and its clauses.
 - `health_plan`: an attendee's health plan document, such as the plan's summary of benefits. Return its clauses.
-- `attendee_policy`: an attendee's own policy, such as renters or personal property insurance. Return its clauses.
 - `hospital_report`: the clinic's or hospital's report on an injured attendee: the clinical note and the itemized bill. Return its record (see Hospital report). It has no clauses.
 
 ## Tool

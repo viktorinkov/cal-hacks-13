@@ -100,9 +100,8 @@ pub(super) fn post(ctx: &ReducerContext, claim_id: u64, journal: bandit_insuranc
     Ok(())
 }
 
-/// Opens the claim when a resolved incident of the venue's broken equipment, or
-/// of an attendee's stolen or broken belonging, has a logged cost: the venue
-/// claims for its equipment, the attendee who wore the band for their belonging. Injury claims
+/// Opens the venue's claim when a resolved incident of its broken or stolen
+/// property has a logged cost. Injury claims
 /// wait for the attendee who wore the band to file them (`file_claim`), or
 /// staff to file for them.
 pub fn on_incident_resolved(ctx: &ReducerContext, incident: &Incident) -> Result<(), String> {
@@ -113,11 +112,7 @@ pub fn on_incident_resolved(ctx: &ReducerContext, incident: &Incident) -> Result
     if !has_cost {
         return Ok(());
     }
-    let claimant = match incident.kind {
-        IncidentKind::Theft | IncidentKind::Breakage => super::people::wore_band_at(ctx, incident.subject_band, incident.opened_at),
-        _ => None,
-    };
-    open_claim_for(ctx, incident, claimant, String::new()).map(|_| ())
+    open_claim_for(ctx, incident, None, String::new()).map(|_| ())
 }
 
 /// Opens a claim by hand for a resolved incident the hook skipped.
@@ -140,11 +135,7 @@ pub(super) fn open_claim_for(ctx: &ReducerContext, incident: &Incident, claimant
     let venue_policy = super::documents::current_policy(ctx).ok_or("no insurance policy is set up")?;
     let kind = incident.kind.core();
     let cover = CoverKind::for_incident(kind);
-    let policy_id = if cover.is_attendee_policy() {
-        claimant.and_then(|c| super::own_policy::ensure(ctx, c)).map(|p| p.id).unwrap_or(0)
-    } else {
-        venue_policy.id
-    };
+    let policy_id = venue_policy.id;
     let claimant_name = claimant.map(|c| super::people::display_name(ctx, c)).unwrap_or_default();
     let zone_name = ctx.db.zone().id().find(incident.zone_id).map(|z| z.name).unwrap_or_else(|| "unzoned".into());
     let claim = ctx.db.claim().insert(Claim {
@@ -267,17 +258,9 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance:
         },
         cost_cents: if cover_of(claim) != CoverKind::MedicalPayments { claim.cost_cents } else { 0 },
         responsible_named: input.responsible.is_some(),
-        attendee_policy_hash: attendee_policy_hash(ctx, claim),
-        venue_policy_hash: venue_hash(ctx, claim),
+        attendee_policy_hash: String::new(),
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
-}
-
-/// The document of the attendee's own policy, for the clause search; empty when none is on file.
-fn attendee_policy_hash(ctx: &ReducerContext, claim: &Claim) -> String {
-    if !cover_of(claim).is_attendee_policy() {
-        return String::new();
-    }
-    ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| p.document_hash).unwrap_or_default()
 }
 
 /// Files the hospital report PDF (already in the blob store) for an injury claim.
@@ -512,20 +495,13 @@ fn core_lines(ctx: &ReducerContext, claim_id: u64) -> Vec<LineDecision> {
 
 fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     let Some(r) = policy_rule(ctx, claim.policy_id, cover_of(claim)) else {
-        if cover_of(claim).is_attendee_policy() {
-            return "The venue's general liability policy excludes guests' property and property in the venue's care, custody or control, so it does not pay for an attendee's own belongings; the attendee has no policy of their own on file, so the organizer decides.".into();
-        }
         return "no cover".into();
     };
     let f = bandit_insurance::money::format_cents;
-    if cover_of(claim).is_attendee_policy() {
-        let p = ctx.db.attendee_policy().id().find(claim.policy_id);
+    if kind_of(claim) == bandit_insurance::IncidentKind::Theft {
         return format!(
-            "The attendee's own policy ({}, {}), personal property cover: pays for the attendee's own belongings stolen or broken away from home, up to {} per claim and {} a year, less a {} deductible the attendee carries. The venue's general liability policy excludes guests' property.",
-            p.as_ref().map(|p| p.insurer_name.clone()).unwrap_or_default(),
-            p.as_ref().map(|p| p.policy_number.clone()).unwrap_or_default(),
+            "The venue's property policy, the property part of its package policy: pays to replace the venue's own property, or a sponsor's gear in its care, stolen during the event, up to {} per claim, after a {} deductible the venue carries. The insurer may recover what it paid from the person who took it.",
             f(r.per_claim_limit_cents),
-            f(r.aggregate_limit_cents),
             f(r.deductible_cents)
         );
     }
@@ -578,8 +554,8 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         policy_summary: policy_summary(ctx, claim),
         claimant_statement: claim.statement.clone(),
         charge: super::charges::brief(ctx, claim),
-        attendee_policy_hash: attendee_policy_hash(ctx, claim),
-        venue_policy_hash: venue_hash(ctx, claim),
+        attendee_policy_hash: String::new(),
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
 
@@ -698,47 +674,15 @@ pub(super) fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<Str
     })
 }
 
-/// Why an attendee's stolen or broken belonging goes to the organizer whatever is decided: they have no
-/// policy of their own on file, and the venue's policy excludes guests' property.
-fn no_own_policy(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
-    (cover_of(claim).is_attendee_policy() && ctx.db.attendee_policy().id().find(claim.policy_id).is_none()).then(|| {
-        "an attendee's own belonging: the venue's policy excludes guests' property and the attendee has no policy of their own on file, so the organizer decides".to_string()
-    })
-}
-
-/// A pay on an attendee's own policy that came from a plan lookup goes to the organizer: its limit and
-/// deductible are what the attendee typed, so the organizer checks them against the plan's wording.
-pub(super) fn typed_policy(ctx: &ReducerContext, claim: &Claim, decision: Decision) -> Decision {
-    let typed = cover_of(claim).is_attendee_policy()
-        && ctx.db.attendee_policy().id().find(claim.policy_id).is_some_and(|p| p.source == super::plan_lookup::KIND_PLAN_LOOKUP);
-    match decision {
-        Decision::AutoSettle { .. } if typed => Decision::Route {
-            reason: "the attendee's own policy was found online from its name: its limit and deductible are the attendee's word, so the organizer decides".into(),
-        },
-        d => d,
-    }
-}
-
 /// An active cover of the claim's policy pays this kind of incident, and the
 /// incident falls in the policy period when the confirmed policy states one.
 pub(super) fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
     let opened = ctx.db.incident().id().find(claim.incident_id).map(|i| i.opened_at).unwrap_or(ctx.timestamp);
-    let in_period = cover_of(claim).is_attendee_policy() || super::documents::in_period(ctx, claim.policy_id, opened);
-    policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active) && in_period
-}
-
-/// The confirmed venue policy PDF the claim's clauses come from; an attendee's own claim still reads the venue's exclusions.
-fn venue_hash(ctx: &ReducerContext, claim: &Claim) -> String {
-    let venue_policy_id = if cover_of(claim).is_attendee_policy() { super::documents::current_policy(ctx).map(|p| p.id).unwrap_or(0) } else { claim.policy_id };
-    super::documents::venue_policy_hash(ctx, venue_policy_id)
+    policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active) && super::documents::in_period(ctx, claim.policy_id, opened)
 }
 
 /// Claude's valid decision, held to its limits.
 fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> Result<(), String> {
-    if let Some(reason) = no_own_policy(ctx, &claim) {
-        route(ctx, claim, reason);
-        return Ok(());
-    }
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
     let rules = core_rules(ctx);
     let guarded = guard(
@@ -753,7 +697,7 @@ fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> 
             mass_occurrence: mass_occurrence(ctx, &claim),
         },
     );
-    let decision = with_precedent(ctx, &claim, typed_policy(ctx, &claim, guarded.decision));
+    let decision = with_precedent(ctx, &claim, guarded.decision);
     apply(ctx, claim, decision, guarded.decided_by)
 }
 
@@ -801,10 +745,6 @@ fn record_precedent(ctx: &ReducerContext, claim: &Claim, found: &[Complication],
 
 /// The code-only decision, when Claude is unavailable or its decision was set aside.
 fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Result<(), String> {
-    if let Some(reason) = no_own_policy(ctx, &claim) {
-        route(ctx, claim, reason);
-        return Ok(());
-    }
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
     let rules = core_rules(ctx);
     let decision = decide(&DecisionInput {
@@ -817,7 +757,7 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
         review_required: settings(ctx).review_required,
         rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
     });
-    let decision = with_precedent(ctx, &claim, typed_policy(ctx, &claim, decision));
+    let decision = with_precedent(ctx, &claim, decision);
     let complicated = !claim_complications(ctx, &claim).is_empty();
     if let (Some(reason), false, false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. }), complicated) {
         route(ctx, claim, reason);
@@ -891,11 +831,7 @@ fn refuse(ctx: &ReducerContext, claim: Claim, reason: String, decided_by: &str) 
 /// property payout goes to the venue's repair vendor and is booked at once.
 fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), String> {
     post(ctx, claim.id, bandit_insurance::ledger::receivable(claim.recoverable_cents), outcome)?;
-    if cover_of(&claim).is_attendee_policy() {
-        if let Some(p) = ctx.db.attendee_policy().id().find(claim.policy_id) {
-            ctx.db.attendee_policy().id().update(AttendeePolicy { used_cents: p.used_cents + claim.payout_cents, updated_at: ctx.timestamp, ..p });
-        }
-    } else if let Some(p) = ctx.db.insurance_policy().id().find(claim.policy_id) {
+    if let Some(p) = ctx.db.insurance_policy().id().find(claim.policy_id) {
         let p = match cover_of(&claim) {
             CoverKind::MedicalPayments => InsurancePolicy { medical_used_cents: p.medical_used_cents + claim.payout_cents, ..p },
             _ => InsurancePolicy { property_used_cents: p.property_used_cents + claim.payout_cents, ..p },
@@ -904,7 +840,8 @@ fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), Strin
     }
     let claim = save(ctx, Claim { decided_at: Some(ctx.timestamp), routed_to: Identity::ZERO, ..claim });
     if cover_of(&claim) == CoverKind::Property {
-        return paid(ctx, claim, "repair vendor".into(), outcome);
+        let to = if kind_of(&claim) == bandit_insurance::IncidentKind::Theft { "the venue, to replace what was stolen" } else { "repair vendor" };
+        return paid(ctx, claim, to.into(), outcome);
     }
     let account = claim.claimant.and_then(|c| ctx.db.claimant_account().identity().find(c));
     let payload = PayoutPayload {
@@ -1000,17 +937,12 @@ fn decision_text(ctx: &ReducerContext, claim: &Claim) -> String {
 fn letter_data(ctx: &ReducerContext, claim: &Claim, counterparty_name: &str, counterparty_contact: &str) -> LetterData {
     let s = settings(ctx);
     let opened = ctx.db.incident().id().find(claim.incident_id).map(|i| micros(i.opened_at)).unwrap_or(0);
-    let (policy_number, insurer_name, fnol_contact) = if cover_of(claim).is_attendee_policy() {
-        let p = ctx.db.attendee_policy().id().find(claim.policy_id);
-        (p.as_ref().map(|p| p.policy_number.clone()).unwrap_or_default(), p.map(|p| p.insurer_name).unwrap_or_default(), String::new())
-    } else {
-        let p = ctx.db.insurance_policy().id().find(claim.policy_id);
-        (
-            p.as_ref().map(|p| p.policy_number.clone()).unwrap_or_default(),
-            p.as_ref().map(|p| p.insurer_name.clone()).unwrap_or_default(),
-            p.map(|p| p.fnol_contact).unwrap_or_default(),
-        )
-    };
+    let p = ctx.db.insurance_policy().id().find(claim.policy_id);
+    let (policy_number, insurer_name, fnol_contact) = (
+        p.as_ref().map(|p| p.policy_number.clone()).unwrap_or_default(),
+        p.as_ref().map(|p| p.insurer_name.clone()).unwrap_or_default(),
+        p.map(|p| p.fnol_contact).unwrap_or_default(),
+    );
     LetterData {
         claim_id: claim.id,
         pack_sha256: claim.pack_hash.clone(),

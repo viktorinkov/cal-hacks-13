@@ -16,3 +16,5 @@ bandit-insurance = { path = "../../crates/bandit-insurance" }
 [dev-dependencies]
 spacetimedb = { version = "2.13", features = ["test-utils"] }
 icu_calendar = "~2.1"
+
+[workspace]

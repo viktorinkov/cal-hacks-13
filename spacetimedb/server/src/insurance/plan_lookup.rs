@@ -1,25 +1,22 @@
-//! Plan lookup: an attendee names their insurer and plan instead of uploading its PDF. A worker
-//! searches for the plan's public document through Bright Data, Claude picks it among the results
-//! and reads what it prints, and the worker keeps the PDF only when the printed insurer and plan
-//! match what the attendee typed. Here the PDF lands like an upload: a health plan fills the medical
-//! card's insurer and plan; a policy for the attendee's belongings becomes their own policy, with the
-//! limit and deductible they typed, because no public form holds a policyholder's own numbers.
+//! Plan lookup: an attendee names their health insurer and plan instead of uploading its PDF. A
+//! worker searches for the plan's public document through Bright Data, Claude picks it among the
+//! results and reads what it prints, and the worker keeps the PDF only when the printed insurer and
+//! plan match what the attendee typed. Here the PDF lands like an upload and fills the medical
+//! card's insurer and plan.
 
 use super::documents::{DocumentIn, queue_document_read};
-use super::own_policy::{self, AttendeePolicyTerms};
 use crate::jobs::{self, *};
 use crate::medical::{self, *};
 use crate::roles::*;
 use crate::social::tables::*;
 use crate::view_as::viewed;
-use bandit_insurance::policy::{ATTENDEE_POLICY, HEALTH_PLAN};
+use bandit_insurance::policy::HEALTH_PLAN;
 use serde::{Deserialize, Serialize};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 pub const KIND_PLAN_LOOKUP: &str = "plan_lookup";
-/// What the attendee names: their health plan, or the policy that covers their belongings.
+/// What the attendee names: their health plan.
 pub const HEALTH: &str = "health";
-pub const BELONGINGS: &str = "belongings";
 
 pub const SEARCHING: &str = "searching";
 pub const FOUND: &str = "found";
@@ -38,13 +35,13 @@ pub struct PlanLookup {
     pub id: u64,
     #[index(btree)]
     pub attendee: Identity,
-    /// `health` or `belongings`.
+    /// `health`.
     pub kind: String,
     /// As the attendee typed them.
     pub insurer: String,
     pub plan: String,
     pub state: String,
-    /// For `belongings`, from the attendee's declarations page; 0 for `health`.
+    /// Kept from an earlier design, when a lookup could name a belongings policy; always 0.
     pub limit_cents: u64,
     pub deductible_cents: u64,
     /// `searching`, `found`, `not_found`, `wrong_plan` or `failed`.
@@ -95,21 +92,11 @@ fn name(what: &str, s: &str) -> Result<String, String> {
     Ok(s)
 }
 
-/// The attendee names their plan; a worker looks for its public document.
+/// The attendee names their health plan; a worker looks for its public document.
 #[spacetimedb::reducer]
-pub fn look_up_plan(
-    ctx: &ReducerContext,
-    kind: String,
-    insurer: String,
-    plan: String,
-    state: String,
-    limit_cents: u64,
-    deductible_cents: u64,
-) -> Result<(), String> {
+pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: String) -> Result<(), String> {
     let me = ctx.sender();
-    if kind != HEALTH && kind != BELONGINGS {
-        return Err("kind is health or belongings".into());
-    }
+    let kind = HEALTH.to_string();
     if ctx.db.band_owner().owner().find(me).is_none() {
         return Err("claim your band first".into());
     }
@@ -119,17 +106,7 @@ pub fn look_up_plan(
     if state.len() != 2 || !state.chars().all(|c| c.is_ascii_alphabetic()) {
         return Err("type your state as two letters, such as CA".into());
     }
-    let (limit_cents, deductible_cents) = if kind == BELONGINGS {
-        if limit_cents == 0 {
-            return Err("type your personal property limit from your declarations page".into());
-        }
-        if deductible_cents >= limit_cents {
-            return Err("the deductible must be below the limit".into());
-        }
-        (limit_cents, deductible_cents)
-    } else {
-        (0, 0)
-    };
+    let (limit_cents, deductible_cents) = (0, 0);
     if ctx.db.plan_lookup().attendee().filter(me).any(|l| l.kind == kind && l.status == SEARCHING) {
         return Err("already looking up your plan".into());
     }
@@ -217,14 +194,10 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
         updated_at: ctx.timestamp,
         ..lookup
     };
-    if found.kind == HEALTH {
-        land_health_plan(ctx, &found);
-    } else {
-        land_own_policy(ctx, &found)?;
-    }
+    land_health_plan(ctx, &found);
     // The Evidence Engine reads the found PDF like an upload; a document it can't take still leaves the lookup found.
     let read = DocumentIn {
-        kind: if found.kind == HEALTH { HEALTH_PLAN } else { ATTENDEE_POLICY }.into(),
+        kind: HEALTH_PLAN.into(),
         attendee: Some(found.attendee),
         file_hash: found.file_hash.clone(),
         page_count: found.page_count,
@@ -257,22 +230,6 @@ fn land_health_plan(ctx: &ReducerContext, l: &PlanLookup) {
             ctx.db.medical_card().insert(MedicalCard { insurer, plan, ..medical::empty_card(l.attendee, ctx.timestamp) });
         }
     }
-}
-
-/// A found belongings policy becomes the attendee's own policy: the printed insurer and plan, and the
-/// limit and deductible they typed, since the public form prints neither. The plan's name stands in
-/// for the policy number, which only their declarations page prints.
-fn land_own_policy(ctx: &ReducerContext, l: &PlanLookup) -> Result<(), String> {
-    let terms = AttendeePolicyTerms {
-        insurer_name: printed_or(&l.printed_insurer, &l.insurer),
-        policy_number: printed_or(&l.printed_plan, &l.plan),
-        per_claim_limit_cents: l.limit_cents,
-        aggregate_limit_cents: l.limit_cents,
-        deductible_cents: l.deductible_cents,
-        source: KIND_PLAN_LOOKUP.into(),
-        document_hash: l.file_hash.clone(),
-    };
-    own_policy::upsert(ctx, l.attendee, terms).map(|_| ())
 }
 
 /// A lookup job gave up after its last attempt.

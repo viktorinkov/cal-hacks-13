@@ -51,7 +51,6 @@ const QUERIES = [
   'SELECT * FROM board_reviews',
   'SELECT * FROM decision',
   'SELECT * FROM board_charges',
-  'SELECT * FROM board_attendee_policies',
   'SELECT * FROM board_records',
   'SELECT * FROM board_approvals',
   'SELECT * FROM board_ledger',
@@ -665,8 +664,9 @@ function showViewAs(on: boolean) {
 
 // --- Claims ---------------------------------------------------------------------------------
 
-/** Open incidents: the medic takes one, opens the medical card, notes the cost and resolves it. For something
- *  broken or stolen, staff note what it is and its value, and name who did it by their band. */
+/** Open incidents: the medic takes one, opens the medical card, notes the cost and resolves it. For the venue's
+ *  equipment broken or something stolen from the venue, staff note what it is and its value, and name who did it
+ *  by their band. */
 function incidentDesk() {
   const incidents = [...conn.db.openIncidents.iter()].sort((a, b) => Number(a.id - b.id));
   const notes = [...conn.db.boardNotes.iter()];
@@ -675,7 +675,7 @@ function incidentDesk() {
   const medic = can('medic');
   return h('section', {},
     h('h3', {}, 'Open incidents'),
-    !incidents.length && h('p', { class: 'muted' }, 'None. A fall or SOS on a band opens one here, and so does a report of something broken or stolen below.'),
+    !incidents.length && h('p', { class: 'muted' }, 'None. A fall or SOS on a band opens one here, and so does a report below of the venue\'s equipment broken or something stolen from the venue.'),
     incidents.map(i => {
       const kind = i.kind.tag.toLowerCase();
       const loss = isLoss(kind);
@@ -690,9 +690,8 @@ function incidentDesk() {
         if (ok) f.reset();
       };
       const band = i.subjectBand ? `band ${bandCode(i.subjectBand)}${names.has(i.subjectBand) ? ` (${names.get(i.subjectBand) || 'no name yet'})` : ''}` : 'no band';
-      const who = loss && kind !== 'property' && i.subjectBand ? `the owner's ${band}` : band;
       return h('div', { class: 'incident' },
-        h('p', {}, h('b', {}, `Incident ${i.id}: ${capital(kindWords(kind))}`), ` in ${zoneName(i.zoneId)}, ${who}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
+        h('p', {}, h('b', {}, `Incident ${i.id}: ${capital(kindWords(kind))}`), ` in ${zoneName(i.zoneId)}, ${band}, ${i.status.tag}, opened ${time(i.openedAt)} by ${i.openedBy}`),
         h('ul', {}, mine.map(n => h('li', {}, `${time(n.createdAt)} ${n.authorRole}: ${n.text}${n.costCents !== undefined ? ` (${money(n.costCents)})` : ''}`))),
         medic && i.status.tag === 'Open' && h('button', { onclick: () => act(() => conn.reducers.assignMedic({ incidentId: i.id })) }, 'Take it'),
         medic && !loss && i.subjectBand !== 0 && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: i.subjectBand })) }, `Tap band ${bandCode(i.subjectBand)} for the medical card`),
@@ -730,34 +729,28 @@ function nameWhoDidIt(incidentId: bigint, charge: Charge | undefined) {
   ];
 }
 
-/** What staff can report by hand: the venue's equipment, or an attendee's own belonging. */
+/** What staff can report by hand: the venue's losses. */
 const LOSS_KINDS: [string, string][] = [
   ['property', 'Venue equipment broken'],
-  ['theft', "An attendee's belonging stolen"],
-  ['breakage', "An attendee's belonging broken by someone else"],
+  ['theft', "Stolen from the venue: its equipment, merch or a sponsor's gear at its booth"],
 ];
 
-/** Staff report something broken or stolen: the kind, the zone, the owner's band for a belonging, and a note. */
+/** Staff report the venue's equipment broken or something stolen from the venue: the kind, the zone and a note. */
 function reportLoss() {
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   const report = async (e: Event) => {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
-    const kind = field(f, 'report-kind');
-    const code = field(f, 'report-band');
-    const bandId = kind === 'property' || !code ? 0 : bandFromCode(code);
-    const ok = await act(async () => {
-      if (kind !== 'property' && !bandId) throw new Error(code ? `${code} is not a band code.` : 'Give the band code of the attendee whose belonging it is.');
-      await conn.reducers.openIncident({ kind, zoneId: BigInt(field(f, 'report-zone')), bandId, note: field(f, 'report-note') });
-    });
+    const ok = await act(() => conn.reducers.openIncident({
+      kind: field(f, 'report-kind'), zoneId: BigInt(field(f, 'report-zone')), bandId: 0, note: field(f, 'report-note'),
+    }));
     if (ok) f.reset();
   };
   return h('form', { onsubmit: report },
     h('h4', {}, 'Report something broken or stolen'),
     h('label', {}, 'What happened', h('select', { name: 'report-kind' }, LOSS_KINDS.map(([value, label]) => h('option', { value }, label)))),
     h('label', {}, 'Where', h('select', { name: 'report-zone' }, zones.map(z => h('option', { value: String(z.id) }, z.name)))),
-    h('label', {}, "The owner's band code, for an attendee's belonging", h('input', { name: 'report-band', placeholder: bandCode(94) })),
-    h('label', {}, 'Note', h('input', { name: 'report-note', placeholder: 'What it is and what it is worth, e.g. a phone, $899' })),
+    h('label', {}, 'Note', h('input', { name: 'report-note', placeholder: 'What it is and what it is worth, e.g. a sponsor\'s laptop, $1,299' })),
     h('button', {}, 'Report it'));
 }
 
@@ -909,32 +902,24 @@ function decides(c: Claim): boolean {
   return c.routedTo.isEqual(conn.identity!) || can(c.routedToRole);
 }
 
-/** Where a claim's payout goes: the attendee's wallet, or the repair vendor for the venue's own equipment. */
+/** Where a claim's payout goes: the attendee's wallet, the repair vendor for the venue's broken equipment, or the
+ *  venue, to replace what was stolen from it. */
 function payee(c: Claim): string {
-  return c.coverKind === 'property' ? 'the repair vendor' : `${c.claimantName || 'the claimant'}'s wallet`;
+  if (c.coverKind !== 'property') return `${c.claimantName || 'the claimant'}'s wallet`;
+  return c.incidentKind === 'theft' ? 'the venue, to replace what was stolen' : 'the repair vendor';
 }
 
-const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property', personal_property: 'personal property' };
+const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property' };
 
 const INJURIES = ['sos', 'fall'];
 
 /** Who pays what on a claim: the payout, what the insurer pays back under which policy, the venue's share and what is not covered.
- *  A stolen or broken belonging is paid from the attendee's own policy, and the attendee carries its deductible. */
+ *  An injury is paid from the venue's medical payments cover; the venue's equipment broken or stolen from its property policy. */
 function whoPays(c: Claim) {
   if (!c.costCents && !c.payoutCents) return null;
-  const name = c.claimantName || 'the attendee';
-  if (c.coverKind === 'personal_property') {
-    const own = [...conn.db.boardAttendeePolicies.iter()].find(p => p.id === c.policyId);
-    const insurer = own ? `${own.insurerName} pays back, ${name}'s own policy ${own.policyNumber}, personal property cover` : `${name}'s own insurer pays back`;
-    const rows: [string, bigint][] = [['Cost', c.costCents], [`Paid to ${payee(c)}`, c.payoutCents], [insurer, c.recoverableCents]];
-    if (c.costCents > c.payoutCents) rows.push([`${name} carries (their deductible, and anything over their limit)`, c.costCents - c.payoutCents]);
-    return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents))))),
-      !own && h('p', { class: 'muted' }, `${name} has no policy of their own on file, so nothing pays on its own: the venue's policy excludes guests' property.`),
-      own?.source === 'plan_lookup' && h('p', { class: 'muted' }, `Policy found online from its name. ${name} typed the ${money(own.perClaimLimitCents)} limit and the ${money(own.deductibleCents)} deductible from their declarations page, so check them before you approve. `,
-        own.documentHash && h('a', { href: `/blobs/${own.documentHash}`, target: '_blank' }, 'Open the policy wording'))];
-  }
   const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
-  const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${COVER_WORDS[c.coverKind] ?? c.coverKind} cover` : 'The insurer pays back';
+  const cover = `${COVER_WORDS[c.coverKind] ?? c.coverKind} cover${c.incidentKind === 'theft' ? ', theft as a cause of loss' : ''}`;
+  const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${cover}` : 'The insurer pays back';
   const rows: [string, bigint][] = [
     ['Cost', c.costCents],
     [`Paid to ${payee(c)}`, c.payoutCents],
@@ -1465,7 +1450,7 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
   },
   {
     job: 'Claims: checking the evidence',
-    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the clauses of the venue\'s policy, and of the attendee\'s own policy for a stolen or broken belonging, that bear on that kind of claim. Both come back to the claim on the Settlements tab, as checks and as its policy clauses; they never change an amount.',
+    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the clauses of the venue\'s policy that bear on that kind of claim. Both come back to the claim on the Settlements tab, as checks and as its policy clauses; they never change an amount.',
     views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
   },
 ];

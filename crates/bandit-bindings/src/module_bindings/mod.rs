@@ -26,8 +26,6 @@ pub mod assign_medic_reducer;
 pub mod attach_claim_letters_reducer;
 pub mod attach_recovery_letter_reducer;
 pub mod attendee_out_type;
-pub mod attendee_policy_table;
-pub mod attendee_policy_type;
 pub mod attendee_table;
 pub mod attendee_type;
 pub mod authority_limit_row_type;
@@ -44,7 +42,6 @@ pub mod band_type;
 pub mod blob_ref_table;
 pub mod blob_ref_type;
 pub mod board_approvals_table;
-pub mod board_attendee_policies_table;
 pub mod board_attendees_table;
 pub mod board_charges_table;
 pub mod board_checks_table;
@@ -261,7 +258,6 @@ pub mod merch_template_type;
 pub mod model_call_in_type;
 pub mod model_call_table;
 pub mod model_call_type;
-pub mod my_attendee_policy_table;
 pub mod my_attendee_table;
 pub mod my_band_table;
 pub mod my_band_type;
@@ -425,7 +421,6 @@ pub mod unclaimed_injuries_table;
 pub mod unclaimed_injury_type;
 pub mod unplace_band_reducer;
 pub mod update_profile_reducer;
-pub mod upsert_attendee_policy_reducer;
 pub mod upsert_camera_reducer;
 pub mod upsert_coverage_rule_reducer;
 pub mod upsert_insurance_policy_reducer;
@@ -487,8 +482,6 @@ pub use assign_medic_reducer::assign_medic;
 pub use attach_claim_letters_reducer::attach_claim_letters;
 pub use attach_recovery_letter_reducer::attach_recovery_letter;
 pub use attendee_out_type::AttendeeOut;
-pub use attendee_policy_table::*;
-pub use attendee_policy_type::AttendeePolicy;
 pub use attendee_table::*;
 pub use attendee_type::Attendee;
 pub use authority_limit_row_type::AuthorityLimitRow;
@@ -505,7 +498,6 @@ pub use band_type::Band;
 pub use blob_ref_table::*;
 pub use blob_ref_type::BlobRef;
 pub use board_approvals_table::*;
-pub use board_attendee_policies_table::*;
 pub use board_attendees_table::*;
 pub use board_charges_table::*;
 pub use board_checks_table::*;
@@ -722,7 +714,6 @@ pub use merch_template_type::MerchTemplate;
 pub use model_call_in_type::ModelCallIn;
 pub use model_call_table::*;
 pub use model_call_type::ModelCall;
-pub use my_attendee_policy_table::*;
 pub use my_attendee_table::*;
 pub use my_band_table::*;
 pub use my_band_type::MyBand;
@@ -886,7 +877,6 @@ pub use unclaimed_injuries_table::*;
 pub use unclaimed_injury_type::UnclaimedInjury;
 pub use unplace_band_reducer::unplace_band;
 pub use update_profile_reducer::update_profile;
-pub use upsert_attendee_policy_reducer::upsert_attendee_policy;
 pub use upsert_camera_reducer::upsert_camera;
 pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
 pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
@@ -1142,12 +1132,9 @@ pub enum Reducer {
         spots: Vec<VenueSpotIn>,
     },
     LookUpPlan {
-        kind: String,
         insurer: String,
         plan: String,
         state: String,
-        limit_cents: u64,
-        deductible_cents: u64,
     },
     LookUpVenuePolicy {
         insurer: String,
@@ -1194,9 +1181,6 @@ pub enum Reducer {
         customer_id: String,
         account_id: String,
         purchase_id: String,
-        refund_customer_id: String,
-        refund_account_id: String,
-        refund_deposit_id: String,
     },
     RecordClaimPayout {
         job_id: u64,
@@ -1440,16 +1424,6 @@ pub enum Reducer {
         display_name: String,
         findable: bool,
     },
-    UpsertAttendeePolicy {
-        holder: __sdk::Identity,
-        insurer_name: String,
-        policy_number: String,
-        per_claim_limit_cents: u64,
-        aggregate_limit_cents: u64,
-        deductible_cents: u64,
-        source: String,
-        document_hash: String,
-    },
     UpsertCamera {
         name: String,
         zone_id: u64,
@@ -1615,7 +1589,6 @@ impl __sdk::Reducer for Reducer {
             Reducer::Sweep { .. } => "sweep",
             Reducer::UnplaceBand { .. } => "unplace_band",
             Reducer::UpdateProfile { .. } => "update_profile",
-            Reducer::UpsertAttendeePolicy { .. } => "upsert_attendee_policy",
             Reducer::UpsertCamera { .. } => "upsert_camera",
             Reducer::UpsertCoverageRule { .. } => "upsert_coverage_rule",
             Reducer::UpsertInsurancePolicy { .. } => "upsert_insurance_policy",
@@ -1982,19 +1955,13 @@ impl __sdk::Reducer for Reducer {
                 })
             }
             Reducer::LookUpPlan {
-                kind,
                 insurer,
                 plan,
                 state,
-                limit_cents,
-                deductible_cents,
             } => __sats::bsatn::to_vec(&look_up_plan_reducer::LookUpPlanArgs {
-                kind: kind.clone(),
                 insurer: insurer.clone(),
                 plan: plan.clone(),
                 state: state.clone(),
-                limit_cents: limit_cents.clone(),
-                deductible_cents: deductible_cents.clone(),
             }),
             Reducer::LookUpVenuePolicy {
                 insurer,
@@ -2074,17 +2041,11 @@ impl __sdk::Reducer for Reducer {
                 customer_id,
                 account_id,
                 purchase_id,
-                refund_customer_id,
-                refund_account_id,
-                refund_deposit_id,
             } => __sats::bsatn::to_vec(&record_charge_payment_reducer::RecordChargePaymentArgs {
                 job_id: job_id.clone(),
                 customer_id: customer_id.clone(),
                 account_id: account_id.clone(),
                 purchase_id: purchase_id.clone(),
-                refund_customer_id: refund_customer_id.clone(),
-                refund_account_id: refund_account_id.clone(),
-                refund_deposit_id: refund_deposit_id.clone(),
             }),
             Reducer::RecordClaimPayout {
                 job_id,
@@ -2520,25 +2481,6 @@ impl __sdk::Reducer for Reducer {
                 display_name: display_name.clone(),
                 findable: findable.clone(),
             }),
-            Reducer::UpsertAttendeePolicy {
-                holder,
-                insurer_name,
-                policy_number,
-                per_claim_limit_cents,
-                aggregate_limit_cents,
-                deductible_cents,
-                source,
-                document_hash,
-            } => __sats::bsatn::to_vec(&upsert_attendee_policy_reducer::UpsertAttendeePolicyArgs {
-                holder: holder.clone(),
-                insurer_name: insurer_name.clone(),
-                policy_number: policy_number.clone(),
-                per_claim_limit_cents: per_claim_limit_cents.clone(),
-                aggregate_limit_cents: aggregate_limit_cents.clone(),
-                deductible_cents: deductible_cents.clone(),
-                source: source.clone(),
-                document_hash: document_hash.clone(),
-            }),
             Reducer::UpsertCamera {
                 name,
                 zone_id,
@@ -2613,7 +2555,6 @@ pub struct DbUpdate {
     api_sessions: __sdk::TableUpdate<ApiSession>,
     approval: __sdk::TableUpdate<Approval>,
     attendee: __sdk::TableUpdate<Attendee>,
-    attendee_policy: __sdk::TableUpdate<AttendeePolicy>,
     authority_limit: __sdk::TableUpdate<AuthorityLimitRow>,
     band: __sdk::TableUpdate<Band>,
     band_claim: __sdk::TableUpdate<BandClaim>,
@@ -2621,7 +2562,6 @@ pub struct DbUpdate {
     band_place: __sdk::TableUpdate<BandPlace>,
     blob_ref: __sdk::TableUpdate<BlobRef>,
     board_approvals: __sdk::TableUpdate<Approval>,
-    board_attendee_policies: __sdk::TableUpdate<AttendeePolicy>,
     board_attendees: __sdk::TableUpdate<AttendeeOut>,
     board_charges: __sdk::TableUpdate<Charge>,
     board_checks: __sdk::TableUpdate<ClaimCheck>,
@@ -2714,7 +2654,6 @@ pub struct DbUpdate {
     merch_template: __sdk::TableUpdate<MerchTemplate>,
     model_call: __sdk::TableUpdate<ModelCall>,
     my_attendee: __sdk::TableUpdate<Attendee>,
-    my_attendee_policy: __sdk::TableUpdate<AttendeePolicy>,
     my_band: __sdk::TableUpdate<MyBand>,
     my_charges: __sdk::TableUpdate<MyCharge>,
     my_claim_queue: __sdk::TableUpdate<Claim>,
@@ -2807,9 +2746,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "attendee" => db_update
                     .attendee
                     .append(attendee_table::parse_table_update(table_update)?),
-                "attendee_policy" => db_update
-                    .attendee_policy
-                    .append(attendee_policy_table::parse_table_update(table_update)?),
                 "authority_limit" => db_update
                     .authority_limit
                     .append(authority_limit_table::parse_table_update(table_update)?),
@@ -2831,9 +2767,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_approvals" => db_update
                     .board_approvals
                     .append(board_approvals_table::parse_table_update(table_update)?),
-                "board_attendee_policies" => db_update.board_attendee_policies.append(
-                    board_attendee_policies_table::parse_table_update(table_update)?,
-                ),
                 "board_attendees" => db_update
                     .board_attendees
                     .append(board_attendees_table::parse_table_update(table_update)?),
@@ -3110,9 +3043,6 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_attendee" => db_update
                     .my_attendee
                     .append(my_attendee_table::parse_table_update(table_update)?),
-                "my_attendee_policy" => db_update
-                    .my_attendee_policy
-                    .append(my_attendee_policy_table::parse_table_update(table_update)?),
                 "my_band" => db_update
                     .my_band
                     .append(my_band_table::parse_table_update(table_update)?),
@@ -3358,9 +3288,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.attendee = cache
             .apply_diff_to_table::<Attendee>("attendee", &self.attendee)
             .with_updates_by_pk(|row| &row.identity);
-        diff.attendee_policy = cache
-            .apply_diff_to_table::<AttendeePolicy>("attendee_policy", &self.attendee_policy)
-            .with_updates_by_pk(|row| &row.id);
         diff.authority_limit = cache
             .apply_diff_to_table::<AuthorityLimitRow>("authority_limit", &self.authority_limit)
             .with_updates_by_pk(|row| &row.role);
@@ -3665,12 +3592,6 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<ApiSession>("api_sessions", &self.api_sessions);
         diff.board_approvals =
             cache.apply_diff_to_table::<Approval>("board_approvals", &self.board_approvals);
-        diff.board_attendee_policies = cache
-            .apply_diff_to_table::<AttendeePolicy>(
-                "board_attendee_policies",
-                &self.board_attendee_policies,
-            )
-            .with_updates_by_pk(|row| &row.id);
         diff.board_attendees =
             cache.apply_diff_to_table::<AttendeeOut>("board_attendees", &self.board_attendees);
         diff.board_charges =
@@ -3765,8 +3686,6 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.medic_medical_cards = cache
             .apply_diff_to_table::<MedicCard>("medic_medical_cards", &self.medic_medical_cards);
         diff.my_attendee = cache.apply_diff_to_table::<Attendee>("my_attendee", &self.my_attendee);
-        diff.my_attendee_policy = cache
-            .apply_diff_to_table::<AttendeePolicy>("my_attendee_policy", &self.my_attendee_policy);
         diff.my_band = cache.apply_diff_to_table::<MyBand>("my_band", &self.my_band);
         diff.my_charges = cache.apply_diff_to_table::<MyCharge>("my_charges", &self.my_charges);
         diff.my_claim_queue =
@@ -3847,9 +3766,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "attendee" => db_update
                     .attendee
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "attendee_policy" => db_update
-                    .attendee_policy
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "authority_limit" => db_update
                     .authority_limit
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3870,9 +3786,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_approvals" => db_update
                     .board_approvals
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "board_attendee_policies" => db_update
-                    .board_attendee_policies
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_attendees" => db_update
                     .board_attendees
@@ -4149,9 +4062,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_attendee" => db_update
                     .my_attendee
-                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "my_attendee_policy" => db_update
-                    .my_attendee_policy
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_band" => db_update
                     .my_band
@@ -4388,9 +4298,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "attendee" => db_update
                     .attendee
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "attendee_policy" => db_update
-                    .attendee_policy
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "authority_limit" => db_update
                     .authority_limit
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4411,9 +4318,6 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_approvals" => db_update
                     .board_approvals
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "board_attendee_policies" => db_update
-                    .board_attendee_policies
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_attendees" => db_update
                     .board_attendees
@@ -4691,9 +4595,6 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_attendee" => db_update
                     .my_attendee
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "my_attendee_policy" => db_update
-                    .my_attendee_policy
-                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_band" => db_update
                     .my_band
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4921,7 +4822,6 @@ pub struct AppliedDiff<'r> {
     api_sessions: __sdk::TableAppliedDiff<'r, ApiSession>,
     approval: __sdk::TableAppliedDiff<'r, Approval>,
     attendee: __sdk::TableAppliedDiff<'r, Attendee>,
-    attendee_policy: __sdk::TableAppliedDiff<'r, AttendeePolicy>,
     authority_limit: __sdk::TableAppliedDiff<'r, AuthorityLimitRow>,
     band: __sdk::TableAppliedDiff<'r, Band>,
     band_claim: __sdk::TableAppliedDiff<'r, BandClaim>,
@@ -4929,7 +4829,6 @@ pub struct AppliedDiff<'r> {
     band_place: __sdk::TableAppliedDiff<'r, BandPlace>,
     blob_ref: __sdk::TableAppliedDiff<'r, BlobRef>,
     board_approvals: __sdk::TableAppliedDiff<'r, Approval>,
-    board_attendee_policies: __sdk::TableAppliedDiff<'r, AttendeePolicy>,
     board_attendees: __sdk::TableAppliedDiff<'r, AttendeeOut>,
     board_charges: __sdk::TableAppliedDiff<'r, Charge>,
     board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
@@ -5022,7 +4921,6 @@ pub struct AppliedDiff<'r> {
     merch_template: __sdk::TableAppliedDiff<'r, MerchTemplate>,
     model_call: __sdk::TableAppliedDiff<'r, ModelCall>,
     my_attendee: __sdk::TableAppliedDiff<'r, Attendee>,
-    my_attendee_policy: __sdk::TableAppliedDiff<'r, AttendeePolicy>,
     my_band: __sdk::TableAppliedDiff<'r, MyBand>,
     my_charges: __sdk::TableAppliedDiff<'r, MyCharge>,
     my_claim_queue: __sdk::TableAppliedDiff<'r, Claim>,
@@ -5118,11 +5016,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Approval>("approval", &self.approval, event);
         callbacks.invoke_table_row_callbacks::<Attendee>("attendee", &self.attendee, event);
-        callbacks.invoke_table_row_callbacks::<AttendeePolicy>(
-            "attendee_policy",
-            &self.attendee_policy,
-            event,
-        );
         callbacks.invoke_table_row_callbacks::<AuthorityLimitRow>(
             "authority_limit",
             &self.authority_limit,
@@ -5136,11 +5029,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<Approval>(
             "board_approvals",
             &self.board_approvals,
-            event,
-        );
-        callbacks.invoke_table_row_callbacks::<AttendeePolicy>(
-            "board_attendee_policies",
-            &self.board_attendee_policies,
             event,
         );
         callbacks.invoke_table_row_callbacks::<AttendeeOut>(
@@ -5467,11 +5355,6 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<ModelCall>("model_call", &self.model_call, event);
         callbacks.invoke_table_row_callbacks::<Attendee>("my_attendee", &self.my_attendee, event);
-        callbacks.invoke_table_row_callbacks::<AttendeePolicy>(
-            "my_attendee_policy",
-            &self.my_attendee_policy,
-            event,
-        );
         callbacks.invoke_table_row_callbacks::<MyBand>("my_band", &self.my_band, event);
         callbacks.invoke_table_row_callbacks::<MyCharge>("my_charges", &self.my_charges, event);
         callbacks.invoke_table_row_callbacks::<Claim>(
@@ -6350,7 +6233,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         api_sessions_table::register_table(client_cache);
         approval_table::register_table(client_cache);
         attendee_table::register_table(client_cache);
-        attendee_policy_table::register_table(client_cache);
         authority_limit_table::register_table(client_cache);
         band_table::register_table(client_cache);
         band_claim_table::register_table(client_cache);
@@ -6358,7 +6240,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         band_place_table::register_table(client_cache);
         blob_ref_table::register_table(client_cache);
         board_approvals_table::register_table(client_cache);
-        board_attendee_policies_table::register_table(client_cache);
         board_attendees_table::register_table(client_cache);
         board_charges_table::register_table(client_cache);
         board_checks_table::register_table(client_cache);
@@ -6451,7 +6332,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         merch_template_table::register_table(client_cache);
         model_call_table::register_table(client_cache);
         my_attendee_table::register_table(client_cache);
-        my_attendee_policy_table::register_table(client_cache);
         my_band_table::register_table(client_cache);
         my_charges_table::register_table(client_cache);
         my_claim_queue_table::register_table(client_cache);
@@ -6528,7 +6408,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "api_sessions",
         "approval",
         "attendee",
-        "attendee_policy",
         "authority_limit",
         "band",
         "band_claim",
@@ -6536,7 +6415,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "band_place",
         "blob_ref",
         "board_approvals",
-        "board_attendee_policies",
         "board_attendees",
         "board_charges",
         "board_checks",
@@ -6622,7 +6500,6 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "merch_template",
         "model_call",
         "my_attendee",
-        "my_attendee_policy",
         "my_band",
         "my_charges",
         "my_claim_queue",

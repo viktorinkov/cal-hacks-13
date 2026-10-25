@@ -17,7 +17,8 @@ pub fn clinic_payload() -> ClinicPayload {
     load(include_str!("../testdata/clinic.json"))
 }
 
-/// Maya Chen's laptop stolen from a table on the Hacking floor, with Sam Patel named by security.
+/// A sponsor's display laptop taken from its booth: the venue claims on its property policy, and
+/// security named Sam Patel.
 pub fn theft_review_payload() -> ReviewPayload {
     load(include_str!("../testdata/review-theft.json"))
 }
@@ -41,7 +42,8 @@ fn every_payload_file_parses() {
     load::<ReviewPayload>(include_str!("../testdata/review-ankle-home.json"));
     load::<ReviewPayload>(include_str!("../testdata/review-first-aid.json"));
     let theft = theft_review_payload();
-    assert_eq!((theft.cover_kind.as_str(), theft.charge.as_ref().map(|c| c.amount_cents)), ("personal_property", Some(119_900)));
+    assert_eq!((theft.cover_kind.as_str(), theft.claimant_name.as_str()), ("property", "Cal Hacks 13.0"));
+    assert_eq!((theft.charge.as_ref().map(|c| c.amount_cents), theft.attendee_policy_hash.as_str()), (Some(129_900), ""));
     let payout = load::<PayoutPayload>(include_str!("../testdata/payout.json"));
     assert_eq!((payout.claimant_name.as_str(), payout.payout_cents), ("Maya Chen", 18_000));
     let wallet = load::<crate::wallet::WalletPayload>(include_str!("../testdata/wallet.json"));

@@ -104,7 +104,7 @@ pub fn insurer_payment(received_cents: Cents, recoverable_cents: Cents) -> Journ
 
 /// J5 when the organizer approves a charge: debit `attendee_receivable` the whole charge; credit
 /// `insurer_payable` the insurer's share (what it paid on the claim, which the charge repays) and
-/// `recoveries` the rest (the venue's deductible, or the owner's deductible that goes back to them).
+/// `recoveries` the rest (the venue's deductible).
 pub fn charge_approved(amount_cents: Cents, insurer_share_cents: Cents) -> Journal {
     let share = insurer_share_cents.min(amount_cents);
     Journal {
@@ -128,11 +128,6 @@ pub fn charge_waived(amount_cents: Cents, insurer_share_cents: Cents) -> Journal
             line(Account::AttendeeReceivable, 0, amount_cents, "charge waived"),
         ],
     }
-}
-
-/// J7 when a paid charge returns the owner's deductible: debit `recoveries`, credit `cash`.
-pub fn deductible_returned(cents: Cents) -> Journal {
-    pair("J7 deductible returned", Account::Recoveries, Account::Cash, cents, "the owner's deductible, back into their wallet")
 }
 
 /// J6 when the attendee pays the charge from their wallet: debit `cash`, credit `attendee_receivable`.
@@ -240,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn a_paid_charge_repays_the_insurer_and_the_deductible() {
+    fn a_paid_charge_repays_the_insurer_and_the_venue() {
         // The speaker: $2,400 charged, the insurer paid $1,900, the venue carried the $500 deductible.
         let life = [charge_approved(240000, 190000), charge_paid(240000)];
         assert!(life.iter().all(Journal::is_balanced));
@@ -248,11 +243,6 @@ mod tests {
         assert_eq!(balance(&life, Account::Cash), 240000);
         assert_eq!(balance(&life, Account::InsurerPayable), -190000);
         assert_eq!(balance(&life, Account::Recoveries), -50000);
-        // A broken laptop on the owner's own policy: $949 back to the insurer, the $250 deductible back to the owner.
-        let own = [charge_approved(119900, 94900), charge_paid(119900), deductible_returned(25000)];
-        assert!(own.iter().all(Journal::is_balanced));
-        assert_eq!(balance(&own, Account::Recoveries), 0);
-        assert_eq!(balance(&own, Account::Cash), 94900);
         let waived = [charge_approved(240000, 190000), charge_waived(240000, 190000)];
         assert!([Account::AttendeeReceivable, Account::InsurerPayable, Account::Recoveries].iter().all(|a| balance(&waived, *a) == 0));
     }

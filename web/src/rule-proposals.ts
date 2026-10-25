@@ -7,7 +7,7 @@ import { searchable } from './table-search';
 import type { DbConnection } from './module_bindings';
 import type { RuleProposal } from './module_bindings/types';
 
-const KIND_WORDS: Record<string, string> = { fall: 'Falls', sos: 'SOS calls', property: 'Broken equipment' };
+const KIND_WORDS: Record<string, string> = { fall: 'Falls', sos: 'SOS calls', property: 'Broken equipment', theft: 'Thefts from the venue' };
 const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property' };
 
 /** "Falls under medical payments cover". */

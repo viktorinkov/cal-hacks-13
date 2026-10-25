@@ -75,11 +75,11 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
             "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
         ),
         ClaimStatus::ReadingRecord => ("Evidence Engine", "Evidence Engine".into(), "Reading the hospital report".into(), "every fact must be quoted from its page".into()),
-        ClaimStatus::Verifying if c.cover_kind == "personal_property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
+        ClaimStatus::Verifying if c.incident_kind == "theft" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
             format!("claim {}", c.id),
-            format!("{} claim opened for {}: {}", if c.incident_kind == "theft" { "Theft" } else { "Breakage" }, person(c), format_cents(c.cost_cents)),
-            "the venue's policy excludes guests' property; the attendee's own policy answers it, less its deductible".into(),
+            format!("Theft claim opened for the venue: {}", format_cents(c.cost_cents)),
+            "staff logged what was taken and its value; the venue's property policy answers it, above its deductible".into(),
         ),
         ClaimStatus::Verifying if c.cover_kind == "property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
@@ -110,6 +110,9 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
                 ),
                 _ => ("organizer", c.routed_to_name.clone(), format!("Approved: {} to {}", format_cents(c.payout_cents), person(c)), paying.into()),
             }
+        }
+        ClaimStatus::Settled if c.incident_kind == "theft" => {
+            ("wallet", "Ledger".into(), format!("Stolen property paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
         }
         ClaimStatus::Settled if c.cover_kind == "property" => {
             ("wallet", "Ledger".into(), format!("Repair paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
@@ -147,7 +150,7 @@ pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
 /// The Evidence Engine's checks and the policy clauses it found.
 pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], clauses: usize) {
     let what = if failed.is_empty() { "Checked the evidence: nothing failed".to_string() } else { format!("Flagged: {}", failed.join(", ")) };
-    let policies = if c.cover_kind == "personal_property" { "the venue's policy and the attendee's own" } else { "the venue's policy" };
+    let policies = "the venue's policy";
     record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{clauses} clauses of {policies} bear on this {} claim", c.incident_kind));
 }
 

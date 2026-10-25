@@ -11,9 +11,6 @@ pub(super) struct RecordChargePaymentArgs {
     pub customer_id: String,
     pub account_id: String,
     pub purchase_id: String,
-    pub refund_customer_id: String,
-    pub refund_account_id: String,
-    pub refund_deposit_id: String,
 }
 
 impl From<RecordChargePaymentArgs> for super::Reducer {
@@ -23,9 +20,6 @@ impl From<RecordChargePaymentArgs> for super::Reducer {
             customer_id: args.customer_id,
             account_id: args.account_id,
             purchase_id: args.purchase_id,
-            refund_customer_id: args.refund_customer_id,
-            refund_account_id: args.refund_account_id,
-            refund_deposit_id: args.refund_deposit_id,
         }
     }
 }
@@ -51,20 +45,8 @@ pub trait record_charge_payment {
         customer_id: String,
         account_id: String,
         purchase_id: String,
-        refund_customer_id: String,
-        refund_account_id: String,
-        refund_deposit_id: String,
     ) -> __sdk::Result<()> {
-        self.record_charge_payment_then(
-            job_id,
-            customer_id,
-            account_id,
-            purchase_id,
-            refund_customer_id,
-            refund_account_id,
-            refund_deposit_id,
-            |_, _| {},
-        )
+        self.record_charge_payment_then(job_id, customer_id, account_id, purchase_id, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `record_charge_payment` to run as soon as possible,
@@ -79,9 +61,6 @@ pub trait record_charge_payment {
         customer_id: String,
         account_id: String,
         purchase_id: String,
-        refund_customer_id: String,
-        refund_account_id: String,
-        refund_deposit_id: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -96,9 +75,6 @@ impl record_charge_payment for super::RemoteReducers {
         customer_id: String,
         account_id: String,
         purchase_id: String,
-        refund_customer_id: String,
-        refund_account_id: String,
-        refund_deposit_id: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -110,9 +86,6 @@ impl record_charge_payment for super::RemoteReducers {
                 customer_id,
                 account_id,
                 purchase_id,
-                refund_customer_id,
-                refund_account_id,
-                refund_deposit_id,
             },
             callback,
         )

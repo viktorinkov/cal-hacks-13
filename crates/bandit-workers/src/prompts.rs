@@ -1,6 +1,7 @@
 //! Every system prompt, and the user turns that carry claim data in
 //! delimited blocks. Text inside a block is escaped so it cannot close it.
 
+use bandit_insurance::IncidentKind;
 use bandit_insurance::clinic::Scenario;
 use bandit_insurance::coverage::Amounts;
 use bandit_insurance::letters::{FAULT_PHRASES, LetterData};
@@ -16,31 +17,34 @@ notes, the zone, where the band had been, the hospital report, the policy on the
 named, if anyone. You investigate the claim with the tools and decide it.
 
 The five kinds of incident, and which policy answers each:
-- sos, fall: an attendee is hurt. The venue's policy pays from its medical payments cover, whoever was at fault; \
-the attendee's own health plan is the other insurance, and the venue's other-insurance clause says which pays first.
-- property: the venue's own equipment is broken. The venue's property policy pays, above the \
+- sos, fall: an attendee is hurt and claims. The venue's general liability pays from its medical payments cover, \
+whoever was at fault; the attendee's own health plan is the other insurance, and the venue's other-insurance clause \
+says which pays first.
+- property: the venue's own equipment is broken, and the venue claims. The venue's property policy pays, above the \
 deductible the venue carries.
-- theft: an attendee's own belonging is stolen. The attendee's own policy pays from its personal property cover, \
-less the deductible the attendee carries. The venue's policy excludes guests' property and never pays for it.
-- breakage: an attendee's own belonging is broken by someone else. The same as theft: the attendee's own policy, \
-never the venue's.
+- theft: someone steals from the venue (its equipment, its merch or a sponsor's gear at its booth), and the venue \
+claims. The venue's property policy pays, theft as a cause of loss, above the deductible the venue carries.
+- breakage: kept from an earlier design and answered like property.
+An attendee's own belongings are not a claim at the venue: the venue's policy excludes guests' property, and the \
+attendee's own insurer pays for them.
 
 Investigate:
 - The brief lists each evidence source and every check by name. Read the sources that bear on the claim with \
 read_evidence, and read what each check compared with read_checks. You can call several tools in one turn.
-- The policies are searchable. search_policy finds the clauses of the venue's policy (policy venue) or of the \
-attendee's own policy (policy attendee) closest in meaning to a query you write, for example \"injury that began \
-before the event\", \"laptop stolen from a table at an event\", \"property left unattended in a public place\" or \
-\"the insurer's right to recover from the person who caused a loss\". read_clause shows one clause in full. \
+- The policies are searchable. search_policy finds the clauses of the venue's policy (policy venue) or, for an \
+injury, of the attendee's health plan (policy attendee) closest in meaning to a query you write, for example \
+\"injury that began before the event\", \"theft of property of others in the insured's care\", \"unexplained \
+disappearance or inventory shortage\" or \"the insurer's right to recover from the person who caused a loss\". \
+read_clause shows one clause in full. \
 <policy_clauses> lists the clauses the Evidence Engine already found for this claim. Write queries in the policy's \
 terms, never with a person's name.
 - Before you pay, read what decides the kind of claim yourself: for an injury the band, the light circle and the \
-hospital report once one is filed; for property the security cameras; for a theft or a breakage the security \
-cameras and the policy (the attendee's own); and the attendee named whenever <charge> is given.
+hospital report once one is filed; for property, a theft or a breakage the security cameras; and the attendee \
+named whenever <charge> is given.
 - Ask whether the story hangs together across time, place and what happened, and, for an injury, the mechanism and \
 the body part treated. Look for an injury from before the event or from somewhere else, a pre-existing condition, \
-treatment that does not fit the incident, a loss the policy excludes (such as property left unattended), and signs \
-of a duplicate.
+treatment that does not fit the incident, a loss the policy excludes (such as an unexplained disappearance, or a \
+stolen item that was an attendee's own), and signs of a duplicate.
 - When <claimant_statement> is given, it is what the attendee wrote when they filed the claim. Compare what they say \
 happened with the incident facts (time, zone, how it happened) and, for an injury, with the hospital report's \
 history and diagnoses; a report that tells a different story from the attendee is a concern.
@@ -55,7 +59,8 @@ when you found one.
 refusal_checks, or cite the contradicting facts in a finding, and cite the exclusion it rests on in cited_clause_ids \
 when you found one. An exclusion alone never refuses a claim on its own.
 - ask_organizer: a person should look before money moves. Put the one question they should answer in question. A \
-theft or a breakage with no attendee policy on file goes to the organizer with the venue's exclusion clause.
+theft whose evidence shows the item was an attendee's own, not the venue's or a sponsor's, goes to the organizer \
+with the venue's exclusion of guests' property.
 
 The charge: when <charge> is given, security named a person as having broken or taken it, and staff proposed a \
 charge. Read the attendee named (read_evidence responsible) and the subrogation clause of the policy that pays, then \
@@ -207,22 +212,21 @@ fn amount_lines(a: &Amounts) -> Vec<String> {
 /// an index of the evidence and checks the tools can open.
 pub fn brief_prompt(p: &ReviewPayload, sources: &[(&str, usize)]) -> String {
     let mut s = String::new();
-    let attendee_policy = if p.attendee_policy_hash.trim().is_empty() { "none on file" } else { "on file (search_policy with policy attendee)" };
-    block(
-        &mut s,
-        "claim",
-        [
-            format!("claim id: {}", p.claim_id),
-            format!("evidence pack: version {}, SHA-256 {}", p.pack_version, p.pack_hash),
-            format!("incident kind: {}", p.incident_kind),
-            format!("cover: {}", p.cover_kind),
-            format!("zone: {}", p.zone_name),
-            format!("incident time (local): {}", p.incident_time),
-            format!("claimant: {}", p.claimant_name),
-            format!("corroboration: {}", p.corroboration),
-            format!("the attendee's own policy: {attendee_policy}"),
-        ],
-    );
+    let mut claim = vec![
+        format!("claim id: {}", p.claim_id),
+        format!("evidence pack: version {}, SHA-256 {}", p.pack_version, p.pack_hash),
+        format!("incident kind: {}", p.incident_kind),
+        format!("cover: {}", p.cover_kind),
+        format!("zone: {}", p.zone_name),
+        format!("incident time (local): {}", p.incident_time),
+        format!("claimant: {}", p.claimant_name),
+        format!("corroboration: {}", p.corroboration),
+    ];
+    if is_injury(p) {
+        let plan = if p.attendee_policy_hash.trim().is_empty() { "none on file" } else { "on file (search_policy with policy attendee)" };
+        claim.push(format!("the attendee's health plan: {plan}"));
+    }
+    block(&mut s, "claim", claim);
     if !p.claimant_statement.trim().is_empty() {
         block(&mut s, "claimant_statement", [p.claimant_statement.clone()]);
     }
@@ -243,6 +247,15 @@ pub fn brief_prompt(p: &ReviewPayload, sources: &[(&str, usize)]) -> String {
     block(&mut s, "policy_clauses", p.clauses.iter().map(|c| clause_line(&c.clause_id, &c.policy, &c.section, c.page, Some(c.score), &c.text, CLAUSE_EXCERPT)));
     s.push_str("Investigate this claim with the tools, then answer in the schema.");
     s
+}
+
+/// An injury (`sos`, `fall`), or a kind code does not know whose cover is not the venue's property policy:
+/// only an injury has an attendee's health plan to search.
+pub fn is_injury(p: &ReviewPayload) -> bool {
+    match IncidentKind::parse(&p.incident_kind) {
+        Some(kind) => kind.is_injury(),
+        None => p.cover_kind != "property",
+    }
 }
 
 /// Characters of a clause's text the brief and a search show; `read_clause` shows it all.
@@ -365,7 +378,7 @@ mod tests {
         assert!(!text.contains(&p.record_history[..40]), "the hospital report stays behind read_evidence");
         assert!(text.contains(&p.claimant_statement));
         assert!(text.contains("9f2c-c5 (venue policy, exclusions, page 5, similarity 0.79): We will not pay expenses"), "{text}");
-        assert!(text.contains("the attendee's own policy: none on file") && !text.contains("<charge>"));
+        assert!(text.contains("the attendee's health plan: none on file") && !text.contains("<charge>"));
         let mut quiet = p.clone();
         quiet.claimant_statement.clear();
         assert!(!brief_prompt(&quiet, &[]).contains("<claimant_statement>"));
@@ -376,10 +389,11 @@ mod tests {
         let p = testdata::theft_review_payload();
         let text = brief_prompt(&p, &[("responsible", 6)]);
         assert!(text.contains("<charge>\nperson named: Sam Patel (band 41)\n"), "{text}");
-        assert!(text.contains("what code would charge: $1,199.00"));
+        assert!(text.contains("what code would charge: $1,299.00"));
+        assert!(text.contains("venue share (deductible): $500.00"));
         assert!(text.contains("check responsible_at_spot: pass: band 41 was 3 m from the spot"));
-        assert!(text.contains("the attendee's own policy: on file"));
-        assert!(text.contains("4b1e-c9 (attendee policy, subrogation, page 7, similarity 0.74)"));
+        assert!(text.contains("claimant: Cal Hacks 13.0\ncorroboration: corroborated\n</claim>"), "a theft from the venue has no attendee's plan: {text}");
+        assert!(text.contains("9f2c-c14 (venue policy, subrogation, page 9, similarity 0.74)"), "{text}");
     }
 
     #[test]

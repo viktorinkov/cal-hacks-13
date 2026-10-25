@@ -54,44 +54,8 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: ChargePaymentPayload) -> Result<(), 
         }
     };
     tracing::info!(job_id = job.id, charge_id = p.charge_id, %customer_id, %account_id, %merchant_id, %purchase_id, "charge paid");
-    let (refund_customer_id, refund_account_id, refund_deposit_id) = refund(nessie, ctx, &p).await?;
-    let finish = Finish::ChargePaid { customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id };
-    ctx.sink.finish(job.id, finish, Vec::new()).await?;
+    ctx.sink.finish(job.id, Finish::ChargePaid { customer_id, account_id, purchase_id }, Vec::new()).await?;
     Ok(())
-}
-
-/// The owner's deductible back into their wallet, a deposit made once (one whose description equals the
-/// refund memo is reused). Empty ids when the charge returns nothing.
-async fn refund(nessie: &Nessie, ctx: &Ctx, p: &ChargePaymentPayload) -> Result<(String, String, String), JobError> {
-    if p.refund_cents == 0 || p.refund_to.is_empty() {
-        return Ok(Default::default());
-    }
-    let (customer_id, account_id) = if p.refund_account_id.is_empty() {
-        let path = ctx.data_dir.join("nessie").join(format!("{}-charge-{}-owner.json", std::env::var("SPACETIMEDB_DATABASE").unwrap_or_default(), p.charge_id));
-        let mut made = load_made(&path);
-        if made.customer_id.is_empty() {
-            let (first, last) = split_name(&p.refund_name);
-            made.customer_id = nessie.create_customer(&first, &last).await?;
-            save_made(&path, &made)?;
-        }
-        if made.account_id.is_empty() {
-            made.account_id = nessie.create_wallet(&made.customer_id, 0).await?;
-            save_made(&path, &made)?;
-        }
-        (made.customer_id, made.account_id)
-    } else {
-        (p.refund_customer_id.clone(), p.refund_account_id.clone())
-    };
-    let existing = nessie.deposits(&account_id).await?.into_iter().find(|d| d.description == p.refund_memo);
-    let deposit_id = match existing {
-        Some(d) => d.id,
-        None => {
-            let date = bandit_insurance::time::local_date(spacetimedb_sdk::Timestamp::now().to_micros_since_unix_epoch(), ctx.tz_offset_minutes);
-            nessie.deposit(&account_id, p.refund_cents, &date, &p.refund_memo).await?
-        }
-    };
-    tracing::info!(charge_id = p.charge_id, %account_id, %deposit_id, "the owner's deductible returned");
-    Ok((customer_id, account_id, deposit_id))
 }
 
 /// The payer's customer and account: from the payload, from an earlier attempt, or made now with
