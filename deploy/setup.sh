@@ -37,9 +37,9 @@ git fetch -q origin "$BANDIT_BRANCH"
 git reset -q --hard FETCH_HEAD
 echo "building $(git log --oneline -1)"
 (cd web && bun install --silent && bun run --silent build > /dev/null)
-# The command center is the desk at /organizer. Publish the committed build first, then replace it
-# if a fresh one succeeds. A failed build keeps the last desk up. /callback, /api, and /blobs stay proxied.
-if [ -f frontend/dist/index.html ]; then
+# Seed the desk on first install. During updates, keep the current desk until a fresh build succeeds.
+# /callback, /api, and /blobs stay proxied.
+if [ ! -f /srv/bandit-desk/index.html ] && [ -f frontend/dist/index.html ]; then
   rm -rf /srv/bandit-desk.new && cp -r frontend/dist /srv/bandit-desk.new
   rm -rf /srv/bandit-desk && mv /srv/bandit-desk.new /srv/bandit-desk
 fi
