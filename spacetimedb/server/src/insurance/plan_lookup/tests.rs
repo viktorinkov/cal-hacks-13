@@ -1,6 +1,7 @@
 //! A plan lookup inside an in-memory module: the attendee names their plan, the worker finds its PDF
 //! or nothing, a found health plan lands on the medical card and a found belongings policy becomes their
-//! own policy, and a lookup that keeps failing ends failed.
+//! own policy, a plan already found is found at once for the next attendee, and a lookup that keeps
+//! failing ends failed.
 
 use super::*;
 use crate::insurance::documents::*;
@@ -97,6 +98,50 @@ fn a_found_health_plan_lands_on_the_medical_card() {
     assert_eq!(w.t.db.job().id().find(job.id).unwrap().status, JobStatus::Done);
     let doc = w.t.db.policy_document().iter().next().expect("the found plan goes to the reading");
     assert_eq!((doc.kind.as_str(), doc.attendee, doc.source.as_str(), doc.page_count), (HEALTH_PLAN, Some(id("alex")), KIND_PLAN_LOOKUP, 8));
+}
+
+#[test]
+fn a_plan_already_found_is_found_at_once() {
+    let w = World::new();
+    for (band, who) in [(8, "sam"), (9, "jo"), (10, "kim")] {
+        w.t.db.band_owner().insert(BandOwner { band_id: band, owner: id(who), claimed_at: w.t.clock.now() });
+    }
+    let jobs = || w.t.db.job().iter().filter(|j| j.kind == KIND_PLAN_LOOKUP).count();
+    let look = |who: &str, insurer: &str, plan: &str, state: &str| w.as_(who, |ctx| look_up_plan(ctx, insurer.into(), plan.into(), state.into()));
+    look("alex", "Blue Shield of California", "Silver 70 PPO", "CA");
+    let job = w.lease();
+    w.as_("worker", |ctx| finish_plan_lookup(ctx, job.id, found(), None));
+    let first = w.lookup();
+
+    look("sam", "blue shield of california", "Silver 70 PPO", "ca");
+    let l = w.lookup();
+    assert_eq!((l.attendee, l.status.as_str(), l.job_id, l.reused_from), (id("sam"), FOUND, 0, first.id), "the same typed name");
+    assert_eq!(l.matched_chunk, first.matched_chunk, "a reused lookup cites the same chunk");
+    assert!(l.matched_chunk.is_some());
+    assert_eq!((l.file_hash.as_str(), l.page_count, l.printed_plan.as_str()), (first.file_hash.as_str(), 8, "Silver 70 PPO 2500/55"));
+    assert_eq!((l.insurer.as_str(), l.source_url.as_str()), ("blue shield of california", first.source_url.as_str()));
+    assert_eq!(jobs(), 1, "no search, pick or fetch");
+    let card = w.t.db.medical_card().attendee().find(id("sam")).unwrap();
+    assert_eq!((card.insurer.as_str(), card.plan.as_str()), ("Blue Shield of California", "Silver 70 PPO 2500/55"));
+    let doc = w.t.db.policy_document().iter().find(|d| d.attendee == Some(id("sam"))).expect("the same PDF goes to the reading for sam");
+    assert_eq!((doc.file_hash.as_str(), doc.source.as_str(), doc.page_count), (first.file_hash.as_str(), KIND_PLAN_LOOKUP, 8));
+    assert_eq!(w.t.db.blob_ref().hash().find(&first.file_hash).unwrap().owner, Some(id("alex")), "one blob, still alex's");
+
+    look("jo", "Blue Shield of California", "Silver 70 PPO 2500/55", "CA");
+    let l = w.lookup();
+    assert_eq!((l.status.as_str(), l.reused_from), (FOUND, first.id), "the printed name, linked to the lookup that fetched it");
+
+    look("kim", "Blue Shield", "Silver 70", "CA");
+    assert_eq!((w.lookup().status.as_str(), jobs()), (SEARCHING, 2), "a shorter name runs its own search");
+    let job = w.lease();
+    w.as_("worker", |ctx| finish_plan_lookup(ctx, job.id, PlanLookupResult { status: NOT_FOUND.into(), ..Default::default() }, None));
+    look("kim", "Blue Shield of California", "Silver 70 PPO", "NV");
+    assert_eq!((w.lookup().status.as_str(), jobs()), (SEARCHING, 3), "another state");
+    let job = w.lease();
+    w.as_("worker", |ctx| finish_plan_lookup(ctx, job.id, PlanLookupResult { status: NOT_FOUND.into(), ..Default::default() }, None));
+    w.t.clock.set(Timestamp::from_micros_since_unix_epoch(1_792_900_000_000_000 + 90 * 86_400_000_000));
+    look("kim", "Blue Shield of California", "Silver 70 PPO", "CA");
+    assert_eq!((w.lookup().status.as_str(), jobs()), (SEARCHING, 4), "another plan year");
 }
 
 #[test]

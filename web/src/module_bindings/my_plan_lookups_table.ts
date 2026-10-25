@@ -34,6 +34,7 @@ export default __t.row({
   note: __t.string(),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  reusedFrom: __t.u64().name("reused_from"),
   get matchedChunk() {
     return __t.option(ChunkMatch).name("matched_chunk");
   },

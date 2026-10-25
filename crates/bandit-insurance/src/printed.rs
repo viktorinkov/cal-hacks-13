@@ -160,6 +160,23 @@ impl FormPrinted {
     }
 }
 
+/// The words that tell plans and insurers apart: lowercase, three letters or more, or a number.
+pub fn telling_words(s: &str) -> Vec<String> {
+    const COMMON: [&str; 12] = ["the", "and", "for", "inc", "plan", "plans", "insurance", "company", "corp", "group", "policy", "coverage"];
+    s.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| (w.len() >= 3 || w.chars().all(|c| c.is_ascii_digit())) && !w.is_empty() && !COMMON.contains(w))
+        .map(String::from)
+        .collect()
+}
+
+/// Two names of one plan: the same telling words of the insurer and of the plan, in order. A plan
+/// lookup reuses a plan already found only under this, since no search narrowed it down.
+pub fn same_plan_name(insurer: &str, plan: &str, other_insurer: &str, other_plan: &str) -> bool {
+    let (i, p) = (telling_words(insurer), telling_words(plan));
+    !i.is_empty() && !p.is_empty() && i == telling_words(other_insurer) && p == telling_words(other_plan)
+}
+
 /// Every form of a `coverage_form` read that passes `FormPrinted::checked`, and why each other one did not.
 pub fn checked_forms(read: &Value, pages: &[String]) -> (Vec<FormPrinted>, Vec<String>) {
     let mut kept = Vec::new();
@@ -186,6 +203,18 @@ mod tests {
 
     fn item(text: &str, page: u32) -> PrintedText {
         PrintedText { text: text.into(), page }
+    }
+
+    #[test]
+    fn one_plan_has_one_set_of_telling_words() {
+        assert_eq!(telling_words("Blue Shield of California, Inc."), ["blue", "shield", "california"]);
+        assert_eq!(telling_words("Silver 70 PPO plan"), ["silver", "70", "ppo"]);
+        assert!(same_plan_name("blue shield  of california", "Silver 70 PPO", "Blue Shield of California", "Silver 70 PPO"));
+        assert!(same_plan_name("Kaiser Permanente", "Bronze 60 HMO", "KAISER PERMANENTE", "Bronze 60 HMO plan"));
+        assert!(!same_plan_name("Blue Shield", "Silver 70", "Blue Shield of California", "Silver 70 PPO"), "a shorter name runs its own search");
+        assert!(!same_plan_name("Blue Shield of California", "Silver 70 PPO", "Blue Shield of California", "Silver 70 HMO"));
+        assert!(!same_plan_name("Blue Shield of California", "PPO 70 Silver", "Blue Shield of California", "Silver 70 PPO"), "in order");
+        assert!(!same_plan_name("The Plan", "Plan", "The Plan", "Plan"), "no telling words names no plan");
     }
 
     #[test]

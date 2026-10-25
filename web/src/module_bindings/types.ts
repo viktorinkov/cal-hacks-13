@@ -1534,6 +1534,7 @@ export const PlanLookup = __t.object("PlanLookup", {
   note: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  reusedFrom: __t.u64(),
   get matchedChunk() {
     return __t.option(ChunkMatch);
   },

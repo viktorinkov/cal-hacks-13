@@ -28,6 +28,7 @@ pub struct PlanLookup {
     pub note: String,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
+    pub reused_from: u64,
     pub matched_chunk: Option<ChunkMatch>,
 }
 
@@ -58,6 +59,7 @@ pub struct PlanLookupCols {
     pub note: __sdk::__query_builder::Col<PlanLookup, String>,
     pub created_at: __sdk::__query_builder::Col<PlanLookup, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<PlanLookup, __sdk::Timestamp>,
+    pub reused_from: __sdk::__query_builder::Col<PlanLookup, u64>,
     pub matched_chunk: __sdk::__query_builder::Col<PlanLookup, Option<ChunkMatch>>,
 }
 
@@ -84,6 +86,7 @@ impl __sdk::__query_builder::HasCols for PlanLookup {
             note: __sdk::__query_builder::Col::new(table_name, "note"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            reused_from: __sdk::__query_builder::Col::new(table_name, "reused_from"),
             matched_chunk: __sdk::__query_builder::Col::new(table_name, "matched_chunk"),
         }
     }
