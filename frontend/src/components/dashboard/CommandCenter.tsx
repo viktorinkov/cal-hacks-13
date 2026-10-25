@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { IncidentPanel } from '@/components/incidents/IncidentPanel'
 import { PurchaseFeed } from './PurchaseFeed'
+import { PersonPanel } from './PersonPanel'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
 import { VenueMap } from '@/map/VenueMap'
 import { useUi } from '@/stores/ui'
@@ -113,6 +114,7 @@ export function CommandCenter() {
           </button>
           <aside id="map-controls" aria-label="Map controls" hidden={!controlsOpen} className="nc-scroll pointer-events-auto min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-[4px]">
             <div className="flex min-w-0 flex-col gap-3 pb-1 [&>*]:max-w-full [&>*]:shrink-0">
+              <PersonPanel />
               {incidentShown && <IncidentPanel />}
               <SidePanel maxHeight={Math.max(280, rowHeight - 60)} docked />
             </div>

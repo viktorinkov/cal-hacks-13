@@ -9,6 +9,7 @@ import { isLive, useConnection } from '@/stores/connection'
 import { useUi } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
 import { SourceChip } from '@/components/dashboard/SourceChip'
+import { useRun } from '@/stdb/runOps'
 
 export function MapHover() {
   const hover = useUi((s) => s.hover)
@@ -17,6 +18,7 @@ export function MapHover() {
   const devices = useWorld((s) => s.devices)
   const incidents = useWorld((s) => s.incidents)
   const commands = useWorld((s) => s.commands)
+  const attendees = useRun((state) => state.attendees)
   const linkUp = useConnection(isLive)
   const now = useServerNow(2)
   if (!hover || !venue) return null
@@ -45,20 +47,30 @@ export function MapHover() {
     )
   } else if (hover.kind === 'device') {
     const d = devices[hover.id]
-    if (!d) return null
-    const st = bandStatus(d, Object.values(commands), now)
-    body = (
-      <>
-        <div className="flex items-center justify-between gap-6">
-          <span className="font-mono text-[13px] font-medium text-ink">band-{d.label}</span>
-          <span className="text-[11px] text-ink-muted">{d.hardwareVariant === 'full' ? 'Full: LED, button, vibration' : 'Lite: LED, button'}</span>
-        </div>
-        <p className="mt-1.5 text-[12px] text-ink">{st.text}</p>
-        <p className="mt-0.5 text-[12px] text-ink-muted">
-          {d.wearerLabel ?? 'Unassigned'} · {locationSourceText(d)}
-        </p>
-      </>
-    )
+    const person = attendees.find((item) => `band-${item.bandId}` === hover.id)
+    if (!d && !person) return null
+    if (!d && person) {
+      body = (
+        <>
+          <p className="text-[13px] font-medium text-ink">{person.displayName || `Band ${person.bandId}`}</p>
+          <p className="mt-1 text-[12px] text-ink-dim">Band {person.bandId} · click to open this person</p>
+        </>
+      )
+    } else if (d) {
+      const st = bandStatus(d, Object.values(commands), now)
+      body = (
+        <>
+          <div className="flex items-center justify-between gap-6">
+            <span className="font-mono text-[13px] font-medium text-ink">band-{d.label}</span>
+            <span className="text-[11px] text-ink-muted">{d.hardwareVariant === 'full' ? 'Full: LED, button, vibration' : 'Lite: LED, button'}</span>
+          </div>
+          <p className="mt-1.5 text-[12px] text-ink">{st.text}</p>
+          <p className="mt-0.5 text-[12px] text-ink-muted">
+            {d.wearerLabel ?? 'Unassigned'} · {locationSourceText(d)}
+          </p>
+        </>
+      )
+    }
   } else if (hover.kind === 'incident') {
     const i = incidents[hover.id]
     if (!i) return null

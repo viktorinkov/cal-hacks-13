@@ -23,7 +23,7 @@ function stories(kind: string, zone: string): [string, string][] {
       ]
 }
 
-function InjuryForm({ incidentId, kind, zone, name }: { incidentId: string; kind: string; zone: string; name: string }) {
+export function InjuryForm({ incidentId, kind, zone, name, onFiled }: { incidentId: string; kind: string; zone: string; name: string; onFiled?: () => void }) {
   const busy = useDesk((s) => s.busy)
   const [statement, setStatement] = useState('')
   const [report, setReport] = useState('random')
@@ -34,6 +34,7 @@ function InjuryForm({ incidentId, kind, zone, name }: { incidentId: string; kind
       await fileClaim(incidentId, statement, report)
       setStatement('')
       setProblem('')
+      onFiled?.()
     } catch (reason) {
       setProblem(reason instanceof Error ? reason.message : 'The claim was not filed.')
     }
