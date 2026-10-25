@@ -244,3 +244,44 @@ fn plan(ctx: &ReducerContext, incident: &safety::Incident, beat: &Beat, culprit_
         naming: if culprit_band == 0 { String::new() } else { beat.naming.into() },
     });
 }
+
+/// A chosen bot follows the same staff, evidence and claim path as scheduled incidents.
+pub(super) fn stage_selected(ctx: &ReducerContext, band: &Band, zone: &crate::venue::Zone, action: &str) {
+    let injury = action == "injury";
+    let beat = if injury {
+        fall("", "first-aid-wrist", "slipped on a spilled drink, right wrist pain and mild swelling; ice and a wrap at first aid")
+    } else {
+        loss(
+            IncidentKind::Theft,
+            "",
+            "a venue laptop was taken from its table; the inventory record puts its replacement cost at $1,299.00",
+            "security reviewed the loss; the venue's property policy answers it",
+            129_900,
+            "security identified this crowd attendee taking the venue laptop from the table",
+            true,
+        )
+    };
+    if injury {
+        ctx.db.band().id().update(Band {
+            state: S_SOS,
+            flags: F_FALL | F_MPU | F_MOTOR,
+            fall: true,
+            sos: false,
+            last_seen: ctx.timestamp,
+            ..ctx.db.band().id().find(band.id).expect("validated crowd band")
+        });
+    }
+    let incident = safety::open(ctx, beat.kind, zone.id, zone.station_id, if injury { band.id } else { 0 }, "ops", Some((band.x_m, band.y_m)));
+    plan(ctx, &incident, &beat, if injury { 0 } else { band.id });
+    let who = wearer(ctx, band.id).map(|(_, name)| name).unwrap_or_else(|| format!("band {}", band.id));
+    let place = place_name(ctx, band.x_m, band.y_m);
+    record(
+        ctx,
+        incident.id,
+        0,
+        "organizer",
+        &safety::caller_name(ctx),
+        format!("{}: {who} at {place}", if injury { "Injury selected" } else { "Theft selected" }),
+        "the organizer chose this action for a crowd attendee; the regular staff and claim steps follow".into(),
+    );
+}

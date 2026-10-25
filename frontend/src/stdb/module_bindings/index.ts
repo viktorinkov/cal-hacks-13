@@ -134,6 +134,7 @@ import SetThresholdsReducer from "./set_thresholds_reducer";
 import SetZoneStationReducer from "./set_zone_station_reducer";
 import SettleMerchOrderReducer from "./settle_merch_order_reducer";
 import SleepBandsReducer from "./sleep_bands_reducer";
+import StageCrowdActionReducer from "./stage_crowd_action_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
 import StartEventImportReducer from "./start_event_import_reducer";
 import StartFindReducer from "./start_find_reducer";
@@ -1405,6 +1406,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_zone_station", SetZoneStationReducer),
   __reducerSchema("settle_merch_order", SettleMerchOrderReducer),
   __reducerSchema("sleep_bands", SleepBandsReducer),
+  __reducerSchema("stage_crowd_action", StageCrowdActionReducer),
   __reducerSchema("start_crowd", StartCrowdReducer),
   __reducerSchema("start_event_import", StartEventImportReducer),
   __reducerSchema("start_find", StartFindReducer),

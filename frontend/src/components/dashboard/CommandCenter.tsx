@@ -3,6 +3,7 @@ import { IncidentPanel } from '@/components/incidents/IncidentPanel'
 import { DemoDock } from '@/components/simulation/DemoDock'
 import { HallDemoDock } from './HallDemoDock'
 import { PurchaseFeed } from './PurchaseFeed'
+import { PersonPanel } from './PersonPanel'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
 import { VenueMap } from '@/map/VenueMap'
 import { useUi } from '@/stores/ui'
@@ -103,6 +104,7 @@ export function CommandCenter() {
 
         {/* the incident sits in the bottom right corner and grows upward */}
         <div ref={rightRef} className="col-start-3 row-span-2 row-start-2 flex min-h-0 flex-col items-end justify-end gap-3">
+          <PersonPanel />
           {incidentShown && <IncidentPanel />}
           <HallDemoDock />
         </div>

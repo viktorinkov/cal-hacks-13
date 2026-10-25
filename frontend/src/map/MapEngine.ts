@@ -7,7 +7,9 @@ import { Application, Container } from 'pixi.js'
 import { boothHandle, moveBooth, resizeBooth, saveBooth, useBooth } from '@/booth/circle'
 import { DEMO_LANE, demoDevices as layDemoDevices, demoIsActive, demoRingHandle, demoRoute, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, withDemoIncidents } from '@/booth/demoRing'
 import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
-import { demoReveal } from '@/mock/calhacksCrowd'
+import { characterAt, demoReveal } from '@/mock/calhacksCrowd'
+import { castRoster } from '@/stdb/cast'
+import { personWidthPx, pickPerson } from './personPicking'
 import { presentCalhacks } from '@/stdb/floor'
 import type { Device, GuidanceCommand, Incident, LedPattern, Vec2, Venue } from '@/contracts/domain'
 import { EntityKind } from '@/contracts/domain'
@@ -859,8 +861,16 @@ export class MapEngine {
         return { kind: 'incident', id: inc.incidentId, x: l.x, y: l.y }
       }
     }
-    // bands
-    if (this.showBandSignals()) {
+    if (this.venue?.venueId === 'calhacks' && useUi.getState().layers.people) {
+      const size = personWidthPx(this.cam.scale)
+      const person = pickPerson(l, castRoster(), characterAt, (at) => {
+        const feet = project(this.cam, at.x, at.y, this.elevation(at.x, at.y))
+        return { x: feet.x, y: feet.y - size * 0.95 }
+      }, Math.max(14, size))
+      if (person != null) return { kind: 'device', id: `band-${person}`, x: l.x, y: l.y }
+    }
+    // The visible hardware bands remain selectable on either floor.
+    if (useUi.getState().layers.bands) {
       for (const [id, at] of this.devicePos) {
         const p = project(this.cam, at.x, at.y, BAND_Z + this.elevation(at.x, at.y))
         if (Math.hypot(l.x - p.x, l.y - p.y) < 12) return { kind: 'device', id, x: l.x, y: l.y }

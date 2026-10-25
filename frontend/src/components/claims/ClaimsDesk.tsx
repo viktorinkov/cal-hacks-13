@@ -16,7 +16,7 @@ import { useSession } from '@/stdb/session'
  * the person it was sent to. Approving calls approve_claim; refusing calls refuse_claim.
  */
 export function ClaimsDesk() {
-  const { go } = useRoute()
+  const { go, search } = useRoute()
   const phase = useSession((state) => state.phase)
   const actionError = useSession((state) => state.actionError)
   const owner = useSession((state) => state.owner)
@@ -30,11 +30,11 @@ export function ClaimsDesk() {
   const refuse = useSession((state) => state.refuse)
   const ordered = useMemo(() => sortBoard(claims), [claims])
   const summary = useMemo(() => boardSummary(claims), [claims])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(search).get('claim') ?? '')
   const [narrow, setNarrow] = useState(false)
   const [tapBand, setTapBand] = useState<number | null>(null)
   const docketRef = useRef<HTMLElement>(null)
-  const selected = ordered.find((claim) => claim.id === selectedId) ?? ordered[0]
+  const selected = selectedId ? ordered.find((claim) => claim.id === selectedId) : ordered[0]
   const operator = useOperatorName()
 
   useEffect(() => {

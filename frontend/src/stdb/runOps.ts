@@ -158,6 +158,7 @@ export interface RunState {
   evacuatingAt: number | null
   eventEnded: boolean
   markers: RunMarker[]
+  plans: { incidentId: string; culpritBand: number }[]
   decisions: RunDecision[]
   stations: RunStation[]
   gateway: RunGateway | null
@@ -186,6 +187,7 @@ const EMPTY: RunState = {
   evacuatingAt: null,
   eventEnded: false,
   markers: [],
+  plans: [],
   decisions: [],
   stations: [],
   gateway: null,
@@ -210,6 +212,7 @@ export const RUN_QUERIES = [
   'SELECT * FROM live_pause',
   'SELECT * FROM live_evacuation',
   'SELECT * FROM incident_marker',
+  'SELECT * FROM live_plan',
   'SELECT * FROM decision',
   'SELECT * FROM station',
   'SELECT * FROM gateway',
@@ -307,6 +310,7 @@ type Db = Record<string, unknown>
 
 /** One reader per table accessor, so a change to one table re-reads only that table. */
 const READERS: Record<string, (db: Db) => Partial<RunState>> = {
+  livePlan: (db) => ({ plans: rowsOf(db.livePlan).map((row) => ({ incidentId: idOf(row.incidentId), culpritBand: num(row.culpritBand) })) }),
   liveRun: (db) => ({ run: readRunRow(zeroRow(db.liveRun)) }),
   livePause: (db) => ({ pausedAt: momentOf(zeroRow(db.livePause), 'pausedAt') }),
   liveEvacuation: (db) => ({ evacuatingAt: momentOf(zeroRow(db.liveEvacuation), 'startedAt') }),
