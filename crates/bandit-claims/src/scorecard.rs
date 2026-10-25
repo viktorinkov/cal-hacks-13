@@ -250,7 +250,7 @@ fn pick_station(app: &App) -> Result<u8> {
                 .db
                 .incident()
                 .iter()
-                .filter(|i| i.kind != IncidentKind::Property && i.zone_id == zone.id)
+                .filter(|i| is_injury(i.kind) && i.zone_id == zone.id)
                 .map(|i| micros(i.opened_at))
                 .collect();
             let near = |x: i64| times.iter().filter(|y| (**y - x).abs() <= WINDOW).count() + usize::from((x - t).abs() <= WINDOW);
