@@ -13,7 +13,7 @@ triggers:
       - name: kind
         type: string
         required: true
-        description: venue_policy, health_plan or attendee_policy.
+        description: venue_policy or health_plan.
       - name: page_count
         type: number
         required: true

@@ -516,7 +516,7 @@ Both check the same things in `file` (`insurance/filing.rs`):
 - someone wore the band when the incident opened (`people::wore_band_at`), and for `file_claim` it is the caller;
 - the incident has no claim yet: `Claim.incident_id` is unique.
 
-A `property` incident needs no filing. `on_incident_resolved` opens the venue's own claim in the same transaction when the incident has a cost note above 0, so a missing policy fails `resolve_incident` itself.
+A `property` or `theft` incident needs no filing. `on_incident_resolved` opens the venue's own claim in the same transaction when the incident has a cost note above 0, so a missing policy fails `resolve_incident` itself.
 
 The claim takes the newest policy and the cover kind for its incident kind: `medical_payments` for `sos` and `fall`, `property` for `property`. The statement becomes the pack's `claimant_statement` fact.
 
