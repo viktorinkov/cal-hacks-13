@@ -344,25 +344,25 @@ def insurance(y0):
     mk = dict(fill=WHITE)
 
     # 1. evidence, one lane per source
-    band = B(C[0], 0, "band", "device", w=400, h=SH, wordmark=WATCH, mark_h=70, cy=lane[0], **mk)
-    circle = B(C[0], 0, "light circle", "device", w=400, h=SH, wordmark=RADIO, mark_h=70, cy=lane[1], **mk)
-    medic = B(C[0], 0, "medic", "web", w=400, h=SH, wordmark=USER, mark_h=70, cy=lane[2], **mk)
-    cam = B(C[0], 0, "security camera", "device", w=400, h=SH, wordmark=CAMERA, mark_h=70, cy=lane[3], **mk)
-    report = B(C[0], 0, "hospital report", "note", w=400, h=SH + 30, wordmark=FILE, mark_h=90, cy=lane[4], **mk)
+    band = B(C[0], 0, "band", "device", w=400, h=SH, wordmark=WATCH, mark_h=70, cy=S.oy + lane[0], **mk)
+    circle = B(C[0], 0, "light circle", "device", w=400, h=SH, wordmark=RADIO, mark_h=70, cy=S.oy + lane[1], **mk)
+    medic = B(C[0], 0, "medic", "web", w=400, h=SH, wordmark=USER, mark_h=70, cy=S.oy + lane[2], **mk)
+    cam = B(C[0], 0, "security camera", "device", w=400, h=SH, wordmark=CAMERA, mark_h=70, cy=S.oy + lane[3], **mk)
+    report = B(C[0], 0, "hospital report", "note", w=400, h=SH + 30, wordmark=FILE, mark_h=90, cy=S.oy + lane[4], **mk)
 
     incident = B(C[1], 0, "incident\nSOS or fall", "stdb", w=460, h=SH, wordmark=STDB, mark_h=MARK_H[STDB],
-                 cy=lane[0], **mk)
-    witness = B(C[1], 0, "witness_zone\n2+ bands in zone", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[1])
-    note = B(C[1], 0, "staff_note_time\nnote within 30 min", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[2])
-    vision = B(C[1], 0, "vision_time\nsame zone, 120 s", "rust", w=460, h=SH, icons={0: RUST}, cy=lane[3])
+                 cy=S.oy + lane[0], **mk)
+    witness = B(C[1], 0, "witness_zone\n2+ bands in zone", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[1])
+    note = B(C[1], 0, "staff_note_time\nnote within 30 min", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[2])
+    vision = B(C[1], 0, "vision_time\nsame zone, 120 s", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[3])
     extract = B(C[1], 0, "Claude reads bill\n(claim_record_extract)", "claude", w=460, h=LH, wordmark=CLAUDE,
-                mark_h=90, cy=lane[4], **mk)
+                mark_h=90, cy=S.oy + lane[4], **mk)
     corro = B(C[2], 0, "corroborate\nnote + witnesses\nor camera\ncorroborated\nor disputed", "rust", w=460,
-              h=lane[3] - lane[1] + SH, wordmark=RUST, mark_h=80, cy=lane[2])
+              h=lane[3] - lane[1] + SH, wordmark=RUST, mark_h=80, cy=S.oy + lane[2])
     checks = B(C[2], 0, "record_checks\ntotals, patient\ndate, injury code\nduplicate bill", "rust", w=460, h=LH,
-               wordmark=RUST, mark_h=70, cy=lane[4])
+               wordmark=RUST, mark_h=70, cy=S.oy + lane[4])
     price = B(C[3], 0, "cover_lines\nfee schedule\nbilled $1,308\npays $895", "rust", w=460, h=LH, wordmark=RUST,
-              mark_h=70, cy=lane[4])
+              mark_h=70, cy=S.oy + lane[4])
     pack = B(C[4], lane[0] - SH / 2, "evidence pack\nnumbered facts\nSHA-256\nnew version\neach rebuild", "stdb",
              w=460, h=lane[4] + LH / 2 - lane[0] + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
 
@@ -370,19 +370,19 @@ def insurance(y0):
     H(circle, witness, "witness bands")
     H(medic, note, "staff note")
     H(cam, vision, "camera sighting")
-    H(report, extract, "PDF\n(submit_medical_record)", y=lane[4])
-    H(witness, corro, "witnesses", y=lane[1])
-    H(note, corro, "note", y=lane[2])
-    H(vision, corro, "camera", y=lane[3])
+    H(report, extract, "PDF\n(submit_medical_record)", y=S.oy + lane[4])
+    H(witness, corro, "witnesses", y=S.oy + lane[1])
+    H(note, corro, "note", y=S.oy + lane[2])
+    H(vision, corro, "camera", y=S.oy + lane[3])
     H(extract, checks, "lines + pages")
     H(checks, price, "valid lines")
-    H(incident, pack, "incident facts", y=lane[0])
-    H(corro, pack, "corroborated\nor disputed", y=lane[2])
-    H(price, pack, "priced lines", y=lane[4])
+    H(incident, pack, "incident facts", y=S.oy + lane[0])
+    H(corro, pack, "corroborated\nor disputed", y=S.oy + lane[2])
+    H(price, pack, "priced lines", y=S.oy + lane[4])
 
     # 2. past claims and Claude's review: the whole case fans in, the structured answer fans out
     ee = B(C[5], 0, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=560, h=320,
-           wordmark=ELASTIC, mark_h=60, cy=lane[2], **mk)
+           wordmark=ELASTIC, mark_h=60, cy=S.oy + lane[2], **mk)
     H(pack, ee, "claim, no names\n(claim_verify)", y=ee.cy)
     r2 = 1330
     CH, CG, CF = 76, 16, 24  # chip height, gap, font
