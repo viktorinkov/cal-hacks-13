@@ -8,7 +8,7 @@
 // decides the claims afterwards.
 
 import {
-  act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
+  act, bandById, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
   signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
@@ -126,13 +126,13 @@ function wearers(): Map<number, string> {
 
 /** A band is alive when it was heard in the last 5 s (the crowd's while they are online), else stale. */
 function alive(bandId: number): boolean {
-  const b = conn.db.band.id.find(bandId);
+  const b = bandById(conn, bandId);
   return !!b && present(b);
 }
 
 function bandStatus(bandId: number): string {
   if (!bandId) return 'no band';
-  if (!conn.db.band.id.find(bandId)) return 'not seen yet';
+  if (!bandById(conn, bandId)) return 'not seen yet';
   return alive(bandId) ? 'online' : 'offline';
 }
 
@@ -332,7 +332,7 @@ function claimsOf(p: Person): Claim[] {
 
 /** The zone a band is in now, else the first zone with a station marker. */
 function zoneOf(bandId: number) {
-  const station = conn.db.band.id.find(bandId)?.zone ?? 0;
+  const station = bandById(conn, bandId)?.zone ?? 0;
   const zones = [...conn.db.zone.iter()].filter(z => z.stationId !== 0).sort((a, b) => a.stationId - b.stationId);
   return zones.find(z => z.stationId === station) ?? zones[0];
 }
@@ -347,6 +347,10 @@ function openPerson(p: Person) {
 const personRows = new Map<string, { shows: string; row: HTMLElement }>();
 /** What the list shows now; the list is drawn again only when it changes. */
 let listShows = '';
+/** The list's count and search as drawn, and its table: when only some rows change, only those rows are swapped,
+ *  so the browser lays out a few rows instead of the whole list of a thousand. */
+let listTop = '';
+let listTable: HTMLElement | undefined;
 
 /** The search and the list of everyone, or null when nothing in it changed; opening a person shows them above,
  *  with what staff can do as them. */
@@ -360,7 +364,7 @@ function peopleList(all: Person[]) {
   }
   const filed = (p: Person) => p.att ? claims.get(`${p.bandId} ${p.name}`) ?? 0 : 0;
   const rows = shown.map(p => {
-    const b = p.bandId ? conn.db.band.id.find(p.bandId) : undefined;
+    const b = p.bandId ? bandById(conn, p.bandId) : undefined;
     const cells = [p.name || '(no name yet)', p.kind, p.bandId ? code(p.bandId) : '', b && present(b) ? stations.get(b.zone) ?? 'no zone' : '',
       bandStatus(p.bandId), p.att?.organization ?? '', String(filed(p) || '')];
     const shows = [...cells, p.key === opened].join('|');
@@ -380,14 +384,22 @@ function peopleList(all: Person[]) {
   const shows = [all.length, peopleSearch, ...rows.map(r => r.shows)].join('\n');
   if (shows === listShows) return null;
   listShows = shows;
+  const top = `${all.length}|${peopleSearch}|${shown.length}`;
+  const old = listTable?.isConnected && top === listTop ? listTable.children : undefined;
+  if (old && old.length === rows.length + 1 && rows.every((r, i) => old[i + 1] === r.row || !r.row.isConnected)) {
+    rows.forEach((r, i) => { if (old[i + 1] !== r.row) old[i + 1].replaceWith(r.row); });
+    return null;
+  }
+  listTop = top;
+  listTable = h('table', {},
+    h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Zone now'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Claims'), h('th', {})),
+    rows.map(r => r.row));
   return h('section', {},
     h('h3', {}, `People (${all.length})`),
     h('input', { name: 'people-search', type: 'search', placeholder: 'Search by name, band, company or handle', value: peopleSearch,
       oninput: (e: Event) => { peopleSearch = (e.target as HTMLInputElement).value; render(); } }),
     words.length > 0 && h('p', { class: 'muted' }, `${shown.length} found`),
-    h('table', {},
-      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Zone now'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Claims'), h('th', {})),
-      rows.map(r => r.row)));
+    listTable);
 }
 
 /** The opened person: who they are, their pages, and what staff do as them. */
@@ -395,7 +407,7 @@ function personPanel(all: Person[]) {
   const p = all.find(x => x.key === opened);
   if (!p) return null;
   const a = p.att;
-  const b = p.bandId ? conn.db.band.id.find(p.bandId) : undefined;
+  const b = p.bandId ? bandById(conn, p.bandId) : undefined;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const name = p.name || 'them';
   const facts = [
@@ -692,7 +704,7 @@ function toClaims(ok: boolean) {
 
 /** A test band's buttons to walk it to each zone. */
 function walkButtons(id: number) {
-  const at = conn.db.band.id.find(id)?.zone;
+  const at = bandById(conn, id)?.zone;
   return [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId).map(z => h('button', { class: 'test', disabled: z.stationId === at || undefined,
     onclick: () => act(() => post(`/api/dev/move/${id}/${z.stationId}`)) }, z.name));
 }
@@ -715,7 +727,7 @@ function bandsTab() {
     h('table', {},
       h('tr', {}, h('th', {}, 'Band'), h('th', {}, 'Wearer'), h('th', {}, 'Zone'), h('th', {}, 'Walk to'), h('th', {})),
       TEST_BANDS.map(id => {
-        const b = conn.db.band.id.find(id);
+        const b = bandById(conn, id);
         const claimed = owners.has(id);
         return h('tr', {},
           h('td', {}, h('b', {}, bandCode(id)), h('div', { class: alive(id) ? 'pass' : 'muted' }, alive(id) ? 'online' : 'offline')),

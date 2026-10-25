@@ -100,7 +100,8 @@ function makeView() {
     const w = view!.clientWidth;
     // On the Live tab the venue fills most of the window's height, so it is easy to explore.
     const hgt = liveLayer.visible ? Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
-    if (w && (renderer.domElement.width !== Math.round(w * renderer.getPixelRatio()) || camera.aspect !== w / hgt)) {
+    // three floors the canvas size; a rounded one never matched at 1.5× on an odd width and resized it every frame.
+    if (w && (renderer.domElement.width !== Math.floor(w * renderer.getPixelRatio()) || camera.aspect !== w / hgt)) {
       renderer.setSize(w, hgt);
       camera.aspect = w / hgt;
       camera.updateProjectionMatrix();
