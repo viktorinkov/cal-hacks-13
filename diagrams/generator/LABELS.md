@@ -10,7 +10,7 @@ Label standard for every box and arrow (kept in sync with diagrams/generator/LAB
 6. An arrow label is a verb of 1 to 3 words, or nothing: opens incident, deposits, tags photo, files claim.
 7. No sentences, no "the", no "in the", no possessives, no explanation in a box.
 
-8. Frame titles are one name, never a sentence: BandIt (the overview), Architecture, SpacetimeDB, Vision, Event data, Evidence Engine, Decision Engine, Claude, Social, Merch and wallet, Capital One Nessie, Vultr, Hardware.
+8. Frame titles are one name, never a sentence: BandIt (the overview), Architecture, SpacetimeDB, Vision, Event data, Evidence Engine, Decision Engine, Claude, Social, Interests, Merch and wallet, Capital One Nessie, Vultr, Hardware.
 9. Make every frame visual: where an icon, a logo or a small picture can replace words on a box, use it. Text stays only for names and 1 to 3 word arrow verbs.
 10. No placeholders: no TBD, TODO, "planned", "not built" or "?", and no box for a part that is not built.
 11. No subtitle, caption or note under a frame title. The picture explains the frame.
