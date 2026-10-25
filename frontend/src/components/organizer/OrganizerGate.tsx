@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { beginSignIn, finishSignIn, staffSignedIn } from '@/stdb/auth'
 import { loadHostConfig, type HostConfig } from '@/stdb/host'
 import { useRoute } from '@/cover/route'
+import { useSession } from '@/stdb/session'
 
 const gateButton =
   'rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5'
@@ -19,6 +20,8 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
   const [host, setHost] = useState<HostConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const as = new URLSearchParams(window.location.search).get('as')
+  const staff = useSession((state) => state.staff)
+  const staffQueries = useSession((state) => state.staffQueries)
 
   useEffect(() => {
     let cancel = false
@@ -48,7 +51,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
         <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">
-          Sign in with your staff email. This desk uses the same database as the live organizer portal.
+          Sign in with your email to run the event.
         </p>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
@@ -75,6 +78,18 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
             Continue as ops
           </button>
         )}
+      </GateCopy>
+    )
+  }
+
+  if (host.authClientId && staffSignedIn() && !as && !staff &&
+      staffQueries['SELECT * FROM my_roles'] === 'open' && staffQueries['SELECT * FROM my_owner'] === 'open') {
+    return (
+      <GateCopy>
+        <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
+        <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
+        <p className="text-[15px] leading-relaxed text-ink-dim">You can run the event with this account.</p>
+        <a className={gateButton} href="/organizer-access?next=%2Forganizer">Continue as organizer</a>
       </GateCopy>
     )
   }

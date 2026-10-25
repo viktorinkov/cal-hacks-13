@@ -93,3 +93,66 @@ fn removing_a_staff_member_takes_the_role_away() {
     assert!(roles_of(&t, id(ISS, "ari")).is_empty());
     assert_eq!(t.db.staff_member().count(), 0);
 }
+
+#[test]
+fn attendee_sign_in_requires_an_explicit_action_to_become_an_organizer() {
+    let t = world();
+    connect(&t, "new-organizer", " Person@Example.com ");
+    let who = id(ISS, "new-organizer");
+    assert!(roles_of(&t, who).is_empty());
+    t.with_reducer_tx(auth(ISS, "new-organizer", " Person@Example.com "), join_organizer).unwrap();
+    assert_eq!(roles_of(&t, who), vec!["ops"]);
+    let role = t.db.staff_role().iter().next().unwrap();
+    assert_eq!(role.label, "person@example.com");
+    assert_eq!(role.granted_by, who);
+    assert!(t.db.owner().identity().find(who).is_none());
+    // No email whitelist and no privilege to grant roles to someone else.
+    assert_eq!(t.db.staff_member().count(), 0);
+    t.with_reducer_tx(auth(ISS, "new-organizer", "person@example.com"), |ctx| {
+        assert!(has_role(ctx, &["ops"]));
+        assert!(!has_role(ctx, &["worker", "medic"]));
+        assert!(add_owner(ctx, who).is_err());
+        assert!(grant_role(ctx, who, "worker".into(), "worker".into()).is_err());
+        Ok::<_, String>(())
+    }).unwrap();
+}
+
+#[test]
+fn organizer_enrollment_requires_a_trusted_email_sign_in() {
+    let t = world();
+    assert!(t.with_reducer_tx(TestAuth::internal(), join_organizer).is_err());
+    let no_email = TestAuth::from_jwt_payload(
+        format!(r#"{{"iss":"{ISS}","sub":"no-email"}}"#), ConnectionId::from_u128(42),
+    ).unwrap();
+    assert!(t.with_reducer_tx(no_email, join_organizer).is_err());
+    for issuer in ["https://issuer.example", "https://auth.spacetimedb.com.attacker.example/oidc", "https://auth.spacetimedb.com/other"] {
+        assert!(t.with_reducer_tx(auth(issuer, "outsider", "person@example.com"), join_organizer).is_err());
+    }
+    assert!(t.with_reducer_tx(auth(ISS, "no-address", ""), join_organizer).is_err());
+    assert_eq!(t.db.staff_role().count(), 0);
+    assert_eq!(t.db.owner().count(), 1);
+}
+
+#[test]
+fn organizer_enrollment_is_idempotent_and_preserves_existing_authority() {
+    let t = world();
+    let staff = id(ISS, "staff");
+    for role in ["medic", "photographer", "worker"] {
+        t.with_reducer_tx(auth(ISS, "owner", "owner@band1t.vip"), |ctx| {
+            grant_role(ctx, staff, role.into(), format!("existing {role}"))
+        }).unwrap();
+    }
+    let existing: Vec<_> = t.db.staff_role().iter().map(|r| (r.id, r.role, r.label, r.granted_by, r.granted_at)).collect();
+    for _ in 0..2 {
+        t.with_reducer_tx(auth(ISS, "staff", "staff@example.com"), join_organizer).unwrap();
+        t.with_reducer_tx(auth(ISS, "owner", "owner@band1t.vip"), join_organizer).unwrap();
+    }
+    assert_eq!(roles_of(&t, staff).len(), 4);
+    assert_eq!(roles_of(&t, staff).iter().filter(|r| *r == "ops").count(), 1);
+    for (id, role, label, granted_by, granted_at) in existing {
+        let row = t.db.staff_role().id().find(id).unwrap();
+        assert_eq!((row.role, row.label, row.granted_by, row.granted_at), (role, label, granted_by, granted_at));
+    }
+    assert!(roles_of(&t, id(ISS, "owner")).is_empty());
+    assert_eq!(t.db.owner().count(), 1);
+}

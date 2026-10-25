@@ -55,6 +55,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/t/{token}", file("t.html"))
         .route_service("/callback", file("t.html"))
         .route_service("/organizer", file("organizer.html"))
+        .route_service("/organizer-access", file("organizer-access.html"))
         .route_service("/photo", file("photo.html"))
         .route_service("/friends", file("friends.html"))
         .route_service("/friends/", file("friends.html"))

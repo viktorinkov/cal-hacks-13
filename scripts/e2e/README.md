@@ -28,9 +28,16 @@ Pages, on http://127.0.0.1:8097:
 | Page | Who | What |
 |---|---|---|
 | `/t/<band code>` (`/t/BANDIT-0n` on the first tags) | attendee | the band's tap link: sign in, claim by press, name, socials, medical history and insurance PDFs, "is this you?", the Capital One wallet, then a thank-you; after "Event ended", the recap |
+| `/organizer-access` | anyone with email sign-in | choose organizer access for this account; no email whitelist, no owner grant |
 | `/organizer` | host and staff | live zones and alerts, low visibility, attendees, incidents, medical cards and claims, learned rules, Kibana links, the Bands tab, "Event ended" |
 | `/photo` | photographer | add a photo taken in a zone; the people whose bands were there are tagged |
 | `/friends` | registered attendee | search for someone they met by remembered name, place or moment; reuses their existing attendee identity and shows the recorded evidence |
+
+## Organizer access
+
+Open `https://band1t.vip/organizer`, sign in with email, then select **Continue as organizer**. An account already signed in as an attendee uses the same button. The plain portal at `/portal` has the same enrollment path. Opening `/organizer-access` starts it directly.
+
+Enrollment grants only `ops` to the signed-in caller. Repeating it preserves existing roles and owners. Attendee sign-in alone does not enroll the attendee. Anonymous identities and tokens outside the email sign-in issuer cannot enroll. Other staff roles, owner controls, claim approvals and payments keep their existing checks.
 
 ## Happy path to test
 

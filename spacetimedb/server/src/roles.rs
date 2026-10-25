@@ -94,7 +94,7 @@ pub fn my_owner(ctx: &ViewContext) -> Vec<Owner> {
 pub const EMAIL_ROLES: &[&str] = &["ops", "medic", "photographer"];
 
 /// The issuer of the pages' email sign-in; other issuers' email claims are not trusted.
-const SIGN_IN_ISSUER: &str = "https://auth.spacetimedb.com";
+const SIGN_IN_ISSUER: &str = "https://auth.spacetimedb.com/oidc";
 
 /// Someone the owner added as staff by email. Whoever signs in with that email gets the role: at
 /// once when they signed in before, else the next time they connect.
@@ -131,11 +131,30 @@ fn normalize_email(email: &str) -> String {
 /// The email in the caller's sign-in token, lowercased; None for tokens without one.
 pub fn sender_email(ctx: &ReducerContext) -> Option<String> {
     let jwt = ctx.sender_auth().jwt()?;
-    if !jwt.issuer().starts_with(SIGN_IN_ISSUER) {
+    if jwt.issuer() != SIGN_IN_ISSUER {
         return None;
     }
     let claims: serde_json::Value = serde_json::from_str(jwt.raw_payload()).ok()?;
     claims.get("email")?.as_str().map(normalize_email).filter(|e| e.contains('@'))
+}
+
+/// A signed-in person deliberately opens the organizer desk. Other roles and owner authority stay
+/// unchanged; ordinary attendee sign-in does not call this reducer.
+#[spacetimedb::reducer]
+pub fn join_organizer(ctx: &ReducerContext) -> Result<(), String> {
+    let email = sender_email(ctx).ok_or("sign in with email to continue as organizer")?;
+    if has_role(ctx, &["ops"]) {
+        return Ok(());
+    }
+    ctx.db.staff_role().insert(StaffRole {
+        id: 0,
+        identity: ctx.sender(),
+        role: "ops".into(),
+        label: email,
+        granted_by: ctx.sender(),
+        granted_at: ctx.timestamp,
+    });
+    Ok(())
 }
 
 /// Gives `identity` the staff member's role and records that this account signed in for it.
