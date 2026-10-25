@@ -13,7 +13,6 @@ import { bandCode } from '../band-code';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { MAP_LEGEND, present, venueMap } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
-import { Identity } from 'spacetimedb';
 import type { DbConnection } from '../module_bindings';
 import type { Claim } from '../module_bindings/types';
 
@@ -53,6 +52,7 @@ const QUERIES = [
   'SELECT * FROM venue_setup',
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
+  'SELECT * FROM board_staff',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -137,12 +137,15 @@ function header() {
   ];
 }
 
-/** A signed-in person with no staff role sees the code the organizer adds them by. */
+/** A signed-in person with no staff role sees the email the organizer adds them by. */
 function noRole() {
+  const email = signedInEmail();
+  if (roles().has('photographer')) return h('section', {}, h('h3', {}, 'Photographer'), h('p', {}, h('a', { href: '/photo' }, 'Add event photos')));
   return h('section', {},
     h('h3', {}, 'This account has no staff role'),
-    h('p', {}, 'The organizer portal is for the event\'s organizer and medics. To get access, send this code to the organizer:'),
-    h('p', {}, h('code', {}, conn.identity!.toHexString())),
+    email
+      ? h('p', {}, `The organizer portal is for the event's staff. Ask the organizer to add ${email} on the Staff tab; this page opens as soon as they do.`)
+      : [h('p', {}, 'The organizer portal is for the event\'s staff. To get access, send this code to the organizer:'), h('p', {}, h('code', {}, conn.identity!.toHexString()))],
     h('p', {}, 'Once you are a medic, tapping a band with this phone opens the wearer\'s medical card.'));
 }
 
@@ -235,36 +238,40 @@ function attendees() {
 
 // --- Staff ----------------------------------------------------------------------------------
 
-/** Who the owner added since the page loaded, so the tab confirms each one. */
-const staffAdded: string[] = [];
+/** The roles the owner adds people to by email, as the module allows them. */
+const EMAIL_ROLES: [string, string][] = [['medic', 'Medic'], ['ops', 'Organizer'], ['photographer', 'Photographer']];
 
-/** The owner makes a signed-in account a medic or an organizer, by the code that account's portal shows. */
+function roleName(role: string): string {
+  return EMAIL_ROLES.find(([r]) => r === role)?.[1] ?? role;
+}
+
+/** The owner adds a medic, organizer or photographer by email. Whoever signs in with it gets the role. */
 function staffTab() {
+  const staff = [...conn.db.boardStaff.iter()].sort((a, b) => a.name.localeCompare(b.name));
   const add = async (e: Event) => {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
-    const name = field(f, 'staff-name');
-    const role = field(f, 'staff-role');
-    const code = field(f, 'staff-code').replace(/^0x/, '');
-    const done = await act(async () => {
-      if (!/^[0-9a-f]{64}$/i.test(code)) throw new Error('The code is the 64-character line the person sees on this portal.');
-      await conn.reducers.grantRole({ identity: Identity.fromString(code), role, label: name });
-    });
-    if (done) {
-      staffAdded.push(`${name} as ${role === 'medic' ? 'a medic' : 'an organizer'}`);
+    if (await act(() => conn.reducers.addStaff({ email: field(f, 'staff-email'), role: field(f, 'staff-role'), name: field(f, 'staff-name') }))) {
       f.reset();
       render();
     }
   };
+  const remove = (id: bigint, name: string, role: string) =>
+    confirm(`Remove ${name} as ${roleName(role).toLowerCase()}?`) && act(() => conn.reducers.removeStaff({ id }));
   return h('section', {},
     h('h3', {}, 'Staff'),
-    h('p', {}, 'A medic or organizer signs in on this portal with their email, and it shows them a code. Add them with that code. A medic who then taps a band with the same phone gets the wearer\'s medical card.'),
+    h('p', {}, 'Add staff by the email they sign in with. A medic who then taps a band with their phone gets the wearer\'s medical card.'),
     h('form', { onsubmit: add },
       h('label', {}, 'Name', h('input', { name: 'staff-name', required: true })),
-      h('label', {}, 'Code from their portal', h('input', { name: 'staff-code', required: true })),
-      h('label', {}, 'Role', h('select', { name: 'staff-role' }, h('option', { value: 'medic' }, 'Medic'), h('option', { value: 'ops' }, 'Organizer'))),
+      h('label', {}, 'Email', h('input', { name: 'staff-email', type: 'email', required: true })),
+      h('label', {}, 'Role', h('select', { name: 'staff-role' }, EMAIL_ROLES.map(([value, label]) => h('option', { value }, label)))),
       h('button', {}, 'Add')),
-    staffAdded.length > 0 && h('p', { class: 'pass' }, `Added ${staffAdded.join(', ')}. They reload the portal to see their tabs.`));
+    staff.length > 0 && h('table', {},
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Email'), h('th', {}, 'Role'), h('th', {}, 'Signed in'), h('th', {}, '')),
+      staff.map(m => h('tr', {},
+        h('td', {}, m.name), h('td', {}, m.email), h('td', {}, roleName(m.role)),
+        h('td', { class: m.account ? 'pass' : 'muted' }, m.account ? 'yes' : 'not yet'),
+        h('td', {}, h('button', { class: 'link', onclick: () => remove(m.id, m.name, m.role) }, 'Remove'))))));
 }
 
 // --- Claims ---------------------------------------------------------------------------------
