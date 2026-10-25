@@ -4,7 +4,7 @@
 
 import { Identity, Timestamp } from 'spacetimedb';
 import { DbConnection } from './module_bindings';
-import type { MedicCard } from './module_bindings/types';
+import type { Band, MedicCard } from './module_bindings/types';
 import { bandCode } from './band-code';
 
 export type Config = {
@@ -225,6 +225,22 @@ function watch(conn: DbConnection, onChange: () => void) {
       table.onUpdate?.(kick);
     }
   }
+}
+
+/** The bands by id, kept in step with the table: the SDK's `band.id.find` walks every row, and with a crowd of a
+ *  thousand the pages look bands up thousands of times per redraw. */
+const bandMaps = new WeakMap<DbConnection, Map<number, Band>>();
+
+export function bandById(conn: DbConnection, id: number): Band | undefined {
+  let bands = bandMaps.get(conn);
+  if (!bands) {
+    const m = new Map([...conn.db.band.iter()].map(b => [b.id, b]));
+    conn.db.band.onInsert((_ctx, b) => m.set(b.id, b));
+    conn.db.band.onUpdate((_ctx, _old, b) => m.set(b.id, b));
+    conn.db.band.onDelete((_ctx, b) => m.delete(b.id));
+    bandMaps.set(conn, bands = m);
+  }
+  return bands.get(id);
 }
 
 /** Opens a bandit-api session for this identity, so bandit-api knows who calls it. */
