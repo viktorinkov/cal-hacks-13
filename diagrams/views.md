@@ -8,7 +8,7 @@ This is source wiring, not evidence of runtime delivery. Generated bindings and 
 
 ## Diagrams 02–03 SpacetimeDB scope
 
-SpacetimeDB live updates (02) shows reducer calls, atomic commits and pushed changes. SpacetimeDB subscriptions (03) uses compact audience cards for attendees, granted medic access, staff boards, service API/indexer and workers. Anonymous projections and raw public floor/commands use a separate path. The subscription diagram shows representative view names; this inventory contains every declared view.
+SpacetimeDB live updates (02) shows reducer calls, atomic commits and pushed changes. SpacetimeDB subscriptions (03) uses compact audience cards for attendees, granted medic access, staff boards, service API/indexer and workers. Anonymous projections and raw public floor/commands use a separate path. The subscription diagram shows representative returned rows and their access conditions; this inventory contains every declared view. The card semantics were rechecked against fetched `06b2370`; the inventory below retains its stated source snapshot.
 
 ## Access rules that affect the drawing
 
