@@ -200,7 +200,7 @@ def walk(y0):
     floor = picture(60, 150, HERE / "floor-paths.png", 1800)
     sx, sw, rx = 1980, 520, 2620
     s1 = B(sx, 150, "incident_marker\nresponding_at", "stdb", w=sw)
-    s2 = B(sx, 360, "nearest door\n17 doors", "web", w=sw, icons={0: WALK})
+    s2 = B(sx, 360, "nearest door\nstraight distance", "web", w=sw, icons={0: WALK})
     s3 = B(sx, 570, "snap to floor\n25 cm cells", "web", w=sw)
     s4 = B(sx, 770, "straight line\nclear?", "web", w=sw, h=200, shape="diamond")
     s5 = B(sx, 1060, "A* search\n8 directions", "web", w=sw)
