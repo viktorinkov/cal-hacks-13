@@ -95,62 +95,68 @@ export function trialBalance(ledger: LedgerEntry[]) {
 }
 
 const td = (cents: bigint, tag = 'td') => h(tag, {}, money(cents));
+const scroll = (table: HTMLElement) => h('div', { style: 'overflow-x: auto' }, table);
 
 function amounts(l: Line, tag = 'td') {
   return [l.billed, l.accrued, l.paid, l.insurerOwes, l.insurerPaid, l.venueCost, l.notCovered].map(x => td(x, tag));
 }
 
-const AMOUNT_HEADS = ['Billed', 'Accrued (J1)', 'Paid (J3)', 'Insurer owes (J2)', 'Insurer paid (J4)', "Venue's cost", 'Not covered'];
+const AMOUNT_HEADS = ['Billed', 'Accrued', 'Paid', 'Insurer owes', 'Insurer paid', 'Venue', 'Not covered'];
+
+function status(c: Claim) {
+  return c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
+/** One journal entry's lines on one row: "Dr account $x, Cr account $y". */
+function entryLines(lines: LedgerEntry[]) {
+  return lines.map(l => l.debitCents ? `Dr ${l.account} ${money(l.debitCents)}` : `Cr ${l.account} ${money(l.creditCents)}`).join(', ');
+}
 
 export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(a.id - b.id));
+  if (!claims.length) return h('section', {}, h('h3', {}, 'Costs'), h('p', { class: 'muted' }, 'No claims yet.'));
   const ledger = [...conn.db.boardLedger.iter()];
   const { lines, centers, total } = rollUp(claims, ledger, [...conn.db.boardRecords.iter()]);
   const tb = trialBalance(ledger);
   const journals = new Map<bigint, LedgerEntry[]>();
   for (const l of [...ledger].sort((a, b) => Number(a.id - b.id))) journals.set(l.journalId, [...(journals.get(l.journalId) ?? []), l]);
   const entries = [...journals.values()].sort((a, b) => Number(b[0].journalId - a[0].journalId));
+  const venueUncovered = centers.get('Venue')?.notCovered ?? 0n;
   return [
     h('section', {},
-      h('h3', {}, 'Costs so far by cost center'),
-      !claims.length && h('p', { class: 'muted' }, 'No claims yet.'),
-      claims.length > 0 && h('table', {},
+      h('h3', {}, 'Cost centers'),
+      scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Cost center'), h('th', {}, 'Claims'), AMOUNT_HEADS.map(x => h('th', {}, x))),
         [...centers.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, l]) => h('tr', {}, h('td', {}, name), h('td', {}, l.claims), amounts(l))),
-        h('tr', {}, h('th', {}, 'Total'), h('th', {}, total.claims), amounts(total, 'th')))),
-    claims.length > 0 && h('section', {},
-      h('h3', {}, 'Who pays what'),
-      h('table', {},
-        h('tr', {}, h('td', {}, 'The venue'), td(total.venueCost),
-          h('td', { class: 'muted' }, `deductibles ${money(total.deductibles)}, insurer short payments ${money(total.shortPaid)}, reserves with no recovery posted yet ${money(total.unrecovered)}`)),
-        h('tr', {}, h('td', {}, "The venue's insurer"), td(total.insurerPaid + total.insurerOwes),
-          h('td', { class: 'muted' }, `paid back ${money(total.insurerPaid)}, still owes ${money(total.insurerOwes)}`)),
-        h('tr', {}, h('td', {}, 'Attendees or their health plans'), td(centers.get('Medical')?.notCovered ?? 0n), h('td', { class: 'muted' }, 'not covered on Medical claims')),
-        h('tr', {}, h('td', {}, 'Still to pay'), td(total.accrued), h('td', { class: 'muted' }, 'accrued reserves not paid yet')))),
-    claims.length > 0 && h('section', {},
-      h('h3', {}, 'Cost lines'),
-      h('table', {},
-        h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Cost center'), h('th', {}, 'Claimant'), h('th', {}, 'What'), AMOUNT_HEADS.map(x => h('th', {}, x)), h('th', {}, 'Status')),
+        h('tr', {}, h('th', {}, 'Total'), h('th', {}, total.claims), amounts(total, 'th'))))),
+    h('section', {},
+      h('h3', {}, 'Who pays'),
+      scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Venue'), h('th', {}, 'Deductibles'), h('th', {}, 'Short payments'), h('th', {}, 'Not recovered yet'), h('th', {}, 'Insurer'), h('th', {}, 'Attendees'), h('th', {}, 'Unpaid')),
+        h('tr', {}, td(total.venueCost + venueUncovered), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
+          td(total.insurerPaid + total.insurerOwes), td(centers.get('Medical')?.notCovered ?? 0n), td(total.accrued))))),
+    h('section', {},
+      h('h3', {}, `Claims (${claims.length})`),
+      scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Cost center'), h('th', {}, 'Claimant'), h('th', {}, 'Billed'), h('th', {}, 'Paid'), h('th', {}, 'Insurer'), h('th', {}, 'Venue'), h('th', {}, 'Not covered'), h('th', {}, 'Status')),
         lines.map(({ claim: c, line }) => h('tr', {},
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(c.id) }, `#${c.id}`)),
-          h('td', {}, costCenter(c)), h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
-          amounts(line), h('td', {}, c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()))))),
-    h('section', {},
-      h('h3', {}, 'Journal'),
-      h('h4', {}, 'Trial balance'),
-      h('table', {},
+          h('td', {}, costCenter(c)), h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '')),
+          td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), h('td', {}, status(c))))))),
+    ledger.length > 0 && h('section', {},
+      h('h3', {}, 'Trial balance'),
+      scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Account'), h('th', {}, 'Debits'), h('th', {}, 'Credits'), h('th', {}, 'Balance')),
         tb.rows.map(([account, a]) => h('tr', {}, h('td', {}, account), td(a.debit), td(a.credit), td(a.debit - a.credit))),
         h('tr', {}, h('th', {}, 'Total'), h('th', {}, money(tb.debit)), h('th', {}, money(tb.credit)),
-          h('th', { class: tb.balanced ? 'pass' : 'fail' }, tb.balanced ? 'Balanced' : `Off by ${money(tb.debit - tb.credit)}`))),
-      h('h4', {}, `Journal entries (${entries.length})`),
-      !entries.length && h('p', { class: 'muted' }, 'None posted yet.'),
-      entries.length > 0 && h('table', {},
-        h('tr', {}, h('th', {}, 'Entry'), h('th', {}, 'Claim'), h('th', {}, 'Account'), h('th', {}, 'Debit'), h('th', {}, 'Credit'), h('th', {}, 'Memo'), h('th', {}, 'Posted')),
-        entries.flatMap(lines => lines.map((l, i) => h('tr', {},
-          h('td', {}, i === 0 ? `${l.journalId} ${l.journal}` : ''),
-          h('td', {}, i === 0 ? h('button', { class: 'link', onclick: () => openClaim(l.claimId) }, `#${l.claimId}`) : ''),
-          h('td', {}, l.account), h('td', {}, l.debitCents ? money(l.debitCents) : ''), h('td', {}, l.creditCents ? money(l.creditCents) : ''),
-          h('td', { class: 'muted' }, l.memo), h('td', { class: 'muted' }, i === 0 ? `${date(l.postedAt)} by ${l.postedBy}` : '')))))),
+          h('th', { class: tb.balanced ? 'pass' : 'fail' }, tb.balanced ? 'Balanced' : `Off by ${money(tb.debit - tb.credit)}`))))),
+    ledger.length > 0 && h('section', {},
+      h('h3', {}, `Journal (${entries.length})`),
+      scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Entry'), h('th', {}, 'Claim'), h('th', {}, 'Lines'), h('th', {}, 'Posted')),
+        entries.map(e => h('tr', {},
+          h('td', {}, `${e[0].journalId} ${e[0].journal}`),
+          h('td', {}, h('button', { class: 'link', onclick: () => openClaim(e[0].claimId) }, `#${e[0].claimId}`)),
+          h('td', {}, entryLines(e)), h('td', { class: 'muted' }, date(e[0].postedAt))))))),
   ];
 }
