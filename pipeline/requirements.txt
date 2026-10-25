@@ -5,3 +5,6 @@ Pillow
 pillow-heif
 opencv-python
 playwright
+scipy
+torch
+websocket-client
