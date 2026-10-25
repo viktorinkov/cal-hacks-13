@@ -309,7 +309,7 @@ Band1t has four queues, and all four live in the `band1t` module. Every screen a
 |---|---|---|---|---|
 | The job queue | `job` rows, read through the view `worker_jobs` | feature reducers, through `jobs::enqueue`; never a client | `bandit-workers` | `claim_job` leases the job for 60 s, and the feature's result reducer finishes it |
 | The command queue | `command` rows with `pending = true` | the Commands and Settings reducers, `claim_band`, `social_tick` when it completes a band claim, and `resolve_incident` | `band1t-bridge` | the bridge writes the command to the gateway, then calls `command_sent` |
-| The organizer's queue | `claim` rows in `Routed`, `rule_proposal` rows in `proposed`, `charge` rows in `proposed` | the guard's `route`, `submit_rule_proposal`, `name_responsible_band` | the organizer, on the organizer portal | `approve_claim` or `refuse_claim`; `approve_rule_proposal` or `reject_rule_proposal`; `approve_charge` or `waive_charge` |
+| The organizer queue | `claim` rows in `Routed`, `rule_proposal` rows in `proposed`, `charge` rows in `proposed` | the guard's `route`, `submit_rule_proposal`, `name_responsible_band` | the organizer, on the organizer portal | `approve_claim` or `refuse_claim`; `approve_rule_proposal` or `reject_rule_proposal`; `approve_charge` or `waive_charge` |
 | The timers | one schedule table per timer | the reducer that starts each timer | the module itself | the timer calls its reducer at a fixed interval |
 
 The question this diagram answers: which queue sits between which parts.
@@ -320,7 +320,7 @@ flowchart LR
     Features["feature reducers"]
     Job[("job queue: job, worker_jobs")]
     Cmd[("command queue: command, pending")]
-    Org[("organizer's queue: claim Routed, rule_proposal proposed, charge proposed")]
+    Org[("organizer queue: claim Routed, rule_proposal proposed, charge proposed")]
     Timers[("timers: schedule tables")]
   end
   Features -->|"jobs::enqueue"| Job
@@ -382,7 +382,7 @@ A `command` row is one command for the bands, such as `state`, `exit`, `clear` o
 - A command older than 30 s when the bridge sees it is not sent. `command_sent` records it as expired.
 - The gateway broadcasts each command 3 times. Bands send no answer, so `sent_at` means the gateway took the command.
 
-#### The organizer's queue
+#### The organizer queue
 
 This is the human in the loop. Code and Claude settle what they can, and everything else waits here for the organizer, on the organizer portal.
 
