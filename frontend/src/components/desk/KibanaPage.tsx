@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import { ArrowUpRight } from 'lucide-react'
-import { KIBANA_INTRO, KIBANA_JOBS, kibanaHref, loadTestHost, useTestBands } from '@/stdb/testBands'
+import { KIBANA_INTRO, KIBANA_JOBS, kibanaHref, loadDeskHost, useHost } from '@/stdb/kibana'
 import { DeskFrame } from './DeskFrame'
 
 /** What the Elastic project does for the event, and the Kibana view behind each job. */
 export function KibanaPage() {
-  const host = useTestBands((s) => s.host)
+  const host = useHost((s) => s.host)
   useEffect(() => {
-    void loadTestHost()
+    void loadDeskHost()
   }, [])
   const base = host?.kibanaUrl ?? ''
   return (

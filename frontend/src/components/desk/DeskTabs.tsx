@@ -16,7 +16,6 @@ const ITEMS: { to: string; label: string; on: (path: string) => boolean; ownerOn
   { to: '/merch', label: 'Merch', on: (path: string) => path === '/merch' },
   { to: '/venue', label: 'Venue setup', on: (path: string) => path === '/venue' },
   { to: '/bands', label: 'Bands', on: (path: string) => path === '/bands' },
-  { to: '/test-bands', label: 'Test bands', on: (path: string) => path === '/test-bands' },
   { to: '/run', label: 'Run', on: (path: string) => path === '/run' },
   { to: '/staff', label: 'Staff', on: (path: string) => path === '/staff', ownerOnly: true },
   { to: '/view-as', label: 'View as', on: (path: string) => path === '/view-as', ownerOnly: true },
