@@ -1,0 +1,63 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct EvidencePack {
+    pub id: u64,
+    pub claim_id: u64,
+    pub version: u32,
+    pub fact_count: u32,
+    pub hash: String,
+    pub built_at: __sdk::Timestamp,
+    pub corroboration: String,
+    pub checks: String,
+}
+
+impl __sdk::InModule for EvidencePack {
+    type Module = super::RemoteModule;
+}
+
+pub struct EvidencePackCols {
+    pub id: __sdk::__query_builder::Col<EvidencePack, u64>,
+    pub claim_id: __sdk::__query_builder::Col<EvidencePack, u64>,
+    pub version: __sdk::__query_builder::Col<EvidencePack, u32>,
+    pub fact_count: __sdk::__query_builder::Col<EvidencePack, u32>,
+    pub hash: __sdk::__query_builder::Col<EvidencePack, String>,
+    pub built_at: __sdk::__query_builder::Col<EvidencePack, __sdk::Timestamp>,
+    pub corroboration: __sdk::__query_builder::Col<EvidencePack, String>,
+    pub checks: __sdk::__query_builder::Col<EvidencePack, String>,
+}
+
+impl __sdk::__query_builder::HasCols for EvidencePack {
+    type Cols = EvidencePackCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        EvidencePackCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            claim_id: __sdk::__query_builder::Col::new(table_name, "claim_id"),
+            version: __sdk::__query_builder::Col::new(table_name, "version"),
+            fact_count: __sdk::__query_builder::Col::new(table_name, "fact_count"),
+            hash: __sdk::__query_builder::Col::new(table_name, "hash"),
+            built_at: __sdk::__query_builder::Col::new(table_name, "built_at"),
+            corroboration: __sdk::__query_builder::Col::new(table_name, "corroboration"),
+            checks: __sdk::__query_builder::Col::new(table_name, "checks"),
+        }
+    }
+}
+
+pub struct EvidencePackIxCols {
+    pub claim_id: __sdk::__query_builder::IxCol<EvidencePack, u64>,
+    pub id: __sdk::__query_builder::IxCol<EvidencePack, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for EvidencePack {
+    type IxCols = EvidencePackIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        EvidencePackIxCols {
+            claim_id: __sdk::__query_builder::IxCol::new(table_name, "claim_id"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for EvidencePack {}

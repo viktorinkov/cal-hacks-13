@@ -1,0 +1,63 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct ClaimPrecedent {
+    pub id: u64,
+    pub claim_id: u64,
+    pub pack_version: u32,
+    pub reference: String,
+    pub outcome: String,
+    pub payout_cents: u64,
+    pub narrative: String,
+    pub score: f32,
+}
+
+impl __sdk::InModule for ClaimPrecedent {
+    type Module = super::RemoteModule;
+}
+
+pub struct ClaimPrecedentCols {
+    pub id: __sdk::__query_builder::Col<ClaimPrecedent, u64>,
+    pub claim_id: __sdk::__query_builder::Col<ClaimPrecedent, u64>,
+    pub pack_version: __sdk::__query_builder::Col<ClaimPrecedent, u32>,
+    pub reference: __sdk::__query_builder::Col<ClaimPrecedent, String>,
+    pub outcome: __sdk::__query_builder::Col<ClaimPrecedent, String>,
+    pub payout_cents: __sdk::__query_builder::Col<ClaimPrecedent, u64>,
+    pub narrative: __sdk::__query_builder::Col<ClaimPrecedent, String>,
+    pub score: __sdk::__query_builder::Col<ClaimPrecedent, f32>,
+}
+
+impl __sdk::__query_builder::HasCols for ClaimPrecedent {
+    type Cols = ClaimPrecedentCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        ClaimPrecedentCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            claim_id: __sdk::__query_builder::Col::new(table_name, "claim_id"),
+            pack_version: __sdk::__query_builder::Col::new(table_name, "pack_version"),
+            reference: __sdk::__query_builder::Col::new(table_name, "reference"),
+            outcome: __sdk::__query_builder::Col::new(table_name, "outcome"),
+            payout_cents: __sdk::__query_builder::Col::new(table_name, "payout_cents"),
+            narrative: __sdk::__query_builder::Col::new(table_name, "narrative"),
+            score: __sdk::__query_builder::Col::new(table_name, "score"),
+        }
+    }
+}
+
+pub struct ClaimPrecedentIxCols {
+    pub claim_id: __sdk::__query_builder::IxCol<ClaimPrecedent, u64>,
+    pub id: __sdk::__query_builder::IxCol<ClaimPrecedent, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for ClaimPrecedent {
+    type IxCols = ClaimPrecedentIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        ClaimPrecedentIxCols {
+            claim_id: __sdk::__query_builder::IxCol::new(table_name, "claim_id"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for ClaimPrecedent {}

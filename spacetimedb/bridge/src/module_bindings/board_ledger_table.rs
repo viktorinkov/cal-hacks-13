@@ -1,0 +1,145 @@
+#![allow(unused, clippy::all)]
+use super::ledger_entry_type::LedgerEntry;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct BoardLedgerTableHandle<'ctx> {
+    imp: __sdk::TableHandle<LedgerEntry>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct BoardLedgerTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for BoardLedgerTableAccessor {
+    type Row = LedgerEntry;
+    type Handle<'db> = BoardLedgerTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.board_ledger()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait BoardLedgerTableAccess {
+    #[allow(non_snake_case)]
+    fn board_ledger(&self) -> BoardLedgerTableHandle<'_>;
+}
+
+impl BoardLedgerTableAccess for super::RemoteTables {
+    fn board_ledger(&self) -> BoardLedgerTableHandle<'_> {
+        BoardLedgerTableHandle {
+            imp: self.imp.get_table::<LedgerEntry>("board_ledger"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct BoardLedgerInsertCallbackId(__sdk::CallbackId);
+pub struct BoardLedgerDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for BoardLedgerTableHandle<'ctx> {
+    type Row = LedgerEntry;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = LedgerEntry> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for BoardLedgerTableHandle<'ctx> {
+    type Row = LedgerEntry;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = LedgerEntry> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = BoardLedgerInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardLedgerInsertCallbackId {
+        BoardLedgerInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: BoardLedgerInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = BoardLedgerDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardLedgerDeleteCallbackId {
+        BoardLedgerDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: BoardLedgerDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for BoardLedgerTableHandle<'ctx> {
+    type InsertCallbackId = BoardLedgerInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardLedgerInsertCallbackId {
+        BoardLedgerInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: BoardLedgerInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for BoardLedgerTableHandle<'ctx> {
+    type DeleteCallbackId = BoardLedgerDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardLedgerDeleteCallbackId {
+        BoardLedgerDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: BoardLedgerDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<LedgerEntry>("board_ledger");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<LedgerEntry>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<LedgerEntry>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait board_ledgerQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn board_ledger(&self) -> __sdk::__query_builder::Table<LedgerEntry>;
+}
+
+impl board_ledgerQueryTableAccess for __sdk::QueryTableAccessor {
+    fn board_ledger(&self) -> __sdk::__query_builder::Table<LedgerEntry> {
+        __sdk::__query_builder::Table::new("board_ledger")
+    }
+}

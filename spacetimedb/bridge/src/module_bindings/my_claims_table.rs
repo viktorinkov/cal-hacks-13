@@ -1,0 +1,146 @@
+#![allow(unused, clippy::all)]
+use super::claim_status_type::ClaimStatus;
+use super::my_claim_type::MyClaim;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct MyClaimsTableHandle<'ctx> {
+    imp: __sdk::TableHandle<MyClaim>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct MyClaimsTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for MyClaimsTableAccessor {
+    type Row = MyClaim;
+    type Handle<'db> = MyClaimsTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.my_claims()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait MyClaimsTableAccess {
+    #[allow(non_snake_case)]
+    fn my_claims(&self) -> MyClaimsTableHandle<'_>;
+}
+
+impl MyClaimsTableAccess for super::RemoteTables {
+    fn my_claims(&self) -> MyClaimsTableHandle<'_> {
+        MyClaimsTableHandle {
+            imp: self.imp.get_table::<MyClaim>("my_claims"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct MyClaimsInsertCallbackId(__sdk::CallbackId);
+pub struct MyClaimsDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for MyClaimsTableHandle<'ctx> {
+    type Row = MyClaim;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MyClaim> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for MyClaimsTableHandle<'ctx> {
+    type Row = MyClaim;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MyClaim> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = MyClaimsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyClaimsInsertCallbackId {
+        MyClaimsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyClaimsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = MyClaimsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyClaimsDeleteCallbackId {
+        MyClaimsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyClaimsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for MyClaimsTableHandle<'ctx> {
+    type InsertCallbackId = MyClaimsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyClaimsInsertCallbackId {
+        MyClaimsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyClaimsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for MyClaimsTableHandle<'ctx> {
+    type DeleteCallbackId = MyClaimsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyClaimsDeleteCallbackId {
+        MyClaimsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyClaimsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<MyClaim>("my_claims");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<MyClaim>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<MyClaim>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait my_claimsQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn my_claims(&self) -> __sdk::__query_builder::Table<MyClaim>;
+}
+
+impl my_claimsQueryTableAccess for __sdk::QueryTableAccessor {
+    fn my_claims(&self) -> __sdk::__query_builder::Table<MyClaim> {
+        __sdk::__query_builder::Table::new("my_claims")
+    }
+}

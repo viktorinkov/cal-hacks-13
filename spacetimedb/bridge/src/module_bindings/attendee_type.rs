@@ -1,0 +1,73 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct Attendee {
+    pub identity: __sdk::Identity,
+    pub node_id: u64,
+    pub display_name: String,
+    pub photo_url: String,
+    pub findable: bool,
+    pub person_id: u64,
+    pub organization_id: u64,
+    pub simulated: bool,
+    pub created_at: __sdk::Timestamp,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for Attendee {
+    type Module = super::RemoteModule;
+}
+
+pub struct AttendeeCols {
+    pub identity: __sdk::__query_builder::Col<Attendee, __sdk::Identity>,
+    pub node_id: __sdk::__query_builder::Col<Attendee, u64>,
+    pub display_name: __sdk::__query_builder::Col<Attendee, String>,
+    pub photo_url: __sdk::__query_builder::Col<Attendee, String>,
+    pub findable: __sdk::__query_builder::Col<Attendee, bool>,
+    pub person_id: __sdk::__query_builder::Col<Attendee, u64>,
+    pub organization_id: __sdk::__query_builder::Col<Attendee, u64>,
+    pub simulated: __sdk::__query_builder::Col<Attendee, bool>,
+    pub created_at: __sdk::__query_builder::Col<Attendee, __sdk::Timestamp>,
+    pub updated_at: __sdk::__query_builder::Col<Attendee, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for Attendee {
+    type Cols = AttendeeCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        AttendeeCols {
+            identity: __sdk::__query_builder::Col::new(table_name, "identity"),
+            node_id: __sdk::__query_builder::Col::new(table_name, "node_id"),
+            display_name: __sdk::__query_builder::Col::new(table_name, "display_name"),
+            photo_url: __sdk::__query_builder::Col::new(table_name, "photo_url"),
+            findable: __sdk::__query_builder::Col::new(table_name, "findable"),
+            person_id: __sdk::__query_builder::Col::new(table_name, "person_id"),
+            organization_id: __sdk::__query_builder::Col::new(table_name, "organization_id"),
+            simulated: __sdk::__query_builder::Col::new(table_name, "simulated"),
+            created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct AttendeeIxCols {
+    pub identity: __sdk::__query_builder::IxCol<Attendee, __sdk::Identity>,
+    pub node_id: __sdk::__query_builder::IxCol<Attendee, u64>,
+    pub organization_id: __sdk::__query_builder::IxCol<Attendee, u64>,
+    pub person_id: __sdk::__query_builder::IxCol<Attendee, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for Attendee {
+    type IxCols = AttendeeIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        AttendeeIxCols {
+            identity: __sdk::__query_builder::IxCol::new(table_name, "identity"),
+            node_id: __sdk::__query_builder::IxCol::new(table_name, "node_id"),
+            organization_id: __sdk::__query_builder::IxCol::new(table_name, "organization_id"),
+            person_id: __sdk::__query_builder::IxCol::new(table_name, "person_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for Attendee {}

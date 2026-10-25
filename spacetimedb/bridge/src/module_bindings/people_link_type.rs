@@ -1,0 +1,73 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct PeopleLink {
+    pub id: u64,
+    pub key: String,
+    pub kind: String,
+    pub from_kind: String,
+    pub from_id: u64,
+    pub to_kind: String,
+    pub to_id: u64,
+    pub weight: f32,
+    pub evidence: String,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for PeopleLink {
+    type Module = super::RemoteModule;
+}
+
+pub struct PeopleLinkCols {
+    pub id: __sdk::__query_builder::Col<PeopleLink, u64>,
+    pub key: __sdk::__query_builder::Col<PeopleLink, String>,
+    pub kind: __sdk::__query_builder::Col<PeopleLink, String>,
+    pub from_kind: __sdk::__query_builder::Col<PeopleLink, String>,
+    pub from_id: __sdk::__query_builder::Col<PeopleLink, u64>,
+    pub to_kind: __sdk::__query_builder::Col<PeopleLink, String>,
+    pub to_id: __sdk::__query_builder::Col<PeopleLink, u64>,
+    pub weight: __sdk::__query_builder::Col<PeopleLink, f32>,
+    pub evidence: __sdk::__query_builder::Col<PeopleLink, String>,
+    pub updated_at: __sdk::__query_builder::Col<PeopleLink, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for PeopleLink {
+    type Cols = PeopleLinkCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        PeopleLinkCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            key: __sdk::__query_builder::Col::new(table_name, "key"),
+            kind: __sdk::__query_builder::Col::new(table_name, "kind"),
+            from_kind: __sdk::__query_builder::Col::new(table_name, "from_kind"),
+            from_id: __sdk::__query_builder::Col::new(table_name, "from_id"),
+            to_kind: __sdk::__query_builder::Col::new(table_name, "to_kind"),
+            to_id: __sdk::__query_builder::Col::new(table_name, "to_id"),
+            weight: __sdk::__query_builder::Col::new(table_name, "weight"),
+            evidence: __sdk::__query_builder::Col::new(table_name, "evidence"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct PeopleLinkIxCols {
+    pub from_id: __sdk::__query_builder::IxCol<PeopleLink, u64>,
+    pub id: __sdk::__query_builder::IxCol<PeopleLink, u64>,
+    pub key: __sdk::__query_builder::IxCol<PeopleLink, String>,
+    pub to_id: __sdk::__query_builder::IxCol<PeopleLink, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for PeopleLink {
+    type IxCols = PeopleLinkIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        PeopleLinkIxCols {
+            from_id: __sdk::__query_builder::IxCol::new(table_name, "from_id"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            key: __sdk::__query_builder::IxCol::new(table_name, "key"),
+            to_id: __sdk::__query_builder::IxCol::new(table_name, "to_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for PeopleLink {}

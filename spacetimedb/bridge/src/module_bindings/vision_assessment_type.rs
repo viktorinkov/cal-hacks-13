@@ -1,0 +1,81 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct VisionAssessment {
+    pub id: u64,
+    pub incident_id: u64,
+    pub trigger: String,
+    pub confirmed: bool,
+    pub confidence: f32,
+    pub description: String,
+    pub recommended_action: String,
+    pub incident_description: String,
+    pub camera_id: u64,
+    pub frame_hashes: Vec<String>,
+    pub frame_times: Vec<__sdk::Timestamp>,
+    pub model_call_id: u64,
+    pub created_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for VisionAssessment {
+    type Module = super::RemoteModule;
+}
+
+pub struct VisionAssessmentCols {
+    pub id: __sdk::__query_builder::Col<VisionAssessment, u64>,
+    pub incident_id: __sdk::__query_builder::Col<VisionAssessment, u64>,
+    pub trigger: __sdk::__query_builder::Col<VisionAssessment, String>,
+    pub confirmed: __sdk::__query_builder::Col<VisionAssessment, bool>,
+    pub confidence: __sdk::__query_builder::Col<VisionAssessment, f32>,
+    pub description: __sdk::__query_builder::Col<VisionAssessment, String>,
+    pub recommended_action: __sdk::__query_builder::Col<VisionAssessment, String>,
+    pub incident_description: __sdk::__query_builder::Col<VisionAssessment, String>,
+    pub camera_id: __sdk::__query_builder::Col<VisionAssessment, u64>,
+    pub frame_hashes: __sdk::__query_builder::Col<VisionAssessment, Vec<String>>,
+    pub frame_times: __sdk::__query_builder::Col<VisionAssessment, Vec<__sdk::Timestamp>>,
+    pub model_call_id: __sdk::__query_builder::Col<VisionAssessment, u64>,
+    pub created_at: __sdk::__query_builder::Col<VisionAssessment, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for VisionAssessment {
+    type Cols = VisionAssessmentCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        VisionAssessmentCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            incident_id: __sdk::__query_builder::Col::new(table_name, "incident_id"),
+            trigger: __sdk::__query_builder::Col::new(table_name, "trigger"),
+            confirmed: __sdk::__query_builder::Col::new(table_name, "confirmed"),
+            confidence: __sdk::__query_builder::Col::new(table_name, "confidence"),
+            description: __sdk::__query_builder::Col::new(table_name, "description"),
+            recommended_action: __sdk::__query_builder::Col::new(table_name, "recommended_action"),
+            incident_description: __sdk::__query_builder::Col::new(
+                table_name,
+                "incident_description",
+            ),
+            camera_id: __sdk::__query_builder::Col::new(table_name, "camera_id"),
+            frame_hashes: __sdk::__query_builder::Col::new(table_name, "frame_hashes"),
+            frame_times: __sdk::__query_builder::Col::new(table_name, "frame_times"),
+            model_call_id: __sdk::__query_builder::Col::new(table_name, "model_call_id"),
+            created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+        }
+    }
+}
+
+pub struct VisionAssessmentIxCols {
+    pub id: __sdk::__query_builder::IxCol<VisionAssessment, u64>,
+    pub incident_id: __sdk::__query_builder::IxCol<VisionAssessment, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for VisionAssessment {
+    type IxCols = VisionAssessmentIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        VisionAssessmentIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            incident_id: __sdk::__query_builder::IxCol::new(table_name, "incident_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for VisionAssessment {}
