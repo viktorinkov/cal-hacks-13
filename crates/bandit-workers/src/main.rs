@@ -1,5 +1,5 @@
 //! `bandit-workers`: leases jobs from the BandIt SpacetimeDB module (insurance
-//! claims, rule proposals and policy documents, wallets, merch purchases, charge payments and venue setup), does the external work (Claude,
+//! claims, rule proposals and policy documents, wallets, merch purchases, charge payments, venue setup and plan lookups), does the external work (Claude,
 //! Elastic, Nessie, Bright Data) and hands each result to the module's reducer for that job. Claude makes the judgment calls and
 //! writes the words; code decides money.
 //!
@@ -9,6 +9,7 @@
 //!                                           the reducer calls instead of making them
 //! ```
 
+mod brightdata;
 mod charge;
 mod clinic;
 mod document;
@@ -22,6 +23,7 @@ mod model;
 mod nessie;
 mod payout;
 mod photo;
+mod plan;
 mod prompts;
 mod propose;
 mod runner;

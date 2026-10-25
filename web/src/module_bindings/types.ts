@@ -1507,6 +1507,42 @@ export const PlanArea = __t.object("PlanArea", {
 });
 export type PlanArea = __Infer<typeof PlanArea>;
 
+export const PlanLookup = __t.object("PlanLookup", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  kind: __t.string(),
+  insurer: __t.string(),
+  plan: __t.string(),
+  state: __t.string(),
+  limitCents: __t.u64(),
+  deductibleCents: __t.u64(),
+  status: __t.string(),
+  sourceUrl: __t.string(),
+  printedInsurer: __t.string(),
+  printedPlan: __t.string(),
+  planYear: __t.string(),
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  jobId: __t.u64(),
+  note: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type PlanLookup = __Infer<typeof PlanLookup>;
+
+export const PlanLookupResult = __t.object("PlanLookupResult", {
+  status: __t.string(),
+  sourceUrl: __t.string(),
+  printedInsurer: __t.string(),
+  printedPlan: __t.string(),
+  planYear: __t.string(),
+  fileHash: __t.string(),
+  sizeBytes: __t.u64(),
+  pageCount: __t.u32(),
+  note: __t.string(),
+});
+export type PlanLookupResult = __Infer<typeof PlanLookupResult>;
+
 export const PolicyDocument = __t.object("PolicyDocument", {
   id: __t.u64(),
   kind: __t.string(),

@@ -102,7 +102,7 @@ pub struct ExtractedCard {
     pub dropped: Vec<String>,
 }
 
-fn empty_card(who: Identity, now: Timestamp) -> MedicalCard {
+pub fn empty_card(who: Identity, now: Timestamp) -> MedicalCard {
     MedicalCard {
         attendee: who,
         blood_type: String::new(),

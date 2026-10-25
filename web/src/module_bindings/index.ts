@@ -67,6 +67,7 @@ import FailJobReducer from "./fail_job_reducer";
 import FileClaimReducer from "./file_claim_reducer";
 import FileClaimForWearerReducer from "./file_claim_for_wearer_reducer";
 import FileClinicReportReducer from "./file_clinic_report_reducer";
+import FinishPlanLookupReducer from "./finish_plan_lookup_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
 import ForceStateReducer from "./force_state_reducer";
 import GatewayUpReducer from "./gateway_up_reducer";
@@ -82,6 +83,7 @@ import LeaveEventReducer from "./leave_event_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
 import LoadVenueFloorReducer from "./load_venue_floor_reducer";
 import LoadVenueSpotsReducer from "./load_venue_spots_reducer";
+import LookUpPlanReducer from "./look_up_plan_reducer";
 import NameResponsibleBandReducer from "./name_responsible_band_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
@@ -232,6 +234,7 @@ import MyMerchOrdersRow from "./my_merch_orders_table";
 import MyMerchSuggestionsRow from "./my_merch_suggestions_table";
 import MyOwnerRow from "./my_owner_table";
 import MyPhotosRow from "./my_photos_table";
+import MyPlanLookupsRow from "./my_plan_lookups_table";
 import MyRolesRow from "./my_roles_table";
 import MySharedVisitsRow from "./my_shared_visits_table";
 import MyVisitsRow from "./my_visits_table";
@@ -1117,6 +1120,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyPhotosRow),
+  myPlanLookups: __table({
+    name: 'my_plan_lookups',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyPlanLookupsRow),
   myRoles: __table({
     name: 'my_roles',
     indexes: [
@@ -1273,6 +1283,7 @@ const reducersSchema = __reducers(
   __reducerSchema("file_claim", FileClaimReducer),
   __reducerSchema("file_claim_for_wearer", FileClaimForWearerReducer),
   __reducerSchema("file_clinic_report", FileClinicReportReducer),
+  __reducerSchema("finish_plan_lookup", FinishPlanLookupReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
   __reducerSchema("force_state", ForceStateReducer),
   __reducerSchema("gateway_up", GatewayUpReducer),
@@ -1288,6 +1299,7 @@ const reducersSchema = __reducers(
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
   __reducerSchema("load_venue_floor", LoadVenueFloorReducer),
   __reducerSchema("load_venue_spots", LoadVenueSpotsReducer),
+  __reducerSchema("look_up_plan", LookUpPlanReducer),
   __reducerSchema("name_responsible_band", NameResponsibleBandReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
@@ -1508,6 +1520,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_owner": Omit<typeof tablesSchema.schemaType.tables["myOwner"], "accessorName"> & { readonly accessorName: "my_owner" };
     /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
     readonly "my_photos": Omit<typeof tablesSchema.schemaType.tables["myPhotos"], "accessorName"> & { readonly accessorName: "my_photos" };
+    /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+    readonly "my_plan_lookups": Omit<typeof tablesSchema.schemaType.tables["myPlanLookups"], "accessorName"> & { readonly accessorName: "my_plan_lookups" };
     /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
     readonly "my_roles": Omit<typeof tablesSchema.schemaType.tables["myRoles"], "accessorName"> & { readonly accessorName: "my_roles" };
     /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */
@@ -1632,6 +1646,7 @@ const tableAccessorAliases = {
   "my_merch_suggestions": "myMerchSuggestions",
   "my_owner": "myOwner",
   "my_photos": "myPhotos",
+  "my_plan_lookups": "myPlanLookups",
   "my_roles": "myRoles",
   "my_shared_visits": "mySharedVisits",
   "my_visits": "myVisits",
@@ -1811,6 +1826,8 @@ export type DbView = __DbViewBase & {
   readonly "my_owner": __DbViewBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __DbViewBase["myPhotos"];
+  /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+  readonly "my_plan_lookups": __DbViewBase["myPlanLookups"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
   readonly "my_roles": __DbViewBase["myRoles"];
   /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */
@@ -1991,6 +2008,8 @@ export type Tables = __TablesBase & {
   readonly "my_owner": __TablesBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __TablesBase["myPhotos"];
+  /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+  readonly "my_plan_lookups": __TablesBase["myPlanLookups"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
   readonly "my_roles": __TablesBase["myRoles"];
   /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */

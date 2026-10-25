@@ -17,6 +17,7 @@ pub mod filing;
 pub mod flow;
 pub mod own_policy;
 pub mod people;
+pub mod plan_lookup;
 pub mod proposals;
 pub mod setup;
 pub mod tables;

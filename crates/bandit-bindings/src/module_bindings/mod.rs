@@ -170,6 +170,7 @@ pub mod fee_schedule_line_type;
 pub mod file_claim_for_wearer_reducer;
 pub mod file_claim_reducer;
 pub mod file_clinic_report_reducer;
+pub mod finish_plan_lookup_reducer;
 pub mod finish_venue_setup_reducer;
 pub mod force_state_reducer;
 pub mod gateway_table;
@@ -231,6 +232,7 @@ pub mod live_tick_reducer;
 pub mod load_merch_templates_reducer;
 pub mod load_venue_floor_reducer;
 pub mod load_venue_spots_reducer;
+pub mod look_up_plan_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
 pub mod medical_access_log_table;
@@ -278,6 +280,7 @@ pub mod my_merch_suggestions_table;
 pub mod my_owner_table;
 pub mod my_photo_type;
 pub mod my_photos_table;
+pub mod my_plan_lookups_table;
 pub mod my_roles_table;
 pub mod my_shared_visit_type;
 pub mod my_shared_visits_table;
@@ -315,6 +318,9 @@ pub mod photo_type;
 pub mod place_band_reducer;
 pub mod place_booth_reducer;
 pub mod plan_area_type;
+pub mod plan_lookup_result_type;
+pub mod plan_lookup_table;
+pub mod plan_lookup_type;
 pub mod policy_document_table;
 pub mod policy_document_type;
 pub mod policy_term_table;
@@ -617,6 +623,7 @@ pub use fee_schedule_line_type::FeeScheduleLine;
 pub use file_claim_for_wearer_reducer::file_claim_for_wearer;
 pub use file_claim_reducer::file_claim;
 pub use file_clinic_report_reducer::file_clinic_report;
+pub use finish_plan_lookup_reducer::finish_plan_lookup;
 pub use finish_venue_setup_reducer::finish_venue_setup;
 pub use force_state_reducer::force_state;
 pub use gateway_table::*;
@@ -678,6 +685,7 @@ pub use live_tick_reducer::live_tick;
 pub use load_merch_templates_reducer::load_merch_templates;
 pub use load_venue_floor_reducer::load_venue_floor;
 pub use load_venue_spots_reducer::load_venue_spots;
+pub use look_up_plan_reducer::look_up_plan;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
 pub use medical_access_log_table::*;
@@ -725,6 +733,7 @@ pub use my_merch_suggestions_table::*;
 pub use my_owner_table::*;
 pub use my_photo_type::MyPhoto;
 pub use my_photos_table::*;
+pub use my_plan_lookups_table::*;
 pub use my_roles_table::*;
 pub use my_shared_visit_type::MySharedVisit;
 pub use my_shared_visits_table::*;
@@ -762,6 +771,9 @@ pub use photo_type::Photo;
 pub use place_band_reducer::place_band;
 pub use place_booth_reducer::place_booth;
 pub use plan_area_type::PlanArea;
+pub use plan_lookup_result_type::PlanLookupResult;
+pub use plan_lookup_table::*;
+pub use plan_lookup_type::PlanLookup;
 pub use policy_document_table::*;
 pub use policy_document_type::PolicyDocument;
 pub use policy_term_table::*;
@@ -1042,6 +1054,11 @@ pub enum Reducer {
         file_hash: String,
         call: ModelCallIn,
     },
+    FinishPlanLookup {
+        job_id: u64,
+        result: PlanLookupResult,
+        call: Option<ModelCallIn>,
+    },
     FinishVenueSetup {
         job_id: u64,
         result: VenueSetupResult,
@@ -1102,6 +1119,14 @@ pub enum Reducer {
     },
     LoadVenueSpots {
         spots: Vec<VenueSpotIn>,
+    },
+    LookUpPlan {
+        kind: String,
+        insurer: String,
+        plan: String,
+        state: String,
+        limit_cents: u64,
+        deductible_cents: u64,
     },
     NameResponsibleBand {
         incident_id: u64,
@@ -1475,6 +1500,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FileClaim { .. } => "file_claim",
             Reducer::FileClaimForWearer { .. } => "file_claim_for_wearer",
             Reducer::FileClinicReport { .. } => "file_clinic_report",
+            Reducer::FinishPlanLookup { .. } => "finish_plan_lookup",
             Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
@@ -1492,6 +1518,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
             Reducer::LoadVenueFloor { .. } => "load_venue_floor",
             Reducer::LoadVenueSpots { .. } => "load_venue_spots",
+            Reducer::LookUpPlan { .. } => "look_up_plan",
             Reducer::NameResponsibleBand { .. } => "name_responsible_band",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
@@ -1803,6 +1830,15 @@ impl __sdk::Reducer for Reducer {
                 file_hash: file_hash.clone(),
                 call: call.clone(),
             }),
+            Reducer::FinishPlanLookup {
+                job_id,
+                result,
+                call,
+            } => __sats::bsatn::to_vec(&finish_plan_lookup_reducer::FinishPlanLookupArgs {
+                job_id: job_id.clone(),
+                result: result.clone(),
+                call: call.clone(),
+            }),
             Reducer::FinishVenueSetup { job_id, result } => {
                 __sats::bsatn::to_vec(&finish_venue_setup_reducer::FinishVenueSetupArgs {
                     job_id: job_id.clone(),
@@ -1904,6 +1940,21 @@ impl __sdk::Reducer for Reducer {
                     spots: spots.clone(),
                 })
             }
+            Reducer::LookUpPlan {
+                kind,
+                insurer,
+                plan,
+                state,
+                limit_cents,
+                deductible_cents,
+            } => __sats::bsatn::to_vec(&look_up_plan_reducer::LookUpPlanArgs {
+                kind: kind.clone(),
+                insurer: insurer.clone(),
+                plan: plan.clone(),
+                state: state.clone(),
+                limit_cents: limit_cents.clone(),
+                deductible_cents: deductible_cents.clone(),
+            }),
             Reducer::NameResponsibleBand {
                 incident_id,
                 band_id,
@@ -2624,6 +2675,7 @@ pub struct DbUpdate {
     my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
     my_owner: __sdk::TableUpdate<Owner>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
+    my_plan_lookups: __sdk::TableUpdate<PlanLookup>,
     my_roles: __sdk::TableUpdate<StaffRole>,
     my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
     my_visits: __sdk::TableUpdate<MyVisit>,
@@ -2638,6 +2690,7 @@ pub struct DbUpdate {
     person_claim: __sdk::TableUpdate<PersonClaim>,
     photo: __sdk::TableUpdate<Photo>,
     photo_tag: __sdk::TableUpdate<PhotoTag>,
+    plan_lookup: __sdk::TableUpdate<PlanLookup>,
     policy_document: __sdk::TableUpdate<PolicyDocument>,
     policy_term: __sdk::TableUpdate<PolicyTerm>,
     property_event: __sdk::TableUpdate<PropertyEvent>,
@@ -3046,6 +3099,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(my_photos_table::parse_table_update(table_update)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(my_plan_lookups_table::parse_table_update(table_update)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(my_roles_table::parse_table_update(table_update)?),
@@ -3088,6 +3144,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "photo_tag" => db_update
                     .photo_tag
                     .append(photo_tag_table::parse_table_update(table_update)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
+                    .append(plan_lookup_table::parse_table_update(table_update)?),
                 "policy_document" => db_update
                     .policy_document
                     .append(policy_document_table::parse_table_update(table_update)?),
@@ -3453,6 +3512,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.photo_tag = cache
             .apply_diff_to_table::<PhotoTag>("photo_tag", &self.photo_tag)
             .with_updates_by_pk(|row| &row.id);
+        diff.plan_lookup = cache
+            .apply_diff_to_table::<PlanLookup>("plan_lookup", &self.plan_lookup)
+            .with_updates_by_pk(|row| &row.id);
         diff.policy_document = cache
             .apply_diff_to_table::<PolicyDocument>("policy_document", &self.policy_document)
             .with_updates_by_pk(|row| &row.id);
@@ -3658,6 +3720,8 @@ impl __sdk::DbUpdate for DbUpdate {
         );
         diff.my_owner = cache.apply_diff_to_table::<Owner>("my_owner", &self.my_owner);
         diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
+        diff.my_plan_lookups =
+            cache.apply_diff_to_table::<PlanLookup>("my_plan_lookups", &self.my_plan_lookups);
         diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
         diff.my_shared_visits =
             cache.apply_diff_to_table::<MySharedVisit>("my_shared_visits", &self.my_shared_visits);
@@ -4057,6 +4121,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4098,6 +4165,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "photo_tag" => db_update
                     .photo_tag
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "policy_document" => db_update
                     .policy_document
@@ -4586,6 +4656,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4627,6 +4700,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "photo_tag" => db_update
                     .photo_tag
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "policy_document" => db_update
                     .policy_document
@@ -4875,6 +4951,7 @@ pub struct AppliedDiff<'r> {
     my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
     my_owner: __sdk::TableAppliedDiff<'r, Owner>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
+    my_plan_lookups: __sdk::TableAppliedDiff<'r, PlanLookup>,
     my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
     my_visits: __sdk::TableAppliedDiff<'r, MyVisit>,
@@ -4889,6 +4966,7 @@ pub struct AppliedDiff<'r> {
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
     photo: __sdk::TableAppliedDiff<'r, Photo>,
     photo_tag: __sdk::TableAppliedDiff<'r, PhotoTag>,
+    plan_lookup: __sdk::TableAppliedDiff<'r, PlanLookup>,
     policy_document: __sdk::TableAppliedDiff<'r, PolicyDocument>,
     policy_term: __sdk::TableAppliedDiff<'r, PolicyTerm>,
     property_event: __sdk::TableAppliedDiff<'r, PropertyEvent>,
@@ -5348,6 +5426,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Owner>("my_owner", &self.my_owner, event);
         callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
+        callbacks.invoke_table_row_callbacks::<PlanLookup>(
+            "my_plan_lookups",
+            &self.my_plan_lookups,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
         callbacks.invoke_table_row_callbacks::<MySharedVisit>(
             "my_shared_visits",
@@ -5386,6 +5469,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Photo>("photo", &self.photo, event);
         callbacks.invoke_table_row_callbacks::<PhotoTag>("photo_tag", &self.photo_tag, event);
+        callbacks.invoke_table_row_callbacks::<PlanLookup>("plan_lookup", &self.plan_lookup, event);
         callbacks.invoke_table_row_callbacks::<PolicyDocument>(
             "policy_document",
             &self.policy_document,
@@ -6284,6 +6368,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_merch_suggestions_table::register_table(client_cache);
         my_owner_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
+        my_plan_lookups_table::register_table(client_cache);
         my_roles_table::register_table(client_cache);
         my_shared_visits_table::register_table(client_cache);
         my_visits_table::register_table(client_cache);
@@ -6298,6 +6383,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         person_claim_table::register_table(client_cache);
         photo_table::register_table(client_cache);
         photo_tag_table::register_table(client_cache);
+        plan_lookup_table::register_table(client_cache);
         policy_document_table::register_table(client_cache);
         policy_term_table::register_table(client_cache);
         property_event_table::register_table(client_cache);
@@ -6451,6 +6537,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_merch_suggestions",
         "my_owner",
         "my_photos",
+        "my_plan_lookups",
         "my_roles",
         "my_shared_visits",
         "my_visits",
@@ -6465,6 +6552,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "person_claim",
         "photo",
         "photo_tag",
+        "plan_lookup",
         "policy_document",
         "policy_term",
         "property_event",

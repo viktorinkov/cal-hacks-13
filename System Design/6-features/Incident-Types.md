@@ -19,6 +19,8 @@ Each attendee can have their own policy on file, an `attendee_policy` row: the i
 
 A `theft` or `breakage` claim pays from it: the item's value up to the per-claim limit, less the deductible, which the attendee carries. BandIt pays it into the attendee's wallet and collects it from their insurer.
 
+An attendee who names their renters or home policy instead of uploading it gets the row from a plan lookup, source `plan_lookup`: the insurer and plan its public form prints, and the limit and deductible they typed from their declarations page ([Bright-Data](../7-integrations/Bright-Data.md)). Those numbers are their own word, so a pay on it goes to the organizer.
+
 With no policy on file the claim goes to the organizer with the venue's exclusion of guests' property, and the tap page gives the attendee the incident record for their own insurer.
 
 The crowd of the live run has no documents. Each crowd attendee's policy terms are drawn once from a generator seeded with their identity, so the same attendee always has the same policy.

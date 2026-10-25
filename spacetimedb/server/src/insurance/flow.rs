@@ -672,6 +672,19 @@ fn no_own_policy(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     })
 }
 
+/// A pay on an attendee's own policy that came from a plan lookup goes to the organizer: its limit and
+/// deductible are what the attendee typed, so the organizer checks them against the plan's wording.
+pub(super) fn typed_policy(ctx: &ReducerContext, claim: &Claim, decision: Decision) -> Decision {
+    let typed = cover_of(claim).is_attendee_policy()
+        && ctx.db.attendee_policy().id().find(claim.policy_id).is_some_and(|p| p.source == super::plan_lookup::KIND_PLAN_LOOKUP);
+    match decision {
+        Decision::AutoSettle { .. } if typed => Decision::Route {
+            reason: "the attendee's own policy was found online from its name: its limit and deductible are the attendee's word, so the organizer decides".into(),
+        },
+        d => d,
+    }
+}
+
 /// An active cover of the claim's policy pays this kind of incident, and the
 /// incident falls in the policy period when the confirmed policy states one.
 pub(super) fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
@@ -706,7 +719,7 @@ fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> 
             mass_occurrence: mass_occurrence(ctx, &claim),
         },
     );
-    let decision = with_precedent(ctx, &claim, guarded.decision);
+    let decision = with_precedent(ctx, &claim, typed_policy(ctx, &claim, guarded.decision));
     apply(ctx, claim, decision, guarded.decided_by)
 }
 
@@ -770,7 +783,7 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
         review_required: settings(ctx).review_required,
         rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
     });
-    let decision = with_precedent(ctx, &claim, decision);
+    let decision = with_precedent(ctx, &claim, typed_policy(ctx, &claim, decision));
     let complicated = !claim_complications(ctx, &claim).is_empty();
     if let (Some(reason), false, false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. }), complicated) {
         route(ctx, claim, reason);
