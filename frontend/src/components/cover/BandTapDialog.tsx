@@ -1,18 +1,13 @@
-import { MOCK_BANDS } from '@/mock/bands'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRoute } from '@/cover/route'
 import { formatCents } from '@/cover/money'
-import { useRegistration } from '@/cover/registry'
 import { useSession } from '@/stdb/session'
-import { CoverSlip } from './CoverSlip'
 
 /** A tap reads the medical card the database will release, and this person's wallet. */
 export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: string; bandNumber?: number; onClose: () => void }) {
   const { go } = useRoute()
-  const registration = useRegistration(deviceId)
-  const band = MOCK_BANDS.find((item) => item.deviceId === deviceId)
-  const label = band?.label ?? deviceId.replace(/^band-/, '')
+  const label = deviceId.replace(/^band-/, '')
   const number = bandNumber ?? Number(label)
   const phase = useSession((state) => state.phase)
   const cards = useSession((state) => state.cards)
@@ -59,7 +54,7 @@ export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: str
             <dd>{card.insurer ? `${card.insurer} ${card.plan} · ${card.memberId}` : 'None on the card'}</dd>
           </dl>
         ) : (
-          <CoverSlip registration={registration} bandLabel={label} />
+          <p className="text-[14px] leading-6 text-ink-dim">No card is released for this band.</p>
         )}
         <div className="flex flex-col gap-3">
           {phase === 'live' && number > 0 && (
@@ -78,7 +73,7 @@ export function BandTapDialog({ deviceId, bandNumber, onClose }: { deviceId: str
             <p className="text-[13px] text-ink-dim">The wallet opens once the database is connected.</p>
           )}
           <button type="button" onClick={edit} className="self-start text-[14px] text-ink">
-            {registration ? 'Edit this band' : 'Register this band'}
+            Register this band
           </button>
         </div>
       </DialogContent>

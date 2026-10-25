@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Camera, Video } from 'lucide-react'
+import { fieldClass } from '@/cover/fields'
+import { useCatalog } from '@/stdb/catalog'
+import { upsertCamera, useSession } from '@/stdb/session'
 import { DeskFrame } from './DeskFrame'
 
 const FOOTAGE = [
@@ -150,9 +153,110 @@ export function FootageCamera({ id, name }: { id: string; name: string }) {
   )
 }
 
+/** Ops registers a camera on a zone; the vision service names it when its frames arrive. */
+function AddCamera() {
+  const zones = useCatalog((s) => s.zones)
+  const [name, setName] = useState('')
+  const [zoneId, setZoneId] = useState('')
+  const [mount, setMount] = useState('overhead')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [added, setAdded] = useState('')
+
+  const add = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!name.trim()) { setError('Name the camera.'); return }
+    if (!zoneId) { setError('Pick the zone it covers.'); return }
+    setBusy(true)
+    setError('')
+    try {
+      await upsertCamera(name.trim(), zoneId, mount)
+      setAdded(name.trim())
+      setName('')
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'The camera could not be registered.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={(event) => void add(event)} noValidate className="mt-4 flex flex-wrap items-end gap-4 rounded-[12px] bg-raised px-5 py-4">
+      <div>
+        <label htmlFor="camera-name" className="mb-1.5 block text-[13px] text-ink-dim">Name</label>
+        <input id="camera-name" value={name} onChange={(event) => { setName(event.target.value); setAdded(''); setError('') }} className={fieldClass} placeholder="CAM-03" autoComplete="off" />
+      </div>
+      <div>
+        <label htmlFor="camera-zone" className="mb-1.5 block text-[13px] text-ink-dim">Zone</label>
+        <select id="camera-zone" value={zoneId} onChange={(event) => { setZoneId(event.target.value); setError('') }} className={fieldClass}>
+          <option value="">Choose a zone</option>
+          {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="camera-mount" className="mb-1.5 block text-[13px] text-ink-dim">Mount</label>
+        <select id="camera-mount" value={mount} onChange={(event) => setMount(event.target.value)} className={fieldClass}>
+          <option value="overhead">Overhead</option>
+          <option value="side">Side</option>
+        </select>
+      </div>
+      <button type="submit" disabled={busy} className="rounded-full bg-champagne px-4 py-2 text-[13px] text-black disabled:opacity-50">
+        {busy ? 'Registering…' : 'Register camera'}
+      </button>
+      {error && <p role="alert" className="w-full text-[13px] text-signal">{error}</p>}
+      {added && <p role="status" className="w-full text-[13px] text-ink-dim">{added} is registered. It shows as live when its frames arrive.</p>}
+    </form>
+  )
+}
+
+/** The venue's registered cameras, from the camera table. */
+function VenueCameras() {
+  const cameras = useCatalog((s) => s.cameras)
+  const zones = useCatalog((s) => s.zones)
+  const roles = useSession((s) => s.roles)
+  const owner = useSession((s) => s.owner)
+  const connected = useSession((s) => s.phase === 'live')
+  const canAdd = connected && (owner || roles.includes('ops') || roles.includes('vision'))
+
+  if (!connected) {
+    return <p className="text-[14px] leading-6 text-ink-dim">Connect to see the venue’s cameras.</p>
+  }
+  return (
+    <>
+      {cameras.length === 0 ? (
+        <p className="text-[14px] leading-6 text-ink-dim">No cameras are registered for this venue.</p>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {cameras.map((camera) => (
+            <li key={camera.id} className="rounded-[12px] bg-raised px-5 py-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-[15px] text-ink">{camera.name}</h3>
+                <span className="rounded-full bg-ground px-2.5 py-0.5 text-[12px] text-ink">
+                  {camera.live ? 'Live' : 'Off'}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[13px] text-ink-dim">
+                {[camera.zoneName || 'Unzoned', camera.mount].filter(Boolean).join(' · ')}
+              </p>
+              <p className="mt-1 text-[12px] text-ink-muted">
+                {camera.lastFrameAt ? `Last frame ${new Date(camera.lastFrameAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'No frames yet'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {canAdd && zones.length > 0 && <AddCamera />}
+    </>
+  )
+}
+
 export function CamerasPage() {
   return (
-    <DeskFrame motif="cameras" title="Live cameras" sentence="A live view from this laptop, with venue recordings alongside it.">
+    <DeskFrame motif="cameras" title="Cameras" sentence="The venue’s cameras, this laptop, and labeled recordings.">
+      <section aria-label="Venue cameras" className="mb-6">
+        <h2 className="mb-3 text-[15px] text-ink-dim">Venue cameras</h2>
+        <VenueCameras />
+      </section>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         <LaptopCamera />
         {FOOTAGE.map((camera) => <FootageCamera key={camera.id} {...camera} />)}

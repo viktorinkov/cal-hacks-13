@@ -78,11 +78,9 @@ afterEach(() => {
 })
 
 describe('command center', () => {
-  it('starts quiet and labels the crowd as simulated', async () => {
+  it('starts quiet', async () => {
     await boot()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')
-    expect(screen.getByText(/people on site \(simulated\)/)).toBeInTheDocument()
-    expect(screen.getAllByText('Simulation').length).toBeGreaterThan(0)
   })
 
   it('an SOS creates an incident, opens it and focuses the map on it', async () => {
@@ -180,7 +178,7 @@ describe('command center', () => {
     expect(within(dialog).getByLabelText(/False alarm/)).toBeChecked()
     await user.click(within(dialog).getByRole('button', { name: /Resolve INC-/ }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Resolved.'))
-    await user.click(screen.getByRole('button', { name: 'Reset the simulation' }))
+    await act(async () => adapter.resetSimulation())
     await waitFor(() => expect(Object.keys(useWorld.getState().incidents)).toHaveLength(0))
     expect(useWorld.getState().scenario?.step).toBe('normal')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('All quiet.')

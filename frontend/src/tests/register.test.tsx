@@ -70,22 +70,17 @@ function renderRegistration() {
   return render(<RouteProvider><RegisterPage /></RouteProvider>)
 }
 
-async function fillPersonAndPayment(user: ReturnType<typeof userEvent.setup>) {
+async function fillPersonAndShipping(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Name', { exact: true }), 'Alex Guest')
-  await user.type(screen.getByLabelText('Email', { exact: true }), 'alex@example.test')
-  await user.type(screen.getByLabelText('Emergency contact', { exact: true }), 'Sam Guest')
-  await user.type(screen.getByLabelText('Emergency phone', { exact: true }), '415-555-0123')
   await user.type(screen.getByLabelText('Street', { exact: true }), '1 Market St')
   await user.type(screen.getByLabelText('City', { exact: true }), 'San Francisco')
   await user.type(screen.getByLabelText('State', { exact: true }), 'CA')
   await user.type(screen.getByLabelText('ZIP', { exact: true }), '94107')
-  await user.type(screen.getByLabelText('Last four', { exact: true }), '4242')
-  await user.type(screen.getByLabelText('Expiry', { exact: true }), '12/28')
 }
 
 describe('band signup', () => {
-  it.each(['/register', '/register?band=', '/register?band=band-999'])(
-    'requires a known NFC band for %s',
+  it.each(['/register', '/register?band='])(
+    'requires a band for %s',
     (path) => {
       window.history.replaceState(null, '', path)
       renderRegistration()
@@ -97,15 +92,23 @@ describe('band signup', () => {
     },
   )
 
-  it('shows the tapped band without a selector or demo identity prefill', () => {
+  it('passes a band the tag names through to the host, which decides whether it exists', async () => {
+    window.history.replaceState(null, '', '/register?band=band-999')
+    renderRegistration()
+
+    expect(screen.getByText(/You’re on band 999/)).toBeInTheDocument()
+    await waitFor(() => expect(claimBand).toHaveBeenCalledExactlyOnceWith('BANDIT-999'))
+  })
+
+  it('shows the tapped band without a selector or identity prefill', () => {
     renderRegistration()
 
     expect(screen.getByText(/You’re on band 05/)).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Band' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Name', { exact: true })).toHaveValue('')
-    expect(screen.getByLabelText('Email', { exact: true })).toHaveValue('')
-    expect(screen.queryByLabelText('Blood type', { exact: true })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Member id', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Email', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Emergency contact', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Last four', { exact: true })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: /findable|discovery|find me/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('switch', { name: /findable|discovery|find me/i })).not.toBeInTheDocument()
     expect(claimBand).not.toHaveBeenCalled()
@@ -119,11 +122,10 @@ describe('band signup', () => {
   })
 
   it('prefills typed details from an actual save for this band', () => {
-    saveRegistration({ ...blankRegistration('band-05'), name: 'Returning guest', email: 'returning@example.test' })
+    saveRegistration({ ...blankRegistration('band-05'), name: 'Returning guest' })
     renderRegistration()
 
     expect(screen.getByLabelText('Name', { exact: true })).toHaveValue('Returning guest')
-    expect(screen.getByLabelText('Email', { exact: true })).toHaveValue('returning@example.test')
     expect(claimBand).not.toHaveBeenCalled()
   })
 
@@ -255,18 +257,19 @@ describe('band signup', () => {
     expect(confirmMedicalCard).toHaveBeenCalledOnce()
   })
 
-  it('saves typed details and shows the confirmed medical card on the completed slip', async () => {
+  it('saves typed details and shows the completed slip', async () => {
     useSession.setState({ medicalCard: { ...extractedCard, status: 'confirmed' } })
     const user = userEvent.setup()
     renderRegistration()
-    await fillPersonAndPayment(user)
+    await fillPersonAndShipping(user)
     await user.click(screen.getByRole('button', { name: 'Save this band' }))
 
     expect(await screen.findByRole('heading', { name: 'Saved on band 05.' })).toBeInTheDocument()
     expect(registerBand).toHaveBeenCalledExactlyOnceWith('BANDIT-05', 'Alex Guest')
-    expect(screen.getByText('MEMBER-123')).toBeInTheDocument()
+    expect(screen.getByText(/Alex Guest/)).toBeInTheDocument()
+    expect(screen.queryByText('MEMBER-123')).not.toBeInTheDocument()
     expect(getSavedRegistration('band-05')).toMatchObject({
-      name: 'Alex Guest', last4: '4242', memberId: '',
+      name: 'Alex Guest',
       street: '1 Market St', city: 'San Francisco', region: 'CA', postalCode: '94107', country: 'United States',
     })
   })
@@ -282,7 +285,6 @@ describe('band signup', () => {
     expect(screen.getByLabelText('Name', { exact: true })).toHaveAccessibleDescription('Name the person wearing it.')
     expect(screen.getByLabelText('Street', { exact: true })).toHaveAccessibleDescription('Give a street address.')
     expect(screen.getByLabelText('ZIP', { exact: true })).toHaveAccessibleDescription('Use a ZIP code, like 94107.')
-    expect(screen.getByLabelText('Last four', { exact: true })).toHaveAccessibleDescription('Last four is four digits.')
     expect(registerBand).not.toHaveBeenCalled()
     expect(getSavedRegistration('band-05')).toBeNull()
   })

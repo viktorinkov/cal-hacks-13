@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
+import { Check, CheckCheck, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
 import { LeaveEvent } from '@/components/attendee/LeaveEvent'
 import { MedicTap } from '@/components/attendee/MedicTap'
 import { PlanLookup } from '@/components/attendee/PlanLookup'
@@ -8,7 +8,7 @@ import { Socials } from '@/components/attendee/Socials'
 import { CoverSlip } from '@/components/cover/CoverSlip'
 import { Recap } from '@/components/recap/Recap'
 import { Button } from '@/components/ui/button'
-import { MOCK_BANDS, type MockBand } from '@/mock/bands'
+import { bandFromCode } from '@/lib/bandCode'
 import { blankRegistration, getSavedRegistration, saveRegistration, type Registration } from '@/cover/registry'
 import { useRoute } from '@/cover/route'
 import { bandIdFromSearch, rememberBand } from '@/cover/tapLink'
@@ -22,11 +22,33 @@ import { ConcertLights } from './ConcertLights'
 import './RegisterPage.css'
 
 const fieldClass = 'signup-input'
-const BRANDS = ['Visa', 'Mastercard', 'Amex']
 
-function bandFromLocation(search: string) {
-  const id = new URLSearchParams(search).get('band')
-  return MOCK_BANDS.find((band) => band.deviceId === id) ?? null
+export interface TagBand {
+  /** The device id the desk's panels use, `band-07`, or the raw tag code. */
+  deviceId: string
+  /** Shown to the wearer: `07` for numbered bands, the code itself otherwise. */
+  label: string
+  /** The claim token exactly as the tag carries it. */
+  token: string
+  /** The band's number when the code is a `BANDIT-NN` tag. */
+  number: number | null
+}
+
+function bandFromLocation(search: string): TagBand | null {
+  const id = new URLSearchParams(search).get('band')?.trim()
+  if (!id) return null
+  const legacy = /^band-(\d{1,3})$/i.exec(id)
+  if (legacy) {
+    const number = Number(legacy[1])
+    return { deviceId: `band-${String(number).padStart(2, '0')}`, label: String(number).padStart(2, '0'), token: `BANDIT-${String(number).padStart(2, '0')}`, number }
+  }
+  const number = bandFromCode(id)
+  return {
+    deviceId: number ? `band-${String(number).padStart(2, '0')}` : id,
+    label: number ? String(number).padStart(2, '0') : id,
+    token: id.toUpperCase(),
+    number: number || null,
+  }
 }
 
 function NightHeader({ lights, onToggleLights }: { lights: boolean; onToggleLights: () => void }) {
@@ -49,17 +71,11 @@ function NightHeader({ lights, onToggleLights }: { lights: boolean; onToggleLigh
 function errorsFor(draft: Registration): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!draft.name.trim()) errors.name = 'Name the person wearing it.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) errors.email = 'Use an email address.'
-  if (!draft.emergencyName.trim()) errors.emergencyName = 'Name someone to call.'
-  if (!draft.emergencyPhone.trim()) errors.emergencyPhone = 'Give a phone number.'
   if (!draft.street.trim()) errors.street = 'Give a street address.'
   if (!draft.city.trim()) errors.city = 'Name the city.'
   if (!draft.region.trim()) errors.region = 'Name the state.'
   if (!/^\d{5}(?:-\d{4})?$/.test(draft.postalCode.trim())) errors.postalCode = 'Use a ZIP code, like 94107.'
   if (!draft.country.trim()) errors.country = 'Name the country.'
-  if (!BRANDS.includes(draft.cardBrand)) errors.cardBrand = 'Choose a card brand.'
-  if (!/^\d{4}$/.test(draft.last4.trim())) errors.last4 = 'Last four is four digits.'
-  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(draft.exp.trim())) errors.exp = 'Use MM/YY, like 09/28.'
   return errors
 }
 
@@ -148,15 +164,7 @@ export function MedicalReview({ card, confirming, blocked, onConfirm }: { card: 
   )
 }
 
-function withMedicalCard(registration: Registration, card: MedicalCardView | null): Registration {
-  if (!card) return registration
-  return { ...registration, bloodType: card.bloodType, allergies: card.allergies, conditions: card.conditions,
-    medications: card.medications, carrier: card.insurer, memberId: card.memberId, groupId: card.groupNumber,
-    emergencyName: registration.emergencyName || card.emergencyContact,
-    emergencyPhone: registration.emergencyPhone }
-}
-
-function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'> }) {
+function RegistrationForm({ band }: { band: TagBand }) {
   const { go } = useRoute()
   const session = useSession()
   const attendee = useAttendee((s) => s.attendee)
@@ -175,7 +183,7 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
   const attemptedClaim = useRef(false)
   // A medic tapping someone else's band must never claim it.
   const isMedic = useIsMedic()
-  const mine = myBand?.bandId === Number(band.label) ? myBand : null
+  const mine = myBand?.bandId != null && (band.number == null || myBand.bandId === band.number) ? myBand : null
   const owned = mine?.status === 'claimed'
   const connected = session.phase === 'live'
   const linked = connected && !claimError
@@ -193,8 +201,8 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
   useEffect(() => {
     if (isViewing() || over || !connected || !myBandReady || attemptedClaim.current || owned || isMedic) return
     attemptedClaim.current = true
-    void claimBand(`BANDIT-${band.label}`).catch((error: unknown) => setClaimError(reason(error)))
-  }, [over, connected, myBandReady, claimBand, band.label, owned, isMedic])
+    void claimBand(band.token).catch((error: unknown) => setClaimError(reason(error)))
+  }, [over, connected, myBandReady, claimBand, band.token, owned, isMedic])
 
   useEffect(() => {
     if (!saved) return
@@ -252,10 +260,9 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
-    const next = { ...draft, bandId: band.deviceId, name: draft.name.trim(), email: draft.email.trim(),
-      emergencyName: draft.emergencyName.trim(), emergencyPhone: draft.emergencyPhone.trim(),
+    const next = { ...draft, bandId: band.deviceId, name: draft.name.trim(),
       street: draft.street.trim(), unit: draft.unit.trim(), city: draft.city.trim(), region: draft.region.trim(),
-      postalCode: draft.postalCode.trim(), country: draft.country.trim(), last4: draft.last4.trim(), exp: draft.exp.trim() }
+      postalCode: draft.postalCode.trim(), country: draft.country.trim() }
     const found = errorsFor(next)
     if (claimError) found.form = claimError
     else if (!connected) found.form = 'Connecting to your band…'
@@ -264,7 +271,7 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
     if (Object.keys(found).length) return
     setSaving(true)
     try {
-      await session.registerBand(`BANDIT-${band.label}`, next.name)
+      await session.registerBand(band.token, next.name)
       saveRegistration(next)
       setDraft(next)
       setSaved(next)
@@ -288,7 +295,7 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
           <button type="button" onClick={() => go('/claims')} className="min-h-11 text-[14px]">Claims desk</button>
         </div>
       </div>
-      <CoverSlip registration={withMedicalCard(saved, session.medicalCardReady ? medicalCard : null)} bandLabel={band.label} />
+      <CoverSlip registration={saved} bandLabel={band.label} />
     </div>
   )
 
@@ -311,18 +318,15 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
         </div>
         <div className="signup-preview" role="group" aria-label="Band details preview">
           <p>{draft.name.trim() || 'Your name goes here'}</p>
-          <span><CreditCard size={15} aria-hidden="true" />{ /^\d{4}$/.test(draft.last4) ? `${draft.cardBrand} ···· ${draft.last4} · Demo` : 'No demo card added'}</span>
+          <span><ShieldCheck size={15} aria-hidden="true" />{confirmed ? 'Medical card confirmed' : 'Medical card to review'}</span>
         </div>
       </div>
 
       <form onSubmit={(event) => void save(event)} noValidate className="signup-form" aria-label={`Register band ${band.label}`}>
         {(errors.form || session.signupError || session.error || claimError) && <p role="alert" className="rounded border border-signal/30 bg-signal/5 p-4 text-[14px] leading-6 text-signal">{errors.form || claimError || session.signupError || session.error}</p>}
-        <Step sectionId="your-details" title="Your details" note="The person wearing the band, and someone to call.">
+        <Step sectionId="your-details" title="Your details" note="The person wearing the band.">
           <div className="grid gap-5 sm:grid-cols-2">
             <Field id="name" label="Name" value={isViewing() ? (attendee?.displayName ?? '') : draft.name} onChange={set('name')} error={errors.name} autoComplete="name" />
-            <Field id="email" label="Email" type="email" value={draft.email} onChange={set('email')} error={errors.email} autoComplete="email" inputMode="email" />
-            <Field id="emergency-name" label="Emergency contact" value={draft.emergencyName} onChange={set('emergencyName')} error={errors.emergencyName} autoComplete="section-emergency name" />
-            <Field id="emergency-phone" label="Emergency phone" type="tel" value={draft.emergencyPhone} onChange={set('emergencyPhone')} error={errors.emergencyPhone} autoComplete="section-emergency tel" inputMode="tel" />
           </div>
         </Step>
         <Step sectionId="socials" title="Socials" note="People you spend time with can see these after the event."><Socials bare /></Step>
@@ -370,19 +374,7 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
           {!session.medicalCardReady || !session.medicalDocumentsReady || outstanding ? <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-dim"><LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Still reading your documents.</p> : !medicalCard ? <p className="text-[14px] leading-6 text-ink-dim">Your medical and insurance details will appear here after you upload your documents.</p> : null}
           {session.medicalCardReady && medicalCard && <MedicalReview card={medicalCard} confirming={confirming} blocked={reviewBlocked} onConfirm={() => void confirm()} />}
         </Step>
-        <Step sectionId="payment" title="Payment" note="Mock payment details for this demo.">
-          <div className="signup-payment-fields">
-            <div>
-              <label htmlFor="brand" className="mb-2 block text-[14px] font-medium">Card</label>
-              <select id="brand" value={draft.cardBrand} onChange={(event) => set('cardBrand')(event.target.value)} className={fieldClass} aria-invalid={errors.cardBrand ? true : undefined} aria-describedby={errors.cardBrand ? 'brand-error' : undefined}>
-                {BRANDS.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
-              </select>
-              {errors.cardBrand && <p id="brand-error" className="mt-2 text-[13px] text-signal">{errors.cardBrand}</p>}
-            </div>
-            <Field id="last4" label="Last four" value={draft.last4} onChange={set('last4')} error={errors.last4} inputMode="numeric" autoComplete="off" maxLength={4} />
-            <Field id="exp" label="Expiry" value={draft.exp} onChange={set('exp')} error={errors.exp} autoComplete="off" maxLength={5} />
-          </div>
-          <p className="mt-3 text-[13px] leading-5 text-ink-dim">Last four only. The full number never lands here.</p>
+        <Step sectionId="payment" title="Payment" note="Your wallet opens with your band.">
           <WalletStatus />
           <Button type="submit" className="signup-primary signup-save mt-6" disabled={saving || !linked || !confirmed}>{saving ? 'Saving…' : 'Save this band'}</Button>
           {!confirmed && <p className="mt-3 text-[13px] leading-5 text-ink-dim">Review your medical card to finish.</p>}
@@ -402,8 +394,10 @@ function WalletStatus() {
 export function RegisterPage({ viewBandId }: { viewBandId?: number } = {}) {
   const [lights, setLights] = useState(true)
   const { search } = useRoute()
-  const band = viewBandId != null && isViewing() ? { deviceId: `band-${viewBandId}`, label: String(viewBandId) } : bandFromLocation(search)
-  const medic = useMedicOnBand(band ? Number(band.label) : null)
+  const band = viewBandId != null && isViewing()
+    ? { deviceId: `band-${viewBandId}`, label: String(viewBandId), token: `BANDIT-${String(viewBandId).padStart(2, '0')}`, number: viewBandId }
+    : bandFromLocation(search)
+  const medic = useMedicOnBand(band ? band.number : null)
   const fromLink = bandIdFromSearch(search)
   useEffect(() => {
     if (!isViewing() && fromLink != null) rememberBand(fromLink)
@@ -416,7 +410,7 @@ export function RegisterPage({ viewBandId }: { viewBandId?: number } = {}) {
       <p className="mt-5 text-[16px] leading-7 text-ink-dim">Checking whether the night has ended.</p>
     </div>
   ) : over ? <main className="wallet-main"><Recap showWalletLink /></main>
-    : band && medic.show ? <main className="signup-main"><MedicTap bandId={Number(band.label)} /></main>
+    : band && medic.show && band.number != null ? <main className="signup-main"><MedicTap bandId={band.number} /></main>
     : band ? <RegistrationForm key={band.deviceId} band={band} /> : (
       <div className="signup-tap">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>

@@ -46,7 +46,8 @@ describe('the payments desk', () => {
     renderDesk()
     const payments = deskPayments(FIXTURE_DESK)
     const paid = applyFilter(payments, 'paid').reduce((sum, payment) => sum + payment.amountCents, 0)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`${formatCents(paid)} through the bands tonight.`)
+    expect(screen.getByText('Through the bands')).toBeInTheDocument()
+    expect(screen.getByText(formatCents(paid))).toBeInTheDocument()
     const filters = within(screen.getByRole('group', { name: 'Filter by status' })).getAllByRole('button')
     const counts = filters.map((button) => Number(button.textContent?.match(/(\d+)$/)?.[1]))
     expect(counts.slice(1).reduce((sum, count) => sum + count, 0)).toBe(counts[0])
@@ -110,7 +111,6 @@ describe('the payments desk', () => {
   it('says when this sign-in can’t see payments', () => {
     seedSession([], { staffRequested: false })
     renderDesk()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Payments are staff only.')
     expect(screen.getAllByText(/This sign-in can’t see payments/).length).toBeGreaterThan(0)
   })
 
@@ -119,14 +119,14 @@ describe('the payments desk', () => {
     usePayments.setState({ desk: EMPTY_DESK })
     renderDesk()
     expect(screen.queryByText('$0.00')).toBeNull()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tonight’s payments are on their way.')
+    expect(screen.getAllByText('Loading payments…').length).toBeGreaterThan(0)
   })
 
   it('labels every figure as sample data in fixture mode', () => {
     usePayments.setState({ desk: EMPTY_DESK })
     renderDesk('/payments?fixture=payments')
     expect(screen.getAllByText('sim').length).toBeGreaterThanOrEqual(4)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('through the bands tonight.')
+    expect(screen.getByText('Through the bands')).toBeInTheDocument()
   })
 
   it('takes no card number', async () => {
@@ -142,10 +142,10 @@ describe('the payments desk', () => {
 })
 
 describe('the desk tabs', () => {
-  it('list Payments second, right after Map', () => {
+  it('list Payments after Settlements and Proposed rules', () => {
     render(<RouteProvider><DeskTabs /></RouteProvider>)
     const tabs = within(screen.getByRole('navigation', { name: 'Desk' })).getAllByRole('button').map((button) => button.textContent)
-    expect(tabs.slice(0, 2)).toEqual(['Map', 'Payments'])
+    expect(tabs.slice(0, 5)).toEqual(['Live', 'Attendees', 'Settlements', 'Proposed rules', 'Payments'])
   })
 })
 
