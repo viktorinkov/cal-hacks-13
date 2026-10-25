@@ -968,6 +968,13 @@ export const Link = __t.object("Link", {
 });
 export type Link = __Infer<typeof Link>;
 
+export const LiveEvacuation = __t.object("LiveEvacuation", {
+  id: __t.u8(),
+  startedAt: __t.timestamp(),
+  startedBy: __t.identity(),
+});
+export type LiveEvacuation = __Infer<typeof LiveEvacuation>;
+
 export const LivePause = __t.object("LivePause", {
   id: __t.u8(),
   pausedAt: __t.timestamp(),

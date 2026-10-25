@@ -12,7 +12,7 @@
 //!   check-in, photographers go wherever the people are, and the event's speakers keep to the stage.
 //! - Teams walk from spot to spot along the venue floor's aisles, one behind the other, at walking speed
 //!   (`walks.rs`), and stay a while where they arrive. In a live run they walk in through the doors when the
-//!   doors open and out through the nearest door when they close.
+//!   doors open and out through the nearest door when they close or the venue is evacuated.
 //! - Teammates at the same spot are close on every tick. Strangers at the same spot sometimes start talking
 //!   and stay close until one of them moves on; everyone working the event talks to people more often.
 //! - One `crowd_tick` every 2 s sends the teams that are due on their way, puts every walker at their place
@@ -911,6 +911,31 @@ pub fn head_for_exits(ctx: &ReducerContext) {
             .collect();
         let at = ctx.timestamp + TimeDuration::from_micros((rng.gen_range(0.0..WALK_OUT_SECS) * 1e6) as i64);
         venue.walk_team(ctx, (g.x_m, g.y_m), &to, &starts, at, pace);
+    }
+}
+
+/// An evacuation is called off: every team walks back in from where it stands, over the first seconds, to its
+/// home spot, and carries on from there. Whoever is down or left early stays as they are.
+pub fn walk_back_in(ctx: &ReducerContext) {
+    let venue = Venue::load(ctx);
+    let pace = walk_pace(ctx);
+    let mut rng = moves_rng(ctx, u64::MAX - 2);
+    let (groups, members) = teams(ctx);
+    let down: Vec<u32> = crate::live::down_bands(ctx).iter().map(|d| d.band_id).collect();
+    let gone: HashSet<u32> = ctx.db.departure().iter().map(|d| d.band_id).collect();
+    for g in groups {
+        let to = CrowdGroup { station: g.home_station, booth_id: g.staff_booth, x_m: g.home_x_m, y_m: g.home_y_m, ..g.clone() };
+        let starts: Vec<(&CrowdMember, P)> = members
+            .get(&g.id)
+            .into_iter()
+            .flatten()
+            .filter(|m| !down.contains(&m.band_id) && !gone.contains(&m.band_id))
+            .map(|m| (m, standing(ctx, m).unwrap_or_else(|| venue.place(&g, m))))
+            .collect();
+        let at = ctx.timestamp + TimeDuration::from_micros((rng.gen_range(0.0..WALK_IN_SECS) * 1e6) as i64);
+        let (_, arrive) = venue.walk_team(ctx, (g.x_m, g.y_m), &to, &starts, at, pace);
+        let next_move_at = arrive.max(at) + dwell(&mut rng, 0.5, 2.0, crate::live::pace(ctx));
+        ctx.db.crowd_group().id().update(CrowdGroup { next_move_at, ..to });
     }
 }
 
