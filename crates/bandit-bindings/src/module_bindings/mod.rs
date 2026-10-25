@@ -42,6 +42,8 @@ pub mod board_lines_table;
 pub mod board_medical_access_table;
 pub mod board_merch_order_type;
 pub mod board_merch_orders_table;
+pub mod board_merch_pick_type;
+pub mod board_merch_picks_table;
 pub mod board_notes_table;
 pub mod board_photo_type;
 pub mod board_photos_table;
@@ -178,6 +180,9 @@ pub mod medical_record_table;
 pub mod medical_record_type;
 pub mod merch_order_table;
 pub mod merch_order_type;
+pub mod merch_pick_in_type;
+pub mod merch_pick_table;
+pub mod merch_pick_type;
 pub mod merch_shop_table;
 pub mod merch_shop_type;
 pub mod merch_suggestion_type;
@@ -254,6 +259,7 @@ pub mod report_test_band_reducer;
 pub mod report_venue_setup_step_reducer;
 pub mod request_medical_card_reducer;
 pub mod request_recovery_letter_reducer;
+pub mod rerun_shopping_agent_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
 pub mod retry_claim_payout_reducer;
@@ -308,6 +314,8 @@ pub mod submit_claim_checks_reducer;
 pub mod submit_claim_review_reducer;
 pub mod submit_medical_document_reducer;
 pub mod submit_medical_record_reducer;
+pub mod submit_merch_picks_reducer;
+pub mod submit_photo_features_reducer;
 pub mod submit_vision_assessment_reducer;
 pub mod sweep_reducer;
 pub mod sweep_timer_table;
@@ -375,6 +383,8 @@ pub use board_lines_table::*;
 pub use board_medical_access_table::*;
 pub use board_merch_order_type::BoardMerchOrder;
 pub use board_merch_orders_table::*;
+pub use board_merch_pick_type::BoardMerchPick;
+pub use board_merch_picks_table::*;
 pub use board_notes_table::*;
 pub use board_photo_type::BoardPhoto;
 pub use board_photos_table::*;
@@ -511,6 +521,9 @@ pub use medical_record_table::*;
 pub use medical_record_type::MedicalRecord;
 pub use merch_order_table::*;
 pub use merch_order_type::MerchOrder;
+pub use merch_pick_in_type::MerchPickIn;
+pub use merch_pick_table::*;
+pub use merch_pick_type::MerchPick;
 pub use merch_shop_table::*;
 pub use merch_shop_type::MerchShop;
 pub use merch_suggestion_type::MerchSuggestion;
@@ -587,6 +600,7 @@ pub use report_test_band_reducer::report_test_band;
 pub use report_venue_setup_step_reducer::report_venue_setup_step;
 pub use request_medical_card_reducer::request_medical_card;
 pub use request_recovery_letter_reducer::request_recovery_letter;
+pub use rerun_shopping_agent_reducer::rerun_shopping_agent;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
 pub use retry_claim_payout_reducer::retry_claim_payout;
@@ -641,6 +655,8 @@ pub use submit_claim_checks_reducer::submit_claim_checks;
 pub use submit_claim_review_reducer::submit_claim_review;
 pub use submit_medical_document_reducer::submit_medical_document;
 pub use submit_medical_record_reducer::submit_medical_record;
+pub use submit_merch_picks_reducer::submit_merch_picks;
+pub use submit_photo_features_reducer::submit_photo_features;
 pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use sweep_reducer::sweep;
 pub use sweep_timer_table::*;
@@ -901,6 +917,7 @@ pub enum Reducer {
         counterparty_name: String,
         counterparty_contact: String,
     },
+    RerunShoppingAgent,
     ResetBridge,
     ResolveIncident {
         incident_id: u64,
@@ -1001,6 +1018,17 @@ pub enum Reducer {
         claim_id: u64,
         file_hash: String,
         page_count: u32,
+    },
+    SubmitMerchPicks {
+        job_id: u64,
+        picks: Vec<MerchPickIn>,
+        call: ModelCallIn,
+    },
+    SubmitPhotoFeatures {
+        job_id: u64,
+        people_count: u32,
+        caption: String,
+        call: ModelCallIn,
     },
     SubmitVisionAssessment {
         incident_id: u64,
@@ -1111,6 +1139,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReportVenueSetupStep { .. } => "report_venue_setup_step",
             Reducer::RequestMedicalCard { .. } => "request_medical_card",
             Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
+            Reducer::RerunShoppingAgent => "rerun_shopping_agent",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
@@ -1138,6 +1167,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitClaimReview { .. } => "submit_claim_review",
             Reducer::SubmitMedicalDocument { .. } => "submit_medical_document",
             Reducer::SubmitMedicalRecord { .. } => "submit_medical_record",
+            Reducer::SubmitMerchPicks { .. } => "submit_merch_picks",
+            Reducer::SubmitPhotoFeatures { .. } => "submit_photo_features",
             Reducer::SubmitVisionAssessment { .. } => "submit_vision_assessment",
             Reducer::Sweep { .. } => "sweep",
             Reducer::UpdateProfile { .. } => "update_profile",
@@ -1546,6 +1577,9 @@ impl __sdk::Reducer for Reducer {
                     counterparty_contact: counterparty_contact.clone(),
                 },
             ),
+            Reducer::RerunShoppingAgent => {
+                __sats::bsatn::to_vec(&rerun_shopping_agent_reducer::RerunShoppingAgentArgs {})
+            }
             Reducer::ResetBridge => {
                 __sats::bsatn::to_vec(&reset_bridge_reducer::ResetBridgeArgs {})
             }
@@ -1718,6 +1752,26 @@ impl __sdk::Reducer for Reducer {
                 file_hash: file_hash.clone(),
                 page_count: page_count.clone(),
             }),
+            Reducer::SubmitMerchPicks {
+                job_id,
+                picks,
+                call,
+            } => __sats::bsatn::to_vec(&submit_merch_picks_reducer::SubmitMerchPicksArgs {
+                job_id: job_id.clone(),
+                picks: picks.clone(),
+                call: call.clone(),
+            }),
+            Reducer::SubmitPhotoFeatures {
+                job_id,
+                people_count,
+                caption,
+                call,
+            } => __sats::bsatn::to_vec(&submit_photo_features_reducer::SubmitPhotoFeaturesArgs {
+                job_id: job_id.clone(),
+                people_count: people_count.clone(),
+                caption: caption.clone(),
+                call: call.clone(),
+            }),
             Reducer::SubmitVisionAssessment {
                 incident_id,
                 trigger,
@@ -1829,6 +1883,7 @@ pub struct DbUpdate {
     board_lines: __sdk::TableUpdate<ClaimLine>,
     board_medical_access: __sdk::TableUpdate<MedicalAccessLog>,
     board_merch_orders: __sdk::TableUpdate<BoardMerchOrder>,
+    board_merch_picks: __sdk::TableUpdate<BoardMerchPick>,
     board_notes: __sdk::TableUpdate<IncidentNote>,
     board_photos: __sdk::TableUpdate<BoardPhoto>,
     board_policies: __sdk::TableUpdate<InsurancePolicy>,
@@ -1884,6 +1939,7 @@ pub struct DbUpdate {
     medical_document: __sdk::TableUpdate<MedicalDocument>,
     medical_record: __sdk::TableUpdate<MedicalRecord>,
     merch_order: __sdk::TableUpdate<MerchOrder>,
+    merch_pick: __sdk::TableUpdate<MerchPick>,
     merch_shop: __sdk::TableUpdate<MerchShop>,
     merch_template: __sdk::TableUpdate<MerchTemplate>,
     model_call: __sdk::TableUpdate<ModelCall>,
@@ -2000,6 +2056,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_merch_orders" => db_update
                     .board_merch_orders
                     .append(board_merch_orders_table::parse_table_update(table_update)?),
+                "board_merch_picks" => db_update
+                    .board_merch_picks
+                    .append(board_merch_picks_table::parse_table_update(table_update)?),
                 "board_notes" => db_update
                     .board_notes
                     .append(board_notes_table::parse_table_update(table_update)?),
@@ -2165,6 +2224,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "merch_order" => db_update
                     .merch_order
                     .append(merch_order_table::parse_table_update(table_update)?),
+                "merch_pick" => db_update
+                    .merch_pick
+                    .append(merch_pick_table::parse_table_update(table_update)?),
                 "merch_shop" => db_update
                     .merch_shop
                     .append(merch_shop_table::parse_table_update(table_update)?),
@@ -2506,6 +2568,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.merch_order = cache
             .apply_diff_to_table::<MerchOrder>("merch_order", &self.merch_order)
             .with_updates_by_pk(|row| &row.id);
+        diff.merch_pick = cache
+            .apply_diff_to_table::<MerchPick>("merch_pick", &self.merch_pick)
+            .with_updates_by_pk(|row| &row.id);
         diff.merch_shop = cache
             .apply_diff_to_table::<MerchShop>("merch_shop", &self.merch_shop)
             .with_updates_by_pk(|row| &row.id);
@@ -2612,6 +2677,8 @@ impl __sdk::DbUpdate for DbUpdate {
         );
         diff.board_merch_orders = cache
             .apply_diff_to_table::<BoardMerchOrder>("board_merch_orders", &self.board_merch_orders);
+        diff.board_merch_picks = cache
+            .apply_diff_to_table::<BoardMerchPick>("board_merch_picks", &self.board_merch_picks);
         diff.board_notes =
             cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
         diff.board_photos =
@@ -2750,6 +2817,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_merch_orders" => db_update
                     .board_merch_orders
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_merch_picks" => db_update
+                    .board_merch_picks
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
@@ -2915,6 +2985,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "merch_order" => db_update
                     .merch_order
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "merch_pick" => db_update
+                    .merch_pick
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "merch_shop" => db_update
                     .merch_shop
@@ -3151,6 +3224,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_merch_orders" => db_update
                     .board_merch_orders
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_merch_picks" => db_update
+                    .board_merch_picks
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3315,6 +3391,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "merch_order" => db_update
                     .merch_order
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "merch_pick" => db_update
+                    .merch_pick
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "merch_shop" => db_update
                     .merch_shop
@@ -3519,6 +3598,7 @@ pub struct AppliedDiff<'r> {
     board_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
     board_medical_access: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
     board_merch_orders: __sdk::TableAppliedDiff<'r, BoardMerchOrder>,
+    board_merch_picks: __sdk::TableAppliedDiff<'r, BoardMerchPick>,
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
     board_photos: __sdk::TableAppliedDiff<'r, BoardPhoto>,
     board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
@@ -3574,6 +3654,7 @@ pub struct AppliedDiff<'r> {
     medical_document: __sdk::TableAppliedDiff<'r, MedicalDocument>,
     medical_record: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     merch_order: __sdk::TableAppliedDiff<'r, MerchOrder>,
+    merch_pick: __sdk::TableAppliedDiff<'r, MerchPick>,
     merch_shop: __sdk::TableAppliedDiff<'r, MerchShop>,
     merch_template: __sdk::TableAppliedDiff<'r, MerchTemplate>,
     model_call: __sdk::TableAppliedDiff<'r, ModelCall>,
@@ -3695,6 +3776,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<BoardMerchOrder>(
             "board_merch_orders",
             &self.board_merch_orders,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<BoardMerchPick>(
+            "board_merch_picks",
+            &self.board_merch_picks,
             event,
         );
         callbacks.invoke_table_row_callbacks::<IncidentNote>(
@@ -3888,6 +3974,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<MerchOrder>("merch_order", &self.merch_order, event);
+        callbacks.invoke_table_row_callbacks::<MerchPick>("merch_pick", &self.merch_pick, event);
         callbacks.invoke_table_row_callbacks::<MerchShop>("merch_shop", &self.merch_shop, event);
         callbacks.invoke_table_row_callbacks::<MerchTemplate>(
             "merch_template",
@@ -4730,6 +4817,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_lines_table::register_table(client_cache);
         board_medical_access_table::register_table(client_cache);
         board_merch_orders_table::register_table(client_cache);
+        board_merch_picks_table::register_table(client_cache);
         board_notes_table::register_table(client_cache);
         board_photos_table::register_table(client_cache);
         board_policies_table::register_table(client_cache);
@@ -4785,6 +4873,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         medical_document_table::register_table(client_cache);
         medical_record_table::register_table(client_cache);
         merch_order_table::register_table(client_cache);
+        merch_pick_table::register_table(client_cache);
         merch_shop_table::register_table(client_cache);
         merch_template_table::register_table(client_cache);
         model_call_table::register_table(client_cache);
@@ -4861,6 +4950,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_lines",
         "board_medical_access",
         "board_merch_orders",
+        "board_merch_picks",
         "board_notes",
         "board_photos",
         "board_policies",
@@ -4910,6 +5000,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "medical_document",
         "medical_record",
         "merch_order",
+        "merch_pick",
         "merch_shop",
         "merch_template",
         "model_call",

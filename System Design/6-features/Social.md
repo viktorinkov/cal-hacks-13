@@ -25,7 +25,7 @@ Responsibilities:
 Non-responsibilities:
 
 - It does not write `band`, `zone_visit`, `encounter` or `event`; it only reads them ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](Safety.md)).
-- It does not analyse images. People counts and captions come from Vision (TBD -- LEO) through `submit_photo_features` ([Vision](../4-devices/Vision.md)).
+- It does not analyse images itself. People counts and captions come from the `photo_features` job in `bandit-workers`, where Claude reads the photo, through `submit_photo_features`. Claude counts people and never says who anyone is.
 - It does not scrape people. Nobody's social profile is scraped; a handle comes only from its owner.
 - Elastic.md: it does not rank by meaning. The order of the recap's people and booths comes from Elastic's `GET /recap/order` over a one-way copy of this file's findable rows ([Elastic](../7-integrations/Elastic.md)); the lists themselves come from this file's views.
 - It does not make merch; it supplies the visits and photos that [Merch](Merch.md) builds its suggestions from.
@@ -41,13 +41,13 @@ Non-responsibilities:
 | In | Bright-Data.md: profile claim | `person` rows (name, role, organisation, headshot) and the `claimed_people` view; `claim_person`, called by the signed-in tap page, copies a claimed profile onto the attendee and is defined in [Bright-Data](../7-integrations/Bright-Data.md) | Module tables |
 | In | Photographer route `/photo`, served with the tap page (role `photographer`) | Photo bytes to `bandit-api` through `POST /api/blobs` with purpose `photo`, then `register_photo` with the returned URL `/blobs/<sha256>`, the capture time, the zone and an optional caption; `hide_photo` | HTTPS upload, then SDK |
 | In | `bandit-api` (role `api`) | `register_blob` for the uploaded photo, stored under its SHA-256 (access class `shared`) | SDK |
-| In | Vision.md (TBD -- LEO): `bandit-vision` | `submit_photo_features` for a `photo_features` job: people count and caption | SDK (role `vision`) |
+| In | `bandit-workers` | `submit_photo_features` for a `photo_features` job: people count, caption and the model call | SDK (role `worker`) |
 | Out | Tap page | Views keyed on the caller: `my_visits`, `my_encounters`, `my_shared_visits`, `my_graph`, `my_photos`, `my_share_links` | Subscription |
 | Out | The big screen on the organizer portal | View `event_graph`: the whole-event graph, people by display name | Subscription |
 | Out | Organizer portal, the Event graph and Photos tabs (staff: the owner, `ops`, `medic`) | View `board_photos`: every event photo with its zone, time and caption, and the graph node ids of the `findable` people tagged in it | Subscription |
 | Out | `bandit-api` | `share_link` rows and the rows a link selects, for the public share page; Elastic.md: `social_encounters` and `social_visits`, the recap candidates for `GET /recap/order` | Subscription (role `api`) |
 | Out | Elastic.md: `bandit-indexer` | the views `social_attendees`, `social_visits` and `social_encounters`, findable attendees only, into `bandit-memories` and `bandit-people`; never `social_handle` or photos | Subscription (role `indexer`) |
-| Out | `job` table | Vision.md: job `photo_features` with the photo id, from `register_photo` | a `job` row |
+| Out | `job` table | `bandit-workers`: job `photo_features` with the photo id, its blob hash, the zone, the zone's booths and the photographer's caption, from `register_photo` | a `job` row |
 | Out | [Merch](Merch.md) | `visit`, `photo` and `photo_tag` rows for the merch suggestions | Module tables |
 
 ## Design
@@ -228,14 +228,14 @@ The photographer route `/photo` is served with the tap page, gated by the `photo
 
 The route then calls `register_photo` with that URL, the capture time, the zone and an optional caption. The photographer picks the zone the photo was taken in from the venue's zones.
 
-The question this diagram answers: how a photo becomes tags, and where Vision joins in.
+The question this diagram answers: how a photo becomes tags, and where Claude joins in.
 
 ```mermaid
 sequenceDiagram
     participant PH as photographer route
     participant API as bandit-api
     participant M as band1t module
-    participant V as bandit-vision (TBD -- LEO)
+    participant V as bandit-workers (Claude)
     participant AT as attendee's recap
     PH->>API: POST /api/blobs, purpose photo
     API->>API: store bytes under their SHA-256
@@ -245,22 +245,22 @@ sequenceDiagram
     M->>M: bands in that zone at taken_at
     M->>M: photo_tag rows, ranked, cap 8
     M-->>V: photo_features job
-    V->>M: submit_photo_features, people count
+    V->>M: submit_photo_features, people count, caption
     M->>M: re-cap to the people count
     M-->>AT: my_photos shows the photo after the event
 ```
 
-Candidate rule: photo tags come from the bands in the photo's zone at the moment it was taken. An attendee is a candidate when they have `findable` on and their band has a `zone_visit` stay in the photo's zone that covers `taken_at`. Candidates are ranked by when that stay began, so someone who was there for a while ranks above someone passing through.
+Candidate rule: photo tags come from the bands in the photo's zone at the moment it was taken. An attendee is a candidate when they have `findable` on and their band has a `zone_visit` stay in the photo's zone that covers `taken_at`. Candidates are ranked by how many of the other candidates their band heard up close at that moment (an `encounter` seen within 30 s of `taken_at`), so a group posing together ranks first, then by when the stay began, so someone who was there for a while ranks above someone passing through.
 
 Test-Bands.md: crowd attendees are candidates through their stays, and people who tapped their bands rank before the crowd.
 
-The list is capped at 8 (starting value) until Vision reports a people count, then at that count. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
+The list is capped at 8 (starting value) until Claude reports a people count, then at that count, at most 20. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
 
 Photos never go to Elastic. Identity always comes from the band, never from a face.
 
 Staff see each photo as soon as it is registered: `board_photos` puts it on the organizer portal's Photos tab and, once it has `findable` people in it, in the event graph among them.
 
-Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `bandit-vision` answers with `submit_photo_features`. The module uses the people count to re-cap the tags and the caption when the photographer gave none. How Vision computes its output is Leo's.
+`register_photo` enqueues a `photo_features` job for a photo in the blob store, and `bandit-workers` answers with `submit_photo_features`. The worker shrinks the photo to 1568 px on its longest side and asks Claude for the number of people clearly in it and a caption of at most 12 words with no names, hashtags or @ mentions. The module re-caps the tags to the people count and uses the caption when the photographer gave none; the recap's Share button uses it.
 
 | `photo` field | Meaning |
 |---|---|
@@ -269,8 +269,9 @@ Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `b
 | `url` | `/blobs/<sha256>`: where the bytes are served from, access class `shared` |
 | `taken_at` | Capture time from the file, else upload time |
 | `zone_id` | The zone the photographer picked, where the photo was taken |
-| `caption` | From the photographer, or from Vision (TBD -- LEO) |
-| `people_count` | From Vision (TBD -- LEO), empty until then |
+| `caption` | From the photographer, or from Claude |
+| `people_count` | From Claude, 0 until the photo is read |
+| `features_call_id` | The model call that read the photo, 0 until then |
 | `status` | `uploaded`, `tagged`, `hidden` |
 
 | `photo_tag` field | Meaning |

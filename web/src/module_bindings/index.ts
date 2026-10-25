@@ -85,6 +85,7 @@ import ReportTestBandReducer from "./report_test_band_reducer";
 import ReportVenueSetupStepReducer from "./report_venue_setup_step_reducer";
 import RequestMedicalCardReducer from "./request_medical_card_reducer";
 import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
+import RerunShoppingAgentReducer from "./rerun_shopping_agent_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
@@ -111,6 +112,8 @@ import SubmitClaimChecksReducer from "./submit_claim_checks_reducer";
 import SubmitClaimReviewReducer from "./submit_claim_review_reducer";
 import SubmitMedicalDocumentReducer from "./submit_medical_document_reducer";
 import SubmitMedicalRecordReducer from "./submit_medical_record_reducer";
+import SubmitMerchPicksReducer from "./submit_merch_picks_reducer";
+import SubmitPhotoFeaturesReducer from "./submit_photo_features_reducer";
 import SubmitVisionAssessmentReducer from "./submit_vision_assessment_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
 import UpsertCameraReducer from "./upsert_camera_reducer";
@@ -130,6 +133,7 @@ import BoardLedgerRow from "./board_ledger_table";
 import BoardLinesRow from "./board_lines_table";
 import BoardMedicalAccessRow from "./board_medical_access_table";
 import BoardMerchOrdersRow from "./board_merch_orders_table";
+import BoardMerchPicksRow from "./board_merch_picks_table";
 import BoardNotesRow from "./board_notes_table";
 import BoardPhotosRow from "./board_photos_table";
 import BoardPoliciesRow from "./board_policies_table";
@@ -604,6 +608,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardMerchOrdersRow),
+  boardMerchPicks: __table({
+    name: 'board_merch_picks',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardMerchPicksRow),
   boardNotes: __table({
     name: 'board_notes',
     indexes: [
@@ -974,6 +985,7 @@ const reducersSchema = __reducers(
   __reducerSchema("report_venue_setup_step", ReportVenueSetupStepReducer),
   __reducerSchema("request_medical_card", RequestMedicalCardReducer),
   __reducerSchema("request_recovery_letter", RequestRecoveryLetterReducer),
+  __reducerSchema("rerun_shopping_agent", RerunShoppingAgentReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
@@ -1000,6 +1012,8 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_claim_review", SubmitClaimReviewReducer),
   __reducerSchema("submit_medical_document", SubmitMedicalDocumentReducer),
   __reducerSchema("submit_medical_record", SubmitMedicalRecordReducer),
+  __reducerSchema("submit_merch_picks", SubmitMerchPicksReducer),
+  __reducerSchema("submit_photo_features", SubmitPhotoFeaturesReducer),
   __reducerSchema("submit_vision_assessment", SubmitVisionAssessmentReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
   __reducerSchema("upsert_camera", UpsertCameraReducer),
@@ -1047,6 +1061,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_medical_access": Omit<typeof tablesSchema.schemaType.tables["boardMedicalAccess"], "accessorName"> & { readonly accessorName: "board_medical_access" };
     /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
     readonly "board_merch_orders": Omit<typeof tablesSchema.schemaType.tables["boardMerchOrders"], "accessorName"> & { readonly accessorName: "board_merch_orders" };
+    /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+    readonly "board_merch_picks": Omit<typeof tablesSchema.schemaType.tables["boardMerchPicks"], "accessorName"> & { readonly accessorName: "board_merch_picks" };
     /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
     readonly "board_notes": Omit<typeof tablesSchema.schemaType.tables["boardNotes"], "accessorName"> & { readonly accessorName: "board_notes" };
     /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
@@ -1173,6 +1189,7 @@ const tableAccessorAliases = {
   "board_lines": "boardLines",
   "board_medical_access": "boardMedicalAccess",
   "board_merch_orders": "boardMerchOrders",
+  "board_merch_picks": "boardMerchPicks",
   "board_notes": "boardNotes",
   "board_photos": "boardPhotos",
   "board_policies": "boardPolicies",
@@ -1272,6 +1289,8 @@ export type DbView = __DbViewBase & {
   readonly "board_medical_access": __DbViewBase["boardMedicalAccess"];
   /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "board_merch_orders": __DbViewBase["boardMerchOrders"];
+  /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_picks": __DbViewBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __DbViewBase["boardNotes"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
@@ -1400,6 +1419,8 @@ export type Tables = __TablesBase & {
   readonly "board_medical_access": __TablesBase["boardMedicalAccess"];
   /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "board_merch_orders": __TablesBase["boardMerchOrders"];
+  /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_picks": __TablesBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __TablesBase["boardNotes"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */

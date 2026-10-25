@@ -2,22 +2,22 @@
 
 Merch turns an attendee's own night into something they can hold. Before the event the team makes six merch templates by hand: for Cal Hacks 13.0, a plain t-shirt, mug and poster, and three that name sponsors. Each template image has a marked photo area.
 
-After the event, the bottom of the recap suggests up to three templates, each with one of the attendee's own photos, ranked by how long they spent at the booths the template names. The tap page places the photo straight into the photo area. One tap buys it from the attendee's BandIt wallet.
+When the event ends, a shopping agent (Claude, through the `merch_picks` job in `bandit-workers`) picks three templates for each attendee who is in a photo: the products of the booths they spent time at, each with one of their photos, the ones with the people they met first, and a short line printed under it such as "with Jordan & Maya". Until it answers, the view ranks templates by the minutes at their booths. The tap page places the photo straight into the photo area, prints the line and ticks the booth crawl poster's box for each sponsor booth the attendee visited. One tap buys it from the attendee's BandIt wallet.
 
-Nothing is generated: no image API, no AI and no rendering on any server. Any event loads its own templates; Cal Hacks 13.0 is the first event it runs at. The whole feature is optional and far from the safety loop.
+No image is generated during the event and nothing is rendered on any server. Any event loads its own templates; Cal Hacks 13.0 is the first event it runs at. The whole feature is optional and far from the safety loop.
 
 ## Role in the system
 
 Responsibilities:
 
 - Hold the templates (`merch_template`, loaded from `assets/merch/templates.json` with `load_merch_templates`), the orders (`merch_order`) and the Capital One Nessie merchant that BandIt merch is sold as (`merch_shop`).
-- Suggest template and photo pairs through the view `my_merch_suggestions`.
+- Ask the shopping agent for each attendee's three picks when the event ends (`merch_picks` jobs, answered with `submit_merch_picks`), and suggest template and photo pairs through the view `my_merch_suggestions`.
 - Take an order and its payment in one call, `buy_merch`, and finish it with `settle_merch_order` once the purchase is on Capital One Nessie.
 - Show the organizer the templates and every order on the organizer portal's Merch tab, through the view `board_merch_orders` ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
 
 Non-responsibilities:
 
-- It generates no images and calls no image API. The team makes the template images by hand before the event, and the tap page places the photo into them.
+- It generates no images during the event. The team makes the template images before the event, and the tap page places the photo into them.
 - It renders nothing on any server and stores no merged image.
 - It does not derive visits or tag photos; [Social](Social.md) does.
 - It does not open wallets or call the Capital One Nessie API; [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md) does. Nothing is sold at the venue.
@@ -35,6 +35,9 @@ Non-responsibilities:
 | Out | Tap page, on the recap | The public table `merch_template`; the views `my_merch_suggestions` and `my_merch_orders` | Subscription |
 | Out | Tap page, through `bandit-api` | The template images, as static files served with the page; the photo from its `photo.url`, `/blobs/<sha256>`, served by `GET /blobs/{hash}` (access class `shared`) | HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Out | Organizer portal, Merch tab | The public table `merch_template`; the view `board_merch_orders`, which returns rows only to the module owner and `ops`: one row per order with its id, the attendee's display name, the template id and title, the size, the amount in cents, the status, the failure, the Capital One Nessie purchase id and when it was ordered | Subscription |
+| Out | `bandit-workers`: the shopping agent | The job `merch_picks`, one per attendee in a photo, from `end_event` and `rerun_shopping_agent` (role `ops`): the attendee's places and minutes at booths, the people they met, their photos with the people in each, and every product with its sponsors | `job` table |
+| In | `bandit-workers` (role `worker`) | `submit_merch_picks` with the job id, up to three picks (template id, photo id, line, reason) and the model call | Reducer |
+| Out | Organizer portal, Merch tab | The view `board_merch_picks`, for staff: each attendee's picks with the photo, the line and the reason | Subscription |
 | Out | `bandit-workers` ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)) | The job `merch_purchase`: order id, account id, merchant id (empty before the first purchase), amount in cents, memo | `job` table |
 | In | `bandit-workers` (role `worker`) | `settle_merch_order` with the job id, the merchant id and the purchase id | Reducer |
 
@@ -106,7 +109,15 @@ The view returns the top 3. Each row holds what the tap page needs to draw it: t
 
 A typical first suggestion: the photo taken at the Elastic booth where the attendee spent 40 minutes, on `mug_elastic.png`.
 
-There is no job, no AI and no Anthropic Claude API. The view recomputes when a visit or a tag changes, so removing a tag takes that photo out at once.
+Each row also carries the line printed under the photo (the people the caller met who are in it, "with A & B"), the people the caller met in the photo, and `ticks`: the template's sponsors whose booths the caller visited, which the tap page ticks on the booth crawl poster from the `checks` boxes in `templates.json`.
+
+### The shopping agent
+
+When the organizer presses "Event ended", `end_event` enqueues one `merch_picks` job for each non-crowd attendee with a photo tag. The payload is the attendee's night as the bands measured it: the zones and minutes, the booths in each zone, the people they met and for how long, each photo with its zone, its caption, the people the bands put in it and which of those they met, and every template with its sponsors and price.
+
+`bandit-workers` sends it to Claude, which picks three different templates, a photo for each and a line of at most 36 characters, with one sentence on why. The worker checks every template and photo id against the payload and asks once more with the problems listed when an answer is wrong. `submit_merch_picks` checks them again (a known template, once each, a photo the attendee is tagged in) and stores them in `merch_pick`.
+
+Once an attendee has picks, `my_merch_suggestions` returns those, in Claude's order, with the reason shown as "Picked for you". `buy_merch` copies the pick's line onto the order. The organizer's Merch tab shows every attendee's picks and can run the agent again.
 
 ### The preview
 
@@ -220,7 +231,8 @@ The organizer portal's Merch tab shows the loaded templates, each with its image
 | A few templates are made by hand before the event, each with a marked photo area; the product has no image API and generates no images | A hackathon needs only a few images, so nothing can fail or stall during the event; any event loads its own templates |
 | The photo area is painted pure green (`#00FF00`) in each image, and its rectangle is written in `templates.json` | The team sees the area while drawing, and the page needs only a rectangle, with no image analysis |
 | The attendee's own photo goes straight into the photo area, scaled to cover it, drawn by the tap page | No server renders or stores anything; an order keeps the template and the photo |
-| Suggestions are the view `my_merch_suggestions`, ranked by the caller's minutes at the template's booths, then by a photo taken at those booths, then plain templates before sponsor ones; top 3 | No job and no AI; the suggestion is instant and easy to explain: your photo, from the booth you loved; an attendee who never stopped at a sponsor booth still gets the plain tee, mug and poster |
+| Suggestions are the view `my_merch_suggestions`: the shopping agent's three picks once it has answered, else ranked by the caller's minutes at the template's booths, then by a photo taken at those booths, then plain templates before sponsor ones; top 3 | The agent reads the whole night (booths, minutes, the people in each photo) and writes the printed line; the ranking keeps the shop working before it answers or without it |
+| The shopping agent runs once, when the event ends, and code checks every id it returns | Nobody shops during the event, and a pick can only name a real product and a photo the attendee is in |
 | A sponsor template names its sponsors in `templates.json`; the loader matches them to the imported organisations and stores their booths | The team knows sponsor names, not row ids, and the booth crawl poster names six sponsors at once; merch from the booth the attendee spent time at is the Visa shopping story |
 | A photo can be bought only by someone tagged in it; there is no merch consent switch | Tags exist only for `findable` attendees whose band was in the photo's zone, so the buyer is always in the photo |
 | Sizes and prices go by kind: a `tee` costs 2500 cents and comes in S, M, L and XL; a `mug` costs 1800 and a `poster` 1500, in one size | No size list to keep, and the same kind costs the same with or without a sponsor |

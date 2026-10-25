@@ -49,6 +49,7 @@ const QUERIES = [
   'SELECT * FROM board_photos',
   'SELECT * FROM merch_template',
   'SELECT * FROM board_merch_orders',
+  'SELECT * FROM board_merch_picks',
   'SELECT * FROM venue_setup',
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
@@ -527,6 +528,7 @@ function photosTab() {
       h('figcaption', {},
         h('b', {}, p.caption || 'Event photo'),
         h('div', { class: 'muted' }, `${p.zoneName}, ${date(p.takenAt)}`),
+        p.read && h('div', { class: 'muted' }, `${p.peopleCount} ${p.peopleCount === 1 ? 'person' : 'people'} in the photo`),
         h('div', {}, p.nodeIds.length ? p.nodeIds.map(id => names.get(id) || 'no name yet').join(', ') : h('span', { class: 'muted' }, 'Nobody tagged')),
         p.nodeIds.length > 0 && h('button', { class: 'link', onclick: () => show(p.id) }, 'Show in the event graph'))))));
 }
@@ -541,13 +543,49 @@ function thumb(url: string, title: string) {
   return thumbs.get(url)!;
 }
 
-/** The loaded templates and every attendee's order: who, what, the size, the status and the Nessie purchase. */
+/** The shopping agent's three picks for each attendee, with the photo, the line and why. */
+function merchPicks() {
+  const picks = [...conn.db.boardMerchPicks.iter()].sort((a, b) => a.attendeeName.localeCompare(b.attendeeName) || a.rank - b.rank);
+  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const titles = new Map([...conn.db.merchTemplate.iter()].map(t => [t.id, t]));
+  return h('section', {},
+    h('h3', {}, `Shopping agent picks (${new Set(picks.map(p => p.attendeeName)).size} attendees)`),
+    !picks.length && h('p', { class: 'muted' }, ended ? 'Picking now. Each attendee in a photo gets three picks.' : 'The shopping agent picks for everyone in a photo once the event ends.'),
+    can('ops') && ended && h('button', { onclick: () => act(() => conn.reducers.rerunShoppingAgent({})) }, 'Run the shopping agent again'),
+    picks.length > 0 && h('table', {},
+      h('tr', {}, h('th', {}, 'Attendee'), h('th', {}, '#'), h('th', {}, 'Product'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Why')),
+      picks.map(p => {
+        const t = titles.get(p.templateId);
+        return h('tr', {},
+          h('td', {}, p.attendeeName || '(no name yet)'), h('td', {}, String(p.rank)),
+          h('td', {}, t ? [thumb(t.imageUrl, t.title), h('div', {}, t.title)] : `template ${p.templateId}`),
+          h('td', {}, thumb(p.photoUrl, 'photo')),
+          h('td', {}, p.line || h('span', { class: 'muted' }, 'none')),
+          h('td', {}, p.reason));
+      })));
+}
+
+/** The shopping agent's picks, the loaded templates and every attendee's order. */
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
   const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
   const paid = orders.filter(o => o.status === 'paid');
   const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
   return [
+    merchPicks(),
+    h('section', {},
+      h('h3', {}, `Orders: ${orders.length}, of which ${paid.length} paid for ${money(paid.reduce((s, o) => s + o.amountCents, 0n))}`),
+      !can('ops') && h('p', { class: 'muted' }, 'Orders show for the organizer.'),
+      can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees buy merch from their recap once the event ends.'),
+      orders.length > 0 && h('table', {},
+        h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
+        orders.map(o => h('tr', {},
+          h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title),
+          h('td', {}, o.photoUrl ? thumb(o.photoUrl, 'photo') : ''), h('td', {}, o.line || '—'), h('td', {}, o.size || '—'),
+          h('td', {}, money(o.amountCents)),
+          h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
+          h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
+          h('td', {}, date(o.createdAt)))))),
     h('section', {},
       h('h3', {}, `Templates (${templates.length})`),
       !templates.length && h('p', { class: 'muted' }, 'None loaded. scripts/merch-setup loads assets/merch/templates.json after the event import.'),
@@ -558,18 +596,6 @@ function merchTab() {
           h('td', {}, t.title, h('div', { class: 'muted' }, t.name)), h('td', {}, t.kind), h('td', {}, money(t.priceCents)),
           h('td', {}, `${t.photoW}×${t.photoH} at ${t.photoX},${t.photoY}`),
           h('td', {}, t.boothIds.length ? booths(t.boothIds) : h('span', { class: 'muted' }, 'plain')))))),
-    h('section', {},
-      h('h3', {}, `Orders: ${orders.length}, of which ${paid.length} paid for ${money(paid.reduce((s, o) => s + o.amountCents, 0n))}`),
-      !can('ops') && h('p', { class: 'muted' }, 'Orders show for the organizer.'),
-      can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees buy merch from their recap once the event ends.'),
-      orders.length > 0 && h('table', {},
-        h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
-        orders.map(o => h('tr', {},
-          h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title), h('td', {}, o.size || '—'),
-          h('td', {}, money(o.amountCents)),
-          h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
-          h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
-          h('td', {}, date(o.createdAt)))))),
   ];
 }
 

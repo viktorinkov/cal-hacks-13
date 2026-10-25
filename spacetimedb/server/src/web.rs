@@ -28,6 +28,9 @@ fn set_ended(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     } else {
         ctx.db.event_state().insert(row);
     }
+    if ended {
+        crate::merch::on_event_ended(ctx);
+    }
     Ok(())
 }
 
@@ -240,6 +243,9 @@ pub struct BoardPhoto {
     pub caption: String,
     /// The graph nodes of the findable people the bands put in it.
     pub node_ids: Vec<u64>,
+    /// The people Claude counted in it, once it has read the photo.
+    pub people_count: u32,
+    pub read: bool,
 }
 
 /// Every event photo with the people in it, for the host portal's photos and event graph.
@@ -265,6 +271,8 @@ pub fn board_photos(ctx: &ViewContext) -> Vec<BoardPhoto> {
             url: p.url,
             taken_at: p.taken_at,
             caption: p.caption,
+            people_count: p.people_count,
+            read: p.features_call_id != 0,
         })
         .collect()
 }

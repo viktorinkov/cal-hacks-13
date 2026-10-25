@@ -18,4 +18,6 @@ export default __t.row({
   caption: __t.string(),
   addedBy: __t.identity().name("added_by"),
   createdAt: __t.timestamp().name("created_at"),
+  peopleCount: __t.u32().name("people_count"),
+  featuresCallId: __t.u64().name("features_call_id"),
 });
