@@ -94,10 +94,17 @@ pub fn treat(app: &App, incident: u64, note: &str) -> Result<()> {
     Ok(())
 }
 
-/// Resolves the incident as `actor` and returns the claim it opened, if any.
+/// Resolves the incident as `actor` and returns its claim, if any. Property
+/// claims open on resolve; for an injury the organizer files the wearer's
+/// claim in their words, with the record to come as a PDF the run files.
 pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Result<Option<Claim>> {
     let conn = app.actor(actor)?;
     call!(conn, resolve_incident_then(incident, resolution.to_string()))?;
+    let i = app.incident(incident)?;
+    if i.kind != IncidentKind::Property {
+        let ops = app.actor("ops")?;
+        call!(ops, file_claim_for_wearer_then(incident, wearer_statement(app, &i), "pdf".to_string()))?;
+    }
     let db = app.db()?;
     let claim = until(4.0, || db.db.claim().incident_id().find(&incident).filter(|c| c.pack_version > 0));
     let who = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
@@ -115,6 +122,15 @@ pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Resul
         }
     }
     Ok(claim)
+}
+
+/// One line in the attendee's words about the scene, for the claim filed for them.
+fn wearer_statement(app: &App, i: &Incident) -> String {
+    let zone = app.zone_name(i.zone_id);
+    match i.kind {
+        IncidentKind::Sos => format!("I got hurt in the {zone} area and pressed my band for help; the medic treated me there."),
+        _ => format!("I fell in the {zone} area and got hurt; the medic treated me there."),
+    }
 }
 
 /// The organizer logs damaged equipment; with `camera` the vision stub

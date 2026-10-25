@@ -2,9 +2,9 @@ use spacetimedb::{Identity, SpacetimeType, Timestamp};
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClaimStatus {
-    /// Injury claim opened; the medical record has not been filed yet.
+    /// Injury claim filed; waiting for the hospital report or a filed record.
     AwaitingRecord,
-    /// Claude is reading the medical record.
+    /// The record reader is reading the filed medical record.
     ReadingRecord,
     /// Elastic is validating the evidence and finding similar claims.
     Verifying,
@@ -12,7 +12,7 @@ pub enum ClaimStatus {
     Reviewing,
     /// Waiting for the named person in `routed_to_name`.
     Routed,
-    /// Approved; the payout is being deposited into the claimant's Nessie account.
+    /// Approved; the payout is being deposited into the claimant's wallet (Nessie).
     Paying,
     /// Paid to the claimant; the insurer's payment is outstanding.
     Settled,
@@ -142,6 +142,38 @@ pub struct Claim {
     pub settled_at: Option<Timestamp>,
     pub reconciled_at: Option<Timestamp>,
     pub updated_at: Timestamp,
+    /// What the attendee wrote when they filed an injury claim; empty for property.
+    #[default("")]
+    pub statement: String,
+}
+
+/// The hospital report requested for an injury claim: the case the module drew
+/// and, once the worker writes it, the report's text in the blob store.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = clinic_report)]
+pub struct ClinicReport {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub claim_id: u64,
+    /// `clinic::Scenario::as_str`.
+    pub scenario: String,
+    /// `random` for an attendee's own filing; `matches`, `mismatch` or `random` from staff.
+    pub choice: String,
+    pub visit_date: String,
+    /// `requested`, `received` or `failed`.
+    pub status: String,
+    pub job_id: u64,
+    pub provider_name: String,
+    /// The report's text in the blob store.
+    pub file_hash: String,
+    /// Why code rejected the report, when it did.
+    pub problems: Vec<String>,
+    pub model_call_id: u64,
+    pub requested_by: Identity,
+    pub requested_at: Timestamp,
+    pub received_at: Option<Timestamp>,
 }
 
 /// One fact in one pack version. `seq` is the id the claims agent cites.

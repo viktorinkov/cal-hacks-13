@@ -200,6 +200,11 @@ async fn blob(State(app): AppState, Path(hash): Path<String>) -> Response {
                 "model/gltf-binary"
             } else if bytes.starts_with(b"{") || bytes.starts_with(b"[") {
                 "application/json"
+            } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
+                "image/svg+xml"
+            } else if std::str::from_utf8(&bytes).is_ok() {
+                // Letters and hospital reports.
+                "text/plain; charset=utf-8"
             } else {
                 "image/jpeg"
             };

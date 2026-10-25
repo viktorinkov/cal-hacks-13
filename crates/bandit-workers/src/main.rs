@@ -9,6 +9,7 @@
 //!                                           the reducer calls instead of making them
 //! ```
 
+mod clinic;
 mod extract;
 mod jobs;
 mod letters;

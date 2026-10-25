@@ -55,4 +55,5 @@ export default __t.row({
   settledAt: __t.option(__t.timestamp()).name("settled_at"),
   reconciledAt: __t.option(__t.timestamp()).name("reconciled_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  statement: __t.string(),
 });

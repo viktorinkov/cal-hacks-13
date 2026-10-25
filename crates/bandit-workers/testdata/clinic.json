@@ -1,0 +1,16 @@
+{
+  "claim_id": 900101,
+  "report_id": 1,
+  "scenario": "matches",
+  "visit_date": "2026-10-24",
+  "incident_date": "2026-10-24",
+  "incident_time": "21:45",
+  "incident_kind": "fall",
+  "venue_name": "Cal Hacks 13.0",
+  "zone_name": "Main stage",
+  "claimant_name": "Jordan Alvarez",
+  "statement": "The crowd surged in the Main stage pit and I fell on my left wrist.",
+  "medic_notes": [
+    "on scene in the pit: left wrist pain and swelling after the crowd surged; wrapping the wrist, referring him to urgent care"
+  ]
+}
