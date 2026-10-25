@@ -64,7 +64,7 @@ describe('live floor', () => {
       ...input,
       incidents: [
         ...input.incidents,
-        { id: '75', kind: 'fall', zoneId: '2', stationId: 101, bandId: 888, openedAt: 60, resolved: false },
+        { id: '75', kind: 'fall', zoneId: '2', stationId: 101, bandId: 888, openedAt: 60, resolved: false, status: 'open' },
       ],
     })
     expect(snap.incidents.map((incident) => incident.incidentId)).toEqual(['4'])
