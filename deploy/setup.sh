@@ -84,7 +84,8 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 		rewrite * /index.html
 		file_server
 	}
-	handle /portal /portal/ {
+	@portal path /portal /portal/
+	handle @portal {
 		root * $APP/web
 		rewrite * /organizer.html
 		file_server
