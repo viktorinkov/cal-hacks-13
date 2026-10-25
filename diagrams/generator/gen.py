@@ -1,4 +1,5 @@
-"""BandIt system design in Excalidraw: fourteen frames stacked top to bottom. Labels follow LABELS.md."""
+"""BandIt system design in Excalidraw: eighteen frames stacked top to bottom, the last four drawn by\n../medic-routing/medic.py. Labels follow LABELS.md."""
+import json
 import pathlib
 import sys
 
@@ -853,12 +854,42 @@ def hardware(y0):
     return S.end_frame()
 
 
+def stack(path, y0, first):
+    """Add the frames another generator drew (its .excalidraw file) under the board, numbered on from first."""
+    scene = json.loads(pathlib.Path(path).read_text())
+    els = scene["elements"]
+    top = min(e["y"] for e in els)
+    ids = {e["id"]: "m" + e["id"] for e in els}  # a prefix keeps its ids apart from this board's
+    frames = sorted((e for e in els if e["type"] == "frame"), key=lambda e: e["y"])
+    names = {f["id"]: f"{first + i} · {f['name']}" for i, f in enumerate(frames)}
+    for e in els:
+        e = json.loads(json.dumps(e))
+        e["y"] += y0 - top
+        e["name"] = names.get(e["id"], e.get("name"))
+        e["id"] = ids[e["id"]]
+        for k in ("frameId", "containerId"):
+            if e.get(k):
+                e[k] = ids[e[k]]
+        for k in ("startBinding", "endBinding"):
+            if e.get(k):
+                e[k]["elementId"] = ids[e[k]["elementId"]]
+        e["boundElements"] = [dict(b, id=ids[b["id"]]) for b in e.get("boundElements") or []]
+        if e["name"] is None:
+            del e["name"]
+        S.elements.append(e)
+    S.files.update(scene.get("files", {}))
+    return max(e["y"] + e["height"] for e in frames) - min(e["y"] for e in frames)
+
+
 FRAMES = (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, interests, merch,
           nessie, vultr, hardware)
+MEDIC = LOGOS.parent / "medic-routing" / "medic-routing.excalidraw"  # medic routing, walk, light circle, exits
 only = sys.argv[2:]  # frame function names, for a board of just those frames
 y = 0
 for draw in FRAMES:
     if not only or draw.__name__ in only:
         y += draw(y) + GAP
+if not only or "medic" in only:
+    y += stack(MEDIC, y, len(FRAMES) + 1) + GAP
 S.dump(sys.argv[1] if len(sys.argv) > 1 else "bandit-system-design.excalidraw")
 print(len(S.elements), "elements")
