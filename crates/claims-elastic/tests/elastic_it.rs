@@ -3,7 +3,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use claims_elastic::{ClaimDoc, ClaimsIndex, NarrativeParts, narrative_for, sections_for_kind};
+use claims_elastic::{ClaimDoc, ClaimsIndex, NarrativeParts, chunk_docs, cite, narrative_for, sections_for_kind};
 
 const TEST_IDS: [&str; 5] = ["claim-900001-v1", "claim-900002-v1", "claim-900003-v1", "claim-900004-v1", "claim-900005-v1"];
 
@@ -286,5 +286,51 @@ async fn rule_precedents_are_counted_and_proposed() -> anyhow::Result<()> {
     for id in PRECEDENT_IDS {
         es.delete_doc(id).await?;
     }
+    Ok(())
+}
+
+/// A fetched plan's two pages, under a hash no real PDF has.
+const CHUNKED: &str = "00000000000000000000000000000000000000000000000000000000000c0de1";
+
+#[tokio::test]
+async fn fetched_pdf_chunks_are_searchable_and_cited() -> anyhow::Result<()> {
+    if std::env::var("CLAIMS_ELASTIC_IT").as_deref() != Ok("1") {
+        eprintln!("skipped: set CLAIMS_ELASTIC_IT=1 to run against Elastic");
+        return Ok(());
+    }
+    let es = ClaimsIndex::from_env()?;
+    es.ensure_clauses_index().await?;
+    es.delete_chunks(CHUNKED).await?;
+    let pages = vec![
+        "Blue Shield of California: Silver 70 PPO 2500/55 Coverage Period: 01/01/2026 - 12/31/2026\n\
+Summary of Benefits and Coverage: What this Plan Covers & What You Pay for Covered Services\n\n\
+The Summary of Benefits and Coverage (SBC) document will help you choose a health plan. The SBC shows you how you and the plan would share the cost for covered health care services."
+            .to_string(),
+        "Important Questions Answers Why This Matters\nWhat is the overall deductible? $2,500 individual / $5,000 family\n\n\
+If you visit a health care provider's office or clinic: urgent care $55 copay; emergency room care $500 copay after deductible"
+            .to_string(),
+    ];
+    let docs = chunk_docs("attendee", CHUNKED, &pages);
+    assert!(docs.len() >= 4, "{docs:?}");
+    assert!(es.index_chunks(CHUNKED, &docs).await?, "a new PDF is chunked");
+    assert!(!es.index_chunks(CHUNKED, &docs).await?, "the same PDF is chunked once");
+    assert_eq!(es.chunk_count(CHUNKED).await?, docs.len() as u64);
+
+    let hits = es.search_chunks("Blue Shield of California Silver 70 PPO summary of benefits and coverage", CHUNKED, None, 5).await?;
+    for (i, h) in hits.iter().enumerate() {
+        eprintln!("#{} {:.4} {} p{} | {}", i + 1, h.score, h.clause_id, h.page, h.text);
+    }
+    assert!(!hits.is_empty() && hits.iter().all(|h| h.document_hash == CHUNKED));
+    let cited = cite(&hits, "Silver 70 PPO 2500/55").expect("a chunk to cite");
+    assert_eq!((cited.clause_id.as_str(), cited.page), (format!("{CHUNKED}-p1-k1").as_str(), 1), "the chunk that prints the plan");
+
+    let urgent = es.search_chunks("what does urgent care cost", CHUNKED, Some((2, 2)), 5).await?;
+    assert!(!urgent.is_empty() && urgent.iter().all(|h| h.page == 2), "the page filter holds");
+
+    let claims = es.search_clauses("urgent care copay", None, Some(CHUNKED), &[], 5).await?;
+    assert!(claims.iter().all(|c| c.document_hash != CHUNKED), "a claim search never returns a chunk");
+
+    assert_eq!(es.delete_chunks(CHUNKED).await?, docs.len() as u64);
+    assert_eq!(es.chunk_count(CHUNKED).await?, 0);
     Ok(())
 }
