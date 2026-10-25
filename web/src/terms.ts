@@ -1,7 +1,6 @@
-// Hover definitions for the finance terms on the Settlements and Costs tabs. After each redraw, every
-// term in the tab's text is wrapped in an <abbr> whose title is one plain sentence, in the words
-// Hyphenate's track uses. Free text such as an attendee's statement only matches the phrases below,
-// so words with an everyday meaning (balance, credit, recovery) are matched only where they are a label.
+// Finance definitions on the Settlements and Costs tabs. Terms open immediately on hover and focus;
+// clicking keeps the definition open until another click or Escape. The tooltip lives outside the
+// redrawn app. Words with an everyday meaning are matched only where they are a label.
 
 import { h } from './lib';
 
@@ -74,16 +73,30 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bcovered(?= \$)/i, 'The part of the bill the venue\'s policy pays, after the fee schedule\'s caps and exclusions.'],
   [/^reduced\b/i, 'Paid only up to the fee schedule\'s cap for this service.'],
   [/^excluded\b/i, 'Not paid: the policy does not cover this service.'],
-  [/\bnot covered\b/i, 'The part of the bill the policy does not pay, left to the attendee or their health plan.'],
+  [/\bnot covered\b|\boutside venue cover\b/i, 'The part of a decided claim\'s bill outside its venue payout. Medical costs may be paid by the attendee\'s own health plan; property costs stay with the venue.'],
   [/^cost$/i, 'What the incident cost before any cover: the bill or the repair cost.'],
 
   // Merch and the booths.
-  [/\bnet cost\b/i, 'What the claims cost the venue, less its part of the charges and the merch margin.'],
-  [/\bprint cost\b/i, 'What the print shop bills to make the products: the cost of goods sold.'],
+  [/\bnet cost\b/i, 'Claims cost less approved venue recoveries and event earnings from merch. A negative amount means earnings and recoveries exceed those costs; this is not the event\'s cash balance.'],
+  [/\bpaid orders\b/i, 'Merch orders whose wallet payment completed. Pending and failed orders do not count.'],
+  [/\bgross sales\b/i, 'The total charged for paid merch orders, before printing and the booth shares. Pending and failed orders do not count.'],
+  [/\bevent (?:revenue|earnings)\b/i, 'Paid merch sales less the estimated print costs and booth shares: the amount the event keeps.'],
+  [/^revenue$/i, 'Money from paid merch orders. Gross sales include printing and booth shares; event revenue is the amount the event keeps.'],
+  [/\b(?:expected|approved) recoveries\b/i, 'The venue\'s share of approved property charges, including amounts the responsible attendees have not paid yet.'],
+  [/\bcollected recoveries\b|\bvenue recoveries collected\b/i, 'The venue\'s share of property charges that responsible attendees have paid. The insurer\'s share is excluded.'],
+  [/\bclaims cost\b/i, 'The claim amounts the venue carries after the insurer\'s recorded share, plus uncovered property losses. Reserved payouts not yet paid are included.'],
+  [/\buncovered property\b/i, 'The repair costs and stolen-item values left outside the venue\'s claim payouts.'],
+  [/\bcash paid\b|\bclaim payments\b/i, 'Claim payouts recorded as paid to attendees and repair vendors. This excludes reserved payouts still waiting for payment.'],
+  [/\binsurer received\b/i, 'Payments received from the insurer and recorded against what it owed for claims.'],
+  [/\binsurer outstanding\b/i, 'The insurer\'s recorded share of claims that has not been received yet.'],
+  [/\bcharges collected\b/i, 'Payments received from responsible attendees for approved property charges, including the venue\'s share and the insurer\'s share.'],
+  [/\bcharges outstanding\b/i, 'Approved property charges that responsible attendees have not paid yet.'],
+  [/\bbooth share\b/i, 'Paid sponsor-product sales less the estimated print cost and the event\'s 10% fee. This amount is owed to the booths; it is not a recorded transfer to them.'],
+  [/\bprint cost\b/i, 'An estimate per paid item: $8 for a T-shirt, $5 for a mug and $3 for a poster. No printing payment is recorded here.'],
   [/\b(?:merch )?margin\b/i, 'What the event keeps from merch after the print cost and what it owes the booths.'],
   [/^sales$/i, 'What attendees paid for the products from their wallets.', 'th'],
   [/^fee$/i, 'The event\'s 10% of the booth\'s sales, for running the shop.', 'th'],
-  [/\bowed to booth\b/i, 'What the event pays the booth: its sales less the print cost and the event\'s fee.'],
+  [/\bowed to booths?\b/i, 'What the event owes the booths: their sales less the estimated print cost and the event\'s fee. No transfer to the booths is recorded here.'],
   [/^booths$/i, 'What the event owes the sponsor booths for the products that name them.', 'th'],
   [/^loss$/i, 'What the incidents at the booth\'s table cost before anyone paid.', 'th'],
   [/^charged$/i, 'What the people responsible were charged: it repays the insurer\'s share, and the deductible goes to the venue.', 'th'],
@@ -112,7 +125,7 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bvenue'?s cost\b|\bvenue carries\b/i, 'What the claim costs the venue after the insurer\'s share: its deductible and any short payment.'],
   [/^venue$/i, 'What the claims cost the venue itself, after the insurer\'s share.', 'th'],
   [/^insurer$/i, 'What the venue\'s insurer pays back on the claims, paid and still owed.', 'th'],
-  [/^attendees$/i, 'What Medical claims did not cover, left to attendees or their health plans.', 'th'],
+  [/^attendees$|^attendee \/ plan$/i, 'Medical costs outside the venue payout, payable by the attendee\'s health plan and the attendee. This does not mean the attendee personally owes the whole amount.', 'th'],
   [/^unpaid$/i, 'Reserves accrued and not paid out yet.', 'th'],
   [/\breconcil(?:ed|iation|e)\b/i, 'Matched the insurer\'s payment to what it owed and posted any difference.'],
   [/^settled\b/i, 'Paid out to the claimant; the insurer may still owe its share.'],
@@ -124,12 +137,79 @@ const TERMS: [RegExp, string, string?][] = [
 ];
 
 /** Text in these is never wrapped: controls and anything already defined. */
-const SKIP = 'abbr, button, input, option, select, textarea, script, style';
+const SKIP = 'abbr, a, button, input, option, select, summary, textarea, script, style';
 
 /** The same terms, searchable from any place in a text: ^ and $ still mean the whole text. */
 const SEARCH = TERMS.map(([re, title, where]) => [new RegExp(re.source, `${re.flags}g`), title, where] as const);
 
-function wrap(text: Text) {
+let tooltip: HTMLElement | undefined;
+let active: HTMLElement | undefined;
+let hovered: HTMLElement | undefined;
+let focused: HTMLElement | undefined;
+let pinned = false;
+let overTooltip = false;
+let scope = '';
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+function closeDefinition() {
+  active?.removeAttribute('aria-describedby');
+  active?.setAttribute('aria-expanded', 'false');
+  active = undefined;
+  pinned = false;
+  overTooltip = false;
+  if (tooltip) tooltip.hidden = true;
+}
+
+function positionDefinition() {
+  if (!active || !tooltip) return;
+  const box = active.getBoundingClientRect();
+  if (!active.isConnected || box.bottom < 0 || box.top > innerHeight) return closeDefinition();
+  const width = tooltip.offsetWidth;
+  const height = tooltip.offsetHeight;
+  tooltip.style.left = `${Math.max(8, Math.min(box.left, innerWidth - width - 8))}px`;
+  tooltip.style.top = `${Math.max(8, box.bottom + height + 6 > innerHeight ? box.top - height - 6 : box.bottom + 6)}px`;
+}
+
+function closeWhenIdle() {
+  clearTimeout(closeTimer);
+  // Keep the definition visible while the pointer crosses the gap to its text.
+  closeTimer = setTimeout(() => {
+    if (!pinned && !overTooltip && active !== hovered && active !== focused) closeDefinition();
+  }, 120);
+}
+
+function showDefinition(term: HTMLElement, context: string) {
+  clearTimeout(closeTimer);
+  if (active !== term) closeDefinition();
+  active = term;
+  scope = context;
+  tooltip!.replaceChildren(h('b', {}, `${term.textContent}: `), term.dataset.definition!);
+  tooltip!.hidden = false;
+  term.setAttribute('aria-describedby', tooltip!.id);
+  term.setAttribute('aria-expanded', 'true');
+  positionDefinition();
+}
+
+function definition(label: string, text: string, context: string) {
+  const term = h('button', { type: 'button', class: 'finance-term', 'data-definition': text, 'aria-expanded': 'false' }, label);
+  term.addEventListener('pointerenter', () => { hovered = term; if (!pinned) showDefinition(term, context); });
+  term.addEventListener('pointerleave', () => { if (hovered === term) hovered = undefined; closeWhenIdle(); });
+  term.addEventListener('focus', () => { focused = term; showDefinition(term, context); });
+  term.addEventListener('blur', () => { focused = undefined; pinned = false; closeWhenIdle(); });
+  term.addEventListener('click', () => {
+    if (active === term && pinned) closeDefinition();
+    else { showDefinition(term, context); pinned = true; }
+  });
+  return term;
+}
+
+/** Holds the page steady while a definition is read, and releases it when changing tabs. */
+export function readingDefinition(context: string): boolean {
+  if (active && (scope !== context || !active.isConnected)) closeDefinition();
+  return !!active;
+}
+
+function wrap(text: Text, context: string) {
   const s = text.data;
   const parts: (string | HTMLElement)[] = [];
   let at = 0;
@@ -142,18 +222,30 @@ function wrap(text: Text) {
       if (m && m[0] && (!best || m.index < best.from)) best = { from: m.index, to: m.index + m[0].length, title };
     }
     if (!best) break;
-    parts.push(s.slice(at, best.from), h('abbr', { title: best.title }, s.slice(best.from, best.to)));
+    parts.push(s.slice(at, best.from), definition(s.slice(best.from, best.to), best.title, context));
     at = best.to;
   }
   if (parts.length) text.replaceWith(...parts, s.slice(at));
 }
 
-/** Wraps every finance term under `root` in an <abbr> that defines it on hover. */
-export function defineTerms(root: HTMLElement) {
+/** Adds visible, keyboard-accessible definitions without nesting controls or wrapping twice. */
+export function defineTerms(root: HTMLElement, context = '') {
+  if (!tooltip) {
+    tooltip = h('div', { id: 'finance-definition', class: 'finance-definition', role: 'tooltip', hidden: true });
+    tooltip.addEventListener('pointerenter', () => { overTooltip = true; clearTimeout(closeTimer); });
+    tooltip.addEventListener('pointerleave', () => { overTooltip = false; closeWhenIdle(); });
+    document.body.append(tooltip);
+    document.addEventListener('pointerdown', e => {
+      if (active && !active.contains(e.target as Node) && !tooltip!.contains(e.target as Node)) closeDefinition();
+    }, true);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDefinition(); });
+    window.addEventListener('resize', positionDefinition);
+    document.addEventListener('scroll', positionDefinition, true);
+  }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (!n.parentElement?.closest(SKIP)) texts.push(n as Text);
   }
-  texts.forEach(wrap);
+  texts.forEach(text => wrap(text, context));
 }

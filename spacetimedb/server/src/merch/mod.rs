@@ -2,8 +2,8 @@
 //! green photo area. When the event ends, the shopping agent (Claude, through a worker job) picks three
 //! products for each attendee from their night: which template, which of their photos (the ones with the
 //! people they met first) and a short line printed on it. Until it answers, or when it cannot, code ranks
-//! the templates by the minutes spent at their booths. The attendee buys one from their BandIt wallet and a
-//! worker records the purchase on Nessie. The app draws the photo and the line into the photo area; the
+//! the templates by the minutes spent at their booths. The attendee buys during and after the event from
+//! their BandIt wallet, and a worker records the purchase on Nessie. The app draws the photo and the line into the photo area; the
 //! server renders and stores no image, and an order keeps the template, the photo and the line.
 
 use crate::insurance::*;
@@ -24,6 +24,7 @@ pub const KIND_MERCH_PICKS: &str = "merch_picks";
 /// Longest line printed on a product, and longest reason shown with it.
 pub const LINE_CHARS: usize = 40;
 pub const REASON_CHARS: usize = 200;
+pub const SHIPPING_ADDRESS_CHARS: usize = 1000;
 pub const TEE_SIZES: &[&str] = &["S", "M", "L", "XL"];
 const SUGGESTIONS: usize = 3;
 
@@ -110,6 +111,15 @@ pub struct MerchOrder {
     pub line: String,
 }
 
+/// The delivery destination fixed at checkout, separate from the existing order schema.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = merch_shipping)]
+pub struct MerchShipping {
+    #[primary_key]
+    pub order_id: u64,
+    pub shipping_address: String,
+}
+
 /// One product the shopping agent picked for an attendee: a template, one of their photos, the line
 /// printed on it and why it suits them.
 #[derive(Clone, Debug)]
@@ -193,22 +203,44 @@ pub fn load_merch_templates(ctx: &ReducerContext, templates: Vec<MerchTemplateIn
 /// Buys one template with one of the caller's photos, paid from their wallet.
 #[spacetimedb::reducer]
 pub fn buy_merch(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
-    place_order(ctx, ctx.sender(), template_id, photo_id, size)
+    place_order(ctx, ctx.sender(), template_id, photo_id, size, String::new())
 }
 
-/// The organizer buys for an attendee exactly as the attendee would from their recap: the same
+/// Buys from the attendee's wallet with a delivery address saved on this order.
+#[spacetimedb::reducer]
+pub fn buy_merch_with_shipping(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
+    place_order(ctx, ctx.sender(), template_id, photo_id, size, checked_shipping_address(&shipping_address)?)
+}
+
+/// The organizer buys for an attendee exactly as the attendee would from their tap page: the same
 /// checks, paid from the attendee's wallet.
 #[spacetimedb::reducer]
 pub fn buy_merch_as(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
     let a = ctx.db.attendee().node_id().find(node_id).ok_or("no such attendee")?;
-    place_order(ctx, a.identity, template_id, photo_id, size)
+    place_order(ctx, a.identity, template_id, photo_id, size, String::new())
 }
 
-fn place_order(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
-    if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) && !crate::departure::left(ctx, me) {
-        return Err("merch opens in your recap once you leave or the event ends".into());
+/// The organizer buys for an attendee with the delivery address provided at checkout.
+#[spacetimedb::reducer]
+pub fn buy_merch_as_with_shipping(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let a = ctx.db.attendee().node_id().find(node_id).ok_or("no such attendee")?;
+    place_order(ctx, a.identity, template_id, photo_id, size, checked_shipping_address(&shipping_address)?)
+}
+
+fn checked_shipping_address(address: &str) -> Result<String, String> {
+    let address = address.trim();
+    if address.is_empty() {
+        return Err("enter the recipient and full shipping address".into());
     }
+    if address.chars().count() > SHIPPING_ADDRESS_CHARS {
+        return Err(format!("shipping address must be {SHIPPING_ADDRESS_CHARS} characters or fewer"));
+    }
+    Ok(address.to_string())
+}
+
+fn place_order(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
     let t = ctx.db.merch_template().id().find(template_id).ok_or("no such template")?;
     let size = match t.kind.as_str() {
         "tee" if TEE_SIZES.contains(&size.as_str()) => size,
@@ -244,6 +276,9 @@ fn place_order(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u
         updated_at: ctx.timestamp,
         line,
     });
+    if !shipping_address.is_empty() {
+        ctx.db.merch_shipping().insert(MerchShipping { order_id: order.id, shipping_address });
+    }
     let merchant_id = ctx.db.merch_shop().id().find(0).map(|s| s.nessie_merchant_id).unwrap_or_default();
     let what = if size.is_empty() { t.title.clone() } else { format!("{} ({size})", t.title) };
     let payload = serde_json::json!({
@@ -298,6 +333,22 @@ pub fn my_held_cents(ctx: &ViewContext, who: Identity) -> i64 {
 #[spacetimedb::view(accessor = my_merch_orders, public)]
 pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {
     ctx.db.merch_order().attendee().filter(viewed(ctx)).collect()
+}
+
+#[spacetimedb::view(accessor = my_merch_shipping, public)]
+pub fn my_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping> {
+    ctx.db.merch_order().attendee().filter(viewed(ctx)).filter_map(|o| ctx.db.merch_shipping().order_id().find(o.id)).collect()
+}
+
+/// Delivery destinations for the organizer's order list.
+#[spacetimedb::view(accessor = board_merch_shipping, public)]
+pub fn board_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping> {
+    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == "ops");
+    if !ops {
+        return Vec::new();
+    }
+    ctx.db.merch_order().attendee().filter(Identity::ZERO..).filter_map(|o| ctx.db.merch_shipping().order_id().find(o.id)).collect()
 }
 
 /// One order with who placed it, for the organizer portal's Merch tab.

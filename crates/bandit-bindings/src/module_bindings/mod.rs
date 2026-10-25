@@ -56,6 +56,7 @@ pub mod board_merch_order_type;
 pub mod board_merch_orders_table;
 pub mod board_merch_pick_type;
 pub mod board_merch_picks_table;
+pub mod board_merch_shipping_table;
 pub mod board_notes_table;
 pub mod board_organizer_precedents_table;
 pub mod board_photo_type;
@@ -78,7 +79,9 @@ pub mod booth_type;
 pub mod bridge_table;
 pub mod bridge_type;
 pub mod buy_merch_as_reducer;
+pub mod buy_merch_as_with_shipping_reducer;
 pub mod buy_merch_reducer;
+pub mod buy_merch_with_shipping_reducer;
 pub mod camera_table;
 pub mod camera_type;
 pub mod charge_table;
@@ -253,6 +256,8 @@ pub mod merch_order_type;
 pub mod merch_pick_in_type;
 pub mod merch_pick_table;
 pub mod merch_pick_type;
+pub mod merch_shipping_table;
+pub mod merch_shipping_type;
 pub mod merch_shop_table;
 pub mod merch_shop_type;
 pub mod merch_suggestion_type;
@@ -280,6 +285,7 @@ pub mod my_incidents_table;
 pub mod my_medical_card_table;
 pub mod my_medical_documents_table;
 pub mod my_merch_orders_table;
+pub mod my_merch_shipping_table;
 pub mod my_merch_suggestions_table;
 pub mod my_owner_table;
 pub mod my_photo_type;
@@ -516,6 +522,7 @@ pub use board_merch_order_type::BoardMerchOrder;
 pub use board_merch_orders_table::*;
 pub use board_merch_pick_type::BoardMerchPick;
 pub use board_merch_picks_table::*;
+pub use board_merch_shipping_table::*;
 pub use board_notes_table::*;
 pub use board_organizer_precedents_table::*;
 pub use board_photo_type::BoardPhoto;
@@ -538,7 +545,9 @@ pub use booth_type::Booth;
 pub use bridge_table::*;
 pub use bridge_type::Bridge;
 pub use buy_merch_as_reducer::buy_merch_as;
+pub use buy_merch_as_with_shipping_reducer::buy_merch_as_with_shipping;
 pub use buy_merch_reducer::buy_merch;
+pub use buy_merch_with_shipping_reducer::buy_merch_with_shipping;
 pub use camera_table::*;
 pub use camera_type::Camera;
 pub use charge_table::*;
@@ -713,6 +722,8 @@ pub use merch_order_type::MerchOrder;
 pub use merch_pick_in_type::MerchPickIn;
 pub use merch_pick_table::*;
 pub use merch_pick_type::MerchPick;
+pub use merch_shipping_table::*;
+pub use merch_shipping_type::MerchShipping;
 pub use merch_shop_table::*;
 pub use merch_shop_type::MerchShop;
 pub use merch_suggestion_type::MerchSuggestion;
@@ -740,6 +751,7 @@ pub use my_incidents_table::*;
 pub use my_medical_card_table::*;
 pub use my_medical_documents_table::*;
 pub use my_merch_orders_table::*;
+pub use my_merch_shipping_table::*;
 pub use my_merch_suggestions_table::*;
 pub use my_owner_table::*;
 pub use my_photo_type::MyPhoto;
@@ -1001,6 +1013,19 @@ pub enum Reducer {
         template_id: u64,
         photo_id: u64,
         size: String,
+    },
+    BuyMerchAsWithShipping {
+        node_id: u64,
+        template_id: u64,
+        photo_id: u64,
+        size: String,
+        shipping_address: String,
+    },
+    BuyMerchWithShipping {
+        template_id: u64,
+        photo_id: u64,
+        size: String,
+        shipping_address: String,
     },
     ChooseVenue {
         setup_id: u64,
@@ -1491,6 +1516,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
             Reducer::BuyMerch { .. } => "buy_merch",
             Reducer::BuyMerchAs { .. } => "buy_merch_as",
+            Reducer::BuyMerchAsWithShipping { .. } => "buy_merch_as_with_shipping",
+            Reducer::BuyMerchWithShipping { .. } => "buy_merch_with_shipping",
             Reducer::ChooseVenue { .. } => "choose_venue",
             Reducer::ClaimBand { .. } => "claim_band",
             Reducer::ClaimJob { .. } => "claim_job",
@@ -1733,6 +1760,34 @@ impl __sdk::Reducer for Reducer {
                 photo_id: photo_id.clone(),
                 size: size.clone(),
             }),
+            Reducer::BuyMerchAsWithShipping {
+                node_id,
+                template_id,
+                photo_id,
+                size,
+                shipping_address,
+            } => __sats::bsatn::to_vec(
+                &buy_merch_as_with_shipping_reducer::BuyMerchAsWithShippingArgs {
+                    node_id: node_id.clone(),
+                    template_id: template_id.clone(),
+                    photo_id: photo_id.clone(),
+                    size: size.clone(),
+                    shipping_address: shipping_address.clone(),
+                },
+            ),
+            Reducer::BuyMerchWithShipping {
+                template_id,
+                photo_id,
+                size,
+                shipping_address,
+            } => {
+                __sats::bsatn::to_vec(&buy_merch_with_shipping_reducer::BuyMerchWithShippingArgs {
+                    template_id: template_id.clone(),
+                    photo_id: photo_id.clone(),
+                    size: size.clone(),
+                    shipping_address: shipping_address.clone(),
+                })
+            }
             Reducer::ChooseVenue { setup_id } => {
                 __sats::bsatn::to_vec(&choose_venue_reducer::ChooseVenueArgs {
                     setup_id: setup_id.clone(),
@@ -2591,6 +2646,7 @@ pub struct DbUpdate {
     board_medical_access: __sdk::TableUpdate<MedicalAccessLog>,
     board_merch_orders: __sdk::TableUpdate<BoardMerchOrder>,
     board_merch_picks: __sdk::TableUpdate<BoardMerchPick>,
+    board_merch_shipping: __sdk::TableUpdate<MerchShipping>,
     board_notes: __sdk::TableUpdate<IncidentNote>,
     board_organizer_precedents: __sdk::TableUpdate<OrganizerPrecedent>,
     board_photos: __sdk::TableUpdate<BoardPhoto>,
@@ -2668,6 +2724,7 @@ pub struct DbUpdate {
     medical_record: __sdk::TableUpdate<MedicalRecord>,
     merch_order: __sdk::TableUpdate<MerchOrder>,
     merch_pick: __sdk::TableUpdate<MerchPick>,
+    merch_shipping: __sdk::TableUpdate<MerchShipping>,
     merch_shop: __sdk::TableUpdate<MerchShop>,
     merch_template: __sdk::TableUpdate<MerchTemplate>,
     model_call: __sdk::TableUpdate<ModelCall>,
@@ -2684,6 +2741,7 @@ pub struct DbUpdate {
     my_medical_card: __sdk::TableUpdate<MedicalCard>,
     my_medical_documents: __sdk::TableUpdate<MedicalDocument>,
     my_merch_orders: __sdk::TableUpdate<MerchOrder>,
+    my_merch_shipping: __sdk::TableUpdate<MerchShipping>,
     my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
     my_owner: __sdk::TableUpdate<Owner>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
@@ -2821,6 +2879,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_merch_picks" => db_update
                     .board_merch_picks
                     .append(board_merch_picks_table::parse_table_update(table_update)?),
+                "board_merch_shipping" => db_update.board_merch_shipping.append(
+                    board_merch_shipping_table::parse_table_update(table_update)?,
+                ),
                 "board_notes" => db_update
                     .board_notes
                     .append(board_notes_table::parse_table_update(table_update)?),
@@ -3052,6 +3113,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "merch_pick" => db_update
                     .merch_pick
                     .append(merch_pick_table::parse_table_update(table_update)?),
+                "merch_shipping" => db_update
+                    .merch_shipping
+                    .append(merch_shipping_table::parse_table_update(table_update)?),
                 "merch_shop" => db_update
                     .merch_shop
                     .append(merch_shop_table::parse_table_update(table_update)?),
@@ -3100,6 +3164,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_merch_orders" => db_update
                     .my_merch_orders
                     .append(my_merch_orders_table::parse_table_update(table_update)?),
+                "my_merch_shipping" => db_update
+                    .my_merch_shipping
+                    .append(my_merch_shipping_table::parse_table_update(table_update)?),
                 "my_merch_suggestions" => db_update.my_merch_suggestions.append(
                     my_merch_suggestions_table::parse_table_update(table_update)?,
                 ),
@@ -3489,6 +3556,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.merch_pick = cache
             .apply_diff_to_table::<MerchPick>("merch_pick", &self.merch_pick)
             .with_updates_by_pk(|row| &row.id);
+        diff.merch_shipping = cache
+            .apply_diff_to_table::<MerchShipping>("merch_shipping", &self.merch_shipping)
+            .with_updates_by_pk(|row| &row.order_id);
         diff.merch_shop = cache
             .apply_diff_to_table::<MerchShop>("merch_shop", &self.merch_shop)
             .with_updates_by_pk(|row| &row.id);
@@ -3645,6 +3715,10 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<BoardMerchOrder>("board_merch_orders", &self.board_merch_orders);
         diff.board_merch_picks = cache
             .apply_diff_to_table::<BoardMerchPick>("board_merch_picks", &self.board_merch_picks);
+        diff.board_merch_shipping = cache.apply_diff_to_table::<MerchShipping>(
+            "board_merch_shipping",
+            &self.board_merch_shipping,
+        );
         diff.board_notes =
             cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
         diff.board_organizer_precedents = cache
@@ -3731,6 +3805,8 @@ impl __sdk::DbUpdate for DbUpdate {
         );
         diff.my_merch_orders =
             cache.apply_diff_to_table::<MerchOrder>("my_merch_orders", &self.my_merch_orders);
+        diff.my_merch_shipping = cache
+            .apply_diff_to_table::<MerchShipping>("my_merch_shipping", &self.my_merch_shipping);
         diff.my_merch_suggestions = cache.apply_diff_to_table::<MerchSuggestion>(
             "my_merch_suggestions",
             &self.my_merch_suggestions,
@@ -3846,6 +3922,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_merch_picks" => db_update
                     .board_merch_picks
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_merch_shipping" => db_update
+                    .board_merch_shipping
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
@@ -4078,6 +4157,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "merch_pick" => db_update
                     .merch_pick
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "merch_shipping" => db_update
+                    .merch_shipping
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "merch_shop" => db_update
                     .merch_shop
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4125,6 +4207,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_merch_orders" => db_update
                     .my_merch_orders
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_merch_shipping" => db_update
+                    .my_merch_shipping
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_merch_suggestions" => db_update
                     .my_merch_suggestions
@@ -4382,6 +4467,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_merch_picks" => db_update
                     .board_merch_picks
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_merch_shipping" => db_update
+                    .board_merch_shipping
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4613,6 +4701,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "merch_pick" => db_update
                     .merch_pick
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "merch_shipping" => db_update
+                    .merch_shipping
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "merch_shop" => db_update
                     .merch_shop
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4660,6 +4751,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_merch_orders" => db_update
                     .my_merch_orders
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_merch_shipping" => db_update
+                    .my_merch_shipping
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_merch_suggestions" => db_update
                     .my_merch_suggestions
@@ -4871,6 +4965,7 @@ pub struct AppliedDiff<'r> {
     board_medical_access: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
     board_merch_orders: __sdk::TableAppliedDiff<'r, BoardMerchOrder>,
     board_merch_picks: __sdk::TableAppliedDiff<'r, BoardMerchPick>,
+    board_merch_shipping: __sdk::TableAppliedDiff<'r, MerchShipping>,
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
     board_organizer_precedents: __sdk::TableAppliedDiff<'r, OrganizerPrecedent>,
     board_photos: __sdk::TableAppliedDiff<'r, BoardPhoto>,
@@ -4948,6 +5043,7 @@ pub struct AppliedDiff<'r> {
     medical_record: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     merch_order: __sdk::TableAppliedDiff<'r, MerchOrder>,
     merch_pick: __sdk::TableAppliedDiff<'r, MerchPick>,
+    merch_shipping: __sdk::TableAppliedDiff<'r, MerchShipping>,
     merch_shop: __sdk::TableAppliedDiff<'r, MerchShop>,
     merch_template: __sdk::TableAppliedDiff<'r, MerchTemplate>,
     model_call: __sdk::TableAppliedDiff<'r, ModelCall>,
@@ -4964,6 +5060,7 @@ pub struct AppliedDiff<'r> {
     my_medical_card: __sdk::TableAppliedDiff<'r, MedicalCard>,
     my_medical_documents: __sdk::TableAppliedDiff<'r, MedicalDocument>,
     my_merch_orders: __sdk::TableAppliedDiff<'r, MerchOrder>,
+    my_merch_shipping: __sdk::TableAppliedDiff<'r, MerchShipping>,
     my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
     my_owner: __sdk::TableAppliedDiff<'r, Owner>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
@@ -5112,6 +5209,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<BoardMerchPick>(
             "board_merch_picks",
             &self.board_merch_picks,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MerchShipping>(
+            "board_merch_shipping",
+            &self.board_merch_shipping,
             event,
         );
         callbacks.invoke_table_row_callbacks::<IncidentNote>(
@@ -5383,6 +5485,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<MerchOrder>("merch_order", &self.merch_order, event);
         callbacks.invoke_table_row_callbacks::<MerchPick>("merch_pick", &self.merch_pick, event);
+        callbacks.invoke_table_row_callbacks::<MerchShipping>(
+            "merch_shipping",
+            &self.merch_shipping,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<MerchShop>("merch_shop", &self.merch_shop, event);
         callbacks.invoke_table_row_callbacks::<MerchTemplate>(
             "merch_template",
@@ -5429,6 +5536,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<MerchOrder>(
             "my_merch_orders",
             &self.my_merch_orders,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MerchShipping>(
+            "my_merch_shipping",
+            &self.my_merch_shipping,
             event,
         );
         callbacks.invoke_table_row_callbacks::<MerchSuggestion>(
@@ -6288,6 +6400,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_medical_access_table::register_table(client_cache);
         board_merch_orders_table::register_table(client_cache);
         board_merch_picks_table::register_table(client_cache);
+        board_merch_shipping_table::register_table(client_cache);
         board_notes_table::register_table(client_cache);
         board_organizer_precedents_table::register_table(client_cache);
         board_photos_table::register_table(client_cache);
@@ -6365,6 +6478,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         medical_record_table::register_table(client_cache);
         merch_order_table::register_table(client_cache);
         merch_pick_table::register_table(client_cache);
+        merch_shipping_table::register_table(client_cache);
         merch_shop_table::register_table(client_cache);
         merch_template_table::register_table(client_cache);
         model_call_table::register_table(client_cache);
@@ -6381,6 +6495,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_medical_card_table::register_table(client_cache);
         my_medical_documents_table::register_table(client_cache);
         my_merch_orders_table::register_table(client_cache);
+        my_merch_shipping_table::register_table(client_cache);
         my_merch_suggestions_table::register_table(client_cache);
         my_owner_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
@@ -6464,6 +6579,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_medical_access",
         "board_merch_orders",
         "board_merch_picks",
+        "board_merch_shipping",
         "board_notes",
         "board_organizer_precedents",
         "board_photos",
@@ -6534,6 +6650,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "medical_record",
         "merch_order",
         "merch_pick",
+        "merch_shipping",
         "merch_shop",
         "merch_template",
         "model_call",
@@ -6550,6 +6667,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_medical_card",
         "my_medical_documents",
         "my_merch_orders",
+        "my_merch_shipping",
         "my_merch_suggestions",
         "my_owner",
         "my_photos",

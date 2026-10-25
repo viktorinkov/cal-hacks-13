@@ -1144,6 +1144,12 @@ export const MerchPickIn = __t.object("MerchPickIn", {
 });
 export type MerchPickIn = __Infer<typeof MerchPickIn>;
 
+export const MerchShipping = __t.object("MerchShipping", {
+  orderId: __t.u64(),
+  shippingAddress: __t.string(),
+});
+export type MerchShipping = __Infer<typeof MerchShipping>;
+
 export const MerchShop = __t.object("MerchShop", {
   id: __t.u8(),
   nessieMerchantId: __t.string(),

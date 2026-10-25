@@ -183,7 +183,7 @@ impl World {
         photo.id
     }
 
-    /// The host's "Event ended" button; merch is sold only after it.
+    /// The host's "Event ended" button, which also queues the final shopping picks.
     fn end_event(&self) {
         self.as_("ops", crate::web::end_event);
     }
@@ -329,15 +329,14 @@ fn suggestions_rank_sponsor_templates_by_minutes_at_their_booths() {
 }
 
 #[test]
-fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
+fn purchases_during_and_after_the_event_hold_money_and_settle_into_the_wallet() {
     let w = World::new();
+    w.as_("ops", crate::web::reopen_event);
     w.sign_up("Maya Chen");
     let photo = w.photo("Maya Chen", w.sponsor_row);
     let tee = w.template("tee_spacetimedb.png");
 
-    let err = w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err();
-    assert!(err.contains("once you leave or the event ends"), "{err}");
-    w.end_event();
+    assert!(!w.t.db.event_state().id().find(0).unwrap().ended);
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, String::new())).unwrap_err().contains("size"));
     assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err().contains("photo"));
     w.as_("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into()));
@@ -358,10 +357,12 @@ fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
     assert_eq!(w.balance("Maya Chen"), 17_500);
     assert_eq!(my_merch_orders(&w.view("Maya Chen")).len(), 1);
     assert!(my_merch_orders(&w.view("Jordan Alvarez")).is_empty());
+    assert!(my_merch_shipping(&w.view("Maya Chen")).is_empty(), "earlier clients still buy without changing their order schema");
     let entries = my_wallet_entries(&w.view("Maya Chen"));
     assert_eq!(entries.last().map(|e| (e.kind.as_str(), e.amount_cents)), Some(("purchase", -2500)));
 
-    // The next purchase carries the merchant the first one created; a mug needs no size.
+    // Buying still works after the event; the next purchase reuses the merchant.
+    w.end_event();
     let mug = w.template("mug_elastic.png");
     w.as_("Maya Chen", |ctx| buy_merch(ctx, mug.id, photo, "XL".into()));
     assert_eq!(w.last_order().size, "");
@@ -374,7 +375,6 @@ fn a_failed_purchase_frees_the_money_and_the_wallet_cannot_overspend() {
     let w = World::new();
     let photo = w.photo("Maya Chen", w.sponsor_row);
     let tee = w.template("tee.png");
-    w.end_event();
     w.as_("Maya Chen", |ctx| update_profile(ctx, "Maya Chen".into(), true));
     w.as_("Maya Chen", crate::wallet::connect_wallet);
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "S".into())).unwrap_err().contains("opening"));
@@ -420,8 +420,6 @@ fn the_organizer_buys_as_an_attendee_from_their_wallet() {
     let photo = w.photo("Maya Chen", w.sponsor_row);
     let tee = w.template("tee_spacetimedb.png");
     let maya = w.t.db.attendee().identity().find(id("Maya Chen")).unwrap().node_id;
-    w.end_event();
-
     assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch_as(ctx, maya, tee.id, photo, "M".into())).unwrap_err().contains("roles"));
     assert!(w.try_as("ops", |ctx| buy_merch_as(ctx, maya + 99, tee.id, photo, "M".into())).unwrap_err().contains("no such attendee"));
     w.as_("ops", |ctx| buy_merch_as(ctx, maya, tee.id, photo, "L".into()));
@@ -432,6 +430,74 @@ fn the_organizer_buys_as_an_attendee_from_their_wallet() {
     let wallets = crate::wallet::board_wallets(&w.view("ops"));
     assert_eq!(wallets.iter().map(|x| (x.node_id, x.balance_cents)).collect::<Vec<_>>(), [(maya, 17_500)]);
     assert!(crate::wallet::board_wallets(&w.view("Maya Chen")).is_empty());
+}
+
+#[test]
+fn shipping_checkout_rejects_missing_and_overlong_addresses_without_holding_money() {
+    let w = World::new();
+    w.sign_up("Maya Chen");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
+    let mug = w.template("mug_elastic.png");
+
+    for address in [" \n\t ".to_string(), "a".repeat(SHIPPING_ADDRESS_CHARS + 1)] {
+        let err = w.try_as("Maya Chen", |ctx| buy_merch_with_shipping(ctx, mug.id, photo, String::new(), address)).unwrap_err();
+        assert!(err.contains("shipping address"), "{err}");
+    }
+    assert_eq!(w.t.db.merch_order().count(), 0);
+    assert_eq!(w.t.db.merch_shipping().count(), 0);
+    assert_eq!(w.t.db.job().kind().filter(KIND_MERCH_PURCHASE).count(), 0);
+    assert_eq!(w.balance("Maya Chen"), 20_000);
+}
+
+#[test]
+fn shipping_is_trimmed_fixed_per_order_and_visible_only_with_the_orders() {
+    let w = World::new();
+    w.as_("ops", crate::web::reopen_event);
+    w.sign_up("Maya Chen");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
+    let mug = w.template("mug_elastic.png");
+    let address = "Maya Chen\nEvent delivery desk\nFort Mason Center\nSan Francisco, CA 94123\nUnited States";
+    w.as_("Maya Chen", |ctx| buy_merch_with_shipping(ctx, mug.id, photo, String::new(), format!("  {address}\n ")));
+    let first = w.last_order();
+    assert_eq!(w.t.db.merch_shipping().order_id().find(first.id).unwrap().shipping_address, address);
+    assert_eq!(w.balance("Maya Chen"), 18_200);
+    assert_eq!(my_merch_shipping(&w.view("Maya Chen"))[0].shipping_address, address);
+    assert!(my_merch_shipping(&w.view("Jordan Alvarez")).is_empty());
+    assert!(board_merch_shipping(&w.view("Jordan Alvarez")).is_empty());
+    assert_eq!(board_merch_shipping(&w.view("ops"))[0].order_id, first.id);
+    assert_eq!(board_merch_shipping(&w.view("owner"))[0].shipping_address, address);
+
+    let job = w.lease(KIND_MERCH_PURCHASE);
+    w.as_("worker", |ctx| settle_merch_order(ctx, job.id, "merchant-1".into(), "purchase-1".into()));
+    assert_eq!(w.order(first.id).status, PAID);
+    w.end_event();
+    let next_address = "Maya Chen\nEvent collection desk B\nFort Mason Center\nSan Francisco, CA 94123\nUnited States";
+    w.as_("Maya Chen", |ctx| buy_merch_with_shipping(ctx, mug.id, photo, String::new(), next_address.into()));
+    assert_eq!(w.t.db.merch_shipping().order_id().find(first.id).unwrap().shipping_address, address);
+    assert_eq!(w.t.db.merch_shipping().order_id().find(w.last_order().id).unwrap().shipping_address, next_address);
+    assert_eq!(my_merch_shipping(&w.view("Maya Chen")).len(), 2);
+}
+
+#[test]
+fn organizer_shipping_checkout_keeps_role_and_photo_checks() {
+    let w = World::new();
+    w.sign_up("Maya Chen");
+    w.sign_up("Jordan Alvarez");
+    let photo = w.photo("Maya Chen", w.sponsor_row);
+    let tee = w.template("tee.png");
+    let maya = w.t.db.attendee().identity().find(id("Maya Chen")).unwrap().node_id;
+    let jordan = w.t.db.attendee().identity().find(id("Jordan Alvarez")).unwrap().node_id;
+    let address = "Maya Chen\nEvent delivery desk\nFort Mason Center\nSan Francisco, CA 94123\nUnited States";
+    assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch_as_with_shipping(ctx, maya, tee.id, photo, "M".into(), address.into())).unwrap_err().contains("roles"));
+    assert!(w.try_as("ops", |ctx| buy_merch_as_with_shipping(ctx, maya, tee.id, photo, "M".into(), " ".into())).unwrap_err().contains("shipping address"));
+    assert!(w.try_as("ops", |ctx| buy_merch_as_with_shipping(ctx, jordan, tee.id, photo, "M".into(), address.into())).unwrap_err().contains("photo"));
+    assert_eq!(w.t.db.merch_order().count(), 0);
+    w.as_("ops", |ctx| buy_merch_as_with_shipping(ctx, maya, tee.id, photo, "M".into(), address.into()));
+    let order = w.last_order();
+    assert_eq!(order.attendee, id("Maya Chen"));
+    assert_eq!(board_merch_shipping(&w.view("ops"))[0].shipping_address, address);
+    assert_eq!(w.balance("Maya Chen"), 17_500);
+    assert_eq!(w.balance("Jordan Alvarez"), 20_000);
 }
 
 #[test]
@@ -504,7 +570,7 @@ fn the_shopping_agent_picks_replace_the_ranking_and_go_onto_the_order() {
 }
 
 #[test]
-fn an_attendee_who_leaves_early_shops_at_once_and_the_end_of_the_event_skips_them() {
+fn leaving_early_queues_final_picks_and_shopping_stays_open_for_everyone() {
     let w = World::new();
     w.sign_up("Maya Chen");
     w.sign_up("Jordan Alvarez");
@@ -521,8 +587,9 @@ fn an_attendee_who_leaves_early_shops_at_once_and_the_end_of_the_event_skips_the
     assert_eq!(jobs.iter().map(|j| j.subject_id).collect::<Vec<_>>(), [maya_node], "her shopping agent runs as she walks out");
 
     w.as_("Maya Chen", |ctx| buy_merch(ctx, mug.id, hers, String::new()));
-    let err = w.try_as("Jordan Alvarez", |ctx| buy_merch(ctx, mug.id, his, String::new())).unwrap_err();
-    assert!(err.contains("once you leave or the event ends"), "{err}");
+    w.as_("Jordan Alvarez", |ctx| buy_merch(ctx, mug.id, his, String::new()));
+    assert_eq!(w.balance("Maya Chen"), 18_200);
+    assert_eq!(w.balance("Jordan Alvarez"), 18_200);
     assert!(w.try_as("Maya Chen", crate::departure::leave_event).unwrap_err().contains("already left"));
 
     w.end_event();

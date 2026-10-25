@@ -310,7 +310,7 @@ The tab carries no explanation text, and it names none of the services behind it
 
 ### Costs tab (Insurance.md)
 
-The Costs tab shows the event's costs so far, from the incidents the event has covered and the merch it sold. It answers one question for the organizer, who acts as the event's controller: who pays what.
+The Costs tab is the organizer's finance dashboard for claims and merch, during and after the event. It shows gross sales, printing costs, amounts owed to booths, event earnings, claim costs and money still waiting to be collected. Review buttons open the existing claim, charge and shopping controls.
 
 It sums the double-entry `ledger_entry` journals that the claims and charges post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every claim number agrees with the Settlements tab, and the tab keeps no totals of its own. Merch comes from the paid orders in `board_merch_orders`, the merch subledger, with each product's kind and booths from `merch_template` ([Merch](../6-features/Merch.md#merch-on-the-costs-tab)).
 
@@ -318,14 +318,18 @@ Each claim's cover picks its cost center. Medical payments cover goes to Medical
 
 The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible: the insurer's share goes to `insurer_payable` and the venue's deductible to `recoveries`. J6 charge payment is its cash application.
 
-"Net cost" is one row, the bottom line:
+"Revenue" stays visible even with no orders: paid order count, gross sales, print cost, amounts owed to booths and event earnings. Only paid orders count. Event earnings are gross sales less print cost and amounts owed to booths.
+
+"Net cost" stays visible even with no claims:
 
 | Column | From |
 |---|---|
-| Claims | what the claims cost the venue, the Venue column of "Who pays" |
-| Recovered | the venue's part of the charges: the `recoveries` balance, the venue's deductible share; the insurer's share sits in `insurer_payable` |
-| Merch margin | the Margin total of "Merch" |
-| Net cost | Claims less Recovered less Merch margin |
+| Claims cost | the claim expense balance plus uncovered property losses |
+| Approved recoveries | the venue's part of approved charges, whether collected yet or still owed; the insurer's share sits in `insurer_payable` |
+| Event earnings | the Margin total of "Merch" |
+| Net cost | Claims cost less Approved recoveries less Event earnings |
+
+"Payments" separates recorded claim payments, insurer receipts and outstanding balances, attendee charge collections and outstanding balances, and the venue's collected part of those charges. A charge approval alone is never labeled collected. "Needs attention" links claims awaiting review, failed payouts, outstanding insurer payments, charges awaiting review and unfinished orders to their existing controls. The full trial balance and journal sit in a closed details section.
 
 "Cost centers" has one row per cost center and a total row:
 
@@ -350,11 +354,11 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 
 "Trial balance" has one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. "Journal" lists every journal entry, newest first, with its claim, its lines on one row and when it was posted.
 
-With no claims and no paid orders the tab reads "No claims yet." With paid orders and no claims it shows "Merch" and "Booths" only.
+With no claims and no paid orders the summary tables show zero, alongside links to the existing claim and shopping screens. Medical amounts outside the venue's cover are labeled "Attendee / plan", because an attendee's own plan may cover them.
 
-The tab has no controls.
+The dashboard uses the existing controls rather than keeping separate totals or adding another approval path.
 
-Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, print cost, margin, event fee, what is owed to a booth, net cost, each account and the journals J1 to J6. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
+Underlined finance terms show a short definition on hover, keyboard focus and tap. One visible tooltip stays outside the redrawn dashboard; reading a definition holds redraws until it is dismissed. Escape and clicking outside dismiss it. Words with an everyday meaning are defined only where they are labels, so attendees' statements stay plain.
 
 ### Event graph (Social.md)
 

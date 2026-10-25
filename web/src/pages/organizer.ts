@@ -22,7 +22,7 @@ import { rulesTab } from '../rule-proposals';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { matches, redrawOnSearch, searchWords, searchable } from '../table-search';
 import { keepTableHeights } from '../resize';
-import { defineTerms } from '../terms';
+import { defineTerms, readingDefinition } from '../terms';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
 import type { AttendeeOut, BoardMerchPick, BoardWallet, Charge, Claim, Departure, MerchTemplate, ViewablePerson } from '../module_bindings/types';
@@ -68,6 +68,7 @@ const QUERIES = [
   'SELECT * FROM board_photos',
   'SELECT * FROM merch_template',
   'SELECT * FROM board_merch_orders',
+  'SELECT * FROM board_merch_shipping',
   'SELECT * FROM board_wallets',
   'SELECT * FROM board_merch_picks',
   'SELECT * FROM venue_setup',
@@ -510,8 +511,8 @@ function personPanel(all: Person[]) {
     a && claimAs(p),
     a && theirClaims(p),
     a && can('ops') && !ended && !gone && h('p', {},
-      h('button', { onclick: () => confirm(`${name} leaves the event now? Their recap and merch open once they are out.`) && act(() => conn.reducers.leaveEarly({ nodeId: a.nodeId })) }, 'Leave early')),
-    a && can('ops') && theirShop(a, overFor(a.nodeId)),
+      h('button', { onclick: () => confirm(`${name} leaves the event now? Their recap opens once they are out.`) && act(() => conn.reducers.leaveEarly({ nodeId: a.nodeId })) }, 'Leave early')),
+    a && can('ops') && theirShop(a),
     p.bandId > 0 && p.bandId < 100 && h('p', {},
       !ended && a && h('button', { onclick: () => takeBack(p.bandId, p.name) }, `Take band ${bandCode(p.bandId)} back`),
       can('medic') && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: p.bandId })) }, `Tap band ${bandCode(p.bandId)} for ${name}'s medical card`)),
@@ -569,11 +570,11 @@ function theirClaims(p: Person) {
 }
 
 /** Their shop, as the Merch tab's "Buy as an attendee" shows it. */
-function theirShop(a: AttendeeOut, ended: boolean) {
+function theirShop(a: AttendeeOut) {
   const w = [...conn.db.boardWallets.iter()].find(x => x.nodeId === a.nodeId);
   if (!w) return h('p', { class: 'muted' }, 'No wallet, so no merch.');
   const people = new Map([...conn.db.boardAttendees.iter()].map(x => [x.nodeId, x.displayName || 'no name yet']));
-  return [h('h4', {}, `Buy merch as ${a.displayName || 'them'}`), shopFor(w, people, ended)];
+  return [h('h4', {}, `Buy merch as ${a.displayName || 'them'}`), shopFor(w, people)];
 }
 
 // --- Staff ----------------------------------------------------------------------------------
@@ -1292,20 +1293,17 @@ let shopper: bigint | undefined;
 
 /** A button for every attendee with a wallet; the chosen one's shop follows, laid out as the same steps. */
 function buyAs() {
-  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const people = new Map([...conn.db.boardAttendees.iter()].map(a => [a.nodeId, a.displayName || 'no name yet']));
   const wallets = [...conn.db.boardWallets.iter()].filter(w => people.has(w.nodeId));
   const byNode = new Map(wallets.map(w => [w.nodeId, w]));
   const chosen = wallets.find(w => w.nodeId === shopper);
   return h('section', {},
     h('h3', {}, 'Buy as an attendee'),
-    h('p', { class: 'muted' }, ended
-      ? 'Pick someone to see their shop as their recap shows it, and buy for them from their own wallet.'
-      : 'Merch is sold once the event ends. Until then this shows each wallet.'),
+    h('p', { class: 'muted' }, 'Pick an attendee to buy from their wallet, during or after the event.'),
     !wallets.length && h('p', { class: 'muted' }, 'Nobody has a wallet yet. Attendees connect one at band setup.'),
     wallets.length > 0 && personSearch('shopper-search', everyone().filter(p => p.att && byNode.has(p.att.nodeId)), p => p.att!.nodeId === shopper,
       p => { shopper = p.att!.nodeId; }, p => ` · ${money(byNode.get(p.att!.nodeId)!.balanceCents)}`),
-    chosen && shopFor(chosen, people, overFor(chosen.nodeId)));
+    chosen && shopFor(chosen, people));
 }
 
 /** The pick as the recap draws it. The booth crawl ticks come from the attendee's own view, so none show here. */
@@ -1317,16 +1315,27 @@ function pickMockup(p: BoardMerchPick, t: MerchTemplate) {
 
 const pickMockups = new Map<string, HTMLCanvasElement>();
 
-function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
+function shopFor(w: BoardWallet, people: Map<bigint, string>) {
   const who = people.get(w.nodeId)!;
   const picks = [...conn.db.boardMerchPicks.iter()].filter(p => p.nodeId === w.nodeId).sort((a, b) => a.rank - b.rank);
+  const ownPhotos = [...conn.db.boardPhotos.iter()].filter(p => p.nodeIds.includes(w.nodeId)).sort((a, b) => Number(b.id - a.id));
+  if (!picks.length && ownPhotos.length) {
+    const photo = ownPhotos[0];
+    for (const t of [...conn.db.merchTemplate.iter()].filter(t => !t.boothIds.length)) {
+      picks.push({ id: t.id, nodeId: w.nodeId, attendeeName: who, templateId: t.id, photoId: photo.id,
+        photoUrl: photo.url, rank: picks.length + 1, line: '', reason: 'Made with your event photo.', createdAt: photo.takenAt });
+    }
+  }
   const orders = [...conn.db.boardMerchOrders.iter()].filter(o => o.nodeId === w.nodeId).sort((a, b) => Number(b.id - a.id));
+  const shipping = new Map([...conn.db.boardMerchShipping.iter()].map(s => [s.orderId, s.shippingAddress]));
+  const lastAddress = orders.map(o => shipping.get(o.id)).find(Boolean) ?? '';
   const photoIds = new Set(picks.map(p => p.photoId));
   const photos = [...conn.db.boardPhotos.iter()].filter(p => photoIds.has(p.id));
   const buy = (e: Event, p: BoardMerchPick, kind: string) => {
     e.preventDefault();
     const size = kind === 'tee' ? field(e.target as HTMLElement, `as-size-${p.templateId}`) : '';
-    act(() => conn.reducers.buyMerchAs({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size }));
+    const shippingAddress = field(e.target as HTMLElement, `as-address-${w.nodeId}-${p.templateId}`);
+    act(() => conn.reducers.buyMerchAsWithShipping({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size, shippingAddress }));
   };
   return h('div', { class: 'flow' },
     h('div', { class: 'step' },
@@ -1338,8 +1347,8 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
         h('div', {}, `With ${p.nodeIds.filter(id => id !== w.nodeId).map(id => people.get(id) ?? 'no name yet').join(', ') || 'nobody else tagged'}`)])),
     h('span', { class: 'arrow' }, '↓'),
     h('div', { class: 'step' },
-      h('b', {}, '2. The shopping agent\'s picks'),
-      !picks.length && h('p', { class: 'muted' }, ended ? 'No picks for them yet: the agent picks for everyone in a photo.' : 'The agent picks when the event ends.'),
+      h('b', {}, '2. Their merch'),
+      !picks.length && h('p', { class: 'muted' }, 'Merch appears once a photo includes this attendee.'),
       h('div', { class: 'merch' }, picks.map(p => {
         const t = conn.db.merchTemplate.id.find(p.templateId);
         if (!t) return null;
@@ -1347,10 +1356,13 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
           h('figcaption', {},
             h('b', {}, `${p.rank}. ${t.title}`), ` · ${money(t.priceCents)}`,
             p.reason && h('div', { class: 'muted' }, p.reason),
+            !p.line && h('div', { class: 'muted' }, 'The printed line is added from friends tagged in the photo.'),
             h('form', { onsubmit: (e: Event) => buy(e, p, t.kind) },
               t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `as-size-${p.templateId}` },
                 ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
-              h('button', { disabled: !ended || w.balanceCents < t.priceCents || undefined }, `Buy as ${who}`))));
+              h('label', {}, 'Shipping address', h('textarea', { name: `as-address-${w.nodeId}-${p.templateId}`, required: true, maxlength: 1000, rows: 4,
+                placeholder: 'Recipient name, street, city, region, postal code, country' }, lastAddress)),
+              h('button', { disabled: w.balanceCents < t.priceCents || undefined }, `Buy as ${who}`))));
       }))),
     h('span', { class: 'arrow' }, '↓'),
     h('div', { class: 'step' },
@@ -1365,6 +1377,7 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
         `#${o.id} ${o.title}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: `,
         h('span', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status),
         o.nessiePurchaseId && h('div', { class: 'muted' }, 'Nessie purchase ', h('code', {}, o.nessiePurchaseId)),
+        shipping.get(o.id) && h('div', { style: 'white-space: pre-line' }, `Ship to: ${shipping.get(o.id)}`),
         o.failure && h('div', { class: 'muted' }, o.failure)))));
 }
 
@@ -1394,6 +1407,7 @@ function merchPicks() {
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
   const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
+  const shipping = new Map([...conn.db.boardMerchShipping.iter()].map(s => [s.orderId, s.shippingAddress]));
   const paid = orders.filter(o => o.status === 'paid');
   const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
   return [
@@ -1402,14 +1416,15 @@ function merchTab() {
     h('section', {},
       h('h3', {}, `Orders: ${orders.length}, of which ${paid.length} paid for ${money(paid.reduce((s, o) => s + o.amountCents, 0n))}`),
       !can('ops') && h('p', { class: 'muted' }, 'Orders show for the organizer.'),
-      can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees buy merch from their recap once the event ends.'),
+      can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees can buy merch during and after the event.'),
       orders.length > 0 && searchable('orders', h('table', {},
-        h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
+        h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Shipping address'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
         orders.map(o => h('tr', {},
           h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title),
           h('td', {}, o.photoUrl ? thumb(o.photoUrl, 'photo', `order ${o.id}`) : ''), h('td', {}, o.line || '—'), h('td', {}, o.size || '—'),
           h('td', {}, money(o.amountCents)),
           h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
+          h('td', { style: 'white-space: pre-line' }, shipping.get(o.id) || 'Not provided'),
           h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
           h('td', {}, date(o.createdAt))))))),
     h('section', {},
@@ -1481,14 +1496,10 @@ function kibana() {
 let pressing = false;
 document.addEventListener('pointerdown', () => { pressing = true; }, true);
 document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; render(); }, 100), true);
-// Resting on a defined term holds redraws for up to 10 seconds, so its definition stays up.
-let reading = 0;
-document.addEventListener('pointerover', e => { reading = (e.target as Element).closest?.('abbr[title]') ? Date.now() : 0; }, true);
-
 function render() {
   // Typing in a story box or choosing from a list holds redraws too, so the text and the open list stay put.
   const busy = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLSelectElement;
-  if (!conn || pressing || busy || Date.now() - reading < 10_000) return;
+  if (!conn || pressing || busy || readingDefinition(tab)) return;
   const open = tabs();
   // The Live tab uses the window's whole width.
   document.body.classList.toggle('wide', tab === 'live' && !viewing());
@@ -1513,9 +1524,13 @@ function render() {
     const drawn = peopleList(people);
     if (drawn) mount('people', drawn);
   }
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'rules' ? rulesTab(conn, can('ops'), toClaim) : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live(people);
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'rules' ? rulesTab(conn, can('ops'), toClaim) : tab === 'costs' ? costsTab(conn, {
+    openClaim: id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); },
+    openTab: next => { tab = next; location.hash = next; render(); },
+    canManage: can('ops'),
+  }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live(people);
   mount('app', body);
-  if (tab === 'claims' || tab === 'rules' || tab === 'costs') defineTerms(document.getElementById('app')!);
+  if (tab === 'claims' || tab === 'rules' || tab === 'costs') defineTerms(document.getElementById('app')!, tab);
   keepTableHeights(document.getElementById('app')!);
   if (scrollToClaim) {
     scrollToClaim = false;

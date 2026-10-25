@@ -10,7 +10,7 @@ import type { DbConnection } from './module_bindings';
 import type { BoardMerchOrder, Claim, IncidentMarker, LedgerEntry, MedicalRecord, MerchTemplate, VenueSpot } from './module_bindings/types';
 
 /** Injuries are Medical; the venue's equipment broken or stolen is Venue, both on the venue's property policy. */
-const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue' };
+const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue', personal_property: 'Attendee property' };
 
 /** One claim's or one cost center's amounts, in cents. */
 export type Line = {
@@ -31,11 +31,15 @@ export type Line = {
    * the venue's deductible, to `recoveries`. */
   charged: bigint;
   recovered: bigint;
+  chargesCollected: bigint;
+  chargesOutstanding: bigint;
+  recoveryCollected: bigint;
 };
 
 const zero = (): Line => ({
   claims: 0, billed: 0n, accrued: 0n, paid: 0n, insurerOwes: 0n, insurerPaid: 0n, venueCost: 0n, notCovered: 0n,
   deductibles: 0n, shortPaid: 0n, unrecovered: 0n, charged: 0n, recovered: 0n,
+  chargesCollected: 0n, chargesOutstanding: 0n, recoveryCollected: 0n,
 });
 
 function add(a: Line, b: Line): Line {
@@ -45,7 +49,7 @@ function add(a: Line, b: Line): Line {
 }
 
 export function costCenter(c: Claim): string {
-  return COST_CENTERS[c.coverKind] ?? c.coverKind;
+  return COST_CENTERS[c.coverKind] ?? c.coverKind.replace(/_/g, ' ');
 }
 
 /** What the bill asked: the hospital report's billed total, else the claim's cost (the logged repair cost). */
@@ -68,6 +72,11 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
   const deductibles = decided ? c.venueCostCents : 0n;
   const notCovered = c.status.tag === 'Refused' ? bill : decided && bill > c.payoutCents ? bill - c.payoutCents : 0n;
   const charged = sum('J5 ', 'attendee_receivable', 'debitCents') - sum('J5r', 'attendee_receivable', 'creditCents');
+  const chargesCollected = sum('J6', 'cash', 'debitCents');
+  const recovered = c.coverKind === 'property' ? -balance('recoveries') : 0n;
+  // Charge payments are in full. Approval books a recovery; J6 is the proof it was collected.
+  const insurerShare = -balance('insurer_payable');
+  const collectedShare = chargesCollected > insurerShare ? chargesCollected - insurerShare : 0n;
   return {
     claims: 1,
     billed: bill,
@@ -81,7 +90,10 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
     shortPaid,
     unrecovered: venueCost - deductibles - shortPaid,
     charged,
-    recovered: c.coverKind === 'property' ? -balance('recoveries') : 0n,
+    recovered,
+    chargesCollected,
+    chargesOutstanding: balance('attendee_receivable'),
+    recoveryCollected: collectedShare < recovered ? collectedShare : recovered,
   };
 }
 
@@ -182,7 +194,7 @@ function amounts(l: Line, tag = 'td') {
   return [l.billed, l.accrued, l.paid, l.insurerOwes, l.insurerPaid, l.venueCost, l.notCovered].map(x => td(x, tag));
 }
 
-const AMOUNT_HEADS = ['Billed', 'Accrued', 'Paid', 'Insurer owes', 'Insurer paid', 'Venue', 'Not covered'];
+const AMOUNT_HEADS = ['Billed', 'Accrued', 'Paid', 'Insurer owes', 'Insurer paid', 'Venue', 'Outside venue cover'];
 
 function status(c: Claim) {
   return c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
@@ -231,27 +243,72 @@ function merchSections(conn: DbConnection, lines: { claim: Claim; line: Line }[]
         h('tr', {}, h('th', {}, 'Total'), boothCells(sum(r => r.merch.sales), sum(r => r.merch.print), sum(r => r.merch.fee), sum(r => r.merch.owed),
           rows.reduce((s, r) => s + r.at.incidents, 0), sum(r => r.at.loss), sum(r => r.at.charged), 'th')))))),
     margin: margin(total),
+    total,
   };
 }
 
-export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
+type FinanceActions = {
+  openClaim: (id: bigint) => void;
+  openTab: (tab: 'claims' | 'merch' | 'live') => void;
+  canManage: boolean;
+};
+
+export function costsTab(conn: DbConnection, actions: FinanceActions) {
+  const { openClaim, openTab, canManage } = actions;
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(a.id - b.id));
   const ledger = [...conn.db.boardLedger.iter()];
   const { lines, centers, total } = rollUp(claims, ledger, [...conn.db.boardRecords.iter()]);
-  const { merch, booths, margin: merchMargin } = merchSections(conn, lines);
-  if (!claims.length && !merch && !booths) return h('section', {}, h('h3', {}, 'Costs'), h('p', { class: 'muted' }, 'No claims yet.'));
-  if (!claims.length) return [merch, booths];
+  const { merch, booths, margin: merchMargin, total: sales } = merchSections(conn, lines);
   const tb = trialBalance(ledger);
   const journals = new Map<bigint, LedgerEntry[]>();
   for (const l of [...ledger].sort((a, b) => Number(a.id - b.id))) journals.set(l.journalId, [...(journals.get(l.journalId) ?? []), l]);
   const entries = [...journals.values()].sort((a, b) => Number(b[0].journalId - a[0].journalId));
   const venueClaims = total.venueCost + (centers.get('Venue')?.notCovered ?? 0n);
+  const review = claims.filter(c => c.status.tag === 'Routed');
+  const insurer = lines.filter(({ claim, line }) => claim.status.tag === 'Settled' && line.insurerOwes > 0n);
+  const failed = claims.filter(c => c.status.tag === 'Paying' && /payout failed/i.test(c.statusNote));
+  const charges = [...conn.db.boardCharges.iter()].filter(c => c.status === 'proposed' || c.status === 'disputed');
+  const orders = [...conn.db.boardMerchOrders.iter()];
+  const pendingOrders = orders.filter(o => o.status === 'paying');
+  const failedOrders = orders.filter(o => o.status === 'failed');
+  const link = (text: string, go: () => void) => h('button', { type: 'button', onclick: go }, text);
+  const attention = [
+    ...review.map(c => ({ item: `Claim #${c.id}`, waiting: 'Approval', amount: c.payoutCents, action: 'Review claim', go: () => openClaim(c.id) })),
+    ...failed.map(c => ({ item: `Claim #${c.id}`, waiting: 'Payout failed', amount: c.payoutCents, action: 'Review payout', go: () => openClaim(c.id) })),
+    ...insurer.map(({ claim, line }) => ({ item: `Claim #${claim.id}`, waiting: 'Insurer payment', amount: line.insurerOwes, action: 'Record payment', go: () => openClaim(claim.id) })),
+    ...charges.map(c => ({ item: `Charge #${c.id}`, waiting: c.status === 'disputed' ? 'Dispute' : 'Charge approval', amount: c.amountCents, action: 'Review charge', go: () => openTab('claims') })),
+    ...pendingOrders.map(o => ({ item: `Order #${o.id}`, waiting: 'Purchase processing', amount: o.amountCents, action: 'View order', go: () => openTab('merch') })),
+    ...failedOrders.map(o => ({ item: `Order #${o.id}`, waiting: 'Purchase failed', amount: o.amountCents, action: 'Review order', go: () => openTab('merch') })),
+  ];
   return [
+    h('section', {},
+      h('h3', {}, 'Costs and revenue'),
+      h('p', { class: 'muted' }, 'Hover, focus, or tap an underlined term for its definition.'),
+      h('p', {}, link('Open settlements', () => openTab('claims')), ' ',
+        link(canManage ? 'Buy as an attendee' : 'View merch orders', () => openTab('merch')), ' ',
+        link('Live controls', () => openTab('live')))),
+    h('section', {},
+      h('h3', {}, 'Revenue'),
+      scroll(h('table', {},
+        h('tr', {}, ['Paid orders', 'Gross sales', 'Print cost', 'Owed to booths', 'Event earnings'].map(x => h('th', {}, x))),
+        h('tr', {}, h('td', {}, sales.orders), td(sales.sales), td(sales.print), td(sales.owed), td(merchMargin, 'th')))),
+      !sales.orders && h('p', { class: 'muted' }, 'No paid orders yet. Sales appear here when a purchase completes.')),
     h('section', {},
       h('h3', {}, 'Net cost'),
       scroll(h('table', {},
-        h('tr', {}, h('th', {}, 'Claims'), h('th', {}, 'Recovered'), h('th', {}, 'Merch margin'), h('th', {}, 'Net cost')),
+        h('tr', {}, h('th', {}, 'Claims cost'), h('th', {}, 'Approved recoveries'), h('th', {}, 'Event earnings'), h('th', {}, 'Net cost')),
         h('tr', {}, td(venueClaims), td(total.recovered), td(merchMargin), td(venueClaims - total.recovered - merchMargin, 'th'))))),
+    h('section', {},
+      h('h3', {}, 'Payments'),
+      scroll(h('table', {},
+        h('tr', {}, ['Claim payments', 'Insurer received', 'Insurer outstanding', 'Charges collected', 'Charges outstanding', 'Venue recoveries collected'].map(x => h('th', {}, x))),
+        h('tr', {}, [total.paid, total.insurerPaid, total.insurerOwes, total.chargesCollected, total.chargesOutstanding, total.recoveryCollected].map(x => td(x)))))),
+    h('section', {},
+      h('h3', {}, `Needs attention (${attention.length})`),
+      !attention.length && h('p', { class: 'muted' }, 'No payments or decisions waiting.'),
+      attention.length > 0 && searchable('finance-attention', h('div', { style: 'max-height: 22rem; overflow: auto' }, h('table', {},
+        h('tr', {}, ['Item', 'Waiting for', 'Amount', 'Action'].map(x => h('th', {}, x))),
+        attention.map(a => h('tr', {}, h('td', {}, a.item), h('td', {}, a.waiting), td(a.amount), h('td', {}, link(a.action, a.go)))))))),
     h('section', {},
       h('h3', {}, 'Cost centers'),
       scroll(h('table', {},
@@ -261,35 +318,39 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
     h('section', {},
       h('h3', {}, 'Who pays'),
       scroll(h('table', {},
-        h('tr', {}, ['Venue', 'Deductibles', 'Short payments', 'Not recovered yet', 'Insurer', 'Attendees', 'Charged', 'Unpaid'].map(x => h('th', {}, x))),
+        h('tr', {}, ['Venue', 'Deductibles', 'Short payments', 'Not recovered yet', 'Insurer', 'Attendee / plan', 'Charged', 'Unpaid'].map(x => h('th', {}, x))),
         h('tr', {}, td(venueClaims), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
-          td(total.insurerPaid + total.insurerOwes), td(centers.get('Medical')?.notCovered ?? 0n),
+          td(total.insurerPaid + total.insurerOwes), td(total.notCovered - (centers.get('Venue')?.notCovered ?? 0n)),
           td(total.charged), td(total.accrued))))),
     merch,
     booths,
     h('section', {},
       h('h3', {}, `Claims (${claims.length})`),
       searchable('cost-claims', scroll(h('table', {},
-        h('tr', {}, ['Claim', 'Cost center', 'Claimant', 'Billed', 'Paid', 'Insurer', 'Venue', 'Not covered', 'Charged', 'Status'].map(x => h('th', {}, x))),
+        h('tr', {}, ['Claim', 'Cost center', 'Claimant', 'Billed', 'Paid', 'Insurer', 'Venue', 'Outside venue cover', 'Charged', 'Status'].map(x => h('th', {}, x))),
         lines.map(({ claim: c, line }) => h('tr', {},
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(c.id) }, `#${c.id}`)),
           h('td', {}, costCenter(c)), h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '')),
           td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), td(line.charged),
           h('td', {}, status(c)))))))),
-    ledger.length > 0 && h('section', {},
+    ledger.length > 0 && h('details', { ontoggle: (e: Event) => { ledgerOpen = (e.currentTarget as HTMLDetailsElement).open; }, open: ledgerOpen || undefined },
+      h('summary', {}, 'Ledger details'),
+      h('section', {},
       h('h3', {}, 'Trial balance'),
       scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Account'), h('th', {}, 'Debits'), h('th', {}, 'Credits'), h('th', {}, 'Balance')),
         tb.rows.map(([account, a]) => h('tr', {}, h('td', {}, account), td(a.debit), td(a.credit), td(a.debit - a.credit))),
         h('tr', {}, h('th', {}, 'Total'), h('th', {}, money(tb.debit)), h('th', {}, money(tb.credit)),
           h('th', { class: tb.balanced ? 'pass' : 'fail' }, tb.balanced ? 'Balanced' : `Off by ${money(tb.debit - tb.credit)}`))))),
-    ledger.length > 0 && h('section', {},
+    h('section', {},
       h('h3', {}, `Journal (${entries.length})`),
       searchable('journal', scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Entry'), h('th', {}, 'Claim'), h('th', {}, 'Lines'), h('th', {}, 'Posted')),
         entries.map(e => h('tr', {},
           h('td', {}, `${e[0].journalId} ${e[0].journal}`),
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(e[0].claimId) }, `#${e[0].claimId}`)),
-          h('td', {}, entryLines(e)), h('td', { class: 'muted' }, date(e[0].postedAt)))))))),
+          h('td', {}, entryLines(e)), h('td', { class: 'muted' }, date(e[0].postedAt))))))))),
   ];
 }
+
+let ledgerOpen = false;

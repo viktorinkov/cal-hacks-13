@@ -1,0 +1,145 @@
+#!/bin/sh
+# Add one event photo, four paid merch orders and one insurer receipt through the normal reducers.
+# Safe to rerun: the photo, order combinations and receipt reference are reused.
+set -eu
+export E2E_TARGET="${E2E_TARGET:-maincloud}"
+. "$(dirname "$0")/e2e-env"
+cd "$ROOT"
+export BANDIT_SITE_URL="${BANDIT_SITE_URL:-https://dev.band1t.vip}"
+python3 - "$@" <<'PY'
+import argparse
+import json
+import os
+from pathlib import Path
+import time
+import urllib.error
+import urllib.request
+
+parser = argparse.ArgumentParser(description='Populate event finance through existing payment flows.')
+parser.add_argument('--prepare-only', action='store_true', help='Register the photo without buying or recording receipts.')
+args = parser.parse_args()
+base = os.environ['SPACETIMEDB_URL'].rstrip('/') + '/v1/database/' + os.environ['SPACETIMEDB_DATABASE']
+token = os.environ.get('BANDIT_OWNER_TOKEN', '')
+if not token:
+    raise SystemExit('Maincloud owner login is required; scripts/e2e-env reads the existing CLI login.')
+
+def request(url, body, content_type, auth=True):
+    headers = {'Content-Type': content_type}
+    if auth:
+        headers['Authorization'] = 'Bearer ' + token
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=30) as response:
+            raw = response.read()
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as error:
+        raise SystemExit(f'{error.code}: {error.read().decode()}') from None
+    except urllib.error.URLError as error:
+        raise SystemExit(f'Cannot reach {url}: {error.reason}') from None
+
+def sql(query):
+    result = request(base + '/sql', query.encode(), 'text/plain')[0]
+    names = [column['name']['some'] for column in result['schema']['elements']]
+    return [dict(zip(names, row)) for row in result['rows']]
+
+def call(reducer, values):
+    request(base + '/call/' + reducer, json.dumps(values).encode(), 'application/json')
+
+def counts():
+    return {table: sql(f'SELECT COUNT(*) AS n FROM {table}')[0]['n']
+            for table in ('claim', 'ledger_entry', 'photo', 'photo_tag', 'merch_order')}
+
+def micros(timestamp):
+    return timestamp[0]
+
+def money(cents):
+    return f'${cents / 100:,.2f}'
+
+print('Before:', json.dumps(counts()), flush=True)
+image_path = Path('assets/photos/sponsor-row.jpg')
+caption = 'Sponsor row crew'
+photos = sql('SELECT id, url, caption FROM photo')
+photo = next((p for p in photos if p['caption'] == caption), None)
+if photo is None:
+    zone = next(z for z in sql('SELECT id, name, station_id FROM zone') if z['name'] == 'Sponsor row')
+    # Use a recorded moment when the three test attendees were together at the sponsor row.
+    visits = {band: sql(f'SELECT entered, left FROM zone_visit WHERE band_id = {band} AND zone = {zone["station_id"]}')
+              for band in (90, 92, 93)}
+    windows = []
+    for a in visits[90]:
+        for b in visits[92]:
+            for c in visits[93]:
+                rows = (a, b, c)
+                start = max(micros(v['entered']) for v in rows)
+                end = min(micros(v['left'][1]) if v['left'][0] == 0 else int(time.time() * 1_000_000) for v in rows)
+                if end - start > 1_000_000:
+                    windows.append(start + 500_000)
+    if not windows:
+        raise SystemExit('The test bands 90, 92 and 93 need an overlapping visit to Sponsor row first.')
+    blob = request(os.environ['BANDIT_SITE_URL'].rstrip('/') + '/api/blobs?purpose=photo', image_path.read_bytes(), 'image/jpeg', False)
+    call('register_photo', [blob['url'], [max(windows)], zone['id'], caption])
+    photo = next(p for p in sql('SELECT id, url, caption FROM photo') if p['caption'] == caption)
+
+print(f'Photo #{photo["id"]}: {caption}', flush=True)
+attendees = sql('SELECT identity, node_id, display_name FROM attendee WHERE crowd = false')
+wallets = sql('SELECT node_id, balance_cents FROM board_wallets')
+deadline = time.monotonic() + 120
+while True:
+    tags = sql(f'SELECT attendee FROM photo_tag WHERE photo_id = {photo["id"]}')
+    buyers = sorted((a for a in attendees if any(t['attendee'] == a['identity'] for t in tags)
+                     and any(w['node_id'] == a['node_id'] and w['balance_cents'] >= 4300 for w in wallets)),
+                    key=lambda a: a['node_id'])
+    if len(buyers) >= 3:
+        break
+    if time.monotonic() > deadline:
+        raise SystemExit('Photo needs three tagged attendees with funded wallets; inspect the photo worker.')
+    time.sleep(2)
+print('Available buyers:', ', '.join(a['display_name'] for a in buyers[:3]), flush=True)
+if args.prepare_only:
+    print('Prepared; no purchases or insurer receipts recorded.', flush=True)
+    print('After:', json.dumps(counts()), flush=True)
+    raise SystemExit(0)
+
+templates = {t['name']: t for t in sql('SELECT id, name, price_cents FROM merch_template')}
+plans = [(buyers[0], 'tee_spacetimedb.png', 'M'), (buyers[1], 'mug_visa.png', ''),
+         (buyers[2], 'mug_capital_one.png', ''), (buyers[0], 'poster.png', '')]
+order_ids = []
+for buyer, name, size in plans:
+    template = templates[name]
+    def matching():
+        return [o for o in sql('SELECT id, attendee, template_id, photo_id, status, amount_cents, failure FROM merch_order')
+                if o['attendee'] == buyer['identity'] and o['template_id'] == template['id'] and o['photo_id'] == photo['id']]
+    orders = matching()
+    if not orders:
+        shipping = '\n'.join((buyer['display_name'] + ' — test order, do not ship',
+                              'Palace of Fine Arts Theatre', '3301 Lyon Street',
+                              'San Francisco, CA 94123', 'United States'))
+        call('buy_merch_as_with_shipping', [buyer['node_id'], template['id'], photo['id'], size, shipping])
+        orders = matching()
+    order = orders[0]
+    order_ids.append(order['id'])
+    print(f'Order #{order["id"]}: {buyer["display_name"]}, {name}, {money(order["amount_cents"])} ({order["status"]})', flush=True)
+
+deadline = time.monotonic() + 180
+while True:
+    orders = [o for o in sql('SELECT id, status, amount_cents, failure FROM merch_order') if o['id'] in order_ids]
+    if any(o['status'] == 'failed' for o in orders):
+        raise SystemExit('Purchase failed: ' + json.dumps([o for o in orders if o['status'] == 'failed']))
+    if all(o['status'] == 'paid' for o in orders) and len(orders) == len(order_ids):
+        break
+    if time.monotonic() > deadline:
+        raise SystemExit('Purchases remain pending; rerun after the payment workers catch up.')
+    time.sleep(2)
+print('Paid sales:', money(sum(o['amount_cents'] for o in orders)), flush=True)
+
+reference = 'FINANCE-RUN-INSURER-1'
+claims = sql("SELECT id, status, status_note, recoverable_cents FROM claim WHERE cover_kind = 'property'")
+recorded = next((c for c in claims if reference in c['status_note']), None)
+if recorded is None:
+    eligible = sorted((c for c in claims if c['status'][0] == 6 and c['recoverable_cents'] > 0), key=lambda c: c['id'])
+    if not eligible:
+        raise SystemExit('No settled property claim is awaiting a positive insurer receipt.')
+    recorded = eligible[0]
+    call('record_insurer_payment', [recorded['id'], recorded['recoverable_cents'], reference])
+print(f'Insurer receipt: claim #{recorded["id"]}, {money(recorded["recoverable_cents"])} ({reference})', flush=True)
+print('After:', json.dumps(counts()), flush=True)
+PY
