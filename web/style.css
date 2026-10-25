@@ -62,8 +62,14 @@ button.on { font-weight: bold; border-width: 2px; }
 #head:empty { display: none; }
 #head { padding-bottom: 0; }
 #people:empty { display: none; }
-#people input[type=search] { width: 100%; max-width: 420px; padding: 6px; font: inherit; box-sizing: border-box; }
+#people input[type=search], input.search { display: block; width: 100%; max-width: 420px; padding: 6px; font: inherit; box-sizing: border-box; }
+ul.results { list-style: none; margin: 4px 0; padding: 0; max-width: 420px; border: 1px solid #ddd; border-radius: 4px; }
+ul.results:empty { display: none; }
+ul.results button { display: block; width: 100%; margin: 0; padding: 6px 8px; border: 0; border-bottom: 1px solid #eee; background: #fff; text-align: left; }
+ul.results button:hover, ul.results button.on { background: #eef3ff; }
 #viewas { max-width: 1100px; margin: 0 auto; padding: 0 16px 24px; }
 #viewas iframe { display: block; width: 100%; height: calc(100vh - 160px); min-height: 560px; border: 2px solid #888; border-radius: 12px; background: #fff; }
 /* A page in the View as frame is read-only: its controls show but cannot be used. */
 body.viewing button, body.viewing input, body.viewing select, body.viewing textarea { pointer-events: none; opacity: .55; }
+.drag-band { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.drag-tag { position: fixed; z-index: 10; margin: 0; pointer-events: none; white-space: nowrap; }

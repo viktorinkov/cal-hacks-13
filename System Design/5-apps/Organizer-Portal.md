@@ -111,6 +111,8 @@ The search box above the list matches every word typed against the name, what th
 
 "Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
 
+Every other place that picks a person uses the same search bar: the View as tab, the Merch tab's "Buy as an attendee" (over the attendees with a wallet, each with its balance) and the Settlements tab's "File a claim as someone" (over the attendees with a band). The bar lists its first 12 matches under it, each with what the person is and their band code. A click, or Enter for the first match, picks one.
+
 | Action | For | Calls |
 |---|---|---|
 | "Their pages": "Their band page now", "Medical card" and "Recap and merch" for an attendee with a band, the portal for an organizer or medic, the photo page for a photographer; the page shows in the View as frame under the person, read-only, until "Hide their page" | the owner | `view_as` |
