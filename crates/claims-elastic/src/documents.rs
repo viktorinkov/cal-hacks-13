@@ -62,6 +62,25 @@ impl ClaimsIndex {
         Ok(())
     }
 
+    /// Writes every page of a PDF through the extract pipeline, `PAGES_PER_BULK`
+    /// pages per request, so a long PDF does not wait on one refresh per page.
+    pub async fn put_pages(&self, document_hash: &str, kind: &str, pages: &[Vec<u8>]) -> Result<()> {
+        let index = self.documents_index();
+        for (c, chunk) in pages.chunks(PAGES_PER_BULK).enumerate() {
+            let first = c * PAGES_PER_BULK + 1;
+            let mut docs = Vec::with_capacity(chunk.len());
+            for (i, pdf) in chunk.iter().enumerate() {
+                let page = (first + i) as u32;
+                let id = page_id(document_hash, page);
+                check_id(&id)?;
+                docs.push((index.clone(), id, page_doc(document_hash, kind, page, pdf, None)));
+            }
+            let last = first + chunk.len() - 1;
+            self.bulk("refresh=wait_for", docs).await.with_context(|| format!("writing pages {first} to {last} of {document_hash}"))?;
+        }
+        Ok(())
+    }
+
     /// Every stored page of a document, in page order.
     pub async fn document_pages(&self, document_hash: &str) -> Result<Vec<StoredPage>> {
         let query = json!({
@@ -100,6 +119,9 @@ impl ClaimsIndex {
         Ok(())
     }
 }
+
+/// Pages sent in one `_bulk` request; a page carries its whole PDF in base64.
+const PAGES_PER_BULK: usize = 10;
 
 pub(crate) fn page_id(document_hash: &str, page: u32) -> String {
     format!("{document_hash}-p{page}")
