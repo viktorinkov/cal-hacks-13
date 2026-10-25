@@ -4,5 +4,74 @@
     "pr": "",
     "sessionUrl": false
   },
-  "includeCoAuthoredBy": false
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "additionalDirectories": [
+      "/mnt/project-files"
+    ],
+    "allow": [
+      "Read(//mnt/project-files/**)",
+      "Edit(//mnt/project-files/**)",
+      "Bash(mkdir -p /mnt/project-files/*)",
+      "Bash(cp * /mnt/project-files/*)",
+      "Bash(git config user.name *)",
+      "Bash(git config user.email *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git merge *)",
+      "Bash(git push origin vik-*)",
+      "Bash(git push -u origin vik-*)",
+      "Bash(git push origin HEAD:vik-*)",
+      "Bash(git push origin claude/*)",
+      "Bash(git push -u origin claude/*)",
+      "Bash(scripts/*)",
+      "Bash(E2E_TARGET=* scripts/*)",
+      "Bash(ENV_FILE=* scripts/*)",
+      "Bash(spacetime publish *)",
+      "Bash(spacetime sql *)",
+      "Bash(spacetime call *)",
+      "Bash(spacetime logs *)",
+      "Bash(spacetime describe *)",
+      "Bash(~/.local/bin/spacetime publish *)",
+      "Bash(~/.local/bin/spacetime sql *)",
+      "Bash(~/.local/bin/spacetime call *)",
+      "Bash(~/.local/bin/spacetime logs *)",
+      "Bash(~/.local/bin/spacetime describe *)",
+      "Bash(ssh root@band1t.vip *)",
+      "Bash(ssh root@104-207-149-22.sslip.io *)",
+      "Bash(ssh root@104.207.149.22 *)",
+      "Bash(python3 diagrams/generator/export.py *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push origin +*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git push * +*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-identity",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bandit-creds",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
 }
