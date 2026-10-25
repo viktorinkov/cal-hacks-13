@@ -39,8 +39,12 @@ One word for one thing in every doc. Code names stay as the code spells them, in
 | hospital report | the hospital's report and itemised bill for a claim | medical record, clinic report |
 | claim | an insurance claim the attendee files after an incident | case, request |
 | evidence pack | a claim's numbered facts, checks and fingerprint | evidence bundle |
-| The Evidence Engine | Elastic's part: past claims, recap ranking, event setup and the raw data | evidence agent, search |
+| The Evidence Engine | Elastic's part: reading the insurance documents and finding their clauses, checking claim copies, recap ranking, event setup and the raw data | evidence agent, search |
 | the insurance Decision Engine | the Anthropic Claude API plus the Rust code that decides insurance claims | claims agent, Decision Engine (alone) |
+| the venue's policy | the venue's general liability insurance policy, uploaded as a PDF at event setup | |
+| policy terms | the limits, deductible, minimum payout, service window, fee schedule and exclusions read from the venue's policy, each quoting its clause | settings, config |
+| clause | one section of the wording of the venue's policy or the attendee's insurance card, as The Evidence Engine indexed it | rule, paragraph |
+| the guard | the code that holds Claude's decision to the policy terms and the checks | |
 | wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
 | findable switch | the one consent switch at sign-up | privacy toggle, consent switch |
 

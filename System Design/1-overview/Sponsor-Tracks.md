@@ -13,20 +13,23 @@ Three engines do the work, and each one does what only it can do.
 | Engine | Built on | Its job | Never does |
 |---|---|---|---|
 | The live world | the `band1t` module on SpacetimeDB Maincloud | every band, zone, incident, claim, wallet movement and memory, as transactions pushed live to every screen | rank by meaning, call outside services |
-| The Evidence Engine | Elastic: Elastic Agent Builder, Elastic Workflows, Elastic ES\|QL, semantic search, Elastic Kibana | organize the scraped event data before import, order each recap by meaning, find the closest past claims and validate each claim copy, show the team the data | hold live state, see names on claims, sit in the safety path |
-| The insurance Decision Engine | the Anthropic Claude API plus the Rust code in the module | read the hospital report, judge whether the injury follows from the incident and the attendee's own words, draft the notice of loss; code checks every fact and computes every amount | move money on a model's word alone, use a model for a random outcome |
+| The Evidence Engine | Elastic: Elastic Agent Builder, Elastic Workflows, Elastic ES\|QL, semantic search, Elastic Kibana | read every insurance PDF (the venue's policy, the attendee's insurance card, the hospital report) into checked terms and searchable clauses, and find the clauses that bear on each claim (next to build); validate each claim copy, organize the scraped event data before import, order each recap by meaning, show the team the data | hold live state, see names on claims, set an amount, sit in the safety path |
+| The insurance Decision Engine | the Anthropic Claude API plus the Rust code in the module | investigate each claim with tools, one evidence source at a time, and decide pay, refuse or ask the organizer, citing the facts and the policy clauses it rests on; code holds the decision to the policy terms and the checks, and computes every amount | pay outside the ceiling of a rule an organizer taught, refuse without a failed check, use a model for a random outcome |
 
 The question this diagram answers: how the three engines hand work to each other during one claim.
 
 ```mermaid
 flowchart LR
+  P["organizer at setup: the venue's policy PDF"] -->|"document_read"| E
   B["band and light circle"] -->|"fall, witnesses, ingest_band"| M["the module: live world"]
   A["attendee, tap page"] -->|"own words, file_claim"| M
   M -->|"job row, claim_review"| D["insurance Decision Engine: Anthropic Claude API + code"]
-  M -->|"de-identified copy, claim_verify"| E["The Evidence Engine: Elastic"]
-  E -->|"top 3 past claims, submit_claim_checks"| M
-  D -->|"verdict + cited facts, submit_claim_review"| M
-  M -->|"routed claim, subscription"| O["organizer, organizer portal"]
+  M -->|"claim copy, claim_verify"| E["The Evidence Engine: Elastic"]
+  E -->|"terms with quoted clauses, apply_document_terms"| M
+  E -->|"checks + clauses, submit_claim_checks"| M
+  D <-->|"search_policy, read_clause"| E
+  D -->|"pay, refuse or ask, submit_claim_review"| M
+  M -->|"what the guard sends to a person, subscription"| O["organizer, organizer portal"]
   O -->|"approval, approve_claim"| M
   M -->|"payout job, claim_payout"| N["Capital One Nessie API: wallet"]
   classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
@@ -36,7 +39,7 @@ flowchart LR
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   class B device
   class M stdb
-  class A,O web
+  class A,O,P web
   class E,N ext
   class D rust
 ```
@@ -87,22 +90,23 @@ BandIt enters the insurance Decision Engine ([Insurance](../6-features/Insurance
 
 | The track asks | BandIt answers with | See it |
 |---|---|---|
-| "Is it real enough? Realistic data, a messy problem, and proof that it works." | Hospital report PDFs that the Anthropic Claude API reads line by line, a 21-code venue fee schedule, per-claim and aggregate limits, a deductible, and a double-entry ledger from the reserve to the insurer's payment. The proof is the accuracy run, `bandit-claims scorecard`: rounds of planted claims with an answer key, 2 genuine falls and 4 kinds of fake each, scored on what the automation paid | the organizer portal (/organizer, Claims); the scorecard printed by `bandit-claims` |
-| "limited access" | The workers hold only the `worker` role and can change a claim only through reducers that reject a stale lease. The Anthropic Claude API never sets an amount. Only the organizer's `ops` role approves a routed claim; the medic files the hospital report and cannot approve | [Insurance](../6-features/Insurance.md), Who decides what |
-| "a clean record of its work" | Every fact is numbered and hashed into the evidence pack (SHA-256), every check is stored, every model call is a `model_call` row, every human decision an `approval` row with the amount and fingerprint the person saw, and every dollar a balanced journal | the claim's page on the Claims tab: checks, evidence facts, decisions, ledger |
-| "knowing when to ask" | `decide` sends a claim to the organizer on any failed check, any concern in the review by the Anthropic Claude API, uncorroborated evidence, no learned rule yet, a payout above the rule's ceiling, and every claim of a mass occurrence | "Waiting for your decision" on the Claims tab |
+| "Is it real enough? Realistic data, a messy problem, and proof that it works." | The venue's own policy PDF, the attendee's insurance card and the hospital report PDFs, all read by The Evidence Engine into terms that quote their clauses (next to build; today the Anthropic Claude API reads the hospital report), a 21-code venue fee schedule, per-claim and aggregate limits, a deductible, and a double-entry ledger from the reserve to the insurer's payment. The proof is the accuracy run, `bandit-claims scorecard`: rounds of planted claims with an answer key, 2 genuine falls and 4 kinds of fake each, scored on what the automation paid | the organizer portal (/organizer, Claims); the scorecard printed by `bandit-claims` |
+| "limited access" | The workers hold only the `worker` role and can change a claim only through reducers that reject a stale lease. The Anthropic Claude API never sets an amount, pays on its own only inside the ceiling of a rule an organizer taught, and refuses on its own only on a failed check. Only the organizer's `ops` role approves a claim sent to a person; the medic files the hospital report and cannot approve | [Insurance](../6-features/Insurance.md), Who decides what |
+| "a clean record of its work" | Every fact is numbered and hashed into the evidence pack (SHA-256), every check is stored, every model call is a `model_call` row, every step of Claude's investigation a `decision` row, every human decision an `approval` row with the amount and fingerprint the person saw, and every dollar a balanced journal | the claim's page on the Claims tab: checks, evidence facts, decisions, ledger; the decision history on the Live tab |
+| "knowing when to ask" | Claude can choose to ask the organizer, with one question. Code's guard also sends a claim there when Claude would pay with a failed check, uncorroborated evidence, no learned rule yet or a payout above the rule's ceiling, when Claude would refuse while every check passed, and for every claim of a mass occurrence | "Waiting for your decision" on the Claims tab |
 | "Did we see something new?" | Claims evidence from a crowd of wristbands: the band's fall is the first notice of loss, and the bands that lit the light circle are the witnesses | [Safety](../6-features/Safety.md), [Insurance](../6-features/Insurance.md) |
-| "The moment" | Sam's hospital report says he hurt his ankle playing basketball at home the evening before; every code check passes, and the review by the Anthropic Claude API catches it | the scripted claims run, step 3 |
-| "The moment", again | Lee's band reports a fall at Main stage, but its light circle forms on Sponsor row; code refuses the claim with every check listed, before any money moves | the scripted claims run, step 4 |
+| "The moment" | Sam's hospital report says he hurt his ankle playing basketball at home the evening before. Every code check passes, and Claude catches it reading the report and recommends a refusal; no check failed, so the guard sends it to the organizer with Claude's finding on top | the scripted claims run, step 3 |
+| "The moment", again | Lee's band reports a fall at Main stage, but its light circle forms on Sponsor row. Claude refuses on the failed `witness_zone` check, and the guard lets the refusal through with every check listed, before any money moves | the scripted claims run, step 4 |
+| "defends a decision when questioned" | Every decision cites the facts it rests on and, in the design, the clause of the venue's own policy with its page; every amount traces to a policy term the organizer confirmed (next to build) | the claim's page on the Claims tab |
 | "recovers from something going wrong" | The organizer's first approval carries an amount from a screen a minute old, so `approve_claim` fails closed and nothing moves | the scripted claims run, step 1 |
 
 The track doc's "What makes it hard" list maps to BandIt like this.
 
-"Sources that disagree": the band, the light circle, the medic's note, the camera sighting and the hospital report are compared in code, and each comparison is a stored check.
+"Sources that disagree": the band, the light circle, the medic's note, the camera sighting and the hospital report are compared in code, and each comparison is a stored check. Claude then reads each source itself and names the one it trusts (`trusted_source`).
 
 "Time": each approval with "learn" ticked writes a versioned `settlement_rule`, so what the organizer decided at 22:10 settles the next claim of that shape by itself.
 
-"Limits": the person who files a hospital report is not the person who approves the claim, and no model can move money.
+"Limits": the person who files a hospital report is not the person who approves the claim, every limit comes from the venue's confirmed policy terms (next to build), and no model can move money outside the authority a person gave it.
 
 The doc also asks for "planted errors with an answer key". That is the accuracy run.
 
@@ -151,7 +155,7 @@ The Slack post words points 3 and 4 differently:
 | "A real problem" | Falls are the leading cause of injury at public venues, and after a fall the biggest risk is a crowd crush. After the night, a hurt attendee waits on paperwork to be paid |
 | "It works" | The bands, the organizer portal and the tap page run live at https://band1t.vip |
 | "how you plan to measure its impact" | The accuracy run's scorecard: claims settled with no person, dollars wrongly paid (target $0), bill-review savings, and the time from incident to payout |
-| "Claude does something that matters to the solution" | The Anthropic Claude API reads every hospital report, judges every claim as the claims agent, writes the notice of loss and the letters, reads each attendee's medical card from their PDFs, and sets up a venue from the event's name |
+| "Claude does something that matters to the solution" | The Anthropic Claude API decides every insurance claim. It investigates with tools, one evidence source at a time, weighs sources that disagree, searches the venue's and the attendee's policies for the clauses that apply (next to build), and decides pay, refuse or ask the organizer. It also writes the hospital report for each drawn case, the notice of loss and the letters, reads each attendee's medical card from their PDFs, and sets up a venue from the event's name |
 | "you know where it could go wrong for the people using it" | The table below |
 
 Where the Anthropic Claude API could go wrong, and what code does about it:
@@ -159,10 +163,11 @@ Where the Anthropic Claude API could go wrong, and what code does about it:
 | It could | Code's guardrail |
 |---|---|
 | misread a hospital report | `validate_record` drops any line whose page is not in the PDF, whose code is not a real code shape or whose date does not parse; the lines must sum to the printed total, or the claim goes to the organizer |
-| invent a fact | every fact id the review cites must exist in this evidence pack, or code rejects the review |
-| invent a figure | every dollar figure in a review or a letter must be one of the amounts code computed |
+| invent a fact | every fact id and policy clause the decision cites must exist on this claim, or code sends it back once, then sets it aside |
+| invent a figure | every dollar figure in a decision or a letter must be one of the amounts code computed |
+| pay without looking | a pay is rejected unless Claude read the band, the light circle and the hospital report itself |
 | be talked round by text inside a document | the data blocks are escaped, and the prompt tells the model to report any text that addresses it as a concern |
-| be wrong about why someone was hurt | its verdict can only send a claim to a person; it never pays, refuses or changes an amount |
+| be wrong about why someone was hurt | it pays on its own only inside a learned rule's ceiling with every check passed, and refuses on its own only on a failed check; anything else goes to a person, and it never sets an amount |
 | decide something that should be chance | random outcomes come from a seeded generator in the module, never from the model |
 
 ### Elastic: Best use of the Elastic Agent Builder on a Serverless Instance
@@ -182,12 +187,12 @@ BandIt enters The Evidence Engine ([Elastic](../7-integrations/Elastic.md)).
 
 | The track asks | BandIt answers with |
 |---|---|
-| "turns complex, messy data into useful insights, answers, or actions" | Thousands of raw records scraped from the event's pages become one checked event bundle; each claim becomes three precedents and a validation; each attendee's night becomes an ordered recap |
-| "Elasticsearch: Creative, meaningful use of search" | The 3 closest past claims for every claim (`bandit-claims`); the people and booths of each recap in order of what the attendee was into (`bandit-people`, `bandit-booths`); candidate matches while organizing the scrape |
+| "turns complex, messy data into useful insights, answers, or actions" | Thousands of raw records scraped from the event's pages become one checked event bundle; every insurance PDF becomes checked terms and searchable clauses, and each claim is matched to the clauses of its two policies (next to build); each attendee's night becomes an ordered recap |
+| "Elasticsearch: Creative, meaningful use of search" | The clauses of the venue's policy and the attendee's own policy that bear on each claim, searched by Claude in its own words (`bandit-policy-clauses`, next to build); the people and booths of each recap in order of what the attendee was into (`bandit-people`, `bandit-booths`); candidate matches while organizing the scrape |
 | "Jina embeddings: Search by meaning" | `semantic_text` fields on the inference endpoint `.jina-embeddings-v5-text-small` |
-| "Agent Builder + Workflows: Agents that answer and act" | The Elastic Agent Builder agent `bandit-organizer`, run by the Elastic Workflows workflow `bandit-organize`, resolves messy records into one bundle after Elastic ES\|QL `LOOKUP JOIN` steps make the exact matches; the ingest pipeline `bandit-claims-validate` checks every claim copy on the way in |
+| "Agent Builder + Workflows: Agents that answer and act" | The Elastic Agent Builder agent `bandit-organizer`, run by the Elastic Workflows workflow `bandit-organize`, resolves messy records into one bundle after Elastic ES\|QL `LOOKUP JOIN` steps make the exact matches; the ingest pipeline `bandit-claims-validate` checks every claim copy on the way in; the workflow `bandit-read-document` runs the agent `bandit-document-reader` over every insurance PDF, with a JSON schema per kind, and every term quotes its clause and page (next to build) |
 | "Cloud Serverless: Zero ops" | One Elastic Cloud Serverless project, with Elastic Kibana dashboards linked from the organizer portal's Kibana tab |
-| "Search → Reason → Act" | Data in from Bright Data, the module and the claims; Elastic finds by meaning; the agent and the claims agent reason; the module acts, through `import_event` and `submit_claim_checks` |
+| "Search → Reason → Act" | Data in from Bright Data, the module, the claims and every insurance PDF; Elastic finds by meaning; the agents and Claude reason; the module acts, through `import_event`, `submit_claim_checks` and `apply_document_terms` |
 
 ### Meta: Meta/Facebook: Bringing People Closer Together with AI
 
