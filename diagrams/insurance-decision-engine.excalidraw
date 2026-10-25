@@ -3797,7 +3797,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "11 \u00b7 Settle a claim",
+   "name": "12 \u00b7 Settle a claim",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -7039,7 +7039,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "12 \u00b7 Policy amounts",
+   "name": "13 \u00b7 Policy amounts",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -8776,7 +8776,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "13 \u00b7 Approve a reusable rule",
+   "name": "14 \u00b7 Approve a reusable rule",
    "customData": {
     "diagramStyleVersion": 1
    }
