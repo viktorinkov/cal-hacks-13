@@ -11,12 +11,12 @@ pub type Cents = u64;
 pub enum IncidentKind {
     Sos,
     Fall,
-    /// The venue's own equipment was broken.
+    /// Venue or sponsor equipment was broken.
     Property,
-    /// An attendee's belonging was stolen.
+    /// Venue or sponsor property was taken, such as merch or a laptop from a booth.
     Theft,
-    /// An attendee's belonging was broken by someone else.
-    Breakage,
+    /// An attendee's own things were lost, stolen or broken.
+    Belongings,
 }
 
 impl IncidentKind {
@@ -26,7 +26,7 @@ impl IncidentKind {
             IncidentKind::Fall => "fall",
             IncidentKind::Property => "property",
             IncidentKind::Theft => "theft",
-            IncidentKind::Breakage => "breakage",
+            IncidentKind::Belongings => "belongings",
         }
     }
 
@@ -36,7 +36,7 @@ impl IncidentKind {
             "fall" => Some(IncidentKind::Fall),
             "property" => Some(IncidentKind::Property),
             "theft" => Some(IncidentKind::Theft),
-            "breakage" => Some(IncidentKind::Breakage),
+            "belongings" => Some(IncidentKind::Belongings),
             _ => None,
         }
     }
@@ -46,12 +46,7 @@ impl IncidentKind {
         matches!(self, IncidentKind::Sos | IncidentKind::Fall)
     }
 
-    /// `theft` and `breakage`: an attendee's own belonging, paid from their own policy.
-    pub fn is_belonging(self) -> bool {
-        matches!(self, IncidentKind::Theft | IncidentKind::Breakage)
-    }
-
-    /// Someone can be responsible, and charged, for every kind but an injury.
+    /// Someone can have broken or taken it, and be charged for it: every kind but an injury.
     pub fn can_be_caused(self) -> bool {
         !self.is_injury()
     }
@@ -62,7 +57,7 @@ impl IncidentKind {
 pub enum CoverKind {
     MedicalPayments,
     Property,
-    /// The attendee's own policy: theft of and damage to their belongings.
+    /// The attendee's own policy: their own things lost, stolen or broken.
     PersonalProperty,
 }
 
@@ -85,14 +80,15 @@ impl CoverKind {
     }
 
     /// The venue's general liability policy pays injuries from medical-payments
-    /// cover and the venue's own equipment from property cover. It excludes
-    /// guests' belongings, so a theft or a breakage is paid from the attendee's
-    /// own policy, its personal property cover.
+    /// cover and broken or stolen equipment from property cover (a theft only
+    /// where its theft clause covers it). It excludes property in the venue's
+    /// care, so an attendee's own things are paid from the attendee's own
+    /// policy, its personal property cover.
     pub fn for_incident(kind: IncidentKind) -> Self {
         match kind {
             IncidentKind::Sos | IncidentKind::Fall => CoverKind::MedicalPayments,
-            IncidentKind::Property => CoverKind::Property,
-            IncidentKind::Theft | IncidentKind::Breakage => CoverKind::PersonalProperty,
+            IncidentKind::Property | IncidentKind::Theft => CoverKind::Property,
+            IncidentKind::Belongings => CoverKind::PersonalProperty,
         }
     }
 
@@ -115,9 +111,7 @@ pub enum Source {
     VisionAssessment,
     MedicalRecord,
     Policy,
-    /// The attendee's report of what was stolen or broken and what it was worth.
-    LossReport,
-    /// The person security named as responsible, and that their band was at the spot.
+    /// The person staff named as responsible, and that their band was at the spot.
     ResponsibleParty,
 }
 
@@ -133,7 +127,6 @@ impl Source {
             Source::VisionAssessment => "vision_assessment",
             Source::MedicalRecord => "medical_record",
             Source::Policy => "policy",
-            Source::LossReport => "loss_report",
             Source::ResponsibleParty => "responsible_party",
         }
     }
