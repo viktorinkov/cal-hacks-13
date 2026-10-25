@@ -1,6 +1,8 @@
 //! Which medical service lines the medical-payments cover pays, and how much.
 //! The venue's fee schedule caps each code at a reasonable and customary
 //! amount per unit; anything the schedule does not list goes to a person.
+//! The schedule is the confirmed policy's schedule of benefits, or
+//! `FEE_SCHEDULE` when the policy states none.
 
 use crate::medical::ValidRecord;
 use crate::money::format_cents;
@@ -76,6 +78,32 @@ pub fn lookup(code: &str) -> Option<&'static FeeEntry> {
     FEE_SCHEDULE.iter().find(|e| e.code.eq_ignore_ascii_case(code))
 }
 
+/// One code of a policy's schedule of benefits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FeeLine {
+    pub code: String,
+    pub description: String,
+    /// Most the cover pays per unit.
+    pub max_allowed_cents: Cents,
+}
+
+impl From<&FeeEntry> for FeeLine {
+    fn from(e: &FeeEntry) -> Self {
+        FeeLine { code: e.code.into(), description: e.description.into(), max_allowed_cents: e.max_allowed_cents }
+    }
+}
+
+/// `FEE_SCHEDULE` as owned lines, for a policy that states no schedule of benefits.
+pub fn default_schedule() -> Vec<FeeLine> {
+    FEE_SCHEDULE.iter().map(FeeLine::from).collect()
+}
+
+/// The line for a code in `schedule`; surrounding space and letter case are ignored.
+pub fn lookup_in<'a>(schedule: &'a [FeeLine], code: &str) -> Option<&'a FeeLine> {
+    let code = code.trim();
+    schedule.iter().find(|e| e.code.eq_ignore_ascii_case(code))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LineOutcome {
@@ -118,20 +146,20 @@ pub struct LineDecision {
 const OUTSIDE_WINDOW: &str = "outside the service window";
 const NOT_ON_SCHEDULE: &str = "not on the venue fee schedule";
 
-/// Per service line, in order:
+/// Per service line against `schedule`, in order:
 /// - dated before `incident_date` or more than `window_days` after it ->
 ///   `Excluded`, reason `outside the service window`;
 /// - code not on the schedule -> `Excluded`, reason `not on the venue fee schedule`;
 /// - billed at or under `cap x units` -> `Covered`, reason `within the schedule`;
 /// - otherwise -> `Reduced` to `cap x units`, reason `reduced to the schedule cap of $X per unit`.
-pub fn cover_lines(rec: &ValidRecord, incident_date: &str, window_days: u32) -> Vec<LineDecision> {
+pub fn cover_lines(rec: &ValidRecord, incident_date: &str, window_days: u32, schedule: &[FeeLine]) -> Vec<LineDecision> {
     rec.record
         .services
         .iter()
         .enumerate()
         .map(|(i, s)| {
             let in_window = date_diff_days(incident_date, &s.date_of_service).is_some_and(|d| (0..=window_days as i64).contains(&d));
-            let (outcome, allowed, reason) = match lookup(&s.code) {
+            let (outcome, allowed, reason) = match lookup_in(schedule, &s.code) {
                 _ if !in_window => (LineOutcome::Excluded, 0, OUTSIDE_WINDOW.to_string()),
                 None => (LineOutcome::Excluded, 0, NOT_ON_SCHEDULE.to_string()),
                 Some(e) => {
@@ -207,7 +235,7 @@ mod tests {
     #[test]
     fn first_aid_bill_is_covered_in_full() {
         let v = validate_record(maya_record(), 1).unwrap();
-        let lines = cover_lines(&v, "2026-10-24", 365);
+        let lines = cover_lines(&v, "2026-10-24", 365, &default_schedule());
         assert_eq!(lines.len(), 5);
         assert!(lines.iter().all(|l| l.outcome == LineOutcome::Covered && l.reason == "within the schedule"));
         assert_eq!(covered_total(&lines), 18_000);
@@ -219,7 +247,7 @@ mod tests {
     #[test]
     fn urgent_care_bill_is_reduced_to_the_schedule() {
         let v = validate_record(jordan_record(), 2).unwrap();
-        let lines = cover_lines(&v, "2026-10-24", 365);
+        let lines = cover_lines(&v, "2026-10-24", 365, &default_schedule());
         let covered: Vec<Cents> = lines.iter().map(|l| l.covered_cents).collect();
         assert_eq!(covered, [27_500, 16_500, 21_000, 9_500, 6_000, 6_500, 2_500]);
         assert_eq!(covered_total(&lines), 89_500);
@@ -237,7 +265,7 @@ mod tests {
         raw.services = vec![service("J1885", "ketorolac injection, 30 mg", "2026-10-24", 60, 1)];
         raw.services[0].units = 2;
         raw.total_billed_cents = 6_000;
-        let lines = cover_lines(&validate_record(raw, 1).unwrap(), "2026-10-24", 365);
+        let lines = cover_lines(&validate_record(raw, 1).unwrap(), "2026-10-24", 365, &default_schedule());
         assert_eq!((lines[0].outcome, lines[0].allowed_cents), (LineOutcome::Reduced, 5_000));
     }
 
@@ -250,7 +278,7 @@ mod tests {
         let v = validate_record(raw, 2).unwrap();
         assert_eq!(v.dropped, ["service 10 (A4570): page 3 is outside 1..=2"]);
 
-        let lines = cover_lines(&v, "2026-10-24", 365);
+        let lines = cover_lines(&v, "2026-10-24", 365, &default_schedule());
         assert_eq!(lines.len(), 9);
         assert_eq!((lines[7].outcome, lines[7].covered_cents, lines[7].reason.as_str()), (LineOutcome::Excluded, 0, "outside the service window"));
         assert_eq!((lines[8].outcome, lines[8].covered_cents, lines[8].reason.as_str()), (LineOutcome::Excluded, 0, "not on the venue fee schedule"));
@@ -264,10 +292,10 @@ mod tests {
     #[test]
     fn window_bounds_are_inclusive() {
         let v = validate_record(jordan_record(), 2).unwrap();
-        assert_eq!(covered_total(&cover_lines(&v, "2026-10-24", 1)), 89_500);
-        assert_eq!(covered_total(&cover_lines(&v, "2026-10-24", 0)), 0);
-        assert_eq!(covered_total(&cover_lines(&v, "2026-10-26", 365)), 0);
-        let only_window = cover_lines(&v, "2026-10-24", 0);
+        assert_eq!(covered_total(&cover_lines(&v, "2026-10-24", 1, &default_schedule())), 89_500);
+        assert_eq!(covered_total(&cover_lines(&v, "2026-10-24", 0, &default_schedule())), 0);
+        assert_eq!(covered_total(&cover_lines(&v, "2026-10-26", 365, &default_schedule())), 0);
+        let only_window = cover_lines(&v, "2026-10-24", 0, &default_schedule());
         assert_eq!(lines_check(&only_window).result, CheckResult::Pass);
     }
 }

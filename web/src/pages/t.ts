@@ -1,17 +1,22 @@
 // The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it is only
 // the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
-// PDFs, the Capital One wallet, then a thank-you.
-// When the host ends the event, the same page turns into the recap.
+// PDFs (or the plan's name), the insurance for their things, the Capital One wallet, then a thank-you.
+// When the host ends the event, or once the attendee leaves early, the same page turns into the recap.
+// After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
+// shows how each claim is going until it lands in the wallet, a stolen or broken belonging's claim too.
+// Below it, any charge the organizer approved for something the wearer broke or took, to pay from the
+// wallet or dispute; at the bottom, the wallet with its movements and the wearer's own policy.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
 // for first aid.
 
 import {
-  act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
-  signIn, signOut, signedInEmail, testAs, time, type Actor, PLATFORMS,
+  act, actors, api, apiSession, capital, config, connect, date, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
+  signIn, signOut, signedInEmail, testAs, time, viewing, type Actor, PLATFORMS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
-import { recap } from '../recap';
+import { movements, recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
+import type { MyCharge } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_attendee',
@@ -19,6 +24,7 @@ const QUERIES = [
   'SELECT * FROM my_handles',
   'SELECT * FROM my_medical_card',
   'SELECT * FROM my_medical_documents',
+  'SELECT * FROM my_plan_lookups',
   'SELECT * FROM my_visits',
   'SELECT * FROM my_encounters',
   'SELECT * FROM my_photos',
@@ -28,6 +34,7 @@ const QUERIES = [
   'SELECT * FROM my_wallet_entries',
   'SELECT * FROM my_wallet',
   'SELECT * FROM event_state',
+  'SELECT * FROM my_departure',
   'SELECT * FROM venue',
   'SELECT * FROM organization',
   'SELECT * FROM person',
@@ -35,13 +42,17 @@ const QUERIES = [
   'SELECT * FROM my_roles',
   'SELECT * FROM open_incidents',
   'SELECT * FROM medic_medical_cards',
+  'SELECT * FROM my_incidents',
+  'SELECT * FROM my_claims',
+  'SELECT * FROM my_charges',
+  'SELECT * FROM my_attendee_policy',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
 const bandId = bandFromCode(token);
 const code = bandId ? bandCode(bandId) : token;
 
-type Step = 'name' | 'socials' | 'history' | 'insurance' | 'profile' | 'card' | 'wallet' | 'done';
+type Step = 'name' | 'socials' | 'history' | 'insurance' | 'things' | 'profile' | 'card' | 'wallet' | 'done';
 
 let conn: DbConnection;
 let testMode = false;
@@ -172,7 +183,60 @@ function documentStep(kind: 'history' | 'insurance', next: Step) {
       await fileDocument(kind, await (await fetch(`/test-records/${testFile}`)).arrayBuffer());
       go(next);
     }) }, 'Use a test record'),
+    kind === 'insurance' && planLookup('health', next),
     h('button', { class: 'link', onclick: () => go(next) }, 'Skip'),
+  ];
+}
+
+type PlanKind = 'health' | 'belongings';
+
+function latestLookup(kind: PlanKind) {
+  return [...conn.db.myPlanLookups.iter()].filter(l => l.kind === kind).sort((a, b) => Number(b.id - a.id))[0];
+}
+
+const dollars = (f: HTMLFormElement, name: string) =>
+  BigInt(Math.round(Number((f.elements.namedItem(name) as HTMLInputElement).value || 0) * 100));
+
+/** "Name your plan instead": the insurer and plan go to the web, and the plan's public document comes back. */
+function planLookup(kind: PlanKind, next: Step) {
+  const l = latestLookup(kind);
+  const status = !l ? null
+    : l.status === 'searching' ? h('p', { class: 'muted' }, kind === 'health' ? 'Looking up your plan…' : 'Looking up your policy…')
+    : l.status === 'found' ? h('p', {}, h('b', {}, kind === 'health' ? 'Plan found: ' : 'Policy found: '),
+        `${l.printedInsurer} ${l.printedPlan}${l.planYear ? ` (${l.planYear})` : ''} `, h('a', { href: l.sourceUrl, target: '_blank' }, 'read it'))
+    : h('p', { class: 'error' }, "We couldn't find your plan's documents online. Upload your policy instead.");
+  const look = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const v = (name: string) => (f.elements.namedItem(name) as HTMLInputElement).value;
+    const belongings = kind === 'belongings';
+    await conn.reducers.lookUpPlan({
+      kind, insurer: v('insurer'), plan: v('plan'), state: v('state'),
+      limitCents: belongings ? dollars(f, 'limit') : 0n, deductibleCents: belongings ? dollars(f, 'deductible') : 0n,
+    });
+    go(next);
+  };
+  return h('section', {},
+    h('h3', {}, kind === 'health' ? 'Name your plan instead' : 'Name your policy instead'),
+    status,
+    h('form', { onsubmit: (e: Event) => act(() => look(e)) },
+      h('label', {}, 'Insurer', h('input', { name: 'insurer', required: true, placeholder: kind === 'health' ? 'Blue Shield of California' : 'Lemonade' })),
+      h('label', {}, kind === 'health' ? 'Plan' : 'Policy', h('input', { name: 'plan', required: true, placeholder: kind === 'health' ? 'Silver 70 PPO' : 'Renters' })),
+      h('label', {}, 'State', h('input', { name: 'state', required: true, maxlength: 2, placeholder: 'CA' })),
+      kind === 'belongings' && [
+        h('label', {}, 'Personal property limit ($), from your declarations page', h('input', { name: 'limit', type: 'number', min: 1, required: true })),
+        h('label', {}, 'Deductible ($)', h('input', { name: 'deductible', type: 'number', min: 0, required: true })),
+      ],
+      h('button', {}, 'Look it up')));
+}
+
+/** The attendee's own insurance for their belongings, which pays when something of theirs is stolen or broken. */
+function thingsStep() {
+  return [
+    h('h2', {}, 'Insurance for your things'),
+    h('p', {}, 'If something of yours is stolen or broken here, your renters or home insurance pays for it, and the payout lands in your wallet.'),
+    planLookup('belongings', 'profile'),
+    h('button', { class: 'link', onclick: () => go('profile') }, 'Skip'),
   ];
 }
 
@@ -224,7 +288,7 @@ function cardStep() {
       card.bloodType && card.bloodType !== 'unknown' && h('p', {}, h('b', {}, 'Blood type: '), card.bloodType),
       list('Allergies', card.allergies), list('Conditions', card.conditions), list('Medications', card.medications),
       card.emergencyContact && h('p', {}, h('b', {}, 'Emergency contact: '), card.emergencyContact),
-      card.insurer && h('p', {}, h('b', {}, 'Insurance: '), `${card.insurer} ${card.plan}, member ${card.memberId}, group ${card.groupNumber}${card.insurerPhone ? `, ${card.insurerPhone}` : ''}`),
+      card.insurer && h('p', {}, h('b', {}, 'Insurance: '), [`${card.insurer} ${card.plan}`, card.memberId && `member ${card.memberId}`, card.groupNumber && `group ${card.groupNumber}`, card.insurerPhone].filter(Boolean).join(', ')),
       docs.some(d => d.status === 'failed') && h('p', { class: 'error' }, 'One document could not be read.')),
     h('button', { onclick: () => act(() => conn.reducers.confirmMedicalCard({})).then(ok => ok && go('wallet')) }, 'Looks right'),
   ];
@@ -239,7 +303,7 @@ function walletStep() {
     return [
       h('h2', {}, 'Your wallet is connected'),
       h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`),
-      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue's insurance pays into it, and after the event you can buy merch with your photos from it.`),
+      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue pays your treatment into it, and after the event you can buy merch with your photos from it.`),
       h('button', { onclick: () => go('done') }, 'Continue'),
     ];
   }
@@ -248,7 +312,7 @@ function walletStep() {
   }
   return [
     h('h2', {}, 'Connect your Capital One wallet'),
-    h('p', {}, "If you get hurt here, the venue's insurance pays into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
+    h('p', {}, "If you get hurt here, the venue pays your treatment into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
     h('button', { onclick: () => act(() => conn.reducers.connectWallet({})).then(ok => { if (ok) { walletAsked = true; render(); } }) }, 'Connect'),
     h('button', { class: 'link', onclick: () => go('done') }, 'Skip'),
   ];
@@ -260,6 +324,7 @@ function thanks() {
     h('h2', {}, "You're all set"),
     h('p', { class: 'big' }, `Thanks, ${conn.db.myAttendee.iter().next().value?.displayName ?? ''}. Enjoy ${v?.name ?? 'the event'}.`),
     h('p', {}, 'Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos.'),
+    !viewing() && h('button', { onclick: () => confirm('Leave the event now? Your band stops and your recap opens.') && act(() => conn.reducers.leaveEvent({})) }, 'Leave the event'),
   ];
 }
 
@@ -267,7 +332,8 @@ function resumeStep(): Step {
   if (!conn.db.myAttendee.iter().next().value?.displayName) return 'name';
   const docs = [...conn.db.myMedicalDocuments.iter()];
   if (!docs.some(d => d.kind === 'history')) return 'history';
-  if (!docs.some(d => d.kind === 'insurance')) return 'insurance';
+  if (!docs.some(d => d.kind === 'insurance') && !latestLookup('health')) return 'insurance';
+  if (!latestLookup('belongings')) return 'things';
   if (conn.db.myMedicalCard.iter().next().value?.status !== 'confirmed') return 'card';
   if (!conn.db.myWallet.iter().next().value) return 'wallet';
   return 'done';
@@ -278,12 +344,129 @@ function setup() {
     case 'name': return nameStep();
     case 'socials': return socialsStep();
     case 'history': return documentStep('history', 'insurance');
-    case 'insurance': return documentStep('insurance', 'profile');
+    case 'insurance': return documentStep('insurance', 'things');
+    case 'things': return thingsStep();
     case 'profile': return profileStep();
     case 'card': return cardStep();
     case 'wallet': return walletStep();
     default: return thanks();
   }
+}
+
+// --- Claims ---------------------------------------------------------------------------------
+
+const INJURIES = ['fall', 'sos'];
+
+/** What a claim's status means for the attendee, in plain words. Only an injury waits for a hospital report. */
+function claimStatus(tag: string, payoutCents: bigint, kind: string): string {
+  switch (tag) {
+    case 'AwaitingRecord': return INJURIES.includes(kind) ? 'Waiting for the hospital report' : 'Being reviewed';
+    case 'ReadingRecord': case 'Verifying': case 'Reviewing': return 'Being reviewed';
+    case 'Routed': return 'Waiting for the organizer to approve the payment';
+    case 'Paying': return 'Approved, paying into your wallet';
+    case 'Settled': case 'Reconciled': return `Paid ${money(payoutCents)} into your wallet`;
+    case 'Refused': return 'Not paid. The organizer can tell you why.';
+    default: return 'Being reviewed';
+  }
+}
+
+const KIND_WORDS: Record<string, string> = {
+  fall: 'a fall',
+  sos: 'a call for help',
+  theft: 'something of yours that was stolen',
+  breakage: 'something of yours that was broken',
+};
+
+/** After a fall or a call for help: ask the venue to pay, in your own words. Then every claim, of any kind,
+ *  followed to the wallet. */
+function claims() {
+  const open = [...conn.db.myIncidents.iter()].filter(i => i.resolved && i.claimId === 0n).sort((a, b) => Number(a.incidentId - b.incidentId));
+  const mine = [...conn.db.myClaims.iter()].sort((a, b) => Number(a.id - b.id));
+  const policy = conn.db.myAttendeePolicy.iter().next().value;
+  const file = (incidentId: bigint) => async (e: Event) => {
+    e.preventDefault();
+    const statement = ((e.target as HTMLFormElement).elements.namedItem(`statement-${incidentId}`) as HTMLTextAreaElement).value.trim();
+    await act(() => conn.reducers.fileClaim({ incidentId, statement }));
+  };
+  return [
+    open.length > 0 && h('section', {},
+      h('h3', {}, 'Hurt at the event?'),
+      open.map(i => h('form', { onsubmit: file(i.incidentId) },
+        h('p', {}, `Your band flagged ${KIND_WORDS[i.kind] ?? 'an alert'} at the ${i.zoneName} at ${time(i.openedAt)}. If you were hurt, tell us what happened and the venue pays your treatment into your wallet.`),
+        h('textarea', { name: `statement-${i.incidentId}`, rows: 4, required: true, placeholder: 'Tell us what happened…' }),
+        h('button', {}, 'Ask the venue to pay')))),
+    mine.length > 0 && h('section', {},
+      h('h3', {}, mine.length > 1 ? 'Your claims' : 'Your claim'),
+      mine.map(c => {
+        const belonging = !INJURIES.includes(c.incidentKind);
+        return h('div', {},
+          h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents, c.incidentKind)),
+          h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an incident'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
+          belonging && (policy
+            ? h('p', { class: 'muted' }, `Your own policy with ${policy.insurerName} pays it, less your ${money(policy.deductibleCents)} deductible.`)
+            : h('p', { class: 'muted' }, `No policy of your own is on file, so the organizer decides it. For your own insurer: incident ${c.incidentId} at the ${c.zoneName}, ${date(c.openedAt)}.`)),
+          c.statement && h('p', {}, `You said: "${c.statement}"`));
+      })),
+  ];
+}
+
+const CHARGE_WHAT: Record<string, string> = {
+  property: 'Venue equipment broken',
+  theft: "Another attendee's belonging stolen",
+  breakage: "Another attendee's belonging broken",
+};
+
+function chargeStatus(c: MyCharge): string {
+  switch (c.status) {
+    case 'approved': return 'To pay. Nothing leaves your wallet until you press pay.';
+    case 'paying': return 'Paying from your wallet…';
+    case 'paid': return `Paid from your wallet${c.paidAt ? ` at ${time(c.paidAt)}` : ''}.`;
+    case 'disputed': return 'Disputed. The organizer looks at it again.';
+    case 'waived': return 'Waived. You owe nothing.';
+    default: return c.status;
+  }
+}
+
+/** Charges the organizer approved for something the attendee broke or took, each like a receipt: pay it from
+ *  the wallet or dispute it in their own words. */
+function charges() {
+  const mine = [...conn.db.myCharges.iter()].sort((a, b) => Number(b.id - a.id));
+  const dispute = (chargeId: bigint) => async (e: Event) => {
+    e.preventDefault();
+    const text = ((e.target as HTMLFormElement).elements.namedItem(`dispute-${chargeId}`) as HTMLTextAreaElement).value.trim();
+    await act(() => conn.reducers.disputeCharge({ chargeId, text }));
+  };
+  return mine.length > 0 && h('section', {},
+    h('h3', {}, 'Your charges'),
+    mine.map(c => h('div', {},
+      h('p', { class: 'big' }, `${CHARGE_WHAT[c.incidentKind] ?? 'Something broken or taken'} at the ${c.zoneName}, ${time(c.happenedAt)}. ${money(c.amountCents)}.`),
+      c.why && h('p', {}, `Why: ${c.why.replace(/\.$/, '')}.`),
+      c.clause && h('p', {}, `${capital(c.clause.replace(/\.$/, ''))}.`),
+      h('p', {}, h('b', {}, chargeStatus(c))),
+      c.disputeText && h('p', {}, `You said: "${c.disputeText}"`),
+      c.status === 'approved' && [
+        h('button', { onclick: () => act(() => conn.reducers.payCharge({ chargeId: c.id })) }, 'Pay from wallet'),
+        h('form', { onsubmit: dispute(c.id) },
+          h('label', {}, 'Not you, or not right? Say why in your own words',
+            h('textarea', { name: `dispute-${c.id}`, rows: 3, required: true, placeholder: 'What happened…' })),
+          h('button', {}, 'Dispute'))])));
+}
+
+/** The wallet and its movements, and the attendee's own policy, during the event. The recap shows the wallet after it. */
+function wallet(ended: boolean) {
+  const w = conn.db.myWallet.iter().next().value;
+  const policy = conn.db.myAttendeePolicy.iter().next().value;
+  const showWallet = !!w && !ended && step !== 'wallet';
+  if (!showWallet && !policy) return null;
+  return h('section', {},
+    showWallet && [
+      h('h3', {}, 'Your wallet'),
+      h('p', { class: 'big' }, `${money(w!.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w!.accountId.slice(0, 8)}`)),
+      movements(conn)],
+    policy && [
+      h(showWallet ? 'h4' : 'h3', {}, 'Your own insurance for your things'),
+      h('p', {}, `${policy.insurerName}, policy ${policy.policyNumber}: up to ${money(policy.perClaimLimitCents)} a claim and ${money(policy.aggregateLimitCents)} a year, with a ${money(policy.deductibleCents)} deductible you carry.`),
+      h('p', { class: 'muted' }, 'It pays for your belongings stolen or broken here, into your wallet.')]);
 }
 
 // --- Medic view -------------------------------------------------------------------------------
@@ -309,7 +492,7 @@ async function tapAsMedic() {
 
 function medicView() {
   const m = [...conn.db.medicMedicalCards.iter()].filter(c => c.bandId === bandId).pop();
-  const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && i.kind.tag !== 'Property');
+  const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && ['Sos', 'Fall'].includes(i.kind.tag));
   const title = h('h2', {}, `Medic view: band ${code}`);
   const again = h('button', { class: 'link', onclick: tapAsMedic }, 'Tap again');
   if (m) {
@@ -328,19 +511,40 @@ function medicView() {
   return [title, h('p', { class: 'error' }, tap), again];
 }
 
+// --- View as -------------------------------------------------------------------------------
+
+/** The screen the organizer's View as frame picked by its hash: the medical card or the recap. */
+function viewedScreen() {
+  const screen = location.hash.slice(1);
+  if (screen === 'card') {
+    const me = conn.db.myAttendee.iter().next().value;
+    return medicalCard({ incidentId: 0n, bandId, name: me?.displayName ?? '', card: conn.db.myMedicalCard.iter().next().value });
+  }
+  return screen === 'recap' ? recap(conn, render) : null;
+}
+
 function render() {
-  if (!conn) return;
+  // While someone types what happened, the page holds still so the phone keeps its keyboard up.
+  if (!conn || document.activeElement instanceof HTMLTextAreaElement) return;
   const mb = conn.db.myBand.iter().next().value;
-  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  // The event is over for an attendee once it ends, or once they walked out early.
+  const ended = (conn.db.eventState.id.find(0)?.ended ?? false) || !!conn.db.myDeparture.iter().next().value?.leftAt;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
-    testMode && people.length > 0 && testAs(people));
+    testMode && !viewing() && people.length > 0 && testAs(people));
   if (isMedic()) return mount('app', top, medicView());
-  if (mb && mb.bandId === bandId && mb.status === 'claimed') {
+  // The View as frame also shows a crowd attendee, who wears a band without tapping it.
+  const wears = mb && mb.bandId === bandId && mb.status === 'claimed';
+  if (wears || (viewing() && conn.db.myAttendee.count() > 0)) {
+    const screen = viewing() && viewedScreen();
+    // The recap shows the wallet itself.
+    if (screen) return mount('app', top, claims(), charges(), screen, wallet(ended || location.hash === '#recap'));
     if (ended) {
-      return mount('app', top, recap(conn, render));
+      return mount('app', top, claims(), charges(), recap(conn, render), wallet(ended));
     }
-    return mount('app', top, setup());
+    // The setup first: it can move on a step, and the wallet's balance shows once, on the wallet step or below.
+    const steps = setup();
+    return mount('app', top, claims(), charges(), steps, wallet(ended));
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));
@@ -355,13 +559,19 @@ async function main() {
   testMode = cfg.test_mode;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest && !viewing()) {
     return mount('app', h('h2', {}, `Band ${code}`), h('p', {}, 'Sign in with your email to make this band yours.'),
       h('button', { onclick: signIn }, 'Sign in with email'),
       testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   if (testMode) people = await actors();
   conn = await connect([...QUERIES, `SELECT * FROM band WHERE id = ${bandId}`], render);
+  // The View as frame only reads: it never taps, claims or opens a card, and its hash picks the screen.
+  if (viewing()) {
+    step = resumeStep();
+    window.addEventListener('hashchange', render);
+    return render();
+  }
   // A medic's tap opens the medical card; it never claims the band.
   if (isMedic()) return tapAsMedic();
   const mb = conn.db.myBand.iter().next().value;

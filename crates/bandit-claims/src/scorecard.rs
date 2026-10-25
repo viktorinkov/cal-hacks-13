@@ -250,7 +250,7 @@ fn pick_station(app: &App) -> Result<u8> {
                 .db
                 .incident()
                 .iter()
-                .filter(|i| i.kind != IncidentKind::Property && i.zone_id == zone.id)
+                .filter(|i| is_injury(i.kind) && i.zone_id == zone.id)
                 .map(|i| micros(i.opened_at))
                 .collect();
             let near = |x: i64| times.iter().filter(|y| (**y - x).abs() <= WINDOW).count() + usize::from((x - t).abs() <= WINDOW);
@@ -299,7 +299,7 @@ fn finish_flow(app: &App, planted: &mut [Planted]) -> Result<()> {
     }
 }
 
-/// The named approvers: approve genuine claims (learning a rule), refuse planted fakes.
+/// The named approvers: approve genuine claims, refuse planted fakes, and approve the rules Claude proposes.
 fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
     for p in planted {
         let c = app.claim(p.claim)?;
@@ -309,7 +309,7 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let who = c.routed_to_name.clone();
         app.quiet.set(true);
         let r = if p.kind == Kind::Genuine {
-            decide::approve(app, p.claim, None, None, true, false, false)
+            decide::approve(app, p.claim, None, false, false)
         } else {
             decide::refuse(app, p.claim, None, &format!("planted fake: {}", p.kind.label()), false)
         };
@@ -318,11 +318,18 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let verb = if p.kind == Kind::Genuine { "approves" } else { "refuses" };
         println!("    {who} {verb} claim {} ({}, {}) -> {}", c.id, p.kind.label(), money(c.payout_cents), status_name(c.status));
     }
+    app.quiet.set(true);
+    let rules = decide::approve_proposals(app);
+    app.quiet.set(false);
+    for p in rules? {
+        println!("    the organizer approves Claude's proposed rule from claims {:?}: {} up to {} -> rule v{}", p.claim_ids, p.incident_kind, money(p.ceiling_cents), p.rule_version);
+    }
     Ok(())
 }
 
-/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule,
-/// 2 stopped only by the claims agent, 3 paid.
+/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule
+/// (Claude refuses on its own only on a failed check), 2 stopped only by
+/// Claude's judgment, 3 paid.
 fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled) {
         return (3, "paid".into());
@@ -331,8 +338,11 @@ fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if c.decided_by == "code" {
         return (0, format!("refused by code ({})", note));
     }
-    if note.starts_with("claims agent") {
-        return (2, "caught only by the claims agent".into());
+    if c.decided_by == "claude" {
+        return (1, format!("refused by Claude on a failed check ({note})"));
+    }
+    if note.starts_with("Claude recommends refusing") || note.starts_with("Claude asks") || note.starts_with("claims agent") {
+        return (2, "caught only by Claude".into());
     }
     if in_pipeline(c.status) {
         return (1, format!("still {}", status_name(c.status)));
@@ -344,7 +354,8 @@ fn score(app: &App, planted: &[Planted], label: &str) -> Result<()> {
     let db = app.db()?;
     let rows: Vec<(&Planted, Claim)> = planted.iter().map(|p| app.claim(p.claim).map(|c| (p, c))).collect::<Result<_>>()?;
     let paid = |c: &Claim| matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled);
-    let auto = |c: &Claim| c.decided_by == "rule";
+    // Settled with no person: Claude's payment inside an approved rule, or the code-only rule.
+    let auto = |c: &Claim| paid(c) && matches!(c.decided_by.as_str(), "claude" | "rule");
     let genuine: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind == Kind::Genuine).collect();
     let fakes: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind != Kind::Genuine).collect();
     let tp = genuine.iter().filter(|(_, c)| auto(c)).count();

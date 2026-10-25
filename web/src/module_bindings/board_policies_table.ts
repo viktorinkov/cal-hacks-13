@@ -20,4 +20,7 @@ export default __t.row({
   medicalUsedCents: __t.u64().name("medical_used_cents"),
   propertyUsedCents: __t.u64().name("property_used_cents"),
   updatedAt: __t.timestamp().name("updated_at"),
+  otherInsurance: __t.string().name("other_insurance"),
+  staffExcluded: __t.bool().name("staff_excluded"),
+  periodChecked: __t.bool().name("period_checked"),
 });

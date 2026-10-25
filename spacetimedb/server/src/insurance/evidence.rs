@@ -25,8 +25,21 @@ pub fn cover_of(claim: &Claim) -> CoverKind {
     CoverKind::parse(&claim.cover_kind).unwrap_or(CoverKind::Property)
 }
 
+/// The cover a claim is paid from: one of the venue policy's, or the attendee's own policy's one cover.
 pub fn policy_rule(ctx: &ReducerContext, policy_id: u64, cover: CoverKind) -> Option<CoverageRuleRow> {
+    if cover.is_attendee_policy() {
+        return ctx.db.attendee_policy().id().find(policy_id).map(|p| super::own_policy::cover_rule(&p));
+    }
     ctx.db.coverage_rule().policy_id().filter(policy_id).find(|r| r.cover_kind == cover.as_str())
+}
+
+/// Paid so far under the claim's cover, against its aggregate limit.
+pub fn used_cents(ctx: &ReducerContext, claim: &Claim) -> u64 {
+    let cover = cover_of(claim);
+    if cover.is_attendee_policy() {
+        return ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| p.used_cents).unwrap_or(0);
+    }
+    ctx.db.insurance_policy().id().find(claim.policy_id).map(|p| aggregate_used(&p, cover)).unwrap_or(0)
 }
 
 pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRule {
@@ -36,6 +49,7 @@ pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRul
         per_claim_limit_cents: r.per_claim_limit_cents,
         aggregate_limit_cents: r.aggregate_limit_cents,
         deductible_cents: r.deductible_cents,
+        minimum_payout_cents: r.minimum_payout_cents,
         service_window_days: r.service_window_days,
         active: r.active,
     }
@@ -44,7 +58,7 @@ pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRul
 pub fn aggregate_used(policy: &InsurancePolicy, cover: CoverKind) -> u64 {
     match cover {
         CoverKind::MedicalPayments => policy.medical_used_cents,
-        CoverKind::Property => policy.property_used_cents,
+        CoverKind::Property | CoverKind::PersonalProperty => policy.property_used_cents,
     }
 }
 
@@ -141,7 +155,7 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         ctx.db
             .zone_visit()
             .band_id()
-            .filter(u32::from(inc.subject_band))
+            .filter(inc.subject_band)
             .filter(|v| micros(v.entered) <= opened_at && v.left.is_none_or(|l| micros(l) >= opened_at - PRESENCE_WINDOW_MICROS))
             .map(|v| {
                 let z = zone_for_station(ctx, v.zone);
@@ -183,21 +197,36 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
     });
 
     let cover = cover_of(claim);
-    let policy = ctx.db.insurance_policy().id().find(claim.policy_id).and_then(|p| {
-        policy_rule(ctx, p.id, cover).map(|r| PolicyInfo {
+    let policy = if cover.is_attendee_policy() {
+        ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| PolicyInfo {
             policy_id: p.id,
             policy_number: p.policy_number.clone(),
             insurer_name: p.insurer_name.clone(),
             cover_kind: cover,
-            per_claim_limit_cents: r.per_claim_limit_cents,
-            aggregate_limit_cents: r.aggregate_limit_cents,
-            aggregate_used_cents: aggregate_used(&p, cover),
-            deductible_cents: r.deductible_cents,
+            per_claim_limit_cents: p.per_claim_limit_cents,
+            aggregate_limit_cents: p.aggregate_limit_cents,
+            aggregate_used_cents: p.used_cents,
+            deductible_cents: p.deductible_cents,
             read_at: micros(ctx.timestamp),
         })
-    });
+    } else {
+        ctx.db.insurance_policy().id().find(claim.policy_id).and_then(|p| {
+            policy_rule(ctx, p.id, cover).map(|r| PolicyInfo {
+                policy_id: p.id,
+                policy_number: p.policy_number.clone(),
+                insurer_name: p.insurer_name.clone(),
+                cover_kind: cover,
+                per_claim_limit_cents: r.per_claim_limit_cents,
+                aggregate_limit_cents: r.aggregate_limit_cents,
+                aggregate_used_cents: aggregate_used(&p, cover),
+                deductible_cents: r.deductible_cents,
+                read_at: micros(ctx.timestamp),
+            })
+        })
+    };
+    let responsible = super::charges::responsible_info(ctx, inc.id);
 
-    EvidenceInput { incident, snapshot, witnesses, notes, zone, presence, vision, record, policy }
+    EvidenceInput { incident, snapshot, witnesses, notes, zone, presence, vision, record, policy, responsible }
 }
 
 /// The record's encounter as a timestamp: its date and time of service in
@@ -228,7 +257,7 @@ pub fn record_checks(ctx: &ReducerContext, claim: &Claim, input: &EvidenceInput)
     if let Ok(record) = serde_json::from_str::<bandit_insurance::medical::ExtractedRecord>(&rec.record_json) {
         let valid = bandit_insurance::medical::ValidRecord { record, dropped: rec.dropped.clone() };
         checks.extend(bandit_insurance::medical::record_checks(&valid, &claim.claimant_name, &incident_date, window));
-        let lines = bandit_insurance::fee_schedule::cover_lines(&valid, &incident_date, window);
+        let lines = bandit_insurance::fee_schedule::cover_lines(&valid, &incident_date, window, &super::documents::fee_schedule_for(ctx, claim.policy_id));
         checks.push(bandit_insurance::fee_schedule::lines_check(&lines));
     }
     checks.push(duplicate_check(ctx, claim, &rec));
@@ -256,9 +285,12 @@ fn duplicate_check(ctx: &ReducerContext, claim: &Claim, rec: &MedicalRecord) -> 
     Check::pass("record_duplicate", "no other claim has this file, invoice, or patient, date and total")
 }
 
-/// Medical-payments cover excludes the venue's own staff.
+/// Medical-payments cover excludes the venue's own staff, unless the confirmed policy has no staff exclusion.
 fn claimant_check(ctx: &ReducerContext, claim: &Claim) -> Option<Check> {
     if cover_of(claim) != CoverKind::MedicalPayments {
+        return None;
+    }
+    if ctx.db.insurance_policy().id().find(claim.policy_id).is_some_and(|p| !p.staff_excluded) {
         return None;
     }
     let claimant = claim.claimant?;
@@ -277,7 +309,7 @@ pub fn occurrence(ctx: &ReducerContext, incident_id: u64) -> Vec<Incident> {
     let Some(inc) = ctx.db.incident().id().find(incident_id) else {
         return Vec::new();
     };
-    if inc.kind == IncidentKind::Property || inc.zone_id == 0 {
+    if !inc.kind.is_injury() || inc.zone_id == 0 {
         return vec![inc];
     }
     let at = micros(inc.opened_at);
@@ -285,7 +317,7 @@ pub fn occurrence(ctx: &ReducerContext, incident_id: u64) -> Vec<Incident> {
         .db
         .incident()
         .iter()
-        .filter(|i| i.kind != IncidentKind::Property && i.zone_id == inc.zone_id && (micros(i.opened_at) - at).abs() <= OCCURRENCE_MICROS)
+        .filter(|i| i.kind.is_injury() && i.zone_id == inc.zone_id && (micros(i.opened_at) - at).abs() <= OCCURRENCE_MICROS)
         .collect();
     all.sort_by_key(|i| i.id);
     all
@@ -305,7 +337,10 @@ pub struct Pack {
 pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
     let input = gather(ctx, claim);
     let s = settings(ctx);
-    let facts = build_facts(&input);
+    let mut facts = build_facts(&input);
+    if !claim.statement.is_empty() {
+        facts.push(statement_fact(claim, facts.len() as u32 + 1));
+    }
     let hash = bandit_insurance::pack::pack_sha256(&facts);
     let (corroboration, mut checks) = bandit_insurance::corroboration::corroborate(&input, &config(&s));
     checks.extend(record_checks(ctx, claim, &input));
@@ -340,6 +375,20 @@ pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
         checks: checks.iter().map(Check::line).collect::<Vec<_>>().join("\n"),
     });
     Pack { version, hash, facts, corroboration, checks, input }
+}
+
+/// The attendee's own words from filing, as the pack's last fact. The core has
+/// no claimant source, so it sits with the incident's facts.
+fn statement_fact(claim: &Claim, seq: u32) -> Fact {
+    Fact {
+        seq,
+        source: bandit_insurance::Source::IncidentSnapshot,
+        key: "claimant_statement".into(),
+        value: claim.statement.clone(),
+        observed_at: micros(claim.opened_at),
+        reader: bandit_insurance::Reader::Code,
+        reference: format!("claim:{}", claim.id),
+    }
 }
 
 pub fn store_check(ctx: &ReducerContext, claim_id: u64, pack_version: u32, c: &Check) {

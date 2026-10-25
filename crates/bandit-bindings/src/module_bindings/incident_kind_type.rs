@@ -13,6 +13,10 @@ pub enum IncidentKind {
     Fall,
 
     Property,
+
+    Theft,
+
+    Breakage,
 }
 
 impl __sdk::InModule for IncidentKind {

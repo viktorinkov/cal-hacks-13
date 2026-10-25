@@ -25,7 +25,7 @@ Responsibilities:
 Non-responsibilities:
 
 - It does not write `band`, `zone_visit`, `encounter` or `event`; it only reads them ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](Safety.md)).
-- It does not analyse images. People counts and captions come from Vision (TBD -- LEO) through `submit_photo_features` ([Vision](../4-devices/Vision.md)).
+- It does not analyse images itself. People counts and captions come from the `photo_features` job in `bandit-workers`, where Claude reads the photo, through `submit_photo_features`. Claude counts people and never says who anyone is.
 - It does not scrape people. Nobody's social profile is scraped; a handle comes only from its owner.
 - Elastic.md: it does not rank by meaning. The order of the recap's people and booths comes from Elastic's `GET /recap/order` over a one-way copy of this file's findable rows ([Elastic](../7-integrations/Elastic.md)); the lists themselves come from this file's views.
 - It does not make merch; it supplies the visits and photos that [Merch](Merch.md) builds its suggestions from.
@@ -41,13 +41,13 @@ Non-responsibilities:
 | In | Bright-Data.md: profile claim | `person` rows (name, role, organisation, headshot) and the `claimed_people` view; `claim_person`, called by the signed-in tap page, copies a claimed profile onto the attendee and is defined in [Bright-Data](../7-integrations/Bright-Data.md) | Module tables |
 | In | Photographer route `/photo`, served with the tap page (role `photographer`) | Photo bytes to `bandit-api` through `POST /api/blobs` with purpose `photo`, then `register_photo` with the returned URL `/blobs/<sha256>`, the capture time, the zone and an optional caption; `hide_photo` | HTTPS upload, then SDK |
 | In | `bandit-api` (role `api`) | `register_blob` for the uploaded photo, stored under its SHA-256 (access class `shared`) | SDK |
-| In | Vision.md (TBD -- LEO): `bandit-vision` | `submit_photo_features` for a `photo_features` job: people count and caption | SDK (role `vision`) |
+| In | `bandit-workers` | `submit_photo_features` for a `photo_features` job: people count, caption and the model call | SDK (role `worker`) |
 | Out | Tap page | Views keyed on the caller: `my_visits`, `my_encounters`, `my_shared_visits`, `my_graph`, `my_photos`, `my_share_links` | Subscription |
 | Out | The big screen on the organizer portal | View `event_graph`: the whole-event graph, people by display name | Subscription |
 | Out | Organizer portal, the Event graph and Photos tabs (staff: the owner, `ops`, `medic`) | View `board_photos`: every event photo with its zone, time and caption, and the graph node ids of the `findable` people tagged in it | Subscription |
 | Out | `bandit-api` | `share_link` rows and the rows a link selects, for the public share page; Elastic.md: `social_encounters` and `social_visits`, the recap candidates for `GET /recap/order` | Subscription (role `api`) |
 | Out | Elastic.md: `bandit-indexer` | the views `social_attendees`, `social_visits` and `social_encounters`, findable attendees only, into `bandit-memories` and `bandit-people`; never `social_handle` or photos | Subscription (role `indexer`) |
-| Out | `job` table | Vision.md: job `photo_features` with the photo id, from `register_photo` | a `job` row |
+| Out | `job` table | `bandit-workers`: job `photo_features` with the photo id, its blob hash, the zone, the zone's booths and the photographer's caption, from `register_photo` | a `job` row |
 | Out | [Merch](Merch.md) | `visit`, `photo` and `photo_tag` rows for the merch suggestions | Module tables |
 
 ## Design
@@ -91,7 +91,9 @@ A stay under 5 s is deleted when the band moves on, and a zone left less than 5 
 
 A stay becomes a visit once it has lasted 2 minutes (`VISIT_MIN_SECONDS`, starting value, calibrate at the venue), counted from when the band was both in the zone and worn, and only when its station id belongs to a zone. A running visit is rewritten at most every 30 s (`REFRESH_SECONDS`), so 1,000 crowd bands stay cheap, and it closes when its stay closes.
 
-A crowd band's stay names the booth it stands at. A radio or test band's stay names none, and its `visited` link goes to every booth in the zone; in the venue layout each booth zone holds one booth.
+A crowd band's stay names the booth it stands at. So does the stay of a band a presenter places on the 3D floor (`place_band`): when the floor spot nearest the click is a sponsor table, the stay names that table's booth, and moving the band to another table starts a new stay.
+
+A stay that only the radio gives, by zone, names no booth, and its `visited` link goes to every booth in the zone.
 
 | `visit` field | Meaning |
 |---|---|
@@ -228,14 +230,14 @@ The photographer route `/photo` is served with the tap page, gated by the `photo
 
 The route then calls `register_photo` with that URL, the capture time, the zone and an optional caption. The photographer picks the zone the photo was taken in from the venue's zones.
 
-The question this diagram answers: how a photo becomes tags, and where Vision joins in.
+The question this diagram answers: how a photo becomes tags, and where Claude joins in.
 
 ```mermaid
 sequenceDiagram
     participant PH as photographer route
     participant API as bandit-api
     participant M as band1t module
-    participant V as bandit-vision (TBD -- LEO)
+    participant V as bandit-workers (Claude)
     participant AT as attendee's recap
     PH->>API: POST /api/blobs, purpose photo
     API->>API: store bytes under their SHA-256
@@ -245,22 +247,22 @@ sequenceDiagram
     M->>M: bands in that zone at taken_at
     M->>M: photo_tag rows, ranked, cap 8
     M-->>V: photo_features job
-    V->>M: submit_photo_features, people count
+    V->>M: submit_photo_features, people count, caption
     M->>M: re-cap to the people count
     M-->>AT: my_photos shows the photo after the event
 ```
 
-Candidate rule: photo tags come from the bands in the photo's zone at the moment it was taken. An attendee is a candidate when they have `findable` on and their band has a `zone_visit` stay in the photo's zone that covers `taken_at`. Candidates are ranked by when that stay began, so someone who was there for a while ranks above someone passing through.
+Candidate rule: photo tags come from the bands in the photo's zone at the moment it was taken. An attendee is a candidate when they have `findable` on and their band has a `zone_visit` stay in the photo's zone that covers `taken_at`. Candidates are ranked by how many of the other candidates their band heard up close at that moment (an `encounter` seen within 30 s of `taken_at`), so a group posing together ranks first, then by when the stay began, so someone who was there for a while ranks above someone passing through.
 
 Test-Bands.md: crowd attendees are candidates through their stays, and people who tapped their bands rank before the crowd.
 
-The list is capped at 8 (starting value) until Vision reports a people count, then at that count. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
+The list is capped at 8 (starting value) until Claude reports a people count, then at that count, at most 20. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
 
 Photos never go to Elastic. Identity always comes from the band, never from a face.
 
 Staff see each photo as soon as it is registered: `board_photos` puts it on the organizer portal's Photos tab and, once it has `findable` people in it, in the event graph among them.
 
-Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `bandit-vision` answers with `submit_photo_features`. The module uses the people count to re-cap the tags and the caption when the photographer gave none. How Vision computes its output is Leo's.
+`register_photo` enqueues a `photo_features` job for a photo in the blob store, and `bandit-workers` answers with `submit_photo_features`. The worker shrinks the photo to 1568 px on its longest side and asks Claude for the number of people clearly in it and a caption of at most 12 words with no names, hashtags or @ mentions. The module re-caps the tags to the people count and uses the caption when the photographer gave none; the recap's Share button uses it.
 
 | `photo` field | Meaning |
 |---|---|
@@ -269,8 +271,9 @@ Vision.md (TBD -- LEO): `register_photo` enqueues a `photo_features` job, and `b
 | `url` | `/blobs/<sha256>`: where the bytes are served from, access class `shared` |
 | `taken_at` | Capture time from the file, else upload time |
 | `zone_id` | The zone the photographer picked, where the photo was taken |
-| `caption` | From the photographer, or from Vision (TBD -- LEO) |
-| `people_count` | From Vision (TBD -- LEO), empty until then |
+| `caption` | From the photographer, or from Claude |
+| `people_count` | From Claude, 0 until the photo is read |
+| `features_call_id` | The model call that read the photo, 0 until then |
 | `status` | `uploaded`, `tagged`, `hidden` |
 
 | `photo_tag` field | Meaning |
@@ -309,6 +312,19 @@ Three service views give the findable rows to `bandit-indexer` and `bandit-api` 
 | `social_encounters` | encounters whose two attendees are both findable, with zone, times and minutes |
 
 `social_shared_visits` gives the shared visits, which are built only between findable attendees, to the service roles `indexer`, `worker` and `api`.
+
+**Interests.** At a venue, the booths someone stands at are what they are into. So each person under "People you spent time with" shows their interests: every booth their band stood at, from their visits that name a booth, with their minutes there.
+
+A booth both of you stood at, at any time of the night, is a shared interest. Shared interests come first, highlighted, with your minutes next to theirs; the person's other booths follow, most minutes first. That is the reason the two of you connect, read straight off the venue.
+
+A visit that names only a zone adds no interest, because one zone such as the sponsor row holds many booths. `GET /api/recap` builds the interests in `bandit-api` from the `social_visits` view, so they come from findable attendees only. Elastic.md: the order of the list comes from the same visits, through the `interests` text of `bandit-people`.
+
+| Interest field | Meaning |
+|---|---|
+| `booth_id`, `name` | The booth |
+| `minutes` | The person's minutes at the booth |
+| `your_minutes` | Your minutes at the booth, 0 when you never stood there |
+| `shared` | True when you both stood at the booth |
 
 
 ### Share links
@@ -378,7 +394,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | Decision | Why |
 |---|---|
 | The photographer route `/photo` is served with the tap page, gated by the `photographer` role | One app on the one public host; the role check is in the module, as for every other route |
-| In the venue layout each booth zone holds one booth, so a visit names one booth | Zones are the only resolution the bands give; one booth per zone makes the visit exact with no hand-placed hints |
+| A visit names a booth when the band stood at a sponsor table: a crowd band at its booth, a placed band at the sponsor table nearest its spot; a visit the radio gives by zone names none | The sponsor row is one zone with many booths, so only the band's spot on the 3D floor says which booth it stood at |
 | Socials are Meta only (Instagram, Facebook, Threads), typed by the attendee at onboarding; no provider sign-in and no `verified` state | Meta is the sponsor track; typing needs no provider approval, and a handle is shown only to people who hung out with its owner |
 | Onboarding has no company field; `works_at` comes only from the import and a claimed profile | Every company link then comes from the event's own pages, and onboarding stays short |
 | No Bandshake and no connection requests: an encounter between two `findable` attendees is the connection, and each sees the other's name and socials | The project description: find who you hung out with and their Insta, afterwards |
@@ -393,6 +409,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | The recap's social part is the attendee's own visits, people and photos; there is no written story | The project description asks for the night back, not a story; the views already give it |
 | The people graph lives in SpacetimeDB as the derived table `people_link`, written by `social_tick`; Elastic draws nothing on it | Every link is an exact fact the bands measured, it must reach every screen live, and `findable` must be enforced in the views; there are no links between people who never met |
 | Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and its shared visits from `my_shared_visits`; Elastic only orders the people and booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
+| Each person you spent time with shows their interests: the booths their band stood at, the ones you both stood at first and highlighted, with both people's minutes | At a venue the booths someone stands at are what they are into, and a booth you share is the plainest reason two people connect; a zone-only visit names no booth, so it adds none |
 | `bandit-indexer` and `bandit-api` read the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only | `findable` is enforced once, in the module, before anything leaves it |
 | A shared visit is two `findable` attendees' visits to one zone that overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value); it is a recap row, not a `people_link` kind | People you were in the same place with for a while belong in the recap next to the people you met, while the graph keeps only measured meetings and visits |
 | Shared booths and companies are shared nodes, never pairs of people | One link per person instead of one per pair, and the shared node is what forms the cluster |

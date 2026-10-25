@@ -6,6 +6,7 @@ mod app;
 mod decide;
 mod story;
 mod flow;
+mod live;
 mod scorecard;
 mod setup;
 mod show;
@@ -56,7 +57,7 @@ enum Cmd {
         #[arg(long)]
         note: String,
     },
-    /// The medic resolves the incident; a claim opens when it qualifies
+    /// The medic resolves the incident and the organizer files the wearer's claim
     Resolve {
         #[arg(long)]
         incident: u64,
@@ -100,14 +101,24 @@ enum Cmd {
         /// The actor who decides (default: ops, the organizer)
         #[arg(long = "as")]
         as_: Option<String>,
-        /// Ceiling for the learned rule, in dollars
-        #[arg(long)]
-        ceiling: Option<String>,
-        #[arg(long)]
-        no_learn: bool,
         /// Send a wrong amount on purpose to show the module failing closed
         #[arg(long)]
         stale: bool,
+    },
+    /// Approve the payment rule Claude proposed
+    ApproveRule {
+        proposal: u64,
+        /// The actor who decides (default: ops, the organizer)
+        #[arg(long = "as")]
+        as_: Option<String>,
+    },
+    /// Reject the payment rule Claude proposed
+    RejectRule {
+        proposal: u64,
+        #[arg(long = "as")]
+        as_: Option<String>,
+        #[arg(long)]
+        reason: String,
     },
     /// Show the approval grid and refuse
     Refuse {
@@ -160,6 +171,12 @@ enum Cmd {
         #[arg(long, default_value_t = 3)]
         rounds: u32,
     },
+    /// The floor staff for the live run: the medic, the camera, security's cost notes and naming, the organizer
+    Live {
+        /// Decide a claim or a charge left waiting for the organizer this many seconds (0: never)
+        #[arg(long, default_value_t = 30)]
+        approve_after: u64,
+    },
 }
 
 fn main() {
@@ -204,10 +221,9 @@ fn run(cli: Cli) -> Result<()> {
         }
         Cmd::Claims => show::claims(&app),
         Cmd::Show { claim } => show::show(&app, claim),
-        Cmd::Approve { claim, as_, ceiling, no_learn, stale } => {
-            let ceiling = ceiling.as_deref().map(parse_money).transpose()?;
-            decide::approve(&app, claim, as_.as_deref(), ceiling, !no_learn, stale, true).map(|_| ())
-        }
+        Cmd::Approve { claim, as_, stale } => decide::approve(&app, claim, as_.as_deref(), stale, true).map(|_| ()),
+        Cmd::ApproveRule { proposal, as_ } => decide::approve_proposal(&app, proposal, as_.as_deref()).map(|_| ()),
+        Cmd::RejectRule { proposal, as_, reason } => decide::reject_proposal(&app, proposal, as_.as_deref(), &reason),
         Cmd::Refuse { claim, as_, reason } => decide::refuse(&app, claim, as_.as_deref(), &reason, true).map(|_| ()),
         Cmd::InsurerPaid { claim, amount, reference } => {
             decide::insurer_paid(&app, claim, parse_money(&amount)?, &reference, None).map(|_| ())
@@ -224,6 +240,7 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::Wait { claim, status, timeout } => show::wait(&app, claim, parse_status(&status)?, timeout).map(|_| ()),
         Cmd::Story { no_pause } => story::run(&app, !no_pause),
         Cmd::Scorecard { rounds } => scorecard::run(&app, rounds),
+        Cmd::Live { approve_after } => live::run(&app, approve_after),
     }
 }
 

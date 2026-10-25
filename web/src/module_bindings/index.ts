@@ -36,39 +36,63 @@ import {
 // Import all reducer arg schemas
 import AddIncidentNoteReducer from "./add_incident_note_reducer";
 import AddOwnerReducer from "./add_owner_reducer";
+import AddStaffReducer from "./add_staff_reducer";
+import ApplyDocumentTermsReducer from "./apply_document_terms_reducer";
 import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
+import ApproveChargeReducer from "./approve_charge_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
+import ApproveRuleProposalReducer from "./approve_rule_proposal_reducer";
 import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
 import BuyMerchReducer from "./buy_merch_reducer";
+import BuyMerchAsReducer from "./buy_merch_as_reducer";
 import ChooseVenueReducer from "./choose_venue_reducer";
 import ClaimBandReducer from "./claim_band_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
 import ClaimPersonReducer from "./claim_person_reducer";
 import ClearReducer from "./clear_reducer";
+import CloseClaimWithoutInjuryReducer from "./close_claim_without_injury_reducer";
 import CommandSentReducer from "./command_sent_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
 import ConfirmMedicalCardReducer from "./confirm_medical_card_reducer";
+import ConfirmPolicyTermsReducer from "./confirm_policy_terms_reducer";
 import ConnectWalletReducer from "./connect_wallet_reducer";
+import DisputeChargeReducer from "./dispute_charge_reducer";
 import EndEventReducer from "./end_event_reducer";
+import EndLiveRunReducer from "./end_live_run_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
+import FileClaimReducer from "./file_claim_reducer";
+import FileClaimForWearerReducer from "./file_claim_for_wearer_reducer";
+import FileClinicReportReducer from "./file_clinic_report_reducer";
+import FinishPlanLookupReducer from "./finish_plan_lookup_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
 import ForceStateReducer from "./force_state_reducer";
 import GatewayUpReducer from "./gateway_up_reducer";
+import GiveBandReducer from "./give_band_reducer";
 import GrantRoleReducer from "./grant_role_reducer";
 import HapticReducer from "./haptic_reducer";
 import ImportEventReducer from "./import_event_reducer";
 import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
+import LeaveEarlyReducer from "./leave_early_reducer";
+import LeaveEventReducer from "./leave_event_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
+import LoadVenueFloorReducer from "./load_venue_floor_reducer";
+import LoadVenueSpotsReducer from "./load_venue_spots_reducer";
+import LookUpPlanReducer from "./look_up_plan_reducer";
+import NameResponsibleBandReducer from "./name_responsible_band_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
 import OpenIncidentReducer from "./open_incident_reducer";
+import PauseLiveRunReducer from "./pause_live_run_reducer";
+import PayChargeReducer from "./pay_charge_reducer";
+import PlaceBandReducer from "./place_band_reducer";
 import PlaceBoothReducer from "./place_booth_reducer";
+import RecordChargePaymentReducer from "./record_charge_payment_reducer";
 import RecordClaimPayoutReducer from "./record_claim_payout_reducer";
 import RecordInsurerPaymentReducer from "./record_insurer_payment_reducer";
 import RecordModelCallReducer from "./record_model_call_reducer";
@@ -77,16 +101,21 @@ import RefuseClaimReducer from "./refuse_claim_reducer";
 import RegisterBlobReducer from "./register_blob_reducer";
 import RegisterBridgeReducer from "./register_bridge_reducer";
 import RegisterPhotoReducer from "./register_photo_reducer";
+import RejectRuleProposalReducer from "./reject_rule_proposal_reducer";
 import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
+import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
+import ReportClaimStepReducer from "./report_claim_step_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
 import ReportVenueSetupStepReducer from "./report_venue_setup_step_reducer";
 import RequestMedicalCardReducer from "./request_medical_card_reducer";
 import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
+import RerunShoppingAgentReducer from "./rerun_shopping_agent_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
+import ResumeLiveRunReducer from "./resume_live_run_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
@@ -103,6 +132,7 @@ import SleepBandsReducer from "./sleep_bands_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
 import StartFindReducer from "./start_find_reducer";
 import StartJobReaperReducer from "./start_job_reaper_reducer";
+import StartLiveRunReducer from "./start_live_run_reducer";
 import StartSafetyWatchReducer from "./start_safety_watch_reducer";
 import StartVenueSetupReducer from "./start_venue_setup_reducer";
 import StopCrowdReducer from "./stop_crowd_reducer";
@@ -111,36 +141,58 @@ import SubmitClaimChecksReducer from "./submit_claim_checks_reducer";
 import SubmitClaimReviewReducer from "./submit_claim_review_reducer";
 import SubmitMedicalDocumentReducer from "./submit_medical_document_reducer";
 import SubmitMedicalRecordReducer from "./submit_medical_record_reducer";
+import SubmitMerchPicksReducer from "./submit_merch_picks_reducer";
+import SubmitPhotoFeaturesReducer from "./submit_photo_features_reducer";
+import SubmitPolicyDocumentReducer from "./submit_policy_document_reducer";
+import SubmitRuleProposalReducer from "./submit_rule_proposal_reducer";
 import SubmitVisionAssessmentReducer from "./submit_vision_assessment_reducer";
+import UnplaceBandReducer from "./unplace_band_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
+import UpsertAttendeePolicyReducer from "./upsert_attendee_policy_reducer";
 import UpsertCameraReducer from "./upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "./upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "./upsert_insurance_policy_reducer";
+import ViewAsReducer from "./view_as_reducer";
+import WaiveChargeReducer from "./waive_charge_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
 import ApiSessionsRow from "./api_sessions_table";
 import BandRow from "./band_table";
+import BandPlaceRow from "./band_place_table";
 import BoardApprovalsRow from "./board_approvals_table";
+import BoardAttendeePoliciesRow from "./board_attendee_policies_table";
 import BoardAttendeesRow from "./board_attendees_table";
+import BoardChargesRow from "./board_charges_table";
 import BoardChecksRow from "./board_checks_table";
+import BoardClinicReportsRow from "./board_clinic_reports_table";
+import BoardCoversRow from "./board_covers_table";
 import BoardFactsRow from "./board_facts_table";
+import BoardFeeScheduleRow from "./board_fee_schedule_table";
 import BoardLedgerRow from "./board_ledger_table";
 import BoardLinesRow from "./board_lines_table";
 import BoardMedicalAccessRow from "./board_medical_access_table";
 import BoardMerchOrdersRow from "./board_merch_orders_table";
+import BoardMerchPicksRow from "./board_merch_picks_table";
 import BoardNotesRow from "./board_notes_table";
+import BoardOrganizerPrecedentsRow from "./board_organizer_precedents_table";
 import BoardPhotosRow from "./board_photos_table";
 import BoardPoliciesRow from "./board_policies_table";
+import BoardPolicyDocumentsRow from "./board_policy_documents_table";
+import BoardPolicyTermsRow from "./board_policy_terms_table";
 import BoardPrecedentsRow from "./board_precedents_table";
 import BoardRecordsRow from "./board_records_table";
 import BoardReviewsRow from "./board_reviews_table";
+import BoardRuleProposalsRow from "./board_rule_proposals_table";
 import BoardRulesRow from "./board_rules_table";
+import BoardStaffRow from "./board_staff_table";
+import BoardWalletsRow from "./board_wallets_table";
 import BoothRow from "./booth_table";
 import CameraRow from "./camera_table";
 import ChosenVenueRow from "./chosen_venue_table";
 import ClaimChecksRow from "./claim_checks_table";
+import ClaimClausesRow from "./claim_clauses_table";
 import ClaimFactsRow from "./claim_facts_table";
 import ClaimLedgerRow from "./claim_ledger_table";
 import ClaimLinesRow from "./claim_lines_table";
@@ -148,6 +200,9 @@ import ClaimReviewsRow from "./claim_reviews_table";
 import ClaimedPeopleRow from "./claimed_people_table";
 import ClaimsBoardRow from "./claims_board_table";
 import CommandRow from "./command_table";
+import CrowdWalkRow from "./crowd_walk_table";
+import DecisionRow from "./decision_table";
+import DepartureRow from "./departure_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
 import EventGraphRow from "./event_graph_table";
@@ -155,22 +210,31 @@ import EventStateRow from "./event_state_table";
 import GatewayRow from "./gateway_table";
 import ImportRunRow from "./import_run_table";
 import IncidentBandsRow from "./incident_bands_table";
+import IncidentMarkerRow from "./incident_marker_table";
 import LinkRow from "./link_table";
+import LivePauseRow from "./live_pause_table";
+import LivePlanRow from "./live_plan_table";
+import LiveRunRow from "./live_run_table";
 import MedicMedicalCardsRow from "./medic_medical_cards_table";
 import MerchTemplateRow from "./merch_template_table";
 import MyAttendeeRow from "./my_attendee_table";
+import MyAttendeePolicyRow from "./my_attendee_policy_table";
 import MyBandRow from "./my_band_table";
+import MyChargesRow from "./my_charges_table";
 import MyClaimQueueRow from "./my_claim_queue_table";
 import MyClaimsRow from "./my_claims_table";
+import MyDepartureRow from "./my_departure_table";
 import MyEncountersRow from "./my_encounters_table";
 import MyGraphRow from "./my_graph_table";
 import MyHandlesRow from "./my_handles_table";
+import MyIncidentsRow from "./my_incidents_table";
 import MyMedicalCardRow from "./my_medical_card_table";
 import MyMedicalDocumentsRow from "./my_medical_documents_table";
 import MyMerchOrdersRow from "./my_merch_orders_table";
 import MyMerchSuggestionsRow from "./my_merch_suggestions_table";
 import MyOwnerRow from "./my_owner_table";
 import MyPhotosRow from "./my_photos_table";
+import MyPlanLookupsRow from "./my_plan_lookups_table";
 import MyRolesRow from "./my_roles_table";
 import MySharedVisitsRow from "./my_shared_visits_table";
 import MyVisitsRow from "./my_visits_table";
@@ -189,10 +253,13 @@ import SocialPhotosRow from "./social_photos_table";
 import SocialSharedVisitsRow from "./social_shared_visits_table";
 import SocialVisitsRow from "./social_visits_table";
 import StationRow from "./station_table";
+import UnclaimedInjuriesRow from "./unclaimed_injuries_table";
 import VenueRow from "./venue_table";
 import VenuePlanRow from "./venue_plan_table";
 import VenueSetupRow from "./venue_setup_table";
 import VenueSetupStepRow from "./venue_setup_step_table";
+import VenueSpotRow from "./venue_spot_table";
+import ViewAsPeopleRow from "./view_as_people_table";
 import WorkerJobsRow from "./worker_jobs_table";
 import ZoneRow from "./zone_table";
 import ZoneVisitRow from "./zone_visit_table";
@@ -212,6 +279,17 @@ const tablesSchema = __schema({
       { name: 'band_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, BandRow),
+  bandPlace: __table({
+    name: 'band_place',
+    indexes: [
+      { accessor: 'band_id', name: 'band_place_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'band_place_band_id_key', constraint: 'unique', columns: ['bandId'] },
+    ],
+  }, BandPlaceRow),
   booth: __table({
     name: 'booth',
     indexes: [
@@ -276,6 +354,48 @@ const tablesSchema = __schema({
       { name: 'command_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CommandRow),
+  crowdWalk: __table({
+    name: 'crowd_walk',
+    indexes: [
+      { accessor: 'band_id', name: 'crowd_walk_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crowd_walk_band_id_key', constraint: 'unique', columns: ['bandId'] },
+    ],
+  }, CrowdWalkRow),
+  decision: __table({
+    name: 'decision',
+    indexes: [
+      { accessor: 'claim_id', name: 'decision_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'decision_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'incident_id', name: 'decision_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+    ],
+    constraints: [
+      { name: 'decision_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, DecisionRow),
+  departure: __table({
+    name: 'departure',
+    indexes: [
+      { accessor: 'attendee', name: 'departure_attendee_idx_btree', algorithm: 'btree', columns: [
+        'attendee',
+      ] },
+      { accessor: 'band_id', name: 'departure_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'departure_attendee_key', constraint: 'unique', columns: ['attendee'] },
+    ],
+  }, DepartureRow),
   encounter: __table({
     name: 'encounter',
     indexes: [
@@ -343,6 +463,23 @@ const tablesSchema = __schema({
       { name: 'import_run_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ImportRunRow),
+  incidentMarker: __table({
+    name: 'incident_marker',
+    indexes: [
+      { accessor: 'band_id', name: 'incident_marker_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+      { accessor: 'incident_id', name: 'incident_marker_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+      { accessor: 'status', name: 'incident_marker_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'incident_marker_incident_id_key', constraint: 'unique', columns: ['incidentId'] },
+    ],
+  }, IncidentMarkerRow),
   link: __table({
     name: 'link',
     indexes: [
@@ -357,6 +494,39 @@ const tablesSchema = __schema({
       { name: 'link_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, LinkRow),
+  livePause: __table({
+    name: 'live_pause',
+    indexes: [
+      { accessor: 'id', name: 'live_pause_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_pause_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LivePauseRow),
+  livePlan: __table({
+    name: 'live_plan',
+    indexes: [
+      { accessor: 'incident_id', name: 'live_plan_incident_id_idx_btree', algorithm: 'btree', columns: [
+        'incidentId',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_plan_incident_id_key', constraint: 'unique', columns: ['incidentId'] },
+    ],
+  }, LivePlanRow),
+  liveRun: __table({
+    name: 'live_run',
+    indexes: [
+      { accessor: 'id', name: 'live_run_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_run_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LiveRunRow),
   merchTemplate: __table({
     name: 'merch_template',
     indexes: [
@@ -503,6 +673,23 @@ const tablesSchema = __schema({
       { name: 'venue_setup_step_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, VenueSetupStepRow),
+  venueSpot: __table({
+    name: 'venue_spot',
+    indexes: [
+      { accessor: 'id', name: 'venue_spot_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'kind', name: 'venue_spot_kind_idx_btree', algorithm: 'btree', columns: [
+        'kind',
+      ] },
+      { accessor: 'station_id', name: 'venue_spot_station_id_idx_btree', algorithm: 'btree', columns: [
+        'stationId',
+      ] },
+    ],
+    constraints: [
+      { name: 'venue_spot_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, VenueSpotRow),
   zone: __table({
     name: 'zone',
     indexes: [
@@ -555,6 +742,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardApprovalsRow),
+  boardAttendeePolicies: __table({
+    name: 'board_attendee_policies',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardAttendeePoliciesRow),
   boardAttendees: __table({
     name: 'board_attendees',
     indexes: [
@@ -562,6 +756,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardAttendeesRow),
+  boardCharges: __table({
+    name: 'board_charges',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardChargesRow),
   boardChecks: __table({
     name: 'board_checks',
     indexes: [
@@ -569,6 +770,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardChecksRow),
+  boardClinicReports: __table({
+    name: 'board_clinic_reports',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardClinicReportsRow),
+  boardCovers: __table({
+    name: 'board_covers',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardCoversRow),
   boardFacts: __table({
     name: 'board_facts',
     indexes: [
@@ -576,6 +791,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardFactsRow),
+  boardFeeSchedule: __table({
+    name: 'board_fee_schedule',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardFeeScheduleRow),
   boardLedger: __table({
     name: 'board_ledger',
     indexes: [
@@ -604,6 +826,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardMerchOrdersRow),
+  boardMerchPicks: __table({
+    name: 'board_merch_picks',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardMerchPicksRow),
   boardNotes: __table({
     name: 'board_notes',
     indexes: [
@@ -611,6 +840,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardNotesRow),
+  boardOrganizerPrecedents: __table({
+    name: 'board_organizer_precedents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardOrganizerPrecedentsRow),
   boardPhotos: __table({
     name: 'board_photos',
     indexes: [
@@ -625,6 +861,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardPoliciesRow),
+  boardPolicyDocuments: __table({
+    name: 'board_policy_documents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardPolicyDocumentsRow),
+  boardPolicyTerms: __table({
+    name: 'board_policy_terms',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardPolicyTermsRow),
   boardPrecedents: __table({
     name: 'board_precedents',
     indexes: [
@@ -646,6 +896,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardReviewsRow),
+  boardRuleProposals: __table({
+    name: 'board_rule_proposals',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardRuleProposalsRow),
   boardRules: __table({
     name: 'board_rules',
     indexes: [
@@ -653,6 +910,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardRulesRow),
+  boardStaff: __table({
+    name: 'board_staff',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardStaffRow),
+  boardWallets: __table({
+    name: 'board_wallets',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardWalletsRow),
   claimChecks: __table({
     name: 'claim_checks',
     indexes: [
@@ -660,6 +931,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, ClaimChecksRow),
+  claimClauses: __table({
+    name: 'claim_clauses',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, ClaimClausesRow),
   claimFacts: __table({
     name: 'claim_facts',
     indexes: [
@@ -730,6 +1008,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyAttendeeRow),
+  myAttendeePolicy: __table({
+    name: 'my_attendee_policy',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAttendeePolicyRow),
   myBand: __table({
     name: 'my_band',
     indexes: [
@@ -737,6 +1022,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyBandRow),
+  myCharges: __table({
+    name: 'my_charges',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyChargesRow),
   myClaimQueue: __table({
     name: 'my_claim_queue',
     indexes: [
@@ -751,6 +1043,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyClaimsRow),
+  myDeparture: __table({
+    name: 'my_departure',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyDepartureRow),
   myEncounters: __table({
     name: 'my_encounters',
     indexes: [
@@ -772,6 +1071,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyHandlesRow),
+  myIncidents: __table({
+    name: 'my_incidents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyIncidentsRow),
   myMedicalCard: __table({
     name: 'my_medical_card',
     indexes: [
@@ -814,6 +1120,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyPhotosRow),
+  myPlanLookups: __table({
+    name: 'my_plan_lookups',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyPlanLookupsRow),
   myRoles: __table({
     name: 'my_roles',
     indexes: [
@@ -905,6 +1218,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, SocialVisitsRow),
+  unclaimedInjuries: __table({
+    name: 'unclaimed_injuries',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, UnclaimedInjuriesRow),
   venuePlan: __table({
     name: 'venue_plan',
     indexes: [
@@ -912,6 +1232,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, VenuePlanRow),
+  viewAsPeople: __table({
+    name: 'view_as_people',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, ViewAsPeopleRow),
   workerJobs: __table({
     name: 'worker_jobs',
     indexes: [
@@ -925,39 +1252,63 @@ const tablesSchema = __schema({
 const reducersSchema = __reducers(
   __reducerSchema("add_incident_note", AddIncidentNoteReducer),
   __reducerSchema("add_owner", AddOwnerReducer),
+  __reducerSchema("add_staff", AddStaffReducer),
+  __reducerSchema("apply_document_terms", ApplyDocumentTermsReducer),
   __reducerSchema("apply_medical_extract", ApplyMedicalExtractReducer),
   __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
+  __reducerSchema("approve_charge", ApproveChargeReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
+  __reducerSchema("approve_rule_proposal", ApproveRuleProposalReducer),
   __reducerSchema("assign_medic", AssignMedicReducer),
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
   __reducerSchema("buy_merch", BuyMerchReducer),
+  __reducerSchema("buy_merch_as", BuyMerchAsReducer),
   __reducerSchema("choose_venue", ChooseVenueReducer),
   __reducerSchema("claim_band", ClaimBandReducer),
   __reducerSchema("claim_job", ClaimJobReducer),
   __reducerSchema("claim_person", ClaimPersonReducer),
   __reducerSchema("clear", ClearReducer),
+  __reducerSchema("close_claim_without_injury", CloseClaimWithoutInjuryReducer),
   __reducerSchema("command_sent", CommandSentReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
   __reducerSchema("confirm_medical_card", ConfirmMedicalCardReducer),
+  __reducerSchema("confirm_policy_terms", ConfirmPolicyTermsReducer),
   __reducerSchema("connect_wallet", ConnectWalletReducer),
+  __reducerSchema("dispute_charge", DisputeChargeReducer),
   __reducerSchema("end_event", EndEventReducer),
+  __reducerSchema("end_live_run", EndLiveRunReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),
+  __reducerSchema("file_claim", FileClaimReducer),
+  __reducerSchema("file_claim_for_wearer", FileClaimForWearerReducer),
+  __reducerSchema("file_clinic_report", FileClinicReportReducer),
+  __reducerSchema("finish_plan_lookup", FinishPlanLookupReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
   __reducerSchema("force_state", ForceStateReducer),
   __reducerSchema("gateway_up", GatewayUpReducer),
+  __reducerSchema("give_band", GiveBandReducer),
   __reducerSchema("grant_role", GrantRoleReducer),
   __reducerSchema("haptic", HapticReducer),
   __reducerSchema("import_event", ImportEventReducer),
   __reducerSchema("ingest_band", IngestBandReducer),
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
+  __reducerSchema("leave_early", LeaveEarlyReducer),
+  __reducerSchema("leave_event", LeaveEventReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
+  __reducerSchema("load_venue_floor", LoadVenueFloorReducer),
+  __reducerSchema("load_venue_spots", LoadVenueSpotsReducer),
+  __reducerSchema("look_up_plan", LookUpPlanReducer),
+  __reducerSchema("name_responsible_band", NameResponsibleBandReducer),
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
   __reducerSchema("open_incident", OpenIncidentReducer),
+  __reducerSchema("pause_live_run", PauseLiveRunReducer),
+  __reducerSchema("pay_charge", PayChargeReducer),
+  __reducerSchema("place_band", PlaceBandReducer),
   __reducerSchema("place_booth", PlaceBoothReducer),
+  __reducerSchema("record_charge_payment", RecordChargePaymentReducer),
   __reducerSchema("record_claim_payout", RecordClaimPayoutReducer),
   __reducerSchema("record_insurer_payment", RecordInsurerPaymentReducer),
   __reducerSchema("record_model_call", RecordModelCallReducer),
@@ -966,16 +1317,21 @@ const reducersSchema = __reducers(
   __reducerSchema("register_blob", RegisterBlobReducer),
   __reducerSchema("register_bridge", RegisterBridgeReducer),
   __reducerSchema("register_photo", RegisterPhotoReducer),
+  __reducerSchema("reject_rule_proposal", RejectRuleProposalReducer),
   __reducerSchema("release_band", ReleaseBandReducer),
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
+  __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
+  __reducerSchema("report_claim_step", ReportClaimStepReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
   __reducerSchema("report_venue_setup_step", ReportVenueSetupStepReducer),
   __reducerSchema("request_medical_card", RequestMedicalCardReducer),
   __reducerSchema("request_recovery_letter", RequestRecoveryLetterReducer),
+  __reducerSchema("rerun_shopping_agent", RerunShoppingAgentReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
+  __reducerSchema("resume_live_run", ResumeLiveRunReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),
@@ -992,6 +1348,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_crowd", StartCrowdReducer),
   __reducerSchema("start_find", StartFindReducer),
   __reducerSchema("start_job_reaper", StartJobReaperReducer),
+  __reducerSchema("start_live_run", StartLiveRunReducer),
   __reducerSchema("start_safety_watch", StartSafetyWatchReducer),
   __reducerSchema("start_venue_setup", StartVenueSetupReducer),
   __reducerSchema("stop_crowd", StopCrowdReducer),
@@ -1000,11 +1357,19 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_claim_review", SubmitClaimReviewReducer),
   __reducerSchema("submit_medical_document", SubmitMedicalDocumentReducer),
   __reducerSchema("submit_medical_record", SubmitMedicalRecordReducer),
+  __reducerSchema("submit_merch_picks", SubmitMerchPicksReducer),
+  __reducerSchema("submit_photo_features", SubmitPhotoFeaturesReducer),
+  __reducerSchema("submit_policy_document", SubmitPolicyDocumentReducer),
+  __reducerSchema("submit_rule_proposal", SubmitRuleProposalReducer),
   __reducerSchema("submit_vision_assessment", SubmitVisionAssessmentReducer),
+  __reducerSchema("unplace_band", UnplaceBandReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
+  __reducerSchema("upsert_attendee_policy", UpsertAttendeePolicyReducer),
   __reducerSchema("upsert_camera", UpsertCameraReducer),
   __reducerSchema("upsert_coverage_rule", UpsertCoverageRuleReducer),
   __reducerSchema("upsert_insurance_policy", UpsertInsurancePolicyReducer),
+  __reducerSchema("view_as", ViewAsReducer),
+  __reducerSchema("waive_charge", WaiveChargeReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
@@ -1013,12 +1378,24 @@ const proceduresSchema = __procedures(
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
   tables: typeof tablesSchema.schemaType.tables & {
+    /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+    readonly "band_place": Omit<typeof tablesSchema.schemaType.tables["bandPlace"], "accessorName"> & { readonly accessorName: "band_place" };
     /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
     readonly "chosen_venue": Omit<typeof tablesSchema.schemaType.tables["chosenVenue"], "accessorName"> & { readonly accessorName: "chosen_venue" };
+    /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+    readonly "crowd_walk": Omit<typeof tablesSchema.schemaType.tables["crowdWalk"], "accessorName"> & { readonly accessorName: "crowd_walk" };
     /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
     readonly "import_run": Omit<typeof tablesSchema.schemaType.tables["importRun"], "accessorName"> & { readonly accessorName: "import_run" };
+    /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+    readonly "incident_marker": Omit<typeof tablesSchema.schemaType.tables["incidentMarker"], "accessorName"> & { readonly accessorName: "incident_marker" };
+    /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+    readonly "live_pause": Omit<typeof tablesSchema.schemaType.tables["livePause"], "accessorName"> & { readonly accessorName: "live_pause" };
+    /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+    readonly "live_plan": Omit<typeof tablesSchema.schemaType.tables["livePlan"], "accessorName"> & { readonly accessorName: "live_plan" };
+    /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+    readonly "live_run": Omit<typeof tablesSchema.schemaType.tables["liveRun"], "accessorName"> & { readonly accessorName: "live_run" };
     /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
     readonly "merch_template": Omit<typeof tablesSchema.schemaType.tables["merchTemplate"], "accessorName"> & { readonly accessorName: "merch_template" };
     /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1027,18 +1404,30 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "venue_setup": Omit<typeof tablesSchema.schemaType.tables["venueSetup"], "accessorName"> & { readonly accessorName: "venue_setup" };
     /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
     readonly "venue_setup_step": Omit<typeof tablesSchema.schemaType.tables["venueSetupStep"], "accessorName"> & { readonly accessorName: "venue_setup_step" };
+    /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+    readonly "venue_spot": Omit<typeof tablesSchema.schemaType.tables["venueSpot"], "accessorName"> & { readonly accessorName: "venue_spot" };
     /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
     readonly "zone_visit": Omit<typeof tablesSchema.schemaType.tables["zoneVisit"], "accessorName"> & { readonly accessorName: "zone_visit" };
     /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
     readonly "api_sessions": Omit<typeof tablesSchema.schemaType.tables["apiSessions"], "accessorName"> & { readonly accessorName: "api_sessions" };
     /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
     readonly "board_approvals": Omit<typeof tablesSchema.schemaType.tables["boardApprovals"], "accessorName"> & { readonly accessorName: "board_approvals" };
+    /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
+    readonly "board_attendee_policies": Omit<typeof tablesSchema.schemaType.tables["boardAttendeePolicies"], "accessorName"> & { readonly accessorName: "board_attendee_policies" };
     /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
     readonly "board_attendees": Omit<typeof tablesSchema.schemaType.tables["boardAttendees"], "accessorName"> & { readonly accessorName: "board_attendees" };
+    /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
+    readonly "board_charges": Omit<typeof tablesSchema.schemaType.tables["boardCharges"], "accessorName"> & { readonly accessorName: "board_charges" };
     /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
     readonly "board_checks": Omit<typeof tablesSchema.schemaType.tables["boardChecks"], "accessorName"> & { readonly accessorName: "board_checks" };
+    /** @deprecated Use `boardClinicReports` instead. This alias will be removed in the next major version. */
+    readonly "board_clinic_reports": Omit<typeof tablesSchema.schemaType.tables["boardClinicReports"], "accessorName"> & { readonly accessorName: "board_clinic_reports" };
+    /** @deprecated Use `boardCovers` instead. This alias will be removed in the next major version. */
+    readonly "board_covers": Omit<typeof tablesSchema.schemaType.tables["boardCovers"], "accessorName"> & { readonly accessorName: "board_covers" };
     /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
     readonly "board_facts": Omit<typeof tablesSchema.schemaType.tables["boardFacts"], "accessorName"> & { readonly accessorName: "board_facts" };
+    /** @deprecated Use `boardFeeSchedule` instead. This alias will be removed in the next major version. */
+    readonly "board_fee_schedule": Omit<typeof tablesSchema.schemaType.tables["boardFeeSchedule"], "accessorName"> & { readonly accessorName: "board_fee_schedule" };
     /** @deprecated Use `boardLedger` instead. This alias will be removed in the next major version. */
     readonly "board_ledger": Omit<typeof tablesSchema.schemaType.tables["boardLedger"], "accessorName"> & { readonly accessorName: "board_ledger" };
     /** @deprecated Use `boardLines` instead. This alias will be removed in the next major version. */
@@ -1047,22 +1436,38 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_medical_access": Omit<typeof tablesSchema.schemaType.tables["boardMedicalAccess"], "accessorName"> & { readonly accessorName: "board_medical_access" };
     /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
     readonly "board_merch_orders": Omit<typeof tablesSchema.schemaType.tables["boardMerchOrders"], "accessorName"> & { readonly accessorName: "board_merch_orders" };
+    /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+    readonly "board_merch_picks": Omit<typeof tablesSchema.schemaType.tables["boardMerchPicks"], "accessorName"> & { readonly accessorName: "board_merch_picks" };
     /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
     readonly "board_notes": Omit<typeof tablesSchema.schemaType.tables["boardNotes"], "accessorName"> & { readonly accessorName: "board_notes" };
+    /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+    readonly "board_organizer_precedents": Omit<typeof tablesSchema.schemaType.tables["boardOrganizerPrecedents"], "accessorName"> & { readonly accessorName: "board_organizer_precedents" };
     /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
     readonly "board_photos": Omit<typeof tablesSchema.schemaType.tables["boardPhotos"], "accessorName"> & { readonly accessorName: "board_photos" };
     /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
     readonly "board_policies": Omit<typeof tablesSchema.schemaType.tables["boardPolicies"], "accessorName"> & { readonly accessorName: "board_policies" };
+    /** @deprecated Use `boardPolicyDocuments` instead. This alias will be removed in the next major version. */
+    readonly "board_policy_documents": Omit<typeof tablesSchema.schemaType.tables["boardPolicyDocuments"], "accessorName"> & { readonly accessorName: "board_policy_documents" };
+    /** @deprecated Use `boardPolicyTerms` instead. This alias will be removed in the next major version. */
+    readonly "board_policy_terms": Omit<typeof tablesSchema.schemaType.tables["boardPolicyTerms"], "accessorName"> & { readonly accessorName: "board_policy_terms" };
     /** @deprecated Use `boardPrecedents` instead. This alias will be removed in the next major version. */
     readonly "board_precedents": Omit<typeof tablesSchema.schemaType.tables["boardPrecedents"], "accessorName"> & { readonly accessorName: "board_precedents" };
     /** @deprecated Use `boardRecords` instead. This alias will be removed in the next major version. */
     readonly "board_records": Omit<typeof tablesSchema.schemaType.tables["boardRecords"], "accessorName"> & { readonly accessorName: "board_records" };
     /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
     readonly "board_reviews": Omit<typeof tablesSchema.schemaType.tables["boardReviews"], "accessorName"> & { readonly accessorName: "board_reviews" };
+    /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+    readonly "board_rule_proposals": Omit<typeof tablesSchema.schemaType.tables["boardRuleProposals"], "accessorName"> & { readonly accessorName: "board_rule_proposals" };
     /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
+    /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+    readonly "board_staff": Omit<typeof tablesSchema.schemaType.tables["boardStaff"], "accessorName"> & { readonly accessorName: "board_staff" };
+    /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+    readonly "board_wallets": Omit<typeof tablesSchema.schemaType.tables["boardWallets"], "accessorName"> & { readonly accessorName: "board_wallets" };
     /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
     readonly "claim_checks": Omit<typeof tablesSchema.schemaType.tables["claimChecks"], "accessorName"> & { readonly accessorName: "claim_checks" };
+    /** @deprecated Use `claimClauses` instead. This alias will be removed in the next major version. */
+    readonly "claim_clauses": Omit<typeof tablesSchema.schemaType.tables["claimClauses"], "accessorName"> & { readonly accessorName: "claim_clauses" };
     /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
     readonly "claim_facts": Omit<typeof tablesSchema.schemaType.tables["claimFacts"], "accessorName"> & { readonly accessorName: "claim_facts" };
     /** @deprecated Use `claimLedger` instead. This alias will be removed in the next major version. */
@@ -1083,18 +1488,26 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "medic_medical_cards": Omit<typeof tablesSchema.schemaType.tables["medicMedicalCards"], "accessorName"> & { readonly accessorName: "medic_medical_cards" };
     /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
     readonly "my_attendee": Omit<typeof tablesSchema.schemaType.tables["myAttendee"], "accessorName"> & { readonly accessorName: "my_attendee" };
+    /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
+    readonly "my_attendee_policy": Omit<typeof tablesSchema.schemaType.tables["myAttendeePolicy"], "accessorName"> & { readonly accessorName: "my_attendee_policy" };
     /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
     readonly "my_band": Omit<typeof tablesSchema.schemaType.tables["myBand"], "accessorName"> & { readonly accessorName: "my_band" };
+    /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */
+    readonly "my_charges": Omit<typeof tablesSchema.schemaType.tables["myCharges"], "accessorName"> & { readonly accessorName: "my_charges" };
     /** @deprecated Use `myClaimQueue` instead. This alias will be removed in the next major version. */
     readonly "my_claim_queue": Omit<typeof tablesSchema.schemaType.tables["myClaimQueue"], "accessorName"> & { readonly accessorName: "my_claim_queue" };
     /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
     readonly "my_claims": Omit<typeof tablesSchema.schemaType.tables["myClaims"], "accessorName"> & { readonly accessorName: "my_claims" };
+    /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+    readonly "my_departure": Omit<typeof tablesSchema.schemaType.tables["myDeparture"], "accessorName"> & { readonly accessorName: "my_departure" };
     /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
     readonly "my_encounters": Omit<typeof tablesSchema.schemaType.tables["myEncounters"], "accessorName"> & { readonly accessorName: "my_encounters" };
     /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */
     readonly "my_graph": Omit<typeof tablesSchema.schemaType.tables["myGraph"], "accessorName"> & { readonly accessorName: "my_graph" };
     /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
     readonly "my_handles": Omit<typeof tablesSchema.schemaType.tables["myHandles"], "accessorName"> & { readonly accessorName: "my_handles" };
+    /** @deprecated Use `myIncidents` instead. This alias will be removed in the next major version. */
+    readonly "my_incidents": Omit<typeof tablesSchema.schemaType.tables["myIncidents"], "accessorName"> & { readonly accessorName: "my_incidents" };
     /** @deprecated Use `myMedicalCard` instead. This alias will be removed in the next major version. */
     readonly "my_medical_card": Omit<typeof tablesSchema.schemaType.tables["myMedicalCard"], "accessorName"> & { readonly accessorName: "my_medical_card" };
     /** @deprecated Use `myMedicalDocuments` instead. This alias will be removed in the next major version. */
@@ -1107,6 +1520,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_owner": Omit<typeof tablesSchema.schemaType.tables["myOwner"], "accessorName"> & { readonly accessorName: "my_owner" };
     /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
     readonly "my_photos": Omit<typeof tablesSchema.schemaType.tables["myPhotos"], "accessorName"> & { readonly accessorName: "my_photos" };
+    /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+    readonly "my_plan_lookups": Omit<typeof tablesSchema.schemaType.tables["myPlanLookups"], "accessorName"> & { readonly accessorName: "my_plan_lookups" };
     /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
     readonly "my_roles": Omit<typeof tablesSchema.schemaType.tables["myRoles"], "accessorName"> & { readonly accessorName: "my_roles" };
     /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */
@@ -1133,8 +1548,12 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "social_shared_visits": Omit<typeof tablesSchema.schemaType.tables["socialSharedVisits"], "accessorName"> & { readonly accessorName: "social_shared_visits" };
     /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
     readonly "social_visits": Omit<typeof tablesSchema.schemaType.tables["socialVisits"], "accessorName"> & { readonly accessorName: "social_visits" };
+    /** @deprecated Use `unclaimedInjuries` instead. This alias will be removed in the next major version. */
+    readonly "unclaimed_injuries": Omit<typeof tablesSchema.schemaType.tables["unclaimedInjuries"], "accessorName"> & { readonly accessorName: "unclaimed_injuries" };
     /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
     readonly "venue_plan": Omit<typeof tablesSchema.schemaType.tables["venuePlan"], "accessorName"> & { readonly accessorName: "venue_plan" };
+    /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+    readonly "view_as_people": Omit<typeof tablesSchema.schemaType.tables["viewAsPeople"], "accessorName"> & { readonly accessorName: "view_as_people" };
     /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
     readonly "worker_jobs": Omit<typeof tablesSchema.schemaType.tables["workerJobs"], "accessorName"> & { readonly accessorName: "worker_jobs" };
   };
@@ -1146,7 +1565,7 @@ const REMOTE_MODULE = {
     cliVersion: "2.13.0" as const,
   },
   tables: tablesSchema.schemaType.tables as __SchemaWithTableAccessorAliases["tables"],
-  viewsWithArgs: ["claim_checks", "claim_facts", "claim_ledger", "claim_lines", "claim_reviews", "incident_bands"],
+  viewsWithArgs: ["claim_checks", "claim_clauses", "claim_facts", "claim_ledger", "claim_lines", "claim_reviews", "incident_bands"],
   reducers: reducersSchema.reducersType.reducers,
   ...proceduresSchema,
 } satisfies __RemoteModule<
@@ -1156,31 +1575,51 @@ const REMOTE_MODULE = {
 >;
 
 const tableAccessorAliases = {
+  "band_place": "bandPlace",
   "chosen_venue": "chosenVenue",
+  "crowd_walk": "crowdWalk",
   "event_state": "eventState",
   "import_run": "importRun",
+  "incident_marker": "incidentMarker",
+  "live_pause": "livePause",
+  "live_plan": "livePlan",
+  "live_run": "liveRun",
   "merch_template": "merchTemplate",
   "schedule_slot": "scheduleSlot",
   "venue_setup": "venueSetup",
   "venue_setup_step": "venueSetupStep",
+  "venue_spot": "venueSpot",
   "zone_visit": "zoneVisit",
   "api_sessions": "apiSessions",
   "board_approvals": "boardApprovals",
+  "board_attendee_policies": "boardAttendeePolicies",
   "board_attendees": "boardAttendees",
+  "board_charges": "boardCharges",
   "board_checks": "boardChecks",
+  "board_clinic_reports": "boardClinicReports",
+  "board_covers": "boardCovers",
   "board_facts": "boardFacts",
+  "board_fee_schedule": "boardFeeSchedule",
   "board_ledger": "boardLedger",
   "board_lines": "boardLines",
   "board_medical_access": "boardMedicalAccess",
   "board_merch_orders": "boardMerchOrders",
+  "board_merch_picks": "boardMerchPicks",
   "board_notes": "boardNotes",
+  "board_organizer_precedents": "boardOrganizerPrecedents",
   "board_photos": "boardPhotos",
   "board_policies": "boardPolicies",
+  "board_policy_documents": "boardPolicyDocuments",
+  "board_policy_terms": "boardPolicyTerms",
   "board_precedents": "boardPrecedents",
   "board_records": "boardRecords",
   "board_reviews": "boardReviews",
+  "board_rule_proposals": "boardRuleProposals",
   "board_rules": "boardRules",
+  "board_staff": "boardStaff",
+  "board_wallets": "boardWallets",
   "claim_checks": "claimChecks",
+  "claim_clauses": "claimClauses",
   "claim_facts": "claimFacts",
   "claim_ledger": "claimLedger",
   "claim_lines": "claimLines",
@@ -1191,18 +1630,23 @@ const tableAccessorAliases = {
   "incident_bands": "incidentBands",
   "medic_medical_cards": "medicMedicalCards",
   "my_attendee": "myAttendee",
+  "my_attendee_policy": "myAttendeePolicy",
   "my_band": "myBand",
+  "my_charges": "myCharges",
   "my_claim_queue": "myClaimQueue",
   "my_claims": "myClaims",
+  "my_departure": "myDeparture",
   "my_encounters": "myEncounters",
   "my_graph": "myGraph",
   "my_handles": "myHandles",
+  "my_incidents": "myIncidents",
   "my_medical_card": "myMedicalCard",
   "my_medical_documents": "myMedicalDocuments",
   "my_merch_orders": "myMerchOrders",
   "my_merch_suggestions": "myMerchSuggestions",
   "my_owner": "myOwner",
   "my_photos": "myPhotos",
+  "my_plan_lookups": "myPlanLookups",
   "my_roles": "myRoles",
   "my_shared_visits": "mySharedVisits",
   "my_visits": "myVisits",
@@ -1216,7 +1660,9 @@ const tableAccessorAliases = {
   "social_photos": "socialPhotos",
   "social_shared_visits": "socialSharedVisits",
   "social_visits": "socialVisits",
+  "unclaimed_injuries": "unclaimedInjuries",
   "venue_plan": "venuePlan",
+  "view_as_people": "viewAsPeople",
   "worker_jobs": "workerJobs",
 } as const;
 
@@ -1238,12 +1684,24 @@ function __withTableAccessorAliases<T extends object>(target: T, freeze = false)
 
 type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
+  /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+  readonly "band_place": __DbViewBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __DbViewBase["chosenVenue"];
+  /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+  readonly "crowd_walk": __DbViewBase["crowdWalk"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __DbViewBase["importRun"];
+  /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+  readonly "incident_marker": __DbViewBase["incidentMarker"];
+  /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+  readonly "live_pause": __DbViewBase["livePause"];
+  /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+  readonly "live_plan": __DbViewBase["livePlan"];
+  /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+  readonly "live_run": __DbViewBase["liveRun"];
   /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
   readonly "merch_template": __DbViewBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1252,18 +1710,30 @@ export type DbView = __DbViewBase & {
   readonly "venue_setup": __DbViewBase["venueSetup"];
   /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
   readonly "venue_setup_step": __DbViewBase["venueSetupStep"];
+  /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+  readonly "venue_spot": __DbViewBase["venueSpot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
   readonly "zone_visit": __DbViewBase["zoneVisit"];
   /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
   readonly "api_sessions": __DbViewBase["apiSessions"];
   /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
   readonly "board_approvals": __DbViewBase["boardApprovals"];
+  /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
+  readonly "board_attendee_policies": __DbViewBase["boardAttendeePolicies"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __DbViewBase["boardAttendees"];
+  /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
+  readonly "board_charges": __DbViewBase["boardCharges"];
   /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
   readonly "board_checks": __DbViewBase["boardChecks"];
+  /** @deprecated Use `boardClinicReports` instead. This alias will be removed in the next major version. */
+  readonly "board_clinic_reports": __DbViewBase["boardClinicReports"];
+  /** @deprecated Use `boardCovers` instead. This alias will be removed in the next major version. */
+  readonly "board_covers": __DbViewBase["boardCovers"];
   /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
   readonly "board_facts": __DbViewBase["boardFacts"];
+  /** @deprecated Use `boardFeeSchedule` instead. This alias will be removed in the next major version. */
+  readonly "board_fee_schedule": __DbViewBase["boardFeeSchedule"];
   /** @deprecated Use `boardLedger` instead. This alias will be removed in the next major version. */
   readonly "board_ledger": __DbViewBase["boardLedger"];
   /** @deprecated Use `boardLines` instead. This alias will be removed in the next major version. */
@@ -1272,22 +1742,38 @@ export type DbView = __DbViewBase & {
   readonly "board_medical_access": __DbViewBase["boardMedicalAccess"];
   /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "board_merch_orders": __DbViewBase["boardMerchOrders"];
+  /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_picks": __DbViewBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __DbViewBase["boardNotes"];
+  /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+  readonly "board_organizer_precedents": __DbViewBase["boardOrganizerPrecedents"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
   readonly "board_photos": __DbViewBase["boardPhotos"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
   readonly "board_policies": __DbViewBase["boardPolicies"];
+  /** @deprecated Use `boardPolicyDocuments` instead. This alias will be removed in the next major version. */
+  readonly "board_policy_documents": __DbViewBase["boardPolicyDocuments"];
+  /** @deprecated Use `boardPolicyTerms` instead. This alias will be removed in the next major version. */
+  readonly "board_policy_terms": __DbViewBase["boardPolicyTerms"];
   /** @deprecated Use `boardPrecedents` instead. This alias will be removed in the next major version. */
   readonly "board_precedents": __DbViewBase["boardPrecedents"];
   /** @deprecated Use `boardRecords` instead. This alias will be removed in the next major version. */
   readonly "board_records": __DbViewBase["boardRecords"];
   /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
   readonly "board_reviews": __DbViewBase["boardReviews"];
+  /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+  readonly "board_rule_proposals": __DbViewBase["boardRuleProposals"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __DbViewBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __DbViewBase["boardStaff"];
+  /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+  readonly "board_wallets": __DbViewBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __DbViewBase["claimChecks"];
+  /** @deprecated Use `claimClauses` instead. This alias will be removed in the next major version. */
+  readonly "claim_clauses": __DbViewBase["claimClauses"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
   readonly "claim_facts": __DbViewBase["claimFacts"];
   /** @deprecated Use `claimLedger` instead. This alias will be removed in the next major version. */
@@ -1308,18 +1794,26 @@ export type DbView = __DbViewBase & {
   readonly "medic_medical_cards": __DbViewBase["medicMedicalCards"];
   /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
   readonly "my_attendee": __DbViewBase["myAttendee"];
+  /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
+  readonly "my_attendee_policy": __DbViewBase["myAttendeePolicy"];
   /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
   readonly "my_band": __DbViewBase["myBand"];
+  /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */
+  readonly "my_charges": __DbViewBase["myCharges"];
   /** @deprecated Use `myClaimQueue` instead. This alias will be removed in the next major version. */
   readonly "my_claim_queue": __DbViewBase["myClaimQueue"];
   /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
   readonly "my_claims": __DbViewBase["myClaims"];
+  /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+  readonly "my_departure": __DbViewBase["myDeparture"];
   /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
   readonly "my_encounters": __DbViewBase["myEncounters"];
   /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */
   readonly "my_graph": __DbViewBase["myGraph"];
   /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
   readonly "my_handles": __DbViewBase["myHandles"];
+  /** @deprecated Use `myIncidents` instead. This alias will be removed in the next major version. */
+  readonly "my_incidents": __DbViewBase["myIncidents"];
   /** @deprecated Use `myMedicalCard` instead. This alias will be removed in the next major version. */
   readonly "my_medical_card": __DbViewBase["myMedicalCard"];
   /** @deprecated Use `myMedicalDocuments` instead. This alias will be removed in the next major version. */
@@ -1332,6 +1826,8 @@ export type DbView = __DbViewBase & {
   readonly "my_owner": __DbViewBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __DbViewBase["myPhotos"];
+  /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+  readonly "my_plan_lookups": __DbViewBase["myPlanLookups"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
   readonly "my_roles": __DbViewBase["myRoles"];
   /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */
@@ -1358,20 +1854,36 @@ export type DbView = __DbViewBase & {
   readonly "social_shared_visits": __DbViewBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __DbViewBase["socialVisits"];
+  /** @deprecated Use `unclaimedInjuries` instead. This alias will be removed in the next major version. */
+  readonly "unclaimed_injuries": __DbViewBase["unclaimedInjuries"];
   /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
   readonly "venue_plan": __DbViewBase["venuePlan"];
+  /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+  readonly "view_as_people": __DbViewBase["viewAsPeople"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __DbViewBase["workerJobs"];
 };
 
 type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
+  /** @deprecated Use `bandPlace` instead. This alias will be removed in the next major version. */
+  readonly "band_place": __TablesBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __TablesBase["chosenVenue"];
+  /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+  readonly "crowd_walk": __TablesBase["crowdWalk"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
   readonly "import_run": __TablesBase["importRun"];
+  /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
+  readonly "incident_marker": __TablesBase["incidentMarker"];
+  /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+  readonly "live_pause": __TablesBase["livePause"];
+  /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
+  readonly "live_plan": __TablesBase["livePlan"];
+  /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
+  readonly "live_run": __TablesBase["liveRun"];
   /** @deprecated Use `merchTemplate` instead. This alias will be removed in the next major version. */
   readonly "merch_template": __TablesBase["merchTemplate"];
   /** @deprecated Use `scheduleSlot` instead. This alias will be removed in the next major version. */
@@ -1380,18 +1892,30 @@ export type Tables = __TablesBase & {
   readonly "venue_setup": __TablesBase["venueSetup"];
   /** @deprecated Use `venueSetupStep` instead. This alias will be removed in the next major version. */
   readonly "venue_setup_step": __TablesBase["venueSetupStep"];
+  /** @deprecated Use `venueSpot` instead. This alias will be removed in the next major version. */
+  readonly "venue_spot": __TablesBase["venueSpot"];
   /** @deprecated Use `zoneVisit` instead. This alias will be removed in the next major version. */
   readonly "zone_visit": __TablesBase["zoneVisit"];
   /** @deprecated Use `apiSessions` instead. This alias will be removed in the next major version. */
   readonly "api_sessions": __TablesBase["apiSessions"];
   /** @deprecated Use `boardApprovals` instead. This alias will be removed in the next major version. */
   readonly "board_approvals": __TablesBase["boardApprovals"];
+  /** @deprecated Use `boardAttendeePolicies` instead. This alias will be removed in the next major version. */
+  readonly "board_attendee_policies": __TablesBase["boardAttendeePolicies"];
   /** @deprecated Use `boardAttendees` instead. This alias will be removed in the next major version. */
   readonly "board_attendees": __TablesBase["boardAttendees"];
+  /** @deprecated Use `boardCharges` instead. This alias will be removed in the next major version. */
+  readonly "board_charges": __TablesBase["boardCharges"];
   /** @deprecated Use `boardChecks` instead. This alias will be removed in the next major version. */
   readonly "board_checks": __TablesBase["boardChecks"];
+  /** @deprecated Use `boardClinicReports` instead. This alias will be removed in the next major version. */
+  readonly "board_clinic_reports": __TablesBase["boardClinicReports"];
+  /** @deprecated Use `boardCovers` instead. This alias will be removed in the next major version. */
+  readonly "board_covers": __TablesBase["boardCovers"];
   /** @deprecated Use `boardFacts` instead. This alias will be removed in the next major version. */
   readonly "board_facts": __TablesBase["boardFacts"];
+  /** @deprecated Use `boardFeeSchedule` instead. This alias will be removed in the next major version. */
+  readonly "board_fee_schedule": __TablesBase["boardFeeSchedule"];
   /** @deprecated Use `boardLedger` instead. This alias will be removed in the next major version. */
   readonly "board_ledger": __TablesBase["boardLedger"];
   /** @deprecated Use `boardLines` instead. This alias will be removed in the next major version. */
@@ -1400,22 +1924,38 @@ export type Tables = __TablesBase & {
   readonly "board_medical_access": __TablesBase["boardMedicalAccess"];
   /** @deprecated Use `boardMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "board_merch_orders": __TablesBase["boardMerchOrders"];
+  /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_picks": __TablesBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __TablesBase["boardNotes"];
+  /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+  readonly "board_organizer_precedents": __TablesBase["boardOrganizerPrecedents"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
   readonly "board_photos": __TablesBase["boardPhotos"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
   readonly "board_policies": __TablesBase["boardPolicies"];
+  /** @deprecated Use `boardPolicyDocuments` instead. This alias will be removed in the next major version. */
+  readonly "board_policy_documents": __TablesBase["boardPolicyDocuments"];
+  /** @deprecated Use `boardPolicyTerms` instead. This alias will be removed in the next major version. */
+  readonly "board_policy_terms": __TablesBase["boardPolicyTerms"];
   /** @deprecated Use `boardPrecedents` instead. This alias will be removed in the next major version. */
   readonly "board_precedents": __TablesBase["boardPrecedents"];
   /** @deprecated Use `boardRecords` instead. This alias will be removed in the next major version. */
   readonly "board_records": __TablesBase["boardRecords"];
   /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
   readonly "board_reviews": __TablesBase["boardReviews"];
+  /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+  readonly "board_rule_proposals": __TablesBase["boardRuleProposals"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __TablesBase["boardRules"];
+  /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
+  readonly "board_staff": __TablesBase["boardStaff"];
+  /** @deprecated Use `boardWallets` instead. This alias will be removed in the next major version. */
+  readonly "board_wallets": __TablesBase["boardWallets"];
   /** @deprecated Use `claimChecks` instead. This alias will be removed in the next major version. */
   readonly "claim_checks": __TablesBase["claimChecks"];
+  /** @deprecated Use `claimClauses` instead. This alias will be removed in the next major version. */
+  readonly "claim_clauses": __TablesBase["claimClauses"];
   /** @deprecated Use `claimFacts` instead. This alias will be removed in the next major version. */
   readonly "claim_facts": __TablesBase["claimFacts"];
   /** @deprecated Use `claimLedger` instead. This alias will be removed in the next major version. */
@@ -1436,18 +1976,26 @@ export type Tables = __TablesBase & {
   readonly "medic_medical_cards": __TablesBase["medicMedicalCards"];
   /** @deprecated Use `myAttendee` instead. This alias will be removed in the next major version. */
   readonly "my_attendee": __TablesBase["myAttendee"];
+  /** @deprecated Use `myAttendeePolicy` instead. This alias will be removed in the next major version. */
+  readonly "my_attendee_policy": __TablesBase["myAttendeePolicy"];
   /** @deprecated Use `myBand` instead. This alias will be removed in the next major version. */
   readonly "my_band": __TablesBase["myBand"];
+  /** @deprecated Use `myCharges` instead. This alias will be removed in the next major version. */
+  readonly "my_charges": __TablesBase["myCharges"];
   /** @deprecated Use `myClaimQueue` instead. This alias will be removed in the next major version. */
   readonly "my_claim_queue": __TablesBase["myClaimQueue"];
   /** @deprecated Use `myClaims` instead. This alias will be removed in the next major version. */
   readonly "my_claims": __TablesBase["myClaims"];
+  /** @deprecated Use `myDeparture` instead. This alias will be removed in the next major version. */
+  readonly "my_departure": __TablesBase["myDeparture"];
   /** @deprecated Use `myEncounters` instead. This alias will be removed in the next major version. */
   readonly "my_encounters": __TablesBase["myEncounters"];
   /** @deprecated Use `myGraph` instead. This alias will be removed in the next major version. */
   readonly "my_graph": __TablesBase["myGraph"];
   /** @deprecated Use `myHandles` instead. This alias will be removed in the next major version. */
   readonly "my_handles": __TablesBase["myHandles"];
+  /** @deprecated Use `myIncidents` instead. This alias will be removed in the next major version. */
+  readonly "my_incidents": __TablesBase["myIncidents"];
   /** @deprecated Use `myMedicalCard` instead. This alias will be removed in the next major version. */
   readonly "my_medical_card": __TablesBase["myMedicalCard"];
   /** @deprecated Use `myMedicalDocuments` instead. This alias will be removed in the next major version. */
@@ -1460,6 +2008,8 @@ export type Tables = __TablesBase & {
   readonly "my_owner": __TablesBase["myOwner"];
   /** @deprecated Use `myPhotos` instead. This alias will be removed in the next major version. */
   readonly "my_photos": __TablesBase["myPhotos"];
+  /** @deprecated Use `myPlanLookups` instead. This alias will be removed in the next major version. */
+  readonly "my_plan_lookups": __TablesBase["myPlanLookups"];
   /** @deprecated Use `myRoles` instead. This alias will be removed in the next major version. */
   readonly "my_roles": __TablesBase["myRoles"];
   /** @deprecated Use `mySharedVisits` instead. This alias will be removed in the next major version. */
@@ -1486,8 +2036,12 @@ export type Tables = __TablesBase & {
   readonly "social_shared_visits": __TablesBase["socialSharedVisits"];
   /** @deprecated Use `socialVisits` instead. This alias will be removed in the next major version. */
   readonly "social_visits": __TablesBase["socialVisits"];
+  /** @deprecated Use `unclaimedInjuries` instead. This alias will be removed in the next major version. */
+  readonly "unclaimed_injuries": __TablesBase["unclaimedInjuries"];
   /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
   readonly "venue_plan": __TablesBase["venuePlan"];
+  /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+  readonly "view_as_people": __TablesBase["viewAsPeople"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __TablesBase["workerJobs"];
 };

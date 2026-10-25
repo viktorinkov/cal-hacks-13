@@ -5,8 +5,10 @@
 
 use crate::insurance::*;
 use crate::jobs::{self, *};
-use crate::roles::require_role;
+use crate::roles::*;
 use crate::social::tables::*;
+use crate::tables::*;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 pub const KIND_WALLET_OPEN: &str = "wallet_open";
@@ -22,7 +24,7 @@ pub struct WalletEntry {
     pub id: u64,
     #[index(btree)]
     pub identity: Identity,
-    /// `opening`, `purchase` or `payout`.
+    /// `opening`, `purchase`, `payout`, `charge` or `refund`.
     pub kind: String,
     /// Money in is positive, money out negative.
     pub amount_cents: i64,
@@ -82,7 +84,7 @@ pub fn add_entry(ctx: &ReducerContext, identity: Identity, kind: &str, amount_ce
 /// What the wallet can still spend: its entries less the merch orders being paid.
 pub fn spendable(ctx: &ReducerContext, who: Identity) -> i64 {
     let entries: i64 = ctx.db.wallet_entry().identity().filter(who).map(|e| e.amount_cents).sum();
-    entries - crate::merch::held_cents(ctx, who)
+    entries - crate::merch::held_cents(ctx, who) - crate::insurance::charges::held_cents(ctx, who)
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -95,15 +97,45 @@ pub struct MyWallet {
 
 #[spacetimedb::view(accessor = my_wallet, public)]
 pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     let account = ctx.db.claimant_account().identity().find(me)?;
-    let entries: i64 = ctx.db.wallet_entry().identity().filter(me).map(|e| e.amount_cents).sum();
-    let held: i64 = crate::merch::my_held_cents(ctx, me);
-    Some(MyWallet { account_id: account.account_id, balance_cents: entries - held, opened_at: account.created_at })
+    Some(MyWallet { account_id: account.account_id, balance_cents: balance(ctx, me), opened_at: account.created_at })
+}
+
+fn balance(ctx: &ViewContext, who: Identity) -> i64 {
+    let entries: i64 = ctx.db.wallet_entry().identity().filter(who).map(|e| e.amount_cents).sum();
+    entries - crate::merch::my_held_cents(ctx, who) - crate::insurance::charges::my_held_cents(ctx, who)
+}
+
+/// One attendee's wallet, for the organizer buying merch as them.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BoardWallet {
+    pub node_id: u64,
+    pub account_id: String,
+    pub balance_cents: i64,
+}
+
+/// Every attendee's wallet and what it can spend, for the organizer (ops) only.
+#[spacetimedb::view(accessor = board_wallets, public)]
+pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet> {
+    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == "ops");
+    if !ops {
+        return Vec::new();
+    }
+    ctx.db
+        .attendee()
+        .person_id()
+        .filter(0u64..)
+        .filter_map(|a| {
+            let account = ctx.db.claimant_account().identity().find(a.identity)?;
+            Some(BoardWallet { node_id: a.node_id, account_id: account.account_id, balance_cents: balance(ctx, a.identity) })
+        })
+        .collect()
 }
 
 /// The wallet's movements, oldest first.
 #[spacetimedb::view(accessor = my_wallet_entries, public)]
 pub fn my_wallet_entries(ctx: &ViewContext) -> Vec<WalletEntry> {
-    ctx.db.wallet_entry().identity().filter(ctx.sender()).collect()
+    ctx.db.wallet_entry().identity().filter(viewed(ctx)).collect()
 }

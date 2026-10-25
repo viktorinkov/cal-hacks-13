@@ -10,10 +10,10 @@ This file is the map: how the parts fit, where data lives, how the system is dep
 
 This file owns:
 
-- the system context and the container view (every process and who it talks to);
+- the system context and how the parts interact: every process, what flows between them and who decides what;
 - the data ownership rules (which store is the source of truth for what);
 - the deployment;
-- the cross-cutting failure table and the mapping from prize tracks to components.
+- the cross-cutting failure table. The mapping from each sponsor track to components is in [Sponsor-Tracks](Sponsor-Tracks.md).
 
 It does not describe any component's internals. Those live in the component files listed in [README](../README.md).
 
@@ -36,13 +36,12 @@ Every connection in the system. Names match the component docs.
 | `bandit-workers` | `band1t` module | claim jobs, submit results | SpacetimeDB Rust client SDK |
 | Anthropic-Claude-API.md, Capital-One-Nessie.md: `bandit-workers` | Anthropic Claude API, Capital One Nessie API | AI calls, bank calls | HTTPS |
 | Elastic.md: `bandit-indexer` | `band1t` module, Elastic Serverless | subscription in, bulk index writes out | SDK in, HTTPS out |
-| Elastic.md: `bandit-api` | Elastic Serverless | `GET /recap/order`: semantic queries that order the recap's people and booths, over candidates SpacetimeDB listed | HTTPS |
-| Bright-Data.md: `bandit-ingest` | Bright Data Web MCP, Anthropic Claude API, `band1t` module | page fetches and extraction; `floorplan_check`; `import_event` | HTTPS; SDK |
+| Elastic.md: `bandit-api` | Elastic Serverless | `GET /api/recap`: semantic queries that order the recap's people and booths, over candidates SpacetimeDB listed | HTTPS |
+| Bright-Data.md: `bandit-ingest` | Bright Data Web MCP, `band1t` module | page fetches (`scrape_as_markdown`) and company datasets (`run_scraper`); `import_event` | HTTPS; SpacetimeDB HTTP API |
 | Bright-Data.md: `pipeline/venue_model.py`, run by hand before the event | Bright Data Browser API | the Cal Hacks venue map opened in a remote browser; its 3D scene back as the file `web/venue/venue.glb` | CDP over WebSocket, through Playwright |
 | Bright-Data.md: `bandit-workers`, job `venue_setup` | Bright Data Web MCP, Bright Data Web Unlocker API, Anthropic Claude API, Bright Data Browser API | a venue set up from the event's name on the organizer portal: search, pages, the picks `venue_find` and `venue_map`, and the model exported by `pipeline/venue_model.py` | HTTPS; CDP over WebSocket, through Playwright |
 | Elastic.md: `bandit-ingest` | Elastic Serverless | parsed JSON records in; the bundle back from `bandit-organize` in Elastic Workflows | HTTPS |
-| Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`; the ids and scores of similar past claims back, written through `submit_claim_checks` | HTTPS; SDK |
-| Elastic.md: the Elastic Agent Builder agent `bandit-organizer` | Bright Data Web MCP | at most 10 gap-fill `extract` calls per run, through an Agent Builder MCP tool | HTTPS |
+| Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | every insurance PDF, read into terms and clauses by `bandit-read-document` (next to build); a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`, with the clauses of both policies that bear on it back, written through `submit_claim_checks` | HTTPS; SDK |
 | Vision.md (TBD -- LEO): `bandit-vision` | `band1t` module, `bandit-api`, Anthropic Claude API | zone counts, ground alerts, camera sightings, property events, photo features; frames stored as blobs; frames to the Anthropic Claude API | reducer calls; HTTPS |
 
 ## Design
@@ -52,13 +51,183 @@ Every connection in the system. Names match the component docs.
 1. **Safety never waits.** Density colours, SOS, fall detection and the light circle run on the bands themselves. The module adds the incident record, the staff screens and the commands organizers send, but the bands stay useful if the venue laptop, the network or the cloud is gone.
 2. **One source of truth.** The SpacetimeDB module `band1t` holds all live state. Every change is a reducer call, so it happens completely or not at all, and every screen sees the same committed state through subscriptions.
 3. **Copies flow one way.** Any other store holds only files or a copy of committed rows. Results come back as SpacetimeDB ids, and acting on them is again a reducer call.
-4. **Slow and external work goes through a queue.** AI and bank work are `job` rows claimed by `bandit-workers`. Code decides money, coverage, safety and access; the model only reads and writes words.
+4. **Slow and external work goes through a queue.** AI and bank work are `job` rows claimed by `bandit-workers`. Code decides money, coverage, safety and access; the Anthropic Claude API reads documents, makes judgments and writes words.
 5. **Every feature can be deleted.** Core components are enough for the safety features. Each optional feature owns its tables, reducers and jobs, so removing its doc and code removes it cleanly.
 6. **The module and services are Rust.** The module, every service and every shared library are Rust. Only the two browser apps are TypeScript.
 
+### How the parts interact
+
+Four rules decide which part does what:
+
+- **SpacetimeDB owns live and exact state.** Every write is a reducer call in the module on SpacetimeDB Maincloud, and every screen and service reads the result by subscription.
+- **The Evidence Engine (Elastic) reads, validates, organizes and ranks by meaning.** It gets copies, raw records and every insurance PDF, and gives back checks, ids, scores, and the policy terms and clauses a claim is held to (next to build). Acting on any of them is again a reducer call.
+- **The Anthropic Claude API judges and writes; code computes every amount.** Inside the insurance Decision Engine it investigates each claim and decides pay, refuse or ask the organizer, and code's guard holds that decision to the policy terms and the checks. Code checks every answer before the module uses it.
+- **Random outcomes come from a seeded RNG in code, never from the Anthropic Claude API.** Insurance.md: in the live run, who falls, where and when comes from a generator seeded with `live_run.seed`, so a run can be played again exactly.
+
+The question this diagram answers: which part talks to which, and what flows along each arrow.
+
+```mermaid
+flowchart LR
+  subgraph Venue["Venue"]
+    subgraph Radio["ESP-NOW radio, channel 1"]
+      Bands["Bands"]
+      Markers["Station markers and exit markers"]
+    end
+    Gateway["Gateway"]
+    Cameras["Security cameras (TBD -- LEO)"]
+    subgraph Laptop["Venue laptop"]
+      Bridge["band1t-bridge"]
+      SecView["Security view (TBD -- LEO)"]
+      Ingest["bandit-ingest, before the event"]
+    end
+  end
+  subgraph Cloud["SpacetimeDB Maincloud"]
+    STDB[("The module, band1t: live and exact state")]
+  end
+  subgraph Vultr["Vultr server, band1t.vip"]
+    API["bandit-api"]
+    Workers["bandit-workers"]
+    Indexer["bandit-indexer"]
+  end
+  subgraph Browsers["Browsers"]
+    Portal["Organizer portal /organizer"]
+    Tap["Tap page /t/code"]
+  end
+  subgraph Outside["Outside services"]
+    Auth["SpacetimeDB SpacetimeAuth"]
+    Claude["Anthropic Claude API: reads and judges"]
+    Elastic["Elastic, The Evidence Engine: validates, organizes, ranks"]
+    Nessie["Capital One Nessie API"]
+    Bright["Bright Data"]
+  end
+
+  Bands -->|"beacons, 10/s"| Bands
+  Markers -->|"station id + exit colour, 5/s"| Bands
+  Radio -->|"beacons + heard lists"| Gateway
+  Gateway -->|"commands, sent 3 times"| Radio
+  Gateway <-->|"JSON lines up, cmd lines down"| Bridge
+  Bridge -->|"band reports, ingest_band"| STDB
+  STDB -->|"pending commands, subscription"| Bridge
+  Cameras -.->|"live video, 30 fps"| SecView
+  SecView -.->|"camera assessment, submit_vision_assessment"| STDB
+  Ingest -->|"page fetches, scrape_as_markdown"| Bright
+  Ingest -->|"raw records, bundle back, bandit-organize"| Elastic
+  Ingest -->|"event bundle, import_event"| STDB
+  Portal -->|"magic-link sign-in"| Auth
+  Tap -->|"magic-link sign-in"| Auth
+  Auth -->|"ID token, checked on connect"| STDB
+  STDB -->|"live rows, subscription"| Portal
+  Portal -->|"staff actions, resolve_incident"| STDB
+  STDB -->|"own rows, my_band"| Tap
+  Tap -->|"attendee actions, update_profile"| STDB
+  Portal -->|"policy + hospital report PDFs, POST /api/blobs"| API
+  Tap -->|"uploads + recap, GET /api/recap"| API
+  STDB -->|"recap rows, subscription"| API
+  API -->|"semantic query, ids + scores back"| Elastic
+  STDB -->|"job rows, worker_jobs"| Workers
+  Workers -->|"lease + result, submit_claim_review"| STDB
+  Workers -->|"claims to investigate, decisions back"| Claude
+  Workers -->|"insurance PDFs + claim copy, terms + clauses back"| Elastic
+  Workers -->|"wallet, purchase, deposit"| Nessie
+  Workers -->|"venue search + pages, venue_setup"| Bright
+  STDB -->|"venue + social rows, subscription"| Indexer
+  Indexer -->|"bulk index, bandit-people"| Elastic
+
+  classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
+  classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+  classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
+  class Bands,Markers,Gateway device
+  class Bridge,Ingest,API,Workers,Indexer rust
+  class STDB stdb
+  class Portal,Tap web
+  class Auth,Claude,Elastic,Nessie,Bright ext
+  class Cameras,SecView tbd
+```
+
+Dashed boxes and arrows are Leo's security view (TBD -- LEO). Arrows point from the caller; "back" marks what the call returns.
+
+#### Every interaction
+
+One row per arrow above, in the same order. Call names are spelled as the code spells them.
+
+| From | To | What flows | Call | Transport | Why this way |
+|---|---|---|---|---|---|
+| Band | Band | beacons: id, flags, neighbour count, zone, state, seq | none | ESP-NOW broadcast, 10 Hz | density and the light circle need no laptop and no network |
+| Station marker, exit marker | Band | station id and exit colour | none | ESP-NOW broadcast, 5 Hz | each band picks its zone itself, and homes in on the exit marker of its colour |
+| Band, station marker | Gateway | every beacon; each band's heard list once a second | none | ESP-NOW broadcast | one radio hears the whole venue |
+| Gateway | Band, station marker | the 13 commands, such as `state`, `exit`, `clear` and `lowvis` | none | ESP-NOW broadcast, each sent 3 times | a broadcast gets no ack, so repeats cover lost packets |
+| Gateway | `band1t-bridge`, both ways | one JSON line per packet heard, and the gateway's acks; `cmd` lines back, such as `cmd 0 lowvis 1` | `cmd` | USB serial, 115200 baud | the gateway stays a plain radio; the logic stays in Rust |
+| `band1t-bridge` | the module | a band's report at once on a change, else once a second; station and heard reports; acks | `ingest_band`, `ingest_station`, `ingest_heard`, `gateway_up`, `command_sent` | SpacetimeDB Rust client SDK (WebSocket) | each report is one transaction every screen sees |
+| the module | `band1t-bridge` | new `command` rows | subscription `SELECT * FROM command WHERE pending = true` | the same WebSocket | a command reaches the radio the moment it commits |
+| Vision.md (TBD -- LEO): security cameras | security view | live video at 30 fps | none | read directly by the venue laptop | the security view works without the internet |
+| Vision.md (TBD -- LEO): security view | the module | a camera assessment of an incident; property events | `submit_vision_assessment`, `report_property_event` | SpacetimeDB client SDK, role `vision` | the module, not the camera, decides what happens next |
+| Bright-Data.md: `bandit-ingest` | Bright Data Web MCP | the event's pages and company datasets | `scrape_as_markdown`, `run_scraper` | MCP over HTTPS | Bright Data does every step that touches the web |
+| Elastic.md: `bandit-ingest` | Elastic | raw records into `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; the organized bundle back from `bandit-bundles` | the Elastic Workflows workflow `bandit-organize` | HTTPS | messy text is resolved before anything reaches the module |
+| Bright-Data.md: `bandit-ingest` | the module | the checked event bundle | `import_event` | SpacetimeDB HTTP API | the whole event loads in one transaction or not at all |
+| Organizer portal | SpacetimeDB SpacetimeAuth | the magic-link email sign-in | OpenID Connect at `auth.spacetimedb.com/oidc` | HTTPS | BandIt keeps no password and sends no email |
+| Tap page | SpacetimeDB SpacetimeAuth | the magic-link email sign-in | OpenID Connect at `auth.spacetimedb.com/oidc` | HTTPS | a judge signs in on their own phone |
+| SpacetimeDB SpacetimeAuth | the module | the ID token, which each page passes when it connects | none | OpenID Connect | one identity per person, the same on every device |
+| the module | Organizer portal | live rows: bands, zones, incidents; Insurance.md: claims | subscriptions such as `band`, `open_incidents`, `board_notes`; Insurance.md: `claims_board` | SpacetimeDB TypeScript client SDK (WebSocket) | every change is pushed; nothing polls |
+| Organizer portal | the module | staff actions | `resolve_incident`, `add_incident_note`, `set_low_vis`, `end_event`; Insurance.md: `file_claim_for_wearer`, `submit_medical_record`, `approve_claim`, `refuse_claim`, and at setup `submit_policy_document` and `confirm_policy_terms` (next to build) | the same WebSocket | each action is one transaction, checked against `staff_role` |
+| the module | Tap page | the attendee's own rows | views such as `my_band` and `my_attendee` | SpacetimeDB TypeScript client SDK (WebSocket) | views scope every row to the caller |
+| Tap page | the module | attendee actions | `claim_band`, `update_profile`; Insurance.md: `file_claim` | the same WebSocket | the module checks who may do what |
+| Organizer portal | `bandit-api` | the app files; Insurance.md: the venue's policy PDF and a hospital report PDF | `POST /api/blobs` | HTTPS, same origin | big files stay out of rows; the module keeps the access class |
+| Tap page | `bandit-api` | the app files, uploads, and the recap with its suggestions in order | `POST /api/blobs`, `GET /api/recap` | HTTPS, with the session token from `open_api_session` | only `bandit-api` holds the Elastic key |
+| the module | `bandit-api` | session rows and the rows each recap is built from | subscription to `api_sessions`; Social.md: `social_visits`, `social_encounters` | SpacetimeDB Rust client SDK | SpacetimeDB decides who and what is on the list |
+| Elastic.md: `bandit-api` | Elastic | a semantic query over the candidates; ids and scores back | `_search` on `bandit-people` and `bandit-booths` | HTTPS, 10 s timeout | Elastic only orders the ids it is given |
+| the module | `bandit-workers` | queued and leased jobs | subscription to the view `worker_jobs` | SpacetimeDB Rust client SDK | slow and outside work never runs inside a transaction |
+| `bandit-workers` | the module | leases, then one result per job | `claim_job`, `extend_job_lease`, `fail_job` and each kind's result reducer; Insurance.md: such as `submit_claim_checks` and `submit_claim_review` | the same WebSocket | the module checks the lease and applies the result in one transaction |
+| Anthropic-Claude-API.md: `bandit-workers` | Anthropic Claude API | claims to investigate with tools, hospital reports to write for a drawn case, medical history PDFs, letters; JSON in a fixed schema back | jobs `claim_review`, `clinic_report`, `claim_record_extract`, `claim_draft`, `recovery_letter`, `medical_extract`, `venue_setup` | HTTPS through `claude-client` | the Anthropic Claude API judges and writes; code checks every answer and holds every claim decision to its limits |
+| Elastic.md, Insurance.md: `bandit-workers` | Elastic | every insurance PDF, read into terms and clauses (next to build); a de-identified copy of each claim, and later its outcome; the validation and the matching policy clauses back | jobs `document_read` (`bandit-documents-extract`, `bandit-read-document`, next to build) and `claim_verify` (pipeline `bandit-claims-validate`, a semantic query on `bandit-policy-clauses`) | HTTPS through `claims-elastic` | the venue's own contract decides what a claim is covered for |
+| Capital-One-Nessie.md: `bandit-workers` | Capital One Nessie API | wallets, merch purchases, claim payouts | jobs `wallet_open`, `merch_purchase`, `claim_payout` | HTTPS | the bank keeps the records; the module keeps the balance |
+| Bright-Data.md: `bandit-workers` | Bright Data | a venue set up from the event's name: search, pages and the 3D map | job `venue_setup`: Bright Data Web MCP `search_engine`, Bright Data Web Unlocker API, Bright Data Browser API through `pipeline/venue_model.py` | HTTPS; CDP over WebSocket | any event's venue from its name alone |
+| Elastic.md: the module | `bandit-indexer` | venue and social rows | subscription to `zone`, `organization`, `booth`, `schedule_slot`, `social_attendees`, `social_visits` | SpacetimeDB Rust client SDK | a one-way copy; nothing flows back |
+| Elastic.md: `bandit-indexer` | Elastic | booth documents and each findable attendee's interests | `_bulk` into `bandit-booths` and `bandit-people`, at most once a second | HTTPS | live state never lives in Elastic |
+
+### Who decides what
+
+Each kind of decision has one maker, with a guardrail in code around it. The Anthropic Claude API judges what a document or a claim says, Elastic orders by meaning, and code computes every amount and every route.
+
+| Decision | Made by | Input | Guardrail |
+|---|---|---|---|
+| Zone and density | code on the band | the signal of the station markers and bands it heard in the last few seconds | hysteresis stops a count at a threshold from flapping; an organizer can override it with `set_override` and `force_state` |
+| The light circle | code on the band | an SOS or fall beacon heard at -58 dBm or stronger (`circle_rssi`) | it takes no command and ranks above a forced state; the module only records the witnesses |
+| An incident opening | code in the module (`watch_bands`, every 500 ms); a person with `open_incident` | a band's SOS or fall flag; a staff report of damage, or of an injury no band flagged | one open incident per band, and a flag within 10 s of a resolve does not reopen it; the snapshot is frozen in the same transaction |
+| Insurance.md: the venue's policy terms (next to build) | The Evidence Engine reads them from the policy PDF; the organizer confirms them (`confirm_policy_terms`) | the venue's uploaded policy PDF | every term quotes its clause and page; code checks each quote word for word and the limits against each other before the organizer sees them |
+| Insurance.md: whether there is a claim | the attendee who wore the band (`file_claim`), or staff for them (`file_claim_for_wearer`); code opens a property claim when the incident resolves | the attendee's own words | one claim per incident, and the claimant must have worn the band at the time |
+| Insurance.md: which hospital report comes back | code in the module: one roll of its seeded generator (`Scenario::pick`) | the incident and the attendee's own words | 3 in 6 match the incident; the Anthropic Claude API only writes the report for the drawn case (`clinic_report`) |
+| Insurance.md: a claim's amount | code in the module (`cover_lines` and `compute_amounts` in `bandit-insurance`) | the bill lines read from the hospital report; the fee schedule and the cover's limits, from the venue's confirmed policy terms (next to build; seeded today) | `validate_record` drops a line whose page is not in the PDF; a decision that names a figure code did not compute is rejected; every ledger journal must balance |
+| Insurance.md: pay, refuse or ask the organizer | the Anthropic Claude API, investigating with tools (`claim_review`) | the evidence sources it chooses to read, the checks, the amounts, the attendee's own words, and the clauses of the venue's and the attendee's policies (next to build) | `validate_decision` rejects a cited fact or clause that is not on the claim, a figure code did not compute, and a pay made without reading the evidence |
+| Insurance.md: whether that decision goes through | code in the module: the guard (`decision::guard` in `bandit-insurance`) | Claude's decision, the cover, the corroboration, the failed checks and the learned `settlement_rule` rows | a pay goes through only under a rule an organizer taught, at or below its ceiling, with every check passed and corroborated evidence; a refusal only on a failed check; anything else, and every claim when 3 or more people are hurt in one zone within 5 minutes, goes to the organizer |
+| Insurance.md: a claim sent to a person | the organizer, with `approve_claim` or `refuse_claim` | the evidence pack, Claude's decision and the clauses it cited, on the organizer portal | it fails closed when the amount or the pack's fingerprint on screen is stale; a refusal needs a reason |
+| Elastic.md: the order of recap suggestions | Elastic (`bandit-people`, `bandit-booths`) | the people and booths SpacetimeDB listed for the attendee, and the attendee's interests | Elastic only orders the ids it is given; without it the lists go by minutes |
+| Elastic.md, Insurance.md: which policy clauses bear on a claim (next to build) | Elastic (`bandit-policy-clauses`) | the de-identified copy's narrative, built by code, and Claude's own queries | only the venue's policy and this attendee's card are searched; a clause matters only when Claude cites it and code checks it |
+| Insurance.md: who falls, where and when in the live run | code in the module: a generator seeded with `live_run.seed` (`live/script.rs`) | the script's beats: the incident kind, the zone kind, the medic's note and the hospital report that follows | never the Anthropic Claude API; a run can be played again exactly, and no zone gets three injuries within five minutes |
+| Bright-Data.md, Elastic.md: the event setup bundle | Elastic: the Elastic Agent Builder agent `bandit-organizer`, run by `bandit-organize` in Elastic Workflows | the raw records Bright Data fetched | Elastic ES\|QL `LOOKUP JOIN` makes the exact joins first, and the agent gives a reason for each decision; `bandit-ingest` checks the bundle and `import_event` loads it in one transaction |
+| Merch.md: a merch order | a person: the attendee, from the recap (`buy_merch`) | a template and a photo the attendee is tagged in | code checks that the event has ended and the wallet covers the price; a failed purchase frees the money |
+
+Insurance.md: the insurance Decision Engine is the Anthropic Claude API plus the Rust code that decides each claim, and The Evidence Engine reads every document it needs. It runs in this order, and steps 0, 2, 3, 5 and 6 leave the module as jobs:
+
+0. At setup, the organizer uploads the venue's policy PDF. The Evidence Engine reads it into terms that quote their clauses, code checks them, and the organizer confirms them. They set every limit and gate below (next to build).
+1. The attendee files a claim in their own words (`file_claim`), or staff file it for them (`file_claim_for_wearer`).
+2. Code draws which hospital report comes back from the module's seeded generator (`Scenario::pick`), and the Anthropic Claude API writes the report for that case (`clinic_report`).
+3. The Evidence Engine reads the hospital report PDF and the attendee's insurance card (next to build; today the Anthropic Claude API reads the report), and code validates what it read.
+4. Code prices each line against the fee schedule and the cover's limits, checks the band, the light-circle witnesses, the staff notes, the camera and the report against each other, and posts the reserve. It refuses a staff claimant, a claim with no cover and a $0 payout before Claude sees them.
+5. The Evidence Engine validates the de-identified copy and finds the clauses of both policies that bear on it (`claim_verify`, then `submit_claim_checks`).
+6. The Anthropic Claude API investigates with tools, one evidence source at a time, searches the policies' clauses, and decides: pay, refuse or ask the organizer (`claim_review`, then `submit_claim_review`). Code rejects an answer that cites a fact or clause not on the claim, or a figure code did not compute.
+7. Code's guard lets a pay through only inside an approved rule's ceiling with every check passed, and a refusal only on a failed check. Everything else goes to the organizer.
+8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, Claude proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
+
+Each step, what Claude reads and answers, and five worked claims are in [Insurance: How the insurance Decision Engine decides](../6-features/Insurance.md#how-the-insurance-decision-engine-decides).
+
 ### System context
 
-Who uses BandIt, and which outside services it relies on.
+The view from outside: the people and the outside services around BandIt. How the parts interact, above, opens the BandIt box.
+
+The question this diagram answers: who uses BandIt, and which outside services it relies on.
 
 ```mermaid
 flowchart LR
@@ -72,16 +241,15 @@ flowchart LR
   Bright["Bright Data"]
   Vision["bandit-vision (TBD -- LEO)"]
 
-  Attendee -->|"taps band, presses to claim, reopens the tap link for the recap"| BandIt
+  Attendee -->|"taps the band, presses to claim it, files an insurance claim, opens the recap"| BandIt
   Staff -->|"runs the event, watches the map, handles incidents"| BandIt
   Attendee -->|"signs in by magic link"| Auth
   Staff -->|"signs in by magic link"| Auth
   Auth -->|"ID token, one identity per person"| BandIt
-  BandIt -->|"scraped records to organize; one-way copy; recap order"| Elastic
-  Elastic -.->|"capped gap-fill fetches"| Bright
-  BandIt -->|"cards, floor plan, letters"| AnthropicAPI
+  BandIt -->|"records to organize, copies to rank, insurance PDFs to read"| Elastic
+  BandIt -->|"claims to decide, letters to write"| AnthropicAPI
   BandIt -->|"accounts, merch purchases, payouts"| NessieAPI
-  BandIt -->|"fetch pages before the event"| Bright
+  BandIt -->|"event pages, venue setup"| Bright
   Vision -->|"counts, alerts, photo features"| BandIt
 
   classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
@@ -96,86 +264,21 @@ flowchart LR
 
 ### Containers
 
-Every running process and the main flows between them. The left half is the live safety path; the right half is the feature services.
+How the parts interact, above, is the container view. It leaves out the SpacetimeDB command line on the venue laptop, which the owner and organizers use for role grants, `start_safety_watch` and the band commands that have no control on a page.
 
-```mermaid
-flowchart LR
-  subgraph Venue["Venue floor"]
-    Bands["Bands x9"]
-    StationMarkers["Station markers"]
-    Gateway["Gateway"]
-  end
-  subgraph Laptop["Venue laptop"]
-    Bridge["band1t-bridge"]
-    CLI["SpacetimeDB command line"]
-    Sim["bandit-claims (Test-Bands.md)"]
-  end
-  STDB[("band1t module on SpacetimeDB Maincloud")]
-  subgraph Apps["Browsers"]
-    Portal["Organizer portal"]
-    App["Tap page"]
-  end
-  subgraph Services["Rust services"]
-    API["bandit-api"]
-    Workers["bandit-workers"]
-    Indexer["bandit-indexer"]
-    Ingest["bandit-ingest"]
-  end
-  subgraph SaaS["External services"]
-    Elastic["Elastic Serverless"]
-    AnthropicAPI["Anthropic Claude API"]
-    NessieAPI["Capital One Nessie API"]
-    Bright["Bright Data"]
-    Auth["SpacetimeDB SpacetimeAuth"]
-  end
+Test-Bands.md: it also leaves out the `bandit-claims` tool on the venue laptop and `bandit-api`'s test routes, which both drive the test bands through `report_test_band`.
 
-  Bands <-->|"ESP-NOW beacons"| StationMarkers
-  Bands <-->|"beacons up, commands down"| Gateway
-  Gateway <-->|"USB serial lines"| Bridge
-  Bridge <-->|"reports up, commands down"| STDB
-  CLI -->|"grants, organizer commands"| STDB
-  Sim -->|"test band reports"| STDB
-  Portal <-->|"subscriptions, organizer reducers"| STDB
-  App <-->|"subscriptions, attendee reducers"| STDB
-  Portal -->|"app files"| API
-  App -->|"app files, uploads, recap order"| API
-  Portal -->|"sign-in"| Auth
-  App -->|"sign-in"| Auth
-  API -->|"queries"| Elastic
-  Workers <-->|"jobs"| STDB
-  Workers -->|"HTTPS"| AnthropicAPI
-  Workers -->|"HTTPS"| NessieAPI
-  Workers -->|"venue setup"| Bright
-  Workers <-->|"claim copies out, precedent ids back"| Elastic
-  Indexer -->|"subscribe"| STDB
-  Indexer -->|"bulk index"| Elastic
-  Ingest -->|"fetch pages"| Bright
-  Ingest -->|"floorplan_check"| AnthropicAPI
-  Ingest -->|"JSON records; organized bundle back"| Elastic
-  Elastic -.->|"gap fill, capped"| Bright
-  Ingest -->|"import_event"| STDB
-
-  classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
-  classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
-  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
-  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
-  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
-  class Bands,StationMarkers,Gateway device
-  class Bridge,CLI,Sim,API,Workers,Indexer,Ingest rust
-  class STDB stdb
-  class Portal,App web
-  class Elastic,AnthropicAPI,NessieAPI,Bright,Auth ext
-```
-
-Vision.md (TBD -- LEO): the security cameras are left out of this picture. Leo's security view runs on the venue laptop beside `band1t-bridge`. It records the gateway, finds a calling band's 4 Hz red flash on the security camera, and shows in the security view where the attendee is, from local files and without the module.
+Vision.md (TBD -- LEO): the security cameras and the security view are the dashed grey boxes in How the parts interact. Leo's security view runs on the venue laptop beside `band1t-bridge`. It records the gateway, finds a calling band's 4 Hz red flash on the security camera, and shows in the security view where the attendee is, from local files and without the module.
 
 Vision.md (TBD -- LEO): `bandit-vision`, which would send the module head counts, person-down alerts, camera sightings and photo features through the reducers in [Vision](../4-devices/Vision.md), is Leo's to build. Identity always comes from the bands, never from faces.
 
 ### The live loop in one picture
 
-What happens to one beacon, and how a command from an organizer gets back to the bands. Everything here is either on the band or a reducer call; nothing waits on AI or a queue. A band guides its attendee on its own: in GUIDE it chases its exit colour, and under low visibility it chases faster as it nears the exit marker glowing that colour while a full band pulses every 2 s ([Safety](../6-features/Safety.md)).
+The order of events behind the radio, `band1t-bridge` and organizer portal arrows of How the parts interact. Everything here is either on the band or a reducer call; nothing waits on AI or a queue.
 
 (TBD -- LEO) Exit routing and the medic approach send their colours and states through the same `command` table ([Safety](../6-features/Safety.md)).
+
+The question this diagram answers: in what order one beacon reaches the screens, and a command from an organizer gets back to the bands.
 
 ```mermaid
 sequenceDiagram
@@ -208,13 +311,13 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Bands, attendees, consent, staff roles | `band1t` module | tap page, organizers, the owner (role grants) | none |
 | Band rows, station markers, the gateway, heard lists, events, commands, settings | `band1t` module | `band1t-bridge` through the ingest reducers, `sweep`, the `ops` reducers; Test-Bands.md: `report_test_band` from the `bandit-claims` tool and `bandit-api`, and `crowd_tick` for the crowd | none |
 | Incidents, snapshots, witnesses, notes | `band1t` module | `watch_bands`, organizers, medics | none |
-| Stays and encounters | `band1t` module (`zone_visit`, `encounter`) | `ingest_band`, `ingest_heard`, `sweep`; Test-Bands.md: `report_test_band` and `crowd_tick` | none; Social.md: `social_tick` turns them into `visit` and `social_encounter`; Elastic.md copies both, for findable attendees only, to `bandit-memories` |
+| Stays and encounters | `band1t` module (`zone_visit`, `encounter`) | `ingest_band`, `ingest_heard`, `sweep`; Test-Bands.md: `report_test_band` and `crowd_tick` | none; Social.md: `social_tick` turns them into `visit` and `social_encounter`; Elastic.md: `bandit-indexer` turns findable attendees' visits into their interests in `bandit-people` |
 | Social.md: the people graph | `band1t` module (`people_link`) | `social_tick`; `exhibits` links from the import | none; Elastic.md: `bandit-people` holds each findable attendee's interests, never the links |
-| Medical-Card.md, Insurance.md: medical card (with the attendee's own health insurance), the venue's insurance policy | `band1t` module, private tables | tap page, workers | never copied |
-| Capital-One-Nessie.md, Insurance.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Capital One Nessie ids | Capital One Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used only to rank similar past claims |
+| Medical-Card.md, Insurance.md: medical card (with the attendee's own health insurance), the venue's insurance policy | `band1t` module, private tables | tap page, workers | never copied; Elastic.md: the policy PDFs and an attendee's card and hospital report are read in Elastic under their SHA-256, and an attendee's are deleted once the claim is decided (next to build) |
+| Capital-One-Nessie.md, Insurance.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Capital One Nessie ids | Capital One Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used to validate the claim and as the query for its policy clauses |
 | Files: photos, PDFs, letters | the blob store, a folder in `/var/lib/bandit` on the Vultr VM | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
 | Bright-Data.md: raw fetch snapshots | versioned files kept with the project | `bandit-ingest` | loaded into the module through `import_event` |
-| Anthropic-Claude-API.md: model calls | `model_call` rows plus response blobs | `bandit-workers`, `bandit-ingest`; Vision.md (TBD -- LEO): `bandit-vision` | used for audit |
+| Anthropic-Claude-API.md: model calls | `model_call` rows, with each response | `bandit-workers`; Vision.md (TBD -- LEO): `bandit-vision` | used for audit |
 | Elastic.md: raw scraped records and the organized bundle | Elastic raw indices and `bandit-bundles` | `bandit-ingest`, `bandit-organize` in Elastic Workflows | working data before the import; rebuilt from the snapshots at every run, never read at the event |
 
 ### What each database does best
@@ -234,15 +337,16 @@ What only SpacetimeDB does here:
 
 Elastic.md: BandIt uses a second database because it has a second, different problem. Elastic solves meaning: messy scraped text before the import, and the order of an attendee's recap by what they were into, plus the analysis of it in Elastic Kibana.
 
-Elastic.md: SpacetimeDB decides who and what is on the list (exact, private, live); Elastic decides the order by meaning (and organizes the scraped data, and finds claim precedents). Neither database does the other's job, and they meet in exactly three places, plus a fourth for Insurance.md's claim precedents, shown in the diagram after this table.
+Elastic.md: SpacetimeDB decides who and what is on the list (exact, private, live); Elastic decides the order by meaning (and organizes the scraped data, and reads the insurance documents). Neither database does the other's job, and they meet in exactly three places, plus a fourth for Insurance.md's claims and documents, shown in the diagram after this table.
 
 Elastic.md: live state never lives in Elastic. What only Elastic does here:
 
 | Strength | Where BandIt uses it | Why it matters here |
 |---|---|---|
-| Ordering by meaning | `semantic_text` fields on `.jina-embeddings-v5-text-small`: `GET /recap/order` puts the people an attendee met and the booths they visited in order of how close they are to what the attendee was into ([Elastic](../7-integrations/Elastic.md)) | two people who visited different booths can still care about the same things; SpacetimeDB filters by exact values and has no relevance ranking or vectors |
+| Ordering by meaning | `semantic_text` fields on `.jina-embeddings-v5-text-small`: `GET /api/recap` puts the people an attendee met and the booths they visited in order of how close they are to what the attendee was into ([Elastic](../7-integrations/Elastic.md)) | two people who visited different booths can still care about the same things; SpacetimeDB filters by exact values and has no relevance ranking or vectors |
 | An agent that resolves messy records | the Elastic Agent Builder agent `bandit-organizer` on the Elastic Managed LLM, run by `bandit-organize` in Elastic Workflows with a JSON schema per section, searching candidates and giving a reason per merge | one company spelled three ways becomes one organisation before anything reaches the module |
 | Bulk joins where raw data lands | Elastic ES\|QL `LOOKUP JOIN` steps match booth numbers, domains and stage names across thousands of raw records | the messy raw records never enter the module; only the checked bundle does |
+| Reading documents into searchable clauses (next to build) | the Elastic Workflow `bandit-read-document` and the agent `bandit-document-reader` read every insurance PDF into terms that quote their clauses; `bandit-policy-clauses` holds each clause of the venue's and the attendee's policy for search by meaning | a claim is decided by what the contract says, and every limit traces to a clause the organizer saw |
 | Analysis you can see | Elastic Kibana, Elastic's web interface: the Elastic Workflows execution view, Elastic Agent Builder, and the dashboards "BandIt · Cal Hacks 13.0 · scrape pipeline" and "BandIt · Cal Hacks 13.0 · sponsors and prizes"; Insurance.md: the "BandIt claims evidence" dashboard | the team shows how the data was organized and what the scrape found about the event, without touching the live screens |
 
 The diagram shows where the two meet and which way data flows at each meeting point.
@@ -253,7 +357,7 @@ flowchart TB
   ES -->|"1. import: one checked bundle, loaded by import_event"| STDB["SpacetimeDB: live state, every write"]
   STDB -->|"2. copy: findable rows, one way, by bandit-indexer"| ES
   ES -->|"3. order: ranked ids for the recap, through bandit-api, over candidates SpacetimeDB listed"| APP["Tap page"]
-  STDB <-->|"4. Insurance.md precedents: de-identified claim copy in, past-claim ids and scores back through a reducer"| ES
+  STDB <-->|"4. Insurance.md: insurance PDFs and the claim copy in, checked terms and matching clauses back through reducers"| ES
   STDB <-->|"live: subscriptions out, reducer calls in"| APP
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
@@ -267,7 +371,7 @@ The recap is the clearest example of the split:
 
 - Social.md: SpacetimeDB holds the people graph and the lists. `social_tick` writes `people_link` rows (`met`, `visited`, `works_at`, `exhibits`) in the same transaction as the encounter or visit they come from, so a new link reaches every screen by subscription at once.
 - Social.md: `my_graph` gives each caller only their own neighbourhood and `event_graph` gives the big screen the whole event with everyone's name, drawn in 3D with the event photos from the staff view `board_photos` among the people in them; only `findable` attendees get links. The recap's people come from `my_encounters` and its booths from `my_visits`.
-- Elastic.md: Elastic orders the lists. `bandit-people` holds each findable attendee's interests, built from their top booths, and `GET /recap/order` puts the people and booths closest to what the attendee was into first. It returns ids only, adds no one to the list and draws nothing on the graph.
+- Elastic.md: Elastic orders the lists. `bandit-people` holds each findable attendee's interests, built from their top booths, and `GET /api/recap` puts the people and booths closest to what the attendee was into first. It returns ids only, adds no one to the list and draws nothing on the graph.
 
 ### Which store answers which question
 
@@ -282,8 +386,8 @@ The line is drawn by the question: exact, live or transactional questions go to 
 | People and the links between them: who owns which band, who hung out with whom, whose socials a person may see | SpacetimeDB tables and views | exact rows that reducers write and views read by key under consent; Elastic only ever orders a findable copy |
 | Consent and access: who may see a card, a tag, a memory | SpacetimeDB views and reducers | enforced by the module on every read; an app or index bug cannot widen it |
 | Elastic.md: organizing scraped data before the import | Elastic (raw indices, fixed `LOOKUP JOIN` steps, the Elastic Agent Builder agent, `bandit-bundles`) | exact joins and fuzzy entity resolution across messy sources are search work; the result is still loaded by a reducer |
-| Elastic.md: "of the people I hung out with, who is most into the same things as me" | Elastic (`bandit-people`, `bandit-booths`) through `GET /recap/order` | ordering by meaning over candidates SpacetimeDB listed; there is no typed search |
-| Elastic.md, Insurance.md: "which past claims look like this one" | Elastic (`bandit-claims`) | ranking by meaning over a de-identified copy against 30 seeded past claims; the ids and scores come back as checks through a reducer and never change an amount |
+| Elastic.md: "of the people I hung out with, who is most into the same things as me" | Elastic (`bandit-people`, `bandit-booths`) through `GET /api/recap` | ordering by meaning over candidates SpacetimeDB listed; there is no typed search |
+| Elastic.md, Insurance.md: "what do the venue's and the attendee's policies say about this claim" | Elastic (`bandit-policy-clauses`, next to build) | search by meaning over the policies' own wording; the clauses come back through a reducer or to Claude's tools and never set an amount |
 | Files: photos, PDFs, letters | the blob store in `/var/lib/bandit`, with a `blob_ref` row | big bytes stay out of rows and subscriptions; the access class is still decided in the module |
 
 ### Deployment
@@ -367,17 +471,9 @@ Tables with personal data are private. Clients read them only through views keye
 
 Social.md: one more people role, `photographer`, uploads booth photos.
 
-### Prize tracks and where they live
+### Sponsor tracks
 
-| Track | What BandIt shows | Main docs |
-|---|---|---|
-| SpacetimeDB | the whole live world in one module on SpacetimeDB Maincloud: reducers as transactions (an SOS incident, its snapshot and its light circle in one commit), subscriptions pushing every change to six kinds of clients, scheduled reducers that open incidents, sweep silent bands and turn stays into memories, identity from the SpacetimeDB SpacetimeAuth sign-in and per-caller views enforcing access, typed bindings for Rust and TypeScript | [SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](../6-features/Safety.md), [Gateway-Bridge](../3-services/Gateway-Bridge.md) |
-| Elastic.md: best use of Elastic Agent Builder on Serverless | an Elastic Agent Builder agent (`bandit-organizer`) run by Elastic Workflows with a schema per section, which resolves messy scraped records into one checked bundle before it loads into SpacetimeDB; each attendee's recap suggestions ordered by meaning; Insurance.md: similar past claims ranked for each claim; Elastic Kibana dashboards of every scrape pipeline run and of the event's sponsors and prizes, linked from the organizer portal's "Kibana" tab. Where people spent time and what they were into shows in each attendee's recap, ordered by meaning | [Elastic](../7-integrations/Elastic.md) |
-| Insurance.md: Hyphenate, autonomous systems for finance | The Decision Engine, which learns from the organizer: a band's fall becomes a claim; the Anthropic Claude API reads the urgent-care bill and code pays it against a fee schedule; the Anthropic Claude API explains causation; the organizer approves the first claim after the event, which teaches a rule, and the next similar claim settles in seconds under it; fakes are refused by code with every check listed. Behind it: evidence packs, coverage in code, fail-closed approvals, a ledger, the notice of loss in ACORD 3 layout and a scorecard from planted claims | [Insurance](../6-features/Insurance.md) |
-| Capital-One-Nessie.md: Capital One, best use of the Capital One Nessie API | a $200 Capital One Nessie sandbox wallet per attendee, merch bought from it with one tap after the event, and claim payouts into it | [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md) |
-| Merch.md: Visa, reimagining shopping | merch made from your own photo at the booths you loved, bought from your recap after the event | [Merch](../6-features/Merch.md) |
-| Social impact and real-world tracks | crowd density on every wrist, an exit marker at every exit in that exit's colour, the SOS light circle, low visibility; Medical-Card.md: medic access to the card from a tap on the band or from the incident desk | [Safety](../6-features/Safety.md), [Hardware](../4-devices/Hardware.md); Medical-Card.md |
-| (TBD -- LEO) Social impact, exit routing and the medic approach | each zone's bands sent to their nearest open door, and the crowd moved aside for a medic | [Safety](../6-features/Safety.md) |
+Each sponsor track's own words, mapped to the parts that answer them and where to see each part running, are in [Sponsor-Tracks](Sponsor-Tracks.md).
 
 ## Failure modes and fallbacks
 
@@ -389,8 +485,8 @@ The failures that can happen during the event, and the one answer to each. The f
 | Radio density readings flap in the taped square | Rings and the map disagree | An organizer turns on the override with `set_override` and drives the colours by hand with `force_state` from the SpacetimeDB command line, and the presenter says so ([Safety](../6-features/Safety.md)). |
 | A band reboots | It keeps its saved thresholds, RSSI and low visibility, but forgets its exit colour (back to blue), the override and any forced state | An organizer sends the exit colour again with `set_exit` from the SpacetimeDB command line ([Safety](../6-features/Safety.md)). |
 | A sign-in email is slow | A judge waits on the sign-in screen | The screen offers "Send again"; a judge already signed in on their phone stays signed in ([Tap-Page](../5-apps/Tap-Page.md)). |
-| Elastic.md: Elastic is unreachable during the event | The recap's suggestions are not ordered by meaning | The recap shows both lists by minutes together; Insurance.md: claims carry no precedent checks and decide the same way; nothing live reads Elastic ([Elastic](../7-integrations/Elastic.md)). |
-| Anthropic-Claude-API.md: the Anthropic Claude API is slow or refuses | A letter or card is late; Insurance.md: a bill is not read or a claim has no causation review | Each feature falls back without AI as its doc describes; Medical-Card.md: the card step shows "Check later" and setup goes on without a card; Insurance.md: staff type the bill lines and the claim goes to a person; nothing live waits on the Anthropic Claude API ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). |
+| Elastic.md: Elastic is unreachable during the event | The recap's suggestions are not ordered by meaning | The recap shows both lists by minutes together; Insurance.md: claims carry no validation check or clauses, and a decision that would rest on a clause goes to the organizer; nothing live reads Elastic ([Elastic](../7-integrations/Elastic.md)). |
+| Anthropic-Claude-API.md: the Anthropic Claude API is slow or refuses | A letter or card is late; Insurance.md: a claim is not investigated | Each feature falls back without AI as its doc describes; Medical-Card.md: the card step shows "Check later" and setup goes on without a card; Insurance.md: code decides the claim alone, so anything that needs judgment goes to a person; nothing live waits on the Anthropic Claude API ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). |
 | Capital-One-Nessie.md: the Capital One Nessie API is down | A wallet cannot open, and a merch order or a payout cannot settle | Each job retries without paying twice; a dead purchase fails the order and frees its money, so the attendee can buy again; a dead payout waits for `retry_claim_payout`; nothing else waits on the Capital One Nessie API ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)). |
 
 ## Dependencies
@@ -399,7 +495,7 @@ The failures that can happen during the event, and the one answer to each. The f
 
 **Used by:** [README](../README.md) points here first; [Flows](Flows.md) and every component doc refer here for the big picture.
 
-**If you delete a component:** remove its rows from the Interfaces, Data ownership, Which store answers which question, prize and failure tables above, its bullet in Deployment, its node from the diagrams, and its rows in [Flows](Flows.md). Core components (Hardware, Gateway-Bridge, SpacetimeDB, Safety, Organizer-Portal, Tap-Page, Rust-Backend) are not meant to be deleted.
+**If you delete a component:** remove its rows from the Interfaces, Data ownership, Which store answers which question and failure tables above, its row in [Sponsor-Tracks](Sponsor-Tracks.md), its bullet in Deployment, its node from the diagrams, and its rows in [Flows](Flows.md). Core components (Hardware, Gateway-Bridge, SpacetimeDB, Safety, Organizer-Portal, Tap-Page, Rust-Backend) are not meant to be deleted.
 
 ## Decisions
 

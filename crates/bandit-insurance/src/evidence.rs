@@ -17,13 +17,13 @@ pub struct IncidentInfo {
     /// The zone the incident was opened in; 0 when unzoned.
     pub zone_id: u64,
     /// The subject band; 0 for property incidents.
-    pub band_id: u8,
+    pub band_id: u32,
 }
 
 /// The subject band's report as frozen at incident open.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SubjectBand {
-    pub band_id: u8,
+    pub band_id: u32,
     pub state: u8,
     pub flags: u8,
     pub neigh: u8,
@@ -37,18 +37,18 @@ pub struct SnapshotInfo {
     pub snapshot_id: u64,
     pub taken_at: Micros,
     /// Online bands in the incident zone at open, ascending.
-    pub bands_present: Vec<u8>,
+    pub bands_present: Vec<u32>,
     /// Mean neighbour count of those bands: how crowded it was.
     pub neigh_mean: f32,
     /// Bands showing the light circle (state 4) at open, ascending.
-    pub circle_bands: Vec<u8>,
+    pub circle_bands: Vec<u32>,
     pub subject: Option<SubjectBand>,
 }
 
 /// A light-circle band recorded while the incident was open.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Witness {
-    pub band_id: u8,
+    pub band_id: u32,
     /// The witness band's zone when first seen in the circle; 0 when unzoned.
     pub zone_id: u64,
     /// Signal from the subject band as the witness heard it; 0 when unknown.
@@ -140,6 +140,23 @@ pub struct PolicyInfo {
     pub read_at: Micros,
 }
 
+/// The attendee staff named as having broken or taken it, and code's checks of that band.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ResponsibleInfo {
+    pub charge_id: u64,
+    pub band_id: u32,
+    pub name: String,
+    /// The staff role that named them, `ops` or `medic`.
+    pub named_by_role: String,
+    /// What staff wrote when they named them.
+    pub note: String,
+    pub named_at: Micros,
+    /// The band was in the incident's zone at the time.
+    pub in_zone: bool,
+    /// The band was one of the bands at the spot when the incident opened, within 10 m.
+    pub at_spot: bool,
+}
+
 /// Everything the evidence engine gathered for one claim.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EvidenceInput {
@@ -152,6 +169,8 @@ pub struct EvidenceInput {
     pub vision: Option<VisionInfo>,
     pub record: Option<RecordSummary>,
     pub policy: Option<PolicyInfo>,
+    #[serde(default)]
+    pub responsible: Option<ResponsibleInfo>,
 }
 
 impl EvidenceInput {
@@ -193,9 +212,13 @@ impl EvidenceInput {
 ///    `record_patient`, `record_provider`, `record_date_of_service`,
 ///    `record_diagnoses` (joined with `; `), `record_billed_cents` (all reader
 ///    model), then `record_covered_cents` and `record_sha256` (reader code).
-/// 10. `policy` (observed at `read_at`, reference `insurance_policy:{policy_id}`):
+/// 10. `policy` (observed at `read_at`, reference `insurance_policy:{policy_id}`,
+///     `attendee_policy:{policy_id}` for the attendee's own):
 ///     `policy_number`, `insurer`, `cover_kind`, `per_claim_limit_cents`,
 ///     `deductible_cents`, `aggregate_remaining_cents` (limit minus used, floored at 0).
+/// 11. `responsible_party` (observed at `named_at`, reference `charge:{charge_id}`):
+///     `responsible_band`, `responsible_name`, `named_by`, `naming_note`,
+///     `band_in_zone` and `band_at_spot` (`yes`/`no`).
 ///
 /// Missing optional inputs simply contribute no facts. Every fact not listed
 /// as model-read has reader `Code`.
@@ -286,13 +309,25 @@ pub fn build_facts(input: &EvidenceInput) -> Vec<Fact> {
     }
 
     if let Some(p) = &input.policy {
-        f.group(Source::Policy, p.read_at, format!("insurance_policy:{}", p.policy_id));
+        let table = if p.cover_kind.is_attendee_policy() { "attendee_policy" } else { "insurance_policy" };
+        f.group(Source::Policy, p.read_at, format!("{table}:{}", p.policy_id));
         f.code("policy_number", &p.policy_number);
         f.code("insurer", &p.insurer_name);
         f.code("cover_kind", p.cover_kind.as_str());
         f.code("per_claim_limit_cents", p.per_claim_limit_cents);
         f.code("deductible_cents", p.deductible_cents);
         f.code("aggregate_remaining_cents", p.aggregate_limit_cents.saturating_sub(p.aggregate_used_cents));
+    }
+
+    if let Some(r) = &input.responsible {
+        let yes = |b: bool| if b { "yes" } else { "no" };
+        f.group(Source::ResponsibleParty, r.named_at, format!("charge:{}", r.charge_id));
+        f.code("responsible_band", r.band_id);
+        f.code("responsible_name", &r.name);
+        f.code("named_by", &r.named_by_role);
+        f.code("naming_note", &r.note);
+        f.code("band_in_zone", yes(r.in_zone));
+        f.code("band_at_spot", yes(r.at_spot));
     }
 
     f.out
@@ -366,7 +401,7 @@ mod tests {
         micros_at(2026, 10, 24, h, m, s, PDT)
     }
 
-    fn witness(band_id: u8, rssi: i8, s: i64) -> Witness {
+    fn witness(band_id: u32, rssi: i8, s: i64) -> Witness {
         Witness { band_id, zone_id: 102, rssi, first_seen_at: at(22, 14, s), last_seen_at: at(22, 20, 0) }
     }
 
@@ -445,6 +480,7 @@ mod tests {
                 deductible_cents: 0,
                 read_at: at(22, 31, 0),
             }),
+            responsible: None,
         }
     }
 
@@ -552,6 +588,7 @@ mod tests {
             vision: None,
             record: None,
             policy: None,
+            responsible: None,
         };
         let facts = build_facts(&input);
         let lines: Vec<(u32, &str, &str)> = facts.iter().map(|f| (f.seq, f.key.as_str(), f.value.as_str())).collect();

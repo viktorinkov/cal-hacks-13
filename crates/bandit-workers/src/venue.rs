@@ -16,15 +16,13 @@ use reqwest::Url;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use crate::brightdata::{BrightData, err, urls_in};
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::ask_twice;
 use crate::sink::Finish;
 
 pub const KIND: &str = "venue_setup";
 
-const MCP_URL: &str = "https://mcp.brightdata.com/mcp";
-const MCP_PROTOCOL: &str = "2025-06-18";
-const UNLOCKER_URL: &str = "https://api.brightdata.com/request";
 /// Pages read per round, rounds of reading, links kept per page, and 3D maps tried.
 const PAGES: usize = 6;
 const ROUNDS: usize = 2;
@@ -38,106 +36,6 @@ const CAPTURE_TIMEOUT: Duration = Duration::from_secs(420);
 pub struct Payload {
     pub setup_id: u64,
     pub event_name: String,
-}
-
-// --- Bright Data -----------------------------------------------------------------------------
-
-struct BrightData {
-    http: reqwest::Client,
-    token: String,
-    zone: String,
-    session: String,
-}
-
-fn env(key: &str) -> Result<String, JobError> {
-    std::env::var(key)
-        .ok()
-        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
-        .filter(|v| !v.is_empty())
-        .ok_or_else(|| JobError::msg(format!("{key} is not set")))
-}
-
-fn err(what: &str, e: impl std::fmt::Display) -> JobError {
-    JobError::msg(format!("{what}: {e}"))
-}
-
-impl BrightData {
-    /// Opens a session on Bright Data's MCP server for the searches.
-    async fn connect() -> Result<Self, JobError> {
-        let http = reqwest::Client::builder().timeout(Duration::from_secs(300)).build().map_err(|e| err("HTTP client", e))?;
-        let mut bd = BrightData { http, token: env("BRIGHTDATA_API_TOKEN")?, zone: env("BRIGHTDATA_ZONE")?, session: String::new() };
-        let init = json!({
-            "jsonrpc": "2.0", "id": 1, "method": "initialize",
-            "params": {"protocolVersion": MCP_PROTOCOL, "capabilities": {}, "clientInfo": {"name": "bandit-workers", "version": "0.1.0"}}
-        });
-        let res = bd.mcp(&init).await?;
-        bd.session = res
-            .headers()
-            .get("mcp-session-id")
-            .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| JobError::msg("Bright Data sent no mcp-session-id"))?
-            .to_string();
-        bd.mcp(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).await?;
-        Ok(bd)
-    }
-
-    async fn mcp(&self, body: &Value) -> Result<reqwest::Response, JobError> {
-        let mut req = self
-            .http
-            .post(format!("{MCP_URL}?token={}", self.token))
-            .header("Accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", MCP_PROTOCOL)
-            .json(body);
-        if !self.session.is_empty() {
-            req = req.header("mcp-session-id", &self.session);
-        }
-        let res = req.send().await.map_err(|e| err("Bright Data MCP", e))?;
-        res.error_for_status().map_err(|e| err("Bright Data MCP", e))
-    }
-
-    /// Google results for `query`, from the search tool of Bright Data's MCP server.
-    async fn search(&self, query: &str) -> Result<String, JobError> {
-        let body = json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "search_engine", "arguments": {"query": query}}});
-        let sse = self.mcp(&body).await?.text().await.map_err(|e| err("Bright Data search", e))?;
-        let data = sse.lines().filter_map(|l| l.strip_prefix("data:")).last().ok_or_else(|| JobError::msg("Bright Data search: no data line"))?;
-        let msg: Value = serde_json::from_str(data).map_err(|e| err("Bright Data search", e))?;
-        if let Some(e) = msg.get("error") {
-            return Err(err("Bright Data search", e));
-        }
-        let text: Vec<&str> = msg["result"]["content"].as_array().into_iter().flatten().filter_map(|c| c["text"].as_str()).collect();
-        if msg["result"]["isError"] == true {
-            return Err(err("Bright Data search", text.join(" ")));
-        }
-        Ok(untrusted_body(&text.join("\n")))
-    }
-
-    /// A page's HTML through the Web Unlocker.
-    async fn page(&self, url: &str) -> Result<String, String> {
-        let res = self
-            .http
-            .post(UNLOCKER_URL)
-            .bearer_auth(&self.token)
-            .json(&json!({"zone": self.zone, "url": url, "format": "raw"}))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let status = res.status();
-        let site = res.headers().get("x-brd-status-code").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
-        let body = res.text().await.map_err(|e| e.to_string())?;
-        if !status.is_success() || !(site.is_empty() || site.starts_with('2')) {
-            return Err(format!("Bright Data answered {status}, the site {}", if site.is_empty() { "?" } else { &site }));
-        }
-        Ok(body)
-    }
-}
-
-/// The text between the MCP server's untrusted-content markers, or all of it.
-fn untrusted_body(text: &str) -> String {
-    static BEGIN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"=====UNTRUSTED_([0-9a-f]+)_BEGIN=====\n").unwrap());
-    let Some(m) = BEGIN.captures(text) else { return text.to_string() };
-    let start = m.get(0).unwrap().end();
-    let end = text.rfind(&format!("\n=====UNTRUSTED_{}_END=====", &m[1])).unwrap_or(text.len());
-    text[start..end].to_string()
 }
 
 // --- Pages -----------------------------------------------------------------------------------
@@ -243,12 +141,6 @@ fn read_page(url: &str, html: &str) -> Page {
         excerpt: chars(&clean(&body), EXCERPT_CHARS),
         links,
     }
-}
-
-/// Every web address in `text`.
-fn urls_in(text: &str) -> HashSet<String> {
-    static URL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"https?://[^\s"'<>()\[\]{}|\\^`]+"#).unwrap());
-    URL.find_iter(text).map(|m| m.as_str().trim_end_matches(['.', ',', ';', ':', '*']).to_string()).collect()
 }
 
 /// An address without its scheme and trailing slash, for the steps the organizer reads.
@@ -617,12 +509,5 @@ mod tests {
         assert!(check_found(&made_up, &urls).unwrap_err()[0].contains("https://calhacks.io/map"));
         let maps = json!({"maps": [{"url": "https://hive.hackberkeley.org/venue-map", "why": "3D"}], "floor_plans": [], "sources": [], "next_pages": []});
         assert_eq!(check_maps(&maps, &urls).unwrap().maps[0].0, "https://hive.hackberkeley.org/venue-map");
-    }
-
-    #[test]
-    fn keeps_the_text_between_the_untrusted_markers() {
-        let text = "note\n=====UNTRUSTED_ab12_BEGIN=====\nresults\n=====UNTRUSTED_ab12_END=====\nmore";
-        assert_eq!(untrusted_body(text), "results");
-        assert_eq!(untrusted_body("plain"), "plain");
     }
 }

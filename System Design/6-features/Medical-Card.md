@@ -1,6 +1,6 @@
 # Medical card
 
-The medical card is the attendee's own health information, the "Wrist assured" card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker sends each to the Anthropic Claude API, which returns the card fields with the page each item came from.
+The medical card is the attendee's own health information, the "Wrist assured" card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker sends each to the Anthropic Claude API, which returns the card fields with the page each item came from. In the design, The Evidence Engine reads the insurance card instead, like every insurance document, because the attendee's own policy is the other insurance on their claim (next to build, [Insurance](Insurance.md#reading-the-insurance-documents-next-to-build)).
 
 Code checks the answer and writes it into the attendee's one `medical_card`, which the attendee checks once before setup ends. A medic sees the card by tapping the attendee's band with their phone, or from the incident desk in the organizer portal (/organizer), and every tap is written to `medical_access_log`.
 
@@ -23,7 +23,7 @@ Non-responsibilities:
 - The setup screens, their order and the tap's landing route: [Tap-Page](../5-apps/Tap-Page.md). This file defines what the upload, document and card steps and the medic view call and show.
 - The incident desk and its layout: [Organizer-Portal](../5-apps/Organizer-Portal.md). This file defines what the medical card part calls and shows.
 - The blob store and the upload route: [Rust-Backend](../3-services/Rust-Backend.md).
-- The venue's insurance policy and claims: [Insurance](Insurance.md). The health insurance on the card is the attendee's own, and Insurance never reads the card.
+- The venue's insurance policy and claims: [Insurance](Insurance.md). The health insurance on the card is the attendee's own policy. A claim the attendee filed uses its insurer, member id, copays and clauses, read by The Evidence Engine (next to build); Insurance never reads the medical history.
 - Calling the Anthropic Claude API, `ask_twice`, recording in `model_call`: [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md).
 
 ## Interfaces
@@ -56,6 +56,10 @@ The page then calls `submit_medical_document(kind, file_hash, page_count)` as th
 A new upload is a new document; when it is read, its fields overwrite that kind's fields on the card.
 
 In test mode each upload step also has "Use a test record". It loads the synthetic `medical-history.pdf` or `insurance-card.pdf` from `bandit-api`'s `/test-records` route and files it the same way.
+
+"Your health insurance" also has "Name your plan instead". The attendee types their insurer, plan and state, and `look_up_plan` with kind `health` finds the plan's Summary of Benefits and Coverage on the web through Bright Data ([Bright-Data](../7-integrations/Bright-Data.md)). The step shows "Looking up your plan" until `my_plan_lookups` says `found` or `not_found`; on `not_found` it offers the upload again.
+
+A found plan fills the card's `insurer` and `plan` when they are empty, and its clauses become the attendee's health plan for their claims ([Insurance](Insurance.md)). The card shows "Plan found online" with the document's title instead of a page, and `member_id` stays empty until a card is uploaded.
 
 Only the attendee's own `my_medical_documents` shows the file hash. Only a medic sees the card, after their own tap, and no staff member sees the PDF.
 

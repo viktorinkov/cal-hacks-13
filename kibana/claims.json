@@ -1,0 +1,291 @@
+{
+  "title": "BandIt claims evidence",
+  "description": "The copy of every claim's evidence that BandIt's claims flow sends to Elastic, with no names: validated on the way in by the bandit-claims-validate ingest pipeline, and the query for the clauses of the venue's and the attendee's policies that bear on the claim. SpacetimeDB holds the claims themselves and decides the money.",
+  "time_range": {
+    "from": "now-7d",
+    "to": "now+1d"
+  },
+  "panels": [
+    {
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 14
+      },
+      "type": "markdown",
+      "config": {
+        "content": "## Claims evidence\n\nEach claim's evidence pack lands here as a copy with no names and no free text: the incident type, the cover, codes, amounts, the kind of item and its value, zone, time and a sentence written by code.\n\n- **Validated** on the way in by the `bandit-claims-validate` ingest pipeline; the result goes back to the claim as the `elastic_validation` check\n- **Matched by meaning** (`semantic_text`) against the clauses of the venue's policy and the attendee's own policy; the closest go back to the claim as its policy clauses\n- Neither changes an amount: SpacetimeDB decides the money"
+      }
+    },
+    {
+      "grid": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Claims tonight",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE source == \"live\" | STATS claims = COUNT_DISTINCT(claim_id)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "claims"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 0,
+        "w": 8,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Claims with a person named",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE source == \"live\" AND responsible_named == true | STATS claims = COUNT_DISTINCT(claim_id)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "claims"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 32,
+        "y": 0,
+        "w": 8,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Evidence failing validation",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE validation.valid == false | STATS invalid = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "invalid"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 40,
+        "y": 0,
+        "w": 8,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Paid tonight (USD)",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE source == \"live\" AND outcome IN (\"auto_settled\", \"approved\") | STATS paid = ROUND(SUM(payout_cents) / 100.0, 2)"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "paid"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 14,
+        "w": 48,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Tonight's claims as Elastic holds them",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE source == \"live\" | EVAL outcome = CASE(outcome == \"\" OR outcome IS NULL, \"open\", outcome), valid = CASE(validation.valid, \"valid\", \"flagged\"), payout = ROUND(payout_cents / 100.0, 2), item = COALESCE(item_kind, \"\"), named = CASE(responsible_named, \"yes\", \"no\") | STATS payout = MAX(payout) BY claim = claim_id, pack = pack_version, incident = incident_kind, cover = cover_kind, item, zone = zone_name, corroboration, witnesses = witness_count, named, valid, outcome | SORT claim DESC, pack DESC | LIMIT 100"
+        },
+        "rows": [
+          {
+            "column": "claim"
+          },
+          {
+            "column": "pack"
+          },
+          {
+            "column": "incident"
+          },
+          {
+            "column": "cover"
+          },
+          {
+            "column": "item"
+          },
+          {
+            "column": "zone"
+          },
+          {
+            "column": "corroboration"
+          },
+          {
+            "column": "witnesses"
+          },
+          {
+            "column": "named"
+          },
+          {
+            "column": "valid"
+          },
+          {
+            "column": "outcome"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "payout"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Outcomes tonight",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-claims | WHERE source == \"live\" | EVAL outcome = CASE(outcome == \"\" OR outcome IS NULL, \"open\", outcome) | STATS claims = COUNT_DISTINCT(claim_id) BY outcome | SORT outcome"
+            },
+            "x": {
+              "column": "outcome"
+            },
+            "y": [
+              {
+                "column": "claims"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 28,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Incident types tonight",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-claims | WHERE source == \"live\" | STATS claims = COUNT_DISTINCT(claim_id) BY incident = incident_kind | SORT incident"
+            },
+            "x": {
+              "column": "incident"
+            },
+            "y": [
+              {
+                "column": "claims"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Paid tonight by zone (USD)",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-claims | WHERE source == \"live\" AND outcome IN (\"auto_settled\", \"approved\") | STATS payout = ROUND(SUM(payout_cents) / 100.0, 2) BY zone_name | SORT payout DESC | LIMIT 10"
+            },
+            "x": {
+              "column": "zone_name"
+            },
+            "y": [
+              {
+                "column": "payout"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 42,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Validation on the way in",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-claims | WHERE source == \"live\" | EVAL result = CASE(validation.valid, \"valid\", \"flagged\"), errors = COALESCE(MV_CONCAT(validation.errors, \", \"), \"none\") | STATS docs = COUNT() BY result, errors | SORT result"
+        },
+        "rows": [
+          {
+            "column": "result"
+          },
+          {
+            "column": "errors"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "docs"
+          }
+        ]
+      }
+    }
+  ]
+}

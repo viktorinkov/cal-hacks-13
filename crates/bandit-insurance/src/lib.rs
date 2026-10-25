@@ -5,12 +5,16 @@
 //! claim can be re-run by hand: the evidence pack hash, the corroboration
 //! checks, the coverage arithmetic, the route and the ledger postings.
 //!
-//! The model reads documents and writes words; this crate decides money,
-//! coverage and routing.
+//! Claude reads the documents, investigates each claim and decides it; this
+//! crate decides money and coverage, and holds Claude's decision to the
+//! limits a person set (see `decision`).
 
+pub mod clinic;
+pub mod complications;
 pub mod config;
 pub mod corroboration;
 pub mod coverage;
+pub mod decision;
 pub mod evidence;
 pub mod fee_schedule;
 pub mod ledger;
@@ -20,7 +24,7 @@ pub mod money;
 pub mod outcome;
 pub mod pack;
 pub mod payloads;
-pub mod review;
+pub mod policy;
 pub mod rules;
 pub mod schemas;
 pub mod time;

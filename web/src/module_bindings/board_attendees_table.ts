@@ -25,4 +25,5 @@ export default __t.row({
     return __t.array(HandleOut);
   },
   createdAt: __t.timestamp().name("created_at"),
+  role: __t.string(),
 });

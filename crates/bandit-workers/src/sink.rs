@@ -15,15 +15,22 @@ use crate::model::new_call;
 #[derive(Clone, Debug)]
 pub enum Finish {
     MedicalRecord { record_json: String },
-    ClaimChecks { checks: Vec<CheckIn>, precedents: Vec<PrecedentIn> },
+    ClaimChecks { checks: Vec<CheckIn>, clauses: Vec<ClauseIn> },
     ClaimReview { review_json: String },
     ClaimLetters { fnol_hash: String, summary_hash: String, determination_hash: String },
     RecoveryLetter { hash: String },
     ClaimPayout { customer_id: String, account_id: String, deposit_id: String },
     WalletOpened { customer_id: String, account_id: String },
     MerchPaid { merchant_id: String, purchase_id: String },
+    ChargePaid { customer_id: String, account_id: String, purchase_id: String, refund_customer_id: String, refund_account_id: String, refund_deposit_id: String },
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
+    PlanLookup { result: PlanLookupResult },
+    ClinicReport { record_json: String, file_hash: String },
+    PhotoFeatures { people_count: u32, caption: String },
+    MerchPicks { picks: Vec<MerchPickIn> },
+    DocumentTerms { read_json: String, pages: Vec<String> },
+    RuleProposal { proposal_json: String },
 }
 
 pub enum Sink {
@@ -69,13 +76,13 @@ macro_rules! reduce {
 pub(crate) use reduce;
 
 impl Sink {
-    /// Registers a letter blob the handler stored.
-    pub async fn register_letter(&self, blob: &BlobInfo) -> Result<()> {
+    /// Registers a text blob the handler stored (a letter or a hospital report) for staff.
+    pub async fn register_text(&self, blob: &BlobInfo, purpose: &str) -> Result<()> {
         let (hash, size) = (blob.sha256.clone(), blob.size_bytes);
         match self {
-            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), "letter".into(), "text/plain".into(), size)),
+            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), purpose.into(), "text/plain".into(), size)),
             Sink::Print => {
-                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": "letter", "content_type": "text/plain", "size_bytes": size}));
+                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": purpose, "content_type": "text/plain", "size_bytes": size}));
                 Ok(())
             }
         }
@@ -104,11 +111,23 @@ impl Sink {
         }
     }
 
+    /// Reports a step of a claim's investigation, so the decision history shows it as it happens.
+    pub async fn claim_step(&self, job_id: u64, step: &bandit_insurance::decision::Step) -> Result<()> {
+        let (actor, what, why) = (step.actor.clone(), step.summary.clone(), step.detail.clone());
+        match self {
+            Sink::Db(conn) => reduce!(conn, report_claim_step_then(job_id, actor, what, why)),
+            Sink::Print => {
+                print_call("report_claim_step", json!({"job_id": job_id, "actor": actor, "what": what, "why": why}));
+                Ok(())
+            }
+        }
+    }
+
     /// Calls the result reducer. The last call record goes with it; earlier
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
-        // The venue setup reducer takes no call record, so its last call is recorded too.
-        let last = if matches!(finish, Finish::VenueSetup { .. }) { None } else { calls.pop() };
+        // The venue setup and document reducers take no call record, so their last call is recorded too.
+        let last = if matches!(finish, Finish::VenueSetup { .. } | Finish::DocumentTerms { .. }) { None } else { calls.pop() };
         for call in calls {
             self.record_call(call).await?;
         }
@@ -119,7 +138,7 @@ impl Sink {
         let required = || last.clone().unwrap_or_else(|| new_call("none"));
         match finish {
             Finish::MedicalRecord { record_json } => reduce!(conn, apply_medical_record_then(job_id, record_json, required())),
-            Finish::ClaimChecks { checks, precedents } => reduce!(conn, submit_claim_checks_then(job_id, checks, precedents)),
+            Finish::ClaimChecks { checks, clauses } => reduce!(conn, submit_claim_checks_then(job_id, checks, clauses)),
             Finish::ClaimReview { review_json } => reduce!(conn, submit_claim_review_then(job_id, review_json, required())),
             Finish::ClaimLetters { fnol_hash, summary_hash, determination_hash } => {
                 reduce!(conn, attach_claim_letters_then(job_id, fnol_hash, summary_hash, determination_hash, last))
@@ -130,8 +149,17 @@ impl Sink {
             }
             Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
+            Finish::ChargePaid { customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id } => {
+                reduce!(conn, record_charge_payment_then(job_id, customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id))
+            }
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
+            Finish::PlanLookup { result } => reduce!(conn, finish_plan_lookup_then(job_id, result, last)),
+            Finish::ClinicReport { record_json, file_hash } => reduce!(conn, file_clinic_report_then(job_id, record_json, file_hash, required())),
+            Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
+            Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
+            Finish::DocumentTerms { read_json, pages } => reduce!(conn, apply_document_terms_then(job_id, read_json, pages)),
+            Finish::RuleProposal { proposal_json } => reduce!(conn, submit_rule_proposal_then(job_id, proposal_json, required())),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -181,11 +209,11 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
     let call = call.map(call_json);
     let (reducer, args) = match finish {
         Finish::MedicalRecord { record_json } => ("apply_medical_record", json!({"record_json": parse_or_text(record_json), "call": call})),
-        Finish::ClaimChecks { checks, precedents } => (
+        Finish::ClaimChecks { checks, clauses } => (
             "submit_claim_checks",
             json!({
                 "checks": checks.iter().map(|c| json!({"name": c.name, "result": c.result, "detail": c.detail})).collect::<Vec<_>>(),
-                "precedents": precedents.iter().map(|p| json!({"reference": p.reference, "outcome": p.outcome, "payout_cents": p.payout_cents, "narrative": p.narrative, "score": p.score})).collect::<Vec<_>>(),
+                "clauses": clauses.iter().map(|c| json!({"clause_id": c.clause_id, "policy": c.policy, "section": c.section, "page": c.page, "text": c.text, "score": c.score})).collect::<Vec<_>>(),
             }),
         ),
         Finish::ClaimReview { review_json } => ("submit_claim_review", json!({"review_json": parse_or_text(review_json), "call": call})),
@@ -199,7 +227,17 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         }
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
+        Finish::ChargePaid { customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id } => (
+            "record_charge_payment",
+            json!({
+                "customer_id": customer_id, "account_id": account_id, "purchase_id": purchase_id,
+                "refund_customer_id": refund_customer_id, "refund_account_id": refund_account_id, "refund_deposit_id": refund_deposit_id
+            }),
+        ),
         Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
+        Finish::ClinicReport { record_json, file_hash } => {
+            ("file_clinic_report", json!({"record_json": parse_or_text(record_json), "file_hash": file_hash, "call": call}))
+        }
         Finish::VenueSetup { result: r } => (
             "finish_venue_setup",
             json!({
@@ -209,6 +247,23 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
                 "floor_plans": r.floor_plans, "sources": r.sources.iter().map(|f| json!({"label": f.label, "value": f.value})).collect::<Vec<_>>(),
             }),
         ),
+        Finish::PlanLookup { result: r } => (
+            "finish_plan_lookup",
+            json!({
+                "status": r.status, "source_url": r.source_url, "printed_insurer": r.printed_insurer, "printed_plan": r.printed_plan,
+                "plan_year": r.plan_year, "file_hash": r.file_hash, "size_bytes": r.size_bytes, "page_count": r.page_count, "note": r.note, "call": call,
+            }),
+        ),
+        Finish::PhotoFeatures { people_count, caption } => ("submit_photo_features", json!({"people_count": people_count, "caption": caption, "call": call})),
+        Finish::MerchPicks { picks } => (
+            "submit_merch_picks",
+            json!({
+                "picks": picks.iter().map(|p| json!({"template_id": p.template_id, "photo_id": p.photo_id, "line": p.line, "reason": p.reason})).collect::<Vec<_>>(),
+                "call": call,
+            }),
+        ),
+        Finish::DocumentTerms { read_json, pages } => ("apply_document_terms", json!({"read_json": parse_or_text(read_json), "pages": pages})),
+        Finish::RuleProposal { proposal_json } => ("submit_rule_proposal", json!({"proposal_json": parse_or_text(proposal_json), "call": call})),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);

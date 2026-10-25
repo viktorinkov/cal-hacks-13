@@ -79,24 +79,14 @@ fn error(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>
 
 type ApiResult<T> = Result<T, (StatusCode, Json<Value>)>;
 
-/// Where the pages connect: the WebSocket form of the SpacetimeDB URL, and the Kibana dashboards.
+/// Where the pages connect: the WebSocket form of the SpacetimeDB URL, and Kibana for the Kibana tab.
 async fn config(State(app): AppState) -> Json<Value> {
     let w = &app.web;
     let ws = w.spacetimedb_url.replacen("https://", "wss://", 1).replacen("http://", "ws://", 1);
-    let kibana = w.kibana_url.trim_end_matches('/');
-    let dashboards: Vec<Value> = [
-        ("Scrape pipeline", "bandit-pipeline-calhacks-13"),
-        ("Sponsors and prizes", "bandit-event-calhacks-13"),
-        ("Claims", "bandit-claims"),
-    ]
-    .iter()
-    .map(|(title, id)| json!({ "title": title, "url": format!("{kibana}/app/dashboards#/view/{id}") }))
-    .collect();
     Json(json!({
         "spacetimedb_url": ws,
         "database": w.database,
-        "kibana_url": kibana,
-        "dashboards": dashboards,
+        "kibana_url": w.kibana_url.trim_end_matches('/'),
         "auth_client_id": w.auth_client_id,
         "test_mode": w.test_mode,
     }))
@@ -129,36 +119,21 @@ async fn recap(State(app): AppState, headers: HeaderMap) -> ApiResult<Json<crate
 
 #[derive(Deserialize)]
 struct UploadQuery {
-    /// `medical` (a clinic bill the medic files), `photo`, or the attendee's own `history` or
-    /// `insurance` PDF, which needs their session and stays theirs.
+    /// `medical` (a clinic bill the medic files), `policy` (the venue's insurance policy the
+    /// organizer uploads), `photo`, or the attendee's own `history` or `insurance` PDF, which
+    /// needs their session and stays theirs.
     purpose: String,
 }
 
-/// PDF pages, counted the way the claims CLI counts them.
-fn count_pages(pdf: &[u8]) -> u32 {
-    let mut n = 0;
-    let mut i = 0;
-    while let Some(at) = pdf[i..].windows(5).position(|w| w == b"/Type") {
-        let mut j = i + at + 5;
-        while j < pdf.len() && pdf[j].is_ascii_whitespace() {
-            j += 1;
-        }
-        if pdf[j..].starts_with(b"/Page") && !pdf.get(j + 5).is_some_and(|c| c.is_ascii_alphanumeric()) {
-            n += 1;
-        }
-        i = j;
-    }
-    n.max(1)
-}
-
 /// Stores the file in the blob store and registers it, so the page can file it on a claim
-/// (medical), register it as an event photo (photo), or file it on the attendee's medical card.
+/// (medical), read it as the venue's policy (policy), register it as an event photo (photo), or
+/// file it on the attendee's medical card.
 async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: HeaderMap, body: Bytes) -> ApiResult<Json<Value>> {
     let (access, default_type, owner) = match q.purpose.as_str() {
-        "medical" => ("staff", "application/pdf", None),
+        "medical" | "policy" => ("staff", "application/pdf", None),
         "photo" => ("shared", "image/jpeg", None),
         "history" | "insurance" => ("owner_only", "application/pdf", Some(session_identity(&app, &headers)?)),
-        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical, photo, history or insurance")),
+        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical, policy, photo, history or insurance")),
     };
     if body.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "empty file"));
@@ -179,7 +154,7 @@ async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: Hea
     rx.await
         .map_err(|e| error(StatusCode::BAD_GATEWAY, e))?
         .map_err(|e| error(StatusCode::BAD_GATEWAY, format!("register_blob: {e}")))?;
-    let pages = if content_type == "application/pdf" { count_pages(&body) } else { 0 };
+    let pages = if content_type == "application/pdf" { bandit_common::count_pages(&body) } else { 0 };
     Ok(Json(json!({
         "hash": blob.sha256,
         "size_bytes": blob.size_bytes,
@@ -200,6 +175,11 @@ async fn blob(State(app): AppState, Path(hash): Path<String>) -> Response {
                 "model/gltf-binary"
             } else if bytes.starts_with(b"{") || bytes.starts_with(b"[") {
                 "application/json"
+            } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
+                "image/svg+xml"
+            } else if std::str::from_utf8(&bytes).is_ok() {
+                // Letters and hospital reports.
+                "text/plain; charset=utf-8"
             } else {
                 "image/jpeg"
             };

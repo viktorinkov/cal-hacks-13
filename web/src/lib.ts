@@ -4,14 +4,13 @@
 
 import { Identity, Timestamp } from 'spacetimedb';
 import { DbConnection } from './module_bindings';
-import type { MedicCard } from './module_bindings/types';
+import type { Band, MedicCard } from './module_bindings/types';
 import { bandCode } from './band-code';
 
 export type Config = {
   spacetimedb_url: string;
   database: string;
   kibana_url: string;
-  dashboards: { title: string; url: string }[];
   auth_client_id: string;
   test_mode: boolean;
 };
@@ -55,7 +54,7 @@ export function idToken(): string | undefined {
 }
 
 export function signedInEmail(): string {
-  const token = idToken();
+  const token = viewing() ? undefined : idToken();
   return token ? jwtClaims(token).email ?? '' : '';
 }
 
@@ -130,27 +129,51 @@ export async function playedToken(): Promise<string | undefined> {
   return (await actors()).find(a => a.name === as)?.token;
 }
 
+// --- View as -------------------------------------------------------------------------------
+
+/** The person the owner's View as tab shows this page for (`?view=<identity>`), else ''. */
+export function viewing(): string {
+  return new URLSearchParams(location.search).get('view') ?? '';
+}
+
+/**
+ * Points this page's viewer, a fresh identity kept for the browser tab, at the person through the
+ * nearest owner page around it (see view-as.ts): the module then answers every view for them.
+ */
+async function pointViewer(viewer: string, person: string): Promise<void> {
+  let w: Window = window.parent;
+  while (!(w as any).banditViewAs && w !== w.parent) w = w.parent;
+  const viewAs = (w as any).banditViewAs;
+  if (!viewAs) throw new Error("Open this page from the organizer portal's View as tab.");
+  await viewAs(viewer, person);
+}
+
 // --- Connection -----------------------------------------------------------------------------
 
 /**
  * Connects as the played person, else the signed-in person, else the identity kept in this
  * browser, and resolves once `queries` have arrived. `onChange` runs after every change to them.
+ * In the View as frame it connects as the tab's viewer instead, read-only.
  */
 export async function connect(queries: string[], onChange: () => void): Promise<DbConnection> {
   const cfg = await config();
   const played = await playedToken();
+  const view = viewing();
   // One kept identity per database, so a local test run never clashes with Maincloud.
   const storeKey = `bandit-token:${cfg.database}`;
+  const viewerKey = `bandit-viewer:${cfg.database}`;
   const stored = localStorage.getItem(storeKey) ?? localStorage.getItem('bandit-token') ?? undefined;
-  const token = played ?? idToken() ?? stored;
+  const token = view ? sessionStorage.getItem(viewerKey) ?? undefined : played ?? idToken() ?? stored;
+  if (view) document.body.classList.add('viewing');
   const open = (token: string | undefined) => new Promise<DbConnection>((resolve, reject) => {
     DbConnection.builder()
       .withUri(cfg.spacetimedb_url)
       .withDatabaseName(cfg.database)
       .withToken(token)
-      .onConnect((c, _identity, newToken) => {
-        if (!played && !idToken()) localStorage.setItem(storeKey, newToken);
-        c.subscriptionBuilder()
+      .onConnect((c, identity, newToken) => {
+        if (view) sessionStorage.setItem(viewerKey, newToken);
+        else if (!played && !idToken()) localStorage.setItem(storeKey, newToken);
+        const subscribe = () => c.subscriptionBuilder()
           .onApplied(() => {
             watch(c, onChange);
             (window as any).bandit = c;
@@ -159,8 +182,12 @@ export async function connect(queries: string[], onChange: () => void): Promise<
           })
           .onError(ctx => reject((ctx as any).event ?? new Error('subscription failed')))
           .subscribe(queries);
+        if (view) pointViewer(identity.toHexString(), view).then(subscribe, reject);
+        else subscribe();
       })
       .onConnectError((_ctx, e) => reject(e))
+      // A lost connection (a module update, a network drop) never comes back on its own: the page reloads.
+      .onDisconnect(() => setTimeout(() => location.reload(), 3000))
       .build();
   });
   try {
@@ -198,6 +225,22 @@ function watch(conn: DbConnection, onChange: () => void) {
       table.onUpdate?.(kick);
     }
   }
+}
+
+/** The bands by id, kept in step with the table: the SDK's `band.id.find` walks every row, and with a crowd of a
+ *  thousand the pages look bands up thousands of times per redraw. */
+const bandMaps = new WeakMap<DbConnection, Map<number, Band>>();
+
+export function bandById(conn: DbConnection, id: number): Band | undefined {
+  let bands = bandMaps.get(conn);
+  if (!bands) {
+    const m = new Map([...conn.db.band.iter()].map(b => [b.id, b]));
+    conn.db.band.onInsert((_ctx, b) => m.set(b.id, b));
+    conn.db.band.onUpdate((_ctx, _old, b) => m.set(b.id, b));
+    conn.db.band.onDelete((_ctx, b) => m.delete(b.id));
+    bandMaps.set(conn, bands = m);
+  }
+  return bands.get(id);
 }
 
 /** Opens a bandit-api session for this identity, so bandit-api knows who calls it. */
@@ -238,12 +281,54 @@ export function money(cents: bigint | number): string {
   return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** A claim with a gap or mismatch in the policies: the organizer decides it one by one, and it makes no rule proposal. */
+export function complicated(c: { statusNote: string }): boolean {
+  return c.statusNote.startsWith('Complication');
+}
+
 export function time(t: Timestamp | undefined): string {
   return t ? t.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 }
 
 export function date(t: Timestamp | undefined): string {
   return t ? t.toDate().toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+/** Each incident kind in a few words, for staff screens. */
+const KIND_WORDS: Record<string, string> = {
+  sos: 'SOS',
+  fall: 'fall',
+  property: 'venue equipment broken',
+  theft: "an attendee's belonging stolen",
+  breakage: "an attendee's belonging broken",
+};
+
+/** An incident kind (`theft`, or an enum tag like `Theft`) in words. */
+export function kindWords(kind: string): string {
+  return KIND_WORDS[kind.toLowerCase()] ?? kind;
+}
+
+/** Something was broken or taken: staff can name who did it, and that attendee can be charged. */
+export function isLoss(kind: string): boolean {
+  return ['property', 'theft', 'breakage'].includes(kind.toLowerCase());
+}
+
+const ROLE_WORDS: Record<string, string> = {
+  hacker: 'hacker',
+  booth_staff: 'booth staff',
+  organizer: 'organizer',
+  photographer: 'photographer',
+  speaker: 'speaker',
+  attendee: 'attendee',
+};
+
+/** What someone does at the event (`booth_staff`), in words. */
+export function roleWords(role: string): string {
+  return ROLE_WORDS[role] ?? role.replace(/_/g, ' ');
+}
+
+export function capital(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function short(id: Identity | string): string {
@@ -304,6 +389,10 @@ export function mount(id: string, ...children: Child[]) {
 /** Runs a reducer call or request and shows its error under the page title instead of throwing. */
 export async function act(what: () => Promise<unknown>): Promise<boolean> {
   const bar = document.getElementById('error');
+  if (viewing()) {
+    if (bar) bar.textContent = 'This is a read-only view: nothing changes for this person.';
+    return false;
+  }
   try {
     if (bar) bar.textContent = '';
     await what();

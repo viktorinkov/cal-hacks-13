@@ -8,7 +8,7 @@ The test bands (ids 90 to 99) report through `report_test_band`, which only the 
 
 Responsibilities:
 
-- Social.md: add up to 2,000 crowd bands, numbered from 100, with `start_crowd`, each worn by a generated attendee; the event runs 1,000. `crowd_tick` moves them every 2 s: hackers in teams between their table, the sponsor booths, food, the stage and the entrance, and booth staff at their booth. The crowd fills the venue map, the big-screen people graph and the recaps, and `stop_crowd` freezes it.
+- Social.md: add up to 2,000 crowd bands, numbered from 100, with `start_crowd`, each worn by a generated attendee; the event runs 1,000. `crowd_tick` moves them every 2 s: hackers in teams between their table, the sponsor booths, food, the stage and the entrance, booth staff at their booth, and the organizers, photographers and speakers on their own rounds. Every role wears a band except the medics. The crowd fills the venue map, the big-screen people graph and the recaps, and `stop_crowd` freezes it.
 - Report the test bands (ids 90 to 99) through `report_test_band`, under the `tester` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press bands 94 to 99, move any test band 90 to 99, and start the tool's `fall` and `property` commands.
 - Play the incident path on the test bands: a fall with its light circle (`fall`), the medic taking it and writing a note (`treat`), the resolve (`resolve`), and a property incident (`property`).
 - Insurance.md: plant insurance claims with the `bandit-claims` tool, each with a medic visit and a synthetic bill: three accuracy rounds of genuine claims and decoys, the stress-test run of the edge cases, and the six claims of the scripted claims run, in which the tool also plays the medic and the organizer.
@@ -63,22 +63,39 @@ A call replaces the whole crowd: it first deletes every crowd attendee with thei
 
 - **Generated attendees.** Each crowd band, from 100 up, is worn by a crowd attendee that `start_crowd` creates. The attendee is keyed by a placeholder identity derived from the band id, which no client can sign in as.
 
-  It has a made-up display name from fixed lists of first and last names, a placeholder photo as `photo_url`, `findable` on, and an Instagram handle in `social_handle` made from the name; three in ten have the same handle on Threads too. Its `attendee` row has `crowd` set, which the attendee list shows. A `crowd_member` row ties the band to the attendee: its team, the attendee's small offset from the team's spot, 2 or 3 interests drawn from the booths' tags, and who they are talking to.
-- **Booth staff and teams.** One crowd attendee in ten staffs a sponsor booth, at most 2 per booth. Bright-Data.md: the biggest sponsors are staffed first, and a staff member's `organization_id` is the booth's organisation, so the graph links them to it with `works_at`.
+  It has a made-up display name from fixed lists of first and last names, a placeholder photo as `photo_url`, `findable` on, and an Instagram handle in `social_handle` made from the name; three in ten have the same handle on Threads too. Its `attendee` row has `crowd` set, which the attendee list shows, and its role is on its `crowd_group` row, which the attendee list and the Live tab's people list show. A `crowd_member` row ties the band to the attendee: its team, the attendee's small offset from the team's spot, 2 or 3 interests drawn from the booths' tags, and who they are talking to.
+- **Every role wears a band.** Everyone at the event wears a band except the medics. Each crowd attendee has one of five roles:
+  - `booth_staff`: one crowd attendee in ten staffs a sponsor booth, at most 2 per booth. Bright-Data.md: the biggest sponsors are staffed first, and a staff member's `organization_id` is the booth's organisation, so the graph links them to it with `works_at`.
+  - `organizer`: one in a hundred, at least one, runs the venue from the entrance's check-in and walks the floor.
+  - `photographer`: one in 250, at least one, goes wherever the people are.
+  - `speaker`: Bright-Data.md: every speaker the event site lists, by the name, photo and organisation of their `person` row, which the attendee row links with `person_id`, so the graph links them to their company with `works_at`. A speaker gets no made-up socials.
+  - `hacker`: everyone else hacks in a team of 1 to 4 with a home table on the hacking floor.
 
-  Everyone else hacks in a team of 1 to 4 with a home table on the hacking floor. Each team, and each booth's staff member, is a `crowd_group` row: its home spot, where it stands now (zone, booth and spot in metres) and when it moves next.
+  Each team, and each person of the other roles, is a `crowd_group` row: its role, its home spot, where it stands now (zone, booth and spot in metres) and when it moves next. In a live run only hackers fall, press SOS, lose things or are named for them, so every injury claim is an attendee's.
 - **Movement.** `crowd_tick` runs every 2 s inside the module. When a team's time is up, the whole team moves on.
 
   From its table it goes to a sponsor booth 45 percent of the time, for 2 to 5 minutes; booths that match its members' interests draw more (Bright-Data.md: and so do bigger sponsors). It goes to food 20 percent of the time (4 to 9 minutes), to the stage 15 percent (5 to 12 minutes), to another team's table 10 percent (3 to 6 minutes) and to the entrance 5 percent (1 to 3 minutes); otherwise it stays.
 
   From a booth it tries another booth 35 percent of the time and otherwise goes back to its table, where it stays 6 to 15 minutes. Booth staff stay at their booth 15 to 40 minutes at a time, with a 4 to 8 minute food break 30 percent of the time.
 
+  Organizers stay at check-in 3 to 8 minutes, then walk to the hacking floor, a sponsor booth, the stage or food for 2 to 5 minutes. Photographers move on every 1 to 4 minutes, to a spot on the hacking floor, a booth, the stage or food. Speakers stay at the stage 10 to 20 minutes at a time, and in between visit a booth or food for 3 to 8 minutes.
+
   At the start a third of the teams are away from their table, and the first moves are spread over the first 10 minutes, so the venue is busy at once. All of these are starting values.
-- **Spots and neighbours.** A team stands at a spot in metres on the venue plan, the same plan the organizer portal's venue map draws from `venue_plan` ([SpacetimeDB](../2-data/SpacetimeDB.md)): a booth's spot for the attendees who visit it, its staff spot for the booth's staff, or a random spot in a zone. Each member stands at the team's spot plus their own offset.
+
+  Where a team goes and how long it stays come from a random generator seeded with the live run's seed and the tick, so the same seed sends the crowd the same way.
+- **Walking.** A team walks to its next spot; nobody jumps. The way follows the venue floor's walkable grid, `venue_floor`: the 3D model seen from above in 25 cm cells, loaded from `web/venue/floor.json` with `load_venue_floor` (role `ops`). Walls, tables, the stage and the food line close a cell; chairs do not, so people walk the gaps between the rows of hacker tables to their table. `pipeline/venue_floor.py` makes the grid from `web/venue/venue.glb`.
+
+  The module finds the shortest way on the grid and keeps only its corners, so people walk straight down an aisle and turn at its end, around the hall's curve instead of through its walls. The members set off one behind the other, 0.6 s apart, each from where they stand to their own place at the new spot, at the team's steady speed of 1.1 to 1.5 m/s. A live run at a faster pace plays the walks at most 1.5 times faster, so they stay brisk walks and never runs.
+
+  Each member's walk is a `crowd_walk` row: its corners, when it starts, when it arrives and its speed. On every tick `crowd_tick` puts the band at its place along the walk, and the organizer portal's 3D view follows the same walk smoothly between ticks. The team's stay at the new spot counts from when its last member arrives.
+- **In and out of the doors.** When a live run opens the doors, every team comes in through a door over the first 25 s, seven in ten by the door nearest their first spot, and walks there; a band is off until its wearer walks in. When the doors close every team walks to its nearest door, and each band goes off as its wearer walks out. The event ends once nobody is still walking, 10 s to 2 minutes after the doors close, and the medic is done.
+- **Leaving early.** While the doors are open, someone of the crowd goes home early about every two minutes, drawn from the run's seed: never someone down, staff or someone still walking in. They leave their team and walk alone to the door nearest to them, and their band goes off as they walk out. That writes their `departure.left_at`, the run's history says "<name> left early by <door>", and their recap opens ([Tap-Page](../5-apps/Tap-Page.md)). The organizer's "Leave early" on the Live tab's person panel sends anyone of the crowd the same way.
+- **Someone down.** A team stays with a member who fell or pressed SOS. Once the medic resolves it, that member walks from where they fell back to the team, and the team moves on. While a live run is paused nobody walks, and every walk and next move carry on by the time it was paused.
+- **Spots and neighbours.** A team stands at a spot in metres on the venue plan, the same plan the organizer portal's venue map draws from `venue_plan` ([SpacetimeDB](../2-data/SpacetimeDB.md)): a booth's spot for the attendees who visit it, its staff spot for the booth's staff, or a random spot in a zone. Each member stands at the team's spot plus their own offset, at the nearest point where someone can stand, so beside a table and never on it. A member on their way counts in the zone and booth they left until they are halfway, then in the ones they walk to.
 
   Every tick, `crowd_tick` counts each crowd band's neighbours, the bands within 1.5 m, real and test bands included. It turns that count into the band's state, IDLE, YELLOW or GUIDE (calm, busy or very busy on the map), against `settings.yellow` and `settings.red`, with the firmware's one-step hysteresis. It writes the `band` row (zone, booth, spot, `neigh`, state, online) only for the bands that changed, all in one transaction.
 - **Stays.** When a crowd band's zone or booth changes, `crowd_tick` closes its open stay in `zone_visit` and opens a new one with the new zone and booth. The crowd needs no space-time mapping, because the module places each crowd band itself.
-- **Who is close.** Teammates are always close. A stranger at the same zone and booth, within 3 m, sometimes starts talking: a chance of 0.4 percent per tick, 5 percent for booth staff. Each attendee talks to only a few strangers over the event: 2 to 10, four times as many for booth staff.
+- **Who is close.** Teammates are always close. A stranger at the same zone and booth, within 3 m, sometimes starts talking: a chance of 0.4 percent per tick, 5 percent for everyone working the event (booth staff, organizers, photographers and speakers). Each attendee talks to only a few strangers over the event: 2 to 10, four times as many for those working the event.
 
   Two people talking stay close until either one moves on. The crowd's time together runs 6 times faster than the clock, so the 3 minutes of the encounter rule pass within 30 s and the graph grows while people watch.
 
@@ -95,8 +112,8 @@ What one crowd tick does.
 
 ```mermaid
 flowchart TB
-    SC["start_crowd: up to 2,000 crowd bands from 100, teams and booth staff"] --> CT["crowd_tick every 2 s"]
-    CT -->|"a team's time is up"| MV["the team moves: a booth, food, the stage, another table, the entrance, or home"]
+    SC["start_crowd: up to 2,000 crowd bands from 100, every role but the medics"] --> CT["crowd_tick every 2 s"]
+    CT -->|"a team's time is up"| MV["the team walks the aisles to a booth, food, the stage, another table, the entrance, or home"]
     MV -->|"zone or booth changed"| ST["zone_visit: old stay closed, new stay opened"]
     CT -->|"bands that changed"| BR["band: zone, booth, spot, neigh, state"]
     CT -->|"teammates always, strangers who talk"| CL["encounter: close time, 6 times faster"]
@@ -166,7 +183,7 @@ Three runs of the tool exercise Insurance.md's claims ([Insurance](../6-features
 
 | Run | What the tool does | What the system should show |
 |---|---|---|
-| Accuracy run | the tool's `scorecard` command: three rounds (starting value), each planting 2 genuine falls and 4 fakes, one of each kind: a light circle in another zone, an injury at home, the same bill twice and an injured staff member. After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person, with learn on, and refuses every fake that reached one. It plants each fall in a zone where no three injuries land within 5 minutes | the scorecard on the organizer portal's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling |
+| Accuracy run | the tool's `scorecard` command: three rounds (starting value), each planting 2 genuine falls and 4 fakes, one of each kind: a light circle in another zone, an injury at home, the same bill twice and an injured staff member. After each round's flow the tool plays the organizer: it approves every genuine claim that waits for a person and every rule Claude proposes, and refuses every fake that reached one. It plants each fall in a zone where no three injuries land within 5 minutes | the scorecard on the organizer portal's Claims queue: straight-through rate rising each round, $0 wrongly paid, human touches falling |
 | Stress test | plants the edge cases not shown live: an injury the hospital report places at home, a bill re-filed as a new scan, a staff injury, and one more fake with witnesses in another zone | each claim next to its expected outcome: a doubt sent to the organizer, `zero_payout` for the duplicate bill, `claimant_not_staff`, `witness_zone` |
 | Scripted claims run | the tool's `story` command, after the event and before the organizer decides the real claims: six claims on bands 90 to 93, with bands 94 to 99 as the light circles. The tool plays the medic (Ari Ramos) and the organizer (the `ops` identity labelled "Ops desk") | Jordan's claim waits for the organizer, a stale approval fails closed and the real approval creates rule v1; Maya's similar fall settles in seconds under v1; the injury at home waits for the organizer; Lee's claim is refused by code as `witness_zone`, with every check listed; the speaker is approved with a recovery letter; the insurer's payment reconciles claim 1 |
 

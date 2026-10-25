@@ -16,7 +16,7 @@ pub struct Incident {
     pub resolved: bool,
     pub zone_id: u64,
     pub station_id: u8,
-    pub subject_band: u8,
+    pub subject_band: u32,
     pub opened_by: String,
     pub opened_at: __sdk::Timestamp,
     pub last_signal_at: __sdk::Timestamp,
@@ -41,7 +41,7 @@ pub struct IncidentCols {
     pub resolved: __sdk::__query_builder::Col<Incident, bool>,
     pub zone_id: __sdk::__query_builder::Col<Incident, u64>,
     pub station_id: __sdk::__query_builder::Col<Incident, u8>,
-    pub subject_band: __sdk::__query_builder::Col<Incident, u8>,
+    pub subject_band: __sdk::__query_builder::Col<Incident, u32>,
     pub opened_by: __sdk::__query_builder::Col<Incident, String>,
     pub opened_at: __sdk::__query_builder::Col<Incident, __sdk::Timestamp>,
     pub last_signal_at: __sdk::__query_builder::Col<Incident, __sdk::Timestamp>,
@@ -81,7 +81,7 @@ impl __sdk::__query_builder::HasCols for Incident {
 pub struct IncidentIxCols {
     pub id: __sdk::__query_builder::IxCol<Incident, u64>,
     pub resolved: __sdk::__query_builder::IxCol<Incident, bool>,
-    pub subject_band: __sdk::__query_builder::IxCol<Incident, u8>,
+    pub subject_band: __sdk::__query_builder::IxCol<Incident, u32>,
 }
 
 impl __sdk::__query_builder::HasIxCols for Incident {

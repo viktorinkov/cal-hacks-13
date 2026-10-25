@@ -4,14 +4,15 @@ use std::path::PathBuf;
 
 use bandit_bindings::ModelCallIn;
 use bandit_common::BlobStore;
-use claims_elastic::ClaimsIndex;
+use claims_elastic::{ClaimsIndex, Kibana};
 use bandit_insurance::payloads::*;
+use bandit_insurance::policy::KIND_DOCUMENT_READ;
 use serde::de::DeserializeOwned;
 
 use crate::model::{Claude, Failed};
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{extract, letters, medical, merch, payout, review, venue, verify, wallet};
+use crate::{charge, clinic, document, extract, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -67,6 +68,9 @@ pub struct Ctx {
     pub elastic: Option<ClaimsIndex>,
     /// Set once `ClaimsIndex::ensure_setup` has succeeded.
     pub elastic_ready: tokio::sync::OnceCell<()>,
+    pub kibana: Option<Kibana>,
+    /// Set once the document indices and the reader's Kibana assets are in place.
+    pub reader_ready: tokio::sync::OnceCell<()>,
     pub nessie: Option<Nessie>,
     pub data_dir: PathBuf,
     /// Local time for prompts and deposit dates (the venue's offset).
@@ -81,11 +85,26 @@ impl Ctx {
         self.elastic_ready.get_or_try_init(|| es.ensure_setup()).await?;
         Ok(es)
     }
+
+    /// The Elastic and Kibana clients for reading a document, with the
+    /// document indices, the clause index and the reader's assets set up.
+    pub async fn reader(&self) -> Result<(&ClaimsIndex, &Kibana), JobError> {
+        let es = self.elastic.as_ref().ok_or_else(|| JobError::msg("ELASTICSEARCH_URL or ELASTICSEARCH_API_KEY is not set"))?;
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.reader_ready
+            .get_or_try_init(|| async {
+                es.ensure_document_indices().await?;
+                es.ensure_clauses_index().await?;
+                kibana.ensure_reader().await
+            })
+            .await?;
+        Ok((es, kibana))
+    }
 }
 
 /// Kinds this worker runs.
 pub fn handles(kind: &str) -> bool {
-    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND
+    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND || kind == photo::KIND || kind == shop::KIND || kind == propose::KIND || kind == plan::KIND || kind == KIND_DOCUMENT_READ
 }
 
 /// Runs one job to its result reducer. On `Err` the caller reports `fail_job`.
@@ -93,14 +112,21 @@ pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
     match job.kind.as_str() {
         KIND_RECORD_EXTRACT => extract::run(ctx, job, job.payload()?).await,
         KIND_VERIFY => verify::run(ctx, job, job.payload()?).await,
-        KIND_REVIEW => review::run(ctx, job, job.payload()?).await,
+        KIND_REVIEW => investigate::run(ctx, job, job.payload()?).await,
         KIND_DRAFT => letters::run_draft(ctx, job, job.payload()?).await,
         KIND_RECOVERY => letters::run_recovery(ctx, job, job.payload()?).await,
         KIND_PAYOUT => payout::run(ctx, job, job.payload()?).await,
+        KIND_CLINIC => clinic::run(ctx, job, job.payload()?).await,
+        KIND_CHARGE_PAYMENT => charge::run(ctx, job, job.payload()?).await,
         wallet::KIND => wallet::run(ctx, job, job.payload()?).await,
         merch::KIND => merch::run(ctx, job, job.payload()?).await,
         medical::KIND => medical::run(ctx, job, job.payload()?).await,
         venue::KIND => venue::run(ctx, job, job.payload()?).await,
+        plan::KIND => plan::run(ctx, job, job.payload()?).await,
+        photo::KIND => photo::run(ctx, job, job.payload()?).await,
+        shop::KIND => shop::run(ctx, job, job.payload()?).await,
+        propose::KIND => propose::run(ctx, job, job.payload()?).await,
+        KIND_DOCUMENT_READ => document::run(ctx, job, job.payload()?).await,
         other => Err(JobError::msg(format!("no handler for job kind {other}"))),
     }
 }

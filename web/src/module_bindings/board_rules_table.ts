@@ -24,4 +24,5 @@ export default __t.row({
   version: __t.u32(),
   status: __t.string(),
   createdAt: __t.timestamp().name("created_at"),
+  proposalId: __t.u64().name("proposal_id"),
 });

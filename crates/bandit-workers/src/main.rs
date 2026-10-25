@@ -1,5 +1,5 @@
 //! `bandit-workers`: leases jobs from the BandIt SpacetimeDB module (insurance
-//! claims, wallets, merch purchases and venue setup), does the external work (Claude,
+//! claims, rule proposals and policy documents, wallets, merch purchases, charge payments, venue setup and plan lookups), does the external work (Claude,
 //! Elastic, Nessie, Bright Data) and hands each result to the module's reducer for that job. Claude makes the judgment calls and
 //! writes the words; code decides money.
 //!
@@ -9,7 +9,12 @@
 //!                                           the reducer calls instead of making them
 //! ```
 
+mod brightdata;
+mod charge;
+mod clinic;
+mod document;
 mod extract;
+mod investigate;
 mod jobs;
 mod letters;
 mod medical;
@@ -17,9 +22,12 @@ mod merch;
 mod model;
 mod nessie;
 mod payout;
+mod photo;
+mod plan;
 mod prompts;
-mod review;
+mod propose;
 mod runner;
+mod shop;
 mod sink;
 #[cfg(test)]
 mod testdata;
@@ -31,7 +39,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 use bandit_common::Config;
-use claims_elastic::ClaimsIndex;
+use claims_elastic::{ClaimsIndex, Kibana};
 use claude_client::ClaudeClient;
 
 use crate::jobs::{Ctx, JobIn};
@@ -64,6 +72,10 @@ fn context(config: &Config, sink: Sink) -> Result<Ctx> {
         (Some(url), Some(key)) => Some(ClaimsIndex::new(url, key)?.with_prefix(&prefix)),
         _ => None,
     };
+    let kibana = match (&config.kibana_url, &config.kibana_api_key) {
+        (Some(url), Some(key)) => Some(Kibana::new(url, key)?),
+        _ => None,
+    };
     let nessie = match (env("NESSIE_BASE_URL"), env("NESSIE_API_KEY")) {
         (Some(url), Some(key)) => Some(Nessie::new(&url, &key)?),
         _ => None,
@@ -73,6 +85,8 @@ fn context(config: &Config, sink: Sink) -> Result<Ctx> {
         blobs: config.blob_store(),
         elastic,
         elastic_ready: tokio::sync::OnceCell::new(),
+        kibana,
+        reader_ready: tokio::sync::OnceCell::new(),
         nessie,
         data_dir: config.data_dir.clone(),
         tz_offset_minutes: bandit_insurance::config::Config::default().tz_offset_minutes,

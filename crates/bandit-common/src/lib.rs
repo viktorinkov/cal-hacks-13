@@ -3,10 +3,12 @@
 
 mod blob;
 mod config;
+mod pdf;
 mod tokens;
 
 pub use blob::{BlobInfo, BlobStore, sha256_hex};
 pub use config::{Config, DEFAULT_SPACETIMEDB_URL, find_env_file};
+pub use pdf::count_pages;
 pub use tokens::TokenStore;
 
 /// Install a `tracing` subscriber filtered by `RUST_LOG` (default `info`).
