@@ -2,7 +2,7 @@
 //! worker searches for the plan's public document through Bright Data, Claude picks it among the
 //! results and reads what it prints, and the worker keeps the PDF only when the printed insurer and
 //! plan match what the attendee typed. Here the PDF lands like an upload and fills the medical
-//! card's insurer and plan.
+//! card's insurer and plan. A plan another lookup already found is linked at once, with no search.
 
 use super::documents::{DocumentIn, queue_document_read};
 use crate::jobs::{self, *};
@@ -11,7 +11,8 @@ use crate::roles::*;
 use crate::social::tables::*;
 use crate::view_as::viewed;
 use bandit_insurance::policy::HEALTH_PLAN;
-use serde::{Deserialize, Serialize};
+use bandit_insurance::printed::same_plan_name;
+use bandit_insurance::time::civil_from_days;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 pub const KIND_PLAN_LOOKUP: &str = "plan_lookup";
@@ -58,6 +59,9 @@ pub struct PlanLookup {
     pub note: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    /// The lookup that fetched the PDF this one links to, when it named a plan already found; 0 when it searched.
+    #[default(0)]
+    pub reused_from: u64,
 }
 
 /// What the worker found. `file_hash` is the PDF it stored; empty unless `status` is `found`.
@@ -75,7 +79,7 @@ pub struct PlanLookupResult {
     pub note: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct LookupPayload {
     lookup_id: u64,
     kind: String,
@@ -92,7 +96,28 @@ fn name(what: &str, s: &str) -> Result<String, String> {
     Ok(s)
 }
 
-/// The attendee names their health plan; a worker looks for its public document.
+/// The calendar year of a time, in UTC: the plan year a lookup's searches ask for.
+fn utc_year(t: Timestamp) -> i64 {
+    civil_from_days(super::micros(t).div_euclid(86_400_000_000)).0
+}
+
+/// The newest lookup that already found the plan `l` names: the same state and calendar year, and
+/// the same telling words of insurer and plan as it was typed or as its PDF prints them.
+fn found_before(ctx: &ReducerContext, l: &PlanLookup) -> Option<PlanLookup> {
+    let year = utc_year(l.created_at);
+    ctx.db
+        .plan_lookup()
+        .iter()
+        .filter(|f| f.kind == l.kind && f.status == FOUND && f.state == l.state && utc_year(f.created_at) == year)
+        .filter(|f| {
+            same_plan_name(&l.insurer, &l.plan, &f.insurer, &f.plan) || same_plan_name(&l.insurer, &l.plan, &f.printed_insurer, &f.printed_plan)
+        })
+        .filter(|f| is_hash(&f.file_hash) && ctx.db.blob_ref().hash().find(&f.file_hash).is_some())
+        .max_by_key(|f| f.id)
+}
+
+/// The attendee names their health plan. A plan another lookup already found is found at once with
+/// its PDF and reading; otherwise a worker looks for its public document.
 #[spacetimedb::reducer]
 pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: String) -> Result<(), String> {
     let me = ctx.sender();
@@ -110,7 +135,7 @@ pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: 
     if ctx.db.plan_lookup().attendee().filter(me).any(|l| l.kind == kind && l.status == SEARCHING) {
         return Err("already looking up your plan".into());
     }
-    let row = ctx.db.plan_lookup().insert(PlanLookup {
+    let typed = PlanLookup {
         id: 0,
         attendee: me,
         kind: kind.clone(),
@@ -130,7 +155,24 @@ pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: 
         note: String::new(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
-    });
+        reused_from: 0,
+    };
+    if let Some(f) = found_before(ctx, &typed) {
+        let found = ctx.db.plan_lookup().insert(PlanLookup {
+            status: FOUND.into(),
+            source_url: f.source_url,
+            printed_insurer: f.printed_insurer,
+            printed_plan: f.printed_plan,
+            plan_year: f.plan_year,
+            file_hash: f.file_hash,
+            page_count: f.page_count,
+            reused_from: if f.reused_from != 0 { f.reused_from } else { f.id },
+            ..typed
+        });
+        land(ctx, &found);
+        return Ok(());
+    }
+    let row = ctx.db.plan_lookup().insert(typed);
     let payload = serde_json::to_string(&LookupPayload { lookup_id: row.id, kind, insurer, plan, state }).map_err(|e| e.to_string())?;
     let job_id = jobs::enqueue(ctx, KIND_PLAN_LOOKUP, payload, "plan_lookup", row.id);
     ctx.db.plan_lookup().id().update(PlanLookup { job_id, ..row });
@@ -194,8 +236,16 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
         updated_at: ctx.timestamp,
         ..lookup
     };
-    land_health_plan(ctx, &found);
-    // The Evidence Engine reads the found PDF like an upload; a document it can't take still leaves the lookup found.
+    land(ctx, &found);
+    ctx.db.plan_lookup().id().update(found);
+    jobs::finish(ctx, job, FOUND);
+    Ok(())
+}
+
+/// A found plan fills the medical card and goes to the Evidence Engine like an upload. A PDF already
+/// read is not read again; a document it can't take still leaves the lookup found.
+fn land(ctx: &ReducerContext, found: &PlanLookup) {
+    land_health_plan(ctx, found);
     let read = DocumentIn {
         kind: HEALTH_PLAN.into(),
         attendee: Some(found.attendee),
@@ -207,9 +257,6 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
     if let Err(e) = queue_document_read(ctx, read) {
         log::warn!("plan lookup {}: not read: {e}", found.id);
     }
-    ctx.db.plan_lookup().id().update(found);
-    jobs::finish(ctx, job, FOUND);
-    Ok(())
 }
 
 /// What the PDF prints, or what the attendee typed when it prints nothing there.

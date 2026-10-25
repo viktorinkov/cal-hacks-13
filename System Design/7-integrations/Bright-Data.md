@@ -277,7 +277,7 @@ A plan lookup finds the plan's public wording and fetches its PDF. From then on 
 1. **Start.** On the tap page, "Name your plan instead" calls `look_up_plan(insurer, plan, state)`. It needs a claimed band, an insurer and a plan of 2 to 80 characters each, and a two-letter state.
 2. **Reuse.** In the same call, the module looks for the same plan among the lookups already `found`: the same state, the same calendar year (UTC), which is the year the searches ask for, and an insurer and plan with the same telling words, in order, as that lookup's typed names or as the names its PDF prints. The telling words are the ones the check in step 6 compares: lowercase, three letters or more or a number, without common words such as "plan" and "insurance".
 
-   So "blue shield of california" and "Silver 70 PPO" find a lookup of "Blue Shield of California" and "Silver 70 PPO", while "Blue Shield" and "Silver 70" run a search of their own. When a lookup matches (the newest, when several do), the new `plan_lookup` row is written `found` at once with its address, printed names, plan year, matched chunks, SHA-256 and page count, and `reused_from` its id. The run goes straight on to step 7 with no job, no search, no Claude call and no fetch. Otherwise the row is written in status `searching` with a job of kind `plan_lookup`.
+   So "blue shield of california" and "Silver 70 PPO" find a lookup of "Blue Shield of California" and "Silver 70 PPO", while "Blue Shield" and "Silver 70" run a search of their own. When a lookup matches (the newest, when several do), the new `plan_lookup` row is written `found` at once with its address, printed names, plan year, matched chunks, SHA-256 and page count, and `reused_from` the id of the lookup that fetched the PDF. The run goes straight on to step 7 with no job, no search, no Claude call and no fetch. Otherwise the row is written in status `searching` with a job of kind `plan_lookup`.
 3. **Search.** The worker calls the Bright Data Web MCP's `search_engine` twice: "<insurer> <plan> <state> <year> summary of benefits and coverage pdf" and "<insurer> <plan> SBC <year>".
 4. **Pick.** The Anthropic Claude API (`plan_find`) reads the results and returns up to 3 addresses of this plan's own document, best first, each with why. It passes over broker pages, comparison sites, other plans and other years. Code keeps only addresses the results named.
 5. **Fetch.** The worker fetches the addresses in turn through the Bright Data Web Unlocker API. An answer counts only when it starts with `%PDF-` and is at most 15 MB.
@@ -332,7 +332,7 @@ flowchart LR
 | `job_id` | id | the `plan_lookup` job; 0 for a reused lookup |
 | `note` | text | why it ended `not_found`, `wrong_plan` or `failed`, in plain words |
 | `created_at`, `updated_at` | timestamps | |
-| `reused_from` | id | the found lookup whose PDF and reading this one links to, when it named a plan already found; 0 when it searched |
+| `reused_from` | id | the lookup that fetched the PDF this one links to, with its reading, when it named a plan already found; 0 when it searched |
 
 `finish_plan_lookup` is callable only by the `worker` holding the job's lease. When the job uses up its attempts, the module marks the lookup `failed` with the job's error. A new lookup of the same kind replaces what the last one wrote.
 

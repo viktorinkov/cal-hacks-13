@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use bandit_bindings::{ModelCallIn, PlanLookupResult};
 use bandit_common::sha256_hex;
 use bandit_insurance::policy::HEALTH_PLAN;
-use bandit_insurance::printed::PlanPrinted;
+use bandit_insurance::printed::{PlanPrinted, telling_words};
 use claude_client::{Effort, MessageRequest};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -128,21 +128,11 @@ impl From<PlanPrinted> for Printed {
 
 // --- Code's check ----------------------------------------------------------------------------
 
-/// The words that tell plans and insurers apart: lowercase, three letters or more, or a number.
-fn words(s: &str) -> Vec<String> {
-    const COMMON: [&str; 12] = ["the", "and", "for", "inc", "plan", "plans", "insurance", "company", "corp", "group", "policy", "coverage"];
-    s.to_lowercase()
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| (w.len() >= 3 || w.chars().all(|c| c.is_ascii_digit())) && !w.is_empty() && !COMMON.contains(w))
-        .map(String::from)
-        .collect()
-}
-
 /// At least half the telling words the attendee typed are in what the document prints, so "Blue
 /// Shield" finds "Blue Shield of California" but not "Anthem Blue Cross". A name with none passes.
 fn names_match(typed: &str, printed: &str) -> bool {
-    let typed = words(typed);
-    let printed: HashSet<String> = words(printed).into_iter().collect();
+    let typed = telling_words(typed);
+    let printed: HashSet<String> = telling_words(printed).into_iter().collect();
     let found = typed.iter().filter(|w| printed.contains(*w)).count();
     found * 2 >= typed.len()
 }
