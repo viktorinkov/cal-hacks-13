@@ -382,10 +382,7 @@ function bandIdFromToken(token: string): number | null {
 async function claimTargetBand(token: string): Promise<void> {
   if (!conn) throw new Error('The database is not connected.')
   const current = useSession.getState().myBand
-  if (current?.bandId === bandIdFromToken(token)) {
-    if (current.status === 'claimed') return
-    if (current.status === 'waiting_for_press' && (current.expiresAt === null || current.expiresAt > Date.now())) return
-  }
+  if (current?.bandId === bandIdFromToken(token) && current.status === 'claimed') return
   const pending = claimRequests.get(token)
   if (pending) return pending
   const request = (async () => { await reducers().claimBand({ token }); publish() })()
@@ -401,8 +398,10 @@ function requireClaimedBand(bandId?: number | null): void {
   const state = useSession.getState()
   if (!conn || state.phase !== 'live') throw new Error('The database is not connected.')
   if (!state.myBandReady) throw new Error('Your band is still being checked. Try again in a moment.')
-  if (state.myBand?.status !== 'claimed' || (bandId != null && state.myBand.bandId !== bandId)) {
-    throw new Error('Press the button on your band to finish claiming it first.')
+  const mine = state.myBand
+  const connected = mine?.status === 'claimed' || mine?.status === 'waiting_for_press'
+  if (!mine || !connected || (bandId != null && mine.bandId !== bandId)) {
+    throw new Error('This wristband is not connected yet.')
   }
 }
 

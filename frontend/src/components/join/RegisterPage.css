@@ -60,9 +60,6 @@
 .signup-complete [data-ui] { border-radius: 20px; padding: 28px; overflow-wrap: anywhere; }
 .signup-complete [data-ui] .font-display { font-family: var(--font-sans); font-size: 24px; }
 .signup-tap { max-width: 420px; margin: 80px auto; text-align: center; }
-/* The tap screen fills the view below the header, so Next sits near the bottom. */
-.signup-tap-screen { display: flex; flex-direction: column; align-items: center; min-height: calc(100dvh - 116px); }
-.signup-page .signup-next { margin-top: auto; min-width: 160px; gap: 8px; }
 @media (max-width: 900px) {
   .signup-section { grid-template-columns: 200px minmax(0, 1fr); }
   .signup-upload { grid-template-columns: 1fr; }
