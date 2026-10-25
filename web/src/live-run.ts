@@ -5,7 +5,7 @@
 // is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, money, time } from './lib';
+import { act, bandById, h, money, time } from './lib';
 import { decideProposal, shapeWords, waitingProposals } from './rule-proposals';
 import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
@@ -353,7 +353,7 @@ function ourBands(): number[] {
   const now = Date.now();
   const ids: number[] = [];
   for (let id = 1; id < 100; id++) {
-    const b = conn.db.band.id.find(id);
+    const b = bandById(conn, id);
     if (TEST_BANDS.includes(id) || placed.has(id) || (b && present(b, now))) ids.push(id);
   }
   return ids;
