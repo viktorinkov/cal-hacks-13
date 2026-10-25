@@ -306,9 +306,9 @@ def exits(y0):
     c1, c2 = 1400, 2080
     r1, r2, r3 = 200, 420, 640
     marker = B(c1, r1, "station marker\nat each exit", "device", w=560, icons={0: RADIO})
-    glow = B(c2, r1, "exit marker\nexit colour", "device", w=500)
+    glow = B(c2, r1, "exit marker\nexit color", "device", w=500)
     band = B(c1, r2, "band\nloudest station", "device", w=560, icons={0: WATCH})
-    guide = B(c2, r2, "GUIDE\nchases colour", "device", w=500)
+    guide = B(c2, r2, "GUIDE\nchases color", "device", w=500)
     zone = B(c1, r3, "zone\nnearest door", "stdb", w=560)
     H(marker, glow, "glows")
     V(marker, band, "sets zone")
