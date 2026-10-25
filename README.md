@@ -49,6 +49,6 @@ Instead of having to buy merch at the event, and not being able to get more beca
 
 ## Diagrams
 
-All diagrams are on one Excalidraw board: https://excalidraw.com/#json=EUInNms8MAMRyj9i6BWbt,Yz6Qklo6BbLrhV84sZz9ew
+All diagrams are on one Excalidraw board: https://excalidraw.com/#json=7jt0ksYhCcCFpyw2cyPcR,-wAkp1bEC9qDRrhaGlV01g
 
-It has 19 frames: Overview, Architecture, SpacetimeDB live loop, Queues, Vision, Event data pipeline, The Evidence Engine, Claim Settlement, Claude jobs, Social, Interests, Merch and wallet, Nessie wallet, Vultr server, Hardware basics, Medic routing, Medic walk, Light circle and Exits. The board's source file is [diagrams/bandit-system-design.excalidraw](diagrams/bandit-system-design.excalidraw).
+It has 19 frames: Band1t, Architecture, SpacetimeDB, Queues, Vision, Event data, Evidence Engine, Claim Settlement, Claude, Social, Interests, Merch and wallet, Capital One Nessie, Vultr, Hardware, Medic routing, Medic walk, Light circle and Exits. The board's source file is [diagrams/bandit-system-design.excalidraw](diagrams/bandit-system-design.excalidraw).
