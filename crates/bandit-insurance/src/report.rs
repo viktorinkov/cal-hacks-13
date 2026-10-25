@@ -295,6 +295,16 @@ fn service_line(s: &ExtractedService) -> String {
     format!("{}  {}  {}  {}  {}", s.date_of_service, s.code, s.description, s.units, format_cents(s.charge_cents))
 }
 
+/// The report's title, which says what kind of record it is, so the reader classifies it by what it prints.
+fn title(document_kind: &str) -> &'static str {
+    match document_kind {
+        "first_aid_record" => "FIRST AID RECORD",
+        "urgent_care_record" => "URGENT CARE VISIT NOTE",
+        "emergency_record" => "EMERGENCY DEPARTMENT RECORD",
+        _ => "HOSPITAL REPORT",
+    }
+}
+
 /// The page the bill's invoice number and total are printed on: the last service line's.
 fn bill_page(r: &ExtractedRecord) -> u32 {
     r.services.last().map(|s| s.page).unwrap_or(r.encounter.page)
@@ -312,7 +322,7 @@ pub fn print_record(r: &ExtractedRecord, page_count: u32) -> Vec<String> {
     if !r.provider.address.is_empty() {
         put(r.provider.page, r.provider.address.clone());
     }
-    put(r.provider.page, "HOSPITAL REPORT".into());
+    put(r.provider.page, title(&r.document_kind).into());
     put(r.patient.page, patient_line(r));
     if !r.patient.date_of_birth.is_empty() {
         put(r.patient.page, format!("Date of birth: {}", r.patient.date_of_birth));

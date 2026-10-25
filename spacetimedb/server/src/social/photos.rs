@@ -1,6 +1,6 @@
 //! Event photos: a photo lands in a zone at a time, and the findable people whose bands were there are
 //! tagged in it. Claude then reads the photo for how many people it shows and a caption, and the tags are
-//! cut to that many: the people the bands put closest together at that moment. Tagged photos go straight
+//! set to that many: the people the bands put closest together at that moment. Tagged photos go straight
 //! into each person's recap and merch.
 
 use super::logic::*;
@@ -14,8 +14,6 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 use std::collections::{HashMap, HashSet};
 
 pub const KIND_PHOTO_FEATURES: &str = "photo_features";
-/// Most people a photo is tagged with once Claude has counted them.
-pub const PHOTO_TAG_MAX: usize = 20;
 /// Two bands count as standing together at the moment of a photo when they heard each other this recently.
 const TOGETHER_SECONDS: i64 = 30;
 const CAPTION_CHARS: usize = 140;
@@ -155,7 +153,7 @@ pub fn submit_photo_features(ctx: &ReducerContext, job_id: u64, people_count: u3
         features_call_id: call_id,
         ..photo
     });
-    tag(ctx, &photo, (people_count as usize).min(PHOTO_TAG_MAX));
+    tag(ctx, &photo, people_count as usize);
     jobs::finish(ctx, job, format!("{people_count} people: {caption}"));
     Ok(())
 }

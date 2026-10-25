@@ -258,7 +258,7 @@ Candidate rule: photo tags come from the bands in the photo's zone at the moment
 
 Test-Bands.md: crowd attendees are candidates through their stays, and people who tapped their bands rank before the crowd.
 
-The list is capped at 8 (starting value) until Claude reports a people count, then at that count, at most 20. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
+The list starts with up to 8 candidates until Claude reports a people count. It then takes that many candidates in ranked order. When fewer eligible candidates are available, it tags all of them. The module applies no additional fixed tag maximum after the count arrives. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
 
 Photos never go to Elastic. Identity always comes from the band, never from a face.
 
