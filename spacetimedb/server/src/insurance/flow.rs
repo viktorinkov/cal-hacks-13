@@ -1001,6 +1001,20 @@ pub fn approve_claim(
     settle(ctx, claim, "approved")
 }
 
+/// Staff close an injury claim that waits for a record nobody will file, because the medic treated no injury.
+#[spacetimedb::reducer]
+pub fn close_claim_without_injury(ctx: &ReducerContext, claim_id: u64, reason: String) -> Result<(), String> {
+    require_role(ctx, &["ops", "medic"])?;
+    let claim = claim_by_id(ctx, claim_id)?;
+    if claim.status != ClaimStatus::AwaitingRecord {
+        return Err(format!("claim {claim_id} is not waiting for a record"));
+    }
+    if reason.trim().is_empty() {
+        return Err("closing a claim needs a reason".into());
+    }
+    refuse(ctx, claim, format!("closed by {}: {}", caller_name(ctx), reason.trim()), "staff").map(|_| ())
+}
+
 #[spacetimedb::reducer]
 pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String, reason: String) -> Result<(), String> {
     let claim = claim_by_id(ctx, claim_id)?;
