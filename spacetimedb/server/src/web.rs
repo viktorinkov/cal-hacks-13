@@ -345,6 +345,26 @@ pub struct AttendeeOut {
     pub organization: String,
     pub handles: Vec<crate::social::views::HandleOut>,
     pub created_at: Timestamp,
+    /// What they do at the event: `hacker`, `booth_staff`, `organizer`, `photographer`, `speaker` or `attendee`.
+    pub role: String,
+}
+
+/// What an attendee does at the event: their crowd role, else their staff role, else the speaker profile they
+/// claimed, else `attendee`. The medics wear no band, so they are never one.
+fn attendee_role(ctx: &ViewContext, a: &Attendee) -> String {
+    if let Some(g) = ctx.db.crowd_member().identity().find(a.identity).and_then(|m| ctx.db.crowd_group().id().find(m.group_id)) {
+        return role_of(&g).into();
+    }
+    let staff = |role: &str| ctx.db.staff_role().identity().filter(a.identity).any(|r| r.role == role);
+    if staff("ops") {
+        ORGANIZER.into()
+    } else if staff("photographer") {
+        PHOTOGRAPHER.into()
+    } else if ctx.db.person().id().find(a.person_id).is_some_and(|p| p.kind == SPEAKER) {
+        SPEAKER.into()
+    } else {
+        "attendee".into()
+    }
 }
 
 /// Everyone who joined, for the host portal.
@@ -377,6 +397,7 @@ pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {
                 .filter(a.identity)
                 .map(|h| crate::social::views::HandleOut { platform: h.platform, handle: h.handle })
                 .collect(),
+            role: attendee_role(ctx, &a),
             display_name: a.display_name,
             created_at: a.created_at,
         })

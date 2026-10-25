@@ -8,7 +8,7 @@ The test bands (ids 90 to 99) report through `report_test_band`, which only the 
 
 Responsibilities:
 
-- Social.md: add up to 2,000 crowd bands, numbered from 100, with `start_crowd`, each worn by a generated attendee; the event runs 1,000. `crowd_tick` moves them every 2 s: hackers in teams between their table, the sponsor booths, food, the stage and the entrance, and booth staff at their booth. The crowd fills the venue map, the big-screen people graph and the recaps, and `stop_crowd` freezes it.
+- Social.md: add up to 2,000 crowd bands, numbered from 100, with `start_crowd`, each worn by a generated attendee; the event runs 1,000. `crowd_tick` moves them every 2 s: hackers in teams between their table, the sponsor booths, food, the stage and the entrance, booth staff at their booth, and the organizers, photographers and speakers on their own rounds. Every role wears a band except the medics. The crowd fills the venue map, the big-screen people graph and the recaps, and `stop_crowd` freezes it.
 - Report the test bands (ids 90 to 99) through `report_test_band`, under the `tester` role: from the `bandit-claims` command-line tool, and from `bandit-api`'s dev routes, which press bands 94 to 99, move any test band 90 to 99, and start the tool's `fall` and `property` commands.
 - Play the incident path on the test bands: a fall with its light circle (`fall`), the medic taking it and writing a note (`treat`), the resolve (`resolve`), and a property incident (`property`).
 - Insurance.md: plant insurance claims with the `bandit-claims` tool, each with a medic visit and a synthetic bill: three accuracy rounds of genuine claims and decoys, the stress-test run of the edge cases, and the six claims of the scripted claims run, in which the tool also plays the medic and the organizer.
@@ -63,15 +63,22 @@ A call replaces the whole crowd: it first deletes every crowd attendee with thei
 
 - **Generated attendees.** Each crowd band, from 100 up, is worn by a crowd attendee that `start_crowd` creates. The attendee is keyed by a placeholder identity derived from the band id, which no client can sign in as.
 
-  It has a made-up display name from fixed lists of first and last names, a placeholder photo as `photo_url`, `findable` on, and an Instagram handle in `social_handle` made from the name; three in ten have the same handle on Threads too. Its `attendee` row has `crowd` set, which the attendee list shows. A `crowd_member` row ties the band to the attendee: its team, the attendee's small offset from the team's spot, 2 or 3 interests drawn from the booths' tags, and who they are talking to.
-- **Booth staff and teams.** One crowd attendee in ten staffs a sponsor booth, at most 2 per booth. Bright-Data.md: the biggest sponsors are staffed first, and a staff member's `organization_id` is the booth's organisation, so the graph links them to it with `works_at`.
+  It has a made-up display name from fixed lists of first and last names, a placeholder photo as `photo_url`, `findable` on, and an Instagram handle in `social_handle` made from the name; three in ten have the same handle on Threads too. Its `attendee` row has `crowd` set, which the attendee list shows, and its role is on its `crowd_group` row, which the attendee list and the Live tab's people list show. A `crowd_member` row ties the band to the attendee: its team, the attendee's small offset from the team's spot, 2 or 3 interests drawn from the booths' tags, and who they are talking to.
+- **Every role wears a band.** Everyone at the event wears a band except the medics. Each crowd attendee has one of five roles:
+  - `booth_staff`: one crowd attendee in ten staffs a sponsor booth, at most 2 per booth. Bright-Data.md: the biggest sponsors are staffed first, and a staff member's `organization_id` is the booth's organisation, so the graph links them to it with `works_at`.
+  - `organizer`: one in a hundred, at least one, runs the venue from the entrance's check-in and walks the floor.
+  - `photographer`: one in 250, at least one, goes wherever the people are.
+  - `speaker`: Bright-Data.md: every speaker the event site lists, by the name, photo and organisation of their `person` row, which the attendee row links with `person_id`, so the graph links them to their company with `works_at`. A speaker gets no made-up socials.
+  - `hacker`: everyone else hacks in a team of 1 to 4 with a home table on the hacking floor.
 
-  Everyone else hacks in a team of 1 to 4 with a home table on the hacking floor. Each team, and each booth's staff member, is a `crowd_group` row: its home spot, where it stands now (zone, booth and spot in metres) and when it moves next.
+  Each team, and each person of the other roles, is a `crowd_group` row: its role, its home spot, where it stands now (zone, booth and spot in metres) and when it moves next. In a live run only hackers fall, press SOS, lose things or are named for them, so every injury claim is an attendee's.
 - **Movement.** `crowd_tick` runs every 2 s inside the module. When a team's time is up, the whole team moves on.
 
   From its table it goes to a sponsor booth 45 percent of the time, for 2 to 5 minutes; booths that match its members' interests draw more (Bright-Data.md: and so do bigger sponsors). It goes to food 20 percent of the time (4 to 9 minutes), to the stage 15 percent (5 to 12 minutes), to another team's table 10 percent (3 to 6 minutes) and to the entrance 5 percent (1 to 3 minutes); otherwise it stays.
 
   From a booth it tries another booth 35 percent of the time and otherwise goes back to its table, where it stays 6 to 15 minutes. Booth staff stay at their booth 15 to 40 minutes at a time, with a 4 to 8 minute food break 30 percent of the time.
+
+  Organizers stay at check-in 3 to 8 minutes, then walk to the hacking floor, a sponsor booth, the stage or food for 2 to 5 minutes. Photographers move on every 1 to 4 minutes, to a spot on the hacking floor, a booth, the stage or food. Speakers stay at the stage 10 to 20 minutes at a time, and in between visit a booth or food for 3 to 8 minutes.
 
   At the start a third of the teams are away from their table, and the first moves are spread over the first 10 minutes, so the venue is busy at once. All of these are starting values.
 
@@ -88,7 +95,7 @@ A call replaces the whole crowd: it first deletes every crowd attendee with thei
 
   Every tick, `crowd_tick` counts each crowd band's neighbours, the bands within 1.5 m, real and test bands included. It turns that count into the band's state, IDLE, YELLOW or GUIDE (calm, busy or very busy on the map), against `settings.yellow` and `settings.red`, with the firmware's one-step hysteresis. It writes the `band` row (zone, booth, spot, `neigh`, state, online) only for the bands that changed, all in one transaction.
 - **Stays.** When a crowd band's zone or booth changes, `crowd_tick` closes its open stay in `zone_visit` and opens a new one with the new zone and booth. The crowd needs no space-time mapping, because the module places each crowd band itself.
-- **Who is close.** Teammates are always close. A stranger at the same zone and booth, within 3 m, sometimes starts talking: a chance of 0.4 percent per tick, 5 percent for booth staff. Each attendee talks to only a few strangers over the event: 2 to 10, four times as many for booth staff.
+- **Who is close.** Teammates are always close. A stranger at the same zone and booth, within 3 m, sometimes starts talking: a chance of 0.4 percent per tick, 5 percent for everyone working the event (booth staff, organizers, photographers and speakers). Each attendee talks to only a few strangers over the event: 2 to 10, four times as many for those working the event.
 
   Two people talking stay close until either one moves on. The crowd's time together runs 6 times faster than the clock, so the 3 minutes of the encounter rule pass within 30 s and the graph grows while people watch.
 
@@ -105,7 +112,7 @@ What one crowd tick does.
 
 ```mermaid
 flowchart TB
-    SC["start_crowd: up to 2,000 crowd bands from 100, teams and booth staff"] --> CT["crowd_tick every 2 s"]
+    SC["start_crowd: up to 2,000 crowd bands from 100, every role but the medics"] --> CT["crowd_tick every 2 s"]
     CT -->|"a team's time is up"| MV["the team walks the aisles to a booth, food, the stage, another table, the entrance, or home"]
     MV -->|"zone or booth changed"| ST["zone_visit: old stay closed, new stay opened"]
     CT -->|"bands that changed"| BR["band: zone, booth, spot, neigh, state"]

@@ -5,7 +5,7 @@
 // is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, bandById, h, money, time } from './lib';
+import { act, bandById, capital, h, money, roleWords, time } from './lib';
 import { decideProposal, shapeWords, waitingProposals } from './rule-proposals';
 import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
@@ -253,7 +253,7 @@ function personWords(b: Band): [string, string[]] {
   const a = [...conn.db.boardAttendees.iter()].find(x => x.bandId === b.id);
   const light = b.fall ? 'Fell' : isDown(b) ? 'Pressed SOS' : b.state === 4 ? 'In the light circle around someone down' : LIGHTS[Math.min(b.state, 2)];
   return [a ? a.displayName || '(no name yet)' : 'Nobody wears this band', [
-    `Band ${bandCode(b.id)}${a?.organization ? `, ${a.organization}` : ''}`,
+    `${a ? `${capital(roleWords(a.role))}, band` : 'Band'} ${bandCode(b.id)}${a?.organization ? `, ${a.organization}` : ''}`,
     `${light}.`,
     pick ? 'Click to open them and fly to them.' : '',
   ].filter(Boolean)];

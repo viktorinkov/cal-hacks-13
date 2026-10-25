@@ -861,7 +861,7 @@ Views use indexed lookups, so per-caller views are cheap at event scale: a few s
 | `my_roles` | any | the caller's `staff_role` rows, so the photographer page and the tap page's medic view know the caller's role and the organizer portal knows which tabs and buttons to show |
 | `my_owner` | any | the caller's `owner` row, if any, so the organizer portal treats the module owner as holding every role, as the module does |
 | `venue_plan` | anyone; anonymous and public | the venue plan the Live tab's map draws: one row per zone with a station marker, a rectangle around its centre sized from `area_sq_m`, and one row per booth, with the spot its staff stand at and the spot in front of it where attendees stand (station id, booth id, name, two points) |
-| `board_attendees` | staff | one row per attendee: display name, graph node id, the band they wear (0 for none), `findable`, organisation and socials. Test-Bands.md: also `crowd`, set for a crowd attendee, whose band comes from `crowd_member` |
+| `board_attendees` | staff | one row per attendee: display name, graph node id, the band they wear (0 for none), `findable`, organisation and socials. Test-Bands.md: also `crowd`, set for a crowd attendee, whose band comes from `crowd_member`, and `role`: the crowd attendee's role from `crowd_group` (`hacker`, `booth_staff`, `organizer`, `photographer` or `speaker`), else `organizer` or `photographer` for staff with that role, else `speaker` for a claimed speaker profile, else `attendee` |
 | `my_departure` | any | the caller's `departure` row, so the tap page opens the recap once they have left |
 | `open_incidents` | staff | every incident not yet resolved |
 | `incident_bands(incident_id)` | staff | the subject and witness rows of one incident |

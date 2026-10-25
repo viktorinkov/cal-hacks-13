@@ -103,13 +103,15 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note; a belongings claim on a policy the attendee named shows "Policy found online from its name", the limit and deductible the attendee typed, and "Open the policy wording" | the Claims queue's tables; Insurance.md: `attendee_policy`; Bright-Data.md: `plan_lookup` | `approve_claim`, `refuse_claim` |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
-Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
+Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A second line counts the roles: "<n> hackers, <n> booth staff, <n> organizers, <n> photographers, <n> speakers, <n> attendees who tapped a band." Every row shows the person's role in a Role column: hacker, booth staff, organizer, photographer or speaker for the crowd, attendee for someone who tapped a band, and organizer or photographer for staff who tapped one. A crowd attendee's row is also marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
 
 ### Names in the 3D venue
 
 The Live tab's 3D view names the floor from the `venue_spot` rows: the areas, the exit doors, every sponsor over its tables and the named places. A name that would cover another hides until the camera comes closer, and close up a sponsor's name climbs a line or two so neighbouring tables all show theirs.
 
 Each exit door shows its exit marker ([Hardware](../4-devices/Hardware.md)): a post and a ring on the floor glowing its exit colour, and under the door's name "exit marker <station id>, <colour>". The colour is the one the station marker reports in `station`, else its zone's `exit_colour`, else blue.
+
+Resting the pointer on a person in the 3D view shows their name, role, band code, company and their band's light.
 
 Each of our bands on the floor carries a blue tag with the name typed when it was placed (`band_place`) over its band code. The tags climb above each other and are never hidden.
 
@@ -123,9 +125,9 @@ A proposed rule waiting for the organizer shows above the decision history with 
 
 At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
 
-The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
+Everyone wears a band except the medics. The search box above the list matches every word typed against the name, the role (hacker, booth staff, organizer, photographer, speaker, attendee or medic), the kind of band (crowd band, test band or hardware band), the band code, the company and the socials. Each row shows the role, the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
 
-"Open" shows the person above the list, with their band code, status, zone, company, socials and join time, and "walking to <door>" or "left at <time> by <door>" once they leave early. Staff act as them from there.
+"Open" shows the person above the list, with their band code, role, kind of band, status, zone, company, socials and join time, and "walking to <door>" or "left at <time> by <door>" once they leave early. Staff act as them from there.
 
 Under the zone table, "Left early (<n>)" lists everyone with a `departure` row while the event runs: the name, the door, when they set off, when they walked out (or "walking") and who sent them, with "Open" for the person.
 
