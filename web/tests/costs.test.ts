@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { claimLine, margin, merchBooks, rollUp } from '../src/costs';
+import { claimLine, insurerReceiptStatus, margin, merchBooks, rollUp } from '../src/costs';
 import type { BoardMerchOrder, Claim, LedgerEntry, MerchTemplate } from '../src/module_bindings/types';
 
 const claim = { id: 1n, status: { tag: 'Settled' }, coverKind: 'property', costCents: 240000n, payoutCents: 240000n, venueCostCents: 50000n } as Claim;
@@ -44,6 +44,24 @@ test('final insurer short payment closes the receivable and raises the venue cos
   expect(line.insurerPaid).toBe(180000n);
   expect(line.shortPaid).toBe(10000n);
   expect(line.venueCost).toBe(60000n);
+});
+
+test('closed claim status shows the actual receipt for partial, full, excess and zero payments', () => {
+  const reconciled = { ...claim, status: { tag: 'Reconciled' }, recoverableCents: 190000n } as Claim;
+  for (const [received, amount] of [[180000n, '$1,800.00'], [190000n, '$1,900.00'], [200000n, '$2,000.00'], [0n, '$0.00']] as const) {
+    const ledger = [...paidClaim,
+      entry('J4 reconciliation', 'cash', received, 0n),
+      entry('J4 reconciliation', 'insurer_receivable', 0n, reconciled.recoverableCents),
+      entry('J6 charge payment', 'cash', 240000n, 0n),
+      { ...entry('J4 reconciliation', 'cash', 999999n, 0n), claimId: 2n },
+    ];
+    expect(insurerReceiptStatus(reconciled, ledger)).toBe(`Closed: the insurer paid ${amount} back. Nothing is waiting.`);
+  }
+});
+
+test('closed claim status does not invent a receipt amount when its journal is unavailable', () => {
+  const reconciled = { ...claim, status: { tag: 'Reconciled' }, recoverableCents: 190000n } as Claim;
+  expect(insurerReceiptStatus(reconciled, paidClaim)).toBe('Closed: the insurer payment is recorded. Nothing is waiting.');
 });
 
 test('paid sponsor and plain orders produce revenue without claims and preserve cents across booths', () => {

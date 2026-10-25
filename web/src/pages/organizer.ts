@@ -12,7 +12,7 @@ import {
   signIn, signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
-import { costsTab } from '../costs';
+import { costsTab, insurerReceiptStatus } from '../costs';
 import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
@@ -928,7 +928,7 @@ function whoPays(c: Claim) {
   if (!c.costCents && !c.payoutCents) return null;
   const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
   const cover = `${COVER_WORDS[c.coverKind] ?? c.coverKind} cover${c.incidentKind === 'theft' ? ', theft as a cause of loss' : ''}`;
-  const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${cover}` : 'The insurer pays back';
+  const insurer = policy ? `Expected recovery from ${policy.insurerName}, policy ${policy.policyNumber}, ${cover}` : 'Expected insurer recovery';
   const rows: [string, bigint][] = [
     ['Cost', c.costCents],
     [`Paid to ${payee(c)}`, c.payoutCents],
@@ -957,7 +957,7 @@ function claimList() {
     h('h3', {}, 'All claims and who pays them'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. An attendee files one from their band page after an injury, or staff file it for them above.'),
     claims.length > 0 && searchable('claims', h('table', {},
-      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Insurer pays back'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
+      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Expected insurer recovery'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
         h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '(none)')), h('td', {}, `${kindWords(c.incidentKind)} in ${c.zoneName}`),
@@ -1021,7 +1021,7 @@ function waiting(c: Claim, hospital: boolean): string {
     case 'Paying': return payoutFailed(c) ? `Approved. The payout to ${name}'s wallet failed and waits for a retry.` : `Approved. Paying ${money(c.payoutCents)} into ${name}'s wallet.`;
     case 'Settled': return `Paid out. Waiting for the insurer to pay ${money(c.recoverableCents)} back.`;
     case 'Refused': return 'Refused: nothing is paid. Nothing is waiting.';
-    case 'Reconciled': return `Closed: the insurer paid ${money(c.recoverableCents)} back. Nothing is waiting.`;
+    case 'Reconciled': return insurerReceiptStatus(c, [...conn.db.boardLedger.iter()]);
     default: return '';
   }
 }
