@@ -338,8 +338,8 @@ def badge(box, n):
 
 
 def insurance(y0):
-    S.begin_frame("7 · Insurance Decision Engine", 0, y0, 1000, 600)
-    S.text(40, 28, "Insurance Decision Engine", fs=64)
+    S.begin_frame("7 · Claim Settlement", 0, y0, 1000, 600)
+    S.text(40, 28, "Claim Settlement", fs=64)
     A, Bx, C1, C2, D_, E, F = 60, 760, 1440, 2160, 2960, 3840, 4580
     p = [330, 640, 950]  # documents rows
     mk = dict(fill=WHITE)
@@ -389,9 +389,9 @@ def insurance(y0):
     D(reader, "r", 0.93, bill, "l", 0.5, "bill lines")
     checks = B(E, 0, "checks bill\ntotals, patient\ndate, injury code\nno duplicate", "rust", w=560, h=300,
                wordmark=RUST, mark_h=70, cy=bill.cy - S.oy)
-    split = B(F, venue_terms.y - S.oy, "Which policy pays\ninjury: venue medical,\nrest to health plan\n"
-              "damage: venue property,\nabove deductible\ntheft: if theft clause\nown things: organizer\n"
-              "charge: responsible attendee", "rust", w=600, h=checks.bottom - venue_terms.y,
+    split = B(F, venue_terms.y - S.oy, "Who pays what\nvenue medical: injury\nhealth plan: the rest\n"
+              "venue property: damage\nabove deductible\ntheft clause: theft\nresponsible attendee: charge\n"
+              "own things: organizer", "rust", w=600, h=checks.bottom - venue_terms.y,
               wordmark=RUST, mark_h=90)
     H(bill, checks, "bill lines")
     H(venue_terms, split, "venue terms", y=venue_terms.cy)
@@ -429,7 +429,7 @@ def insurance(y0):
     tz = Z(3320, pack.y - S.oy, 1800, 90 + 330 + 50 + 330 + 50, "tools", "plain")
     search = B(3360, pack.y - S.oy + 90, "search_policy\nread_clause\nboth policies", "ext", w=800, h=330,
                wordmark=ELASTIC, mark_h=60, **mk)
-    rchecks = B(4240, pack.y - S.oy + 90, "read_checks\nbill checks\nwhich policy pays", "rust", w=840, h=330,
+    rchecks = B(4240, pack.y - S.oy + 90, "read_checks\nbill checks\nwho pays what", "rust", w=840, h=330,
                 wordmark=RUST, mark_h=60, **mk)
     revid = B(3360, search.bottom - S.oy + 50, "read_evidence\nband, light circle, security cameras\n"
               "medic notes, hospital report", "stdb", w=1720, h=330, wordmark=CAMERA, mark_h=110, **mk)
@@ -440,14 +440,14 @@ def insurance(y0):
     H(tz, claude, "returns", y=tz.y + tz.h * 0.7)
     R(search, "t", clauses, "b", [(search.cx, clauses.bottom + 80), (clauses.cx, clauses.bottom + 80)],
       label="semantic search", seg=1)
-    V(split, rchecks, "venue share\ninsurer share", x=rchecks.cx)
+    V(split, rchecks, "share per payer", x=rchecks.cx)
 
     # 6. code holds Claude to its limits
     r3 = L(pack.bottom) + 330
     guard = B(2360, 0, "guard\namounts from code\nrefuse alone: failed check\npay alone: rule ceiling", "rust",
               w=760, h=330, wordmark=RUST, mark_h=70, cy=r3)
     refused = B(1300, 0, "refused\nreason shown", "bad", w=640, h=200, cy=r3)
-    payout = B(3720, 0, "payout\nattendee, repair vendor\ncharge responsible attendee\nup to $5,000 per claim\n"
+    payout = B(3720, 0, "settles\npays attendee, repair vendor\ncharges responsible attendee\nup to $5,000 per claim\n"
                "within $25,000 per event\ndouble-entry journals", "rust", w=640, h=380, wordmark=RUST, mark_h=60, cy=r3)
     nessie = B(4600, 0, "deposit, charge\n(wallet)", "ext", w=500, h=240, wordmark=CAPONE, mark_h=60, cy=r3 - 100,
                **mk)
@@ -464,7 +464,7 @@ def insurance(y0):
     org = B(2200, 0, "Organizer decides\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
             wordmark=USER, mark_h=260, cy=r4)
     stale = B(3720, 0, "amount and evidence\nunchanged", "rust", w=640, h=240, wordmark=RUST, mark_h=60, cy=r4)
-    insurer = B(4600, 0, "attendee insurer claim\nnotice of loss", "claude", w=500, h=240, wordmark=CLAUDE,
+    insurer = B(4600, 0, "health plan claim\nnotice of loss", "claude", w=500, h=240, wordmark=CLAUDE,
                 mark_h=90, cy=r4, **mk)
     rules = B(1240, 0, "learned rules\nversion, approver", "stdb", w=640, h=220, wordmark=STDB, mark_h=50,
               cy=L(org.y) + org.h * 0.72, **mk)
@@ -474,7 +474,7 @@ def insurance(y0):
     H(org, stale, "approves", y=org.cy)
     V(stale, payout, "unchanged", x=stale.cx)
     R(payout, "r", insurer, "l", [(payout.right + 110, payout.y + payout.h * 0.85), (payout.right + 110, insurer.cy)],
-      label="insurer share", seg=1, fa=0.85)
+      label="health plan share", seg=1, fa=0.85)
     D(org, "t", 0.06, refused, "b", 0.85, "refuses")
     teach = H(org, rules, "teaches a rule", dashed=True, color="#2b8a3e", y=rules.cy)
     teach["strokeWidth"] = 4
