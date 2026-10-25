@@ -353,7 +353,7 @@ When either of you stood at no booth, or Elastic cannot answer, the line falls b
 |---|---|
 | `your_booth` | Your booth closest by meaning to `their_booth` |
 | `their_booth` | Their booth closest by meaning to your interests |
-| `topic` | A tag both booths carry, such as "drones"; empty when they share none |
+| `topic` | A tag both booths carry, such as "drones", other than a booth kind such as "sponsor"; empty when they share none |
 
 
 ### Share links

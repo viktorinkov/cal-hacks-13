@@ -623,9 +623,11 @@ pub fn their_best_booths(s: &Summary, theirs: &[Closest], max: usize) -> Vec<u64
 
 /// Gives each person who shares no booth with you the closest pair: their booth closest to your
 /// interests (`theirs`), your booth closest to that one (`yours`, keyed by their booth) and a tag both
-/// carry. Someone whose pair Elastic did not find keeps none.
+/// carry, other than a kind every such booth has, such as "sponsor". Someone whose pair Elastic did not
+/// find keeps none.
 pub fn apply_similar(s: &mut Summary, booths: &[Booth], theirs: &[Closest], yours: &BTreeMap<u64, Closest>) {
     let name = |id: u64| booths.iter().find(|b| b.id == id).map(|b| b.name.clone());
+    let kind = |t: &str| booths.iter().any(|b| b.kind.eq_ignore_ascii_case(t));
     for (interests, similar) in everyone(s).filter(|(i, _)| shares_no_booth(i)) {
         let Some(best) = their_best(interests, theirs) else {
             continue;
@@ -639,7 +641,7 @@ pub fn apply_similar(s: &mut Summary, booths: &[Booth], theirs: &[Closest], your
         let topic = best
             .tags
             .iter()
-            .find(|t| mine.tags.iter().any(|m| m.eq_ignore_ascii_case(t)))
+            .find(|t| !kind(t) && mine.tags.iter().any(|m| m.eq_ignore_ascii_case(t)))
             .cloned()
             .unwrap_or_default();
         *similar = Some(Similar { your_booth, their_booth, topic });
@@ -1162,12 +1164,13 @@ mod tests {
             tags: tags.iter().map(|t| t.to_string()).collect(),
         };
         // Skydio is the closest to Ada's interests, then the Elastic booth.
-        let theirs = vec![closest(13, &["Drones", "hardware"]), closest(10, &["search"])];
+        let theirs = vec![closest(13, &["Sponsor", "Drones", "hardware"]), closest(10, &["sponsor", "search"])];
         // Di comes first, under the people Ada met, then Fay.
         assert_eq!(their_best_booths(&s, &theirs, 12), vec![10, 13]);
         assert_eq!(their_best_booths(&s, &theirs, 1), vec![10]);
 
-        let yours = BTreeMap::from([(13, closest(12, &["drones"])), (10, closest(11, &["robots"]))]);
+        // Every booth is a sponsor's, so "sponsor" names no topic.
+        let yours = BTreeMap::from([(13, closest(12, &["sponsor", "drones"])), (10, closest(11, &["sponsor", "robots"]))]);
         apply_similar(&mut s, &rows.booths, &theirs, &yours);
         let similar = |yours: &str, theirs: &str, topic: &str| Some(Similar {
             your_booth: yours.into(),
