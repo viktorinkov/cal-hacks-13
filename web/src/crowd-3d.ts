@@ -15,6 +15,10 @@ const RADIUS_M = 0.3;
 const LENGTH_M = 0.9;
 const HALF_HEIGHT_M = RADIUS_M + LENGTH_M / 2;
 const PRESENTER_SCALE = 1.6;
+/** A pick reaches this far off the ray per metre from the camera: about 6 pixels at the Live tab's size. */
+const PICK_RADIANS = 0.006;
+const AT = new THREE.Vector3();
+const TO = new THREE.Vector3();
 /** Anyone not on a walk from the module walks to their new spot at 1.1 to 1.5 m/s, as the crowd does, taking
  * at least this long. Farther than JUMP_M they stand at the new spot at once: a straight line that long would
  * cross the hall's walls or leave the building, and walking it quickly would be a sprint. */
@@ -227,6 +231,27 @@ export class Crowd {
   /** The band drawn in an instance, after a pick. */
   bandAt(instance: number): Band | undefined {
     return this.slots[instance]?.band;
+  }
+
+  /** The person a ray from the camera passes through: within a body's reach, or a few pixels when they are far
+   *  away and small, the one nearest the middle of the ray. */
+  pick(ray: THREE.Ray): Band | undefined {
+    let best: Walker | undefined;
+    let score = 1;
+    for (const w of this.list) {
+      if (!w.shown) continue;
+      const s = isOurs(w.band.id) ? PRESENTER_SCALE : 1;
+      AT.set(w.x, (w.band.fall ? RADIUS_M : HALF_HEIGHT_M) * s, w.z);
+      const along = TO.subVectors(AT, ray.origin).dot(ray.direction);
+      if (along <= 0) continue;
+      const reach = Math.max(HALF_HEIGHT_M * s, along * PICK_RADIANS);
+      const off = ray.distanceSqToPoint(AT) / (reach * reach);
+      if (off < score) {
+        score = off;
+        best = w;
+      }
+    }
+    return best?.band;
   }
 
   /** Moves every band one frame along its walk and writes the instances. */
