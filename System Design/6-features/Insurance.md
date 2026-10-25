@@ -532,7 +532,7 @@ A property claim skips `Paying`: settling it posts J3 to the repair vendor at on
 
 ### Ledger
 
-`ledger_entry` rows are double-entry: each journal has debits equal to credits, and posting rejects a journal that does not balance.
+`ledger_entry` rows are double-entry: each journal has debits equal to credits, and posting rejects a journal that does not balance. The organizer portal's Costs tab sums these journals into the event's costs so far ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
 
 | Account | Kind |
 |---|---|

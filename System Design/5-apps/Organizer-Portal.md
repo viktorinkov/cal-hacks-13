@@ -77,7 +77,8 @@ The no-role screen. A signed-in person with no staff role sees no tabs. The page
 The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, and "Zones" with the low-visibility button and the zone table), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
 
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
-- Social.md: the Event graph tab, then the Photos tab, after Claims (see Event graph and Photos tab below).
+- Insurance.md: the Costs tab, right after Claims (see Costs tab below).
+- Social.md: the Event graph tab, then the Photos tab, after Costs (see Event graph and Photos tab below).
 - Merch.md: the Merch tab, after Photos (see Merch tab below).
 - Bright-Data.md: the Venue setup tab, after Merch (see Venue setup tab below).
 - Elastic.md: the Kibana tab, after Merch and Venue setup (see Kibana tab below).
@@ -248,6 +249,42 @@ sequenceDiagram
     Mod-->>Org: the incident leaves Open incidents
 ```
 
+### Costs tab (Insurance.md)
+
+The Costs tab shows the event's costs so far, from the incidents the event has covered. It answers one question for the organizer, who acts as the event's controller: who pays what.
+
+It sums the double-entry `ledger_entry` journals that the claims post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every number agrees with the Settlements tab, and the tab keeps no totals of its own.
+
+Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), and property cover goes to Venue (the venue's own equipment). A claim counts once, in one cost center.
+
+The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application.
+
+"Costs so far by cost center" has one row per cost center and a total row:
+
+| Column | From |
+|---|---|
+| Claims | the claims in the cost center |
+| Billed | the hospital report's billed total, or the repair cost the organizer logged |
+| Accrued | J1 reserves not yet paid: the `claims_reserve` balance |
+| Paid | J3 payments: the `cash` credits |
+| Insurer owes | J2 receivables not yet paid back: the `insurer_receivable` balance |
+| Insurer paid | J4 receipts: the `cash` debits |
+| Venue's cost | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
+| Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
+
+"Who pays what" sums the same journals by party:
+
+- The venue: its cost, split into deductibles, insurer short payments (the J4 difference) and reserves whose insurer share is not posted yet.
+- The venue's insurer: what it paid back and what it still owes.
+- Attendees or their health plans: what Medical did not cover.
+- Still to pay: the accrued reserves.
+
+"Cost lines" has one row per claim with its cost center, claimant, incident, status and the same amounts. The claim number opens the claim on the Settlements tab.
+
+"Journal" starts with the trial balance: one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. Below it comes every journal entry, newest first, with its name, claim, lines, who posted it and when.
+
+The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
+
 ### Event graph (Social.md)
 
 The event graph is a big-screen view for the event: the whole event as one live 3D graph of people, booths, companies and the event photos. Judges watch it grow as people meet, visit booths and turn up in photos.
@@ -365,7 +402,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | `board_attendees` | the attendee list on the Attendees tab, and the name of the attendee who wears the band on an "Alerts" line or an incident |
 | `my_roles`, `my_owner` | the caller's own roles and whether they are the owner, for the header, the tabs and the hidden buttons |
 | `event_state` | the "Event ended" button |
-| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, filing the hospital report |
+| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, filing the hospital report, the Costs tab |
 | Medical-Card.md: `medic_medical_cards`, `board_medical_access` | the medical card in the incident desk, the medical access log |
 | Vision.md (TBD -- LEO): `camera`, `camera_count`, `ground_alert`, `vision_assessment` | camera tile, the security camera's count in the zone table |
 | Social.md: `event_graph` | event graph |
