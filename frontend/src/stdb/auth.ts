@@ -57,6 +57,8 @@ export async function beginSignIn(): Promise<void> {
     code_challenge: base64url(digest),
     code_challenge_method: 'S256',
     state,
+    // This is an explicit sign-in action, including switching accounts after signing out.
+    prompt: 'login',
   })
   window.location.assign(`${AUTH}/auth?${query}`)
 }
@@ -89,4 +91,21 @@ export async function finishSignIn(): Promise<string> {
   window.sessionStorage.removeItem(PENDING)
   const back = pending.back ?? ''
   return back.startsWith('/') && !back.startsWith('//') ? back : '/organizer'
+}
+
+/** Remove this app's account and draft data without changing other applications' storage. */
+export function clearSignInCredentials(database: string): void {
+  window.localStorage.removeItem(ID_TOKEN)
+  window.localStorage.removeItem(`bandit-token:${database}`)
+  window.localStorage.removeItem('bandit-token')
+  window.localStorage.removeItem('bandit.cover')
+  window.sessionStorage.removeItem(PENDING)
+  window.sessionStorage.removeItem('bandit-band')
+}
+
+/** A full navigation closes this page's sockets and clears its cached account data. */
+export async function signOut(): Promise<void> {
+  const host = await loadHostConfig()
+  clearSignInCredentials(host.database)
+  window.location.replace('/organizer')
 }

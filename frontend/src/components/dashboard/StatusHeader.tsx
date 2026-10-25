@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { DeskTabs } from '@/components/desk/DeskTabs'
-import { NightControls } from '@/components/dashboard/NightControls'
 import { useVenuePlan, type VenuePlan } from '@/map/venuePlan'
-import { useOperatorName } from '@/stdb/operatorName'
 import { selectVenuePlan } from '@/services/runtime'
 import { useServerNow } from '@/hooks/useServerNow'
 import { clock, elapsed } from '@/lib/format'
@@ -36,8 +33,6 @@ export function StatusHeader() {
   const now = useServerNow(2)
   const tz = venue?.timeZone
 
-  const operator = useOperatorName()
-
   const h = useMemo(() => {
     const zoneList = Object.values(zones)
     return headline({
@@ -65,13 +60,7 @@ export function StatusHeader() {
   return (
     <header className="pointer-events-auto flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-display text-[30px] leading-none tracking-[-0.01em] text-ink">Band1t</span>
-          <VenueSelect />
-          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
-        </div>
-        <DeskTabs />
-        <NightControls />
+        <VenueSelect />
       </div>
       <div className="flex gap-4">
         <span aria-hidden className={cn('mt-2 w-[3px] flex-none rounded-full', toneBar[h.tone])} />
@@ -79,7 +68,7 @@ export function StatusHeader() {
           <h1 className="font-display text-[clamp(34px,2.6vw,56px)] leading-[0.98] tracking-[-0.015em] text-ink" aria-live="polite">
             {h.title}
           </h1>
-          {h.sentence && <p className="max-w-[34ch] text-[15px] leading-[1.5] text-ink-dim">{h.sentence}</p>}
+          <p className="max-w-[34ch] text-[15px] leading-[1.5] text-ink-dim">{h.sentence}</p>
         </div>
       </div>
       <div className="flex items-center gap-3 pl-[19px] font-mono text-[12.5px] text-ink-dim">
@@ -97,15 +86,15 @@ export function StatusHeader() {
   )
 }
 
+const PLANS: { id: VenuePlan; label: string }[] = [
+  { id: 'calhacks', label: 'CalHacks 13.0' },
+  { id: 'simulation', label: 'Simulation' },
+]
+
 function VenueSelect() {
   const plan = useVenuePlan((s) => s.plan)
-  const venue = useWorld((s) => s.venue)
   const [menu, setMenu] = useState(false)
-  const plans: { id: VenuePlan; label: string }[] = [
-    { id: 'calhacks', label: plan === 'calhacks' ? venue?.name || 'Event venue' : 'Event venue' },
-    { id: 'simulation', label: 'Concert venue' },
-  ]
-  const label = plans.find((item) => item.id === plan)?.label ?? 'Venue'
+  const label = PLANS.find((item) => item.id === plan)?.label ?? 'Venue'
   return (
     <div className="relative">
       <button
@@ -121,7 +110,7 @@ function VenueSelect() {
       </button>
       {menu && (
         <ul role="listbox" aria-label="Venues" className="nc-panel absolute left-0 top-8 z-20 flex min-w-44 flex-col p-1">
-          {plans.map((item) => (
+          {PLANS.map((item) => (
             <li key={item.id}>
               <button
                 type="button"
