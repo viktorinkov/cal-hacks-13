@@ -36,11 +36,20 @@ git fetch -q origin "$BANDIT_BRANCH"
 git reset -q --hard FETCH_HEAD
 echo "building $(git log --oneline -1)"
 (cd web && bun install --silent && bun run --silent build > /dev/null)
-# The command center is built into frontend/dist (Vite base /cc/). Copy it aside so Caddy
-# can serve the desk without taking /callback, /api, /config.json, or /blobs.
-install -d -m 755 /var/lib/bandit/command-center
-find /var/lib/bandit/command-center -mindepth 1 -delete
-cp -a frontend/dist/. /var/lib/bandit/command-center/
+# The command center is the desk at /organizer. Publish the committed build first, then replace it
+# if a fresh one succeeds. A failed build keeps the last desk up. /callback, /api, and /blobs stay proxied.
+if [ -f frontend/dist/index.html ]; then
+  rm -rf /srv/bandit-desk.new && cp -r frontend/dist /srv/bandit-desk.new
+  rm -rf /srv/bandit-desk && mv /srv/bandit-desk.new /srv/bandit-desk
+fi
+if [ -f frontend/package.json ]; then
+  if (cd frontend && bun install --silent && bun run --silent build:host > /dev/null); then
+    rm -rf /srv/bandit-desk.new && cp -r frontend/dist /srv/bandit-desk.new
+    rm -rf /srv/bandit-desk && mv /srv/bandit-desk.new /srv/bandit-desk
+  else
+    echo "command center build failed, keeping the last one"
+  fi
+fi
 CARGO_PROFILE_DEV_DEBUG=0 cargo build -q -p bandit-api -p bandit-indexer -p bandit-workers -p bandit-claims
 [ -x var/venv/bin/python3 ] || python3 -m venv var/venv
 var/venv/bin/pip install -q playwright requests
@@ -53,28 +62,30 @@ systemctl enable -q bandit@api bandit@indexer bandit@workers bandit-live
 systemctl restart bandit@api bandit@indexer bandit@workers bandit-live
 systemctl enable -q --now bandit-autodeploy.timer
 
-# /deploy/ shows deploy/autodeploy.sh's last deploy (status.txt) and its log.
-# The desk routes are the command center. /portal keeps the previous organizer page.
+# /deploy/ shows the last deploy. dev.$BANDIT_HOST keeps the plain pages for testing.
+# The first line names the main host, which deploy/autodeploy.sh reads back.
+# /organizer and the other desk routes are the command center. /portal keeps the previous organizer page.
 install -d -m 755 /srv/bandit-deploy
-cat > /etc/caddy/Caddyfile <<EOF
-${BANDIT_HOST}, www.${BANDIT_HOST} {
+cat > /etc/caddy/Caddyfile <<CADDY
+$BANDIT_HOST, www.$BANDIT_HOST {
 	handle_path /deploy/* {
 		root * /srv/bandit-deploy
 		file_server
 	}
-	handle /cc/* {
-		root * /var/lib/bandit/command-center
-		uri strip_prefix /cc
+	redir /cc /cc/
+	handle_path /cc/* {
+		root * /srv/bandit-desk
+		try_files {path} /index.html
 		file_server
 	}
 	@desk path /organizer /organizer/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/
 	handle @desk {
-		root * /var/lib/bandit/command-center
+		root * /srv/bandit-desk
 		rewrite * /index.html
 		file_server
 	}
 	handle /portal /portal/ {
-		root * ${APP}/web
+		root * $APP/web
 		rewrite * /organizer.html
 		file_server
 	}
@@ -82,7 +93,17 @@ ${BANDIT_HOST}, www.${BANDIT_HOST} {
 		reverse_proxy 127.0.0.1:8080
 	}
 }
-EOF
+
+dev.$BANDIT_HOST {
+	handle_path /deploy/* {
+		root * /srv/bandit-deploy
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}
+CADDY
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
 printf '%s %s deployed at %s\n' "$BANDIT_BRANCH" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > /srv/bandit-deploy/status.txt

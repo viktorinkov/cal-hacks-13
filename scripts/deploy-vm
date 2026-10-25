@@ -1,7 +1,7 @@
 #!/bin/sh
 # Deploy BandIt to the Debian VM: scripts/deploy-vm root@band1t.vip (the Vultr server).
 # Copies the service keys from .env, the module owner's token and the Maincloud identities over SSH straight
-# to the VM, then runs deploy/setup.sh there with sudo, which builds $BANDIT_BRANCH (default vik-deploy) and
+# to the VM, then runs deploy/setup.sh there with sudo, which builds $BANDIT_BRANCH (default vik-e2e) and
 # serves it on https://<dns name> and www. Run it again to update the VM. The VM also deploys vik-e2e by itself
 # whenever it moves on GitHub (deploy/autodeploy.sh), which is how cloud threads ship.
 set -e
@@ -10,7 +10,7 @@ TARGET="$1"
 [ -n "$TARGET" ] || { echo "usage: scripts/deploy-vm <user>@<dns name>" >&2; exit 2; }
 ENV_FILE="${ENV_FILE:-$ROOT/.env}"
 IDENTITIES="${IDENTITIES:-$ROOT/.dev/e2e-maincloud/identities}"
-BRANCH="${BANDIT_BRANCH:-vik-deploy}"
+BRANCH="${BANDIT_BRANCH:-vik-e2e}"
 HOST="${TARGET#*@}"
 SSH="ssh -o StrictHostKeyChecking=accept-new $TARGET"
 
