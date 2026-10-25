@@ -7,7 +7,7 @@
 # .env and .dev/e2e-maincloud/identities. The project folder is mounted after this script, so every new shell runs it.
 set -e
 curl -fsSL https://spacetimedb-client-binaries.s3.amazonaws.com/refs/tags/v2.13.0/spacetime-x86_64-unknown-linux-gnu.tar.gz \
-  | tar -xz -C /usr/local/bin spacetimedb-cli
+  | tar -xz -C /usr/local/bin spacetimedb-cli spacetimedb-standalone
 mv /usr/local/bin/spacetimedb-cli /usr/local/bin/spacetime
 rustup target add wasm32-unknown-unknown || true
 git config --global user.name "Viktor Minchev"
