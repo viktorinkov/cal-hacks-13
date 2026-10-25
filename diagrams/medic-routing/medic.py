@@ -7,8 +7,6 @@
 
 path.mts runs web/src/floor-path.ts itself, so the paths on the picture are the ones the Live tab draws.
 """
-import base64
-import hashlib
 import math
 import pathlib
 import sys
@@ -36,6 +34,7 @@ RUST, THREE, PYTHON = logo("rust.svg"), logo("threedotjs.svg"), logo("python.svg
 USER, PHONE, MONITOR, RADIO, WATCH, WALK, HEART, NFC = (logo(f"icon-{n}.svg") for n in (
     "user", "smartphone", "monitor", "radio", "watch", "footprints", "heart-pulse", "file-text"))
 NFC = logo("nfc.svg")
+CLOCK, PIN = logo("icon-clock.svg"), logo("icon-map-pin.svg")
 
 
 def L(v, axis="y"):
@@ -100,23 +99,15 @@ def Z(x, y, w, h, label, kind, logo_=None):
 
 
 def picture(x, y, path, w):
-    """A big picture at frame-local x, y, w pixels wide, with a thin border."""
-    data = pathlib.Path(path).read_bytes()
-    fid = hashlib.sha1(data).hexdigest()[:20]
-    mime = "image/jpeg" if str(path).endswith(".jpg") else "image/png"
-    S.files.setdefault(fid, {"mimeType": mime, "id": fid, "created": 1792828800000,
-                             "dataURL": f"data:{mime};base64," + base64.b64encode(data).decode()})
-    h = w / aspect(path) if mime == "image/png" else w * pic_ratio(path)
-    el = S.base("image", S.ox + x, S.oy + y, w, h, fileId=fid, status="saved", scale=[1, 1], crop=None,
-                strokeColor="transparent")
+    """A standalone floor drawing with a thin border."""
+    h = w / aspect(path)
+    el = S.image(S.ox + x, S.oy + y, path, h)
     S.base("rectangle", S.ox + x, S.oy + y, w, h, strokeColor="#868e96", strokeWidth=2, roughness=0)
     return Box(el)
 
 
-def pic_ratio(path):
-    from PIL import Image
-    w, h = Image.open(path).size
-    return h / w
+def card(x, y, label, icon, kind="web", w=520, h=240):
+    return B(x, y, label, kind, w=w, h=h, wordmark=icon, mark_h=120, fill=WHITE)
 
 
 def badge(box, n):
@@ -195,46 +186,40 @@ def routing(y0):
 
 # ---------------------------------------------------------------- 2. Medic walk
 def walk(y0):
-    S.begin_frame("Medic walk", 0, y0, 1000, 600)
-    title("Medic walk")
-    floor = picture(60, 150, HERE / "floor-paths.png", 1800)
-    sx, sw, rx = 1980, 520, 2620
-    s1 = B(sx, 150, "incident_marker\nresponding_at", "stdb", w=sw)
-    s2 = B(sx, 360, "nearest door\nstraight distance", "web", w=sw, icons={0: WALK})
-    s3 = B(sx, 570, "snap to floor\n25 cm cells", "web", w=sw)
-    s4 = B(sx, 770, "straight line\nclear?", "web", w=sw, h=200, shape="diamond")
-    s5 = B(sx, 1060, "A* search\n8 directions", "web", w=sw)
-    s6 = B(sx, 1270, "fewest corners", "web", w=sw)
-    s7 = B(sx, 1480, "stop 1.4 m short\n5 m/s, 1.5 to 9 s", "web", w=sw)
-    straight = B(rx, 0, "walk straight", "web", w=460, cy=L(s4.cy))
-    json_ = B(rx, 0, "floor.json\nvenue_floor.py", "rust", w=460, cy=L(s3.cy), icons={1: PYTHON})
-    crowd = B(rx, 0, "venue::floor\ncrowd walks", "rust", w=460, cy=L(s5.cy), icons={0: RUST})
-    Z(sx - 30, 90, sw + 60, 1480 + BH + 40 - 90, "floor-path.ts", "web")
-    V(s1, s2, "sets off")
-    V(s2, s3, "snaps")
-    V(s3, s4, "checks")
-    V(s4, s5, "blocked")
-    V(s5, s6, "straightens")
-    V(s6, s7, "walks")
-    H(s4, straight, "clear")
-    H(json_, s3, "loads")
-    H(s5, crowd, "same search", both=True)
-    R(straight, "r", s7, "r", [(straight.right + 60, straight.cy), (straight.right + 60, s7.cy)], label="walks", seg=1)
-    # what the picture shows
-    ly = L(floor.bottom) + 50
-    lw = 336
-    chips = [("medic walk", "good", "#63e6be", False, False), ("straight line", "bad", "#ffe3e3", True, False),
-             ("person down", "bad", "#ff8787", False, False), ("door", "web", "#4dabf7", False, False),
-             ("tables, walls", "stdb", "#495057", False, True)]
-    for i, (t, k, fill, dashed, white) in enumerate(chips):
-        chip = B(60 + i * (lw + 30), ly, t, k, w=lw, fill=fill, dashed=dashed)
-        if white:
-            white_text(chip)
-    shot = picture(60, ly + BH + 90, HERE / "live-medic.jpg", 1800)
-    cy0 = max(L(shot.y) + 40, 1480 + BH + 120)
-    status = [("open", "#ffc9c9"), ("medic on way", "#ffe8a3"), ("resolved", "#b2f2bb"), ("medic", WHITE)]
-    for i, (t, fill) in enumerate(status):
-        B(sx, cy0 + i * (BH + 50), t, "web", w=sw, fill=fill, icons={0: USER} if t == "medic" else None)
+    S.begin_frame("Medic walk", 0, y0, 3340, 1920)
+    medic = card(80, 60, "medic", USER, w=440)
+    route_map = card(690, 60, "route", WALK, w=440)
+    attendee = card(1300, 60, "attendee", HEART, w=440)
+    H(medic, route_map, "walks")
+    H(route_map, attendee, "reaches")
+    for box, n in ((medic, 1), (route_map, 2), (attendee, 3)):
+        badge(box, n)
+    floor = picture(60, 430, HERE / "floor-paths.png", 1680)
+    V(route_map, floor, "follows aisles", x=route_map.cx)
+
+    incident = card(1980, 60, "incident_marker", HEART, "stdb")
+    nearest = card(1980, 480, "nearest door", PIN)
+    clear = B(1980, 880, "clear route", "web", w=520, h=240, shape="diamond")
+    search = card(1980, 1280, "A* search", WALK)
+    floor_data = card(2760, 480, "floor.json", PYTHON, "rust")
+    straight = card(2760, 880, "straight route", WALK)
+    route = card(2760, 1280, "medic walk", WALK, "good")
+    stop = card(2760, 1680, "attendee", HEART)
+    Z(1940, 390, 1380, 1150, "floor-path.ts", "web")
+    V(incident, nearest, "selects entry")
+    V(nearest, clear, "checks aisle")
+    D(floor_data, "l", 0.75, clear, "r", 0.25, "loads floor")
+    H(clear, straight, "walks direct")
+    V(clear, search, "finds detour")
+    H(search, route, "follows aisles")
+    V(straight, route, "walks")
+    V(route, stop, "stops nearby")
+
+    ly = L(floor.bottom) + 90
+    for x, label, kind, fill in ((60, "medic walk", "good", "#63e6be"),
+                                 (650, "blocked route", "bad", "#ffe3e3"),
+                                 (1240, "attendee", "bad", "#ff8787")):
+        B(x, ly, label, kind, w=500, fill=fill)
     return S.end_frame()
 
 
@@ -299,36 +284,34 @@ def light_circle(y0):
 
 # ---------------------------------------------------------------- 4. Exits
 def exits(y0):
-    S.begin_frame("Exits", 0, y0, 1000, 600)
-    title("Exits")
-    shot = picture(60, 150, HERE / "exit-marker.jpg", 1200)
-    picture(60, L(shot.bottom) + 60, HERE / "doors.png", 1200)
-    c1, c2 = 1400, 2080
-    r1, r2, r3 = 200, 420, 640
-    marker = B(c1, r1, "station marker\nat each exit", "device", w=560, icons={0: RADIO})
-    glow = B(c2, r1, "exit marker\nexit color", "device", w=500)
-    band = B(c1, r2, "band\nloudest station", "device", w=560, icons={0: WATCH})
-    guide = B(c2, r2, "GUIDE\nchases color", "device", w=500)
-    zone = B(c1, r3, "zone\nnearest door", "stdb", w=560)
-    H(marker, glow, "glows")
+    S.begin_frame("Exits", 0, y0, 3380, 2040)
+    picture(60, 80, HERE / "doors.png", 1680)
+    marker = card(1980, 80, "station marker", RADIO, "device", w=560)
+    glow = card(2780, 80, "exit marker", RADIO, "device", w=560)
+    band = card(1980, 560, "band", WATCH, "device", w=560)
+    door = card(2780, 560, "nearest exit", PIN, "device", w=560)
+    H(marker, glow, "lights exit")
     V(marker, band, "sets zone")
-    H(band, guide, "crowded")
-    V(band, zone, "reports")
-    D(guide, "b", 0.5, zone, "r", 0.5, "leads to")
-    # doors close
-    r4, r5, r6 = 980, 1200, 1420
-    close = B(c1, r4, "close_doors\nend time", "stdb", w=560)
-    head = B(c2, r4, "head_for_exits\n4 exit doors", "stdb", w=500)
-    stays = B(c1, r5, "person down\nstays", "bad", w=560)
-    out = B(c2, r5, "walk_team\nnearest exit", "stdb", w=500, icons={0: WALK})
-    wait = B(c1, r6, "doors wait\nup to 120 s", "stdb", w=560)
-    medic = B(c2, r6, "medic\nresolves", "web", w=500, icons={0: USER})
-    Z(c1 - 30, r4 - 70, c2 + 500 + 30 - (c1 - 30), r6 + BH + 40 - (r4 - 70), "live run", "stdb")
+    V(glow, door, "marks door")
+    H(band, door, "follows color")
+    for box, n in ((marker, 1), (band, 2), (door, 3)):
+        badge(box, n)
+
+    Z(40, 1040, 3300, 960, "live run", "stdb")
+    close = card(80, 1150, "close_doors", CLOCK, "stdb", w=500)
+    head = card(840, 1150, "head_for_exits", WALK, "stdb", w=500)
+    out = card(1600, 1150, "walk_team", WALK, "stdb", w=500)
+    exit_ = card(2360, 1150, "exit", PIN, "device", w=500)
+    stays = card(840, 1520, "attendee", HEART, "bad", w=500)
+    wait = card(1600, 1520, "doors", CLOCK, "stdb", w=500)
+    medic = card(2360, 1520, "medic", USER, "web", w=500)
     H(close, head, "sends crowd")
-    V(head, out, "walks")
-    V(close, stays, "keeps")
-    V(stays, wait, "holds doors")
-    D(medic, "l", 0.3, stays, "r", 0.7, "frees")
+    H(head, out, "routes crowd")
+    H(out, exit_, "reaches exit")
+    D(close, "b", 0.5, stays, "l", 0.5, "keeps still")
+    H(stays, wait, "holds doors")
+    R(medic, "b", stays, "b", [(medic.cx, S.oy + 1900), (stays.cx, S.oy + 1900)],
+      "resolves incident", seg=1)
     return S.end_frame()
 
 

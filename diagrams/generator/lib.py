@@ -175,6 +175,17 @@ class Scene:
 
     def add_file(self, path):
         data = pathlib.Path(path).read_bytes()
+        if pathlib.Path(path).suffix == ".svg":
+            # Canvas image decoding needs intrinsic dimensions, even with a viewBox.
+            root = re.search(rb"<svg\b[^>]*>", data)
+            vb = re.search(rb'viewBox="([^\"]+)"', root.group())
+            if vb:
+                _, _, width, height = re.split(rb"[\s,]+", vb.group(1).strip())
+                tag = root.group()
+                for name, value in ((b"width", width), (b"height", height)):
+                    if not re.search(rb"\b" + name + rb"=", tag):
+                        tag = tag[:-1] + b" " + name + b'="' + value + b'">'
+                data = data[:root.start()] + tag + data[root.end():]
         fid = hashlib.sha1(data).hexdigest()[:20]
         mime = {".png": "image/png", ".jpg": "image/jpeg"}.get(pathlib.Path(path).suffix, "image/svg+xml")
         self.files.setdefault(fid, {"mimeType": mime, "id": fid, "created": 1792828800000,
@@ -185,7 +196,7 @@ class Scene:
         """A logo at absolute x, y, h pixels tall, width from its aspect ratio."""
         w = h * aspect(path)
         return self.base("image", x, y, w, h, fileId=self.add_file(path), status="saved", scale=[1, 1], crop=None,
-                         strokeColor="transparent")
+                         strokeColor="transparent", customData={"assetSource": str(pathlib.Path(path).resolve().relative_to(pathlib.Path(__file__).resolve().parents[2]))})
 
     # frames ---------------------------------------------------------------
     def begin_frame(self, name, x, y, w, h):
@@ -280,6 +291,7 @@ class Scene:
             y = cy - h / 2
         rid = self.uid("bx")
         tid = self.uid("tx")
+        first = len(self.elements)
         rect = self.base(shape, self.ox + x, self.oy + y, w, h, id=rid, backgroundColor=fill, strokeColor=stroke,
                          strokeStyle="dashed" if dashed else "solid",
                          roundness={"type": 3} if shape == "rectangle" else {"type": 2},
@@ -308,6 +320,8 @@ class Scene:
         if wordmark:
             mw = mark_h * aspect(wordmark)
             self.image(self.ox + x + (w - mw) / 2, self.oy + ty - 8 - mark_h, wordmark, mark_h)
+        for element in self.elements[first:]:
+            element["groupIds"] = ["card_" + rid]
         return Box(rect)
 
     def arrow(self, a, b, pts, label=None, dashed=False, both=False, color="#343a40", fs=16, head="arrow"):

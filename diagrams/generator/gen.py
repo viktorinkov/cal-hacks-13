@@ -659,7 +659,6 @@ def claude_jobs(y0):
 
 USERS, CLOCK, PIN, STORE, SPARKLES, BUILDING, TIMER, HANDS, SEARCH = (logo(f"icon-{n}.svg") for n in (
     "users", "clock", "map-pin", "store", "sparkles", "building-2", "timer", "handshake", "search-check"))
-GRAPH_SHOT = str(LOGOS.parent / "images" / "event-graph.jpg")  # the organizer portal's Event graph tab
 
 
 def card(x, cy, label, kind, icon, w, h, mh=80, **kw):
@@ -750,15 +749,15 @@ def social(y0):
     H(met, metl, "minutes")
     H(tags, inph, "tags")
 
-    # 6. the event graph draws every link live; Memories groups people around a booth
-    gtop, gbot = links.y, inph.bottom
-    graph = card(X5, L((gtop + gbot) / 2), "Event graph\norganizer portal (/organizer)", "web", GRAPH_SHOT, 1340,
-                 gbot - gtop, 1120, **mk)
-    memories = card(X5, L(gbot) + 260, "Memories\ngroups around a booth\nmet, visited, in_photo", "web", GRAPH3D,
-                    1340, 300, 100, **mk)
-    H(links, graph, "draws links", y=links.cy)
-    H(inph, graph, "draws photos", y=inph.cy)
-    V(graph, memories, "colours by")
+    # The link types above explain the graph; its destination only needs a name.
+    graph_y = L((links.y + inph.bottom) / 2)
+    graph = B(X5, 0, "Event graph\norganizer portal (/organizer)", "web", w=800,
+              h=220, cy=graph_y, fill=WHITE)
+    memories = B(X5, 0, "Memories\ngroups by booth", "web", w=800,
+                 h=180, cy=L(graph.bottom) + 250, fill=WHITE)
+    D(links, "r", 0.5, graph, "l", 0.25, "draws links")
+    D(inph, "r", 0.5, graph, "l", 0.8, "draws photos")
+    V(graph, memories, "groups links")
     for box, n in ((tap, 1), (band, 2), (tick, 3), (page, 4), (links, 5), (graph, 6)):
         badge(box, n)
     return S.end_frame()
@@ -967,6 +966,7 @@ def stack(path, y0, first):
         e["y"] += y0 - top
         e["name"] = names.get(e["id"], e.get("name"))
         e["id"] = ids[e["id"]]
+        e["groupIds"] = ["m" + group for group in e.get("groupIds", [])]
         for k in ("frameId", "containerId"):
             if e.get(k):
                 e[k] = ids[e[k]]
