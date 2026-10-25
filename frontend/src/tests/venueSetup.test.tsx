@@ -203,7 +203,7 @@ describe('venue run steps', () => {
 describe('venue setup page', () => {
   it('opens on the finished Palace replay, labelled as reconstructed', () => {
     page()
-    expect(screen.getByLabelText("Find a venue by its event's name")).toBeInTheDocument()
+    expect(screen.getByLabelText('Event name')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Cal Hacks 13.0 at the Palace of Fine Arts' })).toBeInTheDocument()
     expect(screen.getByText(/Reconstructed from the model saved/)).toBeInTheDocument()
     expect(screen.getByText('5 steps')).toBeInTheDocument()
@@ -219,7 +219,7 @@ describe('venue setup page', () => {
     await user.click(screen.getByRole('button', { name: /Replay the run/ }))
     expect(screen.getByText('Replaying')).toBeInTheDocument()
     expect(screen.getByText('1 step')).toBeInTheDocument()
-    expect(screen.getByText("The venue's model shows here once its public 3D map is captured.")).toBeInTheDocument()
+    expect(screen.getByText('Waiting for the 3D map.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Pause/ }))
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
   })
@@ -237,7 +237,7 @@ describe('venue setup page', () => {
       })
     }
     expect(slider).toHaveAttribute('aria-valuetext', '1:30 of 2:52')
-    expect(screen.getByText('Capturing the 3D map in a remote browser')).toBeInTheDocument()
+    expect(screen.getByText('Capturing the 3D map')).toBeInTheDocument()
     act(() => {
       fireEvent.keyDown(slider, { key: 'End' })
     })
@@ -254,17 +254,17 @@ describe('venue setup page', () => {
   it('shows a refused start next to the field', async () => {
     const user = userEvent.setup()
     page()
-    await user.type(screen.getByLabelText("Find a venue by its event's name"), 'Tree Hacks 2027')
+    await user.type(screen.getByLabelText('Event name'), 'Tree Hacks 2027')
     await user.click(screen.getByRole('button', { name: 'Find the venue' }))
     expect(await screen.findByText('The database is not connected.')).toBeInTheDocument()
-    expect(screen.getByLabelText("Find a venue by its event's name")).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Event name')).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('waits for the connection before a search can start', () => {
     useSession.setState({ phase: 'connecting' })
     page()
     expect(screen.getByRole('button', { name: 'Find the venue' })).toBeDisabled()
-    expect(screen.getByText('Connecting to the desk.')).toBeInTheDocument()
+    expect(screen.getByText('Connecting…')).toBeInTheDocument()
   })
 
   it('shows a live search as it works when it is picked', async () => {

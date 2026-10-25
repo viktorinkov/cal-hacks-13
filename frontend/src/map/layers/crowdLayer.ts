@@ -10,6 +10,7 @@ import type { ElevationAt } from '@/lib/elevation'
 import { mapPalette, particleColor } from '../palette'
 import { groundMatrix, project, type Camera, type ScreenPoint } from '../projection'
 import { personTexture, ringTexture, trailTexture } from '../textures'
+import { personWidthPx } from '../personPicking'
 
 export const CLASS_NONE = 0
 export const CLASS_LANE = 1
@@ -204,9 +205,7 @@ export class CrowdLayer {
     const s = cam.scale
     // level of detail: dots at overview zoom, standing figures once a person is big enough to read.
     // Close in, the figure grows until the dot of the i is a real circle.
-    const lod = Math.max(0, Math.min(1, (s - 10) / 8))
-    const span = Math.min(34, 0.58 * s)
-    const d = 2.6 + (span - 2.6) * lod
+    const d = personWidthPx(s)
     const unit = d / this.personTex.width
 
     // depth sort: far first. Key packs quantised depth and index into one float.

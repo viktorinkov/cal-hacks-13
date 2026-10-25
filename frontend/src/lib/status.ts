@@ -217,16 +217,6 @@ export interface Headline {
   tone: Tone
 }
 
-const SECTION_NAMES: Record<SectionKind, string> = {
-  front: 'the front of the stage',
-  floor: 'the main floor',
-  wing: 'the side wings',
-  concourse: 'the concourse',
-  plaza: 'the gate plazas',
-  food: 'the food court',
-  passage: 'the passages',
-}
-
 /**
  * The one sentence the screen leads with: does anyone need help, and is it reaching them?
  */
@@ -324,11 +314,9 @@ export function headline(args: {
     // the latest resolution leads for a short while after the fact
     return { title: 'Resolved.', sentence: `${recent.displayId} closed. Every band is back to ready.`, tone: 'ok' }
   }
-  const busiest = [...zones].sort((a, b) => (b.estimatedDensity ?? 0) - (a.estimatedDensity ?? 0))[0]
-  const section = busiest ? args.zoneSections[busiest.zoneId] : undefined
   return {
     title: 'All quiet.',
-    sentence: `${args.people.toLocaleString('en-US')} people on site${sim}. Busiest at ${section ? SECTION_NAMES[section] : 'the stage'}.`,
+    sentence: '',
     tone: 'ok',
   }
 }

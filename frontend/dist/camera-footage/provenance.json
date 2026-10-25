@@ -1,0 +1,35 @@
+{
+  "created_utc": "2026-10-25",
+  "source_commit": "6a1f570dc638b4426cefa6fa76df1715f094e6c3",
+  "source_commit_subject": "add venue overhead videos",
+  "source_kind": "recorded venue videos already tracked in repository",
+  "tool": "FFmpeg 7.1.1",
+  "transformation": [
+    "select first video track",
+    "resize 3840x2160 to 1280x720 without cropping",
+    "encode H.264 libx264, fast preset, CRF 25, yuv420p",
+    "remove audio and other streams",
+    "move MP4 metadata before video for web playback"
+  ],
+  "duration_seconds": 31.633333,
+  "frames_per_second": 30,
+  "originals_unchanged": true,
+  "files": [
+    {
+      "file": "main-hall.mp4",
+      "source": "assets/venue/main-hall.mov",
+      "source_sha256": "076f06760c64f45cd8250eb3e7c49bbf2c1f78647077b81c6ce2cf05d076098d",
+      "sha256": "e9d65283b26a9ebb1ac6642713e606ec73513b23f9cc3cd2db90d9487e5c3b87",
+      "bytes": 9565510,
+      "fast_start_verified": true
+    },
+    {
+      "file": "booth-aisle.mp4",
+      "source": "assets/venue/booth-aisle.mov",
+      "source_sha256": "e4b570185c5e0e2a4d77998e1928bbcbc10b2d32dd5baedd4d1c28a40e662272",
+      "sha256": "8b65551409932e0416444a405f2de92dcd4cf642db0c3b538808f440f10085fd",
+      "bytes": 6850495,
+      "fast_start_verified": true
+    }
+  ]
+}

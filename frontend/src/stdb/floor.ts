@@ -447,7 +447,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
         sosActive: device.sosActive,
         connectionStatus: 'connected',
         location: device.location,
-        wearerLabel: 'Demo',
+        wearerLabel: 'Test band',
       }
       continue
     }

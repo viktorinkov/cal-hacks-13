@@ -170,8 +170,19 @@ export interface DepartureRow {
   by: string
 }
 
+export interface CameraRow {
+  id: string
+  name: string
+  zoneId: string
+  zoneName: string
+  mount: string
+  live: boolean
+  lastFrameAt: number
+}
+
 export interface Catalog {
   attendees: Attendee[]
+  cameras: CameraRow[]
   guests: Guest[]
   bands: LiveBand[]
   zones: ZoneName[]
@@ -196,6 +207,7 @@ export interface Catalog {
 
 const EMPTY: Catalog = {
   attendees: [],
+  cameras: [],
   guests: [],
   bands: [],
   zones: [],
@@ -311,6 +323,15 @@ export function readCatalog(db: unknown): Catalog {
     stationId: num(row.stationId),
   }))
   const zoneById = new Map(zones.map((zone) => [zone.id, zone.name]))
+  const cameras = rowsOf(tables.camera).map((row) => ({
+    id: idOf(row.id),
+    name: text(row.name),
+    zoneId: idOf(row.zoneId),
+    zoneName: zoneById.get(idOf(row.zoneId)) ?? '',
+    mount: text(row.mount),
+    live: row.live === true,
+    lastFrameAt: millis(row.lastFrameAt),
+  }))
   const attendees = rowsOf(tables.boardAttendees).map((row) => ({
     nodeId: idOf(row.nodeId),
     displayName: text(row.displayName),
@@ -379,6 +400,7 @@ export function readCatalog(db: unknown): Catalog {
   }))
   return {
     attendees,
+    cameras,
     guests,
     bands: rowsOf(tables.band).map((row) => ({
       id: num(row.id),

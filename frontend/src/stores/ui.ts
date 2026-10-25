@@ -60,7 +60,6 @@ interface UiStore {
   pending: Record<string, true>
   /** Screen space the panels cover, so the map can fit and focus into the open area. */
   insets: Insets
-  demoOpen: boolean
   layersOpen: boolean
   /** The incident panel can be folded to a small card. */
   incidentOpen: boolean
@@ -72,7 +71,6 @@ interface UiStore {
   setView(v: '3d' | 'plan'): void
   setPending(key: string, on: boolean): void
   setInsets(i: Partial<Insets>): void
-  setDemoOpen(open: boolean): void
   setLayersOpen(open: boolean): void
   setIncidentOpen(open: boolean): void
   setSidePanelOpen(open: boolean): void
@@ -99,7 +97,6 @@ export const useUi = create<UiStore>()((set) => ({
   view: '3d',
   pending: {},
   insets: { left: 0, right: 0, top: 0, bottom: 0 },
-  demoOpen: true,
   layersOpen: false,
   incidentOpen: true,
   sidePanelOpen: false,
@@ -115,7 +112,6 @@ export const useUi = create<UiStore>()((set) => ({
       return { pending }
     }),
   setInsets: (i) => set((s) => ({ insets: { ...s.insets, ...i } })),
-  setDemoOpen: (demoOpen) => set({ demoOpen }),
   setLayersOpen: (layersOpen) => set({ layersOpen }),
   setIncidentOpen: (incidentOpen) => set({ incidentOpen }),
   setSidePanelOpen: (sidePanelOpen) => set({ sidePanelOpen }),

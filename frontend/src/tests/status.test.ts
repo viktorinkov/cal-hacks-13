@@ -172,8 +172,8 @@ describe('headline', () => {
     expect(h.sentence).toMatch(/not live/)
   })
 
-  it('labels simulated head counts', () => {
-    expect(headline({ ...base, incidents: [] }).sentence).toMatch(/simulated/)
+  it('does not invent a busiest location or repeat counts in the quiet headline', () => {
+    expect(headline({ ...base, incidents: [] }).sentence).toBe('')
   })
 
   it('keeps the hall path closed until the operator opens it', () => {

@@ -62,7 +62,7 @@ describe('full View As screens', () => {
     render(<RouteProvider><ViewedScreen /></RouteProvider>)
     expect(screen.getByRole('form', { name: 'Register band 1200' })).toBeInTheDocument()
     expect(screen.getByLabelText('Name')).toHaveValue('Nia')
-    expect(screen.getByLabelText('Email')).toHaveValue('')
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
     expect(claimBand).not.toHaveBeenCalled()
     expect(getSavedRegistration('band-1200')).toBeNull()
     expect(signedInPerson()).toEqual({ name: '', email: '' })

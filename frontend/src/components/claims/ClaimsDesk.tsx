@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
-import { DeskTabs } from '@/components/desk/DeskTabs'
-import { useOperatorName } from '@/stdb/operatorName'
 import { BandTapDialog } from '@/components/cover/BandTapDialog'
 import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
 import { formatCents } from '@/cover/money'
@@ -16,7 +14,7 @@ import { useSession } from '@/stdb/session'
  * the person it was sent to. Approving calls approve_claim; refusing calls refuse_claim.
  */
 export function ClaimsDesk() {
-  const { go } = useRoute()
+  const { go, search } = useRoute()
   const phase = useSession((state) => state.phase)
   const actionError = useSession((state) => state.actionError)
   const owner = useSession((state) => state.owner)
@@ -30,12 +28,11 @@ export function ClaimsDesk() {
   const refuse = useSession((state) => state.refuse)
   const ordered = useMemo(() => sortBoard(claims), [claims])
   const summary = useMemo(() => boardSummary(claims), [claims])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(search).get('claim') ?? '')
   const [narrow, setNarrow] = useState(false)
   const [tapBand, setTapBand] = useState<number | null>(null)
   const docketRef = useRef<HTMLElement>(null)
-  const selected = ordered.find((claim) => claim.id === selectedId) ?? ordered[0]
-  const operator = useOperatorName()
+  const selected = selectedId ? ordered.find((claim) => claim.id === selectedId) : ordered[0]
 
   useEffect(() => {
     if (!narrow || !window.matchMedia('(max-width: 767px)').matches) return
@@ -50,13 +47,6 @@ export function ClaimsDesk() {
   return (
     <div data-page data-motif="claims" className="desk-night h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1360px] px-5 py-6 md:px-10 md:py-8">
-        <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="font-display text-[30px] leading-none text-ink">BandIt</span>
-            <DeskTabs />
-          </div>
-          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
-        </header>
 
         <div className="mt-8 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
           <ActorSelect actors={actors} />

@@ -1,7 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pointInPolygon } from '@/lib/geometry'
 import { calhacksTables, calhacksVenue } from '@/mock/calhacks'
-import { CalhacksCrowd, floorUse, type CrowdSeed } from '@/mock/calhacksCrowd'
+import {
+  CalhacksCrowd,
+  bindCrowdCast,
+  characterAt,
+  floorUse,
+  startCalhacksCrowd,
+  stopCalhacksCrowd,
+  type CrowdSeed,
+} from '@/mock/calhacksCrowd'
+import { pickPerson } from '@/map/personPicking'
+import { castRoster } from '@/stdb/cast'
 
 describe('calhacks crowd', () => {
   it('keeps the fake attendees inside the room they are walking', () => {
@@ -111,11 +121,52 @@ describe('calhacks crowd', () => {
     const same = crowd.people.find((person) => person.bandId === walking!.bandId)
     expect(same?.x).toBe(x)
     expect(same?.y).toBe(y)
-    expect(crowd.adopt([{ id: 7, sos: false, fall: false, online: true }], 8)).toBe(false)
-    expect(crowd.people).toHaveLength(8)
+    // Hardware bands are not crowd people; an empty pool empties the floor.
+    expect(crowd.adopt([{ id: 7, sos: false, fall: false, online: true }], 8)).toBe(true)
+    expect(crowd.people).toHaveLength(0)
 
     const quiet = new CalhacksCrowd(12, 2)
     expect(quiet.adopt([{ id: 440, sos: false, fall: false, online: false }], 8)).toBe(true)
     expect(quiet.people.map((person) => person.bandId)).toEqual([440])
+  })
+})
+
+describe('the pickable roster', () => {
+  afterEach(() => {
+    stopCalhacksCrowd()
+    vi.unstubAllEnvs()
+  })
+
+  it('holds exactly the drawn crowd people, and empties when the floor does', () => {
+    vi.stubEnv('MODE', 'development')
+    startCalhacksCrowd()
+    // The floor starts empty: no roster means no click can land on an invented person.
+    expect(castRoster()).toEqual([])
+
+    const seeds: CrowdSeed[] = [
+      { id: 7, sos: false, fall: false, online: true },
+      { id: 200, sos: false, fall: false, online: true },
+      { id: 201, sos: true, fall: false, online: true },
+      { id: 300, sos: false, fall: false, online: true },
+    ]
+    bindCrowdCast(seeds)
+    const roster = castRoster().map((band) => band.id)
+    expect(roster).not.toContain(7)
+    expect(roster).toEqual(expect.arrayContaining([200, 201, 300]))
+    for (const id of roster) expect(characterAt(id)).toBeTruthy()
+
+    // A click on a drawn character picks a real roster person.
+    const at = characterAt(roster[0]!)!
+    const picked = pickPerson(at, castRoster(), characterAt, (point) => point)
+    expect(picked).not.toBeNull()
+    expect(roster).toContain(picked)
+
+    // No database rows: the roster is empty and nothing is clickable.
+    bindCrowdCast([])
+    expect(castRoster()).toEqual([])
+    expect(pickPerson(at, castRoster(), characterAt, (point) => point)).toBeNull()
+
+    stopCalhacksCrowd()
+    expect(castRoster()).toEqual([])
   })
 })

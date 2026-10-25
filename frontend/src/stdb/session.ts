@@ -65,6 +65,7 @@ const DESK_QUERIES = [
   'SELECT * FROM merch_template',
   'SELECT * FROM organization',
   'SELECT * FROM person',
+  'SELECT * FROM camera',
   'SELECT * FROM social_photos',
   'SELECT * FROM event_graph',
   'SELECT * FROM settings',
@@ -217,6 +218,7 @@ type Reducers = {
   approveRuleProposal(args: { proposalId: bigint; ceilingSeenCents: bigint }): Promise<unknown>
   rejectRuleProposal(args: { proposalId: bigint; reason: string }): Promise<unknown>
   setLowVis(args: { on: boolean }): Promise<unknown>
+  upsertCamera(args: { name: string; zoneId: bigint; mount: string }): Promise<unknown>
   endEvent(args: Record<string, never>): Promise<unknown>
   reopenEvent(args: Record<string, never>): Promise<unknown>
   leaveEarly(args: { nodeId: bigint }): Promise<unknown>
@@ -479,6 +481,11 @@ export async function rejectProposal(id: string, reason: string): Promise<void> 
 /** Fire or smoke: every band guides its wearer to the exit colour of its zone. */
 export async function setLowVisibility(on: boolean): Promise<void> {
   await call(() => reducers().setLowVis({ on }))
+}
+
+/** Register a camera on a zone. `mount` is `overhead` or `side`. Needs the ops or vision role. */
+export async function upsertCamera(name: string, zoneId: string, mount: string): Promise<void> {
+  await call(() => reducers().upsertCamera({ name, zoneId: BigInt(zoneId), mount }))
 }
 
 /** End the event. Every tap link switches to that person's recap. */

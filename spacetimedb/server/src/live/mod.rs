@@ -14,10 +14,12 @@
 //! that spot.
 
 pub mod log;
+mod actions;
 mod script;
 mod shopping;
 
 pub use log::*;
+pub use actions::stage_crowd_action;
 
 use crate::roles::require_role;
 use crate::insurance::settlement_rule;

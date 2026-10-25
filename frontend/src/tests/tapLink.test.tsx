@@ -16,15 +16,15 @@ afterEach(() => {
 
 describe('band tag links', () => {
   it('sends a tag link to that band’s sign-up page', () => {
-    expect(tapTarget('/t/BANDIT-01')).toBe('/register?band=band-01')
-    expect(tapTarget('/t/bandit-7')).toBe('/register?band=band-07')
-    expect(tapTarget('/t/BANDIT-09/')).toBe('/register?band=band-09')
+    expect(tapTarget('/t/BANDIT-01')).toBe('/register?band=BANDIT-01')
+    expect(tapTarget('/t/K3QX-9A7M')).toBe('/register?band=K3QX-9A7M')
+    expect(tapTarget('/t/BANDIT-09/')).toBe('/register?band=BANDIT-09')
   })
 
   it('leaves every other address alone', () => {
     expect(tapTarget('/register')).toBeNull()
     expect(tapTarget('/t/')).toBeNull()
-    expect(tapTarget('/t/BANDIT-')).toBeNull()
+    expect(tapTarget('/t/x')).toBeNull()
     expect(tapTarget('/t/BANDIT-01/extra')).toBeNull()
   })
 
@@ -35,9 +35,9 @@ describe('band tag links', () => {
         <Where />
       </RouteProvider>,
     )
-    expect(screen.getByText('/register?band=band-03')).toBeInTheDocument()
+    expect(screen.getByText('/register?band=BANDIT-03')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/register')
-    expect(window.location.search).toBe('?band=band-03')
+    expect(window.location.search).toBe('?band=BANDIT-03')
     expect(rememberedBand()).toBe(3)
   })
 })

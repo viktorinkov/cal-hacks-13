@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { IncidentPanel } from '@/components/incidents/IncidentPanel'
-import { DemoDock } from '@/components/simulation/DemoDock'
-import { HallDemoDock } from './HallDemoDock'
 import { PurchaseFeed } from './PurchaseFeed'
+import { PersonPanel } from './PersonPanel'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
 import { VenueMap } from '@/map/VenueMap'
 import { useUi } from '@/stores/ui'
@@ -11,34 +11,34 @@ import { ConnectionBanner } from './ConnectionBanner'
 import { MapToolbar } from './MapToolbar'
 import { OnStageStrip } from './OnStageStrip'
 import { PressureTimeline } from './PressureTimeline'
-import { SourceStatus } from './SourceStatus'
 import { SidePanel } from './SidePanel'
 import { StatusHeader } from './StatusHeader'
+import { panelInset } from './panelInsets'
 
 /** Report how much of the screen a panel covers, so the map fits and focuses into the open area. */
-function useInset(side: 'left' | 'right' | 'top' | 'bottom', ref: React.RefObject<HTMLElement | null>, active = true) {
+function useInset(side: 'left' | 'right' | 'top' | 'bottom', ref: React.RefObject<HTMLElement | null>, viewportRef: React.RefObject<HTMLElement | null>, active = true) {
   const setInsets = useUi((s) => s.setInsets)
   useEffect(() => {
     const el = ref.current
-    if (!el || !active) {
-      setInsets({ [side]: side === 'right' ? 24 : 0 })
+    const viewport = viewportRef.current
+    if (!el || !viewport || !active) {
+      setInsets({ [side]: 0 })
       return
     }
     const measure = () => {
-      const r = el.getBoundingClientRect()
-      const value =
-        side === 'left' ? r.right + 16 : side === 'right' ? window.innerWidth - r.left + 16 : side === 'top' ? r.bottom + 8 : window.innerHeight - r.top + 8
-      setInsets({ [side]: Math.max(0, Math.round(value)) })
+      setInsets({ [side]: panelInset(side, el.getBoundingClientRect(), viewport.getBoundingClientRect()) })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    ro.observe(viewport)
     window.addEventListener('resize', measure)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
+      setInsets({ [side]: 0 })
     }
-  }, [ref, side, active, setInsets])
+  }, [ref, viewportRef, side, active, setInsets])
 }
 
 /**
@@ -47,15 +47,20 @@ function useInset(side: 'left' | 'right' | 'top' | 'bottom', ref: React.RefObjec
  */
 export function CommandCenter() {
   const mode = useWorld((s) => s.mode)
-  const venueId = useWorld((s) => s.venue?.venueId)
-  const sideOpen = useUi((s) => s.sidePanelOpen)
   const incidentShown = useWorld((s) => Object.values(s.incidents).length > 0)
+  const selection = useUi((s) => s.selection)
+  const setSidePanelOpen = useUi((s) => s.setSidePanelOpen)
   const announcement = useIncidentFocus()
-  const leftRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const [rowHeight, setRowHeight] = useState(600)
+  const [controlsOpen, setControlsOpen] = useState(() => window.innerWidth >= 900)
+  useEffect(() => {
+    if (selection.kind !== 'none') setControlsOpen(true)
+    if (selection.kind === 'zone') setSidePanelOpen(true)
+  }, [selection, setSidePanelOpen])
   useEffect(() => {
     const el = rowRef.current
     if (!el) return
@@ -66,14 +71,13 @@ export function CommandCenter() {
   }, [])
   const topRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  // the open panel (or, folded, the toolbar at the left edge) bounds the open map area
-  useInset('left', sideOpen ? leftRef : toolbarRef)
-  useInset('right', rightRef, incidentShown || venueId === 'calhacks')
-  useInset('top', topRef)
-  useInset('bottom', bottomRef)
+  useInset('left', toolbarRef, viewportRef)
+  useInset('right', rightRef, viewportRef)
+  useInset('top', topRef, viewportRef)
+  useInset('bottom', bottomRef, viewportRef)
 
   return (
-    <div className="relative h-full w-full overflow-clip bg-ground">
+    <div ref={viewportRef} className="relative h-full w-full overflow-clip bg-ground">
       <VenueMap />
 
       {/* scrims so text over the map stays readable; neutral, not decorative */}
@@ -82,37 +86,46 @@ export function CommandCenter() {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgba(10,10,11,0.75),rgba(10,10,11,0))]" />
       {mode !== 'live' && <div aria-hidden className="nc-sim-bar pointer-events-none absolute inset-x-0 top-0 h-[3px] opacity-80" />}
 
-      <div className="pointer-events-none absolute inset-0 grid grid-cols-[auto_1fr_auto] grid-rows-[auto_minmax(0,1fr)_auto] gap-x-4 gap-y-4 px-6 pb-5 pt-7 2xl:px-10">
-        <div ref={topRef} className="col-span-3 row-start-1 grid grid-cols-[minmax(240px,360px)_minmax(0,1fr)_auto] items-start gap-4 2xl:grid-cols-[380px_1fr_auto]">
+      <div className="pointer-events-none absolute inset-0 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] gap-3 px-3 pb-3 pt-4 lg:px-6 lg:pb-5">
+        <div ref={topRef} className="col-span-3 row-start-1 grid grid-cols-[minmax(240px,360px)_minmax(0,1fr)] items-start gap-4 2xl:grid-cols-[380px_1fr]">
           <StatusHeader />
           <div className="flex min-w-0 flex-col items-center gap-3 pt-1">
             <OnStageStrip />
             <ConnectionBanner />
           </div>
-          <SourceStatus />
         </div>
 
-        <div ref={rowRef} className="col-span-2 col-start-1 row-start-2 flex min-h-0 items-stretch gap-3">
+        <div ref={rowRef} className="col-span-2 col-start-1 row-start-2 flex min-h-0 items-stretch">
           <div ref={toolbarRef} className="flex flex-none items-center">
             <MapToolbar />
           </div>
-          <div ref={leftRef} className="flex min-h-0 items-end">
-            <SidePanel maxHeight={rowHeight} />
-          </div>
         </div>
 
-        {/* the incident sits in the bottom right corner and grows upward */}
-        <div ref={rightRef} className="col-start-3 row-span-2 row-start-2 flex min-h-0 flex-col items-end justify-end gap-3">
-          {incidentShown && <IncidentPanel />}
-          <HallDemoDock />
+        <div ref={rightRef} className={`col-start-3 row-span-2 row-start-2 flex min-h-0 flex-col items-end gap-2 ${controlsOpen ? 'w-[min(22.5rem,calc(100vw-6rem))]' : 'w-10'}`}>
+          <button
+            type="button"
+            className="nc-panel pointer-events-auto flex h-10 shrink-0 items-center justify-center gap-2 px-3 text-[13px] text-ink-dim hover:text-ink"
+            aria-label={controlsOpen ? 'Hide controls' : 'Show controls'}
+            aria-expanded={controlsOpen}
+            aria-controls="map-controls"
+            onClick={() => setControlsOpen(!controlsOpen)}
+          >
+            {controlsOpen ? <><span>Controls</span><PanelRightClose className="size-4" /></> : <PanelRightOpen className="size-4" />}
+          </button>
+          <aside id="map-controls" aria-label="Map controls" hidden={!controlsOpen} className="nc-scroll pointer-events-auto min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-[4px]">
+            <div className="flex min-w-0 flex-col gap-3 pb-1 [&>*]:max-w-full [&>*]:shrink-0">
+              <PersonPanel />
+              {incidentShown && <IncidentPanel />}
+              <SidePanel maxHeight={Math.max(280, rowHeight - 60)} docked />
+            </div>
+          </aside>
         </div>
 
         <div ref={bottomRef} className="col-span-2 col-start-1 row-start-3 flex min-w-0 items-end gap-4">
-          <DemoDock />
           <PressureTimeline />
-          <PurchaseFeed />
         </div>
       </div>
+      <PurchaseFeed />
 
       <div className="sr-only" aria-live="assertive">
         {announcement}

@@ -9,7 +9,7 @@ import { EntityKind, type EntityFrame, type VenueZone } from '@/contracts/domain
 import { bbox, newProjectResult, Path, pointInPolygon, type ProjectResult } from '@/lib/geometry'
 import { frames } from '@/stores/frames'
 import { useWorld } from '@/stores/world'
-import { MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
+import { MAP_PEOPLE, sampleCast, setCastRoster, type CastBand } from '@/stdb/cast'
 import { DEMO_LANE, demoIsActive, demoRoute, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
 import { onStair } from '@/booth/hallRoute'
 import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
@@ -336,13 +336,13 @@ export class CalhacksCrowd {
   /**
    * Replace the local crowd with a capped sample of database people.
    * The same ids are a no-op, including when only their coordinates changed,
-   * so a live position tick cannot rebuild the hall.
+   * so a live position tick cannot rebuild the hall. An empty pool empties the
+   * floor: the map never draws people the database does not have.
    */
   adopt(bands: CrowdSeed[], limit = MAP_PEOPLE): boolean {
     const pool = bands.filter((band) => band.id > HARDWARE_ID_MAX)
-    if (pool.length === 0) return false
     const chosen = sampleCast(pool, limit)
-    const key = chosen.map((band) => band.id).join(',')
+    const key = chosen.length ? chosen.map((band) => band.id).join(',') : '__empty__'
     if (key === this.seedKey) return false
     this.seedKey = key
     this.people = this.peopleFrom(chosen)
@@ -1069,6 +1069,8 @@ export function demoReveal(): number {
 /** Seed the hall from database people. The same ids leave everyone where they already are. */
 export function bindCrowdCast(bands: CrowdSeed[]): void {
   if (!crowd) return
+  // The pickable roster is exactly the sample the floor draws, so a click can only land on a person who is rendered.
+  setCastRoster(sampleCast(bands.filter((band) => band.id > HARDWARE_ID_MAX)))
   if (crowd.adopt(bands)) frames.push(crowd.frame())
 }
 
@@ -1095,7 +1097,8 @@ export function startCalhacksCrowd(): void {
     return
   }
   if (slot.current?.timer) clearInterval(slot.current.timer)
-  crowd = slot.current?.crowd ?? new CalhacksCrowd()
+  // The floor starts empty; database crowd rows seed it through bindCrowdCast.
+  crowd = slot.current?.crowd ?? new CalhacksCrowd(0)
   crowd.enableShopping()
   frames.push(crowd.frame())
   timer = setInterval(() => {
@@ -1122,6 +1125,7 @@ export function stopCalhacksCrowd(): void {
   timer = null
   crowd = null
   publishedAt = 0
+  setCastRoster([])
 }
 
 function publishCounts(): void {

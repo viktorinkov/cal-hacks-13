@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   blankRegistration,
   clearRegistrations,
-  getRegistration,
   getSavedRegistration,
   saveRegistration,
 } from '@/cover/registry'
@@ -13,86 +12,55 @@ beforeEach(clearRegistrations)
 afterEach(clearRegistrations)
 
 describe('registration browser storage', () => {
-  it('persists only typed contact details, mock card fields and tap accounting', () => {
+  it('persists only the name and shipping details the phone can use again', () => {
     saveRegistration({
       ...blankRegistration('band-01'),
       name: 'Alex',
-      email: 'alex@example.test',
-      emergencyName: 'Sam',
-      emergencyPhone: '415-555-0123',
       street: '1 Market St',
       unit: 'Floor 4',
       city: 'San Francisco',
       region: 'CA',
       postalCode: '94107',
       country: 'United States',
-      cardBrand: 'Visa',
-      last4: '4242',
-      exp: '12/28',
-      bloodType: 'A+',
-      allergies: 'Extracted allergy',
-      conditions: 'Extracted condition',
-      medications: 'Extracted medication',
-      carrier: 'Extracted insurer',
-      memberId: 'Private member ID',
-      groupId: 'Private group ID',
-      lastChargeCents: 1250,
-      lastChargeAt: 1_700_000_000_000,
     })
 
     expect(JSON.parse(window.localStorage.getItem(KEY)!)).toEqual([{
       bandId: 'band-01',
       name: 'Alex',
-      email: 'alex@example.test',
-      emergencyName: 'Sam',
-      emergencyPhone: '415-555-0123',
       street: '1 Market St',
       unit: 'Floor 4',
       city: 'San Francisco',
       region: 'CA',
       postalCode: '94107',
       country: 'United States',
-      cardBrand: 'Visa',
-      last4: '4242',
-      exp: '12/28',
-      lastChargeCents: 1250,
-      lastChargeAt: 1_700_000_000_000,
     }])
     expect(getSavedRegistration('band-01')).toMatchObject({
       name: 'Alex',
-      bloodType: '',
-      allergies: '',
-      conditions: '',
-      medications: '',
-      carrier: '',
-      memberId: '',
-      groupId: '',
       street: '1 Market St',
       city: 'San Francisco',
       postalCode: '94107',
     })
   })
 
-  it('retains demo seeds for floor taps without prefilling signup with them', () => {
-    expect(getRegistration('band-05')).toMatchObject({ name: 'Judge D', allergies: 'Penicillin' })
+  it('starts every band empty: no seeded identity ever comes back', () => {
     expect(getSavedRegistration('band-05')).toBeNull()
-    expect(blankRegistration('band-05')).toMatchObject({ name: '', carrier: '', groupId: '' })
+    expect(blankRegistration('band-05')).toMatchObject({ name: '', street: '', postalCode: '' })
 
     saveRegistration({ ...blankRegistration('band-05'), name: 'Alex' })
-    expect(getRegistration('band-05')).toMatchObject({ name: 'Alex', allergies: '', carrier: '' })
+    expect(getSavedRegistration('band-05')).toMatchObject({ name: 'Alex' })
     clearRegistrations()
-    expect(getRegistration('band-05')?.name).toBe('Judge D')
+    expect(getSavedRegistration('band-05')).toBeNull()
   })
 
-  it('scrubs medical data and unexpected upload fields from every legacy record on read', () => {
+  it('scrubs card, medical and unexpected fields from every legacy record on read', () => {
     window.localStorage.setItem(KEY, JSON.stringify([
-      { ...blankRegistration('band-01'), name: 'Alex', allergies: 'Private allergy', file: { contents: 'private bytes' } },
-      { ...blankRegistration('band-02'), memberId: 'Private member ID', medicalCard: { bloodType: 'A+' } },
+      { bandId: 'band-01', name: 'Alex', allergies: 'Private allergy', file: { contents: 'private bytes' } },
+      { bandId: 'band-02', memberId: 'Private member ID', medicalCard: { bloodType: 'A+' }, last4: '4242' },
     ]))
 
-    expect(getSavedRegistration('band-01')).toMatchObject({ name: 'Alex', allergies: '' })
+    expect(getSavedRegistration('band-01')).toMatchObject({ name: 'Alex' })
     const raw = window.localStorage.getItem(KEY)!
-    expect(raw).not.toMatch(/allergies|memberId|medicalCard|contents|private|Private/)
+    expect(raw).not.toMatch(/allergies|memberId|medicalCard|last4|contents|private|Private/)
     expect(JSON.parse(raw)).toHaveLength(2)
   })
 
@@ -100,13 +68,13 @@ describe('registration browser storage', () => {
     window.localStorage.setItem(KEY, JSON.stringify([
       null,
       { name: 'Missing band' },
-      { bandId: 'band-01', name: { document: 'private bytes' }, last4: 1234, lastChargeAt: -1 },
+      { bandId: 'band-01', name: { document: 'private bytes' }, last4: 1234 },
     ]))
 
-    expect(getSavedRegistration('band-01')).toMatchObject({ name: '', last4: '' })
+    expect(getSavedRegistration('band-01')).toMatchObject({ name: '' })
     const stored = JSON.parse(window.localStorage.getItem(KEY)!)
     expect(stored).toHaveLength(1)
-    expect(stored[0]).not.toHaveProperty('lastChargeAt')
+    expect(stored[0]).not.toHaveProperty('last4')
     expect(window.localStorage.getItem(KEY)).not.toContain('private bytes')
   })
 

@@ -12,7 +12,7 @@ import {
   summarize,
 } from '@/cover/claims'
 import { formatCents, parseDollars } from '@/cover/money'
-import { clearRegistrations, getRegistration, saveRegistration } from '@/cover/registry'
+import { clearRegistrations, getSavedRegistration, saveRegistration } from '@/cover/registry'
 import { useClaims } from '@/cover/store'
 import { seedSession, useSession } from '@/stdb/session'
 
@@ -70,13 +70,12 @@ describe('claim totals', () => {
 })
 
 describe('registrations', () => {
-  it('keeps typed saved details ahead of the sample without persisting medical fields', () => {
-    expect(getRegistration('band-05')?.allergies).toBe('Penicillin')
-    const current = getRegistration('band-05')!
-    saveRegistration({ ...current, name: 'New guest', allergies: 'Shellfish' })
-    expect(getRegistration('band-05')?.name).toBe('New guest')
-    expect(getRegistration('band-05')?.allergies).toBe('')
-    expect(getRegistration('band-01')).toBeNull()
+  it('keeps typed saved details and never persists medical fields', () => {
+    expect(getSavedRegistration('band-05')).toBeNull()
+    saveRegistration({ bandId: 'band-05', name: 'New guest', street: '1 Market St', unit: '', city: 'San Francisco', region: 'CA', postalCode: '94107', country: 'United States' })
+    expect(getSavedRegistration('band-05')?.name).toBe('New guest')
+    expect(getSavedRegistration('band-05')).not.toHaveProperty('allergies')
+    expect(getSavedRegistration('band-01')).toBeNull()
   })
 
   it('parses a tap amount into cents', () => {
@@ -138,9 +137,9 @@ describe('live board', () => {
         <ClaimsDesk />
       </RouteProvider>,
     )
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('One still needs a person.')
+    expect(screen.getByRole('button', { name: 'Approve $390.00' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Approve $390.00' }))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('The board is clear.')
+    expect(screen.queryByRole('button', { name: 'Approve $390.00' })).not.toBeInTheDocument()
     expect(screen.getByText('$1,320.00')).toBeInTheDocument()
   })
 })
