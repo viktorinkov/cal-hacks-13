@@ -16,7 +16,6 @@ import { PaymentsPage } from '@/components/desk/PaymentsPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
 import { RunPage } from '@/components/desk/RunPage'
 import { StaffPage } from '@/components/desk/StaffPage'
-import { TestBandsPage } from '@/components/desk/TestBandsPage'
 import { ViewAsPage } from '@/components/desk/ViewAsPage'
 import { PhotographerPage } from '@/components/photo/PhotographerPage'
 import { VenuePage } from '@/components/desk/VenuePage'
@@ -85,7 +84,6 @@ function Pages() {
   if (path === '/run') return <RunPage />
   if (path === '/bands') return <BandsPage />
   if (path === '/cameras') return <CamerasPage />
-  if (path === '/test-bands') return <TestBandsPage />
   if (path === '/photos') return <PhotosPage />
   if (path === '/photo') return <PhotographerPage />
   if (path === '/merch') return <MerchPage />

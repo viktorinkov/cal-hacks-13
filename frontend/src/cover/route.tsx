@@ -48,7 +48,6 @@ const TITLES: Record<string, string> = {
   '/rules': 'Rules · BandIt',
   '/costs': 'Costs · BandIt',
   '/run': 'Run · BandIt',
-  '/test-bands': 'Test bands · BandIt',
   '/kibana': 'Kibana · BandIt',
   '/join': 'BandIt',
   '/register': 'Register a band · BandIt',
