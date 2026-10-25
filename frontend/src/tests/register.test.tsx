@@ -106,6 +106,8 @@ describe('band signup', () => {
     expect(screen.getByLabelText('Email', { exact: true })).toHaveValue('')
     expect(screen.queryByLabelText('Blood type', { exact: true })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Member id', { exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /findable|discovery|find me/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /findable|discovery|find me/i })).not.toBeInTheDocument()
     expect(claimBand).not.toHaveBeenCalled()
   })
 

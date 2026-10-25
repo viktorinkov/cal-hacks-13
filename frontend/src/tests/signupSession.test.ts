@@ -120,7 +120,22 @@ describe('attendee session', () => {
     expect(conn.reducers.openApiSession).toHaveBeenCalledOnce()
   })
 
-  it('edits an owned band without re-claiming, and does not fail registration when wallet creation fails', async () => {
+  it('enables friend discovery after claiming a new band', async () => {
+    const store = await started()
+    const conn = harness.conn as ReturnType<typeof connection>
+    apply('my_band')
+    conn.reducers.claimBand.mockImplementationOnce(async () => {
+      conn.db.myBand.rows = [{ bandId: 5, status: 'claimed' }]
+    })
+
+    await store.getState().registerBand('BANDIT-05', 'Alex')
+
+    expect(conn.reducers.claimBand).toHaveBeenCalledExactlyOnceWith({ token: 'BANDIT-05' })
+    expect(conn.reducers.updateProfile).toHaveBeenCalledExactlyOnceWith({ displayName: 'Alex', findable: true })
+    expect(conn.reducers.claimBand.mock.invocationCallOrder[0]).toBeLessThan(conn.reducers.updateProfile.mock.invocationCallOrder[0])
+  })
+
+  it('keeps an owned band discoverable when saving and does not fail when wallet creation fails', async () => {
     const store = await started()
     const conn = harness.conn as ReturnType<typeof connection>
     conn.db.myBand.rows = [{ bandId: 5, status: 'claimed' }]
@@ -128,7 +143,7 @@ describe('attendee session', () => {
     conn.reducers.connectWallet.mockRejectedValue(new Error('Wallet service unavailable'))
     await expect(store.getState().registerBand('BANDIT-05', 'Alex')).resolves.toBeUndefined()
     expect(conn.reducers.claimBand).not.toHaveBeenCalled()
-    expect(conn.reducers.updateProfile).toHaveBeenCalledWith({ displayName: 'Alex', findable: false })
+    expect(conn.reducers.updateProfile).toHaveBeenCalledExactlyOnceWith({ displayName: 'Alex', findable: true })
     expect(conn.reducers.connectWallet).toHaveBeenCalledWith({})
     expect(store.getState()).toMatchObject({ walletError: 'Wallet service unavailable', actionError: null })
   })

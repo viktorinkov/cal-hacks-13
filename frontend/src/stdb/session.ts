@@ -921,7 +921,7 @@ export const useSession = create<SessionState>((set, get) => ({
     await call(async () => {
       await claimTargetBand(token)
       requireClaimedBand(bandIdFromToken(token))
-      await reducers().updateProfile({ displayName: name, findable: false })
+      await reducers().updateProfile({ displayName: name, findable: true })
       set({ walletError: null })
       try {
         await reducers().connectWallet({})
