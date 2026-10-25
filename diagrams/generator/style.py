@@ -312,7 +312,8 @@ def _style_frame(frame, children, target_y):
     for zone in sorted(zones, key=lambda item: item["y"]):
         images = zone_images[zone["id"]]
         labels = [by_id[label_id] for label_id, owner in zone_labels.items() if owner["id"] == zone["id"]]
-        sizes = [_image_size(image, 128, min(520, zone["width"] - 64)) for image in images]
+        header_image_height = 200 if (zone.get("customData") or {}).get("diagramCenteredHeader") else 128
+        sizes = [_image_size(image, header_image_height, min(520, zone["width"] - 64)) for image in images]
         image_height = max((height for _, height in sizes), default=0)
         label_height = max((_text(label, ZONE_SIZE, width=zone["width"] - 64, align="left")[1]
                             for label in labels), default=0)
@@ -333,6 +334,17 @@ def _style_frame(frame, children, target_y):
     for zone in zones:
         left, top = zone["x"] + 32, zone["y"] + 16
         sizes, image_height = zone_headers[zone["id"]]
+        centered_header = (zone.get("customData") or {}).get("diagramCenteredHeader")
+        if centered_header:
+            row_width = sum(width for width, _ in sizes) + 20 * max(0, len(sizes) - 1)
+            left = zone["x"] + (zone["width"] - row_width) / 2
+            label_height = max((by_id[label_id]["height"] for label_id, owner in zone_labels.items()
+                                if owner["id"] == zone["id"]), default=0)
+            property_top = min((card["y"] for card in cards
+                                if (card.get("customData") or {}).get("diagramParentComponent") == zone["id"]),
+                               default=zone["y"] + zone["height"])
+            content_height = image_height + (12 if sizes else 0) + label_height
+            top = zone["y"] + max(16, (property_top - zone["y"] - content_height) / 2)
         for image, (width, height) in zip(zone_images[zone["id"]], sizes):
             image.update(x=left, y=top, width=width, height=height)
             left += width + 20
@@ -341,8 +353,12 @@ def _style_frame(frame, children, target_y):
             if owner["id"] != zone["id"]:
                 continue
             label = by_id[label_id]
-            _text(label, ZONE_SIZE, width=zone["width"] - 64,
-                  position=(zone["x"] + 32, label_top), align="left")
+            if centered_header:
+                _text(label, ZONE_SIZE, width=zone["width"] - 64,
+                      center=(zone["x"] + zone["width"] / 2, label_top + label["height"] / 2), align="center")
+            else:
+                _text(label, ZONE_SIZE, width=zone["width"] - 64,
+                      position=(zone["x"] + 32, label_top), align="left")
             handled_text.add(label_id)
 
     for image in unattached_images:

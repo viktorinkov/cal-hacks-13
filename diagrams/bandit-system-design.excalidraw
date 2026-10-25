@@ -10109,16 +10109,17 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true
    }
   },
   {
    "id": "im249",
    "type": "image",
-   "x": 3848.0,
-   "y": 11554.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 4112.0,
+   "y": 11591.0,
+   "width": 200.0,
+   "height": 200,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -10152,8 +10153,8 @@
   {
    "id": "te250",
    "type": "text",
-   "x": 3848.0,
-   "y": 11694.0,
+   "x": 4025.68,
+   "y": 11803.0,
    "width": 372.64,
    "height": 60.0,
    "angle": 0,
@@ -10179,7 +10180,7 @@
    "originalText": "Schema check",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,
@@ -10219,16 +10220,17 @@
    "link": null,
    "locked": false,
    "customData": {
-    "diagramComponent": true
+    "diagramComponent": true,
+    "diagramCenteredHeader": true
    }
   },
   {
    "id": "im272",
    "type": "image",
-   "x": 5072.0,
-   "y": 12850.0,
-   "width": 128.0,
-   "height": 128,
+   "x": 5336.0,
+   "y": 12887.0,
+   "width": 200.0,
+   "height": 200,
    "angle": 0,
    "strokeColor": "transparent",
    "backgroundColor": "transparent",
@@ -10262,8 +10264,8 @@
   {
    "id": "te273",
    "type": "text",
-   "x": 5072.0,
-   "y": 12990.0,
+   "x": 5172.88,
+   "y": 13099.0,
    "width": 526.24,
    "height": 60.0,
    "angle": 0,
@@ -10289,7 +10291,7 @@
    "originalText": "Worker validation",
    "fontSize": 48,
    "fontFamily": 5,
-   "textAlign": "left",
+   "textAlign": "center",
    "verticalAlign": "top",
    "containerId": null,
    "autoResize": true,

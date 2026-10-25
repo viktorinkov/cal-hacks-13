@@ -414,6 +414,7 @@ def elastic_execution(y0):
     text_model = B(x[2], 160, "Claude\nconfigured model", "claude", w=w, h=h,
                    wordmark=CLAUDE, mark_h=100)
     schema = _elastic_component(x[3], 160, w, h, "Schema check", "rust", RUST)
+    schema.el["customData"]["diagramCenteredHeader"] = True
     _elastic_property(schema, x[3] + 30, 370, w - 60, "JSON answer")
     H(text, prompt, "worker starts run")
     H(prompt, text_model, "calls connector")
@@ -426,6 +427,7 @@ def elastic_execution(y0):
     agent_model = B(x[3], 880, "Claude\nconfigured model", "claude", w=w, h=h,
                     wordmark=CLAUDE, mark_h=100)
     validation = _elastic_component(x[4], 880, w, h, "Worker validation", "rust", RUST)
+    validation.el["customData"]["diagramCenteredHeader"] = True
     _elastic_property(validation, x[4] + 30, 1090, w - 60, "Agent answer")
     H(image, workflow, "worker attaches")
     H(workflow, agent, "runs scoped agent")
