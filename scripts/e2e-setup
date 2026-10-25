@@ -28,7 +28,8 @@ echo "spots      web/venue/spots.json"
 call load_venue_spots "$(cat web/venue/spots.json)"
 # Where people can walk on the 3D floor (pipeline/venue_floor.py), so the crowd follows the aisles.
 echo "floor      web/venue/floor.json"
-call load_venue_floor "$(cat web/venue/floor.json)"
+# Field names with digits take an extra underscore in the call's JSON.
+call load_venue_floor "$(sed 's/"x0"/"x_0"/;s/"z0"/"z_0"/' web/venue/floor.json)"
 
 # Identities for the services and the photographer, saved in the same token store.
 identity() {
