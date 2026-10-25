@@ -56,12 +56,15 @@ FRAME_NAMES = (
     ("Jobs", "Queues"),
     ("Prepare the event", "Event data", "Event data pipeline"),
     ("Find people again",),
-    ("Photos and Memories", "Social"),
+    ("Memories engine", "Photos and Memories", "Social"),
     ("Settle a claim", "Decision Engine", "Claim Settlement"),
     ("Policy amounts",),
     ("Approve a reusable rule",),
     ("Respond to an incident", "Medic routing"),
     ("Routes and clear space", "Medic walk", "Light circle"),
+    ("Fire evacuation",),
+    ("How your photos find you",),
+    ("Your photo on your merch",),
     ("Band data flow", "Hardware", "Hardware basics"),
     ("Band wiring",),
     ("Exit markers and gateway",),
@@ -277,9 +280,12 @@ def _style_frame(frame, children, target_y):
         gap = 20
         sizes = []
         if images:
-            max_height = 200 if card["height"] >= 600 else 128
-            sizes = [_image_size(im, min(max_height, 128) if im["width"] / im["height"] >= 2 else max_height,
-                                 min(520, usable_width)) for im in images]
+            artwork = card.get("customData") or {}
+            max_height = artwork.get("diagramArtworkHeight", 200 if card["height"] >= 600 else 128)
+            max_width = artwork.get("diagramArtworkMaxWidth", 520)
+            sizes = [_image_size(im, max_height if "diagramArtworkHeight" in artwork else
+                                 min(max_height, 128) if im["width"] / im["height"] >= 2 else max_height,
+                                 min(max_width, usable_width)) for im in images]
             row_width = sum(w for w, _ in sizes) + gap * (len(images) - 1)
             if row_width > usable_width:
                 ratio = (usable_width - gap * (len(images) - 1)) / sum(w for w, _ in sizes)
@@ -312,7 +318,8 @@ def _style_frame(frame, children, target_y):
     for zone in sorted(zones, key=lambda item: item["y"]):
         images = zone_images[zone["id"]]
         labels = [by_id[label_id] for label_id, owner in zone_labels.items() if owner["id"] == zone["id"]]
-        header_image_height = 200 if (zone.get("customData") or {}).get("diagramCenteredHeader") else 128
+        artwork = zone.get("customData") or {}
+        header_image_height = artwork.get("diagramHeaderArtworkHeight", 200 if artwork.get("diagramCenteredHeader") else 128)
         sizes = [_image_size(image, header_image_height, min(520, zone["width"] - 64)) for image in images]
         image_height = max((height for _, height in sizes), default=0)
         label_height = max((_text(label, ZONE_SIZE, width=zone["width"] - 64, align="left")[1]
