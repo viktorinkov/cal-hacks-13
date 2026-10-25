@@ -61,6 +61,7 @@ const QUERIES = [
   'SELECT * FROM board_staff',
   'SELECT * FROM live_run',
   'SELECT * FROM live_pause',
+  'SELECT * FROM crowd_walk',
   'SELECT * FROM incident_marker',
   'SELECT * FROM decision',
   'SELECT * FROM band_place',

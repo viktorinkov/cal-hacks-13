@@ -169,6 +169,7 @@ import ClaimReviewsRow from "./claim_reviews_table";
 import ClaimedPeopleRow from "./claimed_people_table";
 import ClaimsBoardRow from "./claims_board_table";
 import CommandRow from "./command_table";
+import CrowdWalkRow from "./crowd_walk_table";
 import DecisionRow from "./decision_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
@@ -316,6 +317,17 @@ const tablesSchema = __schema({
       { name: 'command_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CommandRow),
+  crowdWalk: __table({
+    name: 'crowd_walk',
+    indexes: [
+      { accessor: 'band_id', name: 'crowd_walk_band_id_idx_btree', algorithm: 'btree', columns: [
+        'bandId',
+      ] },
+    ],
+    constraints: [
+      { name: 'crowd_walk_band_id_key', constraint: 'unique', columns: ['bandId'] },
+    ],
+  }, CrowdWalkRow),
   decision: __table({
     name: 'decision',
     indexes: [
@@ -1199,6 +1211,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "band_place": Omit<typeof tablesSchema.schemaType.tables["bandPlace"], "accessorName"> & { readonly accessorName: "band_place" };
     /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
     readonly "chosen_venue": Omit<typeof tablesSchema.schemaType.tables["chosenVenue"], "accessorName"> & { readonly accessorName: "chosen_venue" };
+    /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+    readonly "crowd_walk": Omit<typeof tablesSchema.schemaType.tables["crowdWalk"], "accessorName"> & { readonly accessorName: "crowd_walk" };
     /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1364,6 +1378,7 @@ const REMOTE_MODULE = {
 const tableAccessorAliases = {
   "band_place": "bandPlace",
   "chosen_venue": "chosenVenue",
+  "crowd_walk": "crowdWalk",
   "event_state": "eventState",
   "import_run": "importRun",
   "incident_marker": "incidentMarker",
@@ -1460,6 +1475,8 @@ export type DbView = __DbViewBase & {
   readonly "band_place": __DbViewBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __DbViewBase["chosenVenue"];
+  /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+  readonly "crowd_walk": __DbViewBase["crowdWalk"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1612,6 +1629,8 @@ export type Tables = __TablesBase & {
   readonly "band_place": __TablesBase["bandPlace"];
   /** @deprecated Use `chosenVenue` instead. This alias will be removed in the next major version. */
   readonly "chosen_venue": __TablesBase["chosenVenue"];
+  /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
+  readonly "crowd_walk": __TablesBase["crowdWalk"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
