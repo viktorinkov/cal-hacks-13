@@ -91,7 +91,9 @@ A stay under 5 s is deleted when the band moves on, and a zone left less than 5 
 
 A stay becomes a visit once it has lasted 2 minutes (`VISIT_MIN_SECONDS`, starting value, calibrate at the venue), counted from when the band was both in the zone and worn, and only when its station id belongs to a zone. A running visit is rewritten at most every 30 s (`REFRESH_SECONDS`), so 1,000 crowd bands stay cheap, and it closes when its stay closes.
 
-A crowd band's stay names the booth it stands at. A radio or test band's stay names none, and its `visited` link goes to every booth in the zone; in the venue layout each booth zone holds one booth.
+A crowd band's stay names the booth it stands at. So does the stay of a band a presenter places on the 3D floor (`place_band`): when the floor spot nearest the click is a sponsor table, the stay names that table's booth, and moving the band to another table starts a new stay.
+
+A stay that only the radio gives, by zone, names no booth, and its `visited` link goes to every booth in the zone.
 
 | `visit` field | Meaning |
 |---|---|
@@ -311,6 +313,19 @@ Three service views give the findable rows to `bandit-indexer` and `bandit-api` 
 
 `social_shared_visits` gives the shared visits, which are built only between findable attendees, to the service roles `indexer`, `worker` and `api`.
 
+**Interests.** At a venue, the booths someone stands at are what they are into. So each person under "People you spent time with" shows their interests: every booth their band stood at, from their visits that name a booth, with their minutes there.
+
+A booth both of you stood at, at any time of the night, is a shared interest. Shared interests come first, highlighted, with your minutes next to theirs; the person's other booths follow, most minutes first. That is the reason the two of you connect, read straight off the venue.
+
+A visit that names only a zone adds no interest, because one zone such as the sponsor row holds many booths. `GET /api/recap` builds the interests in `bandit-api` from the `social_visits` view, so they come from findable attendees only. Elastic.md: the order of the list comes from the same visits, through the `interests` text of `bandit-people`.
+
+| Interest field | Meaning |
+|---|---|
+| `booth_id`, `name` | The booth |
+| `minutes` | The person's minutes at the booth |
+| `your_minutes` | Your minutes at the booth, 0 when you never stood there |
+| `shared` | True when you both stood at the booth |
+
 
 ### Share links
 
@@ -379,7 +394,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | Decision | Why |
 |---|---|
 | The photographer route `/photo` is served with the tap page, gated by the `photographer` role | One app on the one public host; the role check is in the module, as for every other route |
-| In the venue layout each booth zone holds one booth, so a visit names one booth | Zones are the only resolution the bands give; one booth per zone makes the visit exact with no hand-placed hints |
+| A visit names a booth when the band stood at a sponsor table: a crowd band at its booth, a placed band at the sponsor table nearest its spot; a visit the radio gives by zone names none | The sponsor row is one zone with many booths, so only the band's spot on the 3D floor says which booth it stood at |
 | Socials are Meta only (Instagram, Facebook, Threads), typed by the attendee at onboarding; no provider sign-in and no `verified` state | Meta is the sponsor track; typing needs no provider approval, and a handle is shown only to people who hung out with its owner |
 | Onboarding has no company field; `works_at` comes only from the import and a claimed profile | Every company link then comes from the event's own pages, and onboarding stays short |
 | No Bandshake and no connection requests: an encounter between two `findable` attendees is the connection, and each sees the other's name and socials | The project description: find who you hung out with and their Insta, afterwards |
@@ -394,6 +409,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | The recap's social part is the attendee's own visits, people and photos; there is no written story | The project description asks for the night back, not a story; the views already give it |
 | The people graph lives in SpacetimeDB as the derived table `people_link`, written by `social_tick`; Elastic draws nothing on it | Every link is an exact fact the bands measured, it must reach every screen live, and `findable` must be enforced in the views; there are no links between people who never met |
 | Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and its shared visits from `my_shared_visits`; Elastic only orders the people and booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
+| Each person you spent time with shows their interests: the booths their band stood at, the ones you both stood at first and highlighted, with both people's minutes | At a venue the booths someone stands at are what they are into, and a booth you share is the plainest reason two people connect; a zone-only visit names no booth, so it adds none |
 | `bandit-indexer` and `bandit-api` read the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only | `findable` is enforced once, in the module, before anything leaves it |
 | A shared visit is two `findable` attendees' visits to one zone that overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value); it is a recap row, not a `people_link` kind | People you were in the same place with for a while belong in the recap next to the people you met, while the graph keeps only measured meetings and visits |
 | Shared booths and companies are shared nodes, never pairs of people | One link per person instead of one per pair, and the shared node is what forms the cluster |

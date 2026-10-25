@@ -281,7 +281,7 @@ sequenceDiagram
 The recap, top to bottom, as `web/src/recap.ts` draws it under "Your <event>" and "Thanks for coming, <name>. Here is your night.". How it looks is front end and not designed here.
 
 1. Social.md: "Where you were", the space-time view, drawn on the phone from `my_visits` (one bar per stay, zones down the side, time along the bottom) and `my_encounters` (a dot per person met), then the stays as text.
-2. Social.md: "People you spent time with", from `GET /api/recap`: each person with their photo, how you met (the zone and time, the minutes together, the booths you both visited, the photos you are both in) and their socials. Only `findable` people appear.
+2. Social.md: "People you spent time with", from `GET /api/recap`: each person with their photo, how you met (the zone and time, the minutes together, the photos you are both in), their interests and their socials. Interests are a table of the booths they stood at ("Booth", their minutes, "You"), the booths you both stood at first and highlighted. Only `findable` people appear.
 3. Social.md: "Also there with you", from `GET /api/recap`: the people you were in the same place with for a while, other than those above, with the zone, the minutes and the time.
 4. Social.md: "Booths you spent time at", from `GET /api/recap`: each booth with its zone.
 5. Social.md: "Your photos", from `my_photos`: each photo with its caption, zone, time and the people in it. "Share" opens the phone's share sheet with the photo and a line that tags the others' Instagram handles; without a share sheet the page copies the line and downloads the photo.
