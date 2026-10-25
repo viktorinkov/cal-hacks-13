@@ -1,5 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, settlements: who pays what on each
-// claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the event graph with its photos,
+// claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the costs so far
+// from the claims' journals, the event graph with its photos,
 // the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
 // The owner also views the portal and the attendee pages as any person sees them, read-only.
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
@@ -11,6 +12,7 @@ import {
   signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
+import { costsTab } from '../costs';
 import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
@@ -100,7 +102,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['costs', 'Costs'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
   const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff'], ['viewas', 'View as']] : all;
   return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
@@ -1011,7 +1013,7 @@ function render() {
   // The 3D venue is the same for everyone, so a View as frame leaves it out.
   showLive3d(tab === 'live' && !viewing());
   showViewAs(tab === 'viewas');
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live();
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live();
   mount('app', body);
   if (scrollToClaim) {
     scrollToClaim = false;
