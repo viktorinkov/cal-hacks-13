@@ -140,8 +140,9 @@ function openIncident(m: IncidentMarker) {
 }
 
 function setUp(c: DbConnection) {
-  conn = c
   const view = venueView(c)
+  if (conn === c) return
+  conn = c
   v = view
   crowd = new Crowd(view.layer)
   for (const b of c.db.band.iter()) crowd.upsert(b)
