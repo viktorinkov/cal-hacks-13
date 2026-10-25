@@ -10,6 +10,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { act, date, field, h, time } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { VenueSetup } from './module_bindings/types';
+import { VenueNames, type Spot } from './venue-names';
 
 /** Setup 0: the venue that ships with the app. */
 const DEFAULT_SETUP = 0n;
@@ -35,6 +36,8 @@ const CUT_M = 4.1;
 let view: HTMLElement | undefined;
 let viewNote: HTMLElement;
 let loadedUrl = '';
+/** The model in the view once it has loaded, so the floor's names show only over the model they belong to. */
+let shownUrl = '';
 let load: (url: string) => void;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
@@ -43,6 +46,9 @@ let controls: OrbitControls;
 /** What the Live tab adds: the crowd and the incidents, shown only there. */
 const liveLayer = new THREE.Group();
 const frames: ((now: number) => void)[] = [];
+/** The Live tab's names on the floor and tags over our bands. */
+const names = new VenueNames();
+let spotsAsked = false;
 
 function makeView() {
   view = h('div', { class: 'venue-3d' });
@@ -50,7 +56,7 @@ function makeView() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  view.append(renderer.domElement);
+  view.append(renderer.domElement, names.box);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#c8effd');
@@ -77,6 +83,7 @@ function makeView() {
         if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.side = THREE.DoubleSide;
       });
       scene.add(model);
+      shownUrl = url;
       // Frame the model whatever its size: the camera, its range and the sun scale with it.
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
@@ -108,6 +115,8 @@ function makeView() {
     controls.update();
     const now = performance.now();
     for (const f of frames) f(now);
+    // The spots are the default model's, so another venue's model shows only our bands' tags.
+    names.draw(camera, controls.target, liveLayer.visible && shownUrl === DEFAULT.modelUrl, liveLayer.visible);
     renderer.render(scene, camera);
   });
 }
@@ -118,6 +127,8 @@ export type LiveView = {
   note: HTMLElement;
   layer: THREE.Group;
   canvas: HTMLCanvasElement;
+  /** The names on the floor and the tags over our bands. */
+  names: VenueNames;
   /** Runs every frame while the view shows. */
   onFrame(f: (now: number) => void): void;
   /** The point of the floor under a click, in model metres (x east, z south), if it is inside the hall. */
@@ -160,7 +171,23 @@ export function venueView(c: DbConnection): LiveView {
   if (!view) makeView();
   if (chosenUrl() !== loadedUrl) load(chosenUrl());
   showLive(true);
-  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, lookAt };
+  if (!spotsAsked) {
+    spotsAsked = true;
+    spots().then(s => names.setSpots(s));
+  }
+  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, names, onFrame: f => frames.push(f), floorAt, lookAt };
+}
+
+/** The floor's named spots: the `venue_spot` rows, or the venue's spots file when there are none. */
+async function spots(): Promise<Spot[]> {
+  const rows = [...conn.db.venueSpot.iter()];
+  if (rows.length) return rows.map(s => ({ kind: s.kind, name: s.name, x: s.xM, z: s.yM }));
+  try {
+    const file: Spot[] = await (await fetch('/venue/spots.json')).json();
+    return file.map(s => ({ kind: s.kind, name: s.name, x: s.x, z: s.z }));
+  } catch {
+    return [];
+  }
 }
 
 // --- The picker -------------------------------------------------------------------------------

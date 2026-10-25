@@ -56,7 +56,12 @@ function setUp(c: DbConnection) {
   conn.db.livePause.onInsert(pause);
   conn.db.livePause.onDelete(pause);
   pause();
-  v.onFrame(now => crowd.frame(now));
+  v.onFrame(now => {
+    crowd.frame(now);
+    // Our bands' tags: the name typed when the band was placed, over its code.
+    const ours = crowd.ours();
+    v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
+  });
   dropPin.visible = false;
   v.layer.add(dropPin);
   window.addEventListener('pointermove', moveDrag);

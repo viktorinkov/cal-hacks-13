@@ -70,6 +70,7 @@ const QUERIES = [
   'SELECT * FROM incident_marker',
   'SELECT * FROM decision',
   'SELECT * FROM band_place',
+  'SELECT * FROM venue_spot',
   'SELECT * FROM view_as_people',
 ];
 
