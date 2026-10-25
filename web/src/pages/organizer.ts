@@ -298,6 +298,28 @@ function found(p: Person, words: string[]): boolean {
   return words.every(w => text.includes(w));
 }
 
+/** What each person search bar holds, by the bar's name. */
+const searches = new Map<string, string>();
+/** How many matches a search bar lists under it. */
+const SEARCH_ROWS = 12;
+
+/** A search bar over people: each word typed must appear in the person's name, kind, band code, company or
+ *  handles. Its first matches list under it; a click, or Enter for the first one, picks a person. */
+function personSearch(name: string, people: Person[], chosen: (p: Person) => boolean, pick: (p: Person) => void, more: (p: Person) => string = () => '') {
+  const words = (searches.get(name) ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = people.filter(p => found(p, words));
+  const choose = (p: Person) => { pick(p); render(); };
+  return h('div', {},
+    h('input', { name, type: 'search', class: 'search', placeholder: 'Search by name, band, company or handle', value: searches.get(name) ?? '',
+      oninput: (e: Event) => { searches.set(name, (e.target as HTMLInputElement).value); render(); },
+      onkeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && matches[0]) { e.preventDefault(); choose(matches[0]); } } }),
+    h('ul', { class: 'results' }, matches.slice(0, SEARCH_ROWS).map(p => h('li', {},
+      h('button', { type: 'button', class: chosen(p) ? 'on' : '', onclick: () => choose(p) },
+        p.name || '(no name yet)', h('span', { class: 'muted' }, ` ${p.kind}${p.bandId ? `, band ${code(p.bandId)}` : ''}${more(p)}`))))),
+    matches.length > SEARCH_ROWS && h('p', { class: 'muted' }, `${matches.length - SEARCH_ROWS} more found: keep typing to narrow it down.`),
+    !matches.length && h('p', { class: 'muted' }, 'Nobody found.'));
+}
+
 /** The injury claims a person filed, or staff filed as them. */
 function claimsOf(p: Person): Claim[] {
   if (!p.att) return [];
@@ -503,8 +525,6 @@ function staffTab() {
 let viewKey = '';
 let viewScreen = '';
 
-const VIEW_GROUPS: [string, string][] = [['ops', 'Organizers'], ['medic', 'Medics'], ['photographer', 'Photographers'], ['attendee', 'Attendees'], ['crowd', 'Crowd']];
-
 function keyOf(p: ViewablePerson) {
   return `${p.role} ${p.identity.toHexString()}`;
 }
@@ -527,28 +547,13 @@ function openFromHash() {
 
 /** The owner picks a person; their page shows below, live with their data. Nothing on it can be pressed. */
 function viewAsTab() {
-  const people = [...conn.db.viewAsPeople.iter()].sort((a, b) => (a.name || '~').localeCompare(b.name || '~'));
   const p = viewed();
-  const pick = (e: Event) => {
-    viewKey = (e.target as HTMLSelectElement).value;
-    const chosen = viewed();
-    viewScreen = chosen ? screens(chosen)[0][0] : '';
-    (e.target as HTMLSelectElement).blur();
-    render();
-  };
-  const band = (x: ViewablePerson) => x.bandId ? `, band ${bandCode(x.bandId)}` : '';
   return h('section', {},
     h('h3', {}, 'View as'),
     h('p', { class: 'muted' }, 'See the pages a person sees, live with their data. It is read-only: nothing on their page can be pressed or changed.'),
-    h('label', {}, 'Person',
-      h('select', { onchange: pick },
-        h('option', { value: '' }, 'Choose a person'),
-        VIEW_GROUPS.map(([group, label]) => {
-          const rows = people.filter(x => (x.crowd ? 'crowd' : x.role) === group);
-          return rows.length > 0 && h('optgroup', { label }, rows.map(x =>
-            h('option', { value: keyOf(x), selected: keyOf(x) === viewKey || undefined }, `${x.name || '(no name yet)'}${band(x)}`)));
-        }))),
-    p && h('p', {}, screens(p).map(([screen, label]) =>
+    personSearch('viewas-search', everyone().filter(x => x.view), x => keyOf(x.view!) === viewKey,
+      x => { viewKey = keyOf(x.view!); viewScreen = screens(x.view!)[0][0]; }),
+    p && h('p', {}, h('b', {}, `${p.name || '(no name yet)'}: `), screens(p).map(([screen, label]) =>
       h('button', { class: screen === viewScreen ? 'on' : '', onclick: () => { viewScreen = screen; render(); } }, label))),
     p && p.role === 'attendee' && !p.bandId && h('p', {}, `${p.name || 'They'} wear no band right now, so there is no band page to show.`));
 }
@@ -1003,7 +1008,22 @@ function claimsTab() {
     openClaim = filed.id;
     scrollToClaim = true;
   }
-  return [incidentDesk(), injuriesWithoutClaim(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+  return [incidentDesk(), injuriesWithoutClaim(), fileAs(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+}
+
+/** The attendee staff file a claim as from the Settlements tab, by key. */
+let claimant = '';
+
+/** Staff find anyone with a band and file a claim as them, as on the Live tab. */
+function fileAs() {
+  if (!can('ops', 'medic')) return null;
+  const people = everyone().filter(p => p.att && p.bandId);
+  const p = people.find(x => x.key === claimant);
+  return h('section', {},
+    h('h3', {}, 'File a claim as someone'),
+    personSearch('claimant-search', people, x => x.key === claimant, x => { claimant = x.key; }),
+    p && claimAs(p),
+    p && theirClaims(p));
 }
 
 // --- Photos -------------------------------------------------------------------------------
@@ -1053,8 +1073,8 @@ let shopper: bigint | undefined;
 function buyAs() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const people = new Map([...conn.db.boardAttendees.iter()].map(a => [a.nodeId, a.displayName || 'no name yet']));
-  const wallets = [...conn.db.boardWallets.iter()].filter(w => people.has(w.nodeId))
-    .sort((a, b) => people.get(a.nodeId)!.localeCompare(people.get(b.nodeId)!));
+  const wallets = [...conn.db.boardWallets.iter()].filter(w => people.has(w.nodeId));
+  const byNode = new Map(wallets.map(w => [w.nodeId, w]));
   const chosen = wallets.find(w => w.nodeId === shopper);
   return h('section', {},
     h('h3', {}, 'Buy as an attendee'),
@@ -1062,8 +1082,8 @@ function buyAs() {
       ? 'Pick someone to see their shop as their recap shows it, and buy for them from their own wallet.'
       : 'Merch is sold once the event ends. Until then this shows each wallet.'),
     !wallets.length && h('p', { class: 'muted' }, 'Nobody has a wallet yet. Attendees connect one at band setup.'),
-    h('p', {}, wallets.map(w => h('button', { class: w.nodeId === shopper ? 'on' : '', onclick: () => { shopper = w.nodeId; render(); } },
-      `${people.get(w.nodeId)} · ${money(w.balanceCents)}`))),
+    wallets.length > 0 && personSearch('shopper-search', everyone().filter(p => p.att && byNode.has(p.att.nodeId)), p => p.att!.nodeId === shopper,
+      p => { shopper = p.att!.nodeId; }, p => ` · ${money(byNode.get(p.att!.nodeId)!.balanceCents)}`),
     chosen && shopFor(chosen, people, ended));
 }
 
