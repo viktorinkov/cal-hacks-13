@@ -445,28 +445,34 @@
   ],
   "record_history": "Patient presents with right ankle pain and swelling. He states he twisted his right ankle (inversion injury) while playing pickup basketball at home on the evening of Friday, October 23, 2026, before attending Cal Hacks 13.0. He was able to walk afterward and did not seek care that night. The pain and swelling got worse while he was walking around the event on Saturday, October 24, 2026, and today he has difficulty bearing full weight. Denies any new fall, twist, or other injury since the initial injury. Rates pain 6/10, lateral ankle, worse with weight bearing. Took ibuprofen 400 mg last night with partial relief. Denies numbness or tingling. No prior right ankle injury.",
   "record_reason": "Right ankle pain and swelling.",
-  "precedents": [
+  "clauses": [
     {
-      "reference": "history-02",
-      "outcome": "refused",
-      "payout_cents": 0,
-      "narrative": "Fall in zone Main stage left at 21:20; 2 light-circle witnesses in the same zone; medic note within 10 minutes; right ankle sprain, subsequent encounter S93.401D; urgent care visit with walking boot; record shows the ankle injury was first treated before the event.",
-      "score": 0.91
+      "clause_id": "9f2c-c3",
+      "policy": "venue",
+      "section": "insuring_agreement",
+      "page": 3,
+      "text": "We will pay medical expenses for bodily injury caused by an accident on premises you own or rent, during the policy period, regardless of fault.",
+      "score": 0.84
     },
     {
-      "reference": "history-06",
-      "outcome": "auto_settled",
-      "payout_cents": 6500,
-      "narrative": "Fall in zone Stage B at 23:25; 2 light-circle witnesses in the same zone; medic note within 8 minutes; right ankle sprain S93.401A; first aid only.",
-      "score": 0.87
+      "clause_id": "9f2c-c5",
+      "policy": "venue",
+      "section": "exclusions",
+      "page": 5,
+      "text": "We will not pay expenses for bodily injury that began before the event or that happened away from the premises.",
+      "score": 0.79
     },
     {
-      "reference": "history-11",
-      "outcome": "refused",
-      "payout_cents": 0,
-      "narrative": "Fall in zone Main stage right at 22:40 during a headline set; no light-circle witnesses in the same zone; medic note within 41 minutes; right ankle sprain S93.401A; urgent care visit with x-ray; 2 light-circle witnesses heard the beacon from zone Food court, not the incident zone.",
-      "score": 0.83000004
+      "clause_id": "9f2c-c8",
+      "policy": "venue",
+      "section": "other_insurance",
+      "page": 8,
+      "text": "This insurance is primary. Other insurance available to the injured person does not reduce what we pay.",
+      "score": 0.72
     }
   ],
-  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event."
+  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event.",
+  "claimant_statement": "",
+  "charge": null,
+  "attendee_policy_hash": ""
 }

@@ -15,7 +15,7 @@ use crate::model::new_call;
 #[derive(Clone, Debug)]
 pub enum Finish {
     MedicalRecord { record_json: String },
-    ClaimChecks { checks: Vec<CheckIn>, precedents: Vec<PrecedentIn> },
+    ClaimChecks { checks: Vec<CheckIn>, clauses: Vec<ClauseIn> },
     ClaimReview { review_json: String },
     ClaimLetters { fnol_hash: String, summary_hash: String, determination_hash: String },
     RecoveryLetter { hash: String },
@@ -135,7 +135,7 @@ impl Sink {
         let required = || last.clone().unwrap_or_else(|| new_call("none"));
         match finish {
             Finish::MedicalRecord { record_json } => reduce!(conn, apply_medical_record_then(job_id, record_json, required())),
-            Finish::ClaimChecks { checks, precedents } => reduce!(conn, submit_claim_checks_then(job_id, checks, precedents)),
+            Finish::ClaimChecks { checks, clauses } => reduce!(conn, submit_claim_checks_then(job_id, checks, clauses)),
             Finish::ClaimReview { review_json } => reduce!(conn, submit_claim_review_then(job_id, review_json, required())),
             Finish::ClaimLetters { fnol_hash, summary_hash, determination_hash } => {
                 reduce!(conn, attach_claim_letters_then(job_id, fnol_hash, summary_hash, determination_hash, last))
@@ -203,11 +203,11 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
     let call = call.map(call_json);
     let (reducer, args) = match finish {
         Finish::MedicalRecord { record_json } => ("apply_medical_record", json!({"record_json": parse_or_text(record_json), "call": call})),
-        Finish::ClaimChecks { checks, precedents } => (
+        Finish::ClaimChecks { checks, clauses } => (
             "submit_claim_checks",
             json!({
                 "checks": checks.iter().map(|c| json!({"name": c.name, "result": c.result, "detail": c.detail})).collect::<Vec<_>>(),
-                "precedents": precedents.iter().map(|p| json!({"reference": p.reference, "outcome": p.outcome, "payout_cents": p.payout_cents, "narrative": p.narrative, "score": p.score})).collect::<Vec<_>>(),
+                "clauses": clauses.iter().map(|c| json!({"clause_id": c.clause_id, "policy": c.policy, "section": c.section, "page": c.page, "text": c.text, "score": c.score})).collect::<Vec<_>>(),
             }),
         ),
         Finish::ClaimReview { review_json } => ("submit_claim_review", json!({"review_json": parse_or_text(review_json), "call": call})),

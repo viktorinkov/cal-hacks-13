@@ -48,9 +48,10 @@ fn wrist_sprain_fall() -> ClaimDoc {
 fn laptop_theft() -> ClaimDoc {
     let narrative = narrative_for(&NarrativeParts {
         incident_kind: "theft",
-        zone_name: "Sponsor row",
+        zone_name: "Hacking floor",
         local_time: "21:10",
         minutes_to_staff_note: Some(4),
+        item: Some("laptop"),
         loss_cents: Some(119_900),
         responsible_named: true,
         ..Default::default()
@@ -59,17 +60,18 @@ fn laptop_theft() -> ClaimDoc {
         doc_id: ClaimDoc::live_id(900004, 1),
         claim_id: 900004,
         incident_kind: "theft".into(),
-        cover_kind: "property".into(),
+        cover_kind: "personal_property".into(),
         zone_id: 104,
-        zone_name: "Sponsor row".into(),
+        zone_name: "Hacking floor".into(),
         witness_count: 0,
         diagnosis_codes: vec![],
         service_codes: vec![],
         record_sha256: String::new(),
         billed_cents: 0,
         covered_cents: 0,
-        payout_cents: 119_900,
+        payout_cents: 94_900,
         cost_cents: 119_900,
+        item_kind: "laptop".into(),
         responsible_named: true,
         narrative,
         ..wrist_sprain_fall()
@@ -145,21 +147,24 @@ async fn claims_round_trip() -> anyhow::Result<()> {
     let r = es.index_claim(&odd).await?;
     assert_eq!((r.valid, r.errors), (false, vec!["bad_incident_kind:slip".to_string()]));
 
-    // A theft is valid with its loss and its property cover.
+    // A theft of an attendee's laptop is valid with its item, its value and the attendee's own cover.
     let theft = laptop_theft();
     let r = es.index_claim(&theft).await?;
     assert!(r.valid && r.errors.is_empty(), "{:?}", r.errors);
 
-    // An attendee's own things need a value and the attendee's own cover.
-    let lost = ClaimDoc {
+    // A breakage needs the item, its value and the attendee's own cover, not the venue's.
+    let broken = ClaimDoc {
         doc_id: ClaimDoc::live_id(900005, 1),
         claim_id: 900005,
-        incident_kind: "belongings".into(),
+        incident_kind: "breakage".into(),
+        cover_kind: "property".into(),
         cost_cents: 0,
+        item_kind: String::new(),
         ..theft.clone()
     };
-    let r = es.index_claim(&lost).await?;
-    assert_eq!(sorted(r.errors), sorted(vec!["cover_kind_mismatch:property".to_string(), "loss_needs_cost_cents".to_string()]));
+    let r = es.index_claim(&broken).await?;
+    let expected = ["cover_kind_mismatch:property", "loss_needs_cost_cents", "loss_needs_item_kind"];
+    assert_eq!(sorted(r.errors), sorted(expected.map(String::from).to_vec()));
 
     // The clause search answers, or is empty when no policy is read yet; it never fails the claim.
     let clauses = es.search_clauses(&theft.narrative, None, None, sections_for_kind("theft"), 5).await?;
@@ -167,7 +172,7 @@ async fn claims_round_trip() -> anyhow::Result<()> {
         eprintln!("#{} {:.4} {} {} p{} | {}", i + 1, c.score, c.clause_id, c.section, c.page, c.text);
     }
     assert!(clauses.len() <= 5);
-    assert!(clauses.iter().all(|c| c.policy == "venue" && sections_for_kind("theft").contains(&c.section.as_str())));
+    assert!(clauses.iter().all(|c| c.policy == "venue" && sections_for_kind("theft").contains(&c.section.as_str())), "no attendee hash, so venue clauses only");
     assert!(clauses.windows(2).all(|w| w[0].score >= w[1].score));
     if let Some(first) = clauses.first() {
         let read = es.read_clause(&first.clause_id).await?.expect("a clause the search found can be read");

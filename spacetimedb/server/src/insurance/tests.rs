@@ -861,7 +861,7 @@ fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
     assert!(w.t.db.evidence_fact().claim_id().filter(claim.id).any(|f| f.key == "responsible_name" && f.value == "Jordan Alvarez"));
     assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().amount_cents, 240_000);
     w.verify(claim.id);
-    w.investigate(claim.id, &["camera"], pays_and_charges);
+    w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
     let charge = w.t.db.charge().id().find(charge.id).unwrap();
@@ -926,7 +926,7 @@ fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
     let p: VerifyPayload = serde_json::from_str(&job.payload).unwrap();
     assert_eq!((p.attendee_policy_hash.as_str(), p.responsible_named, p.cost_cents), ("ab".repeat(32).as_str(), true, 119_900));
     w.verify(claim.id);
-    w.investigate(claim.id, &["camera"], pays_and_charges);
+    w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
     w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, false));
@@ -948,7 +948,7 @@ fn a_stolen_bag_with_no_policy_on_file_goes_to_the_organizer() {
     let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
     assert_eq!((claim.policy_id, claim.cost_cents, claim.payout_cents), (0, 34_000, 0));
     w.verify(claim.id);
-    w.investigate(claim.id, &["camera"], |p| decision(p, "pay"));
+    w.investigate(claim.id, &["camera", "policy"], |p| decision(p, "pay"));
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed);
     assert!(c.status_note.contains("no policy of their own on file"), "{}", c.status_note);

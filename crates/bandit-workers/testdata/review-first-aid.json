@@ -471,28 +471,34 @@
   ],
   "record_history": "Patient presented to the Event Medical Station on foot at 22:20, accompanied by a friend. At approximately 22:05, while attending Cal Hacks 13.0, she slipped on a spilled drink near Main stage and fell onto her outstretched right hand. She did not strike her head and had no loss of consciousness. She reports immediate pain over the back of the right wrist, rated 5/10, worse with wrist extension and gripping. Denies numbness, tingling, or any other injury. Right-hand dominant. No prior injury to the right wrist.",
   "record_reason": "Right wrist pain after a fall.",
-  "precedents": [
+  "clauses": [
     {
-      "reference": "history-04",
-      "outcome": "auto_settled",
-      "payout_cents": 9800,
-      "narrative": "Fall in zone Main stage left at 22:10 during a headline set; 3 light-circle witnesses in the same zone; medic note within 12 minutes; right wrist sprain S63.501A; first aid only.",
-      "score": 0.91
+      "clause_id": "9f2c-c3",
+      "policy": "venue",
+      "section": "insuring_agreement",
+      "page": 3,
+      "text": "We will pay medical expenses for bodily injury caused by an accident on premises you own or rent, during the policy period, regardless of fault.",
+      "score": 0.84
     },
     {
-      "reference": "history-19",
-      "outcome": "auto_settled",
-      "payout_cents": 5500,
-      "narrative": "Fall in zone Main stage left at 22:30 during a headline set; 4 light-circle witnesses in the same zone; medic note within 9 minutes; left wrist sprain S63.502A; first aid only.",
-      "score": 0.87
+      "clause_id": "9f2c-c5",
+      "policy": "venue",
+      "section": "exclusions",
+      "page": 5,
+      "text": "We will not pay expenses for bodily injury that began before the event or that happened away from the premises.",
+      "score": 0.79
     },
     {
-      "reference": "history-26",
-      "outcome": "refused",
-      "payout_cents": 0,
-      "narrative": "Fall in zone Stage B at 22:05; no light-circle witnesses in the same zone; medic note within 35 minutes; right wrist sprain S63.501A; first aid only; 3 light-circle witnesses were in zone Lagoon path at the reported time.",
-      "score": 0.83000004
+      "clause_id": "9f2c-c8",
+      "policy": "venue",
+      "section": "other_insurance",
+      "page": 8,
+      "text": "This insurance is primary. Other insurance available to the injured person does not reduce what we pay.",
+      "score": 0.72
     }
   ],
-  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event."
+  "policy_summary": "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to $5,000.00 per claim and $25,000.00 for the event, services within 30 days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event.",
+  "claimant_statement": "",
+  "charge": null,
+  "attendee_policy_hash": ""
 }

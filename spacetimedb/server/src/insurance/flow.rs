@@ -15,7 +15,7 @@ use bandit_insurance::letters::LetterData;
 use bandit_insurance::medical::{ExtractedRecord, ValidRecord, validate_record};
 use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
 use bandit_insurance::payloads::*;
-use bandit_insurance::decision::{AgentDecision, GuardInput, Investigation, guard, required_reading, validate_decision};
+use bandit_insurance::decision::{AgentDecision, GuardInput, Investigation, guard, validate_review};
 use bandit_insurance::rules::{SettlementRule, learned_ceiling, matching_rule, next_version};
 use bandit_insurance::{Check, CoverKind};
 use spacetimedb::{Identity, ReducerContext, Table};
@@ -582,15 +582,11 @@ pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: Strin
     if claim.pack_version != p.pack_version || claim.status != ClaimStatus::Reviewing {
         return Ok(());
     }
-    let seqs: Vec<u32> = p.facts.iter().map(|f| f.seq).collect();
-    let mut allowed: Vec<u64> = p.amounts.figures().to_vec();
-    allowed.extend(p.lines.iter().flat_map(|l| [l.billed_cents, l.allowed_cents, l.covered_cents]));
-    let must_read = required_reading(&p);
     let checked: Result<AgentDecision, Vec<String>> = serde_json::from_str::<Investigation>(&review_json)
         .map_err(|e| vec![format!("not an investigation: {e}")])
         .and_then(|inv| {
             let d: AgentDecision = serde_json::from_value(inv.decision).map_err(|e| vec![format!("not a decision: {e}")])?;
-            validate_decision(&d, &seqs, &p.checks, &allowed, &inv.sources_read, &must_read).map(|_| d)
+            validate_review(&d, &p, &inv.sources_read, &inv.clauses_seen).map(|_| d)
         });
     let verdict = checked.as_ref().map(|d| d.decision.as_str().to_string()).unwrap_or_else(|_| "invalid".into());
     let d = checked.as_ref().ok();
@@ -1141,7 +1137,7 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
             route(ctx, claim, "the hospital report did not arrive; a person must file the record".into());
         }
         KIND_VERIFY if claim.status == ClaimStatus::Verifying => {
-            store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or precedents").by(bandit_insurance::Reader::Elastic));
+            store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or policy clauses").by(bandit_insurance::Reader::Elastic));
             queue_review(ctx, claim);
         }
         KIND_PAYOUT if claim.status == ClaimStatus::Paying => {

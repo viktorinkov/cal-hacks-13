@@ -19,20 +19,20 @@ pub const CLAUSE_SECTIONS: [&str; 8] =
 
 /// The sections that can decide each kind of incident:
 ///
-/// | Kind | Clauses it should find |
-/// |---|---|
-/// | `fall`, `sos` | the venue's medical payments clause, its limits and schedule of benefits, its exclusions, its service window (conditions), the other-insurance clause |
-/// | `property` | the venue's property clause, its limits and deductible, its exclusions, the subrogation clause |
-/// | `theft` | the venue's theft clause, its conditions and exclusions, the subrogation clause |
-/// | `belongings` | the venue's exclusion of property in its care and its liability cover; the attendee policy's personal property clause, its limits and deductible |
+/// | Kind | The policy and cover | Sections |
+/// |---|---|---|
+/// | `fall`, `sos` | the venue's medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (staff, pre-existing, off premises), conditions (service window), other insurance |
+/// | `property` | the venue's property cover | insuring agreement, limits and deductible, exclusions, subrogation |
+/// | `theft` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions (such as property left unattended), theft, subrogation |
+/// | `breakage` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions, subrogation |
 ///
 /// An unknown kind searches every section.
 pub fn sections_for_kind(kind: &str) -> &'static [&'static str] {
     match kind {
         "sos" | "fall" => &["insuring_agreement", "limits", "schedule_of_benefits", "exclusions", "conditions", "other_insurance"],
         "property" => &["insuring_agreement", "limits", "exclusions", "subrogation"],
-        "theft" => &["theft", "conditions", "exclusions", "subrogation"],
-        "belongings" => &["exclusions", "insuring_agreement", "limits"],
+        "theft" => &["insuring_agreement", "limits", "exclusions", "theft", "subrogation"],
+        "breakage" => &["insuring_agreement", "limits", "exclusions", "subrogation"],
         _ => &CLAUSE_SECTIONS,
     }
 }
@@ -207,14 +207,14 @@ mod tests {
 
     #[test]
     fn every_kind_searches_known_sections() {
-        for kind in ["sos", "fall", "property", "theft", "belongings"] {
+        for kind in ["sos", "fall", "property", "theft", "breakage"] {
             let sections = sections_for_kind(kind);
             assert!(!sections.is_empty() && sections.len() < CLAUSE_SECTIONS.len(), "{kind}");
             assert!(sections.iter().all(|s| CLAUSE_SECTIONS.contains(s)), "{kind}");
         }
         assert!(sections_for_kind("theft").contains(&"theft") && sections_for_kind("theft").contains(&"subrogation"));
         assert!(sections_for_kind("fall").contains(&"other_insurance"));
-        assert!(sections_for_kind("belongings").contains(&"exclusions"));
+        assert!(sections_for_kind("breakage").contains(&"exclusions") && sections_for_kind("breakage").contains(&"subrogation"));
         assert_eq!(sections_for_kind("slip"), CLAUSE_SECTIONS);
     }
 
