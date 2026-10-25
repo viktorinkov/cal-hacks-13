@@ -438,3 +438,52 @@ fn image_block_shape() {
     assert_eq!(body["max_tokens"], claude_client::DEFAULT_MAX_TOKENS);
     assert!(body.get("output_config").is_none());
 }
+
+#[tokio::test]
+async fn tool_loop_appends_turns_unchanged() {
+    let first = json!([
+        {"type": "thinking", "thinking": "", "signature": "sig-1"},
+        {"type": "tool_use", "id": "toolu_1", "name": "read_evidence", "input": {"source": "light_circle", "reason": "who saw it"}}
+    ]);
+    let last = json!([{"type": "text", "text": "{\"approved\": true, \"reason\": \"three witnesses\"}"}]);
+    let (url, log) = mock(vec![
+        reply(200, message("claude-opus-5-5", first.clone(), "tool_use")),
+        reply(200, message("claude-opus-5-5", last, "end_turn")),
+    ])
+    .await;
+    let schema = json!({
+        "type": "object",
+        "properties": {"source": {"type": "string"}, "reason": {"type": "string"}},
+        "required": ["source", "reason"],
+        "additionalProperties": false
+    });
+    let request = MessageRequest::new()
+        .system("You review insurance claims.")
+        .text("Investigate claim 7.")
+        .tool("read_evidence", "Read one evidence source.", schema)
+        .json_schema(claim_schema());
+    let c = client(&url);
+
+    let out = c.call(&request).await.unwrap();
+    assert_eq!(out.json, None, "a tool turn is not the answer");
+    assert_eq!(out.tool_uses.len(), 1);
+    assert_eq!((out.tool_uses[0].id.as_str(), out.tool_uses[0].name.as_str()), ("toolu_1", "read_evidence"));
+    assert_eq!(out.tool_uses[0].input["source"], "light_circle");
+
+    let next = request.next_turn(&out.content).tool_result("toolu_1", "3 witnesses in zone 101", false).tool_choice_none();
+    let done = c.call(&next).await.unwrap();
+    assert_eq!(done.typed::<Claim>().unwrap(), Claim { approved: true, reason: "three witnesses".into() });
+
+    let seen = log.lock().unwrap();
+    let body = &seen[0].body;
+    assert_eq!(body["tools"][0]["name"], "read_evidence");
+    assert_eq!(body["tools"][0]["strict"], true);
+    assert!(body.get("tool_choice").is_none());
+    let body = &seen[1].body;
+    let messages = body["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 3);
+    assert_eq!(messages[0]["content"][0]["text"], "Investigate claim 7.");
+    assert_eq!(messages[1], json!({"role": "assistant", "content": first}), "Claude's turn goes back unchanged");
+    assert_eq!(messages[2]["content"][0], json!({"type": "tool_result", "tool_use_id": "toolu_1", "content": "3 witnesses in zone 101"}));
+    assert_eq!(body["tool_choice"], json!({"type": "none"}));
+}

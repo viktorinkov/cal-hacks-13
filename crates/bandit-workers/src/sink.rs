@@ -107,6 +107,21 @@ impl Sink {
         }
     }
 
+    /// Reports a step of a claim's investigation, so the decision history shows it as it happens.
+    pub async fn claim_step(&self, job_id: u64, step: &bandit_insurance::decision::Step) -> Result<()> {
+        let s = step.clone();
+        match self {
+            Sink::Db(conn) => reduce!(conn, report_claim_step_then(job_id, s.actor, s.action, s.summary, s.detail, s.fact_ids)),
+            Sink::Print => {
+                print_call(
+                    "report_claim_step",
+                    json!({"job_id": job_id, "actor": s.actor, "action": s.action, "summary": s.summary, "detail": s.detail, "fact_ids": s.fact_ids}),
+                );
+                Ok(())
+            }
+        }
+    }
+
     /// Calls the result reducer. The last call record goes with it; earlier
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
