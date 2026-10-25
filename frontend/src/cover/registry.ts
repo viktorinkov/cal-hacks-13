@@ -1,4 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react'
+import { isViewing } from '@/stdb/viewing'
 
 /**
  * What a tap reads. Seeds cover the demo bands that appear in tonight's claims.
@@ -221,11 +222,13 @@ function readStored(): StoredRegistration[] {
 
 /** For the signup form: an unsaved band must never inherit a demo identity. */
 export function getSavedRegistration(bandId: string): Registration | null {
+  if (isViewing()) return null
   const stored = readStored().find((item) => item.bandId === bandId)
   return stored ? { ...blankRegistration(bandId), ...stored } : null
 }
 
 export function getRegistration(bandId: string): Registration | null {
+  if (isViewing()) return null
   return getSavedRegistration(bandId) ?? SEEDS.find((item) => item.bandId === bandId) ?? null
 }
 

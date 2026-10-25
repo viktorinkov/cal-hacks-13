@@ -4,6 +4,7 @@ import { loadHostConfig, type HostConfig } from '@/stdb/host'
 import { useRoute } from '@/cover/route'
 import { useSession } from '@/stdb/session'
 import { JoinOrganizerGate } from './JoinOrganizer'
+import { isViewing } from '@/stdb/viewing'
 
 const gateButton =
   'rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5'
@@ -36,6 +37,8 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
       cancel = true
     }
   }, [])
+
+  if (isViewing()) return children
 
   if (!host) {
     return (

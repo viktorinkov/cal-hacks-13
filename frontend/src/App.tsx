@@ -14,7 +14,9 @@ import { MerchPage } from '@/components/desk/MerchPage'
 import { PaymentsPage } from '@/components/desk/PaymentsPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
 import { RunPage } from '@/components/desk/RunPage'
+import { StaffPage } from '@/components/desk/StaffPage'
 import { TestBandsPage } from '@/components/desk/TestBandsPage'
+import { ViewAsPage } from '@/components/desk/ViewAsPage'
 import { PhotographerPage } from '@/components/photo/PhotographerPage'
 import { VenuePage } from '@/components/desk/VenuePage'
 import { JoinPage } from '@/components/join/JoinPage'
@@ -77,6 +79,8 @@ function Pages() {
   if (path === '/claims') return <ClaimsDesk />
   if (path === '/rules') return <RulesPage />
   if (path === '/attendees') return <AttendeesPage />
+  if (path === '/staff') return <StaffPage />
+  if (path === '/view-as') return <ViewAsPage />
   if (path === '/run') return <RunPage />
   if (path === '/bands') return <BandsPage />
   if (path === '/cameras') return <CamerasPage />

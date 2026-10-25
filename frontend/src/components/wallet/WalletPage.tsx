@@ -1,3 +1,4 @@
+import { isViewing } from '@/stdb/viewing'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Waves } from 'lucide-react'
 import { ChargePay } from '@/components/attendee/ChargePay'
@@ -405,7 +406,7 @@ function bandOnThisPhone(band: { bandId: number; status: string } | null): numbe
   return band.status === 'claimed' || band.status === 'waiting_for_press' ? band.bandId : null
 }
 
-export function WalletPage() {
+export function WalletPage({ viewBandId }: { viewBandId?: number } = {}) {
   const fixture = usePaymentsFixture()
   const { go, search } = useRoute()
   const phase = useSession((s) => s.phase)
@@ -420,20 +421,20 @@ export function WalletPage() {
   const known = useSession((s) => nightKnown(s.eventReady, s.departureReady, s.recapViewErrors.my_departure))
   const over = known && nightIsOver(eventEnded, leftAt)
   const fromUrl = bandIdFromSearch(search)
-  const linked = fromUrl ?? rememberedBand()
+  const linked = isViewing() ? (viewBandId ?? fromUrl) : (fromUrl ?? rememberedBand())
   const attached = bandOnThisPhone(myBand)
-  const bandId = !known ? null : fixture ? FIXTURE_BAND : attached ?? (over ? null : linked)
+  const bandId = !known ? null : isViewing() ? (viewBandId ?? attached ?? fromUrl) : fixture ? FIXTURE_BAND : attached ?? (over ? null : linked)
   const label = bandId == null ? '' : bandDigits(bandId)
   const [notice, setNotice] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
   const attempt = useRef<number | null>(null)
 
   useEffect(() => {
-    if (fromUrl != null) rememberBand(fromUrl)
+    if (!isViewing() && fromUrl != null) rememberBand(fromUrl)
   }, [fromUrl])
 
   useEffect(() => {
-    if (fixture || phase !== 'live' || !myBandReady || !known || over || linked == null) return
+    if (isViewing() || fixture || phase !== 'live' || !myBandReady || !known || over || linked == null) return
     const mine = bandOnThisPhone(myBand)
     if (mine != null && mine !== linked) return
     if (mine != null && wallet) return

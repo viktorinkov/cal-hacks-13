@@ -1,3 +1,4 @@
+import { isViewing } from '@/stdb/viewing'
 import { useEffect, useRef } from 'react'
 import { useRoute } from '@/cover/route'
 import { bandDigits, clock } from '@/payments/model'
@@ -82,6 +83,7 @@ export function MedicTap({ bandId }: { bandId: number }) {
   const incidentId = incident?.id ?? null
 
   useEffect(() => {
+    if (isViewing()) return
     if (!show || !incidentId || asked.current === incidentId) return
     asked.current = incidentId
     void requestMedicalCard(bandId)
