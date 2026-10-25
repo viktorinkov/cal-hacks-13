@@ -340,7 +340,7 @@ def badge(box, n):
 def insurance(y0):
     S.begin_frame("7 · Insurance Decision Engine", 0, y0, 1000, 600)
     S.text(40, 28, "Insurance Decision Engine", fs=64)
-    A, Bx, C1, C2, D_, E, F = 60, 760, 1440, 2160, 2960, 3760, 4500
+    A, Bx, C1, C2, D_, E, F = 60, 760, 1440, 2160, 2960, 3840, 4580
     p = [330, 640, 950]  # documents rows
     mk = dict(fill=WHITE)
 
@@ -376,20 +376,22 @@ def insurance(y0):
     V(reader, clauses, "each clause", x=clauses.cx)
 
     # 3. the terms that drive the decision, from both policies
-    venue_terms = B(D_, 0, "venue terms\ncovers injury, damage, theft\nstaff excluded\n$5,000 per claim\n"
-                    "$25,000 per event\nminimum payout, deductible\nfee schedule", "stdb", w=620, h=360, wordmark=STDB, mark_h=50,
+    venue_terms = B(D_, 0, "venue terms\nmedical payments cover\nproperty cover, theft clause\n"
+                    "staff excluded, subrogation\n$5,000 per claim, $25,000 per event\nminimum payout, deductible\n"
+                    "fee schedule", "stdb", w=700, h=400, wordmark=STDB, mark_h=50,
                     cy=p[0] - 20, **mk)
-    att_terms = B(D_, 0, "attendee terms\ninsurer, plan\ncoverage, deductible", "stdb", w=620, h=230,
+    att_terms = B(D_, 0, "attendee terms\nhealth plan, insurer\ncoverage, deductible", "stdb", w=700, h=230,
                   wordmark=STDB, mark_h=50, cy=p[1] + 20, **mk)
-    bill = B(D_, 0, "bill lines\npage cites\ninjury codes", "stdb", w=620, h=230, wordmark=STDB, mark_h=50,
+    bill = B(D_, 0, "bill lines\npage cites\ninjury codes", "stdb", w=700, h=230, wordmark=STDB, mark_h=50,
              cy=p[2] + 10, **mk)
     H(reader, venue_terms, "venue terms", y=venue_terms.cy)
     H(reader, att_terms, "attendee terms", y=att_terms.cy)
     D(reader, "r", 0.93, bill, "l", 0.5, "bill lines")
     checks = B(E, 0, "checks bill\ntotals, patient\ndate, injury code\nno duplicate", "rust", w=560, h=300,
                wordmark=RUST, mark_h=70, cy=bill.cy - S.oy)
-    split = B(F, venue_terms.y - S.oy, "Which policy pays\ninjury: venue, rest to insurer\ndamage, theft: venue,\n"
-              "then charge attendee\n$1,308 billed: venue $895\nattendee insurer $413", "rust", w=600, h=checks.bottom - venue_terms.y,
+    split = B(F, venue_terms.y - S.oy, "Which policy pays\ninjury: venue medical,\nrest to health plan\n"
+              "damage: venue property,\nabove deductible\ntheft: if theft clause\nown things: organizer\n"
+              "charge: responsible attendee", "rust", w=600, h=checks.bottom - venue_terms.y,
               wordmark=RUST, mark_h=90)
     H(bill, checks, "bill lines")
     H(venue_terms, split, "venue terms", y=venue_terms.cy)
@@ -406,13 +408,13 @@ def insurance(y0):
             for (label, icon), y in zip((("band", WATCH), ("light circle", RADIO), ("security camera", CAMERA),
                                          ("medic", USER)), e[2:])]
     facts = [B(820, 0, "file_claim\nown words, injury", "stdb", w=560, h=200, cy=e[0]),
-             B(820, 0, "file_claim\ndamage, theft, who", "stdb", w=560, h=200, cy=e[1]),
+             B(820, 0, "responsible band\nzone visit, camera sighting", "rust", w=560, h=200, cy=e[1]),
              B(820, 0, "incident\nSOS, fall, damage", "stdb", w=560, h=200, cy=e[2]),
              B(820, 0, "witnesses\n2+ bands, same zone", "rust", w=560, h=200, cy=e[3]),
              B(820, 0, "camera sighting\nsame zone, 2 min", "rust", w=560, h=200, cy=e[4]),
              B(820, 0, "medic note\nwithin 30 min", "rust", w=560, h=200, cy=e[5])]
     V(attendee, claim, "files claim", x=attendee.cx)
-    for src, fact, label in zip([claim, venue_claim] + srcs, facts, ("own words", "opens claim", "SOS or fall",
+    for src, fact, label in zip([claim, venue_claim] + srcs, facts, ("own words", "names band", "SOS or fall",
                                                                      "witness bands", "flash", "note")):
         H(src, fact, label, y=fact.cy)
     pack = B(1620, claim.y - S.oy, "evidence pack\nnumbered facts", "stdb", w=520, h=facts[-1].bottom - claim.y,
@@ -445,17 +447,17 @@ def insurance(y0):
     guard = B(2360, 0, "guard\namounts from code\nrefuse alone: failed check\npay alone: rule ceiling", "rust",
               w=760, h=330, wordmark=RUST, mark_h=70, cy=r3)
     refused = B(1300, 0, "refused\nreason shown", "bad", w=640, h=200, cy=r3)
-    payout = B(3720, 0, "payout\nvenue share\nattendee charges\nup to $5,000 per claim\nwithin $25,000 per event\n"
-               "double-entry journals", "rust", w=640, h=380, wordmark=RUST, mark_h=60, cy=r3)
+    payout = B(3720, 0, "payout\nattendee, repair vendor\ncharge responsible attendee\nup to $5,000 per claim\n"
+               "within $25,000 per event\ndouble-entry journals", "rust", w=640, h=380, wordmark=RUST, mark_h=60, cy=r3)
     nessie = B(4600, 0, "deposit, charge\n(wallet)", "ext", w=500, h=240, wordmark=CAPONE, mark_h=60, cy=r3 - 100,
                **mk)
-    charges = B(4600, 0, "tap page (/t/code)\ncharges, payouts", "web", w=500, h=270, wordmark=PHONE, mark_h=110,
+    charges = B(4600, 0, "tap page (/t/code)\nYour charges\npay, dispute", "web", w=500, h=280, wordmark=PHONE, mark_h=110,
                 cy=r3 + 300, **mk)
-    V(nessie, charges, "shows", x=nessie.cx)
+    V(nessie, charges, "shows, pays", x=nessie.cx, both=True)
     V(claude, guard, "pay, refuse\nor ask", x=claude.cx)
     H(guard, refused, "refuses", y=refused.cy)
     H(guard, payout, "pays", y=S.oy + r3)
-    H(payout, nessie, "venue share\ncharges", y=nessie.cy)
+    H(payout, nessie, "payouts\ncharges", y=nessie.cy)
 
     # 7. the organizer decides what code and Claude hand over
     r4 = r3 + 650
