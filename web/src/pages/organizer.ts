@@ -1,24 +1,27 @@
-// The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// attendee's filing (or staff filing for them) to the named approver's decision, the event graph with its photos,
+// The organizer portal: the live event from the bands, alerts, everyone at the event with what staff do as each of them, settlements: who pays what on each
+// claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the costs so far from the claims' journals, the event graph with its photos,
 // the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and the live run
 // in the venue's 3D view with its start, pause and end of the event.
+// The owner also views the portal and the attendee pages as any person sees them, read-only.
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
 
 import {
   act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
-  signOut, signedInEmail, time, type Config, EXIT_COLOURS,
+  signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
+import { costsTab } from '../costs';
 import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
-import { liveRunSection } from '../live-run';
+import { liveRunSection, runBar } from '../live-run';
+import { screens, serveViewers, viewUrl } from '../view-as';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
-import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate } from '../module_bindings/types';
+import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
@@ -42,6 +45,7 @@ const QUERIES = [
   'SELECT * FROM board_checks',
   'SELECT * FROM board_lines',
   'SELECT * FROM board_reviews',
+  'SELECT * FROM decision',
   'SELECT * FROM board_precedents',
   'SELECT * FROM board_records',
   'SELECT * FROM board_approvals',
@@ -61,10 +65,10 @@ const QUERIES = [
   'SELECT * FROM board_staff',
   'SELECT * FROM live_run',
   'SELECT * FROM live_pause',
-  'SELECT * FROM crowd_walk',
   'SELECT * FROM incident_marker',
   'SELECT * FROM decision',
   'SELECT * FROM band_place',
+  'SELECT * FROM view_as_people',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -104,8 +108,8 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
-  const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff']] : all;
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['costs', 'Costs'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
+  const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff'], ['viewas', 'View as']] : all;
   return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
 
@@ -140,7 +144,8 @@ function header() {
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
     roles().has('medic') && h('p', {}, 'Tap a band with this phone to open the wearer\'s medical card.'),
-    ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. Start or reopen it on the Live tab.'),
+    ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap.'),
+    can(...STAFF_ROLES) && runBar(conn, can('ops')),
     h('nav', {}, tabs().map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
   ];
 }
@@ -161,7 +166,7 @@ function noRole() {
 function signInScreen() {
   return [
     h('h2', {}, 'BandIt organizer portal'),
-    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, claims and the end of the event.'),
+    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, who pays for each claim and the end of the event.'),
     h('button', { onclick: signIn }, 'Sign in with email'),
   ];
 }
@@ -182,7 +187,8 @@ function live() {
   const names = wearers();
   const wearer = (band: number) => names.has(band) ? ` (${names.get(band) || 'no name yet'})` : '';
   return [
-    liveRunSection(conn, can('ops')),
+    // The 3D venue is the same for everyone, so a View as frame leaves it out.
+    !viewing() && liveRunSection(conn, can('ops')),
     (alerts.length > 0 || incidents.length > 0) && h('section', { class: 'alert' },
       h('h3', {}, 'Alerts'),
       h('ul', {},
@@ -191,7 +197,7 @@ function live() {
           return h('li', {}, h('b', {}, b.fall ? 'Fall' : 'SOS'), ` on band ${bandCode(b.id)}${wearer(b.id)} in ${z?.name ?? 'no zone'}: the bands around it show the light circle.`);
         }),
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
-          h('a', { href: '#claims' }, 'open in Claims'))))),
+          h('a', { href: '#claims' }, 'open in Settlements'))))),
     h('section', {},
       h('h3', {}, 'Zones'),
       h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands.`),
@@ -216,6 +222,11 @@ function live() {
 
 // --- Attendees ------------------------------------------------------------------------------
 
+function takeBack(bandId: number, name: string) {
+  return confirm(`Take band ${bandCode(bandId)} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
+    && act(() => conn.reducers.releaseBand({ bandId }));
+}
+
 function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.crowd) - Number(b.crowd) || a.displayName.localeCompare(b.displayName));
   const kind = (a: (typeof all)[number]) => a.crowd || a.bandId >= 100 ? 'crowd' : a.bandId >= 90 ? 'test' : a.bandId > 0 ? 'hardware' : 'none';
@@ -223,9 +234,6 @@ function attendees() {
   const people = all.filter(a => !a.crowd).length;
   const shown = all.slice(0, people + CROWD_ROWS);
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
-  const takeBack = (bandId: number, name: string) =>
-    confirm(`Take band ${bandCode(bandId)} back from ${name || 'this attendee'}? They keep their profile and memories; the next person can claim the band.`)
-      && act(() => conn.reducers.releaseBand({ bandId }));
   return h('section', {},
     h('h3', {}, `${all.length} attendees`),
     h('p', { class: 'muted' }, `${count('crowd')} in the crowd, ${count('test')} wearing test bands, ${count('hardware')} wearing hardware bands${count('none') ? `, ${count('none')} without a band` : ''}.`),
@@ -239,6 +247,216 @@ function attendees() {
           a.bandId > 0 && a.bandId < 100 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
         h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
+}
+
+// --- People (Live tab) ----------------------------------------------------------------------
+
+/** One person on the Live tab's list: an attendee from the host's list, or a staff member the owner can view as. */
+type Person = { key: string; name: string; kind: string; crowd: boolean; bandId: number; att?: AttendeeOut; view?: ViewablePerson };
+
+/** What the Live tab's search holds, and the person opened from the list, by key. */
+let peopleSearch = '';
+let opened = '';
+let scrollToPerson = false;
+
+/** Band codes by band id: the list shows a thousand of them on every redraw. */
+const codes = new Map<number, string>();
+
+function code(bandId: number): string {
+  if (!codes.has(bandId)) codes.set(bandId, bandCode(bandId));
+  return codes.get(bandId)!;
+}
+
+function kindOf(bandId: number, crowd: boolean): string {
+  return crowd || bandId >= 100 ? 'crowd' : bandId >= 90 ? 'test band' : bandId > 0 ? 'hardware band' : 'no band';
+}
+
+/** Everyone: the attendees who tapped a band, then the staff, then the crowd, by name. For the owner each
+ *  attendee also carries their row of `view_as_people`, which opens their pages. */
+function everyone(): Person[] {
+  const out: Person[] = [...conn.db.boardAttendees.iter()].map(a =>
+    ({ key: `a${a.nodeId}`, name: a.displayName, kind: kindOf(a.bandId, a.crowd), crowd: a.crowd, bandId: a.bandId, att: a }));
+  const byBand = new Map(out.filter(p => p.bandId).map(p => [p.bandId, p]));
+  const byName = new Map(out.filter(p => !p.bandId).map(p => [p.name, p]));
+  for (const v of conn.db.viewAsPeople.iter()) {
+    if (v.role !== 'attendee') {
+      out.push({ key: keyOf(v), name: v.name, kind: roleName(v.role).toLowerCase(), crowd: false, bandId: v.bandId, view: v });
+      continue;
+    }
+    const p = v.bandId ? byBand.get(v.bandId) : byName.get(v.name);
+    if (p) p.view = v;
+  }
+  const rank = (p: Person) => (p.crowd ? 2 : p.att ? 0 : 1);
+  return out.sort((a, b) => rank(a) - rank(b) || (a.name || '~').localeCompare(b.name || '~'));
+}
+
+/** Every word of the search appears in the person's name, kind, band code, company or handles. */
+function found(p: Person, words: string[]): boolean {
+  if (!words.length) return true;
+  const text = [p.name, p.kind, p.bandId ? code(p.bandId) : '', p.att?.organization ?? '', ...(p.att?.handles.map(x => x.handle) ?? [])]
+    .join(' ').toLowerCase();
+  return words.every(w => text.includes(w));
+}
+
+/** The injury claims a person filed, or staff filed as them. */
+function claimsOf(p: Person): Claim[] {
+  if (!p.att) return [];
+  return [...conn.db.claimsBoard.iter()]
+    .filter(c => c.claimant && (p.view ? c.claimant.isEqual(p.view.identity) : c.bandId === p.bandId && c.claimantName === p.name))
+    .sort((a, b) => Number(b.id - a.id));
+}
+
+/** The zone a band is in now, else the first zone with a station marker. */
+function zoneOf(bandId: number) {
+  const station = conn.db.band.id.find(bandId)?.zone ?? 0;
+  const zones = [...conn.db.zone.iter()].filter(z => z.stationId !== 0).sort((a, b) => a.stationId - b.stationId);
+  return zones.find(z => z.stationId === station) ?? zones[0];
+}
+
+function openPerson(p: Person) {
+  opened = p.key;
+  scrollToPerson = true;
+  render();
+}
+
+/** The list's rows by person, kept with what they show: a crowd of a thousand would otherwise rebuild every redraw. */
+const personRows = new Map<string, { shows: string; row: HTMLElement }>();
+/** What the list shows now; the list is drawn again only when it changes. */
+let listShows = '';
+
+/** The search and the list of everyone, or null when nothing in it changed; opening a person shows them above,
+ *  with what staff can do as them. */
+function peopleList(all: Person[]) {
+  const words = peopleSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = all.filter(p => found(p, words));
+  const stations = new Map([...conn.db.zone.iter()].map(z => [z.stationId, z.name]));
+  const claims = new Map<string, number>();
+  for (const c of conn.db.claimsBoard.iter()) {
+    if (c.claimant) claims.set(`${c.bandId} ${c.claimantName}`, (claims.get(`${c.bandId} ${c.claimantName}`) ?? 0) + 1);
+  }
+  const filed = (p: Person) => p.att ? claims.get(`${p.bandId} ${p.name}`) ?? 0 : 0;
+  const rows = shown.map(p => {
+    const b = p.bandId ? conn.db.band.id.find(p.bandId) : undefined;
+    const cells = [p.name || '(no name yet)', p.kind, p.bandId ? code(p.bandId) : '', b && present(b) ? stations.get(b.zone) ?? 'no zone' : '',
+      bandStatus(p.bandId), p.att?.organization ?? '', String(filed(p) || '')];
+    const shows = [...cells, p.key === opened].join('|');
+    let kept = personRows.get(p.key);
+    if (kept?.shows !== shows) {
+      const [name, kind, band, zone, status, company, count] = cells;
+      kept = { shows, row: h('tr', {},
+        h('td', {}, h('button', { class: 'link', onclick: () => openPerson(p) }, name), h('span', { class: 'muted' }, ` ${kind}`)),
+        h('td', {}, band), h('td', {}, zone),
+        h('td', { class: status === 'online' ? 'pass' : 'muted' }, status),
+        h('td', {}, company), h('td', {}, count),
+        h('td', {}, h('button', { class: p.key === opened ? 'on' : '', onclick: () => openPerson(p) }, 'Open'))) };
+      personRows.set(p.key, kept);
+    }
+    return kept;
+  });
+  const shows = [all.length, peopleSearch, ...rows.map(r => r.shows)].join('\n');
+  if (shows === listShows) return null;
+  listShows = shows;
+  return h('section', {},
+    h('h3', {}, `People (${all.length})`),
+    h('input', { name: 'people-search', type: 'search', placeholder: 'Search by name, band, company or handle', value: peopleSearch,
+      oninput: (e: Event) => { peopleSearch = (e.target as HTMLInputElement).value; render(); } }),
+    words.length > 0 && h('p', { class: 'muted' }, `${shown.length} found`),
+    h('table', {},
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Zone now'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Claims'), h('th', {})),
+      rows.map(r => r.row)));
+}
+
+/** The opened person: who they are, their pages, and what staff do as them. */
+function personPanel(all: Person[]) {
+  const p = all.find(x => x.key === opened);
+  if (!p) return null;
+  const a = p.att;
+  const b = p.bandId ? conn.db.band.id.find(p.bandId) : undefined;
+  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  const name = p.name || 'them';
+  const facts = [
+    p.kind,
+    b && present(b) ? `${bandStatus(p.bandId)} in ${[...conn.db.zone.iter()].find(z => z.stationId === b.zone)?.name ?? 'no zone'}` : p.bandId ? bandStatus(p.bandId) : '',
+    a?.organization,
+    a?.handles.map(x => `${x.platform} ${x.handle}`).join(', '),
+    a && (a.findable ? 'findable' : 'not findable'),
+    a && `joined ${time(a.createdAt)}`,
+  ].filter(Boolean);
+  const pages = p.view && (p.view.role !== 'attendee' || p.bandId) ? screens(p.view) : [];
+  const showing = !!p.view && keyOf(p.view) === viewKey && !!viewScreen;
+  const card = [...conn.db.medicMedicalCards.iter()].find(m => m.bandId === p.bandId);
+  return h('section', { id: 'person' },
+    h('h3', {}, p.name || '(no name yet)', ' ', h('button', { class: 'link', onclick: () => { opened = ''; viewScreen = ''; render(); } }, 'close')),
+    h('p', {}, p.bandId > 0 && [h('a', { href: `/t/${bandCode(p.bandId)}` }, `Band ${bandCode(p.bandId)}`), ' · '], facts.join(' · ')),
+    pages.length > 0 && h('p', {}, 'Their pages: ',
+      pages.map(([screen, label]) => h('button', { class: showing && viewScreen === screen ? 'on' : '',
+        onclick: () => { viewKey = keyOf(p.view!); viewScreen = screen; render(); } }, label)),
+      showing && h('button', { class: 'link', onclick: () => { viewScreen = ''; render(); } }, 'Hide their page')),
+    a && claimAs(p),
+    a && theirClaims(p),
+    a && can('ops') && theirShop(a, ended),
+    p.bandId > 0 && p.bandId < 100 && h('p', {},
+      !ended && h('button', { onclick: () => takeBack(p.bandId, p.name) }, `Take band ${bandCode(p.bandId)} back`),
+      can('medic') && h('button', { onclick: () => act(() => conn.reducers.requestMedicalCard({ bandId: p.bandId })) }, `Tap band ${bandCode(p.bandId)} for ${name}'s medical card`)),
+    card && can('medic') && medicalCard(card),
+    cfg.test_mode && TEST_BANDS.includes(p.bandId) && [h('p', {}, 'Walk to: ', walkButtons(p.bandId)), h('p', {}, testBandButtons(p.bandId, !!a))]);
+}
+
+/** Staff file an injury claim as the attendee: for their injury nobody filed a claim for yet, else for a fall
+ *  or SOS opened on their band where they stand now. The hospital report matches, doesn't match, or is random. */
+function claimAs(p: Person) {
+  if (!p.bandId || !can('ops', 'medic')) return null;
+  const injury = [...conn.db.unclaimedInjuries.iter()].filter(r => r.bandId === p.bandId).sort((x, y) => Number(y.incidentId - x.incidentId))[0];
+  const zone = zoneOf(p.bandId);
+  if (!injury && !zone) return null;
+  const options: [string, string, string][] = injury
+    ? stories(injury.kind, injury.zoneName || 'stage').map(([label, text]) => [injury.kind, label, text])
+    : (['fall', 'sos'] as const).flatMap(kind => stories(kind, zone!.name).map(([label, text]): [string, string, string] => [kind, label, text]));
+  const name = p.name || 'the attendee';
+  const file = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const [kind, , statement] = options[Number(field(f, 'claim-story'))] ?? options[0];
+    await act(async () => {
+      const incidentId = injury?.incidentId ?? await injure(p.bandId, kind, zone!.id);
+      await conn.reducers.fileClaimForWearer({ incidentId, statement, report: field(f, 'claim-report') });
+    });
+  };
+  return h('form', { onsubmit: file },
+    h('h4', {}, `File a claim as ${name}`),
+    injury && h('p', {}, `For their ${injury.kind === 'sos' ? 'SOS' : 'fall'} in ${injury.zoneName} at ${time(injury.openedAt)}.`),
+    h('label', {}, 'What happened',
+      h('select', { name: 'claim-story' }, options.map(([kind, label], i) => h('option', { value: i }, injury ? label : `${kind === 'sos' ? 'SOS' : 'Fall'}: ${label}`)))),
+    h('label', {}, 'Hospital report',
+      h('select', { name: 'claim-report' }, REPORTS.map(([value, label]) => h('option', { value, selected: value === 'random' || undefined }, label)))),
+    h('button', {}, `File the claim as ${name}`));
+}
+
+/** Opens a fall or SOS on the band where it is now, as its alert would, and resolves it as treated on site. */
+async function injure(bandId: number, kind: string, zoneId: bigint): Promise<bigint> {
+  const before = new Set([...conn.db.openIncidents.iter()].map(i => i.id));
+  await conn.reducers.openIncident({ kind, zoneId, bandId, note: '' });
+  const fresh = () => [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && !before.has(i.id));
+  for (let n = 0; n < 50 && !fresh(); n++) await new Promise(r => setTimeout(r, 100));
+  const incident = fresh();
+  if (!incident) throw new Error('The incident did not open.');
+  await conn.reducers.resolveIncident({ incidentId: incident.id, resolution: 'treated on site' });
+  return incident.id;
+}
+
+function theirClaims(p: Person) {
+  const mine = claimsOf(p);
+  return mine.length > 0 && [h('h4', {}, 'Their claims'), h('ul', {}, mine.map(c => h('li', {},
+    h('button', { class: 'link', onclick: () => toClaim(c.id) }, `#${c.id}`),
+    ` ${c.incidentKind} in ${c.zoneName}: ${statusOf(c)}${c.payoutCents ? `, ${money(c.payoutCents)} to ${payee(c)}` : ''}`)))];
+}
+
+/** Their shop, as the Merch tab's "Buy as an attendee" shows it. */
+function theirShop(a: AttendeeOut, ended: boolean) {
+  const w = [...conn.db.boardWallets.iter()].find(x => x.nodeId === a.nodeId);
+  if (!w) return h('p', { class: 'muted' }, 'No wallet, so no merch.');
+  const people = new Map([...conn.db.boardAttendees.iter()].map(x => [x.nodeId, x.displayName || 'no name yet']));
+  return [h('h4', {}, `Buy merch as ${a.displayName || 'them'}`), shopFor(w, people, ended)];
 }
 
 // --- Staff ----------------------------------------------------------------------------------
@@ -277,6 +495,72 @@ function staffTab() {
         h('td', {}, m.name), h('td', {}, m.email), h('td', {}, roleName(m.role)),
         h('td', { class: m.account ? 'pass' : 'muted' }, m.account ? 'yes' : 'not yet'),
         h('td', {}, h('button', { class: 'link', onclick: () => remove(m.id, m.name, m.role) }, 'Remove'))))));
+}
+
+// --- View as --------------------------------------------------------------------------------
+
+/** The person the owner views as, by `<role> <identity>`, and which of their screens. */
+let viewKey = '';
+let viewScreen = '';
+
+const VIEW_GROUPS: [string, string][] = [['ops', 'Organizers'], ['medic', 'Medics'], ['photographer', 'Photographers'], ['attendee', 'Attendees'], ['crowd', 'Crowd']];
+
+function keyOf(p: ViewablePerson) {
+  return `${p.role} ${p.identity.toHexString()}`;
+}
+
+function viewed(): ViewablePerson | undefined {
+  return [...conn.db.viewAsPeople.iter()].find(p => keyOf(p) === viewKey);
+}
+
+/** Opens /organizer#viewas/<identity hex> on that person, as an attendee when they are one. */
+function openFromHash() {
+  const hex = location.hash.match(/^#viewas\/([0-9a-f]+)/i)?.[1]?.toLowerCase();
+  if (!hex) return;
+  tab = 'viewas';
+  const matches = [...conn.db.viewAsPeople.iter()].filter(p => p.identity.toHexString() === hex);
+  const p = matches.find(x => x.role === 'attendee') ?? matches[0];
+  if (!p) return;
+  viewKey = keyOf(p);
+  viewScreen = screens(p)[0][0];
+}
+
+/** The owner picks a person; their page shows below, live with their data. Nothing on it can be pressed. */
+function viewAsTab() {
+  const people = [...conn.db.viewAsPeople.iter()].sort((a, b) => (a.name || '~').localeCompare(b.name || '~'));
+  const p = viewed();
+  const pick = (e: Event) => {
+    viewKey = (e.target as HTMLSelectElement).value;
+    const chosen = viewed();
+    viewScreen = chosen ? screens(chosen)[0][0] : '';
+    (e.target as HTMLSelectElement).blur();
+    render();
+  };
+  const band = (x: ViewablePerson) => x.bandId ? `, band ${bandCode(x.bandId)}` : '';
+  return h('section', {},
+    h('h3', {}, 'View as'),
+    h('p', { class: 'muted' }, 'See the pages a person sees, live with their data. It is read-only: nothing on their page can be pressed or changed.'),
+    h('label', {}, 'Person',
+      h('select', { onchange: pick },
+        h('option', { value: '' }, 'Choose a person'),
+        VIEW_GROUPS.map(([group, label]) => {
+          const rows = people.filter(x => (x.crowd ? 'crowd' : x.role) === group);
+          return rows.length > 0 && h('optgroup', { label }, rows.map(x =>
+            h('option', { value: keyOf(x), selected: keyOf(x) === viewKey || undefined }, `${x.name || '(no name yet)'}${band(x)}`)));
+        }))),
+    p && h('p', {}, screens(p).map(([screen, label]) =>
+      h('button', { class: screen === viewScreen ? 'on' : '', onclick: () => { viewScreen = screen; render(); } }, label))),
+    p && p.role === 'attendee' && !p.bandId && h('p', {}, `${p.name || 'They'} wear no band right now, so there is no band page to show.`));
+}
+
+/** The View as frame sits outside the redrawn parts, so the person's page never reloads on a redraw. */
+function showViewAs(on: boolean) {
+  const box = document.getElementById('viewas')!;
+  const p = on ? viewed() : undefined;
+  box.hidden = !p || (p.role === 'attendee' && !p.bandId);
+  const frame = box.querySelector('iframe')!;
+  const want = p ? viewUrl(p, viewScreen) : '';
+  if (want && frame.getAttribute('src') !== want) frame.setAttribute('src', want);
 }
 
 // --- Claims ---------------------------------------------------------------------------------
@@ -399,6 +683,21 @@ function toClaims(ok: boolean) {
   render();
 }
 
+/** A test band's buttons to walk it to each zone. */
+function walkButtons(id: number) {
+  const at = conn.db.band.id.find(id)?.zone;
+  return [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId).map(z => h('button', { class: 'test', disabled: z.stationId === at || undefined,
+    onclick: () => act(() => post(`/api/dev/move/${id}/${z.stationId}`)) }, z.name));
+}
+
+/** A test band's press, and its fall once someone wears it. */
+function testBandButtons(id: number, claimed: boolean) {
+  return [
+    id >= 94 && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/press/${id}`)) }, 'Press'),
+    claimed && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/fall/${id}`)).then(toClaims) }, 'Fall here'),
+  ];
+}
+
 /** Bands 90 to 99: who wears them and where they are, with buttons to walk, press or drop them. */
 function bandsTab() {
   const owners = wearers();
@@ -415,11 +714,8 @@ function bandsTab() {
           h('td', {}, h('b', {}, bandCode(id)), h('div', { class: alive(id) ? 'pass' : 'muted' }, alive(id) ? 'online' : 'offline')),
           h('td', {}, claimed ? owners.get(id) || '(no name yet)' : h('span', { class: 'muted' }, 'not claimed')),
           h('td', {}, zones.find(z => z.stationId === b?.zone)?.name ?? 'no zone'),
-          h('td', {}, zones.map(z => h('button', { class: 'test', disabled: z.stationId === b?.zone || undefined,
-            onclick: () => act(() => post(`/api/dev/move/${id}/${z.stationId}`)) }, z.name))),
-          h('td', {},
-            id >= 94 && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/press/${id}`)) }, 'Press'),
-            claimed && h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/fall/${id}`)).then(toClaims) }, 'Fall here')));
+          h('td', {}, walkButtons(id)),
+          h('td', {}, testBandButtons(id, claimed)));
       })),
     h('h3', {}, 'Property damage'),
     h('p', { class: 'muted' }, 'A venue camera sees a speaker knocked off its stand; the vision check confirms it and a property claim opens.'),
@@ -435,6 +731,13 @@ function showClaim(id: bigint) {
   render();
 }
 
+/** Opens a claim's detail on the Settlements tab. */
+function toClaim(id: bigint) {
+  tab = 'claims';
+  location.hash = 'claims';
+  showClaim(id);
+}
+
 function statusOf(c: Claim) {
   return c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 }
@@ -445,30 +748,52 @@ function decides(c: Claim): boolean {
   return c.routedTo.isEqual(conn.identity!) || can(c.routedToRole);
 }
 
+/** Where a claim's payout goes: the attendee's wallet, or the repair vendor for the venue's own equipment. */
+function payee(c: Claim): string {
+  return c.coverKind === 'property' ? 'the repair vendor' : `${c.claimantName || 'the claimant'}'s wallet`;
+}
+
+const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property' };
+
+/** Who pays what on a claim: the payout, what the insurer pays back under which policy, the venue's share and what is not covered. */
+function whoPays(c: Claim) {
+  if (!c.costCents && !c.payoutCents) return null;
+  const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
+  const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${COVER_WORDS[c.coverKind] ?? c.coverKind} cover` : 'The insurer pays back';
+  const rows: [string, bigint][] = [
+    ['Cost', c.costCents],
+    [`Paid to ${payee(c)}`, c.payoutCents],
+    [insurer, c.recoverableCents],
+    ['The venue carries (deductible)', c.venueCostCents],
+  ];
+  if (c.costCents > c.payoutCents) rows.push(['Not covered', c.costCents - c.payoutCents]);
+  return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents)))))];
+}
+
 /** The organizer's queue: claims no learned rule settled, oldest first. */
 function myQueue() {
   const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && decides(c)).sort((a, b) => Number(a.id - b.id));
   if (!can('ops')) return null;
   return h('section', { class: mine.length ? 'alert' : '' },
-    h('h3', {}, `Waiting for your decision (${mine.length})`),
-    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Claims a learned rule covers settle on their own.'),
+    h('h3', {}, `Payments waiting for your sign-off (${mine.length})`),
+    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Payments a learned rule covers go out on their own.'),
     h('ul', {}, mine.map(c => h('li', {},
       h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`),
-      ` ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}, ${money(c.payoutCents)}: ${c.statusNote}`))));
+      ` ${money(c.payoutCents)} to ${payee(c)}, ${c.incidentKind} in ${c.zoneName}: ${c.statusNote}`))));
 }
 
 function claimList() {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(b.id - a.id));
   return h('section', {},
-    h('h3', {}, 'All claims'),
+    h('h3', {}, 'All claims and who pays them'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. An attendee files one from their band page after an injury, or staff file it for them above.'),
     claims.length > 0 && h('table', {},
-      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Payout'), h('th', {}, 'Waiting for')),
+      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Insurer pays back'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
         h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
+        h('td', {}, money(c.costCents)), h('td', {}, money(c.payoutCents)), h('td', {}, money(c.recoverableCents)), h('td', {}, money(c.venueCostCents)),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
-        h('td', {}, money(c.payoutCents)),
         h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : '')))));
 }
 
@@ -510,12 +835,12 @@ function decide(c: Claim) {
   return h('div', {},
     h('form', { onsubmit: approve },
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
-        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims settle on their own'),
+        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims are paid on their own'),
       h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' })),
-      h('button', {}, `Approve ${money(c.payoutCents)}`)),
+      h('button', {}, `Approve paying ${money(c.payoutCents)} to ${payee(c)}`)),
     h('form', { onsubmit: refuse },
       h('input', { name: 'reason', placeholder: 'Reason for refusing', required: true }),
-      h('button', {}, 'Refuse')));
+      h('button', {}, 'Refuse to pay')));
 }
 
 /** A Nessie deposit that failed leaves the claim in Paying with this in its note. */
@@ -531,11 +856,11 @@ function waiting(c: Claim, hospital: boolean): string {
     case 'ReadingRecord': return `Waiting for Claude to read the ${hospital ? 'hospital report' : 'medical record'}.`;
     case 'Verifying': return 'Waiting for the Elastic checks.';
     case 'Reviewing': return 'Waiting for the claims agent\'s review.';
-    case 'Routed': return decides(c) ? 'Waiting for your decision.' : `Waiting for the ${c.routedToName.toLowerCase()} to decide.`;
+    case 'Routed': return decides(c) ? `Waiting for your sign-off to pay ${money(c.payoutCents)} to ${payee(c)}.` : `Waiting for the ${c.routedToName.toLowerCase()} to sign off the payment.`;
     case 'Paying': return payoutFailed(c) ? `Approved. The payout to ${name}'s wallet failed and waits for a retry.` : `Approved. Paying ${money(c.payoutCents)} into ${name}'s wallet.`;
-    case 'Settled': return `Settled. Waiting for the insurer to pay ${money(c.recoverableCents)}.`;
-    case 'Refused': return 'Refused. Nothing is waiting.';
-    case 'Reconciled': return 'Closed: the insurer paid. Nothing is waiting.';
+    case 'Settled': return `Paid out. Waiting for the insurer to pay ${money(c.recoverableCents)} back.`;
+    case 'Refused': return 'Refused: nothing is paid. Nothing is waiting.';
+    case 'Reconciled': return `Closed: the insurer paid ${money(c.recoverableCents)} back. Nothing is waiting.`;
     default: return '';
   }
 }
@@ -610,7 +935,8 @@ function claimDetail(id: bigint) {
   return h('section', { id: 'claim-detail' },
     h('h3', {}, `Claim #${c.id}: ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}`, ' ', h('button', { class: 'link', onclick: () => { openClaim = undefined; render(); } }, 'close')),
     h('p', { class: 'big' }, h('b', {}, statusOf(c)), c.statusNote && `: ${c.statusNote}`),
-    h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claims agent (Claude): ${verdict(review.verdict)}.`),
+    h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claude decided: ${verdict(review.verdict)}.`),
+    whoPays(c),
     c.statement && h('p', {}, h('b', {}, 'In their words: '), `"${c.statement}"`),
     evidenceTrail(conn, c),
     hospital && [h('h4', {}, 'Hospital report'),
@@ -623,14 +949,15 @@ function claimDetail(id: bigint) {
       h('label', {}, 'Clinic report PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.test_mode && h('label', {}, 'or a test report, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'Upload it, Claude reads it')),
-    review && [h('h4', {}, `Claims agent review (Claude): ${verdict(review.verdict)}`),
+    review && [h('h4', {}, `Claude's decision: ${verdict(review.verdict)}`),
       h('p', {}, review.summary), review.causation && h('p', {}, `Causation: ${review.causation}`),
       review.concerns.length > 0 && h('ul', {}, review.concerns.map(x => h('li', {}, x))),
+      review.innocentExplanations.length > 0 && h('p', {}, `Innocent readings: ${review.innocentExplanations.join('; ')}`),
       review.missingEvidence.length > 0 && h('p', {}, `Missing: ${review.missingEvidence.join('; ')}`),
-      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code rejected the review: ${review.rejected.join('; ')}`)],
-    c.status.tag === 'Routed' && decides(c) && h('div', {}, h('h4', {}, 'Your decision'), decide(c)),
+      review.citedFactIds.length > 0 && h('p', { class: 'muted' }, `Rests on facts ${review.citedFactIds.map(n => `[${n}]`).join(' ')}`),
+      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code set Claude's decision aside: ${review.rejected.join('; ')}`)],
+    c.status.tag === 'Routed' && decides(c) && h('div', {}, h('h4', {}, 'Your sign-off'), decide(c)),
     afterDecision(c),
-    h('p', {}, `Cost ${money(c.costCents)} · payout ${money(c.payoutCents)} · recoverable from the insurer ${money(c.recoverableCents)} · venue pays ${money(c.venueCostCents)}`),
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
@@ -660,12 +987,12 @@ function rules() {
   const rows = [...conn.db.boardRules.iter()].sort((a, b) => b.version - a.version);
   const policy = conn.db.boardPolicies.iter().next().value;
   return h('section', {},
-    h('h3', {}, 'Learned rules'),
+    h('h3', {}, 'Learned payment rules'),
     !rows.length && h('p', { class: 'muted' }, 'None yet. An approval with "learn" checked creates one.'),
-    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${r.coverKind}`),
-      h('td', {}, `up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
+    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${COVER_WORDS[r.coverKind] ?? r.coverKind} cover`),
+      h('td', {}, `pays up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
       h('td', {}, `from ${r.approverName} (${r.approverRole})`), h('td', {}, r.status)))),
-    policy && h('p', { class: 'muted' }, `Policy ${policy.policyNumber} with ${policy.insurerName}. Medical payments used ${money(policy.medicalUsedCents)}, property used ${money(policy.propertyUsedCents)}.`));
+    policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
 }
 
 function claimsTab() {
@@ -867,8 +1194,8 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
     views: [
       ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
       ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
-      ['bandit-organize runs, step by step', '/app/workflows'],
-      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+      ['bandit-organize runs, step by step', '/app/workflows/bandit-organize'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder/agents/bandit-organizer'],
     ],
   },
   {
@@ -901,10 +1228,10 @@ function kibana() {
 }
 
 // The page redraws on every change and every second; holding off while a button is pressed keeps a
-// click from landing on a button that was just replaced.
+// click from landing on a button that was just replaced. The redraw the press held off follows the release.
 let pressing = false;
 document.addEventListener('pointerdown', () => { pressing = true; }, true);
-document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; }, 100), true);
+document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; render(); }, 100), true);
 
 function render() {
   // Typing in a story box or choosing from a list holds redraws too, so the text and the open list stay put.
@@ -912,14 +1239,35 @@ function render() {
   if (!conn || pressing || busy) return;
   const open = tabs();
   mount('head', header());
-  if (!open.length) return mount('app', noRole());
+  const list = document.getElementById('people')!;
+  if (!open.length) {
+    showViewAs(false);
+    list.replaceChildren();
+    listShows = '';
+    return mount('app', noRole());
+  }
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : live();
+  // On the Live tab the frame shows the opened person's page, between them and the list.
+  const people = tab === 'live' ? everyone() : [];
+  const person = people.find(p => p.key === opened);
+  showViewAs(tab === 'viewas' || (!!person?.view && keyOf(person.view) === viewKey && !!viewScreen));
+  if (tab !== 'live') {
+    list.replaceChildren();
+    listShows = '';
+  } else {
+    const drawn = peopleList(people);
+    if (drawn) mount('people', drawn);
+  }
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : [live(), personPanel(people)];
   mount('app', body);
   if (scrollToClaim) {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
+  }
+  if (scrollToPerson) {
+    scrollToPerson = false;
+    document.getElementById('person')?.scrollIntoView({ block: 'start' });
   }
 }
 
@@ -930,7 +1278,10 @@ async function main() {
   if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
-  window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
+  serveViewers(conn);
+  openFromHash();
+  render();
+  window.addEventListener('hashchange', () => { tab = location.hash.slice(1); openFromHash(); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLSelectElement)) render(); }, 1000);
 }
 

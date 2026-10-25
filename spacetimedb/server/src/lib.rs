@@ -17,6 +17,7 @@ pub mod web;
 pub mod wallet;
 pub mod merch;
 pub mod medical;
+pub mod view_as;
 
 use spacetimedb::{ReducerContext, Table};
 use tables::*;

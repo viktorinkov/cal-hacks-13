@@ -9,6 +9,7 @@ use crate::roles::*;
 use crate::tables::*;
 use crate::live::band_place;
 use crate::venue::zone;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp, ViewContext};
 
 pub const S_NEAR_SOS: u8 = 4;
@@ -508,8 +509,8 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
 }
 
 fn is_staff(ctx: &ViewContext) -> bool {
-    ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| STAFF_ROLES.contains(&r.role.as_str()))
+    ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| STAFF_ROLES.contains(&r.role.as_str()))
 }
 
 /// Incidents not yet resolved, for staff screens.

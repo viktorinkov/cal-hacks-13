@@ -1,9 +1,10 @@
-// The live run on the organizer's Live tab: one set of controls (start, pause, resume, end the event), the
-// crowd and the open incidents in the venue's 3D view from the Venue setup tab, placing our bands with a
-// click on the floor, and the decision history. The module runs everything; this page only shows it.
+// The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
+// resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
+// the Venue setup tab, placing our bands with a click on the floor, and the decision history. The module
+// runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, time } from './lib';
+import { act, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
@@ -36,8 +37,9 @@ function setUp(c: DbConnection) {
   conn.db.band.onInsert((_ctx, b) => crowd.upsert(b));
   conn.db.band.onUpdate((_ctx, _old, b) => crowd.upsert(b));
   conn.db.band.onDelete((_ctx, b) => crowd.remove(b.id));
-  // The crowd's walks, and the run's pause, which holds everyone where they are.
-  for (const w of conn.db.crowdWalk.iter()) crowd.walk(w);
+  // The crowd's walks, and the run's pause, which holds everyone where they are. The walks have their own
+  // subscription, so a module without them leaves the rest of the page working.
+  conn.subscriptionBuilder().onError(() => console.warn('no crowd walks: the crowd walks to its spots')).subscribe(['SELECT * FROM crowd_walk']);
   conn.db.crowdWalk.onInsert((_ctx, w) => crowd.walk(w));
   conn.db.crowdWalk.onUpdate((_ctx, _old, w) => crowd.walk(w));
   conn.db.crowdWalk.onDelete((_ctx, w) => crowd.unwalk(w.bandId));
@@ -90,21 +92,30 @@ function syncPoles(open: IncidentMarker[]) {
   }
 }
 
-function status(r: LiveRun | undefined, list: IncidentMarker[]): string {
-  if (!r || r.phase.tag === 'Idle') return 'No run yet.';
+function phaseWords(r: LiveRun | undefined): string {
+  if (!r || r.phase.tag === 'Idle') return 'Not started';
   const paused = conn.db.livePause.id.find(0);
-  const people = crowd.counts().crowd;
+  if (paused) return `Paused since ${time(paused.pausedAt)}`;
+  if (r.phase.tag === 'Running') return 'Running';
+  if (r.phase.tag === 'Closing') return `Doors closed at ${time(r.closingAt)}, everyone walking out`;
+  return `Ended at ${time(r.endedAt)}`;
+}
+
+/** The run at a glance, as a plain table. */
+function status(r: LiveRun | undefined, list: IncidentMarker[]) {
+  const now = Date.now();
+  const people = [...conn.db.band.iter()].filter(b => b.id >= 100 && present(b, now)).length;
+  const row = (k: string, val: string) => h('tr', {}, h('th', {}, k), h('td', {}, val));
+  if (!r || r.phase.tag === 'Idle') return h('table', {}, row('Event run', 'Not started'), row('People', people.toLocaleString()));
   const open = list.filter(m => m.status !== 'resolved').length;
   const count = (s: string) => list.filter(m => m.claimStatus === s).length;
   const paid = list.filter(m => m.claimStatus.startsWith('paid')).length;
-  const claims = `claims: ${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`;
-  const numbers = `${people.toLocaleString()} people, ${list.length} incidents (${open} open), ${claims}. Seed ${r.seed}.`;
-  const phase = r.phase.tag === 'Running'
-    ? `Running since ${time(r.startedAt)}, ${r.crowd.toLocaleString()} people at ${r.pace}× speed, ends at ${time(r.endsAt)}.`
-    : r.phase.tag === 'Closing'
-      ? `Doors closed at ${time(r.closingAt)}: everyone walks out and the medic finishes the open incidents.`
-      : `The event ended at ${time(r.endedAt)}.`;
-  return `${paused ? `Paused at ${time(paused.pausedAt)}. ` : ''}${phase} ${numbers}`;
+  return h('table', {},
+    row('Event run', `${phaseWords(r)}: started ${time(r.startedAt)}, ends ${time(r.endsAt)}, ${r.pace}× speed`),
+    row('People', `${people.toLocaleString()} of ${r.crowd.toLocaleString()}`),
+    row('Incidents', `${list.length}, ${open} open`),
+    row('Claims', `${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`),
+    row('Seed', String(r.seed)));
 }
 
 function controls(r: LiveRun | undefined) {
@@ -165,7 +176,8 @@ function placeBands() {
     (f.querySelector('[name="place_label"]') as HTMLInputElement).value = '';
   };
   return h('section', {},
-    h('h4', {}, 'Place our band'),
+    h('h4', {}, 'Put one of our real bands on the map'),
+    h('p', { class: 'muted' }, 'For showing the run with a band someone is wearing: pick the band, type who wears it, press Place and click the floor where they stand. It stands there among the crowd, the crowd near it meets it, and its SOS and falls show like anyone else\'s.'),
     h('form', { onsubmit: begin },
       h('select', { name: 'place_band' }, ourBands().map(id => h('option', { value: id }, bandCode(id)))), ' ',
       h('input', { name: 'place_label', placeholder: 'Name, e.g. the presenter', maxlength: 40 }), ' ',
@@ -193,22 +205,52 @@ function history() {
           h('td', {}, d.why)))));
 }
 
-/** The Live tab's run section. */
+/** The run's state and its controls, for the portal's top bar. */
+export function runBar(c: DbConnection, canRun: boolean) {
+  conn = c;
+  const r = run();
+  return [status(r, markers(r)), canRun && controls(r)];
+}
+
+/** This run's incidents, newest first, with what happened to each and its claim. */
+function incidents(r: LiveRun | undefined, canRun: boolean) {
+  const list = markers(r).sort((a, b) => Number(b.incidentId - a.incidentId));
+  const claims = new Map([...conn.db.claimsBoard.iter()].map(c => [c.id, c]));
+  return h('section', {},
+    h('h4', {}, `Incidents (${list.length})`),
+    list.length === 0
+      ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
+      : h('table', {},
+        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
+        list.map(m => {
+          const c = claims.get(m.claimId);
+          const waiting = canRun && c?.status.tag === 'Routed';
+          return h('tr', {},
+            h('td', {}, time(m.openedAt)),
+            h('td', {}, `${m.incidentId}: ${m.kind}${m.person ? `, ${m.person}` : ''}${m.place ? ` at ${m.place}` : ''}`),
+            h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status),
+            h('td', {}, m.claimId ? `${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : ''),
+            h('td', {},
+              h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
+              waiting && [' ', h('button', {
+                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
+              }, 'Approve and teach a rule')]));
+        })));
+}
+
+/** The Live tab's run section: the 3D view, our bands, the incidents and the decision history. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
-  const list = markers(r);
-  syncPoles(going(r) ? list.filter(m => m.status !== 'resolved') : []);
+  syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
   return [
     h('section', {},
-      h('h3', {}, 'Event run'),
-      h('p', {}, status(r, list)),
-      canRun && controls(r),
       v!.view, v!.note,
-      h('p', { class: 'muted' }, 'Green, amber and red people are calm, busy and very busy spots; a red person lying down fell or pressed SOS, and a red pole marks each open incident. Our bands are blue.'),
+      h('p', { class: 'muted' }, "Each person shows their band's light: green calm, amber busy, red very busy, a red strobe on SOS or a fall (someone who fell lies down), and a blue pulse in the light circle around them. Our hardware and test bands are blue. A red pole marks each open incident."),
       canRun && placeBands()),
+    incidents(r, canRun),
     history(),
   ];
 }

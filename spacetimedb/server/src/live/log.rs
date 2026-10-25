@@ -1,10 +1,11 @@
 //! The decision history: one row each time someone or something decides about an incident or its claim, with
-//! who decided, what and why. Bands raise incidents, the medic treats, Claude reads the clinic record and
-//! reviews the evidence, the Evidence Engine checks it against past claims, the Decision Engine settles,
-//! routes or refuses in code, and the organizer approves and teaches a rule. The 3D page lists it live.
+//! who decided, what and why. Bands raise incidents, the medic treats, Claude reads the clinic record, the
+//! Evidence Engine checks the evidence against past claims, Claude investigates it source by source and
+//! decides, the Decision Engine holds that decision to its limits in code, and the organizer approves and
+//! teaches a rule. The 3D page lists it live.
 
 use super::{IncidentMarker, incident_marker};
-use crate::insurance::{Claim, ClaimStatus, MedicalRecord};
+use crate::insurance::{Claim, ClaimStatus, MedicalRecord, settlement_rule};
 use bandit_insurance::money::format_cents;
 use spacetimedb::{ReducerContext, Table, Timestamp};
 
@@ -60,8 +61,7 @@ fn person(c: &Claim) -> String {
 /// Called with the claim before and after every save: a status change is a decision.
 pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
     let changed = before.is_none_or(|b| b.status != c.status);
-    let payout_cents = if c.status == ClaimStatus::Refused { 0 } else { c.payout_cents };
-    update_marker(ctx, c.incident_id, |m| IncidentMarker { claim_id: c.id, claim_status: status_words(c.status).into(), payout_cents, ..m });
+    update_marker(ctx, c.incident_id, |m| IncidentMarker { claim_id: c.id, claim_status: status_words(c.status).into(), payout_cents: c.payout_cents, ..m });
     if !changed {
         return;
     }
@@ -71,14 +71,10 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::AwaitingRecord => (
             "Decision Engine",
             format!("claim {}", c.id),
-            format!("Claim filed for {}", person(c)),
-            if c.statement.is_empty() {
-                "a medical payments claim; it waits for the hospital report".into()
-            } else {
-                format!("\"{}\" It waits for the hospital report.", c.statement)
-            },
+            format!("Claim opened for {}", person(c)),
+            "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
         ),
-        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the medical record".into(), "the record was filed on the claim".into()),
+        ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
         ClaimStatus::Verifying if c.cover_kind == "property" => (
             "Decision Engine",
             format!("claim {}", c.id),
@@ -89,14 +85,25 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::Reviewing => return,
         ClaimStatus::Routed => ("Decision Engine", "code".into(), format!("Sent to the organizer: {}", format_cents(c.payout_cents)), c.status_note.clone()),
         ClaimStatus::Paying => {
-            let who = if c.decided_by == "rule" { format!("rule v{}", c.settlement_rule_version) } else { crate::safety::caller_name(ctx) };
-            let what = if c.decided_by == "rule" {
-                format!("Settled on its own: {} to {}", format_cents(c.payout_cents), person(c))
-            } else {
-                format!("Approved: {} to {}", format_cents(c.payout_cents), person(c))
-            };
-            let actor = if c.decided_by == "rule" { "Decision Engine" } else { "organizer" };
-            (actor, who, what, "paying into their Capital One wallet".into())
+            let paying = "paying into their Capital One wallet";
+            match c.decided_by.as_str() {
+                "claude" => {
+                    let ceiling = ctx.db.settlement_rule().id().find(c.settlement_rule_id).map(|r| format_cents(r.ceiling_cents)).unwrap_or_default();
+                    (
+                        "Decision Engine",
+                        format!("rule v{}", c.settlement_rule_version),
+                        format!("Paid on Claude's decision: {} to {}", format_cents(c.payout_cents), person(c)),
+                        format!("every check passed and {} is inside the {ceiling} authority rule v{} gives; {paying}", format_cents(c.payout_cents), c.settlement_rule_version),
+                    )
+                }
+                "rule" => (
+                    "Decision Engine",
+                    format!("rule v{}", c.settlement_rule_version),
+                    format!("Settled on its own: {} to {}", format_cents(c.payout_cents), person(c)),
+                    paying.into(),
+                ),
+                _ => ("organizer", c.routed_to_name.clone(), format!("Approved: {} to {}", format_cents(c.payout_cents), person(c)), paying.into()),
+            }
         }
         ClaimStatus::Settled if c.cover_kind == "property" => {
             ("wallet", "Ledger".into(), format!("Repair paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
@@ -104,7 +111,11 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
         ClaimStatus::Settled => ("wallet", "Capital One".into(), format!("{} landed in {}'s wallet", format_cents(c.payout_cents), person(c)), c.payout_reference.clone()),
         ClaimStatus::Refused => {
             let actor = if c.decided_by == "approver" { "organizer" } else { "Decision Engine" };
-            let who = if c.decided_by == "approver" { crate::safety::caller_name(ctx) } else { "code".into() };
+            let who = match c.decided_by.as_str() {
+                "approver" => c.routed_to_name.clone(),
+                "claude" => "Claude".into(),
+                _ => "code".into(),
+            };
             (actor, who, format!("Refused {}'s claim", person(c)), c.refusal_reason.clone())
         }
         ClaimStatus::Reconciled => ("wallet", "Insurer".into(), "The insurer paid the venue back".into(), c.payout_reference.clone()),
@@ -121,7 +132,7 @@ pub fn record_read(ctx: &ReducerContext, c: &Claim, r: &MedicalRecord) {
         c.id,
         "Claude",
         "Claude",
-        format!("Read the medical record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
+        format!("Read the clinic record: {} billed, {} covered", format_cents(r.billed_cents), format_cents(r.covered_cents)),
         format!("{}, {}: {dx}", r.provider_name, r.date_of_service),
     );
 }
@@ -132,9 +143,9 @@ pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], precedent
     record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{precedents} similar past claims found"));
 }
 
-/// Claude's review of the evidence pack.
-pub fn reviewed(ctx: &ReducerContext, c: &Claim, verdict: &str, summary: &str) {
-    record(ctx, c.incident_id, c.id, "Claude", "Claude", format!("Review: {}", verdict.replace('_', " ")), summary.into());
+/// Code set Claude's decision aside: it failed validation even after one more try.
+pub fn set_aside(ctx: &ReducerContext, c: &Claim, problems: &[String]) {
+    record(ctx, c.incident_id, c.id, "Decision Engine", "code", "Set Claude's decision aside".into(), problems.join("; "));
 }
 
 /// The organizer's approval, and the rule it taught.

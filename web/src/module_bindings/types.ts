@@ -1682,6 +1682,23 @@ export const VenueSpotIn = __t.object("VenueSpotIn", {
 });
 export type VenueSpotIn = __Infer<typeof VenueSpotIn>;
 
+export const ViewablePerson = __t.object("ViewablePerson", {
+  identity: __t.identity(),
+  name: __t.string(),
+  role: __t.string(),
+  bandId: __t.u32(),
+  crowd: __t.bool(),
+});
+export type ViewablePerson = __Infer<typeof ViewablePerson>;
+
+export const ViewingAs = __t.object("ViewingAs", {
+  viewer: __t.identity(),
+  target: __t.identity(),
+  by: __t.identity(),
+  at: __t.timestamp(),
+});
+export type ViewingAs = __Infer<typeof ViewingAs>;
+
 export const VisionAssessment = __t.object("VisionAssessment", {
   id: __t.u64(),
   incidentId: __t.u64(),

@@ -290,6 +290,7 @@ pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
 pub mod remove_staff_reducer;
 pub mod reopen_event_reducer;
+pub mod report_claim_step_reducer;
 pub mod report_property_event_reducer;
 pub mod report_test_band_reducer;
 pub mod report_venue_setup_step_reducer;
@@ -379,6 +380,11 @@ pub mod venue_spot_table;
 pub mod venue_spot_type;
 pub mod venue_table;
 pub mod venue_type;
+pub mod view_as_people_table;
+pub mod view_as_reducer;
+pub mod viewable_person_type;
+pub mod viewing_as_table;
+pub mod viewing_as_type;
 pub mod vision_assessment_table;
 pub mod vision_assessment_type;
 pub mod visit_table;
@@ -677,6 +683,7 @@ pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use remove_staff_reducer::remove_staff;
 pub use reopen_event_reducer::reopen_event;
+pub use report_claim_step_reducer::report_claim_step;
 pub use report_property_event_reducer::report_property_event;
 pub use report_test_band_reducer::report_test_band;
 pub use report_venue_setup_step_reducer::report_venue_setup_step;
@@ -766,6 +773,11 @@ pub use venue_spot_table::*;
 pub use venue_spot_type::VenueSpot;
 pub use venue_table::*;
 pub use venue_type::Venue;
+pub use view_as_people_table::*;
+pub use view_as_reducer::view_as;
+pub use viewable_person_type::ViewablePerson;
+pub use viewing_as_table::*;
+pub use viewing_as_type::ViewingAs;
 pub use vision_assessment_table::*;
 pub use vision_assessment_type::VisionAssessment;
 pub use visit_table::*;
@@ -1022,6 +1034,12 @@ pub enum Reducer {
         id: u64,
     },
     ReopenEvent,
+    ReportClaimStep {
+        job_id: u64,
+        actor: String,
+        what: String,
+        why: String,
+    },
     ReportPropertyEvent {
         incident_id: u64,
         camera_id: u64,
@@ -1218,6 +1236,10 @@ pub enum Reducer {
         period_start: __sdk::Timestamp,
         period_end: __sdk::Timestamp,
     },
+    ViewAs {
+        viewer: __sdk::Identity,
+        target: __sdk::Identity,
+    },
     WatchBands {
         timer: IncidentWatchTimer,
     },
@@ -1291,6 +1313,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::RemoveStaff { .. } => "remove_staff",
             Reducer::ReopenEvent => "reopen_event",
+            Reducer::ReportClaimStep { .. } => "report_claim_step",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportTestBand { .. } => "report_test_band",
             Reducer::ReportVenueSetupStep { .. } => "report_venue_setup_step",
@@ -1335,6 +1358,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertCamera { .. } => "upsert_camera",
             Reducer::UpsertCoverageRule { .. } => "upsert_coverage_rule",
             Reducer::UpsertInsurancePolicy { .. } => "upsert_insurance_policy",
+            Reducer::ViewAs { .. } => "view_as",
             Reducer::WatchBands { .. } => "watch_bands",
             _ => unreachable!(),
         }
@@ -1751,6 +1775,17 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReopenEvent => {
                 __sats::bsatn::to_vec(&reopen_event_reducer::ReopenEventArgs {})
             }
+            Reducer::ReportClaimStep {
+                job_id,
+                actor,
+                what,
+                why,
+            } => __sats::bsatn::to_vec(&report_claim_step_reducer::ReportClaimStepArgs {
+                job_id: job_id.clone(),
+                actor: actor.clone(),
+                what: what.clone(),
+                why: why.clone(),
+            }),
             Reducer::ReportPropertyEvent {
                 incident_id,
                 camera_id,
@@ -2106,6 +2141,12 @@ impl __sdk::Reducer for Reducer {
                     period_end: period_end.clone(),
                 },
             ),
+            Reducer::ViewAs { viewer, target } => {
+                __sats::bsatn::to_vec(&view_as_reducer::ViewAsArgs {
+                    viewer: viewer.clone(),
+                    target: target.clone(),
+                })
+            }
             Reducer::WatchBands { timer } => {
                 __sats::bsatn::to_vec(&watch_bands_reducer::WatchBandsArgs {
                     timer: timer.clone(),
@@ -2261,6 +2302,8 @@ pub struct DbUpdate {
     venue_setup: __sdk::TableUpdate<VenueSetup>,
     venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
     venue_spot: __sdk::TableUpdate<VenueSpot>,
+    view_as_people: __sdk::TableUpdate<ViewablePerson>,
+    viewing_as: __sdk::TableUpdate<ViewingAs>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
     wallet_entry: __sdk::TableUpdate<WalletEntry>,
@@ -2698,6 +2741,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue_spot" => db_update
                     .venue_spot
                     .append(venue_spot_table::parse_table_update(table_update)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(view_as_people_table::parse_table_update(table_update)?),
+                "viewing_as" => db_update
+                    .viewing_as
+                    .append(viewing_as_table::parse_table_update(table_update)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(vision_assessment_table::parse_table_update(table_update)?),
@@ -2994,6 +3043,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.venue_spot = cache
             .apply_diff_to_table::<VenueSpot>("venue_spot", &self.venue_spot)
             .with_updates_by_pk(|row| &row.id);
+        diff.viewing_as = cache
+            .apply_diff_to_table::<ViewingAs>("viewing_as", &self.viewing_as)
+            .with_updates_by_pk(|row| &row.viewer);
         diff.vision_assessment = cache
             .apply_diff_to_table::<VisionAssessment>("vision_assessment", &self.vision_assessment)
             .with_updates_by_pk(|row| &row.id);
@@ -3123,6 +3175,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.unclaimed_injuries = cache
             .apply_diff_to_table::<UnclaimedInjury>("unclaimed_injuries", &self.unclaimed_injuries);
         diff.venue_plan = cache.apply_diff_to_table::<PlanArea>("venue_plan", &self.venue_plan);
+        diff.view_as_people =
+            cache.apply_diff_to_table::<ViewablePerson>("view_as_people", &self.view_as_people);
         diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
@@ -3553,6 +3607,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_spot" => db_update
                     .venue_spot
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -4008,6 +4068,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue_spot" => db_update
                     .venue_spot
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4182,6 +4248,8 @@ pub struct AppliedDiff<'r> {
     venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
     venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
     venue_spot: __sdk::TableAppliedDiff<'r, VenueSpot>,
+    view_as_people: __sdk::TableAppliedDiff<'r, ViewablePerson>,
+    viewing_as: __sdk::TableAppliedDiff<'r, ViewingAs>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
     wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
@@ -4658,6 +4726,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<VenueSpot>("venue_spot", &self.venue_spot, event);
+        callbacks.invoke_table_row_callbacks::<ViewablePerson>(
+            "view_as_people",
+            &self.view_as_people,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ViewingAs>("viewing_as", &self.viewing_as, event);
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
             "vision_assessment",
             &self.vision_assessment,
@@ -5473,6 +5547,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         venue_setup_table::register_table(client_cache);
         venue_setup_step_table::register_table(client_cache);
         venue_spot_table::register_table(client_cache);
+        view_as_people_table::register_table(client_cache);
+        viewing_as_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
         wallet_entry_table::register_table(client_cache);
@@ -5616,6 +5692,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "venue_setup",
         "venue_setup_step",
         "venue_spot",
+        "view_as_people",
+        "viewing_as",
         "vision_assessment",
         "visit",
         "wallet_entry",

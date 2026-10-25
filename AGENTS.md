@@ -18,6 +18,17 @@
 
 - Random outcomes, for example whether a claim matches the insurance, come from a seeded RNG in code, never from Claude or another model.
 
+## Permissions
+
+- This project's auto mode rules live in `scripts/agent-permissions`. For a new kind of block, add the entry there and give Viktor one command: `python3 ~/Development/CalHacks\ 13.0/scripts/agent-permissions`. It backs up his settings first and is safe to rerun.
+- Agents may edit the project's `.claude/settings.json` and `.claude/hooks/` to add project-scoped allow rules, for example for the repo's scripts, `spacetime`, the VM and `/mnt/project-files`.
+- Never add broad rules: no `Bash(*)`, bare interpreters, `rm` or `curl`.
+
 ## Git
 
-- Set `user.name` to `Viktor Minchev` and `user.email` to `vikitominchev@gmail.com` in every clone and worktree before the first commit. Never commit as Claude.
+- The SessionStart hook `.claude/hooks/git-identity` sets Viktor's identity when it is unset or `noreply@anthropic.com`.
+- In any clone or worktree the hook does not cover, set `user.name` to `Viktor Minchev` and `user.email` to `vikitominchev@gmail.com` before the first commit. Never commit as Claude.
+
+## Deleting files
+
+- Use `rm -rf` only with literal absolute paths, never with shell variables. The built-in safety check refuses variable paths.

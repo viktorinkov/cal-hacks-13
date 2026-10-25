@@ -136,7 +136,11 @@ fn floor(app: &App, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64
                 say!(app, "medic      incident {id} at {}: {}", m.place, if plan.note.is_empty() { "on scene" } else { &plan.note });
             }
         } else if m.responding_at.is_some_and(|t| since(t) >= treat_secs(id)) && done.insert((id, "resolve")) {
-            flow::resolve(app, id, &plan.resolution, "medic")?;
+            // Not `flow::resolve`, which files the claim at once and leaves its record to a PDF upload: here the
+            // person files below, and only when the medic treated an injury.
+            let medic = app.actor("medic")?;
+            call!(medic, resolve_incident_then(id, plan.resolution.clone()))?;
+            say!(app, "resolved   incident {id} at {}: {}", m.place, plan.resolution);
         }
         return Ok(());
     }

@@ -8,6 +8,7 @@ use crate::safety::*;
 use crate::social::tables::*;
 use crate::venue::*;
 use crate::tables::*;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, RawQuery, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 /// One row, id 0. Once the host ends the event, the band's link shows the recap instead of the live view.
@@ -52,8 +53,8 @@ pub fn reopen_event(ctx: &ReducerContext) -> Result<(), String> {
 }
 
 fn is_staff(ctx: &ViewContext) -> bool {
-    ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| STAFF_ROLES.contains(&r.role.as_str()))
+    ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| STAFF_ROLES.contains(&r.role.as_str()))
 }
 
 fn staff_query<T>(ctx: &ViewContext, table: &str) -> RawQuery<T> {
@@ -179,7 +180,7 @@ pub struct MyClaim {
 /// The caller's own claims, as the claimant sees them: status and payout, no evidence.
 #[spacetimedb::view(accessor = my_claims, public)]
 pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     ctx.db
         .claim()
         .routed_to()
@@ -230,7 +231,7 @@ pub struct MyIncident {
 /// SOS and fall incidents on the band the caller wears, since they claimed it: what they can file a claim for.
 #[spacetimedb::view(accessor = my_incidents, public)]
 pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident> {
-    let Some(own) = ctx.db.band_owner().owner().find(ctx.sender()) else {
+    let Some(own) = ctx.db.band_owner().owner().find(viewed(ctx)) else {
         return Vec::new();
     };
     ctx.db

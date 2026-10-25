@@ -8,6 +8,7 @@ use crate::jobs::{self, *};
 use crate::roles::*;
 use crate::social::tables::*;
 use crate::tables::*;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 pub const KIND_WALLET_OPEN: &str = "wallet_open";
@@ -96,7 +97,7 @@ pub struct MyWallet {
 
 #[spacetimedb::view(accessor = my_wallet, public)]
 pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     let account = ctx.db.claimant_account().identity().find(me)?;
     Some(MyWallet { account_id: account.account_id, balance_cents: balance(ctx, me), opened_at: account.created_at })
 }
@@ -117,8 +118,8 @@ pub struct BoardWallet {
 /// Every attendee's wallet and what it can spend, for the organizer (ops) only.
 #[spacetimedb::view(accessor = board_wallets, public)]
 pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet> {
-    let ops = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "ops");
+    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == "ops");
     if !ops {
         return Vec::new();
     }
@@ -136,5 +137,5 @@ pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet> {
 /// The wallet's movements, oldest first.
 #[spacetimedb::view(accessor = my_wallet_entries, public)]
 pub fn my_wallet_entries(ctx: &ViewContext) -> Vec<WalletEntry> {
-    ctx.db.wallet_entry().identity().filter(ctx.sender()).collect()
+    ctx.db.wallet_entry().identity().filter(viewed(ctx)).collect()
 }

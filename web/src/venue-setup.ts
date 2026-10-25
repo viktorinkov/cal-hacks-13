@@ -39,6 +39,7 @@ let load: (url: string) => void;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
 let model: THREE.Object3D | undefined;
+let controls: OrbitControls;
 /** What the Live tab adds: the crowd and the incidents, shown only there. */
 const liveLayer = new THREE.Group();
 const frames: ((now: number) => void)[] = [];
@@ -59,7 +60,7 @@ function makeView() {
   liveLayer.visible = false;
   scene.add(liveLayer);
   camera = new THREE.PerspectiveCamera(35, 16 / 9, 0.5, 2000);
-  const controls = new OrbitControls(camera, renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
   let asked = 0;
 
   load = (url: string) => {
@@ -120,11 +121,19 @@ export type LiveView = {
   onFrame(f: (now: number) => void): void;
   /** The point of the floor under a click, in model metres (x east, z south), if it is inside the hall. */
   floorAt(e: MouseEvent): { x: number; z: number } | undefined;
+  /** Turns the camera to look down at a spot of the floor from close by. */
+  lookAt(x: number, z: number): void;
 };
 
 function showLive(on: boolean) {
   liveLayer.visible = on;
   renderer.clippingPlanes = on ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT_M)] : [];
+}
+
+function lookAt(x: number, z: number) {
+  controls.target.set(x, 0, z);
+  camera.position.set(x, 35, z + 30);
+  controls.update();
 }
 
 function floorAt(e: MouseEvent) {
@@ -142,7 +151,7 @@ export function venueView(c: DbConnection): LiveView {
   if (!view) makeView();
   if (chosenUrl() !== loadedUrl) load(chosenUrl());
   showLive(true);
-  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt };
+  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, lookAt };
 }
 
 // --- The picker -------------------------------------------------------------------------------

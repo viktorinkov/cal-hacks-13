@@ -120,10 +120,10 @@
       "type": "vis",
       "config": {
         "type": "data_table",
-        "title": "Each attendee's latest ranking: the first booth by meaning next to the first by minutes",
+        "title": "Each attendee's latest ranking: the first booth by meaning, next to the first without it (zone minutes, then booth order)",
         "data_source": {
           "type": "esql",
-          "query": "FROM bandit-recap-rankings | EVAL spent_most_time_at = MV_CONCAT(top_spots, \", \") | STATS score = MAX(first_booth_score) BY attendee, spent_most_time_at, first_booth, first_booth_by_minutes, first_person | SORT score DESC | LIMIT 200"
+          "query": "FROM bandit-recap-rankings | EVAL spent_most_time_at = MV_CONCAT(top_spots, \", \"), first_without_ranking = first_booth_by_minutes | STATS score = MAX(first_booth_score) BY attendee, spent_most_time_at, first_booth, first_without_ranking, first_person | SORT score DESC | LIMIT 200"
         },
         "rows": [
           {
@@ -136,7 +136,7 @@
             "column": "first_booth"
           },
           {
-            "column": "first_booth_by_minutes"
+            "column": "first_without_ranking"
           },
           {
             "column": "first_person"

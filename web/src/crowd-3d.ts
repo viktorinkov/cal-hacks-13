@@ -1,33 +1,35 @@
 // The crowd in the venue's 3D view on the Live tab: every band is one instance of one mesh. Someone of the crowd
 // on their way follows their walk from the module, corner by corner along the aisles at its steady speed; anyone
-// else walks to the spot the module last wrote for them instead of jumping. The colour is the band's light: calm,
-// busy, very busy, the light circle pulsing around someone down, and the person down lying flat in bright red
-// with a pulsing ring. Bands 1 to 99 are our real bands: bigger and blue, with a ring.
+// else walks to the spot the module last wrote for them instead of jumping. The colour is the band's ring as the
+// Hardware doc's light states give it: green calm, amber busy, red very busy, a red strobe on SOS or a fall, and
+// a blue pulse in the light circle around them. Someone who fell lies on the floor. Bands 1 to 99, our hardware
+// and test bands, are blue as on the Organizer Portal's map, and a little bigger so they are easy to find.
 
 import * as THREE from 'three';
 import { present } from './venue-map';
 import type { Band, CrowdWalk } from './module_bindings/types';
 
 const MAX_BANDS = 2200;
-const MAX_RINGS = 256;
 const FIRST_CROWD_BAND = 100;
 const RADIUS_M = 0.3;
 const LENGTH_M = 0.9;
 const HALF_HEIGHT_M = RADIUS_M + LENGTH_M / 2;
 const PRESENTER_SCALE = 1.6;
-/** People walk at 2.5 to 5 m/s; a long walk is sped up to take at most this long. */
+/** Anyone not on a walk from the module walks to their new spot at 1.1 to 1.5 m/s, as the crowd does, taking
+ * at least this long. Farther than JUMP_M they stand at the new spot at once: a straight line that long would
+ * cross the hall's walls or leave the building, and walking it quickly would be a sprint. */
 const WALK_MIN_MS = 250;
-const WALK_MAX_MS = 4500;
+const JUMP_M = 8;
 /** Light states: 3 is SOS or down, 4 the light circle around someone down. */
 const DOWN = 3;
 const CIRCLE = 4;
 
 const col = (hex: string) => new THREE.Color(hex);
 const STATE_COLOURS = [col('#2fd27a'), col('#ffb020'), col('#ff5a2a')];
-const DOWN_COLOUR = col('#ff1030');
-const CIRCLE_A = col('#ff2a3d');
-const CIRCLE_B = col('#ffffff');
-const PRESENTER_COLOUR = col('#3d8bff');
+const SOS_COLOUR = col('#ff1030');
+const OFF_COLOUR = col('#3a0a10');
+const CIRCLE_COLOUR = col('#2f6bff');
+const OURS_COLOUR = col('#3d8bff');
 
 /** A walk from the module: its corners, how far along the way each corner is, and its start and end. */
 type Way = {
@@ -79,7 +81,6 @@ export function isOurs(id: number): boolean {
 
 export class Crowd {
   readonly bodies: THREE.InstancedMesh;
-  readonly rings: THREE.InstancedMesh;
   private walkers = new Map<number, Walker>();
   private list: Walker[] = [];
   /** The walker drawn in each instance this frame, for picking. */
@@ -101,16 +102,6 @@ export class Crowd {
     this.bodies.count = 0;
     scene.add(this.bodies);
 
-    const ring = new THREE.RingGeometry(0.75, 1, 40).rotateX(-Math.PI / 2);
-    // Added light, so a ring fades out by dimming its colour.
-    const ringMaterial = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
-    this.rings = new THREE.InstancedMesh(ring, ringMaterial, MAX_RINGS);
-    this.rings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.rings.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_RINGS * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    this.rings.frustumCulled = false;
-    this.rings.renderOrder = 2;
-    this.rings.count = 0;
-    scene.add(this.rings);
   }
 
   /** The module's time now, in ms since the epoch: frozen while the run is paused. */
@@ -165,7 +156,7 @@ export class Crowd {
     }
     const w = this.walkers.get(b.id);
     if (!w) {
-      const n: Walker = { band: b, shown, x: b.xM, z: b.yM, fromX: b.xM, fromZ: b.yM, toX: b.xM, toZ: b.yM, at: now, ms: 0, speed: (2.5 + 2.5 * hash(b.id)) / 1000, way: this.ways.get(b.id), walking: false };
+      const n: Walker = { band: b, shown, x: b.xM, z: b.yM, fromX: b.xM, fromZ: b.yM, toX: b.xM, toZ: b.yM, at: now, ms: 0, speed: (1.1 + 0.4 * hash(b.id)) / 1000, way: this.ways.get(b.id), walking: false };
       this.walkers.set(b.id, n);
       this.list.push(n);
       return;
@@ -180,8 +171,17 @@ export class Crowd {
       Object.assign(w, { x: b.xM, z: b.yM, fromX: b.xM, fromZ: b.yM, toX: b.xM, toZ: b.yM, ms: 0 });
       return;
     }
+    this.walkTo(w, b, now);
+  }
+
+  /** From where the walker stands to the band's spot: walking when it is near, else standing there at once. */
+  private walkTo(w: Walker, b: Band, now: number) {
     const d = Math.hypot(b.xM - w.x, b.yM - w.z);
-    Object.assign(w, { fromX: w.x, fromZ: w.z, toX: b.xM, toZ: b.yM, at: now, ms: Math.min(WALK_MAX_MS, Math.max(WALK_MIN_MS, d / w.speed)) });
+    if (d < 0.01 || d > JUMP_M) {
+      Object.assign(w, { x: b.xM, z: b.yM, fromX: b.xM, fromZ: b.yM, toX: b.xM, toZ: b.yM, ms: 0 });
+      return;
+    }
+    Object.assign(w, { fromX: w.x, fromZ: w.z, toX: b.xM, toZ: b.yM, at: now, ms: Math.max(WALK_MIN_MS, d / w.speed) });
   }
 
   remove(id: number) {
@@ -223,13 +223,10 @@ export class Crowd {
   frame(now: number) {
     const m = this.bodies.instanceMatrix.array as Float32Array;
     const c = this.bodies.instanceColor!.array as Float32Array;
-    const rm = this.rings.instanceMatrix.array as Float32Array;
-    const rc = this.rings.instanceColor!.array as Float32Array;
-    const seconds = now / 1000;
-    const flash = 0.5 + 0.5 * Math.sin(seconds * Math.PI * 3);
-    const ripple = (seconds * 0.8) % 1;
+    // The SOS strobe: 125 ms on, 125 ms off. The light circle: a blue pulse over 1 s.
+    const strobe = Math.floor(now / 125) % 2 === 0;
+    const pulse = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin((now / 1000) * Math.PI * 2));
     let n = 0;
-    let r = 0;
     const t = this.clock();
     for (const w of this.list) {
       if (this.following(w)) {
@@ -241,8 +238,7 @@ export class Crowd {
         w.walking = false;
         const b = w.band;
         if (w.way && !isDown(b)) [w.x, w.z] = along(w.way, Infinity);
-        const d = Math.hypot(b.xM - w.x, b.yM - w.z);
-        Object.assign(w, { fromX: w.x, fromZ: w.z, toX: b.xM, toZ: b.yM, at: now, ms: d < 0.01 ? 0 : Math.min(WALK_MAX_MS, Math.max(WALK_MIN_MS, d / w.speed)) });
+        this.walkTo(w, b, now);
       }
       if (w.ms) {
         const t = Math.min(1, (now - w.at) / w.ms);
@@ -257,7 +253,7 @@ export class Crowd {
       const down = isDown(b);
       const s = ours ? PRESENTER_SCALE : 1;
       const o = n * 16;
-      if (down) {
+      if (b.fall) {
         // Lying on the floor: the capsule turned onto its side.
         m[o] = 0; m[o + 1] = s; m[o + 2] = 0; m[o + 3] = 0;
         m[o + 4] = -s; m[o + 5] = 0; m[o + 6] = 0; m[o + 7] = 0;
@@ -269,39 +265,21 @@ export class Crowd {
         m[o + 8] = 0; m[o + 9] = 0; m[o + 10] = s; m[o + 11] = 0;
         m[o + 12] = w.x; m[o + 13] = HALF_HEIGHT_M * s + 0.04; m[o + 14] = w.z; m[o + 15] = 1;
       }
-      let colour = ours ? PRESENTER_COLOUR : STATE_COLOURS[Math.min(b.state, 2)];
-      if (down) colour = DOWN_COLOUR;
+      let colour = ours ? OURS_COLOUR : STATE_COLOURS[Math.min(b.state, 2)];
+      if (down) colour = strobe ? SOS_COLOUR : OFF_COLOUR;
       const k = n * 3;
       if (b.state === CIRCLE && !down) {
-        c[k] = CIRCLE_A.r + (CIRCLE_B.r - CIRCLE_A.r) * flash;
-        c[k + 1] = CIRCLE_A.g + (CIRCLE_B.g - CIRCLE_A.g) * flash;
-        c[k + 2] = CIRCLE_A.b + (CIRCLE_B.b - CIRCLE_A.b) * flash;
+        c[k] = CIRCLE_COLOUR.r * pulse; c[k + 1] = CIRCLE_COLOUR.g * pulse; c[k + 2] = CIRCLE_COLOUR.b * pulse;
       } else {
         c[k] = colour.r; c[k + 1] = colour.g; c[k + 2] = colour.b;
       }
       this.slots[n] = w;
       n++;
-      if ((down || ours) && r < MAX_RINGS) {
-        // The down band's ring ripples outwards; ours stands steady under it.
-        const rs = down ? 1 + 1.4 * ripple : 1.3;
-        const ro = r * 16;
-        rm[ro] = rs; rm[ro + 1] = 0; rm[ro + 2] = 0; rm[ro + 3] = 0;
-        rm[ro + 4] = 0; rm[ro + 5] = 1; rm[ro + 6] = 0; rm[ro + 7] = 0;
-        rm[ro + 8] = 0; rm[ro + 9] = 0; rm[ro + 10] = rs; rm[ro + 11] = 0;
-        rm[ro + 12] = w.x; rm[ro + 13] = 0.06; rm[ro + 14] = w.z; rm[ro + 15] = 1;
-        const rc0 = down ? DOWN_COLOUR : PRESENTER_COLOUR;
-        const fade = down ? 1 - ripple : 1;
-        rc[r * 3] = rc0.r * fade; rc[r * 3 + 1] = rc0.g * fade; rc[r * 3 + 2] = rc0.b * fade;
-        r++;
-      }
     }
     this.slots.length = n;
     this.bodies.count = n;
-    this.rings.count = r;
     this.bodies.instanceMatrix.needsUpdate = true;
     this.bodies.instanceColor!.needsUpdate = true;
-    this.rings.instanceMatrix.needsUpdate = true;
-    this.rings.instanceColor!.needsUpdate = true;
     // A pick recomputes the bounds from the moved instances.
     this.bodies.boundingSphere = null;
     this.bodies.boundingBox = null;
