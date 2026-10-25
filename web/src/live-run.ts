@@ -195,10 +195,13 @@ function status(r: LiveRun | undefined, list: IncidentMarker[]) {
   const open = list.filter(m => m.status !== 'resolved').length;
   const count = (s: string) => list.filter(m => m.claimStatus === s).length;
   const paid = list.filter(m => m.claimStatus.startsWith('paid')).length;
+  // The first incident comes a minute in, once the crowd has reached its tables.
+  const secs = Math.max(0, Math.round((Number(r.nextIncidentAt.microsSinceUnixEpoch / 1000n) - now) / 1000));
+  const next = r.phase.tag === 'Running' && !conn.db.livePause.id.find(0) ? `, next in ${secs} s` : '';
   return h('table', {},
     row('Event run', `${phaseWords(r)}: started ${time(r.startedAt)}, ends ${time(r.endsAt)}, ${r.pace}× speed`),
     row('People', `${people.toLocaleString()} of ${r.crowd.toLocaleString()}`),
-    row('Incidents', `${list.length}, ${open} open`),
+    row('Incidents', `${list.length}, ${open} open${next}`),
     row('Claims', `${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`),
     row('Seed', String(r.seed)));
 }
