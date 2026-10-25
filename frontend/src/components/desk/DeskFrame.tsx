@@ -12,6 +12,7 @@ const MARK = {
   bands: 'Bands',
   testbands: 'Test',
   photos: 'Pit',
+  cameras: 'Watch',
   merch: 'Tags',
   graph: 'Meet',
   costs: 'Rider',
