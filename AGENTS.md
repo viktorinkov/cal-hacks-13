@@ -16,7 +16,7 @@
 
 ## Randomness
 
-- Random outcomes come from a seeded RNG in code, never from Claude or another model.
+- Random outcomes, for example whether a claim matches the insurance, come from a seeded RNG in code, never from Claude or another model.
 
 ## Git
 
