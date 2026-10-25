@@ -100,11 +100,11 @@ insurers and other years. Leave `documents` empty when no result is that documen
     )
 }
 
-/// Every address must be one the search gave; at most `DOCUMENTS`. An empty list means nothing fits.
-pub(crate) fn check_find(v: &Value, urls: &HashSet<String>) -> Result<Vec<String>, Vec<String>> {
+/// Every address must be one the search gave; at most `max`. An empty list means nothing fits.
+pub(crate) fn check_find(v: &Value, urls: &HashSet<String>, max: usize) -> Result<Vec<String>, Vec<String>> {
     let mut problems = Vec::new();
     let mut picked = Vec::new();
-    for d in v["documents"].as_array().into_iter().flatten().take(DOCUMENTS) {
+    for d in v["documents"].as_array().into_iter().flatten().take(max) {
         let url = d["url"].as_str().unwrap_or("").trim().to_string();
         if !urls.contains(&url) {
             problems.push(format!("{url} is not one of the given addresses; copy addresses exactly"));
@@ -254,7 +254,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: Payload) -> Result<(), JobError> {
         Vec::new()
     } else {
         let request = || MessageRequest::new().system(SYSTEM).text(find_prompt(&p, year, &results)).json_schema(find_schema());
-        let tries = ask_twice(&ctx.claude, "plan_find", Effort::Low, request, |v| check_find(v, &urls)).await?;
+        let tries = ask_twice(&ctx.claude, "plan_find", Effort::Low, request, |v| check_find(v, &urls, DOCUMENTS)).await?;
         calls.extend(tries.calls);
         tries.checked.map_err(|e| JobError { error: e.join("; "), calls: std::mem::take(&mut calls) })?
     };
@@ -346,10 +346,10 @@ mod tests {
     fn picks_may_only_name_addresses_the_search_gave() {
         let urls = urls_in("1. https://www.blueshieldca.com/sbc/silver-70.pdf 2. (https://www.healthcare.gov/plans).");
         let ok = json!({"documents": [{"url": "https://www.blueshieldca.com/sbc/silver-70.pdf", "why": "the SBC"}]});
-        assert_eq!(check_find(&ok, &urls).unwrap(), ["https://www.blueshieldca.com/sbc/silver-70.pdf"]);
+        assert_eq!(check_find(&ok, &urls, DOCUMENTS).unwrap(), ["https://www.blueshieldca.com/sbc/silver-70.pdf"]);
         let made_up = json!({"documents": [{"url": "https://blueshieldca.com/sbc.pdf", "why": ""}]});
-        assert!(check_find(&made_up, &urls).unwrap_err()[0].contains("not one of the given addresses"));
-        assert!(check_find(&json!({"documents": []}), &urls).unwrap().is_empty());
+        assert!(check_find(&made_up, &urls, DOCUMENTS).unwrap_err()[0].contains("not one of the given addresses"));
+        assert!(check_find(&json!({"documents": []}), &urls, DOCUMENTS).unwrap().is_empty());
     }
 
     fn printed(document: &str, insurer: &str, plan: &str) -> Printed {
