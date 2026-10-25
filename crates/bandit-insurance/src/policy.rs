@@ -595,7 +595,7 @@ pub fn venue_policy_schema() -> serde_json::Value {
             "fee_schedule": {"type": "array", "items": {"type": "object", "required": ["code", "description", "cap", "quote", "page"], "properties": quoted(serde_json::json!({
                 "code": {"type": "string", "description": "the CPT or HCPCS code"},
                 "description": {"type": "string"},
-                "cap": {"type": "string", "description": "the most paid per unit, as printed"}
+                "cap": {"type": "string", "description": "the most paid per unit: the amount alone as printed, such as $65.00"}
             }))}},
             "exclusions": {"type": "array", "items": {"type": "object", "required": ["kind", "quote", "page"], "properties": quoted(serde_json::json!({
                 "kind": {"type": "string", "enum": EXCLUSION_KINDS}
@@ -606,6 +606,21 @@ pub fn venue_policy_schema() -> serde_json::Value {
                 "text": {"type": "string", "description": "the clause's words, copied exactly from one page"}
             }}}
         }
+    })
+}
+
+/// The JSON schema `bandit-read-document` gives the reader for `kind`: the
+/// venue policy's terms and clauses, or only the clauses of an attendee's
+/// health plan or own policy.
+pub fn document_schema(kind: &str) -> serde_json::Value {
+    let venue = venue_policy_schema();
+    if kind == VENUE_POLICY {
+        return venue;
+    }
+    serde_json::json!({
+        "type": "object",
+        "required": ["clauses"],
+        "properties": {"clauses": venue["properties"]["clauses"].clone()}
     })
 }
 
@@ -771,5 +786,18 @@ mod tests {
         let s = venue_policy_schema();
         assert_eq!(s["properties"]["terms"]["items"]["properties"]["name"]["enum"].as_array().unwrap().len(), 11);
         assert_eq!(s["properties"]["clauses"]["items"]["properties"]["section"]["enum"].as_array().unwrap().len(), 8);
+    }
+
+    #[test]
+    fn an_attendee_document_is_read_for_its_clauses_only() {
+        assert_eq!(document_schema(VENUE_POLICY), venue_policy_schema());
+        for kind in [HEALTH_PLAN, ATTENDEE_POLICY] {
+            let s = document_schema(kind);
+            assert_eq!(s["required"], serde_json::json!(["clauses"]));
+            assert_eq!(s["properties"].as_object().unwrap().len(), 1);
+            assert_eq!(s["properties"]["clauses"], venue_policy_schema()["properties"]["clauses"]);
+        }
+        let read: PolicyRead = serde_json::from_value(serde_json::json!({"clauses": [{"section": "limits", "page": 1, "text": "x"}]})).unwrap();
+        assert_eq!((read.terms.len(), read.clauses.len()), (0, 1));
     }
 }

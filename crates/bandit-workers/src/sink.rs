@@ -27,6 +27,7 @@ pub enum Finish {
     ClinicReport { record_json: String, file_hash: String },
     PhotoFeatures { people_count: u32, caption: String },
     MerchPicks { picks: Vec<MerchPickIn> },
+    DocumentTerms { read_json: String, pages: Vec<String> },
 }
 
 pub enum Sink {
@@ -122,8 +123,8 @@ impl Sink {
     /// Calls the result reducer. The last call record goes with it; earlier
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
-        // The venue setup reducer takes no call record, so its last call is recorded too.
-        let last = if matches!(finish, Finish::VenueSetup { .. }) { None } else { calls.pop() };
+        // The venue setup and document reducers take no call record, so their last call is recorded too.
+        let last = if matches!(finish, Finish::VenueSetup { .. } | Finish::DocumentTerms { .. }) { None } else { calls.pop() };
         for call in calls {
             self.record_call(call).await?;
         }
@@ -150,6 +151,7 @@ impl Sink {
             Finish::ClinicReport { record_json, file_hash } => reduce!(conn, file_clinic_report_then(job_id, record_json, file_hash, required())),
             Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
             Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
+            Finish::DocumentTerms { read_json, pages } => reduce!(conn, apply_document_terms_then(job_id, read_json, pages)),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -238,6 +240,7 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
                 "call": call,
             }),
         ),
+        Finish::DocumentTerms { read_json, pages } => ("apply_document_terms", json!({"read_json": parse_or_text(read_json), "pages": pages})),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);

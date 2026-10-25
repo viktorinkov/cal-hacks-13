@@ -1,0 +1,69 @@
+version: "1"
+name: bandit-read-document
+description: Reads one BandIt insurance PDF, already indexed one page per document, into the terms and clauses it states. The bandit-document-reader agent quotes the page behind every term, and the answer is saved as one document for bandit-workers to check.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: document_hash
+        type: string
+        required: true
+        description: SHA-256 of the PDF.
+      - name: kind
+        type: string
+        required: true
+        description: venue_policy, health_plan or attendee_policy.
+      - name: page_count
+        type: number
+        required: true
+        description: Pages in the PDF.
+      - name: schema
+        type: string
+        required: true
+        description: The JSON schema of the answer for this kind.
+      - name: terms_index
+        type: string
+        required: true
+        description: Where the answer is saved, for example bandit-document-terms.
+steps:
+  - name: pages
+    type: elasticsearch.esql.query
+    with:
+      query: >
+        FROM bandit*-documents
+        | WHERE document_hash == ?
+        | STATS pages = COUNT_DISTINCT(page)
+      params:
+        - "{{ inputs.document_hash }}"
+
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+
+  - name: read
+    type: ai.agent
+    agent-id: bandit-document-reader
+    create-conversation: true
+    with:
+      message: |
+        Document: {{ inputs.document_hash }}
+        Kind: {{ inputs.kind }}
+        Pages: {{ inputs.page_count }} ({{ steps.pages.output.values[0][0] }} indexed)
+
+        Read every page with bandit.document_pages, passing document_hash {{ inputs.document_hash }}, from page 1 to page {{ inputs.page_count }}.
+        Then fill the structured response with what the pages print, copied word for word, each with its page. Leave out anything this document does not state.
+      schema: "${{ steps.schema.output }}"
+
+  - name: save_terms
+    type: elasticsearch.index
+    with:
+      index: "{{ inputs.terms_index }}"
+      id: "{{ inputs.document_hash }}"
+      refresh: wait_for
+      document:
+        document_hash: "{{ inputs.document_hash }}"
+        kind: "{{ inputs.kind }}"
+        model: "{{ steps.read.output.metadata.usage.connectorId }}"
+        pages_indexed: "${{ steps.pages.output.values[0][0] }}"
+        read: "${{ steps.read.output.structured_output }}"
