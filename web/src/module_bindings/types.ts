@@ -149,8 +149,25 @@ export const BoardMerchOrder = __t.object("BoardMerchOrder", {
   failure: __t.string(),
   nessiePurchaseId: __t.string(),
   createdAt: __t.timestamp(),
+  line: __t.string(),
+  photoUrl: __t.string(),
+  nodeId: __t.u64(),
 });
 export type BoardMerchOrder = __Infer<typeof BoardMerchOrder>;
+
+export const BoardMerchPick = __t.object("BoardMerchPick", {
+  id: __t.u64(),
+  nodeId: __t.u64(),
+  attendeeName: __t.string(),
+  rank: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  photoUrl: __t.string(),
+  line: __t.string(),
+  reason: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type BoardMerchPick = __Infer<typeof BoardMerchPick>;
 
 export const BoardPhoto = __t.object("BoardPhoto", {
   id: __t.u64(),
@@ -159,6 +176,8 @@ export const BoardPhoto = __t.object("BoardPhoto", {
   zoneName: __t.string(),
   caption: __t.string(),
   nodeIds: __t.array(__t.u64()),
+  peopleCount: __t.u32(),
+  read: __t.bool(),
 });
 export type BoardPhoto = __Infer<typeof BoardPhoto>;
 
@@ -849,8 +868,30 @@ export const MerchOrder = __t.object("MerchOrder", {
   nessiePurchaseId: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  line: __t.string(),
 });
 export type MerchOrder = __Infer<typeof MerchOrder>;
+
+export const MerchPick = __t.object("MerchPick", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  rank: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  line: __t.string(),
+  reason: __t.string(),
+  modelCallId: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type MerchPick = __Infer<typeof MerchPick>;
+
+export const MerchPickIn = __t.object("MerchPickIn", {
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  line: __t.string(),
+  reason: __t.string(),
+});
+export type MerchPickIn = __Infer<typeof MerchPickIn>;
 
 export const MerchShop = __t.object("MerchShop", {
   id: __t.u8(),
@@ -873,6 +914,10 @@ export const MerchSuggestion = __t.object("MerchSuggestion", {
   photoH: __t.u32(),
   photoId: __t.u64(),
   photoUrl: __t.string(),
+  line: __t.string(),
+  reason: __t.string(),
+  friends: __t.array(__t.string()),
+  ticks: __t.array(__t.string()),
 });
 export type MerchSuggestion = __Infer<typeof MerchSuggestion>;
 
@@ -1153,6 +1198,8 @@ export const Photo = __t.object("Photo", {
   caption: __t.string(),
   addedBy: __t.identity(),
   createdAt: __t.timestamp(),
+  peopleCount: __t.u32(),
+  featuresCallId: __t.u64(),
 });
 export type Photo = __Infer<typeof Photo>;
 

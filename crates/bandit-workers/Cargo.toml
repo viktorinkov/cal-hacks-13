@@ -12,6 +12,7 @@ bandit-common = { path = "../bandit-common" }
 claims-elastic = { path = "../claims-elastic" }
 claude-client = { path = "../claude-client" }
 bandit-insurance = { path = "../bandit-insurance" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 regex = "1"
 reqwest.workspace = true
 serde.workspace = true

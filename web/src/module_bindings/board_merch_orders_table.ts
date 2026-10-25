@@ -21,4 +21,7 @@ export default __t.row({
   failure: __t.string(),
   nessiePurchaseId: __t.string().name("nessie_purchase_id"),
   createdAt: __t.timestamp().name("created_at"),
+  line: __t.string(),
+  photoUrl: __t.string().name("photo_url"),
+  nodeId: __t.u64().name("node_id"),
 });
