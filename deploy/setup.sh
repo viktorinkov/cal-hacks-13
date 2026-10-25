@@ -36,6 +36,11 @@ git fetch -q origin "$BANDIT_BRANCH"
 git reset -q --hard FETCH_HEAD
 echo "building $(git log --oneline -1)"
 (cd web && bun install --silent && bun run --silent build > /dev/null)
+# The command center is built into frontend/dist (Vite base /cc/). Copy it aside so Caddy
+# can serve the desk without taking /callback, /api, /config.json, or /blobs.
+install -d -m 755 /var/lib/bandit/command-center
+find /var/lib/bandit/command-center -mindepth 1 -delete
+cp -a frontend/dist/. /var/lib/bandit/command-center/
 CARGO_PROFILE_DEV_DEBUG=0 cargo build -q -p bandit-api -p bandit-indexer -p bandit-workers -p bandit-claims
 [ -x var/venv/bin/python3 ] || python3 -m venv var/venv
 var/venv/bin/pip install -q playwright requests
@@ -49,9 +54,35 @@ systemctl restart bandit@api bandit@indexer bandit@workers bandit-live
 systemctl enable -q --now bandit-autodeploy.timer
 
 # /deploy/ shows deploy/autodeploy.sh's last deploy (status.txt) and its log.
+# The desk routes are the command center. /portal keeps the previous organizer page.
 install -d -m 755 /srv/bandit-deploy
-printf '%s, www.%s {\n\thandle_path /deploy/* {\n\t\troot * /srv/bandit-deploy\n\t\tfile_server\n\t}\n\thandle {\n\t\treverse_proxy 127.0.0.1:8080\n\t}\n}\n' \
-  "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
+cat > /etc/caddy/Caddyfile <<EOF
+${BANDIT_HOST}, www.${BANDIT_HOST} {
+	handle_path /deploy/* {
+		root * /srv/bandit-deploy
+		file_server
+	}
+	handle /cc/* {
+		root * /var/lib/bandit/command-center
+		uri strip_prefix /cc
+		file_server
+	}
+	@desk path /organizer /organizer/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/
+	handle @desk {
+		root * /var/lib/bandit/command-center
+		rewrite * /index.html
+		file_server
+	}
+	handle /portal /portal/ {
+		root * ${APP}/web
+		rewrite * /organizer.html
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}
+EOF
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
 printf '%s %s deployed at %s\n' "$BANDIT_BRANCH" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > /srv/bandit-deploy/status.txt
