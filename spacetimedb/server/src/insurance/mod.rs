@@ -15,7 +15,6 @@ pub mod documents;
 pub mod evidence;
 pub mod filing;
 pub mod flow;
-pub mod own_policy;
 pub mod people;
 pub mod plan_lookup;
 pub mod proposals;
@@ -29,7 +28,6 @@ mod tests;
 
 pub use flow::{on_incident_resolved, on_job_dead};
 pub use charges::*;
-pub use own_policy::*;
 pub use documents::{FeeScheduleLine, PolicyDocument, PolicyTerm, fee_schedule_line, policy_document, policy_term};
 pub use tables::*;
 

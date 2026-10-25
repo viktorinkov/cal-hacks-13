@@ -212,8 +212,7 @@ impl EvidenceInput {
 ///    `record_patient`, `record_provider`, `record_date_of_service`,
 ///    `record_diagnoses` (joined with `; `), `record_billed_cents` (all reader
 ///    model), then `record_covered_cents` and `record_sha256` (reader code).
-/// 10. `policy` (observed at `read_at`, reference `insurance_policy:{policy_id}`,
-///     `attendee_policy:{policy_id}` for the attendee's own):
+/// 10. `policy` (observed at `read_at`, reference `insurance_policy:{policy_id}`):
 ///     `policy_number`, `insurer`, `cover_kind`, `per_claim_limit_cents`,
 ///     `deductible_cents`, `aggregate_remaining_cents` (limit minus used, floored at 0).
 /// 11. `responsible_party` (observed at `named_at`, reference `charge:{charge_id}`):
@@ -309,8 +308,7 @@ pub fn build_facts(input: &EvidenceInput) -> Vec<Fact> {
     }
 
     if let Some(p) = &input.policy {
-        let table = if p.cover_kind.is_attendee_policy() { "attendee_policy" } else { "insurance_policy" };
-        f.group(Source::Policy, p.read_at, format!("{table}:{}", p.policy_id));
+        f.group(Source::Policy, p.read_at, format!("insurance_policy:{}", p.policy_id));
         f.code("policy_number", &p.policy_number);
         f.code("insurer", &p.insurer_name);
         f.code("cover_kind", p.cover_kind.as_str());

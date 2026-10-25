@@ -5,7 +5,7 @@ use super::*;
 use crate::roles::*;
 use crate::tables::*;
 use crate::view_as::viewed;
-use spacetimedb::{RawQuery, ViewContext};
+use spacetimedb::ViewContext;
 
 fn is_claims_staff(ctx: &ViewContext) -> bool {
     ctx.db.owner().identity().find(viewed(ctx)).is_some()
@@ -64,11 +64,4 @@ pub fn claim_clauses(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimClause> {
         return Vec::new();
     }
     ctx.db.claim_clause().claim_id().filter(claim_id).collect()
-}
-
-/// Every attendee's own policy on file, for the organizer deciding a claim on an attendee's own things.
-#[spacetimedb::view(accessor = board_attendee_policies, public)]
-pub fn board_attendee_policies(ctx: &ViewContext) -> RawQuery<AttendeePolicy> {
-    let filter = if is_claims_staff(ctx) { "" } else { " WHERE id = 0" };
-    RawQuery::new(format!("SELECT * FROM attendee_policy{filter}"))
 }

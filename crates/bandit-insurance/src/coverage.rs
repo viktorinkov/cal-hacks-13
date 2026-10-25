@@ -4,8 +4,7 @@
 use crate::{Cents, CoverKind, IncidentKind};
 use serde::{Deserialize, Serialize};
 
-/// One cover: medical payments in the venue's general liability, property in the venue's property policy,
-/// or the attendee's own personal property cover.
+/// One cover: medical payments in the venue's general liability, property in the venue's property policy.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CoverageRule {
     pub cover_kind: CoverKind,
@@ -52,25 +51,16 @@ pub fn rule_for(rules: &[CoverageRule], kind: IncidentKind) -> Option<&CoverageR
     rules.iter().find(|r| r.applies_to(kind))
 }
 
-/// The venue's covers, in order:
+/// In order:
 /// 1. `payout = min(cost, per_claim_limit, aggregate_limit - aggregate_used)`
 ///    (the aggregate remainder floors at 0);
 /// 2. `recoverable = payout - deductible`, floored at 0;
 /// 3. `venue_cost = payout - recoverable`.
-///
-/// The attendee's own personal property cover: the attendee carries the
-/// deductible, so `payout = min(cost, per_claim_limit, aggregate remaining) -
-/// deductible` (floored at 0), all of it recoverable from their insurer, and
-/// `venue_cost = 0`.
 pub fn compute_amounts(cost_cents: Cents, rule: &CoverageRule, aggregate_used_cents: Cents) -> Amounts {
     let aggregate_remaining = rule.aggregate_limit_cents.saturating_sub(aggregate_used_cents);
-    let covered = cost_cents.min(rule.per_claim_limit_cents).min(aggregate_remaining);
-    if rule.cover_kind == CoverKind::PersonalProperty {
-        let payout_cents = covered.saturating_sub(rule.deductible_cents);
-        return Amounts { cost_cents, payout_cents, recoverable_cents: payout_cents, venue_cost_cents: 0 };
-    }
-    let recoverable_cents = covered.saturating_sub(rule.deductible_cents);
-    Amounts { cost_cents, payout_cents: covered, recoverable_cents, venue_cost_cents: covered - recoverable_cents }
+    let payout_cents = cost_cents.min(rule.per_claim_limit_cents).min(aggregate_remaining);
+    let recoverable_cents = payout_cents.saturating_sub(rule.deductible_cents);
+    Amounts { cost_cents, payout_cents, recoverable_cents, venue_cost_cents: payout_cents - recoverable_cents }
 }
 
 #[cfg(test)]
@@ -140,23 +130,6 @@ mod tests {
     fn deductible_larger_than_payout() {
         assert_eq!(compute_amounts(30000, &property(), 0), amounts(30000, 30000, 0, 30000));
         assert_eq!(compute_amounts(0, &property(), 0), amounts(0, 0, 0, 0));
-    }
-
-    #[test]
-    fn attendee_carries_their_own_deductible() {
-        let own = CoverageRule {
-            cover_kind: CoverKind::PersonalProperty,
-            incident_kinds: vec![IncidentKind::Theft, IncidentKind::Breakage],
-            per_claim_limit_cents: 150000,
-            aggregate_limit_cents: 1000000,
-            deductible_cents: 25000,
-            minimum_payout_cents: 0,
-            service_window_days: 0,
-            active: true,
-        };
-        assert_eq!(compute_amounts(119900, &own, 0), amounts(119900, 94900, 94900, 0));
-        assert_eq!(compute_amounts(240000, &own, 0), amounts(240000, 125000, 125000, 0));
-        assert_eq!(compute_amounts(9000, &own, 0), amounts(9000, 0, 0, 0));
     }
 
     #[test]

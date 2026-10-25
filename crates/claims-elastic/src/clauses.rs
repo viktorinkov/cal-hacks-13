@@ -16,7 +16,7 @@ use crate::{ClaimsIndex, INFERENCE_ID, check_id};
 pub struct PolicyClause {
     /// `<document_hash>-c<n>`, n the clause's 1-based position among the checked clauses.
     pub clause_id: String,
-    /// `venue` or `attendee`.
+    /// `venue`, or `attendee` for an attendee's health plan.
     pub policy: String,
     /// SHA-256 of the policy PDF.
     pub document_hash: String,

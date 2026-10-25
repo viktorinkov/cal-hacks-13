@@ -88,8 +88,8 @@ export const CONGESTION_TINT = 0xf09a62
 export const HEAT = { bloom: 0xff5524, warm: 0xff8640, core: 0xffc9a0 }
 
 /** People per m², smoothed over a few metres, where each part of the glow starts and is full. */
-export const HEAT_BLOOM = [0.3, 1.4] as const
-export const HEAT_CORE = [1.2, 2.6] as const
+export const HEAT_BLOOM = [0.24, 1.2] as const
+export const HEAT_CORE = [1.0, 2.3] as const
 
 const smooth = (v: number, [lo, hi]: readonly [number, number]) => {
   const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo)))

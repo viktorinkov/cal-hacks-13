@@ -118,8 +118,7 @@ pub struct Claim {
     pub band_id: u32,
     pub zone_id: u64,
     pub zone_name: String,
-    /// The venue's `insurance_policy`, or the attendee's own `attendee_policy` for a `personal_property`
-    /// claim (0 when they have none on file).
+    /// The venue's `insurance_policy`.
     pub policy_id: u64,
     pub status: ClaimStatus,
     /// Why the claim is where it is, in one line.
