@@ -1,8 +1,8 @@
 {
   "file": "hall.spz",
   "format": "SPZ v3 (gzip), SH degree 3",
-  "gaussians": 2869019,
-  "training": "Brush, 20000 of 30000 steps (preview; final version replaces this file)",
+  "gaussians": 3012192,
+  "training": "Brush, 30000 steps (final)",
   "source": "IMG_2133.MOV, 504 frames registered with COLMAP, people masked with YOLO11-seg",
   "coordinates": "The file is in COLMAP space (arbitrary scale and orientation). Apply toMetresYUp to get metres with +Y up and the floor at y = 0 (three.js: mesh.matrixAutoUpdate = false; mesh.matrix.fromArray(toMetresYUp_columnMajor)).",
   "toMetresYUp_rowMajor": [
