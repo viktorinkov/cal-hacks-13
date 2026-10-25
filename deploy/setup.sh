@@ -3,11 +3,14 @@
 # checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, sets up the Python the
 # venue setup runs pipeline/venue_model.py with (Playwright drives Bright Data's browser), then (re)starts
 # bandit-api, bandit-indexer, bandit-workers and the live run's floor staff under systemd behind Caddy on
-# https://$BANDIT_HOST.
+# https://$BANDIT_HOST, and turns on bandit-autodeploy.timer, which runs this again whenever vik-e2e moves.
 # scripts/deploy-vm copies /opt/bandit/.env and /var/lib/bandit/identities first, then runs this.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 APP=/opt/bandit
+# One deploy at a time: scripts/deploy-vm and deploy/autodeploy.sh can start together.
+exec 9> /var/lock/bandit-deploy
+flock 9
 
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl git build-essential pkg-config libssl-dev unzip \
@@ -39,10 +42,15 @@ var/venv/bin/pip install -q playwright requests
 
 install -m 644 deploy/bandit@.service /etc/systemd/system/bandit@.service
 install -m 644 deploy/bandit-live.service /etc/systemd/system/bandit-live.service
+install -m 644 deploy/bandit-autodeploy.service deploy/bandit-autodeploy.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable -q bandit@api bandit@indexer bandit@workers bandit-live
 systemctl restart bandit@api bandit@indexer bandit@workers bandit-live
+systemctl enable -q --now bandit-autodeploy.timer
 
-printf '%s, www.%s {\n\treverse_proxy 127.0.0.1:8080\n}\n' "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
+# /deploy/ shows deploy/autodeploy.sh's last deploy (status.txt) and its log.
+install -d -m 755 /srv/bandit-deploy
+printf '%s, www.%s {\n\thandle_path /deploy/* {\n\t\troot * /srv/bandit-deploy\n\t\tfile_server\n\t}\n\thandle {\n\t\treverse_proxy 127.0.0.1:8080\n\t}\n}\n' \
+  "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
