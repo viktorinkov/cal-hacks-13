@@ -28,6 +28,7 @@ pub enum Finish {
     PhotoFeatures { people_count: u32, caption: String },
     MerchPicks { picks: Vec<MerchPickIn> },
     DocumentTerms { read_json: String, pages: Vec<String> },
+    RuleProposal { proposal_json: String },
 }
 
 pub enum Sink {
@@ -152,6 +153,7 @@ impl Sink {
             Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
             Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
             Finish::DocumentTerms { read_json, pages } => reduce!(conn, apply_document_terms_then(job_id, read_json, pages)),
+            Finish::RuleProposal { proposal_json } => reduce!(conn, submit_rule_proposal_then(job_id, proposal_json, required())),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -241,6 +243,7 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
             }),
         ),
         Finish::DocumentTerms { read_json, pages } => ("apply_document_terms", json!({"read_json": parse_or_text(read_json), "pages": pages})),
+        Finish::RuleProposal { proposal_json } => ("submit_rule_proposal", json!({"proposal_json": parse_or_text(proposal_json), "call": call})),
     };
     let mut args = args;
     args["job_id"] = json!(job_id);

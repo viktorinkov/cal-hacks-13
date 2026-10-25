@@ -162,20 +162,18 @@ pub fn show(app: &App, id: u64) -> Result<()> {
     approvals.sort_by_key(|a| a.id);
     for a in &approvals {
         println!(
-            "approval {}  {} ({}) {}  saw {} on {}  learn {}{}{}",
+            "approval {}  {} ({}) {}  saw {} on {}{}",
             app.hms(a.decided_at),
             a.approver_name,
             a.approver_role,
             a.decision,
             money(a.amount_seen_cents),
             short_hash(&a.pack_hash_seen),
-            if a.learn { "yes" } else { "no" },
-            a.requested_ceiling_cents.map(|c| format!(", ceiling asked {}", money(c))).unwrap_or_default(),
             if a.reason.is_empty() { String::new() } else { format!(", reason: {}", a.reason) }
         );
     }
-    for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
-        println!("learned  {}", rule_line(app, &r));
+    for p in db.db.rule_proposal().iter().filter(|p| p.claim_ids.contains(&id)) {
+        println!("proposal {}  {}  from claims {:?}  {}", p.id, p.status, p.claim_ids, p.rule);
     }
     if matches!(c.decided_by.as_str(), "rule" | "claude")
         && c.settlement_rule_id != 0
@@ -337,8 +335,8 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
             short_hash(&a.pack_hash_seen)
         );
     }
-    for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
-        println!("  learned  {}", rule_line(app, &r));
+    for p in db.db.rule_proposal().iter().filter(|p| p.claim_ids.contains(&id)) {
+        println!("  proposal {} {} from claims {:?}: {}", p.id, p.status, p.claim_ids, p.rule);
     }
     if matches!(c.decided_by.as_str(), "rule" | "claude")
         && c.settlement_rule_id != 0

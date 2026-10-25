@@ -3,7 +3,7 @@
 //! resolves the incident; the person who fell files their claim (staff file it for them) and the hospital
 //! report follows on its own; the camera confirms broken equipment and the organizer logs the repair cost.
 //! A claim left waiting for the organizer, in this run or an earlier one, is decided after `--approve-after`
-//! seconds so the run keeps moving: approved with a learned rule, or refused when Claude recommended refusing
+//! seconds so the run keeps moving: approved, or refused when Claude recommended refusing
 //! it. While the run is paused, the floor staff wait too.
 //!
 //! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
@@ -30,6 +30,7 @@ const LIVE_TABLES: &[&str] = &[
     "claim_check",
     "approval",
     "settlement_rule",
+    "rule_proposal",
     "insurance_policy",
     "coverage_rule",
     "insurance_settings",
@@ -114,6 +115,16 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
                 if done.insert((c.id, "decide")) {
                     if let Err(e) = decide_claim(app, &c) {
                         say!(app, "live       claim {}: {e:#}", c.id);
+                    }
+                }
+            }
+            // A rule Claude proposed is approved as long after, as the organizer would.
+            let proposed: Vec<RuleProposal> =
+                db.db.rule_proposal().iter().filter(|p| p.status == "proposed" && p.proposed_at.is_some_and(|t| since(t) >= approve_after as i64)).collect();
+            for p in proposed {
+                if done.insert((p.id, "approve rule")) {
+                    if let Err(e) = decide::approve_proposal(app, p.id, None) {
+                        say!(app, "live       proposed rule {}: {e:#}", p.id);
                     }
                 }
             }
@@ -239,7 +250,7 @@ fn decide_claim(app: &App, c: &Claim) -> Result<()> {
     } else if c.payout_cents == 0 {
         decide::refuse(app, c.id, None, "nothing to pay: no hospital report covers it", false)?;
     } else {
-        decide::approve(app, c.id, None, None, true, false, false)?;
+        decide::approve(app, c.id, None, false, false)?;
     }
     Ok(())
 }

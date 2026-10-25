@@ -1,5 +1,5 @@
-//! The scripted story: six claims that show every outcome, from the learned
-//! rule settling a small fall on its own to a refusal that lists its checks.
+//! The scripted story: six claims that show every outcome, from the organizer's
+//! approvals kept as precedents to a refusal that lists its checks.
 
 use crate::app::*;
 use crate::test_bands::{Pose, TEST_BANDS, TestBands};
@@ -38,9 +38,9 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     show::summary(app, jordan)?;
     if c.status == ClaimStatus::Routed {
         println!("\nThe organizer's screen is a minute old:");
-        decide::approve(app, jordan, None, None, true, true, false)?;
+        decide::approve(app, jordan, None, true, false)?;
         println!();
-        decide::approve(app, jordan, None, None, true, false, true)?;
+        decide::approve(app, jordan, None, false, true)?;
         show::wait_for(app, jordan, FLOW_SECS, |c| !in_pipeline(c.status))?;
         show::summary(app, jordan)?;
     } else {
@@ -51,8 +51,12 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     let note = "on scene near the stage: right wrist pain after slipping on a spilled drink; walking her to the medical station";
     let maya = injury(app, &test_bands, 91, MAIN_STAGE, &[97, 98], MAIN_STAGE, note)?;
     flow::attach_record(app, maya, "first-aid-wrist", None, None)?;
-    show::wait_for(app, maya, FLOW_SECS, |c| !in_pipeline(c.status))?;
+    let c = show::wait_for(app, maya, FLOW_SECS, |c| !in_pipeline(c.status))?;
     show::summary(app, maya)?;
+    if c.status == ClaimStatus::Routed {
+        println!();
+        decide::approve(app, maya, None, false, true)?;
+    }
 
     step(pause, "3. Sam Patel goes down on the Hacking floor; his urgent-care record says he hurt the ankle at home")?;
     let note = "on scene at the tables: right ankle pain and swelling after a stumble; splinting it, referring him to urgent care";
@@ -72,7 +76,7 @@ pub fn run(app: &App, pause: bool) -> Result<()> {
     let c = show::wait_for(app, speaker.id, FLOW_SECS, |c| !in_pipeline(c.status))?;
     if c.status == ClaimStatus::Routed {
         println!();
-        decide::approve(app, speaker.id, None, None, true, false, true)?;
+        decide::approve(app, speaker.id, None, false, true)?;
     }
     let c = app.claim(speaker.id)?;
     if matches!(c.status, ClaimStatus::Settled | ClaimStatus::Reconciled) {

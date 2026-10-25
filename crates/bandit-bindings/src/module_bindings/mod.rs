@@ -20,6 +20,7 @@ pub mod apply_medical_record_reducer;
 pub mod approval_table;
 pub mod approval_type;
 pub mod approve_claim_reducer;
+pub mod approve_rule_proposal_reducer;
 pub mod assign_medic_reducer;
 pub mod attach_claim_letters_reducer;
 pub mod attach_recovery_letter_reducer;
@@ -54,6 +55,7 @@ pub mod board_merch_orders_table;
 pub mod board_merch_pick_type;
 pub mod board_merch_picks_table;
 pub mod board_notes_table;
+pub mod board_organizer_precedents_table;
 pub mod board_photo_type;
 pub mod board_photos_table;
 pub mod board_policies_table;
@@ -62,6 +64,7 @@ pub mod board_policy_terms_table;
 pub mod board_precedents_table;
 pub mod board_records_table;
 pub mod board_reviews_table;
+pub mod board_rule_proposals_table;
 pub mod board_rules_table;
 pub mod board_staff_table;
 pub mod board_wallet_type;
@@ -269,6 +272,8 @@ pub mod open_incidents_table;
 pub mod organization_in_type;
 pub mod organization_table;
 pub mod organization_type;
+pub mod organizer_precedent_table;
+pub mod organizer_precedent_type;
 pub mod owner_table;
 pub mod owner_type;
 pub mod pause_live_run_reducer;
@@ -302,6 +307,7 @@ pub mod refuse_claim_reducer;
 pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
 pub mod register_photo_reducer;
+pub mod reject_rule_proposal_reducer;
 pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
 pub mod remove_staff_reducer;
@@ -318,6 +324,8 @@ pub mod resolve_incident_reducer;
 pub mod resume_live_run_reducer;
 pub mod retry_claim_payout_reducer;
 pub mod revoke_role_reducer;
+pub mod rule_proposal_table;
+pub mod rule_proposal_type;
 pub mod schedule_slot_in_type;
 pub mod schedule_slot_table;
 pub mod schedule_slot_type;
@@ -374,6 +382,7 @@ pub mod submit_medical_record_reducer;
 pub mod submit_merch_picks_reducer;
 pub mod submit_photo_features_reducer;
 pub mod submit_policy_document_reducer;
+pub mod submit_rule_proposal_reducer;
 pub mod submit_vision_assessment_reducer;
 pub mod sweep_reducer;
 pub mod sweep_timer_table;
@@ -433,6 +442,7 @@ pub use apply_medical_record_reducer::apply_medical_record;
 pub use approval_table::*;
 pub use approval_type::Approval;
 pub use approve_claim_reducer::approve_claim;
+pub use approve_rule_proposal_reducer::approve_rule_proposal;
 pub use assign_medic_reducer::assign_medic;
 pub use attach_claim_letters_reducer::attach_claim_letters;
 pub use attach_recovery_letter_reducer::attach_recovery_letter;
@@ -467,6 +477,7 @@ pub use board_merch_orders_table::*;
 pub use board_merch_pick_type::BoardMerchPick;
 pub use board_merch_picks_table::*;
 pub use board_notes_table::*;
+pub use board_organizer_precedents_table::*;
 pub use board_photo_type::BoardPhoto;
 pub use board_photos_table::*;
 pub use board_policies_table::*;
@@ -475,6 +486,7 @@ pub use board_policy_terms_table::*;
 pub use board_precedents_table::*;
 pub use board_records_table::*;
 pub use board_reviews_table::*;
+pub use board_rule_proposals_table::*;
 pub use board_rules_table::*;
 pub use board_staff_table::*;
 pub use board_wallet_type::BoardWallet;
@@ -682,6 +694,8 @@ pub use open_incidents_table::*;
 pub use organization_in_type::OrganizationIn;
 pub use organization_table::*;
 pub use organization_type::Organization;
+pub use organizer_precedent_table::*;
+pub use organizer_precedent_type::OrganizerPrecedent;
 pub use owner_table::*;
 pub use owner_type::Owner;
 pub use pause_live_run_reducer::pause_live_run;
@@ -715,6 +729,7 @@ pub use refuse_claim_reducer::refuse_claim;
 pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
 pub use register_photo_reducer::register_photo;
+pub use reject_rule_proposal_reducer::reject_rule_proposal;
 pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
 pub use remove_staff_reducer::remove_staff;
@@ -731,6 +746,8 @@ pub use resolve_incident_reducer::resolve_incident;
 pub use resume_live_run_reducer::resume_live_run;
 pub use retry_claim_payout_reducer::retry_claim_payout;
 pub use revoke_role_reducer::revoke_role;
+pub use rule_proposal_table::*;
+pub use rule_proposal_type::RuleProposal;
 pub use schedule_slot_in_type::ScheduleSlotIn;
 pub use schedule_slot_table::*;
 pub use schedule_slot_type::ScheduleSlot;
@@ -787,6 +804,7 @@ pub use submit_medical_record_reducer::submit_medical_record;
 pub use submit_merch_picks_reducer::submit_merch_picks;
 pub use submit_photo_features_reducer::submit_photo_features;
 pub use submit_policy_document_reducer::submit_policy_document;
+pub use submit_rule_proposal_reducer::submit_rule_proposal;
 pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use sweep_reducer::sweep;
 pub use sweep_timer_table::*;
@@ -872,8 +890,10 @@ pub enum Reducer {
         claim_id: u64,
         amount_seen_cents: u64,
         pack_hash_seen: String,
-        requested_ceiling_cents: Option<u64>,
-        learn: bool,
+    },
+    ApproveRuleProposal {
+        proposal_id: u64,
+        ceiling_seen_cents: u64,
     },
     AssignMedic {
         incident_id: u64,
@@ -1079,6 +1099,10 @@ pub enum Reducer {
         zone_id: u64,
         caption: String,
     },
+    RejectRuleProposal {
+        proposal_id: u64,
+        reason: String,
+    },
     ReleaseBand {
         band_id: u8,
     },
@@ -1250,6 +1274,11 @@ pub enum Reducer {
         file_hash: String,
         page_count: u32,
     },
+    SubmitRuleProposal {
+        job_id: u64,
+        proposal_json: String,
+        call: ModelCallIn,
+    },
     SubmitVisionAssessment {
         incident_id: u64,
         trigger: String,
@@ -1318,6 +1347,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
             Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveClaim { .. } => "approve_claim",
+            Reducer::ApproveRuleProposal { .. } => "approve_rule_proposal",
             Reducer::AssignMedic { .. } => "assign_medic",
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
@@ -1372,6 +1402,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterBlob { .. } => "register_blob",
             Reducer::RegisterBridge => "register_bridge",
             Reducer::RegisterPhoto { .. } => "register_photo",
+            Reducer::RejectRuleProposal { .. } => "reject_rule_proposal",
             Reducer::ReleaseBand { .. } => "release_band",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
             Reducer::RemoveStaff { .. } => "remove_staff",
@@ -1415,6 +1446,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitMerchPicks { .. } => "submit_merch_picks",
             Reducer::SubmitPhotoFeatures { .. } => "submit_photo_features",
             Reducer::SubmitPolicyDocument { .. } => "submit_policy_document",
+            Reducer::SubmitRuleProposal { .. } => "submit_rule_proposal",
             Reducer::SubmitVisionAssessment { .. } => "submit_vision_assessment",
             Reducer::Sweep { .. } => "sweep",
             Reducer::UnplaceBand { .. } => "unplace_band",
@@ -1482,14 +1514,17 @@ impl __sdk::Reducer for Reducer {
                 claim_id,
                 amount_seen_cents,
                 pack_hash_seen,
-                requested_ceiling_cents,
-                learn,
             } => __sats::bsatn::to_vec(&approve_claim_reducer::ApproveClaimArgs {
                 claim_id: claim_id.clone(),
                 amount_seen_cents: amount_seen_cents.clone(),
                 pack_hash_seen: pack_hash_seen.clone(),
-                requested_ceiling_cents: requested_ceiling_cents.clone(),
-                learn: learn.clone(),
+            }),
+            Reducer::ApproveRuleProposal {
+                proposal_id,
+                ceiling_seen_cents,
+            } => __sats::bsatn::to_vec(&approve_rule_proposal_reducer::ApproveRuleProposalArgs {
+                proposal_id: proposal_id.clone(),
+                ceiling_seen_cents: ceiling_seen_cents.clone(),
             }),
             Reducer::AssignMedic { incident_id } => {
                 __sats::bsatn::to_vec(&assign_medic_reducer::AssignMedicArgs {
@@ -1848,6 +1883,13 @@ impl __sdk::Reducer for Reducer {
                 zone_id: zone_id.clone(),
                 caption: caption.clone(),
             }),
+            Reducer::RejectRuleProposal {
+                proposal_id,
+                reason,
+            } => __sats::bsatn::to_vec(&reject_rule_proposal_reducer::RejectRuleProposalArgs {
+                proposal_id: proposal_id.clone(),
+                reason: reason.clone(),
+            }),
             Reducer::ReleaseBand { band_id } => {
                 __sats::bsatn::to_vec(&release_band_reducer::ReleaseBandArgs {
                     band_id: band_id.clone(),
@@ -2152,6 +2194,15 @@ impl __sdk::Reducer for Reducer {
                 file_hash: file_hash.clone(),
                 page_count: page_count.clone(),
             }),
+            Reducer::SubmitRuleProposal {
+                job_id,
+                proposal_json,
+                call,
+            } => __sats::bsatn::to_vec(&submit_rule_proposal_reducer::SubmitRuleProposalArgs {
+                job_id: job_id.clone(),
+                proposal_json: proposal_json.clone(),
+                call: call.clone(),
+            }),
             Reducer::SubmitVisionAssessment {
                 incident_id,
                 trigger,
@@ -2281,6 +2332,7 @@ pub struct DbUpdate {
     board_merch_orders: __sdk::TableUpdate<BoardMerchOrder>,
     board_merch_picks: __sdk::TableUpdate<BoardMerchPick>,
     board_notes: __sdk::TableUpdate<IncidentNote>,
+    board_organizer_precedents: __sdk::TableUpdate<OrganizerPrecedent>,
     board_photos: __sdk::TableUpdate<BoardPhoto>,
     board_policies: __sdk::TableUpdate<InsurancePolicy>,
     board_policy_documents: __sdk::TableUpdate<PolicyDocument>,
@@ -2288,6 +2340,7 @@ pub struct DbUpdate {
     board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
     board_records: __sdk::TableUpdate<MedicalRecord>,
     board_reviews: __sdk::TableUpdate<ClaimReview>,
+    board_rule_proposals: __sdk::TableUpdate<RuleProposal>,
     board_rules: __sdk::TableUpdate<SettlementRuleRow>,
     board_staff: __sdk::TableUpdate<StaffMember>,
     board_wallets: __sdk::TableUpdate<BoardWallet>,
@@ -2373,6 +2426,7 @@ pub struct DbUpdate {
     my_wallet_entries: __sdk::TableUpdate<WalletEntry>,
     open_incidents: __sdk::TableUpdate<Incident>,
     organization: __sdk::TableUpdate<Organization>,
+    organizer_precedent: __sdk::TableUpdate<OrganizerPrecedent>,
     owner: __sdk::TableUpdate<Owner>,
     people_link: __sdk::TableUpdate<PeopleLink>,
     person: __sdk::TableUpdate<Person>,
@@ -2382,6 +2436,7 @@ pub struct DbUpdate {
     policy_document: __sdk::TableUpdate<PolicyDocument>,
     policy_term: __sdk::TableUpdate<PolicyTerm>,
     property_event: __sdk::TableUpdate<PropertyEvent>,
+    rule_proposal: __sdk::TableUpdate<RuleProposal>,
     schedule_slot: __sdk::TableUpdate<ScheduleSlot>,
     settings: __sdk::TableUpdate<Settings>,
     settlement_rule: __sdk::TableUpdate<SettlementRuleRow>,
@@ -2495,6 +2550,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_notes" => db_update
                     .board_notes
                     .append(board_notes_table::parse_table_update(table_update)?),
+                "board_organizer_precedents" => db_update.board_organizer_precedents.append(
+                    board_organizer_precedents_table::parse_table_update(table_update)?,
+                ),
                 "board_photos" => db_update
                     .board_photos
                     .append(board_photos_table::parse_table_update(table_update)?),
@@ -2516,6 +2574,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_reviews" => db_update
                     .board_reviews
                     .append(board_reviews_table::parse_table_update(table_update)?),
+                "board_rule_proposals" => db_update.board_rule_proposals.append(
+                    board_rule_proposals_table::parse_table_update(table_update)?,
+                ),
                 "board_rules" => db_update
                     .board_rules
                     .append(board_rules_table::parse_table_update(table_update)?),
@@ -2771,6 +2832,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "organization" => db_update
                     .organization
                     .append(organization_table::parse_table_update(table_update)?),
+                "organizer_precedent" => db_update
+                    .organizer_precedent
+                    .append(organizer_precedent_table::parse_table_update(table_update)?),
                 "owner" => db_update
                     .owner
                     .append(owner_table::parse_table_update(table_update)?),
@@ -2798,6 +2862,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "property_event" => db_update
                     .property_event
                     .append(property_event_table::parse_table_update(table_update)?),
+                "rule_proposal" => db_update
+                    .rule_proposal
+                    .append(rule_proposal_table::parse_table_update(table_update)?),
                 "schedule_slot" => db_update
                     .schedule_slot
                     .append(schedule_slot_table::parse_table_update(table_update)?),
@@ -3115,6 +3182,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.organization = cache
             .apply_diff_to_table::<Organization>("organization", &self.organization)
             .with_updates_by_pk(|row| &row.id);
+        diff.organizer_precedent = cache
+            .apply_diff_to_table::<OrganizerPrecedent>(
+                "organizer_precedent",
+                &self.organizer_precedent,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.owner = cache
             .apply_diff_to_table::<Owner>("owner", &self.owner)
             .with_updates_by_pk(|row| &row.identity);
@@ -3141,6 +3214,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.property_event = cache
             .apply_diff_to_table::<PropertyEvent>("property_event", &self.property_event)
+            .with_updates_by_pk(|row| &row.id);
+        diff.rule_proposal = cache
+            .apply_diff_to_table::<RuleProposal>("rule_proposal", &self.rule_proposal)
             .with_updates_by_pk(|row| &row.id);
         diff.schedule_slot = cache
             .apply_diff_to_table::<ScheduleSlot>("schedule_slot", &self.schedule_slot)
@@ -3241,6 +3317,12 @@ impl __sdk::DbUpdate for DbUpdate {
             .apply_diff_to_table::<BoardMerchPick>("board_merch_picks", &self.board_merch_picks);
         diff.board_notes =
             cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
+        diff.board_organizer_precedents = cache
+            .apply_diff_to_table::<OrganizerPrecedent>(
+                "board_organizer_precedents",
+                &self.board_organizer_precedents,
+            )
+            .with_updates_by_pk(|row| &row.id);
         diff.board_photos =
             cache.apply_diff_to_table::<BoardPhoto>("board_photos", &self.board_photos);
         diff.board_policies = cache
@@ -3261,6 +3343,9 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<MedicalRecord>("board_records", &self.board_records);
         diff.board_reviews =
             cache.apply_diff_to_table::<ClaimReview>("board_reviews", &self.board_reviews);
+        diff.board_rule_proposals = cache
+            .apply_diff_to_table::<RuleProposal>("board_rule_proposals", &self.board_rule_proposals)
+            .with_updates_by_pk(|row| &row.id);
         diff.board_rules = cache
             .apply_diff_to_table::<SettlementRuleRow>("board_rules", &self.board_rules)
             .with_updates_by_pk(|row| &row.id);
@@ -3419,6 +3504,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_organizer_precedents" => db_update
+                    .board_organizer_precedents
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_photos" => db_update
                     .board_photos
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3439,6 +3527,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_reviews" => db_update
                     .board_reviews
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_rule_proposals" => db_update
+                    .board_rule_proposals
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_rules" => db_update
                     .board_rules
@@ -3695,6 +3786,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "organization" => db_update
                     .organization
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "organizer_precedent" => db_update
+                    .organizer_precedent
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "owner" => db_update
                     .owner
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3721,6 +3815,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "rule_proposal" => db_update
+                    .rule_proposal
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "schedule_slot" => db_update
                     .schedule_slot
@@ -3906,6 +4003,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_notes" => db_update
                     .board_notes
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_organizer_precedents" => db_update
+                    .board_organizer_precedents
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_photos" => db_update
                     .board_photos
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3926,6 +4026,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_reviews" => db_update
                     .board_reviews
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_rule_proposals" => db_update
+                    .board_rule_proposals
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_rules" => db_update
                     .board_rules
@@ -4182,6 +4285,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "organization" => db_update
                     .organization
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "organizer_precedent" => db_update
+                    .organizer_precedent
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "owner" => db_update
                     .owner
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4208,6 +4314,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "rule_proposal" => db_update
+                    .rule_proposal
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "schedule_slot" => db_update
                     .schedule_slot
@@ -4347,6 +4456,7 @@ pub struct AppliedDiff<'r> {
     board_merch_orders: __sdk::TableAppliedDiff<'r, BoardMerchOrder>,
     board_merch_picks: __sdk::TableAppliedDiff<'r, BoardMerchPick>,
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
+    board_organizer_precedents: __sdk::TableAppliedDiff<'r, OrganizerPrecedent>,
     board_photos: __sdk::TableAppliedDiff<'r, BoardPhoto>,
     board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
     board_policy_documents: __sdk::TableAppliedDiff<'r, PolicyDocument>,
@@ -4354,6 +4464,7 @@ pub struct AppliedDiff<'r> {
     board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
     board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
+    board_rule_proposals: __sdk::TableAppliedDiff<'r, RuleProposal>,
     board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
     board_staff: __sdk::TableAppliedDiff<'r, StaffMember>,
     board_wallets: __sdk::TableAppliedDiff<'r, BoardWallet>,
@@ -4439,6 +4550,7 @@ pub struct AppliedDiff<'r> {
     my_wallet_entries: __sdk::TableAppliedDiff<'r, WalletEntry>,
     open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
     organization: __sdk::TableAppliedDiff<'r, Organization>,
+    organizer_precedent: __sdk::TableAppliedDiff<'r, OrganizerPrecedent>,
     owner: __sdk::TableAppliedDiff<'r, Owner>,
     people_link: __sdk::TableAppliedDiff<'r, PeopleLink>,
     person: __sdk::TableAppliedDiff<'r, Person>,
@@ -4448,6 +4560,7 @@ pub struct AppliedDiff<'r> {
     policy_document: __sdk::TableAppliedDiff<'r, PolicyDocument>,
     policy_term: __sdk::TableAppliedDiff<'r, PolicyTerm>,
     property_event: __sdk::TableAppliedDiff<'r, PropertyEvent>,
+    rule_proposal: __sdk::TableAppliedDiff<'r, RuleProposal>,
     schedule_slot: __sdk::TableAppliedDiff<'r, ScheduleSlot>,
     settings: __sdk::TableAppliedDiff<'r, Settings>,
     settlement_rule: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
@@ -4578,6 +4691,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.board_notes,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<OrganizerPrecedent>(
+            "board_organizer_precedents",
+            &self.board_organizer_precedents,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<BoardPhoto>(
             "board_photos",
             &self.board_photos,
@@ -4611,6 +4729,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<ClaimReview>(
             "board_reviews",
             &self.board_reviews,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<RuleProposal>(
+            "board_rule_proposals",
+            &self.board_rule_proposals,
             event,
         );
         callbacks.invoke_table_row_callbacks::<SettlementRuleRow>(
@@ -4882,6 +5005,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.organization,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<OrganizerPrecedent>(
+            "organizer_precedent",
+            &self.organizer_precedent,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Owner>("owner", &self.owner, event);
         callbacks.invoke_table_row_callbacks::<PeopleLink>("people_link", &self.people_link, event);
         callbacks.invoke_table_row_callbacks::<Person>("person", &self.person, event);
@@ -4901,6 +5029,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<PropertyEvent>(
             "property_event",
             &self.property_event,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<RuleProposal>(
+            "rule_proposal",
+            &self.rule_proposal,
             event,
         );
         callbacks.invoke_table_row_callbacks::<ScheduleSlot>(
@@ -5688,6 +5821,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_merch_orders_table::register_table(client_cache);
         board_merch_picks_table::register_table(client_cache);
         board_notes_table::register_table(client_cache);
+        board_organizer_precedents_table::register_table(client_cache);
         board_photos_table::register_table(client_cache);
         board_policies_table::register_table(client_cache);
         board_policy_documents_table::register_table(client_cache);
@@ -5695,6 +5829,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_precedents_table::register_table(client_cache);
         board_records_table::register_table(client_cache);
         board_reviews_table::register_table(client_cache);
+        board_rule_proposals_table::register_table(client_cache);
         board_rules_table::register_table(client_cache);
         board_staff_table::register_table(client_cache);
         board_wallets_table::register_table(client_cache);
@@ -5780,6 +5915,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_wallet_entries_table::register_table(client_cache);
         open_incidents_table::register_table(client_cache);
         organization_table::register_table(client_cache);
+        organizer_precedent_table::register_table(client_cache);
         owner_table::register_table(client_cache);
         people_link_table::register_table(client_cache);
         person_table::register_table(client_cache);
@@ -5789,6 +5925,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         policy_document_table::register_table(client_cache);
         policy_term_table::register_table(client_cache);
         property_event_table::register_table(client_cache);
+        rule_proposal_table::register_table(client_cache);
         schedule_slot_table::register_table(client_cache);
         settings_table::register_table(client_cache);
         settlement_rule_table::register_table(client_cache);
@@ -5848,6 +5985,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_merch_orders",
         "board_merch_picks",
         "board_notes",
+        "board_organizer_precedents",
         "board_photos",
         "board_policies",
         "board_policy_documents",
@@ -5855,6 +5993,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_precedents",
         "board_records",
         "board_reviews",
+        "board_rule_proposals",
         "board_rules",
         "board_staff",
         "board_wallets",
@@ -5934,6 +6073,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_wallet_entries",
         "open_incidents",
         "organization",
+        "organizer_precedent",
         "owner",
         "people_link",
         "person",
@@ -5943,6 +6083,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "policy_document",
         "policy_term",
         "property_event",
+        "rule_proposal",
         "schedule_slot",
         "settings",
         "settlement_rule",

@@ -1280,6 +1280,24 @@ export const OrganizationIn = __t.object("OrganizationIn", {
 });
 export type OrganizationIn = __Infer<typeof OrganizationIn>;
 
+export const OrganizerPrecedent = __t.object("OrganizerPrecedent", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  approvalId: __t.u64(),
+  incidentKind: __t.string(),
+  coverKind: __t.string(),
+  decision: __t.string(),
+  payoutCents: __t.u64(),
+  claimantName: __t.string(),
+  zoneName: __t.string(),
+  complications: __t.string(),
+  reason: __t.string(),
+  decidedByName: __t.string(),
+  proposalId: __t.u64(),
+  decidedAt: __t.timestamp(),
+});
+export type OrganizerPrecedent = __Infer<typeof OrganizerPrecedent>;
+
 export const Owner = __t.object("Owner", {
   identity: __t.identity(),
 });
@@ -1446,6 +1464,30 @@ export const PropertyEvent = __t.object("PropertyEvent", {
 });
 export type PropertyEvent = __Infer<typeof PropertyEvent>;
 
+export const RuleProposal = __t.object("RuleProposal", {
+  id: __t.u64(),
+  incidentKind: __t.string(),
+  coverKind: __t.string(),
+  status: __t.string(),
+  ceilingCents: __t.u64(),
+  limitCents: __t.u64(),
+  claimIds: __t.array(__t.u64()),
+  rule: __t.string(),
+  summary: __t.string(),
+  jobId: __t.u64(),
+  modelCallId: __t.u64(),
+  proposedBy: __t.identity(),
+  decidedBy: __t.identity(),
+  decidedByName: __t.string(),
+  reason: __t.string(),
+  settlementRuleId: __t.u64(),
+  ruleVersion: __t.u32(),
+  createdAt: __t.timestamp(),
+  proposedAt: __t.option(__t.timestamp()),
+  decidedAt: __t.option(__t.timestamp()),
+});
+export type RuleProposal = __Infer<typeof RuleProposal>;
+
 export const ScheduleSlot = __t.object("ScheduleSlot", {
   id: __t.u64(),
   sourceKey: __t.string(),
@@ -1515,6 +1557,7 @@ export const SettlementRuleRow = __t.object("SettlementRuleRow", {
   version: __t.u32(),
   status: __t.string(),
   createdAt: __t.timestamp(),
+  proposalId: __t.u64(),
 });
 export type SettlementRuleRow = __Infer<typeof SettlementRuleRow>;
 

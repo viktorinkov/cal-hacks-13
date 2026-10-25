@@ -1,8 +1,8 @@
-//! The named people: the approver's grid and decision, the insurer's payment
-//! and the recovery letter request.
+//! The named people: the approver's grid and decision, the organizer's call on a
+//! proposed rule, the insurer's payment and the recovery letter request.
 
 use crate::app::*;
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use bandit_bindings::*;
 use spacetimedb_sdk::Table;
 
@@ -67,33 +67,20 @@ fn decider(as_: Option<&str>) -> String {
 
 /// Shows the grid and approves with exactly what it showed (or, with `stale`,
 /// a wrong amount, to show the module failing closed).
-pub fn approve(
-    app: &App,
-    claim_id: u64,
-    as_: Option<&str>,
-    ceiling: Option<u64>,
-    learn: bool,
-    stale: bool,
-    verbose: bool,
-) -> Result<Claim> {
+pub fn approve(app: &App, claim_id: u64, as_: Option<&str>, stale: bool, verbose: bool) -> Result<Claim> {
     let g = grid(app, claim_id, verbose)?;
     let who = decider(as_);
     let conn = app.actor(&who)?;
     let name = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
     let amount = if stale { g.payout_cents + 10_000 } else { g.payout_cents };
-    let learning = match (learn, ceiling) {
-        (false, _) => "no rule learned".to_string(),
-        (true, Some(c)) => format!("learning a rule up to {}", money(c)),
-        (true, None) => format!("learning a rule up to {}", money(g.payout_cents)),
-    };
     say!(
         app,
-        "{name} approves {} on pack {}, {learning}{}",
+        "{name} approves {} on pack {}{}",
         money(amount),
         short_hash(&g.pack_hash),
         if stale { " (a stale screen, on purpose)" } else { "" }
     );
-    let sent = call!(conn, approve_claim_then(claim_id, amount, g.pack_hash.clone(), ceiling, learn));
+    let sent = call!(conn, approve_claim_then(claim_id, amount, g.pack_hash.clone()));
     if let Err(e) = sent {
         if stale {
             say!(app, "  refused, fail-closed: {e}; nothing moved");
@@ -107,20 +94,36 @@ pub fn approve(
     let c = until(5.0, || app.claim(claim_id).ok().filter(|c| c.status != ClaimStatus::Routed)).unwrap_or(app.claim(claim_id)?);
     say!(app, "  -> {}: {}", status_name(c.status), c.status_note);
     let db = app.db()?;
-    let approval = db.db.approval().iter().filter(|a| a.claim_id == claim_id && a.decision == "approve").max_by_key(|a| a.id);
-    if let Some(r) = approval.and_then(|a| db.db.settlement_rule().iter().find(|r| r.approval_id == a.id)) {
-        let zone = if r.zone_id == 0 { "any zone".to_string() } else { app.zone_name(r.zone_id) };
-        say!(
-            app,
-            "  -> learned rule v{}: {} / {} in {zone} up to {}, approved by {}",
-            r.version,
-            r.incident_kind,
-            r.cover_kind,
-            money(r.ceiling_cents),
-            r.approver_name
-        );
+    if let Some(p) = db.db.rule_proposal().iter().filter(|p| p.claim_ids.contains(&claim_id) && p.status == "proposing").max_by_key(|p| p.id) {
+        say!(app, "  -> precedent for a rule: Claude is proposing one from claims {:?}", p.claim_ids);
     }
     Ok(c)
+}
+
+/// The organizer approves Claude's proposed rule with the ceiling it shows; the module refuses whoever proposed it.
+pub fn approve_proposal(app: &App, proposal_id: u64, as_: Option<&str>) -> Result<RuleProposal> {
+    let conn = app.actor(&decider(as_))?;
+    let name = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
+    let p = app.db()?.db.rule_proposal().id().find(&proposal_id).with_context(|| format!("no proposal {proposal_id}"))?;
+    say!(app, "{name} approves the proposed rule {proposal_id}: {} up to {}, from claims {:?}", p.incident_kind, money(p.ceiling_cents), p.claim_ids);
+    call!(conn, approve_rule_proposal_then(proposal_id, p.ceiling_cents))?;
+    let p = until(5.0, || app.db().ok()?.db.rule_proposal().id().find(&proposal_id).filter(|p| p.status != "proposed")).with_context(|| format!("proposal {proposal_id} did not change"))?;
+    say!(app, "  -> {}: rule v{}", p.status, p.rule_version);
+    Ok(p)
+}
+
+/// The organizer rejects Claude's proposed rule.
+pub fn reject_proposal(app: &App, proposal_id: u64, as_: Option<&str>, reason: &str) -> Result<()> {
+    let conn = app.actor(&decider(as_))?;
+    let name = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
+    say!(app, "{name} rejects the proposed rule {proposal_id}: {reason}");
+    call!(conn, reject_rule_proposal_then(proposal_id, reason.to_string()))
+}
+
+/// Every proposed rule waiting for the organizer, approved.
+pub fn approve_proposals(app: &App) -> Result<Vec<RuleProposal>> {
+    let waiting: Vec<u64> = app.db()?.db.rule_proposal().iter().filter(|p| p.status == "proposed").map(|p| p.id).collect();
+    waiting.into_iter().map(|id| approve_proposal(app, id, None)).collect()
 }
 
 pub fn refuse(app: &App, claim_id: u64, as_: Option<&str>, reason: &str, verbose: bool) -> Result<Claim> {
