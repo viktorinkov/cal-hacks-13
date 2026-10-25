@@ -544,6 +544,38 @@ pub fn place_band(ctx: &ReducerContext, band_id: u32, x_m: f32, y_m: f32, label:
     Ok(())
 }
 
+/// Hands a presenter's band (1 to 99) to the attendee who wears it, as tapping it would: `node_id` picks an
+/// attendee, 0 adds a new one named `name`. Whoever wore the band before lets it go, and so does any band the
+/// attendee wore.
+#[spacetimedb::reducer]
+pub fn give_band(ctx: &ReducerContext, band_id: u32, node_id: u64, name: String) -> Result<(), String> {
+    require_role(ctx, &["ops", "tester"])?;
+    let radio = radio_id(band_id).filter(|b| *b != 0).ok_or("give a radio or test band, 1 to 99")?;
+    let who = if node_id != 0 {
+        ctx.db.attendee().node_id().find(node_id).ok_or("no such attendee")?
+    } else {
+        let a = ctx.db.attendee().insert(Attendee {
+            identity: Identity::from_claims("bandit-staff", &format!("attendee-{}", micros(ctx.timestamp))),
+            node_id: 0,
+            display_name: crate::social::logic::clean_name(&name)?,
+            photo_url: String::new(),
+            findable: true,
+            person_id: 0,
+            organization_id: 0,
+            crowd: false,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        });
+        crate::social::graph::relink(ctx, &a);
+        a
+    };
+    ctx.db.band_claim().band_id().delete(radio);
+    ctx.db.band_owner().band_id().delete(radio);
+    ctx.db.band_owner().owner().delete(who.identity);
+    ctx.db.band_owner().insert(BandOwner { band_id: radio, owner: who.identity, claimed_at: ctx.timestamp });
+    Ok(())
+}
+
 /// Takes a presenter's band off the floor: it goes back to standing at its radio zone.
 #[spacetimedb::reducer]
 pub fn unplace_band(ctx: &ReducerContext, band_id: u32) -> Result<(), String> {

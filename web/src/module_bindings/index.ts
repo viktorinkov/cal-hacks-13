@@ -64,6 +64,7 @@ import FileClinicReportReducer from "./file_clinic_report_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
 import ForceStateReducer from "./force_state_reducer";
 import GatewayUpReducer from "./gateway_up_reducer";
+import GiveBandReducer from "./give_band_reducer";
 import GrantRoleReducer from "./grant_role_reducer";
 import HapticReducer from "./haptic_reducer";
 import ImportEventReducer from "./import_event_reducer";
@@ -1129,6 +1130,7 @@ const reducersSchema = __reducers(
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
   __reducerSchema("force_state", ForceStateReducer),
   __reducerSchema("gateway_up", GatewayUpReducer),
+  __reducerSchema("give_band", GiveBandReducer),
   __reducerSchema("grant_role", GrantRoleReducer),
   __reducerSchema("haptic", HapticReducer),
   __reducerSchema("import_event", ImportEventReducer),

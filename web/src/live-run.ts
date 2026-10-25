@@ -10,7 +10,7 @@ import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
 import { venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
-import type { IncidentMarker, LiveRun } from './module_bindings/types';
+import type { AttendeeOut, IncidentMarker, LiveRun } from './module_bindings/types';
 
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
@@ -20,12 +20,18 @@ const HISTORY_ROWS = 60;
 let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
-/** A band to put on the floor: from the panel, with the name typed there, or one already placed. */
-type Placing = { bandId: number; label: string; fromPanel: boolean };
+/** An attendee picked to wear a band; node 0 is a new attendee by that name. */
+type Wearer = { nodeId: bigint; name: string };
+/** A band to put on the floor: from the panel, with the attendee picked there, or one already placed. */
+type Placing = { bandId: number; label: string; fromPanel: boolean; wearer?: Wearer };
 /** The band being dragged, with the tag that follows the pointer. */
 let dragging: (Placing & { tag: HTMLElement }) | undefined;
 /** The band the panel's marker drags; it follows the band list. */
 let chosenBand: number | undefined;
+/** Who wears the panel's band, and what the search for them holds. */
+let wearer: Wearer | undefined;
+let wearerSearch = '';
+const WEARER_ROWS = 8;
 let hint = '';
 /** A blue pin and ring on the floor where the dragged band lands if let go, big enough to see from afar. */
 const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.DoubleSide });
@@ -100,10 +106,15 @@ function drop(e: PointerEvent) {
     return;
   }
   hint = '';
-  // The typed name goes with the band it was typed for.
-  const typed = document.querySelector('[name="place_label"]') as HTMLInputElement | null;
-  if (d.fromPanel && typed) typed.value = '';
-  act(() => conn.reducers.placeBand({ bandId: d.bandId, xM: at.x, yM: at.z, label: d.label }));
+  // The picked attendee goes with the band they were picked for.
+  if (d.fromPanel) {
+    wearer = undefined;
+    wearerSearch = '';
+  }
+  act(async () => {
+    if (d.wearer) await conn.reducers.giveBand({ bandId: d.bandId, nodeId: d.wearer.nodeId, name: d.wearer.name });
+    await conn.reducers.placeBand({ bandId: d.bandId, xM: at.x, yM: at.z, label: d.label });
+  });
 }
 
 /** A band to drag onto the floor, blue like our bands in the 3D view. */
@@ -223,18 +234,51 @@ function placeBands() {
     chosenBand = Number((e.target as HTMLSelectElement).value);
     code.textContent = bandCode(chosenBand);
   };
-  const label = () => (document.querySelector('[name="place_label"]') as HTMLInputElement | null)?.value.trim() ?? '';
   return h('section', {},
     h('h4', {}, 'Put one of our real bands on the map'),
-    h('p', { class: 'muted' }, 'For showing the run with a band someone is wearing: pick the band, type who wears it and drag the blue band onto the floor where they stand. It stands there among the crowd, the crowd near it meets it, and its SOS and falls show like anyone else\'s. Drag a placed band again to move it.'),
+    h('p', { class: 'muted' }, 'For showing the run with a band someone is wearing: pick the band, find who wears it and drag the blue band onto the floor where they stand. The band becomes theirs. It stands there among the crowd, the crowd near it meets it, and its SOS and falls show like anyone else\'s. Drag a placed band again to move it.'),
     h('label', {}, 'Band ', h('select', { name: 'place_band', onchange: choose }, ids.map(id => h('option', { value: id, selected: id === chosenBand }, bandCode(id))))),
-    h('label', {}, 'Who wears it ', h('input', { name: 'place_label', placeholder: 'Name, e.g. the presenter', maxlength: 40 })),
-    h('p', {}, marker(code, () => ({ bandId: chosenBand!, label: label(), fromPanel: true }), 'Drag onto the floor of the 3D view')),
+    whoWears(),
+    h('p', {}, marker(code, () => ({ bandId: chosenBand!, label: wearer?.name ?? '', fromPanel: true, wearer }), 'Drag onto the floor of the 3D view')),
     hint && h('p', {}, h('b', {}, hint)),
     placed.length > 0 && h('ul', {}, placed.map(p => h('li', {},
       marker(`${bandCode(p.bandId)}${p.label ? ` (${p.label})` : ''}`, () => ({ bandId: p.bandId, label: p.label, fromPanel: false }), 'Drag to move it'),
       ` at ${p.xM.toFixed(1)}, ${p.yM.toFixed(1)} m `,
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
+}
+
+/** The attendees who tapped a band, whose name has every word of the search. The crowd is left out: they
+ *  already walk the floor with their own bands. */
+function wearerMatches(): AttendeeOut[] {
+  const words = wearerSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return [...conn.db.boardAttendees.iter()]
+    .filter(a => !a.crowd && words.every(w => `${a.displayName} ${a.organization}`.toLowerCase().includes(w)))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+/** Who wears the panel's band: an attendee found by name, or a new one with the name typed. */
+function whoWears() {
+  if (wearer) {
+    return h('p', {}, 'Who wears it: ', h('b', {}, wearer.name), wearer.nodeId === 0n && ' (new attendee)', ' ',
+      h('button', { class: 'link', onclick: () => { wearer = undefined; } }, 'Change'));
+  }
+  const list = h('ul', {});
+  const fill = () => {
+    const typed = wearerSearch.trim();
+    const matches = wearerMatches();
+    list.replaceChildren(
+      ...matches.slice(0, WEARER_ROWS).map(a => h('li', {},
+        h('button', { type: 'button', onclick: () => { wearer = { nodeId: a.nodeId, name: a.displayName }; } },
+          a.displayName || '(no name yet)', h('span', { class: 'muted' }, `${a.bandId ? `, band ${bandCode(a.bandId)}` : ''}${a.organization ? `, ${a.organization}` : ''}`)))),
+      ...(typed && !matches.some(a => a.displayName.toLowerCase() === typed.toLowerCase())
+        ? [h('li', {}, h('button', { type: 'button', onclick: () => { wearer = { nodeId: 0n, name: typed }; } }, `Add ${typed} as a new attendee`))]
+        : []));
+  };
+  fill();
+  return h('div', {},
+    h('label', {}, 'Who wears it ', h('input', { name: 'place_wearer', type: 'search', placeholder: 'Search attendees by name, e.g. yours', maxlength: 60, value: wearerSearch,
+      oninput: (e: Event) => { wearerSearch = (e.target as HTMLInputElement).value; fill(); } })),
+    list);
 }
 
 function history() {
