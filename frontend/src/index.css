@@ -1,0 +1,218 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource/instrument-serif";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Nocturne tokens. The same values live in src/lib/tokens.ts for the PixiJS renderer;
+ * tokens.test.ts fails if they drift apart.
+ */
+:root {
+  --nc-ground: #0a0a0b;
+  --nc-panel: #0e0e10;
+  --nc-raised: #151518;
+  --nc-ink: #ecebe6;
+  --nc-ink-dim: #a3a3a8;
+  --nc-ink-muted: #85858b;
+  --nc-silver: #cfd0d4;
+  --nc-champagne: #dcc79f;
+  --nc-champagne-hover: #e9d8b6;
+  --nc-red: #ff3b30;
+  --nc-aside: #ffb547;
+  --nc-caution: #f0b44c;
+  --nc-teal: #6fb7ad;
+  --nc-amber: #d6a25a;
+  --nc-green: #8cc09b;
+  --nc-grey: #55555a;
+  --nc-section-front: #b8a6ff;
+  --nc-section-floor: #93c2ff;
+  --nc-section-wing: #8fe0bf;
+  --nc-section-concourse: #ffbf94;
+  --nc-section-plaza: #f2dc8c;
+  --nc-section-food: #ff9fbf;
+  --nc-section-passage: #cfd0d4;
+
+  --nc-line: rgba(207, 208, 212, 0.14);
+  --nc-line-strong: rgba(207, 208, 212, 0.26);
+  --nc-glass: rgba(14, 14, 16, 0.9);
+
+  /* shadcn roles mapped onto Nocturne */
+  --background: var(--nc-ground);
+  --foreground: var(--nc-ink);
+  --card: var(--nc-panel);
+  --card-foreground: var(--nc-ink);
+  --popover: #141417;
+  --popover-foreground: var(--nc-ink);
+  --primary: var(--nc-champagne);
+  --primary-foreground: #17140f;
+  --secondary: rgba(236, 235, 230, 0.07);
+  --secondary-foreground: var(--nc-ink);
+  --muted: #18181b;
+  --muted-foreground: var(--nc-ink-muted);
+  --accent: rgba(236, 235, 230, 0.08);
+  --accent-foreground: var(--nc-ink);
+  --destructive: var(--nc-red);
+  --border: var(--nc-line);
+  --input: var(--nc-line-strong);
+  --ring: var(--nc-champagne);
+  --radius: 0.25rem;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif;
+
+  --color-ground: var(--nc-ground);
+  --color-panel: var(--nc-panel);
+  --color-raised: var(--nc-raised);
+  --color-ink: var(--nc-ink);
+  --color-ink-dim: var(--nc-ink-dim);
+  --color-ink-muted: var(--nc-ink-muted);
+  --color-silver: var(--nc-silver);
+  --color-champagne: var(--nc-champagne);
+  --color-champagne-hover: var(--nc-champagne-hover);
+  --color-signal: var(--nc-red);
+  --color-aside: var(--nc-aside);
+  --color-caution: var(--nc-caution);
+  --color-teal: var(--nc-teal);
+  --color-amber: var(--nc-amber);
+  --color-help: var(--nc-green);
+  --color-line: var(--nc-line);
+  --color-line-strong: var(--nc-line-strong);
+  --color-section-front: var(--nc-section-front);
+  --color-section-floor: var(--nc-section-floor);
+  --color-section-wing: var(--nc-section-wing);
+  --color-section-concourse: var(--nc-section-concourse);
+  --color-section-plaza: var(--nc-section-plaza);
+  --color-section-food: var(--nc-section-food);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --animate-breath: nc-breath 2.2s ease-in-out infinite;
+  --animate-blink: nc-blink 0.9s steps(1) infinite;
+  --animate-flash: nc-flash 1s steps(1) infinite;
+  --animate-scan: nc-scan 1.6s ease-in-out infinite;
+}
+
+@keyframes nc-breath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes nc-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.2; }
+}
+/* SOS: triple flash each second, as the band does */
+@keyframes nc-flash {
+  0%, 9% { opacity: 1; }
+  10%, 19% { opacity: 0.15; }
+  20%, 29% { opacity: 1; }
+  30%, 39% { opacity: 0.15; }
+  40%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+@keyframes nc-eq {
+  0% { transform: scaleY(0.25); }
+  100% { transform: scaleY(1); }
+}
+@keyframes nc-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    overflow: hidden;
+    font-feature-settings: 'ss01', 'tnum';
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 1px solid var(--nc-champagne);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Floating panels over the map: solid enough to read, the map still shows at the edges. */
+  .nc-panel {
+    background: var(--nc-glass);
+    box-shadow: 0 0 0 1px var(--nc-line), 0 24px 60px rgba(0, 0, 0, 0.45);
+    border-radius: 4px;
+  }
+  /* Hazard-tape stripes mark anything simulated, so it never passes for a live measurement. */
+  .nc-sim-stripes {
+    background-image: repeating-linear-gradient(-45deg, rgba(184, 166, 255, 0.28) 0 4px, transparent 4px 8px);
+  }
+  .nc-sim-bar {
+    background-image: repeating-linear-gradient(-45deg, #b8a6ff 0 6px, #1a1630 6px 12px);
+  }
+  .nc-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    will-change: transform;
+    white-space: nowrap;
+  }
+  .nc-halo-text {
+    text-shadow: 0 0 3px #111317, 0 0 8px #111317, 0 0 14px #111317;
+  }
+  .nc-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(207, 208, 212, 0.2) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
