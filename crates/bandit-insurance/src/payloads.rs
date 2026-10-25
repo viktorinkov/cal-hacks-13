@@ -60,7 +60,7 @@ pub struct VerifyPayload {
     /// True when staff named the attendee who broke or took it.
     #[serde(default)]
     pub responsible_named: bool,
-    /// The attendee's own policy document (`attendee_policy.document_hash`), empty when none is on file.
+    /// SHA-256 of the claimant's newest read health plan PDF, empty when none is on file.
     #[serde(default)]
     pub attendee_policy_hash: String,
     /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
@@ -126,12 +126,16 @@ pub struct ReviewPayload {
     /// The charge staff proposed on this incident, when they named someone.
     #[serde(default)]
     pub charge: Option<ChargeBrief>,
-    /// The attendee's own policy document, empty when none is on file: Claude's policy search covers it too.
+    /// SHA-256 of the claimant's newest read health plan PDF, empty when none is on file: Claude's policy search covers it too.
     #[serde(default)]
     pub attendee_policy_hash: String,
     /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
     #[serde(default)]
     pub venue_policy_hash: String,
+    /// What the attendee's own health plan pays first when the venue's cover is
+    /// excess: the covered lines less the copay the cover pays; 0 otherwise.
+    #[serde(default)]
+    pub plan_pays_cents: Cents,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

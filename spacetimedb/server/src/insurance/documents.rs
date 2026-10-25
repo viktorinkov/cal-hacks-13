@@ -9,7 +9,7 @@ use super::*;
 use crate::jobs::{self, Job, blob_ref};
 use crate::roles::*;
 use bandit_insurance::policy::{
-    CheckedTerm, DocumentReadPayload, KIND_DOCUMENT_READ, PolicyRead, TermStatus, VENUE_POLICY, check_policy, effective,
+    CheckedTerm, DocumentReadPayload, HEALTH_PLAN, KIND_DOCUMENT_READ, PolicyRead, TermStatus, VENUE_POLICY, check_policy, effective,
 };
 use bandit_insurance::{CoverKind, policy};
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
@@ -177,6 +177,26 @@ pub fn apply_document_terms(ctx: &ReducerContext, job_id: u64, read_json: String
     }
     for old in ctx.db.policy_term().document_id().filter(doc.id) {
         ctx.db.policy_term().id().delete(old.id);
+    }
+    if doc.kind == HEALTH_PLAN {
+        // The plan's copays: what it leaves the attendee for a visit, which an excess cover pays.
+        for (name, item, cents) in read.printed.checked_copays(&pages) {
+            ctx.db.policy_term().insert(PolicyTerm {
+                id: 0,
+                document_id: doc.id,
+                cover_kind: String::new(),
+                name: name.into(),
+                code: String::new(),
+                value: cents.to_string(),
+                shown: bandit_insurance::money::format_cents(cents),
+                read_value: item.text.clone(),
+                quote: item.text,
+                page: item.page,
+                clause_id: String::new(),
+                status: "read".into(),
+                problem: String::new(),
+            });
+        }
     }
     if doc.kind == VENUE_POLICY {
         for t in &checked.terms {
@@ -355,6 +375,31 @@ pub fn venue_policy_hash(ctx: &ReducerContext, policy_id: u64) -> String {
         .max_by_key(|d| d.confirmed_at.map(micros).unwrap_or(0))
         .map(|d| d.file_hash)
         .unwrap_or_default()
+}
+
+/// The attendee's newest read health plan, which the plan lookup found at sign-up.
+fn attendee_plan(ctx: &ReducerContext, attendee: Option<Identity>) -> Option<PolicyDocument> {
+    let attendee = attendee?;
+    ctx.db
+        .policy_document()
+        .iter()
+        .filter(|d| d.kind == HEALTH_PLAN && d.attendee == Some(attendee) && d.status == "read")
+        .max_by_key(|d| d.read_at.map(micros).unwrap_or(0))
+}
+
+/// The SHA-256 of the attendee's health plan PDF, whose clauses the Evidence
+/// Engine searches with the venue's; empty when none is on file or it has no clauses.
+pub fn attendee_plan_hash(ctx: &ReducerContext, attendee: Option<Identity>) -> String {
+    attendee_plan(ctx, attendee).filter(|d| d.clause_count > 0).map(|d| d.file_hash).unwrap_or_default()
+}
+
+/// What the attendee's health plan leaves them to pay for the visit a hospital
+/// report of `document_kind` records: its copay, in cents; none for first aid,
+/// with no plan on file, or when the plan prints no copay for that visit.
+pub fn plan_copay(ctx: &ReducerContext, attendee: Option<Identity>, document_kind: &str) -> Option<u64> {
+    let term = bandit_insurance::printed::copay_term(document_kind)?;
+    let plan = attendee_plan(ctx, attendee)?;
+    ctx.db.policy_term().document_id().filter(plan.id).find(|t| t.name == term && t.status == "read").and_then(|t| t.value.parse().ok())
 }
 
 /// The policy's schedule of benefits, or the default schedule when it states none.

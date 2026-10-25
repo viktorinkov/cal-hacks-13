@@ -39,7 +39,7 @@ pub fn upsert_insurance_policy(
                 medical_used_cents: 0,
                 property_used_cents: 0,
                 updated_at: ctx.timestamp,
-                other_insurance: "primary".into(),
+                other_insurance: "excess".into(),
                 staff_excluded: true,
                 period_checked: false,
             });

@@ -11,7 +11,7 @@ use crate::venue::zone;
 use crate::roles::*;
 use crate::safety::*;
 use bandit_insurance::complications::{ClaimState, Complication, complications};
-use bandit_insurance::coverage::{Amounts, compute_amounts};
+use bandit_insurance::coverage::{Amounts, compute_amounts, venue_share};
 use bandit_insurance::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
 use bandit_insurance::letters::LetterData;
 use bandit_insurance::medical::{ValidRecord, validate_record};
@@ -54,17 +54,43 @@ fn with_amounts(claim: Claim, a: Amounts) -> Claim {
     }
 }
 
-/// Amounts from the current coverage rule: the record's covered lines for an
-/// injury, the staff's logged cost (the repair or the item's value) for everything else.
+/// Amounts from the current coverage rule: for an injury, the venue's share of
+/// the record's covered lines (`plan_share`); the staff's logged cost (the
+/// repair or the item's value) for everything else.
 fn current_amounts(ctx: &ReducerContext, claim: &Claim) -> Option<Amounts> {
     let cover = cover_of(claim);
     let rule = policy_rule(ctx, claim.policy_id, cover)?;
-    let cost = if cover == CoverKind::MedicalPayments {
-        extracted_record(ctx, claim.id).map(|r| r.covered_cents).unwrap_or(0)
-    } else {
-        logged_cost(ctx, claim.incident_id)
-    };
+    let cost = if cover == CoverKind::MedicalPayments { plan_share(ctx, claim).map(|s| s.venue_cents).unwrap_or(0) } else { logged_cost(ctx, claim.incident_id) };
     Some(compute_amounts(cost, &core_rule(&rule), used_cents(ctx, claim)))
+}
+
+/// How an injury's covered lines split between the attendee's own health plan and the venue's cover.
+pub(super) struct PlanShare {
+    /// What the record's lines cover under the venue fee schedule.
+    pub covered_cents: u64,
+    /// What the venue's cover owes: all of it, or under an excess cover the copay the plan leaves.
+    pub venue_cents: u64,
+    /// The plan's copay for the visit; 0 when none applies.
+    pub copay_cents: u64,
+    /// `urgent care` or `emergency room`, the visit the copay is for.
+    pub visit: &'static str,
+}
+
+impl PlanShare {
+    /// What the attendee's plan pays first.
+    pub fn plan_cents(&self) -> u64 {
+        self.covered_cents - self.venue_cents
+    }
+}
+
+/// The split of an injury claim's extracted record; none before the record is read.
+pub(super) fn plan_share(ctx: &ReducerContext, claim: &Claim) -> Option<PlanShare> {
+    let r = extracted_record(ctx, claim.id)?;
+    let other = ctx.db.insurance_policy().id().find(claim.policy_id).map(|p| p.other_insurance).unwrap_or_default();
+    let copay = super::documents::plan_copay(ctx, claim.claimant, &r.document_kind);
+    let venue_cents = venue_share(r.covered_cents, &other, copay);
+    let visit = if r.document_kind == "emergency_record" { "emergency room" } else { "urgent care" };
+    Some(PlanShare { covered_cents: r.covered_cents, venue_cents, copay_cents: copay.unwrap_or(0), visit })
 }
 
 /// What staff logged on the incident's notes: the repair cost or the item's value.
@@ -258,7 +284,7 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance:
         },
         cost_cents: if cover_of(claim) != CoverKind::MedicalPayments { claim.cost_cents } else { 0 },
         responsible_named: input.responsible.is_some(),
-        attendee_policy_hash: String::new(),
+        attendee_policy_hash: super::documents::attendee_plan_hash(ctx, claim.claimant),
         venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
@@ -420,6 +446,9 @@ pub(super) fn apply_record(ctx: &ReducerContext, claim: Claim, record: MedicalRe
     if let Some(r) = ctx.db.medical_record().id().find(record.id) {
         crate::live::record_read(ctx, &claim, &r);
     }
+    if let Some(s) = plan_share(ctx, &claim).filter(|s| s.plan_cents() > 0) {
+        crate::live::plan_pays_first(ctx, &claim, s.plan_cents(), s.copay_cents, s.visit);
+    }
     rebuild(ctx, claim)?;
     Ok(())
 }
@@ -445,7 +474,7 @@ pub fn submit_claim_checks(ctx: &ReducerContext, job_id: u64, checks: Vec<CheckI
         store_check(ctx, claim.id, claim.pack_version, &check);
     }
     let failed: Vec<String> = checks.iter().filter(|c| c.result == "fail").map(|c| c.name.replace('_', " ")).collect();
-    crate::live::checks_done(ctx, &claim, &failed, clauses.len());
+    crate::live::checks_done(ctx, &claim, &failed, clauses.len(), clauses.iter().any(|k| k.policy == "attendee"));
     for k in clauses {
         ctx.db.claim_clause().insert(ClaimClause {
             id: 0,
@@ -493,6 +522,16 @@ fn core_lines(ctx: &ReducerContext, claim_id: u64) -> Vec<LineDecision> {
         .collect()
 }
 
+/// Which insurance pays first for an injury, from the venue's other-insurance term.
+fn pays_first(ctx: &ReducerContext, policy_id: u64) -> &'static str {
+    match ctx.db.insurance_policy().id().find(policy_id).map(|p| p.other_insurance) {
+        Some(o) if o == "excess" => {
+            "It is excess over other insurance: the attendee's own health plan pays first, and this cover pays only what the plan leaves."
+        }
+        _ => "It is primary: it pays first, whatever other insurance the attendee has.",
+    }
+}
+
 fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     let Some(r) = policy_rule(ctx, claim.policy_id, cover_of(claim)) else {
         return "no cover".into();
@@ -507,10 +546,11 @@ fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     }
     if cover_of(claim) == CoverKind::MedicalPayments {
         format!(
-            "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to {} per claim and {} for the event, services within {} days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event.",
+            "Venue general liability, medical payments cover: pays reasonable first-aid and medical costs for a guest hurt on the venue's premises during the event, no fault needed, up to {} per claim and {} for the event, services within {} days of the incident, each service capped by the venue fee schedule. It does not pay for injuries that happened elsewhere or before the event. {}",
             f(r.per_claim_limit_cents),
             f(r.aggregate_limit_cents),
-            r.service_window_days
+            r.service_window_days,
+            pays_first(ctx, claim.policy_id)
         )
     } else {
         format!(
@@ -554,8 +594,9 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         policy_summary: policy_summary(ctx, claim),
         claimant_statement: claim.statement.clone(),
         charge: super::charges::brief(ctx, claim),
-        attendee_policy_hash: String::new(),
+        attendee_policy_hash: super::documents::attendee_plan_hash(ctx, claim.claimant),
         venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
+        plan_pays_cents: if cover_of(claim) == CoverKind::MedicalPayments { plan_share(ctx, claim).map(|s| s.plan_cents()).unwrap_or(0) } else { 0 },
     }
 }
 

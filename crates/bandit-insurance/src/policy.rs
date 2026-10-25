@@ -50,7 +50,8 @@ pub const OTHER_INSURANCE: [&str; 2] = ["primary", "excess"];
 pub const MAX_SERVICE_WINDOW_DAYS: u32 = 730;
 
 /// What `bandit-read-document` returns for a venue policy, in the shape its
-/// JSON schema asks for.
+/// JSON schema asks for, or for an attendee's health plan: what it prints about
+/// itself, and its clauses.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PolicyRead {
     #[serde(default)]
@@ -61,6 +62,9 @@ pub struct PolicyRead {
     pub exclusions: Vec<ExclusionRead>,
     #[serde(default)]
     pub clauses: Vec<ClauseRead>,
+    /// A health plan's own insurer, plan and copays; empty for a venue policy.
+    #[serde(default)]
+    pub printed: crate::printed::PlanPrinted,
 }
 
 /// One term as printed: `value` is the text, such as `$5,000`, `365 days` or `2026-10-01`.
@@ -769,6 +773,7 @@ pub mod fixtures {
                 },
                 ClauseRead { section: "exclusions".into(), page: 2, text: "This insurance does not apply to bodily injury to any employee or volunteer of the insured.".into() },
             ],
+            ..Default::default()
         }
     }
 }

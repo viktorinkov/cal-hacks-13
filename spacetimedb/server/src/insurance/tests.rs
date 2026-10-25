@@ -1248,3 +1248,89 @@ fn a_policy_that_cannot_be_read_is_marked_failed() {
     assert!(w.try_as("ops", |ctx| documents::confirm_policy_terms(ctx, doc.id)).is_err());
     assert!(w.try_as("ops", |ctx| documents::submit_policy_document(ctx, "ef".repeat(32), 2)).is_err(), "the file must be stored first");
 }
+
+/// An attendee's health plan PDF, filed by the plan lookup and read: one
+/// other-insurance clause and a $55 urgent care copay.
+fn file_plan(w: &World, who: &str, hash: &str, read: bool) {
+    w.as_("ops", |ctx| register_blob(ctx, hash.into(), Some(id(who)), "owner_only".into(), "other".into(), "application/pdf".into(), 9000));
+    let doc = documents::DocumentIn {
+        kind: bandit_insurance::policy::HEALTH_PLAN.into(),
+        attendee: Some(id(who)),
+        file_hash: hash.into(),
+        page_count: 1,
+        source: "plan_lookup".into(),
+        source_url: "https://plans.test/sbc.pdf".into(),
+    };
+    let doc_id = w.as_("worker", |ctx| documents::queue_document_read(ctx, doc));
+    if !read {
+        return;
+    }
+    let job = w.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, doc_id);
+    let clause = "This plan pays after any medical payments coverage.";
+    let page = format!("Urgent care $55 copay/visit. Emergency room care 20% coinsurance. Coordination of benefits. {clause}");
+    let answer = serde_json::json!({
+        "printed": {"urgent_care_copay": {"text": "$55", "page": 1}, "emergency_room_copay": {"text": "20% coinsurance", "page": 1}},
+        "clauses": [{"section": "other_insurance", "page": 1, "text": clause}]
+    });
+    w.as_("worker", |ctx| documents::apply_document_terms(ctx, job.id, answer.to_string(), vec![page]));
+}
+
+fn set_other_insurance(w: &World, other: &str) {
+    let mut policy = w.t.db.insurance_policy().iter().next().unwrap();
+    policy.other_insurance = other.into();
+    w.t.db.insurance_policy().id().update(policy);
+}
+
+/// Jordan's urgent care visit with his own plan on file: the lines cover
+/// $895.00, his plan pays $840.00 of it first, and the venue's excess cover
+/// pays only the $55.00 copay the plan leaves him.
+#[test]
+fn the_attendees_own_plan_pays_first_and_the_venue_only_the_copay() {
+    let w = World::new();
+    let plan = "4b".repeat(32);
+    file_plan(&w, "Jordan Alvarez", &plan, true);
+    file_plan(&w, "Maya Chen", &"5c".repeat(32), true);
+    file_plan(&w, "Lee Park", &"6d".repeat(32), false);
+    assert_eq!(w.as_("ops", |ctx| Ok(documents::attendee_plan_hash(ctx, Some(id("Lee Park"))))), "", "a plan still being read is not searched");
+    assert_eq!(w.t.db.insurance_policy().iter().next().unwrap().other_insurance, "excess", "the seeded venue policy pays second");
+
+    let claim = w.injury_claim(w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]));
+    w.file_record(claim.id, URGENT_CARE, 2);
+    let c = w.claim(claim.id);
+    assert_eq!((c.cost_cents, c.payout_cents, c.recoverable_cents, c.venue_cost_cents), (5_500, 5_500, 5_500, 0));
+    assert!(w.history(claim.id).contains(&("Decision Engine".into(), "Jordan Alvarez's health plan pays $840.00 first".into())), "{:?}", w.history(claim.id));
+    let verify: VerifyPayload = serde_json::from_str(&w.open_job(KIND_VERIFY, claim.id).payload).unwrap();
+    assert_eq!((verify.attendee_policy_hash.as_str(), verify.covered_cents, verify.payout_cents), (plan.as_str(), 89_500, 5_500), "Jordan's own plan, not Maya's");
+    w.verify(claim.id);
+    let review: ReviewPayload = serde_json::from_str(&w.open_job(KIND_REVIEW, claim.id).payload).unwrap();
+    assert_eq!((review.attendee_policy_hash.as_str(), review.plan_pays_cents), (plan.as_str(), 84_000));
+    assert!(review.policy_summary.ends_with("the attendee's own health plan pays first, and this cover pays only what the plan leaves."), "{}", review.policy_summary);
+    w.claude_pays(claim.id);
+    let c = w.claim(claim.id);
+    assert!(c.status_note.starts_with("Claude would pay $55.00"), "{}", c.status_note);
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
+    w.pay(claim.id);
+    assert_eq!(w.ledger(claim.id)[0], ("J1 reserve".into(), "claims_expense".into(), 5_500, 0));
+}
+
+/// First aid has no copay, so the venue's excess cover still pays all of it;
+/// and a primary cover pays first whatever plan the attendee has.
+#[test]
+fn first_aid_and_a_primary_cover_pay_all_the_covered_lines() {
+    let w = World::new();
+    file_plan(&w, "Maya Chen", &"5c".repeat(32), true);
+    file_plan(&w, "Jordan Alvarez", &"4b".repeat(32), true);
+    let maya = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record(maya.id, FIRST_AID, 1);
+    assert_eq!(w.claim(maya.id).payout_cents, 18_000);
+
+    set_other_insurance(&w, "primary");
+    w.advance(3600);
+    let jordan = w.injury_claim(w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]));
+    w.file_record(jordan.id, URGENT_CARE, 2);
+    assert_eq!(w.claim(jordan.id).payout_cents, 89_500);
+    w.verify(jordan.id);
+    let review: ReviewPayload = serde_json::from_str(&w.open_job(KIND_REVIEW, jordan.id).payload).unwrap();
+    assert_eq!(review.plan_pays_cents, 0);
+    assert!(review.policy_summary.ends_with("It is primary: it pays first, whatever other insurance the attendee has."), "{}", review.policy_summary);
+}
