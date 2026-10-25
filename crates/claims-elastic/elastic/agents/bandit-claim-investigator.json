@@ -1,5 +1,5 @@
 {
-  "id": "bandit-claim-investigator",
+  "id": "bandit-claim-investigator-v3",
   "name": "Band1t claim investigator",
   "description": "Investigates one claim through the worker's bounded evidence and policy tool bridge. Recommends a decision; SpacetimeDB enforces payment authority.",
   "labels": ["bandit"],
