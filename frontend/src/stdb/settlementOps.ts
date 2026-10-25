@@ -273,6 +273,7 @@ interface SettlementState {
   claims: Record<string, SettleClaim>
   reviews: Record<string, ClaimReview>
   records: Record<string, ClaimRecord>
+  extractedRecords: Record<string, ClaimRecord>
   clinicReports: Record<string, ClinicReport>
   approvals: Record<string, ClaimApproval[]>
   clauses: Record<string, ClaimClause[]>
@@ -301,6 +302,7 @@ type Rows = Pick<
   | 'claims'
   | 'reviews'
   | 'records'
+  | 'extractedRecords'
   | 'clinicReports'
   | 'approvals'
   | 'clauses'
@@ -327,6 +329,7 @@ const EMPTY_ROWS: Rows = {
   claims: {},
   reviews: {},
   records: {},
+  extractedRecords: {},
   clinicReports: {},
   approvals: {},
   clauses: {},
@@ -526,28 +529,28 @@ export function readSettlement(): void {
     }
   }
 
-  const records = latest<ClaimRecord>(
-    rowsOf(db.boardRecords).map((row) => ({
-      id: idOf(row.id),
-      claimId: idOf(row.claimId),
-      fileHash: text(row.fileHash),
-      pageCount: num(row.pageCount),
-      status: text(row.status),
-      documentKind: text(row.documentKind),
-      patientName: text(row.patientName),
-      providerName: text(row.providerName),
-      dateOfService: text(row.dateOfService),
-      invoiceNumber: text(row.invoiceNumber),
-      reasonForVisit: text(row.reasonForVisit),
-      history: text(row.history),
-      diagnoses: strings(row.diagnoses),
-      billedCents: num(row.billedCents),
-      coveredCents: num(row.coveredCents),
-      dropped: strings(row.dropped),
-      submittedAt: millisOf(row.submittedAt),
-      extractedAt: millisOf(row.extractedAt),
-    })),
-  )
+  const recordRows: ClaimRecord[] = rowsOf(db.boardRecords).map((row) => ({
+    id: idOf(row.id),
+    claimId: idOf(row.claimId),
+    fileHash: text(row.fileHash),
+    pageCount: num(row.pageCount),
+    status: text(row.status),
+    documentKind: text(row.documentKind),
+    patientName: text(row.patientName),
+    providerName: text(row.providerName),
+    dateOfService: text(row.dateOfService),
+    invoiceNumber: text(row.invoiceNumber),
+    reasonForVisit: text(row.reasonForVisit),
+    history: text(row.history),
+    diagnoses: strings(row.diagnoses),
+    billedCents: num(row.billedCents),
+    coveredCents: num(row.coveredCents),
+    dropped: strings(row.dropped),
+    submittedAt: millisOf(row.submittedAt),
+    extractedAt: millisOf(row.extractedAt),
+  }))
+  const records = latest(recordRows)
+  const extractedRecords = latest(recordRows.filter((row) => row.status === 'extracted'))
 
   const clinicReports = latest<ClinicReport>(
     rowsOf(db.boardClinicReports).map((row) => ({
@@ -811,6 +814,7 @@ export function readSettlement(): void {
     claims,
     reviews,
     records,
+    extractedRecords,
     clinicReports,
     approvals,
     clauses,

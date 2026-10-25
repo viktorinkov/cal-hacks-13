@@ -169,6 +169,20 @@ describe('settlement store', () => {
     expect(subscribed.filter((query) => query === 'SELECT * FROM claim_clauses(15)')).toHaveLength(1)
   })
 
+  it('keeps the latest extracted bill for costs while a newer record is pending', () => {
+    attachLink(fakeConnection(claimTables({
+      boardRecords: [
+        { id: 1n, claimId: 15n, status: 'extracted', billedCents: 10000n },
+        { id: 2n, claimId: 15n, status: 'extracted', billedCents: 12000n },
+        { id: 3n, claimId: 15n, status: 'pending', billedCents: 0n },
+      ],
+    })).conn)
+    expect(useSettlement.getState().records['15']).toMatchObject({ id: '3', status: 'pending' })
+    expect(useSettlement.getState().extractedRecords['15']).toMatchObject({ id: '2', billedCents: 12000 })
+    dropLink()
+    expect(useSettlement.getState().extractedRecords).toEqual({})
+  })
+
   it('clears the store when the socket closes', () => {
     attachLink(fakeConnection(claimTables()).conn)
     expect(useSettlement.getState().claims['15']).toBeDefined()
