@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920">
+<rect width="1600" height="920" fill="#ffffff"/>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2e8d71"/></marker></defs>
+<text x="45" y="53" font-family="Excalifont, Arial, sans-serif" font-size="40" fill="#24333d">Leaving the venue</text>
+<rect x="45" y="100" width="1510" height="115" rx="18" fill="#e2eef8" stroke="transparent"/>
+<ellipse cx="105.0" cy="126.0" rx="9.0" ry="9.0" fill="#326285"/>
+<rect x="93.0" y="139.5" width="24.0" height="32.25" rx="10" fill="#326285" stroke="transparent"/>
+<polyline points="99.0,168.75 95.25,187.5" fill="none" stroke="#326285" stroke-width="6.75" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="111.0,168.75 114.75,187.5" fill="none" stroke="#326285" stroke-width="6.75" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="165" y="158.0" font-family="Excalifont, Arial, sans-serif" font-size="34" fill="#24333d" text-anchor="start">The organizer starts an evacuation</text>
+<text x="165" y="193.0" font-family="Excalifont, Arial, sans-serif" font-size="25" fill="#4a6070" text-anchor="start">Groups head to their nearest exit.</text>
+<rect x="45" y="250" width="965" height="595" rx="24" fill="#f4f6f4" stroke="#d6ddd6"/>
+<text x="82" y="303.0" font-family="Excalifont, Arial, sans-serif" font-size="30" fill="#24333d" text-anchor="start">Follow the venue paths</text>
+<rect x="230" y="364" width="150" height="93" rx="18" fill="#dde5de" stroke="transparent"/>
+<rect x="230" y="649" width="150" height="90" rx="18" fill="#dde5de" stroke="transparent"/>
+<rect x="505" y="364" width="150" height="93" rx="18" fill="#dde5de" stroke="transparent"/>
+<rect x="505" y="649" width="150" height="90" rx="18" fill="#dde5de" stroke="transparent"/>
+<rect x="780" y="364" width="150" height="93" rx="18" fill="#dde5de" stroke="transparent"/>
+<rect x="780" y="649" width="150" height="90" rx="18" fill="#dde5de" stroke="transparent"/>
+<text x="305" y="416.0" font-family="Excalifont, Arial, sans-serif" font-size="23" fill="#667567" text-anchor="middle">Booths</text>
+<text x="580" y="416.0" font-family="Excalifont, Arial, sans-serif" font-size="23" fill="#667567" text-anchor="middle">Booths</text>
+<text x="855" y="416.0" font-family="Excalifont, Arial, sans-serif" font-size="23" fill="#667567" text-anchor="middle">Booths</text>
+<rect x="80" y="500" width="130" height="70" rx="10" fill="#16705b" stroke="transparent"/>
+<text x="145" y="542.0" font-family="Excalifont, Arial, sans-serif" font-size="28" fill="#ffffff" text-anchor="middle">EXIT</text>
+<text x="145" y="600.0" font-family="Excalifont, Arial, sans-serif" font-size="22" fill="#476458" text-anchor="middle">West exit</text>
+<rect x="825" y="500" width="130" height="70" rx="10" fill="#16705b" stroke="transparent"/>
+<text x="890" y="542.0" font-family="Excalifont, Arial, sans-serif" font-size="28" fill="#ffffff" text-anchor="middle">EXIT</text>
+<text x="890" y="600.0" font-family="Excalifont, Arial, sans-serif" font-size="22" fill="#476458" text-anchor="middle">East exit</text>
+<polyline points="430,615 430,545 220,545" fill="none" stroke="#2e8d71" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#head)"/>
+<polyline points="705,615 705,545 812,545" fill="none" stroke="#2e8d71" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#head)"/>
+<ellipse cx="399.0" cy="621.6" rx="9.600000000000001" ry="9.600000000000001" fill="#3b7daa"/>
+<rect x="386.2" y="636.0" width="25.6" height="34.4" rx="10" fill="#3b7daa" stroke="transparent"/>
+<polyline points="392.6,667.2 388.6,687.2" fill="none" stroke="#3b7daa" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="405.4,667.2 409.4,687.2" fill="none" stroke="#3b7daa" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="461.0" cy="621.6" rx="9.600000000000001" ry="9.600000000000001" fill="#3b7daa"/>
+<rect x="448.2" y="636.0" width="25.6" height="34.4" rx="10" fill="#3b7daa" stroke="transparent"/>
+<polyline points="454.6,667.2 450.6,687.2" fill="none" stroke="#3b7daa" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="467.4,667.2 471.4,687.2" fill="none" stroke="#3b7daa" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="430.0" cy="611.4" rx="11.399999999999999" ry="11.399999999999999" fill="#3b7daa"/>
+<rect x="414.8" y="628.5" width="30.4" height="40.85" rx="10" fill="#3b7daa" stroke="transparent"/>
+<polyline points="422.4,665.55 417.65,689.3" fill="none" stroke="#3b7daa" stroke-width="8.549999999999999" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="437.6,665.55 442.35,689.3" fill="none" stroke="#3b7daa" stroke-width="8.549999999999999" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="674.0" cy="621.6" rx="9.600000000000001" ry="9.600000000000001" fill="#7870a9"/>
+<rect x="661.2" y="636.0" width="25.6" height="34.4" rx="10" fill="#7870a9" stroke="transparent"/>
+<polyline points="667.6,667.2 663.6,687.2" fill="none" stroke="#7870a9" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="680.4,667.2 684.4,687.2" fill="none" stroke="#7870a9" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="736.0" cy="621.6" rx="9.600000000000001" ry="9.600000000000001" fill="#7870a9"/>
+<rect x="723.2" y="636.0" width="25.6" height="34.4" rx="10" fill="#7870a9" stroke="transparent"/>
+<polyline points="729.6,667.2 725.6,687.2" fill="none" stroke="#7870a9" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="742.4,667.2 746.4,687.2" fill="none" stroke="#7870a9" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="705.0" cy="611.4" rx="11.399999999999999" ry="11.399999999999999" fill="#7870a9"/>
+<rect x="689.8" y="628.5" width="30.4" height="40.85" rx="10" fill="#7870a9" stroke="transparent"/>
+<polyline points="697.4,665.55 692.65,689.3" fill="none" stroke="#7870a9" stroke-width="8.549999999999999" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="712.6,665.55 717.35,689.3" fill="none" stroke="#7870a9" stroke-width="8.549999999999999" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1050" y="250" width="505" height="595" rx="24" fill="#fff0ea" stroke="#ead6ce"/>
+<text x="1082" y="303.0" font-family="Excalifont, Arial, sans-serif" font-size="30" fill="#24333d" text-anchor="start">Help comes first</text>
+<ellipse cx="1193.0" cy="372.6" rx="12.600000000000001" ry="12.600000000000001" fill="#318874"/>
+<rect x="1176.2" y="391.5" width="33.6" height="45.15" rx="10" fill="#318874" stroke="transparent"/>
+<polyline points="1184.6,432.45 1179.35,458.7" fill="none" stroke="#318874" stroke-width="9.450000000000001" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1201.4,432.45 1206.65,458.7" fill="none" stroke="#318874" stroke-width="9.450000000000001" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1182.5" y="407.25" width="21.0" height="6.300000000000001" rx="0" fill="#ffffff" stroke="transparent"/>
+<rect x="1189.85" y="399.9" width="6.300000000000001" height="21.0" rx="0" fill="#ffffff" stroke="transparent"/>
+<ellipse cx="1345.0" cy="387.0" rx="14.0" ry="14.0" fill="#bf6655"/>
+<rect x="1325" y="410" width="40" height="48" rx="10" fill="#bf6655" stroke="transparent"/>
+<polyline points="1338,453 1370,453 1370,483" fill="none" stroke="#bf6655" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1319,466 1379,466" fill="none" stroke="#caa394" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1302" y="536.0" font-family="Excalifont, Arial, sans-serif" font-size="27" fill="#24333d" text-anchor="middle">Injured attendees</text>
+<text x="1302" y="569.75" font-family="Excalifont, Arial, sans-serif" font-size="27" fill="#24333d" text-anchor="middle">wait for help.</text>
+<polyline points="1302,606 1302,668" fill="none" stroke="#2e8d71" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#head)"/>
+<text x="1302" y="727.0" font-family="Excalifont, Arial, sans-serif" font-size="25" fill="#24333d" text-anchor="middle">After the incident is resolved,</text>
+<text x="1302" y="758.25" font-family="Excalifont, Arial, sans-serif" font-size="25" fill="#24333d" text-anchor="middle">they leave too.</text>
+<text x="45" y="892.0" font-family="Excalifont, Arial, sans-serif" font-size="20" fill="#68756f" text-anchor="start">Behavior illustration • paths and positions are illustrative</text>
+</svg>

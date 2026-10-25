@@ -1,0 +1,62 @@
+BandIt sponsor setup — October 23, 2026 (Pacific time)
+
+Scope: accounts, sponsor credits, cloud projects, API credentials, and team access for the six services you named. Reviewed all six sponsor Slack channels, relevant Hive resources/email, and 22 event photos with OCR/QR extraction.
+
+Credentials
+The project .env contains verified Nessie, Bright Data, Elasticsearch, and Kibana/Agent Builder API keys, plus the actual Spacetime database connection and Bright Data zone. It is permission 600 and ignored by Git. .env.example contains the same connection settings with secret values blank.
+Anthropic fields remain blank in this file: you confirmed that Anthropic is already set up and asked that it be left alone. Its existing credentials were not copied or replaced.
+
+SpacetimeDB — completed
+Signed in as GitHub viktorinkov. Redeemed CALHACKS13 for 100,000 TeV; the redemption screen confirmed a 102,500 TeV balance before the empty database began using credits. Redeemed credits do not expire.
+Created the empty cloud database bandit-calhacks13-sp82j, with no application tables. Connection: https://maincloud.spacetimedb.com . Spacetime uses identity authentication; no static dashboard API key was exported.
+All three teammates have pending Developer invitations directly to this database. This fits the free collaborator allowance, so a paid Team organization was unnecessary; its payment flow was not completed.
+Dashboard: https://spacetimedb.com/@viktorinkov/bandit-calhacks13-sp82j
+Credit source: IMG_2116.HEIC; https://spacetimedb.com/redeem
+A separate pinned offer advertises up to $50,000 of startup credits and free Team access for eligible accelerator startups. Eligibility is unverified, so no eligibility claim/application was submitted: https://spacetimedb.com/startups
+
+Capital One Nessie — completed
+GitHub sign-in succeeded. Saved the personal sandbox API key. Base URL: https://prod-api.nessieisreal.com . A read-only GET /customers returned HTTP 200.
+Nessie provides mock banking data; no monetary credit redemption or organization invitation feature was identified.
+Account: https://prod.nessieisreal.com/profile
+Sponsor instructions: https://cal-hacks-13-0.slack.com/archives/C0C6HQPNJET/p1792802652433309
+
+Bright Data — completed
+Created the UCSB account v_minchev@ucsb.edu. The dashboard confirmed promo calhack2026 and $300 of $300 credits remaining, alongside 5,000 monthly free credits.
+Created active Web Unlocker zone bandit_web_unlocker for public event and merchandise information. Saved and verified the API token; the read-only active-zones check returned HTTP 200 and listed this zone. The token shows expiry January 24, 2027.
+All three teammates were invited as User, without admin privileges; registration/acceptance is still required. The RIT teammate uses the display label “BandIt RIT teammate.”
+No payment method is configured. Bright Data labels its default credit-backed account “Pay as you go”; no recurring package was purchased. The zone has a saved $10/day limit with “Suspend zone” selected. The provider evaluates limits once per minute, so this is not an instantaneous hard stop.
+Dashboard shows promo expiry December 23, 2026. The photographed sponsor placard says valid until December 1, 2026; that earlier date is the conservative deadline.
+Use public, accessible web data for the sponsor track; its Slack instructions exclude login/paywall scraping and mocked demo data.
+Billing: https://brightdata.com/cp/billing/overview
+Zone: https://brightdata.com/cp/web_access/bandit_web_unlocker/stats
+Promo: https://brightdata.com/?promo=calhack2026&hs_signup=1
+Sponsor instructions: https://cal-hacks-13-0.slack.com/archives/C0C6SULMV2P/p1792778412337339
+
+Elastic — completed
+Reused the existing UCSB organization Org-1758287 (ID 682324499). Its expired trial was extended free for seven days; the interface displays October 30, 2026 as the end date.
+Created BandIt as an Elasticsearch Serverless project, ID c79b82c9e5234fe5a1aef2a611316cef, on Google Cloud N. Virginia. Saved its Elasticsearch endpoint, Kibana endpoint, and project API key. Elasticsearch and Kibana use the same validated project key.
+The built-in Agent Builder is available. Read-only Elasticsearch and Agent Builder agent-list requests both returned HTTP 200.
+All three teammates have pending Developer invitations scoped to the BandIt Elasticsearch project. Organization-owner and billing-admin roles were not granted.
+No paid subscription was selected. The sponsor photos provided a Serverless trial registration link, with no additional credit amount or coupon.
+Project management: https://cloud.elastic.co/projects/elasticsearch/c79b82c9e5234fe5a1aef2a611316cef
+Agent Builder: https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/agent_builder/agents
+Sponsor registration: https://ela.st/calhacks
+
+Hyphenate — no account/key prerequisite identified
+Reviewed its official starter pack and sponsor Slack channel. The finance-agent challenge permits any models/frameworks and specifies no Hyphenate API key, developer-account signup, or API-credit claim. No unrelated Hyphen vendor account was created.
+Starter pack: https://docs.google.com/document/d/1u4iN8R97ILY3kfHTPKC82zdutHrGx4ze5eCAP-J92w4/edit
+Sponsor channel: https://app.slack.com/client/T0C6HL088DD/C0C6TRFL8H3
+
+Anthropic — already handled by you
+You confirmed the credits and setup are complete. No duplicate credit redemption, new organization, teammate invitation, or key was created. Its current key was not copied into this .env.
+
+Team invitations sent
+lp3749@rit.edu
+luke.huh@yale.edu
+edward.lai@yale.edu
+Each received Spacetime Developer, BandIt Elastic Developer, and Bright Data User access invitations. The recipients must accept/register before access is complete.
+
+Verification and remaining items
+Nessie, Bright Data, Elasticsearch, and Agent Builder credentials passed read-only HTTP 200 checks. The Bright Data zone was independently confirmed active. No scraping or model-generation request was made during these checks.
+Remaining: teammate acceptance, your separately managed Anthropic key if this project later needs it in .env, and optional confirmation of Spacetime startup-program eligibility. No additional unconditional API-credit claim for the other named services was found in the reviewed materials.
+No payment methods were added and no subscription package was purchased.

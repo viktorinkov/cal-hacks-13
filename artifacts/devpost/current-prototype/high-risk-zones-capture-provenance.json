@@ -1,0 +1,37 @@
+{
+  "captured_at_utc": "2026-10-25T12:10:56.021Z",
+  "file": "high-risk-zones-ui-zoom.jpg",
+  "sha256": "9c5d9883b2a3bf11c333175466e82abdb0cb213ec1ab33ad12ffee8f319af7af",
+  "dimensions": [
+    1728,
+    963
+  ],
+  "url": "https://band1t.vip/organizer",
+  "capture_method": "Official OpenAI Chrome browser runtime. Native full-viewport JPEG, no crop, rescaling, DOM modification or pixel edits.",
+  "purpose": "Devpost crowd-crush prevention: a close view of high-risk zones using actual map UI zoom.",
+  "controls": [
+    "Sign in with existing email session",
+    "Venue selector: concert preview",
+    "Surge",
+    "Pause crowd",
+    "Map Zoom in buttons",
+    "Map drag to center Concourse West and West Passage"
+  ],
+  "visible_state": "Current deployed frontend shows Concourse West and West Passage at 4.7 people per square metre, above their critical lines. Main Left is at caution. On-screen source labels remain visible.",
+  "state_scope": "Crowd surge and pause change only the in-browser crowd. No shared event, incident, approval, payment, band command or role was changed. Shared dev event was already ended; its Start/Reset/Reopen controls were not used.",
+  "source_review_commit": "1049a04d879c7680b0571e2ca7261f9738a639aa",
+  "local_control_evidence": [
+    "frontend/src/components/simulation/DemoDock.tsx:61 invokes demo.triggerCongestion",
+    "frontend/src/services/MockBackendAdapter.ts:194 invokes the in-browser backend",
+    "frontend/src/mock/MockBackend.ts:414 starts the local seeded surge"
+  ],
+  "caption": "The map highlights crowded zones in the scripted concert scenario.",
+  "limitations": [
+    "A scripted local crowd, not a measured crowd at an actual event.",
+    "Not evidence of physical band delivery or safety performance.",
+    "The public CalHacks map was quiet at capture; this image uses the existing concert scenario."
+  ],
+  "article_only": true,
+  "original_assets_preserved": true,
+  "review": "Independent visual QA passed by devpost_images_review: full viewport preserves native controls, critical-zone labels and source labels; keep the entire image as captured."
+}

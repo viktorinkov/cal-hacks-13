@@ -1,0 +1,36 @@
+category,part,listing,qty_expected,qty_counted,where,per_lite_band,per_full_band,per_gateway,per_station,notes
+band,XIAO ESP32C3,Seeed Studio XIAO ESP32C3 3PCS Pack x4,12,,carried from Rochester,1,1,1,0,"21x17.8 mm, LiPo charger 380 mA, BAT pads on back, U.FL + FPC antenna included"
+band,12-LED WS2812B ring,DIYmall 5PCS 12 X WS2812B RGB LED Rings,5 + teammate's,,"SF (Tony Ago) + teammate",1,1,0,1,"37.5 OD measured, 27 ID, ~3.2 thick; DI pads on the back"
+band,LiPo 3.7V 500mAh 503035,Qimoo x8 + Winfox x2,10,,carried from Rochester,1,1,0,0,"35x30x5 mm, protected, JST-PH 2.0; METER POLARITY"
+band,JST-PH 2.0 pigtail sets,20 Sets Mini Micro JST-PH 2.0mm 2 Pin,20,,carried from Rochester,0,0,0,0,bench use only; plug cut off in the case
+band,Tactile switch 6x6x5,QTEATAK 120 Pcs,120 + teammate's,,"SF (Tony Ago) + teammate",1,1,0,0,"wire two legs across the body, not the pair on one side"
+band,NFC sticker NTAG215 anti-metal,SummerBrite 30 Pcs,30,,carried from Rochester,1,1,0,0,on the lid over the tail half
+band,GY-521 MPU-6050,AITRIP 5 Pcs,5,,carried from Rochester,0,1,0,0,no header pins; 21.2x16.4x2.7
+band,Coin vibration motor 10x3 mm 3V,tatoko 20PCS,20,,carried from Rochester,0,1,0,0,sticky pad down
+band,2N2222A TO-92,GuuYebe 100 pcs,100,,SF (Tony Ago),0,1,0,0,check E-B-C with the meter
+band,1N4001 diode,EEEEE 120pcs,120,,"Amazon Locker Shirley, order 111-9334561-1288213",0,1,0,1,flyback across the motor; series drop for station rings
+band,330 R resistor,BOJACK kit,plenty,,kit,1,1,0,1,ring data line
+band,1k resistor,BOJACK kit,plenty,,kit,0,1,0,0,transistor base
+band,200k or 100k resistor (pairs),BOJACK kit,plenty,,kit,0,0,0,0,optional battery divider
+station,ESP32-C3 SuperMini,Teyleten Robot 3pcs x2,6,,carried from Rochester,0,0,0,1,"flash as ESP32C3 Dev Module, USB CDC on"
+station,Header pins 2.54 mm,OCR 20PCS male+female,plenty,,carried from Rochester,0,0,0,1,SuperMinis only
+demo,Light stand + phone clamp,UTEBIT 2 Pack,2,,carried from Rochester,0,0,0,0,overhead camera / pay terminal
+demo,USB-A to C cable 1 ft,10 pack,10,,carried from Rochester,0,0,1,1,flash charge power
+demo,Gaffer tape 2in x 30yd,SUNALDO,1,,carried from Rochester,0,0,0,0,"1.2 m and 1.5 m squares"
+strap,Jacquard ribbon 5/8 in,Boutigem 10 yd x2 colours,2 rolls,,carried from Rochester,300 mm,300 mm,0,0,melt the cut ends
+strap,Slide lock,Aogigigio 50pcs,50,,carried from Rochester,1,1,0,0,
+tools,Soldering iron kit 60 W,9-in-1 kit,1,,carried from Rochester,,,,,finest tip for BAT pads
+tools,Solder 60/40 0.8 mm,HGMZZQ 50 g,1,,carried from Rochester,,,,,
+tools,Multimeter,2000 counts,1,,carried from Rochester,,,,,
+tools,Wire stripper 20-30 AWG,TMAX,1,,carried from Rochester,,,,,
+tools,Silicone wire 28 AWG red+black,BNTECHGO 10 ft each + teammate's,2 + teammate's,,"SF (Tony Ago) + teammate",,,,,
+tools,Heat shrink kit,DHOOZ 900 pcs,1,,carried from Rochester,,,,,
+printed,Base (black PLA),bandit_v2_base.stl,15,,printed at RIT,1,1,0,0,
+printed,Lid (white PLA),bandit_v2_lid_facedown.stl,15,,printed at RIT,1,1,0,0,
+printed,Button cap (black PLA),bandit_v2_button_facedown.stl,15,,printed at RIT,1,1,0,0,optional
+missing,Hot glue gun,,,,buy locally,,,,,lid dots and strain relief
+missing,Foam tape 0.3 to 0.5 mm double sided,,,,buy locally,,,,,MPU motor switch XIAO pad
+missing,Flush cutters + tweezers,,,,borrow,,,,,
+missing,CA glue,,,,buy locally,,,,,button caps
+missing,USB power bricks (12 A-ports total) + 2 power strips,,,,bring,,,,,charging nine bands plus stations
+missing,USB-A hub or C-to-A adapter,,,,bring,,,,,all cables are A to C

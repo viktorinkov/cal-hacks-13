@@ -1,0 +1,98 @@
+{
+  "capturedAtUtc": "2026-10-25T11:53:37.292Z",
+  "sourceUrl": "https://dev.band1t.vip/organizer#claims",
+  "browser": "Chrome Work through official OpenAI browser runtime",
+  "case": {
+    "claimId": 74,
+    "incidentId": 79,
+    "type": "venue_property_theft",
+    "description": "Sponsor display laptop missing from Sponsor row",
+    "costDollars": 1299,
+    "status": "settled",
+    "approvedBy": "Ops desk",
+    "payoutRecipient": "the venue, to replace what was stolen",
+    "payoutDollars": 1299,
+    "insurerReceivableDollars": 799,
+    "venueDeductibleDollars": 500
+  },
+  "capture": {
+    "method": "Native browser screenshot with document-coordinate clip",
+    "viewport": {
+      "width": 1728,
+      "height": 907
+    },
+    "noDomEdits": true,
+    "noImageEdits": true,
+    "noRecordMutations": true,
+    "interaction": "Normal existing-account sign-in, Settlements, claim #74, Live incident #79 Show"
+  },
+  "assets": [
+    {
+      "file": "venue-theft-settlement.jpg",
+      "width": 860,
+      "height": 390,
+      "clip": {
+        "x": 434,
+        "y": 2289.5,
+        "width": 860,
+        "height": 390
+      },
+      "sha256": "9f340957ff27c2efc98f11f0085cdcb25f1e3597da615c016d2f1e78cfdf468a"
+    },
+    {
+      "file": "venue-theft-organizer-review.jpg",
+      "width": 860,
+      "height": 610,
+      "clip": {
+        "x": 434,
+        "y": 5149.65625,
+        "width": 860,
+        "height": 610
+      },
+      "sha256": "102fcad5a8533cc8d3830735e8a68045e6bd0128214676de87a6543692fc42d1"
+    }
+  ],
+  "interpretation": {
+    "settlement": "First image shows current settled state and an insurer receivable still awaiting payment.",
+    "recommendation": "Second image shows the stored recommendation that asked for organizer review before the recorded approval.",
+    "identity": "The camera assessment supports the missing laptop but does not independently identify a person; only the ops note identifies the suspect.",
+    "coverage": "The recommendation flags tension between sponsor-equipment coverage in the policy summary and an exclusion in retrieved clauses.",
+    "scope": "Venue and sponsor property at the event; does not illustrate attendee-belongings coverage."
+  },
+  "suggestedPlacement": "What it does > Financial management for large events",
+  "reviewStatus": "passed",
+  "sourceVerification": {
+    "fetchedRef": "origin/vik-e2e",
+    "commit": "219d48e079651fc5851e32cf0cb172eebededa57",
+    "method": "git show at fetched commit plus SELECT-only live query by theft_case_evidence",
+    "references": [
+      {
+        "path": "spacetimedb/server/src/safety/mod.rs",
+        "lines": "29–37",
+        "supports": "Venue equipment, merchandise and sponsor gear scope"
+      },
+      {
+        "path": "web/src/pages/organizer.ts",
+        "lines": "891–938",
+        "supports": "Claim selection, route, payment recipient and amounts"
+      },
+      {
+        "path": "spacetimedb/server/src/insurance/flow.rs",
+        "lines": "875–901",
+        "supports": "Property payout booking separate from injury wallet job"
+      },
+      {
+        "path": "spacetimedb/server/src/insurance/tests.rs",
+        "lines": "1275–1289",
+        "supports": "1299 venue claim, 799 recoverable regression"
+      }
+    ]
+  },
+  "independentReview": {
+    "reviewer": "/root/devpost_images_review",
+    "recommendation": "Use only venue-theft-settlement.jpg; the full organizer-review screenshot duplicates existing financial recommendation content and has a stronger opening camera claim than the detailed evidence supports.",
+    "title": "A venue-property theft claim",
+    "caption": "A $1,299 replacement settlement is recorded for the venue: $500 is its deductible, and $799 remains due from its insurer.",
+    "placement": "After What it does > Financial management paragraph distinguishing injury payouts from property settlements."
+  }
+}

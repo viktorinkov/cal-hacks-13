@@ -1,0 +1,187 @@
+{
+ "fit": {
+  "battery 35 x 30 x 5.5 on the floor": [
+   0,
+   1176
+  ],
+  "SOS switch 6x6 body on the battery, ring centre": [
+   0,
+   1176
+  ],
+  "SOS switch plunger up to the lid hole": [
+   0,
+   1080
+  ],
+  "LED ring 37.5/27 x 3.2": [
+   0,
+   2700
+  ],
+  "wires + solder under the ring (1.0 gap over battery)": [
+   0,
+   1480
+  ],
+  "MPU-6050 in the tail, on the floor": [
+   0,
+   1176
+  ],
+  "coin motor in the tail, on the floor": [
+   0,
+   1080
+  ],
+  "XIAO PCB over MPU + motor (port down)": [
+   0,
+   1176
+  ],
+  "XIAO shield can under the PCB": [
+   0,
+   1176
+  ],
+  "XIAO USB-C receptacle under the PCB": [
+   0,
+   1176
+  ],
+  "USB-C cable shell through the window": [
+   0,
+   1176
+  ],
+  "USB-C plug nose (12 x 6.5) in the outside recess": [
+   0,
+   1176
+  ],
+  "U.FL plug under the XIAO": [
+   0,
+   1176
+  ],
+  "FPC antenna on the +Y tail wall (21 x 9.3)": [
+   0,
+   240
+  ],
+  "battery leads through the divider gap": [
+   0,
+   1176
+  ],
+  "fingertip reaching the plunger through the lid hole": [
+   0,
+   1080
+  ]
+ },
+ "pairs": {},
+ "sweeps": {
+  "battery straight down into the pocket": [
+   0,
+   3840
+  ],
+  "MPU straight down into the tail": [
+   0,
+   2352
+  ],
+  "motor straight down into the tail": [
+   0,
+   1440
+  ],
+  "switch straight down onto the battery": [
+   0,
+   768
+  ],
+  "LED ring straight down into its pocket": [
+   0,
+   5400
+  ],
+  "XIAO straight down onto MPU + motor (vs case, MPU and motor)": [
+   0,
+   22176
+  ]
+ },
+ "clearances": {
+  "on-wrist height (rails to lid top)": 13.6,
+  "footprint length x width": "64.0 x 42.0",
+  "strap channel: width - 15.9 ribbon": 1.5999999999999996,
+  "strap channel: height - 1.0 ribbon": 0.30000000000000004,
+  "floor bridge span over the channel": 17.5,
+  "battery vs pocket X / Y (per side)": "1.00 / 1.00",
+  "ring OD vs pocket (radial)": 0.3999999999999986,
+  "ring bearing crescent width at +/-Y": 3.1499999999999986,
+  "ring bottom above battery (wire gap)": 1.0,
+  "ring top to lid underside": 0.4,
+  "switch plunger top below lid top": 0.7999999999999989,
+  "switch body top vs lid underside": 1.0999999999999996,
+  "switch body vs ring ID (radial)": 9.257359312880716,
+  "lid hole vs switch plunger (radial, plunger 3.5)": 1.5,
+  "XIAO near end sits between the divider posts by (X)": 0.8000000000000007,
+  "divider gap half-width vs XIAO half-width": 0.29999999999999893,
+  "MPU far end vs XIAO port (X)": 0.29999999999999716,
+  "XIAO PCB back vs lid underside": 4.1,
+  "XIAO port bottom above floor": 1.5,
+  "XIAO can bottom vs MPU/motor top (pad)": 0.2999999999999998,
+  "USB window height - port (3.3)": 0.9000000000000004,
+  "USB window inner width - receptacle (9.0)": 1.5999999999999996,
+  "receptacle recess behind the end face (after the 0.7 outside recess)": 0.8,
+  "MPU vs bay flare wall at its near corner": 0.581818181818182,
+  "MPU near end to divider post (X)": 0.1999999999999993,
+  "MPU to motor (Y)": 1.4999999999999991,
+  "motor vs bay corner wall (radial)": 3.3000000000000007,
+  "motor to bay far wall (X)": 3.5,
+  "motor vs USB port (Y)": 1.6999999999999993,
+  "tail bay spare height above the XIAO": 4.1,
+  "end wall / side wall thickness": "1.5 / 1.5",
+  "head side wall outside the pocket (Y)": 5.0,
+  "lid vs rebate (per side)": 0.2,
+  "lid thickness over the LEDs (light window)": 0.6
+ },
+ "ceilings": [
+  [
+   "strap channel roof = floor",
+   1.3,
+   1108.3125,
+   [
+    [
+     -43.0,
+     21.0,
+     -8.5,
+     8.5,
+     1108.3125
+    ]
+   ]
+  ],
+  [
+   "USB window top",
+   7.5,
+   8.0625,
+   [
+    [
+     -42.25,
+     -41.75,
+     -5.25,
+     5.25,
+     8.0625
+    ]
+   ]
+  ],
+  [
+   "seat plane",
+   8.8,
+   0,
+   []
+  ],
+  [
+   "rebate step",
+   12.4,
+   0,
+   []
+  ]
+ ],
+ "mesh_agreement": 0.9979889391654098,
+ "heights": {
+  "slot_top": 1.3,
+  "floor_top": 2.3,
+  "batt_top": 7.8,
+  "seat": 8.8,
+  "ring_top": 12.0,
+  "lid_bot": 12.4,
+  "top": 13.6,
+  "switch_top": 12.8,
+  "usb_bot": 3.3,
+  "usb_top": 7.5
+ },
+ "pass": true
+}

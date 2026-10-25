@@ -33,7 +33,7 @@ Use one word for one thing in devpost.md and on the diagrams. Define each term o
 | the insurance Decision Engine | Elastic investigation with code-enforced approvals and settlement; Decision Engine in diagram titles | claims agent |
 | Capital One Nessie | the bank sandbox behind each wallet | Nessie (alone) |
 | wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
-| findable switch | the one consent switch at sign-up | privacy toggle |
+| social matching | band records connect attendees, photos and shared places | findable switch, privacy toggle |
 
 Coverage checks retrieve policy clauses. Past approved claims support separate precedent review and rule proposals. Elastic Workflows and Elastic Agent Builder coordinate model tasks; Claude can be the configured model, while Rust code and SpacetimeDB enforce decision and settlement boundaries.
 
@@ -59,6 +59,8 @@ Give sponsors detail in proportion to their substantive contribution, especially
 
 Keep sentences concise without making the article thin. Give each distinct feature enough explanation and useful visual detail to be understood. Expand sponsor sections with their substantive contributions, design choices and supported outcomes. Split a dense diagram into focused diagrams when that makes the system clearer; do not cut features to meet an arbitrary length or diagram count.
 
+Social matching is enabled for every registered attendee. Do not describe a Findable switch or an opt-out. The backend `findable` field can appear when explaining an actual access predicate. Medical and insurance uploads use PDFs, and attendees confirm the extracted medical card.
+
 For the Devpost narrative, introduce sign-up in the opening and group the recap around people, photos and personal shopping. Order the product story as safety, social, shopping, then financial management. This does not change the established sponsor ranking or the board’s organization.
 
 Name the final product section “Financial management for large events.” Keep its scope to the existing claims, charges, receipts, ledgers and merch booth accounting.
@@ -66,6 +68,8 @@ Name the final product section “Financial management for large events.” Keep
 State the actual actor and action positively. Remove unprompted explanations of what does not happen when readers would already assume it. Keep necessary limits and consent boundaries, preferably as the behavior the system enforces.
 
 Keep a comfortable reading length between useful images in feature and technical explanations. Judge words, sentence length and sentence count across section headings; headings do not remove that reading burden. Paragraph count is a guide, not a hard limit. Use a relevant diagram, product image or UI capture when it explains the next part of the flow, rather than adding decoration to satisfy a quota. Track entries and reference lists can remain text when their points are already illustrated elsewhere.
+
+Show meaningful view and job groups in focused diagrams. Keep exhaustive view, job and field inventories in supporting references, not wide tables in Devpost. Do not replace a removed table with a wall of prose.
 
 Preserve distinct product features when shortening text or images. Crowd-crush prevention, medic response and fire evacuation are separate behaviors; combine only repeated explanations of the same behavior. Meet the visual rhythm rule with a useful image or clearer grouping, never by deleting a feature.
 
