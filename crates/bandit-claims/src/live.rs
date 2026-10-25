@@ -2,9 +2,9 @@
 //! when; this plays the people who answer it. The medic reaches each person, notes what they found and
 //! resolves the incident; the person who fell files their claim (staff file it for them) and the hospital
 //! report follows on its own; the camera confirms broken equipment and the organizer logs the repair cost.
-//! A claim left waiting for the organizer is decided after `--approve-after` seconds so the run keeps
-//! moving: approved with a learned rule, or refused when Claude recommended refusing it. While the run is
-//! paused, the floor staff wait too.
+//! A claim left waiting for the organizer, in this run or an earlier one, is decided after `--approve-after`
+//! seconds so the run keeps moving: approved with a learned rule, or refused when Claude recommended refusing
+//! it. While the run is paused, the floor staff wait too.
 //!
 //! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
 //! band, is treated as a sprain at first aid.
@@ -106,7 +106,9 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
                 .db
                 .claim()
                 .iter()
-                .filter(|c| c.status == ClaimStatus::Routed && c.opened_at >= r.started_at && since(c.updated_at) >= approve_after as i64)
+                .filter(|c| c.status == ClaimStatus::Routed && since(c.updated_at) >= approve_after as i64)
+                // This run's claims, and any an earlier run left waiting.
+                .filter(|c| c.opened_at >= r.started_at || db.db.live_plan().incident_id().find(&c.incident_id).is_some())
                 .collect();
             for c in waiting {
                 if done.insert((c.id, "decide")) {
