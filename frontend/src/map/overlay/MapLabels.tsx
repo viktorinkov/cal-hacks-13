@@ -2,7 +2,7 @@
  * Words on the map. React renders them; the engine moves each one to its projected world point
  * every frame, so text stays crisp and selectable and never re-renders with the crowd.
  */
-import { memo, useCallback, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import type { CongestionStatus, SectionKind } from '@/contracts/domain'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,8 @@ import { Path } from '@/lib/geometry'
 import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
 import { demoReveal } from '@/mock/calhacksCrowd'
 import { calhacksMarks } from '@/mock/calhacks'
+import { formatCents } from '@/cover/money'
+import { useFloorShop } from '@/payments/floorShop'
 import { useSession } from '@/stdb/session'
 import type { MapEngine } from '../MapEngine'
 import { BAND_Z, BEACON_TOP } from '../layers/marksLayer'
@@ -314,6 +316,36 @@ function RouteTags({ engine }: { engine: MapEngine }) {
   )
 }
 
+function PurchaseTags({ engine }: { engine: MapEngine }) {
+  const marks = useFloorShop((s) => s.marks)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!marks.length) return
+    const id = window.setInterval(() => setNow(Date.now()), 400)
+    return () => window.clearInterval(id)
+  }, [marks.length > 0])
+  const fresh = marks.filter((mark) => now - mark.at < 8000).slice(-4)
+  if (!fresh.length) return null
+  return (
+    <>
+      {fresh.map((mark) => (
+        <Anchored
+          key={mark.id}
+          engine={engine}
+          id={`purchase:${mark.id}`}
+          resolve={() => ({ x: mark.x, y: mark.y, z: 1.7 })}
+          className="-translate-x-1/2 -translate-y-full"
+        >
+          <span className="block rounded-[3px] bg-[rgba(14,14,16,0.92)] px-2 py-1 shadow-[inset_0_0_0_1px_rgba(220,199,159,0.55)]">
+            <span className="block text-[12px] font-medium text-ink">{mark.name}</span>
+            <span className="block text-[11px] tabular-nums text-ink-dim">{mark.title} · {formatCents(mark.amountCents)}</span>
+          </span>
+        </Anchored>
+      ))}
+    </>
+  )
+}
+
 function DemoRingTag({ engine }: { engine: MapEngine }) {
   const venueId = useWorld((s) => s.venue?.venueId)
   const incidents = useWorld((s) => s.incidents)
@@ -450,6 +482,7 @@ export const MapLabels = memo(function MapLabels({ engine }: { engine: MapEngine
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       <PoiLabels engine={engine} />
       <CalhacksLabels engine={engine} />
+      <PurchaseTags engine={engine} />
       <ZoneLabels engine={engine} />
       <BoothTag engine={engine} />
       <DemoRingTag engine={engine} />

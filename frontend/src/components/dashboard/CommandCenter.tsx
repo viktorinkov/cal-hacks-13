@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IncidentPanel } from '@/components/incidents/IncidentPanel'
 import { DemoDock } from '@/components/simulation/DemoDock'
 import { HallDemoDock } from './HallDemoDock'
+import { PurchaseFeed } from './PurchaseFeed'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
 import { VenueMap } from '@/map/VenueMap'
 import { useUi } from '@/stores/ui'
@@ -109,6 +110,7 @@ export function CommandCenter() {
         <div ref={bottomRef} className="col-span-2 col-start-1 row-start-3 flex min-w-0 items-end gap-4">
           <DemoDock />
           <PressureTimeline />
+          <PurchaseFeed />
         </div>
       </div>
 

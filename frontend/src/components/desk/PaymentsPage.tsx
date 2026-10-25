@@ -9,6 +9,7 @@ import {
   applyFilter, bandLabel, binsOf, boothRanking, clock, deskPayments, figuresOf, filterCounts, MISSING, pinnedWallet, searchPayments,
   STATUS_LABEL, STATUS_ORDER, type Filter, type Payment, type PinnedWallet,
 } from '@/payments/model'
+import { useFloorShop } from '@/payments/floorShop'
 import { useDeskData, usePaymentsFixture } from '@/payments/live'
 import type { DeskData } from '@/payments/rows'
 import { DESK_VIEWS } from '@/payments/store'
@@ -21,7 +22,7 @@ type BlockState = 'ready' | 'loading' | 'refused' | 'error'
 const PAGE = 100
 const NEEDS_CAP = 4
 
-function useBlockStates(fixture: boolean): { payments: BlockState; wallets: BlockState; partial: string } {
+function useBlockStates(fixture: boolean, floorOrders: number): { payments: BlockState; wallets: BlockState; partial: string } {
   const phase = useSession((s) => s.phase)
   const requested = useSession((s) => s.staffRequested)
   const queries = useSession((s) => s.staffQueries)
@@ -32,7 +33,8 @@ function useBlockStates(fixture: boolean): { payments: BlockState; wallets: Bloc
   const of = (query: string): BlockState => (queries[query] === 'open' ? 'ready' : queries[query] === 'refused' ? 'refused' : 'loading')
   const charges = of(DESK_VIEWS.charges)
   const orders = of(DESK_VIEWS.orders)
-  const payments: BlockState = charges === 'refused' && orders === 'refused' ? 'refused' : charges === 'loading' || orders === 'loading' ? 'loading' : 'ready'
+  const host: BlockState = charges === 'refused' && orders === 'refused' ? 'refused' : charges === 'loading' || orders === 'loading' ? 'loading' : 'ready'
+  const payments: BlockState = host === 'ready' || floorOrders > 0 ? 'ready' : host
   const partial = payments === 'ready' && charges === 'refused' ? 'Charges aren’t visible to this sign-in.' : payments === 'ready' && orders === 'refused' ? 'Merch orders aren’t visible to this sign-in.' : ''
   return { payments, wallets: of(DESK_VIEWS.wallets), partial }
 }
@@ -303,7 +305,8 @@ function PaymentsTable({ payments, desk, state, partial, sim, onOpen, openId }: 
 export function PaymentsPage() {
   const fixture = usePaymentsFixture()
   const desk = useDeskData()
-  const states = useBlockStates(fixture)
+  const floorOrders = useFloorShop((s) => s.orders.length)
+  const states = useBlockStates(fixture, floorOrders)
   const [openId, setOpenId] = useState<string | null>(null)
   const payments = useMemo(() => deskPayments(desk), [desk])
   const figures = figuresOf(payments, desk.wallets)

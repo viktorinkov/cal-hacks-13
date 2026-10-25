@@ -4,6 +4,7 @@ import { useRoute } from '@/cover/route'
 import { useSession, type WalletView } from '@/stdb/session'
 import { FIXTURE_BAND, FIXTURE_DESK, FIXTURE_NOW, FIXTURE_WALLET, FIXTURE_WALLET_VIEW, isPaymentsFixture } from './fixture'
 import type { DeskData, WalletData } from './rows'
+import { useFloorShop, withFloorPurchases } from './floorShop'
 import { usePayments, type PaymentsState } from './store'
 
 /* The fixture's own small backend: the same effects the reducers have, on a local copy, never on the host. */
@@ -141,7 +142,11 @@ export function useDeskData(): DeskData {
   const fixture = usePaymentsFixture()
   const live = usePayments((s) => s.desk)
   const sample = useFixturePayments((s) => s.desk)
-  return fixture ? sample : live
+  const orders = useFloorShop((s) => s.orders)
+  const people = useFloorShop((s) => s.people)
+  const templates = useFloorShop((s) => s.templates)
+  const booths = useFloorShop((s) => s.booths)
+  return withFloorPurchases(fixture ? sample : live, { orders, people, templates, booths })
 }
 
 export function useWalletData(): { data: WalletData; view: WalletView | null } {

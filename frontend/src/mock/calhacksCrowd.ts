@@ -13,7 +13,9 @@ import { MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
 import { DEMO_LANE, demoIsActive, demoRoute, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
 import { onStair } from '@/booth/hallRoute'
 import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
+import { buyerName, duePurchase, followBuyers, openingClock, pickPiece, placePurchase, type ShopClock } from '@/payments/floorShop'
 import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
+import { palaceSponsors } from './palaceTrace'
 import { Rng } from './sim/rng'
 
 /** Simulated attendees on the floor. A smaller page of them carries the live band ids. */
@@ -48,6 +50,10 @@ interface Person {
   meetBy: number
   /** Band this character is standing in for. 0 means the page has not assigned one. */
   bandId: number
+  /** Already bought this run. Each person buys once. */
+  bought: boolean
+  /** Walking to a sponsor booth to pay. */
+  errand: { x: number; y: number; since: number } | null
 }
 
 interface Anchor {
@@ -311,6 +317,16 @@ export class CalhacksCrowd {
   private laneZ: number[] | null = null
   private laneReveal = 0
   private readonly hit: ProjectResult = newProjectResult()
+  /** Purchases at sponsor booths. Off until the hall is actually running, so tests stay still. */
+  private shopping = false
+  private shop: ShopClock = openingClock()
+  private shopOrigin = 0
+  private boothStands: { name: string; x: number; y: number }[] | null = null
+
+  /** The hall starts buying at sponsor booths. */
+  enableShopping(): void {
+    this.shopping = true
+  }
 
   /** True once the people on the floor were taken from database rows. */
   seeded(): boolean {
@@ -391,7 +407,13 @@ export class CalhacksCrowd {
   step(): void {
     this.t += DT * 1000
     if (this.lane) this.laneReveal = Math.min(this.lane.length, this.laneReveal + 4)
+    this.shopTick()
     for (const person of this.people) {
+      if (person.errand && this.t - person.errand.since > 12000) {
+        person.errand = null
+        this.depart(person)
+        continue
+      }
       if (this.yieldLane(person)) continue
       if (this.leaveRing(person)) continue
       if (person.pose === SEATED) {
@@ -439,6 +461,9 @@ export class CalhacksCrowd {
       if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny, person.zone)) {
         person.x = nx
         person.y = ny
+      } else if (person.errand) {
+        person.vx = 0
+        person.vy = 0
       } else {
         this.retarget(person)
         person.vx = 0
@@ -446,6 +471,7 @@ export class CalhacksCrowd {
       }
     }
     this.tally()
+    this.syncPurchaseMarks()
     this.seq += 1
   }
 
@@ -521,6 +547,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
   }
 
@@ -542,6 +570,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
     this.retarget(person)
     return person
@@ -580,6 +610,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
     this.retarget(person)
     return person
@@ -711,6 +743,14 @@ export class CalhacksCrowd {
   }
 
   private retarget(person: Person): void {
+    if (person.errand) {
+      person.gx = person.errand.x
+      person.gy = person.errand.y
+      person.lane = null
+      const sponsor = rooms.findIndex((room) => room.zoneId === 'sponsor')
+      if (sponsor >= 0) person.zone = sponsor
+      return
+    }
     const lane = person.lane
     if (lane && lane.length > 0) {
       let next = person.laneIndex + person.laneDir
@@ -835,6 +875,11 @@ export class CalhacksCrowd {
     person.vx = 0
     person.vy = 0
     person.pose = STANDING
+    if (person.errand) {
+      person.errand = null
+      person.holdUntil = this.t + this.rng.range(4000, 8000)
+      return
+    }
     if (person.group) {
       if (this.groupTogether(person)) this.startChat(person)
       else this.waitForGroup(person)
@@ -884,6 +929,111 @@ export class CalhacksCrowd {
     person.speed = this.rng.range(0.32, 1.6)
     if (person.lane && this.rng.next() < 0.4) person.lane = null
     this.retarget(person)
+  }
+
+  /** One purchase at a time, from someone already on sponsor row, at the booth nearest them. */
+  private shopTick(): void {
+    if (!this.shopping) return
+    const zone = rooms.findIndex((room) => room.zoneId === 'sponsor')
+    const room = rooms[zone]
+    if (!room) return
+    const booths = this.sponsorBooths(room)
+    if (!booths.length) return
+    const here: { person: Person; index: number }[] = []
+    const free: { person: Person; index: number }[] = []
+    for (let index = 0; index < this.people.length; index++) {
+      const person = this.people[index]!
+      if (person.bought || person.errand || person.pose === SEATED) continue
+      free.push({ person, index })
+      if (person.zone === zone) here.push({ person, index })
+    }
+    const open = here.length ? here : free
+    if (!this.shopOrigin) this.shopOrigin = Date.now()
+    const step = duePurchase(this.shop, Math.max(this.t, Date.now() - this.shopOrigin), this.people.length, open.length > 0)
+    this.shop = step
+    if (!step.buy) return
+    const chosen = open[this.rng.int(open.length)]
+    if (!chosen) return
+    let booth = booths[0]!
+    let best = Infinity
+    for (const candidate of booths) {
+      const dist = Math.hypot(candidate.x - chosen.person.x, candidate.y - chosen.person.y)
+      if (dist < best) {
+        best = dist
+        booth = candidate
+      }
+    }
+    const stand = this.standBeside(booth, room) ?? { x: chosen.person.x, y: chosen.person.y }
+    const piece = pickPiece(this.rng, booth.name)
+    const { person, index } = chosen
+    const onRow = person.zone === zone && pointInPolygon(person.x, person.y, room.polygon)
+    placePurchase({
+      who: index,
+      name: buyerName(index),
+      bandId: person.bandId || 100 + index,
+      booth: booth.name,
+      piece,
+      x: onRow ? person.x : stand.x,
+      y: onRow ? person.y : stand.y,
+      fail: this.rng.next() < 0.025,
+    })
+    person.bought = true
+    person.group = 0
+    person.meetBy = 0
+    person.lane = null
+    person.zone = zone
+    person.gx = stand.x
+    person.gy = stand.y
+    if (onRow && Math.hypot(person.x - stand.x, person.y - stand.y) > 1.4) {
+      person.holdUntil = 0
+      person.pose = WALKING
+      person.speed = Math.max(person.speed, 0.85)
+      person.errand = { x: stand.x, y: stand.y, since: this.t }
+      return
+    }
+    person.x = stand.x
+    person.y = stand.y
+    person.vx = 0
+    person.vy = 0
+    person.pose = STANDING
+    person.holdUntil = this.t + this.rng.range(4000, 8000)
+    person.errand = null
+  }
+
+  private sponsorBooths(room: VenueZone): { name: string; x: number; y: number }[] {
+    if (this.boothStands) return this.boothStands
+    const inside = palaceSponsors.filter((booth) => !booth.mezz && pointInPolygon(booth.x, booth.y, room.polygon))
+    const list = (inside.length ? inside : palaceSponsors.filter((booth) => !booth.mezz)).map((booth) => ({
+      name: booth.name,
+      x: booth.x,
+      y: booth.y,
+    }))
+    this.boothStands = list
+    return list
+  }
+
+  private standBeside(booth: { x: number; y: number }, room: VenueZone): { x: number; y: number } | null {
+    for (let ring = 0; ring < 8; ring++) {
+      const dist = 0.7 + ring * 0.4
+      for (let turn = 0; turn < 8; turn++) {
+        const angle = (turn / 8) * Math.PI * 2 + ring
+        const x = booth.x + Math.cos(angle) * dist
+        const y = booth.y + Math.sin(angle) * dist
+        if (pointInPolygon(x, y, room.polygon) && walkable(x, y)) return { x, y }
+      }
+    }
+    return null
+  }
+
+  private syncPurchaseMarks(): void {
+    if (!this.shopping) return
+    const spots: { who: number; x: number; y: number }[] = []
+    for (let index = 0; index < this.people.length; index++) {
+      const person = this.people[index]!
+      if (!person.bought) continue
+      spots.push({ who: index, x: person.x, y: person.y })
+    }
+    if (spots.length) followBuyers(spots)
   }
 
   private tally(): void {
@@ -941,10 +1091,12 @@ export function startCalhacksCrowd(): void {
   if (slot.current?.owner === startCalhacksCrowd) {
     crowd = slot.current.crowd
     timer = slot.current.timer
+    crowd.enableShopping()
     return
   }
   if (slot.current?.timer) clearInterval(slot.current.timer)
   crowd = slot.current?.crowd ?? new CalhacksCrowd()
+  crowd.enableShopping()
   frames.push(crowd.frame())
   timer = setInterval(() => {
     if (!crowd) return
