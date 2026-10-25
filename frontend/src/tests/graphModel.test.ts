@@ -1,5 +1,6 @@
 import { describe as group, expect, it } from 'vitest'
 import { adjacency, buildGraph, cluster, describe, named, neighbourhood, type Labels } from '@/components/desk/graphModel'
+import { attendeeName } from '@/components/desk/attendeeName'
 import type { GraphLink } from '@/stdb/catalog'
 
 const link = (id: string, kind: string, from: string, to: string, weight = 1): GraphLink => {
@@ -62,6 +63,21 @@ group('event graph model', () => {
     expect(renamed.changed).toBe(false)
     expect(renamed.renamed).toBe(true)
     expect(renamed.nodes.get('company:20')?.label).toBe('Figma Inc')
+  })
+
+  it('gives every person node a stable name', () => {
+    expect(attendeeName('16514')).toMatch(/^[A-Za-z]+ [A-Za-z]+$/)
+    expect(attendeeName('16514')).toBe(attendeeName('16514'))
+    const names = new Set(['1', '2', '3', '16514', '16966', '42'].map(attendeeName))
+    expect(names.size).toBeGreaterThan(4)
+  })
+
+  it('notices a person renamed after their first link', () => {
+    const first = buildGraph(rows, labels, empty, 0)
+    const renamed = buildGraph(rows, { ...labels, person: new Map([['1', 'Maya Chen'], ['2', 'Sam Ortiz'], ['3', 'Ada Lopes']]) }, first, 1)
+    expect(renamed.changed).toBe(false)
+    expect(renamed.renamed).toBe(true)
+    expect(renamed.nodes.get('person:3')?.label).toBe('Ada Lopes')
   })
 
   it('skips rows whose ends are not people, booths or companies', () => {

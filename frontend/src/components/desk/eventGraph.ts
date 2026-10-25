@@ -150,7 +150,13 @@ function create(): EventGraph {
     }
   }
 
-  /** Company names float above their spheres at one size on screen; everything else is named on hover or when selected. */
+  /** How far apart two floating names must sit, in pixels, before both stay on screen. */
+  const NAME_GAP = 96
+  const COMPANY_GAP = 124
+  let lastNames = 0
+  let labeledSelection: string | undefined
+
+  /** Company names float above their spheres. Person names do too, packed so a crowd of them stays readable. */
   function nodeObject(n: GNode): THREE.Object3D {
     if (n.kind !== 'company') return null as unknown as THREE.Object3D
     let held = names.get(n.id)
@@ -201,8 +207,84 @@ function create(): EventGraph {
       })
       .linkWidth((link) => (fresh(link, now) ? 1.2 : touches(link) ? 0.8 : 0))
       .linkDirectionalParticles((link) => (!still && touches(link) ? 3 : 0))
-    for (const [id, held] of names) held.sprite.material.opacity = !selected || near.has(id) ? 1 : 0.1
+    for (const [id, held] of names) {
+      if (id.startsWith('person:')) continue
+      held.sprite.material.opacity = !selected || near.has(id) ? 1 : 0.1
+    }
     tag()
+    layoutLabels(true)
+  }
+
+  /**
+   * Puts a name on the people you can actually read: the busiest person in each patch of the view.
+   * Moving in spreads the dots, so more names fit. A selection uses its own tags instead.
+   */
+  function layoutLabels(force = false) {
+    const now = performance.now()
+    const selection = selected?.id
+    if (!force && selection === labeledSelection && now - lastNames < 200) return
+    labeledSelection = selection
+    lastNames = now
+    const people = [...names.keys()].filter((id) => id.startsWith('person:'))
+    if (selected) {
+      for (const id of people) {
+        const held = names.get(id)
+        if (held) held.sprite.material.opacity = 0
+      }
+      return
+    }
+    const camera = fg.camera() as THREE.PerspectiveCamera
+    const width = host.clientWidth || 1
+    const height = host.clientHeight || 1
+    const project = (n: GNode) => {
+      if (n.x === undefined || n.y === undefined || n.z === undefined) return null
+      const v = new THREE.Vector3(n.x, n.y, n.z).project(camera)
+      if (v.z < -1 || v.z > 1) return null
+      const x = (v.x * 0.5 + 0.5) * width
+      const y = (-v.y * 0.5 + 0.5) * height
+      if (x < 8 || y < 52 || x > width - 8 || y > height - 28) return null
+      if (y < 78 && x > width - 520) return null
+      if (y > height - 96 && x < 460) return null
+      return { x, y }
+    }
+    const taken: { x: number; y: number; gap: number }[] = []
+    for (const n of nodes.values()) {
+      if (n.kind !== 'company') continue
+      const at = project(n)
+      if (at) taken.push({ ...at, gap: COMPANY_GAP * COMPANY_GAP })
+    }
+    const ranked = [...nodes.values()]
+      .filter((n) => n.kind === 'person' && named(n))
+      .sort((a, b) => (adjacent.get(b.id)?.length ?? 0) - (adjacent.get(a.id)?.length ?? 0))
+    const want = new Set<string>()
+    const personGap = NAME_GAP * NAME_GAP
+    for (const n of ranked) {
+      if (want.size >= 80) break
+      const at = project(n)
+      if (!at || taken.some((spot) => (spot.x - at.x) ** 2 + (spot.y - at.y) ** 2 < spot.gap)) continue
+      taken.push({ ...at, gap: personGap })
+      want.add(n.id)
+    }
+    for (const id of people) {
+      if (want.has(id)) continue
+      const held = names.get(id)
+      if (!held) continue
+      dispose(held.sprite)
+      names.delete(id)
+    }
+    for (const id of want) {
+      const n = nodes.get(id) as WithObject | undefined
+      if (!n?.__threeObj) continue
+      const held = names.get(id)
+      if (held?.label === n.label && held.sprite.parent === n.__threeObj) {
+        held.sprite.material.opacity = 1
+        continue
+      }
+      if (held) dispose(held.sprite)
+      const sprite = fixedLabel(n.label, 12, 4 * Math.cbrt(NODE_VALS.person) + 3, color.ink)
+      n.__threeObj.add(sprite)
+      names.set(id, { label: n.label, sprite })
+    }
   }
 
   function publish() {
@@ -276,7 +358,10 @@ function create(): EventGraph {
     const built = buildGraph(rows, labels, { nodes, links }, born)
     dirty = false
     if (!built.changed) {
-      if (built.renamed) fg.nodeThreeObject((n) => nodeObject(n))
+      if (built.renamed) {
+        fg.nodeThreeObject((n) => nodeObject(n))
+        restyle()
+      }
       publish()
       return
     }
@@ -369,12 +454,15 @@ function create(): EventGraph {
   document.fonts
     ?.load(`600 40px ${FONT}`)
     .then(() => {
-      if (!names.size) return
       for (const held of names.values()) dispose(held.sprite)
       names.clear()
+      lastNames = 0
       fg.nodeThreeObject((n) => nodeObject(n))
+      layoutLabels()
     })
     .catch(() => {})
+  const orbit = controls as { autoRotate: boolean; autoRotateSpeed: number; addEventListener?: (type: string, fn: () => void) => void }
+  orbit.addEventListener?.('change', () => layoutLabels())
 
   window.setInterval(() => {
     if (!attached) return
@@ -385,6 +473,7 @@ function create(): EventGraph {
     if (!selected && !still && now - lastTouch > ROTATE_AFTER_MS) controls.autoRotate = true
     // A layout still growing keeps the camera with it.
     if (settling && framed && !selected && now - lastFit > 4000) fit(1200)
+    layoutLabels()
   }, TICK_MS)
 
   return {

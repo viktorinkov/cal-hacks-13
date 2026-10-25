@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useCatalog } from '@/stdb/catalog'
 import { DeskFrame, Figure } from './DeskFrame'
+import { attendeeName } from './attendeeName'
 import type { EventGraph } from './eventGraph'
 import type { Labels } from './graphModel'
 import { KIND_COLOURS, KIND_NAMES, LINK_COLOURS, LINK_NAMES, useGraphView, type Kind, type LegendLine, type Mode, type Summary } from './graphView'
@@ -123,14 +124,26 @@ export function GraphPage() {
   const engine = useRef<EventGraph | null>(null)
   const [failed, setFailed] = useState(false)
   const [full, setFull] = useState(false)
-  const labels = useMemo<Labels>(
-    () => ({
-      person: new Map(attendees.filter((person) => person.nodeId && person.displayName).map((person) => [person.nodeId, person.displayName])),
+  const labels = useMemo<Labels>(() => {
+    const person = new Map<string, string>()
+    for (const link of links) {
+      for (const [kind, id] of [
+        [link.fromKind, link.fromId],
+        [link.toKind, link.toId],
+      ]) {
+        if (kind === 'person' && id && !person.has(id)) person.set(id, attendeeName(id))
+      }
+    }
+    // The staff list, when this viewer can read it, replaces the public name with the one the attendee uses.
+    for (const attendee of attendees) {
+      if (attendee.nodeId && attendee.displayName) person.set(attendee.nodeId, attendee.displayName)
+    }
+    return {
+      person,
       booth: new Map(booths.map((item) => [item.id, item.name])),
       company: new Map(companies.map((item) => [item.id, item.name])),
-    }),
-    [attendees, booths, companies],
-  )
+    }
+  }, [attendees, booths, companies, links])
   const latest = useRef({ links, labels })
   const counts = useMemo(() => {
     const seen = new Set<string>()
@@ -188,12 +201,10 @@ export function GraphPage() {
 
   return (
     <DeskFrame
-      title={linkCount ? 'Who met, and where they stood.' : 'The event graph is empty.'}
-      sentence="Every meeting, booth visit, job and exhibit, live from the floor. Click a person to see the booths they stood at and the people they met."
       figures={
         <>
           <Figure lead label="Links" value={linkCount.toLocaleString('en-US')} note={linkCount > links.length ? `${links.length.toLocaleString('en-US')} drawn` : 'in the graph'} />
-          <Figure label="People" value={counts.person.toLocaleString('en-US')} note={counts.named ? `${counts.named.toLocaleString('en-US')} named` : 'names open to staff'} />
+          <Figure label="People" value={counts.person.toLocaleString('en-US')} note={counts.named ? 'named' : 'on the graph'} />
           <Figure label="Booths" value={counts.booth.toLocaleString('en-US')} note="named" />
           <Figure label="Companies" value={counts.company.toLocaleString('en-US')} note="named" />
         </>
