@@ -65,7 +65,8 @@ systemctl enable -q --now bandit-autodeploy.timer
 
 # /deploy/ shows the last deploy. dev.$BANDIT_HOST keeps the plain pages for testing.
 # The first line names the main host, which deploy/autodeploy.sh reads back.
-# /organizer and the other desk routes are the command center. /portal keeps the previous organizer page.
+# / is the front page (home.html in the desk build). /organizer and the other desk routes are the command
+# center. /portal keeps the previous organizer page.
 # A band's tag link, /t/BANDIT-07, opens the command center's signup for that band; dev.$BANDIT_HOST keeps the old tap page.
 install -d -m 755 /srv/bandit-deploy /srv/bandit-portal
 cp -f web/organizer.html /srv/bandit-portal/index.html
@@ -80,6 +81,12 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 	handle_path /cc/* {
 		root * /srv/bandit-desk
 		try_files {path} /index.html
+		file_server
+	}
+	@home path /
+	handle @home {
+		root * /srv/bandit-desk
+		rewrite * /home.html
 		file_server
 	}
 	@desk path /organizer /organizer/ /payments /payments/ /venue /venue/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/ /wallet /wallet/ /t/*
