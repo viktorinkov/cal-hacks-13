@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { tapTarget } from './tapLink'
 
 export interface RouteApi {
   path: string
@@ -17,6 +18,13 @@ export function currentPath() {
   return normalize(window.location.pathname)
 }
 
+/** Where the page landed, with a tag link swapped for its sign-up page so Back never returns to it. */
+function arrival() {
+  const tap = tapTarget(window.location.pathname)
+  if (tap) window.history.replaceState(null, '', tap)
+  return { path: currentPath(), search: window.location.search }
+}
+
 const TITLES: Record<string, string> = {
   '/': 'BandIt Command Center',
   '/organizer': 'Organizer · BandIt',
@@ -33,7 +41,7 @@ const TITLES: Record<string, string> = {
 }
 
 export function RouteProvider({ children }: { children: ReactNode }) {
-  const [location, setLocation] = useState(() => ({ path: currentPath(), search: window.location.search }))
+  const [location, setLocation] = useState(arrival)
   const { path, search } = location
 
   useEffect(() => {
