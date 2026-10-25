@@ -88,6 +88,7 @@ fn context(config: &Config, sink: Sink) -> Result<Ctx> {
         elastic_ready: tokio::sync::OnceCell::new(),
         kibana,
         reader_ready: tokio::sync::OnceCell::new(),
+        proposer_ready: tokio::sync::OnceCell::new(),
         nessie,
         data_dir: config.data_dir.clone(),
         tz_offset_minutes: bandit_insurance::config::Config::default().tz_offset_minutes,

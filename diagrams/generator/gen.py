@@ -522,8 +522,8 @@ def insurance(y0):
                 mark_h=90, cy=r4, **mk)
     prec = B(1240, 0, "precedents\none per decision\ncomplicated: no proposal", "stdb", w=680, h=260, wordmark=STDB,
              mark_h=50, cy=r4 + 40, **mk)
-    propose = B(300, 0, "Claude\nproposes payment rule\nfrom 3 alike precedents\nceiling under policy limit", "claude",
-                w=680, h=340, wordmark=CLAUDE, mark_h=110, cy=r4 + 40, **mk)
+    propose = B(300, 0, "Agent Builder\n(bandit-rule-proposer)\nES|QL counts approvals\nproposes payment rule", "ext",
+                w=680, h=340, wordmark=ELASTIC, mark_h=MARK_H[ELASTIC], cy=r4 + 40, **mk)
     rules = B(300, 0, "payment rule vN\nshape, ceiling\nprecedents, approver", "stdb", w=680, h=260, wordmark=STDB,
               mark_h=50, cy=r3, **mk)
     history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",

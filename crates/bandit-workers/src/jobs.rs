@@ -71,6 +71,8 @@ pub struct Ctx {
     pub kibana: Option<Kibana>,
     /// Set once the document indices and the reader's Kibana assets are in place.
     pub reader_ready: tokio::sync::OnceCell<()>,
+    /// Set once the claims index, the answer index and the proposer's Kibana assets are in place.
+    pub proposer_ready: tokio::sync::OnceCell<()>,
     pub nessie: Option<Nessie>,
     pub data_dir: PathBuf,
     /// Local time for prompts and deposit dates (the venue's offset).
@@ -96,6 +98,20 @@ impl Ctx {
                 es.ensure_document_indices().await?;
                 es.ensure_clauses_index().await?;
                 kibana.ensure_reader().await
+            })
+            .await?;
+        Ok((es, kibana))
+    }
+
+    /// The Elastic and Kibana clients for proposing a rule, with the claims
+    /// index, the answer index and the proposer's assets set up.
+    pub async fn proposer(&self) -> Result<(&ClaimsIndex, &Kibana), JobError> {
+        let es = self.elastic().await?;
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.proposer_ready
+            .get_or_try_init(|| async {
+                es.ensure_proposals_index().await?;
+                kibana.ensure_proposer().await
             })
             .await?;
         Ok((es, kibana))

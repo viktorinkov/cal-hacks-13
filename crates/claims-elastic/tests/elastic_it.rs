@@ -188,3 +188,59 @@ async fn claims_round_trip() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+/// Copies a rule proposal offers: three approved wrist sprains, one of them not yet recorded, and a refused one.
+const PRECEDENT_IDS: [&str; 5] = ["claim-900011-v1", "claim-900011-v2", "claim-900012-v2", "claim-900013-v2", "claim-900014-v2"];
+
+fn precedent(claim_id: i64, pack_version: i32, payout_cents: i64) -> ClaimDoc {
+    ClaimDoc { doc_id: ClaimDoc::live_id(claim_id, pack_version), claim_id, pack_version, payout_cents, ..wrist_sprain_fall() }
+}
+
+#[tokio::test]
+async fn rule_precedents_are_counted() -> anyhow::Result<()> {
+    if std::env::var("CLAIMS_ELASTIC_IT").as_deref() != Ok("1") {
+        eprintln!("skipped: set CLAIMS_ELASTIC_IT=1 to run against Elastic");
+        return Ok(());
+    }
+    let es = ClaimsIndex::from_env()?;
+    es.ensure_setup().await?;
+    for id in PRECEDENT_IDS {
+        es.delete_doc(id).await?;
+    }
+    // Claim 900011's second pack is its newest copy, so it is the one counted.
+    es.index_claim(&precedent(900011, 1, 0)).await?;
+    es.index_claim(&precedent(900011, 2, 18_000)).await?;
+    es.index_claim(&precedent(900012, 2, 15_000)).await?;
+    es.index_claim(&precedent(900013, 2, 18_000)).await?;
+    es.index_claim(&ClaimDoc { diagnosis_codes: vec!["S93.401A".into()], ..precedent(900014, 2, 9_500) }).await?;
+    for (id, outcome, payout) in [(900011, "approved", 18_000), (900012, "approved", 15_000), (900014, "refused", 0)] {
+        es.set_outcome(id, 2, outcome, payout).await?;
+    }
+    let newest = es.newest_copy(900011).await?.expect("claim 900011 has copies");
+    assert_eq!((newest.doc_id.as_str(), newest.outcome.as_str()), ("claim-900011-v2", "approved"));
+    assert!(es.newest_copy(900099).await?.is_none());
+    // The approval the letters have not recorded yet, as the job records it.
+    let late = es.newest_copy(900013).await?.unwrap();
+    assert_eq!(late.outcome, "");
+    es.set_outcome(late.claim_id, late.pack_version, "approved", 18_000).await?;
+
+    let doc_ids: Vec<String> = ["claim-900011-v2", "claim-900012-v2", "claim-900013-v2", "claim-900014-v2"].map(String::from).to_vec();
+    let out = es.claim_precedents(&doc_ids).await?;
+    eprintln!("{out:#}");
+    let col = |name: &str| out["columns"].as_array().unwrap().iter().position(|c| c["name"] == name).unwrap();
+    let rows = out["values"].as_array().unwrap();
+    let approved = rows.iter().find(|r| r[col("outcome")] == "approved" && r[col("diagnosis_codes")] == "S63.501A").expect("an approved wrist sprain row");
+    assert_eq!(approved[col("claims")], 3);
+    assert_eq!(approved[col("highest_payout_cents")], 18_000);
+    assert_eq!(approved[col("lowest_payout_cents")], 15_000);
+    let mut ids: Vec<i64> = approved[col("claim_ids")].as_array().unwrap().iter().map(|v| v.as_i64().unwrap()).collect();
+    ids.sort();
+    assert_eq!(ids, [900011, 900012, 900013]);
+    assert!(rows.iter().any(|r| r[col("outcome")] == "refused" && r[col("diagnosis_codes")] == "S93.401A" && r[col("claims")] == 1));
+    assert!(!rows.iter().any(|r| r[col("claim_ids")].to_string().contains("900099")));
+
+    for id in PRECEDENT_IDS {
+        es.delete_doc(id).await?;
+    }
+    Ok(())
+}

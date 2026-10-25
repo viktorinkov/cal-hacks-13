@@ -1,0 +1,63 @@
+version: "1"
+name: bandit-propose-rule
+description: Proposes one BandIt payment rule from the claims the organizer approved one by one. The bandit-rule-proposer agent counts the offered claims in the claims index with ES|QL, and the answer is saved as one document for bandit-workers to check.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: proposal_key
+        type: string
+        required: true
+        description: The id the answer is saved under, for example proposal-3-1 (proposal 3, first try).
+      - name: claims_index
+        type: string
+        required: true
+        description: The claims index, for example bandit-claims.
+      - name: doc_ids
+        type: string
+        required: true
+        description: The ids of the offered claims' copies, comma-separated.
+      - name: task
+        type: string
+        required: true
+        description: The shape, the policy and the precedents, as text.
+      - name: schema
+        type: string
+        required: true
+        description: The JSON schema of the answer.
+      - name: proposals_index
+        type: string
+        required: true
+        description: Where the answer is saved, for example bandit-rule-proposals.
+steps:
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+
+  - name: propose
+    type: ai.agent
+    agent-id: bandit-rule-proposer
+    create-conversation: true
+    with:
+      message: |
+        Claims index: {{ inputs.claims_index }}
+        Copies: {{ inputs.doc_ids }}
+
+        Count the copies with bandit.claim_precedents, passing claims_index {{ inputs.claims_index }} and doc_ids {{ inputs.doc_ids }}.
+        Then fill the structured response with the rule they share.
+
+        {{ inputs.task }}
+      schema: "${{ steps.schema.output }}"
+
+  - name: save_proposal
+    type: elasticsearch.index
+    with:
+      index: "{{ inputs.proposals_index }}"
+      id: "{{ inputs.proposal_key }}"
+      refresh: wait_for
+      document:
+        proposal_key: "{{ inputs.proposal_key }}"
+        model: "{{ steps.propose.output.metadata.usage.connectorId }}"
+        usage: "${{ steps.propose.output.metadata.usage }}"
+        answer: "${{ steps.propose.output.structured_output }}"

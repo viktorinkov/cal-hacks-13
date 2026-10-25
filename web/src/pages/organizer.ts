@@ -1468,6 +1468,14 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
     what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the clauses of the venue\'s policy, and of the attendee\'s own policy for a stolen or broken belonging, that bear on that kind of claim. Both come back to the claim on the Settlements tab, as checks and as its policy clauses; they never change an amount.',
     views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
   },
+  {
+    job: 'Claims: proposing payment rules from the organizer\'s approvals',
+    what: 'Once the organizer has approved three claims of one kind one by one, the agent bandit-rule-proposer counts their copies in bandit-claims with one ES|QL query, by diagnosis and payout, and proposes a rule whose ceiling is the highest payout among them. Code checks the claims it cites and the ceiling, and the rule pays nothing until the organizer approves it on the Proposed rules tab.',
+    views: [
+      ['bandit-propose-rule runs, step by step', '/app/workflows/bandit-propose-rule'],
+      ['bandit-rule-proposer, the agent and its counts', '/app/agent_builder/agents/bandit-rule-proposer'],
+    ],
+  },
 ];
 
 function kibana() {
