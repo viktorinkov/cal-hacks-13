@@ -370,8 +370,8 @@ These are the 18 job kinds in the code (`KIND` constants in `spacetimedb/server/
 | `merch_picks` | `leave_event` and `leave_early`, when an attendee leaves; the end of the event (`end_event`, or the live run's end); `rerun_shopping_agent` | picks the three products the attendee would most want | Anthropic Claude API | `submit_merch_picks` |
 | `photo_features` | `register_photo` | counts the people in an event photo and writes a caption | Anthropic Claude API | `submit_photo_features` |
 | `venue_setup` | `start_venue_setup` (the organizer) | finds the venue and its 3D map from the event's name; Claude picks with `venue_find` and `venue_map` | Bright Data, with the Anthropic Claude API | `report_venue_setup_step` for each step, then `finish_venue_setup` |
-| `plan_lookup` | `look_up_plan` (the attendee) | finds the PDF of the insurance plan the attendee named; Claude picks with `plan_find` and checks with `plan_check` | Bright Data, with the Anthropic Claude API | `finish_plan_lookup` |
-| `venue_policy_lookup` | `look_up_venue_policy` (the organizer) | finds the venue's two policy forms by their form numbers; Claude picks with `venue_policy_find` and checks with `venue_policy_check` | Bright Data, with the Anthropic Claude API | `finish_venue_policy_lookup` |
+| `plan_lookup` | `look_up_plan` (the attendee) | finds the PDF of the insurance plan the attendee named; Claude picks with `plan_find`, and the Evidence Engine reads the PDF with `bandit-read-document`, whose insurer, plan and year code checks against what was typed | Bright Data, with the Anthropic Claude API and Elastic | `finish_plan_lookup` |
+| `venue_policy_lookup` | `look_up_venue_policy` (the organizer) | finds the venue's two policy forms by their form numbers; Claude picks with `venue_policy_find`, and the Evidence Engine reads which coverage forms each PDF holds (`bandit-read-document`, kind `coverage_form`), whose form number code checks against what was typed | Bright Data, with the Anthropic Claude API and Elastic | `finish_venue_policy_lookup` |
 
 #### The command queue
 

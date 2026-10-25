@@ -1,6 +1,6 @@
 version: "1"
 name: bandit-read-document
-description: Reads one BandIt insurance PDF, already indexed one page per document, into the terms and clauses it states. The bandit-document-reader agent quotes the page behind every term, and the answer is saved as one document for bandit-workers to check.
+description: Reads one BandIt insurance PDF, already indexed one page per document, into the terms and clauses it states and what it prints about itself. The bandit-document-reader agent quotes the page behind every term and name, and the answer is saved as one document for bandit-workers to check.
 enabled: true
 tags: [bandit]
 triggers:
@@ -13,7 +13,7 @@ triggers:
       - name: kind
         type: string
         required: true
-        description: venue_policy or health_plan.
+        description: venue_policy, health_plan, or coverage_form for a PDF a venue policy lookup fetched.
       - name: page_count
         type: number
         required: true
@@ -26,6 +26,10 @@ triggers:
         type: string
         required: true
         description: Where the answer is saved, for example bandit-document-terms.
+      - name: reader
+        type: string
+        required: false
+        description: The reader's version, a hash of the agent, the tool, this workflow and the schema, saved with the answer so the same PDF is read once.
 steps:
   - name: pages
     type: elasticsearch.esql.query
@@ -64,6 +68,7 @@ steps:
       document:
         document_hash: "{{ inputs.document_hash }}"
         kind: "{{ inputs.kind }}"
+        reader: "{{ inputs.reader }}"
         model: "{{ steps.read.output.metadata.usage.connectorId }}"
         pages_indexed: "${{ steps.pages.output.values[0][0] }}"
         read: "${{ steps.read.output.structured_output }}"
