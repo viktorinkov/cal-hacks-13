@@ -1,6 +1,7 @@
 //! The three outcomes: auto-settle under a learned rule, route to a named
 //! person, or refuse and show what was checked.
 
+use crate::complications::{ClaimState, complications, reason};
 use crate::coverage::Amounts;
 use crate::rules::SettlementRule;
 use crate::{Check, CheckResult, Corroboration};
@@ -40,7 +41,8 @@ pub enum Decision {
 }
 
 /// First match wins:
-/// 1. no cover -> `Refuse("no active cover for this incident kind")`;
+/// 1. a complication (no cover, a bill over the policy's limit, a service the
+///    fee schedule does not list) -> `Route("Complication: " + every one)`;
 /// 2. `Disputed` -> `Refuse("evidence disputed: " + names of failed checks, comma-joined)`;
 /// 3. payout 0 -> `Refuse("payout is zero after limits")`;
 /// 4. any check with result `Fail` -> `Route("failed checks: " + names)`;
@@ -59,8 +61,9 @@ pub fn decide(input: &DecisionInput) -> Decision {
     let route = |reason: String| Decision::Route { reason };
     let payout = input.amounts.payout_cents;
 
-    if !input.has_cover {
-        return refuse("no active cover for this incident kind".into());
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    if !found.is_empty() {
+        return route(reason("", &found));
     }
     if input.corroboration == Corroboration::Disputed {
         let failed = failed_check_names(input.checks);
@@ -132,7 +135,7 @@ mod tests {
     }
 
     fn amounts(payout: u64) -> Amounts {
-        Amounts { cost_cents: 18000, payout_cents: payout, recoverable_cents: payout, venue_cost_cents: 0 }
+        Amounts { cost_cents: payout, payout_cents: payout, recoverable_cents: payout, venue_cost_cents: 0 }
     }
 
     /// The hero claim: every gate open, a v2 rule with a 25000 ceiling.
@@ -163,10 +166,12 @@ mod tests {
     }
 
     #[test]
-    fn rule_1_no_cover_refuses_first() {
+    fn rule_1_a_gap_in_the_policy_goes_to_a_person_first() {
         let (checks, rule) = (failing(), rule());
         let input = DecisionInput { has_cover: false, corroboration: Corroboration::Disputed, amounts: amounts(0), ..happy(&checks, &rule) };
-        assert_eq!(decide(&input), refused("no active cover for this incident kind"));
+        assert_eq!(decide(&input), routed("Complication: no cover in the venue's policy pays for this kind of incident"));
+        let capped = DecisionInput { amounts: Amounts { cost_cents: 30000, ..amounts(18000) }, ..happy(&checks, &rule) };
+        assert_eq!(decide(&capped), routed("Complication: the covered cost $300.00 is over the policy's limit, which pays at most $180.00"));
     }
 
     #[test]

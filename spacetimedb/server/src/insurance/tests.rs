@@ -336,7 +336,7 @@ fn approve_larger_fall(w: &World) -> Claim {
     w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
-    assert!(c.status_note.starts_with("Claude would pay $895.00"), "{}", c.status_note);
+    assert_eq!(c.status_note, "Complication: the policy's fee schedule does not list 90715. Claude would pay $895.00");
     assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
     let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));

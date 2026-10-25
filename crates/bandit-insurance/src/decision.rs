@@ -5,6 +5,10 @@
 //! checks the answer and holds the decision to the limits a person set:
 //!
 //! - Claude never sets an amount. The fee schedule and the policy limits did.
+//! - A claim with a complication, a gap or mismatch in the policies (no cover
+//!   for the incident, a bill over the policy's limit, a billed service the
+//!   fee schedule does not list), always goes to the organizer, who decides
+//!   it one by one (`complications`).
 //! - Claude pays only claims whose checks all passed, whose evidence is
 //!   corroborated, and that fall inside the authority an organizer's approval
 //!   gave the Decision Engine (a learned rule and its ceiling). Any other pay
@@ -16,6 +20,7 @@
 //! - Claude pays only after it has read the band evidence, the light circle
 //!   and, for an injury, the hospital report itself.
 
+use crate::complications::{ClaimState, complications, reason};
 use crate::coverage::Amounts;
 use crate::letters::unknown_figures;
 use crate::money::format_cents;
@@ -391,7 +396,8 @@ fn concerns_text(d: &AgentDecision) -> String {
 }
 
 /// Holds a valid decision to the limits, first match wins:
-/// 1. no cover: refuse, whatever Claude decided;
+/// 1. a complication (a gap or mismatch in the policies): to the organizer,
+///    whatever Claude decided, with every complication listed;
 /// 2. `refuse` resting on failed checks: refused by Claude; any other refusal goes to the organizer;
 /// 3. `ask_organizer`: to the organizer with Claude's question;
 /// 4. `pay` goes through only with every check passed, a payout above zero,
@@ -403,8 +409,14 @@ pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
     let route = |reason: String, guardrail: String| Guarded { decision: Decision::Route { reason }, decided_by: "code", guardrail };
     let payout = format_cents(input.amounts.payout_cents);
 
-    if !input.has_cover {
-        return refuse("no active cover for this incident kind".into(), "code", "the policy has no active cover for this kind of incident");
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    if !found.is_empty() {
+        let head = match d.decision {
+            Choice::Pay => format!("Claude would pay {payout}"),
+            Choice::Refuse => format!("Claude recommends refusing: {}", concerns_text(d).trim_end_matches('.')),
+            Choice::AskOrganizer => format!("Claude asks: {}", d.question.trim()),
+        };
+        return route(reason(&head, &found), "a gap or mismatch in the policies is decided one by one".into());
     }
     match d.decision {
         Choice::Refuse if !d.refusal_checks.is_empty() => refuse(
@@ -647,9 +659,32 @@ mod tests {
     fn no_cover_and_no_payout_refuse_in_code() {
         let (checks, rule) = (passing(), rule());
         let g = guard(&pay(), &GuardInput { has_cover: false, ..input(&checks, Some(&rule)) });
-        assert_eq!((g.decision, g.decided_by), (Decision::Refuse { reason: "no active cover for this incident kind".into() }, "code"));
+        let gap = "Complication: no cover in the venue's policy pays for this kind of incident. Claude would pay $180.00";
+        assert_eq!((g.decision, g.decided_by), (Decision::Route { reason: gap.into() }, "code"));
         let zero = GuardInput { amounts: Amounts::default(), ..input(&checks, Some(&rule)) };
         assert_eq!(guard(&pay(), &zero).decision, Decision::Refuse { reason: "payout is zero after limits".into() });
+    }
+
+    #[test]
+    fn a_gap_in_the_policy_goes_to_the_organizer_whatever_claude_decided() {
+        let rule = rule();
+        let unlisted = vec![Check::fail("record_lines", "5 covered, 1 reduced, 1 excluded; not on the schedule: 90715")];
+        let route = |g: Guarded| match g.decision {
+            Decision::Route { reason } => reason,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            route(guard(&pay(), &input(&unlisted, Some(&rule)))),
+            "Complication: the policy's fee schedule does not list 90715. Claude would pay $180.00"
+        );
+        let mut refuse = refuse_at_home();
+        refuse.refusal_checks = vec!["record_lines".into()];
+        assert!(route(guard(&refuse, &input(&unlisted, Some(&rule)))).starts_with("Complication: the policy's fee schedule does not list 90715. Claude recommends refusing"));
+        let (checks, capped) = (passing(), Amounts { cost_cents: 720_000, payout_cents: 500_000, recoverable_cents: 500_000, venue_cost_cents: 0 });
+        assert_eq!(
+            route(guard(&pay(), &GuardInput { amounts: capped, ..input(&checks, Some(&rule)) })),
+            "Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00"
+        );
     }
 
     #[test]
