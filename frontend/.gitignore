@@ -27,3 +27,5 @@ dist-ssr
 test-results
 playwright-report
 coverage
+
+public/venue/place/
