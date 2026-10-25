@@ -304,6 +304,8 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 
 The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
 
+Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, each account and the journals J1 to J4. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
+
 ### Event graph (Social.md)
 
 The event graph is a big-screen view for the event: the whole event as one live 3D graph of people, booths, companies and the event photos. Judges watch it grow as people meet, visit booths and turn up in photos.

@@ -19,6 +19,7 @@ import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
+import { defineTerms } from '../terms';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
 import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
@@ -1232,11 +1233,14 @@ function kibana() {
 let pressing = false;
 document.addEventListener('pointerdown', () => { pressing = true; }, true);
 document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; render(); }, 100), true);
+// Resting on a defined term holds redraws for up to 10 seconds, so its definition stays up.
+let reading = 0;
+document.addEventListener('pointerover', e => { reading = (e.target as Element).closest?.('abbr[title]') ? Date.now() : 0; }, true);
 
 function render() {
   // Typing in a story box or choosing from a list holds redraws too, so the text and the open list stay put.
   const busy = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLSelectElement;
-  if (!conn || pressing || busy) return;
+  if (!conn || pressing || busy || Date.now() - reading < 10_000) return;
   const open = tabs();
   mount('head', header());
   const list = document.getElementById('people')!;
@@ -1261,6 +1265,7 @@ function render() {
   }
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : [live(), personPanel(people)];
   mount('app', body);
+  if (tab === 'claims' || tab === 'costs') defineTerms(document.getElementById('app')!);
   if (scrollToClaim) {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
