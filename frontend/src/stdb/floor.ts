@@ -1,9 +1,8 @@
 import type { Device, Incident, SectionKind, Venue, VenueZone, WorldSnapshot, ZoneState } from '@/contracts/domain'
 import { rect } from '@/lib/geometry'
 import { CALHACKS_CAPACITY, calhacksHome, calhacksVenue } from '@/mock/calhacks'
-import { bindCrowdCast, crowdIsSeeded, crowdOccupancy, crowdSize, startCalhacksCrowd } from '@/mock/calhacksCrowd'
-import { HARDWARE_ID_MAX, demoDevices, isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
-import { applyHallDemo, overlayScripted, scriptedBands } from '@/booth/hallDemo'
+import { bindCrowdCast, startCalhacksCrowd } from '@/mock/calhacksCrowd'
+import { HARDWARE_ID_MAX } from '@/booth/demoRing'
 import { setLiveBands } from '@/booth/place'
 import { currentPlan } from '@/map/venuePlan'
 import { resetServerTime, setClockRate } from '@/stores/clock'
@@ -73,7 +72,7 @@ let seq = 0
 let lastInput: FloorInput | null = null
 let venueKey = ''
 let venueCache: Venue | null = null
-/** Who is on the floor, ignoring coordinates. A crowd tick that only moves people does not rebuild the map. */
+/** What the map draws: crowd presence, online state and position all move people on the floor. */
 let floorStamp = ''
 
 function stampOf(input: FloorInput): string {
@@ -84,6 +83,10 @@ function stampOf(input: FloorInput): string {
     if (band.id > HARDWARE_ID_MAX) {
       crowd += 1
       hash ^= band.id
+      hash ^= band.online ? 0x9e3779 : 0
+      hash ^= band.zone * 31
+      hash ^= Math.round((band.xM ?? 0) * 10)
+      hash ^= Math.round((band.yM ?? 0) * 10) << 8
       hash = Math.imul(hash, 16777619)
       continue
     }
@@ -371,7 +374,8 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
         lastSeenAt: band.lastSeen,
         currentPattern: band.sos ? 'sos' : band.fall ? 'steady_red' : band.online ? 'ready' : 'off',
         sosActive: band.sos,
-        locationSource: 'unknown',
+        ...(band.hasPosition && band.xM != null && band.yM != null ? { location: { x: band.xM, y: band.yM } } : {}),
+        locationSource: 'station_estimate' as const,
         zoneId,
         hapticsSupported: band.hasMotor,
         imuSupported: band.hasMpu,
@@ -381,15 +385,26 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
     })
   }
 
-  const wandering = crowdOccupancy()
-  const seeded = crowdIsSeeded()
+  // Occupancy comes from the band rows themselves: a crowd member counts while the backend
+  // says they are inside (online with a zone), a hardware band counts wherever it last reported.
+  const occupancy = new Map<string, number>()
+  const alerted = new Set<string>()
+  for (const band of input?.bands ?? []) {
+    if (band.zone === 0) continue
+    const source = byStation.get(band.zone)
+    if (!source) continue
+    const home = calhacksHome(source.name)
+    if (band.id > HARDWARE_ID_MAX && !band.online) continue
+    occupancy.set(home, (occupancy.get(home) ?? 0) + 1)
+    if (band.sos || band.fall) alerted.add(home)
+  }
+
   const zones: ZoneState[] = calhacksVenue.zones.map((zone) => {
-    const bands = grouped.get(zone.zoneId) ?? []
     const room = capacity.get(zone.zoneId) || CALHACKS_CAPACITY[zone.zoneId] || 1
     const area = zone.areaM2 || 1
-    const count = wandering ? (wandering[zone.zoneId] ?? 0) : bands.length
+    const count = occupancy.get(zone.zoneId) ?? 0
     const density = count / area
-    const alert = !wandering && bands.some((band) => band.sos || band.fall)
+    const alert = alerted.has(zone.zoneId)
     const cautionLine = zone.section === 'front' ? 3.8 : 3.1
     const criticalLine = zone.section === 'front' ? 4.8 : 4.1
     return {
@@ -398,26 +413,21 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       occupancyEstimate: count,
       estimatedDensity: density,
       peakDensity: density,
-      congestionStatus: alert || density >= criticalLine ? 'critical' : !wandering && bands.length / room >= 0.8 ? 'caution' : density >= cautionLine ? 'caution' : 'normal',
-      source: wandering ? 'simulation' : 'estimated',
+      congestionStatus: alert || density >= criticalLine ? 'critical' : count / room >= 0.8 || density >= cautionLine ? 'caution' : 'normal',
+      source: 'estimated',
       dataQuality: 'good',
       updatedAt: now,
     }
   })
 
   const incidents: Incident[] = []
-  const ring = useDemoRing.getState()
-  const laid = layoutDemo(input?.bands ?? [], ring)
   for (const incident of input?.incidents ?? []) {
-    // The crowd roster starts at 100. Those rows are the local people, not operator incidents.
-    if (incident.bandId > HARDWARE_ID_MAX) continue
     const source = byId.get(incident.zoneId) ?? byStation.get(incident.stationId)
     const home = calhacksHome(source?.name ?? '')
     const place = calhacksVenue.zones.find((zone) => zone.zoneId === home)
     const kind = incident.kind || 'incident'
     const subject = input?.bands.find((band) => band.id === incident.bandId)
-    const spot = laid.find((item) => item.band.id === incident.bandId)?.at
-    const inRing = (kind === 'sos' || kind === 'fall') && !!subject && isHardware(subject)
+    const at = subject?.hasPosition && subject.xM != null && subject.yM != null ? { x: subject.xM, y: subject.yM } : undefined
     incidents.push({
       incidentId: incident.id,
       displayId: `INC-${incident.id}`,
@@ -427,62 +437,30 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zoneId,
-      location: inRing ? (spot ?? { x: ring.x, y: ring.y }) : place?.labelAt,
-      localizationStatus: place ? 'estimated' : 'unknown',
+      location: at ?? place?.labelAt,
+      localizationStatus: at || place ? 'estimated' : 'unknown',
       cameraObservations: [],
       timeline: [{ at: incident.openedAt ?? now, source: 'device', text: `${kind} on band ${incident.bandId || 'unknown'}` }],
       guidanceCommandIds: [],
       isSimulated: false,
     })
   }
-  const overlaid = overlayScripted(input?.bands ?? [])
-  const reported = mergeHardwareAlerts(incidents, overlaid, ring, now)
-  const guided = applyHallDemo(reported, [])
-  for (const device of demoDevices(scriptedBands(), ring)) {
-    const index = devices.findIndex((item) => item.deviceId === device.deviceId)
-    if (index >= 0) {
-      devices[index] = {
-        ...devices[index],
-        currentPattern: device.currentPattern,
-        sosActive: device.sosActive,
-        connectionStatus: 'connected',
-        location: device.location,
-        wearerLabel: 'Test band',
-      }
-      continue
-    }
-    devices.push(device)
-  }
 
+  const inside = [...occupancy.values()].reduce((sum, count) => sum + count, 0)
   seq += 1
   return {
     timestamp: now,
     seq,
-    mode: seeded ? 'live' : wandering ? (input ? 'hybrid' : 'simulation') : input ? 'live' : 'simulation',
+    mode: input ? 'live' : 'simulation',
     venue: calhacksVenue,
     zones,
     devices,
-    incidents: guided.incidents,
+    incidents,
     observations: [],
-    commands: guided.commands,
-    sources: [
-      ...(input
-        ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live on the floor · ${input.venueName}` }]
-        : []),
-      ...(wandering
-        ? [{
-            sourceId: 'crowd',
-            kind: 'crowd' as const,
-            label: 'Crowd',
-            status: 'ok' as const,
-            lastUpdateAt: now,
-            isSimulated: !crowdIsSeeded(),
-            detail: crowdIsSeeded()
-              ? `${crowdSize().toLocaleString('en-US')} people seeded from the venue`
-              : `${crowdSize().toLocaleString('en-US')} local attendees`,
-          }]
-        : []),
-    ],
+    commands: [],
+    sources: input
+      ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${inside.toLocaleString('en-US')} inside · ${input.venueName}` }]
+      : [],
   }
 }
 

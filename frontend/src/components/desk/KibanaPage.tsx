@@ -12,7 +12,7 @@ export function KibanaPage() {
   const base = host?.kibanaUrl ?? ''
   return (
     <DeskFrame motif="kibana" title={KIBANA_INTRO.title} sentence={KIBANA_INTRO.text}>
-      {host && !base && <p className="mb-6 text-[14px] text-signal">This host has no Kibana address, so the views below cannot open.</p>}
+      {host && !base && <p className="mb-6 text-[14px] text-signal">No Kibana address on this host.</p>}
       <div className="grid gap-4 md:grid-cols-2">
         {KIBANA_JOBS.map(({ job, what, views }) => (
           <section key={job} aria-label={job} className="desk-card flex flex-col p-5">

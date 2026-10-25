@@ -10,6 +10,7 @@ import { useWorld } from '@/stores/world'
 import { ConnectionBanner } from './ConnectionBanner'
 import { MapToolbar } from './MapToolbar'
 import { OnStageStrip } from './OnStageStrip'
+import { RunBar } from '@/components/run/RunBar'
 import { PressureTimeline } from './PressureTimeline'
 import { SidePanel } from './SidePanel'
 import { StatusHeader } from './StatusHeader'
@@ -114,6 +115,7 @@ export function CommandCenter() {
           </button>
           <aside id="map-controls" aria-label="Map controls" hidden={!controlsOpen} className="nc-scroll pointer-events-auto min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-[4px]">
             <div className="flex min-w-0 flex-col gap-3 pb-1 [&>*]:max-w-full [&>*]:shrink-0">
+              <RunBar />
               <PersonPanel />
               {incidentShown && <IncidentPanel />}
               <SidePanel maxHeight={Math.max(280, rowHeight - 60)} docked />

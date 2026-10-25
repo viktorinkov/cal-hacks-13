@@ -59,7 +59,7 @@ describe('live floor', () => {
     expect(placeOnCalhacks(null).devices).toEqual([])
   })
 
-  it('leaves crowd falls off the operator map', () => {
+  it('shows a crowd incident on the operator map', () => {
     const snap = placeOnCalhacks({
       ...input,
       incidents: [
@@ -67,7 +67,7 @@ describe('live floor', () => {
         { id: '75', kind: 'fall', zoneId: '2', stationId: 101, bandId: 888, openedAt: 60, resolved: false, status: 'open' },
       ],
     })
-    expect(snap.incidents.map((incident) => incident.incidentId)).toEqual(['4'])
+    expect(snap.incidents.map((incident) => incident.incidentId)).toEqual(['4', '75'])
   })
 
   it('does not turn the crowd table into wristband markers', () => {

@@ -33,9 +33,9 @@ describe('laptop camera lifecycle', () => {
     render(<LaptopCamera />)
     expect(getUserMedia).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Start camera' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Live'))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('On'))
     expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({ video: true, audio: false })
-    const preview = screen.getByLabelText('Live laptop camera preview') as HTMLVideoElement
+    const preview = screen.getByLabelText('Laptop camera preview') as HTMLVideoElement
     expect(preview.srcObject).toBe(camera.value)
     await userEvent.click(screen.getByRole('button', { name: 'Stop camera' }))
     expect(camera.track.stop).toHaveBeenCalledOnce()

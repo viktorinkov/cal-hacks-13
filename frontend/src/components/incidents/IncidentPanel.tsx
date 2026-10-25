@@ -9,7 +9,6 @@ import { clock, elapsed } from '@/lib/format'
 import { incidentStatusText, incidentTitle, localizationText, observationText, simBandsFor, type Tone } from '@/lib/status'
 import { cn } from '@/lib/utils'
 import { mapController } from '@/map/controller'
-import { scriptedIncidentId, useHallDemo } from '@/booth/hallDemo'
 import { DeskIncidentActions } from '@/components/incidents/DeskIncidentActions'
 import { acknowledgeIncident, approveGuidance, cancelGuidance, isModuleIncident, pendingKey, previewGuidance } from '@/services/operatorCommands'
 import { isLive, useConnection } from '@/stores/connection'
@@ -62,7 +61,6 @@ export function IncidentPanel() {
   const expanded = useUi((s) => s.incidentOpen)
   const setExpanded = useUi((s) => s.setIncidentOpen)
   const linkUp = useConnection(isLive)
-  const rehearsal = useHallDemo((s) => s.scripted)
   const near = useMapStats((s) => s.nearIncident)
   const simulatedBands = useWorld((s) => s.scenario?.simulatedBands)
   const now = useServerNow(1)
@@ -98,9 +96,8 @@ export function IncidentPanel() {
   }, [incId, status, hasLocation, cmds.length])
 
   if (!inc) return null
-  const local = rehearsal && inc.incidentId === scriptedIncidentId()
   const onDesk = isModuleIncident(inc.incidentId)
-  const canAct = onDesk || linkUp || local
+  const canAct = onDesk || linkUp
   const tz = venue?.timeZone
   const zoneName = venue?.zones.find((z) => z.zoneId === inc.candidateZone)?.name ?? 'Unknown zone'
   const reporter = inc.reportedByDeviceId ? devices[inc.reportedByDeviceId] : undefined

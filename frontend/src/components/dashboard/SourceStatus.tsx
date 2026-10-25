@@ -106,10 +106,10 @@ function ModeChip({ mode }: { mode: 'simulation' | 'live' | 'hybrid' }) {
   return (
     <span
       className="inline-flex h-7 items-center gap-2 overflow-hidden whitespace-nowrap rounded-[3px] bg-[rgba(184,166,255,0.1)] pr-2.5 text-[12px] font-semibold text-[#d9d0ff] shadow-[inset_0_0_0_1px_rgba(184,166,255,0.55)]"
-      title={mode === 'hybrid' ? 'Live bands and incidents; locally generated crowd' : 'Locally generated event data'}
+      title={mode === 'hybrid' ? 'Band and incident feed with a locally generated crowd' : 'Locally generated event data'}
     >
       <span aria-hidden className="nc-sim-bar h-full w-3" />
-      {mode === 'hybrid' ? 'Live bands · local crowd' : 'Local event'}
+      {mode === 'hybrid' ? 'Band feed · local crowd' : 'Local event'}
     </span>
   )
 }

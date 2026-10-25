@@ -7,11 +7,7 @@ export type CrowdAction = 'injury' | 'theft'
 export function personActionUnavailable(person: RunAttendee, run: RunState): string {
   if (!person.crowd) return 'Actions are available only for the test crowd.'
   if (!run.linked) return 'Waiting for the event connection.'
-  if (run.eventEnded) return 'Reopen the event and start the run to choose a bot action.'
-  if (run.run?.phase !== 'running') return 'Start the event run to choose a bot action.'
-  if (run.pausedAt != null) return 'Resume the event run to choose a bot action.'
-  if (run.evacuatingAt != null) return 'Bot actions pause during evacuation.'
-  if (!run.bands.some((band) => band.id === person.bandId && band.online)) return 'This band is offline.'
+  if (!run.bands.some((band) => band.id === person.bandId && band.hasPosition)) return 'This band has no recorded place.'
   const open = new Set(run.incidents.map((incident) => incident.id))
   if (run.incidents.some((incident) => incident.subjectBand === person.bandId)
     || run.plans.some((plan) => plan.culpritBand === person.bandId && open.has(plan.incidentId))) {

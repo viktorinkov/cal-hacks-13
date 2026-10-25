@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CalhacksCrowd } from '@/mock/calhacksCrowd'
 import { Rng } from '@/mock/sim/rng'
 import {
   FIRST_MS,
@@ -11,7 +10,6 @@ import {
   resetFloorShop,
   shopGapMs,
   shopTarget,
-  useFloorShop,
   withFloorPurchases,
 } from '@/payments/floorShop'
 import { EMPTY_DESK } from '@/payments/rows'
@@ -77,17 +75,6 @@ describe('floor purchases', () => {
     expect(desk.booths[0]?.name).toBe('Visa')
   })
 
-  it('sends people on the hall to a booth and records the purchase', () => {
-    vi.useFakeTimers()
-    const crowd = new CalhacksCrowd(180, 3)
-    crowd.enableShopping()
-    for (let n = 0; n < 450; n++) crowd.step()
-    const orders = useFloorShop.getState().orders
-    expect(orders.length).toBeGreaterThan(0)
-    expect(orders.every((item) => item.status === 'paying' || item.status === 'paid' || item.status === 'failed')).toBe(true)
-    const names = new Set(orders.map((item) => item.attendeeName))
-    expect(names.size).toBe(orders.length)
-  })
 })
 
 function order(id: string) {

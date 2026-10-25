@@ -5,9 +5,8 @@
  */
 import { Application, Container } from 'pixi.js'
 import { boothHandle, moveBooth, resizeBooth, saveBooth, useBooth } from '@/booth/circle'
-import { DEMO_LANE, demoDevices as layDemoDevices, demoIsActive, demoRingHandle, demoRoute, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, withDemoIncidents } from '@/booth/demoRing'
-import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
-import { characterAt, demoReveal } from '@/mock/calhacksCrowd'
+import { demoDevices as layDemoDevices, demoIsActive, demoRingHandle, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, useHardware, withDemoIncidents } from '@/booth/demoRing'
+import { characterAt } from '@/mock/calhacksCrowd'
 import { castRoster } from '@/stdb/cast'
 import { personWidthPx, pickPerson } from './personPicking'
 import { presentCalhacks } from '@/stdb/floor'
@@ -394,7 +393,7 @@ export class MapEngine {
     // incidents, routes, classification
     const incidents = Object.values(world.incidents)
     const open = incidents.filter((i) => i.status !== 'resolved')
-    const floorBands = this.venue.venueId === 'calhacks' ? bandsOnFloor() : []
+    const floorBands = this.venue.venueId === 'calhacks' ? useHardware.getState().bands : []
     const shown = this.venue.venueId === 'calhacks' ? withDemoIncidents(open, floorBands, useDemoRing.getState()) : open
     const focus = ui.selection.kind === 'incident' ? ui.selection.id : (shown[0]?.incidentId ?? null)
     const routes = this.routes(world.commands, dt)
@@ -492,14 +491,7 @@ export class MapEngine {
     const marks = this.marks
     if (!marks) return out
     const booth = useBooth.getState()
-    const hall = useHallDemo.getState()
-    const alerting = this.venue?.venueId === 'calhacks' && demoIsActive(bandsOnFloor(), Object.values(useWorld.getState().incidents))
-    const showPath = alerting && (hall.pathOpen || (hall.scripted && hall.acknowledged))
     if (this.venue?.venueId === 'main-stage') marks.setBoothPath([{ x: 10.3, y: 56 }, { x: booth.x, y: booth.y }])
-    else if (showPath) {
-      const route = demoRoute(useDemoRing.getState())
-      marks.setBoothPath(route.points, 'COR-DEMO', route.z)
-    }
     else marks.setBoothPath(null)
     const seen = new Set<string>()
     for (const c of Object.values(commands)) {
@@ -508,13 +500,6 @@ export class MapEngine {
       if (c.approvalStatus === 'pending_approval') out.push({ path, command: c, mode: 'preview', reveal: path.length })
       else if (c.approvalStatus === 'approved' && c.deliveryStatus !== 'cancelled') {
         seen.add(c.commandId)
-        if (c.commandId === 'demo-path') {
-          const r = this.reveal.get(c.commandId) ?? { at: demoReveal() }
-          r.at = this.reducedMotion ? path.length : Math.min(path.length, Math.max(r.at, demoReveal()) + REVEAL_SPEED * dt)
-          this.reveal.set(c.commandId, r)
-          out.push({ path, command: c, mode: 'active', reveal: r.at })
-          continue
-        }
         const r = this.reveal.get(c.commandId) ?? { at: 0 }
         r.at = this.reducedMotion ? path.length : Math.min(path.length, r.at + REVEAL_SPEED * dt)
         this.reveal.set(c.commandId, r)
@@ -531,7 +516,7 @@ export class MapEngine {
     const near = open.filter((i) => i.location).map((i) => i.location!)
     const active = routes.filter((r) => r.mode === 'active')
     const r2 = NEAR_RADIUS * NEAR_RADIUS
-    const ringAlert = this.venue?.venueId === 'calhacks' && demoIsActive(bandsOnFloor(), open)
+    const ringAlert = this.venue?.venueId === 'calhacks' && demoIsActive(useHardware.getState().bands, open)
     const ring = ringAlert ? useDemoRing.getState() : null
     const halo = ring ? (ring.r + RING_HALO) * (ring.r + RING_HALO) : 0
     for (let i = 0; i < n; i++) {
@@ -556,7 +541,7 @@ export class MapEngine {
       if (!c) {
         for (const r of active) {
           r.path.project(x, y, this.pr)
-          const half = r.command.commandId === 'demo-path' ? DEMO_LANE : LANE_HALF
+          const half = LANE_HALF
           if (this.pr.distance <= half && this.pr.along <= r.reveal) {
             c = CLASS_LANE
             break
@@ -592,7 +577,7 @@ export class MapEngine {
    */
   private demoDevices(): Record<string, Device> {
     const devices: Record<string, Device> = {}
-    for (const device of layDemoDevices(bandsOnFloor(), useDemoRing.getState())) devices[device.deviceId] = device
+    for (const device of layDemoDevices(useHardware.getState().bands, useDemoRing.getState())) devices[device.deviceId] = device
     return devices
   }
 
