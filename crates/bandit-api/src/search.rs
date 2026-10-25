@@ -1,9 +1,10 @@
 //! bandit-api's Elastic side: it ranks the recap's suggestions, finds the closest booths of people who
 //! share none with the attendee, and keeps each attendee's latest ranking in
-//! `<prefix>-recap-rankings` for the Kibana recap dashboard. Every ranking is a hybrid search: a
+//! `<prefix>-recap-rankings` for the Kibana recap dashboard. Automatic recap ranking is a hybrid search: a
 //! keyword match on the `words` subfield and a semantic query, fused with RRF, then reordered by a
 //! reranker.
 //! The people and booths indices and their fields are written by bandit-indexer.
+//! Typed friend search instead reranks transient, caller-scoped encounter evidence directly.
 
 use anyhow::{Result, bail};
 use futures_util::{StreamExt, TryStreamExt, stream};
