@@ -98,7 +98,7 @@ function showBands(p) {
   bandLayer = new THREE.Group();
   const camPos = new THREE.Vector3().setFromMatrixPosition(cams[photos.indexOf(p)].g.matrix);
   for (const b of p.bands) {
-    const role = ROLE[b.role];
+    const role = p.confident ? ROLE[b.role] : 'off';
     const [x, z] = toScan(b.x, b.z);
     const atCamera = Math.hypot(x - camPos.x, z - camPos.z) < 2 * metre;
     const colour = COLOUR[role];
@@ -221,9 +221,10 @@ function select(i, fly = true) {
     return li;
   }));
   if (!send.length && !maybe.length) $('detail-send').replaceChildren(el('li', 'no band in view'));
-  $('detail-note').textContent = p.test_bands
-    ? 'The band positions around this photo are seeded test wearers, not radio data.'
-    : `${p.bands.length} bands were on the floor at that moment.`;
+  if (!p.confident) $('detail-send').replaceChildren(el('li', 'held back: the camera did not settle'));
+  $('detail-note').textContent = (p.confident ? '' : 'Look through the lens: if the photo lines up with the scan, the place is right. ')
+    + (p.test_bands ? 'The band positions around this photo are seeded test wearers, not radio data.'
+      : `${p.bands.length} bands were on the floor at that moment.`);
   if (fly) {
     const { eye, target } = aroundPhoto(p);
     flyTo(eye, lookQuat(eye, target), 55, 1500, () => { controls.target.copy(target); });
@@ -310,7 +311,7 @@ $('list').replaceChildren(...photos.map((p, i) => {
   img.loading = 'lazy';
   const send = p.bands.filter((b) => b.role === 'in photo').length;
   const cap = document.createElement('div');
-  cap.innerHTML = `<b>${p.id}</b> · ${send ? `${send} to send` : 'nobody in view'}`;
+  cap.innerHTML = `<b>${p.id}</b> · ${!p.confident ? 'unsure' : send ? `${send} to send` : 'nobody in view'}`;
   li.append(img, cap);
   li.addEventListener('click', () => select(i));
   return li;
