@@ -90,18 +90,21 @@ Prize: $8,000, $5,000 and $3,000. Source: Hyphenate's track doc (its starter pac
 |---|---|---|---|---|
 | Jordan's fall: urgent care billed $1,308 | Jordan, $895 into his wallet, the fee schedule's cap on each billed line | the venue, from its medical payments cover; when that cover is excess, Jordan's own health plan pays first and the venue pays only his copay (next to build) | the venue's insurer, $895, since the cover has no deductible | reserve (J1), what the insurer owes (J2), the payout (J3), the insurer's payment (J4) |
 | The speaker knocked off its stand: a $2,400 repair | the repair vendor, $2,400 | the venue, from its property cover | the venue's insurer, $1,900; the $500 deductible stays with the venue | J1, J2, J3 at once, J4 |
-| The same speaker, when staff saw who knocked it over (next to build) | the venue | the attendee who broke it, through a charge on their tap page that they pay from their wallet or dispute | | a receivable from the attendee until they pay |
+| The same speaker, when security names who knocked it over (next to build) | the venue's insurer, which paid the repair | the person named, from their wallet, once the organizer approves the charge | | the recovery (J5) |
+| A laptop stolen from the hacker tables (next to build) | the owner, at once into their wallet: its value up to their policy's limit, less the deductible | BandIt, from the owner's own policy, since the venue's policy excludes guests' belongings | the owner's insurer | when security names the thief, the charge gives the owner their deductible back and repays the insurer (J5) |
 | Sam's claim, if the organizer refuses it | nobody | | | the reserve reverses (J1r) |
 
 **The seats BandIt fills.** Hyphenate's own example is "the accountant who applies customer payments and the person who chases the late ones". At a venue after an incident those seats are:
 
 - the payments resolver, who works out who owes what to whom and from which policy: the venue's medical or property cover, the attendee's own health plan, the venue's insurer, or the attendee who broke something;
 - the accountant who applies each payment on a double-entry ledger: the reserve, the payout to the attendee's wallet or the repair vendor, what the insurer owes, and the insurer's payment when it lands;
-- the person who chases what is owed: the venue's insurer, through the notice of loss and its recorded payment; whoever handled broken equipment, through the recovery letter; and an attendee, through a charge on their tap page (next to build).
+- the person who chases what is owed: the venue's insurer, through the notice of loss and its recorded payment; whoever handled broken equipment, through the recovery letter; and the person responsible, through a charge collected from their wallet and shown on their tap page (next to build).
 
 They answer to the organizer, the venue's risk manager. Checking each claim against the evidence (the band, the light circle, the cameras and the hospital report) is how the resolver earns the right to pay.
 
 BandIt enters its payment resolution. The insurance Decision Engine decides who is paid and how much, and the ledger, the wallet payouts and the insurer reconciliation move the money ([Insurance](../6-features/Insurance.md)).
+
+The organizer reads the same books as the event's controller on the Costs tab: the costs so far by cost center, who pays what, every cost line and the journal with its trial balance ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
 
 | The track asks | BandIt answers with | See it |
 |---|---|---|
