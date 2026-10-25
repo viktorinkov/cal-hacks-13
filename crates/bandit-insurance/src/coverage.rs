@@ -4,7 +4,8 @@
 use crate::{Cents, CoverKind, IncidentKind};
 use serde::{Deserialize, Serialize};
 
-/// One cover under the venue's general liability policy.
+/// One cover: medical payments in the venue's general liability, property in the venue's property policy,
+/// or the attendee's own personal property cover.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CoverageRule {
     pub cover_kind: CoverKind,

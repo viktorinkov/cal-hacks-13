@@ -54,7 +54,7 @@ pub fn validation_check(v: &ValidationResult) -> CheckIn {
 fn looked_for(kind: &str) -> &'static str {
     match kind {
         "sos" | "fall" => "the venue's medical payments cover, its limits, exclusions and service window, and the other-insurance clause",
-        "property" => "the venue's property cover, its limits and deductible, its exclusions and the subrogation clause",
+        "property" => "the venue's property policy, its limits and deductible, its exclusions and the subrogation clause",
         "theft" => {
             "the attendee's own personal property cover, its limits, deductible and exclusions such as property left unattended, \
              the subrogation clause, and the venue's exclusion of guests' property"
@@ -246,7 +246,7 @@ mod tests {
             c.detail
         );
         let c = clauses_check("property", false, &Ok(vec![hit("venue", "subrogation")]));
-        assert!(c.detail.starts_with("1 clause of the venue's policy (subrogation); no attendee policy on file; looked for the venue's property cover"), "{}", c.detail);
+        assert!(c.detail.starts_with("1 clause of the venue's policy (subrogation); no attendee policy on file; looked for the venue's property policy"), "{}", c.detail);
         let none = clauses_check("fall", false, &Ok(vec![]));
         assert_eq!(none.result, "info");
         assert!(none.detail.starts_with("0 clauses of the venue's policy; no attendee policy on file; looked for the venue's medical payments cover"), "{}", none.detail);

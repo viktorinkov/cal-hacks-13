@@ -89,7 +89,7 @@ Prize: $8,000, $5,000 and $3,000. Source: Hyphenate's track doc (its starter pac
 | Incident | Paid to | Paid by | Paid back to the venue by | On the books |
 |---|---|---|---|---|
 | Jordan's fall: urgent care billed $1,308 | Jordan, $895 into his wallet, the fee schedule's cap on each billed line | the venue, from its medical payments cover; when that cover is excess, Jordan's own health plan pays first and the venue pays only his copay (next to build) | the venue's insurer, $895, since the cover has no deductible | reserve (J1), what the insurer owes (J2), the payout (J3), the insurer's payment (J4) |
-| The speaker knocked off its stand: a $2,400 repair | the repair vendor, $2,400 | the venue, from its property cover | the venue's insurer, $1,900; the $500 deductible stays with the venue | J1, J2, J3 at once, J4 |
+| The speaker knocked off its stand: a $2,400 repair | the repair vendor, $2,400 | the venue, from its property policy | the venue's insurer, $1,900; the $500 deductible stays with the venue | J1, J2, J3 at once, J4 |
 | The same speaker, when security names who knocked it over (next to build) | the venue's insurer, which paid the repair | the person named, from their wallet, once the organizer approves the charge | | the recovery (J5) |
 | A laptop stolen from the hacker tables (next to build) | the owner, at once into their wallet: its value up to their policy's limit, less the deductible | BandIt, from the owner's own policy, since the venue's policy excludes guests' belongings | the owner's insurer | when security names the thief, the charge gives the owner their deductible back and repays the insurer (J5) |
 | Sam's claim, if the organizer refuses it | nobody | | | the reserve reverses (J1r) |

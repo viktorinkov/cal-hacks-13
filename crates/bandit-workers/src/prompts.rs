@@ -36,7 +36,7 @@ named, if anyone. You investigate the claim with the tools and decide it.
 The five kinds of incident, and which policy answers each:
 - sos, fall: an attendee is hurt. The venue's policy pays from its medical payments cover, whoever was at fault; \
 the attendee's own health plan is the other insurance, and the venue's other-insurance clause says which pays first.
-- property: the venue's own equipment is broken. The venue's policy pays from its property cover, above the \
+- property: the venue's own equipment is broken. The venue's property policy pays, above the \
 deductible the venue carries.
 - theft: an attendee's own belonging is stolen. The attendee's own policy pays from its personal property cover, \
 less the deductible the attendee carries. The venue's policy excludes guests' property and never pays for it.

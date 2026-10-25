@@ -6,7 +6,7 @@ Insurance resolves the money after an incident: who is paid, how much, from whic
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
 - **The organizer** decides each claim that Claude or the guard sends them, and every decision is kept as a precedent. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Once three approved claims of one shape agree, Claude proposes a payment rule that cites them, and after the organizer approves it, the next claim of that shape is paid with nobody involved.
 
-Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first. The attendee's own policy pays when their belongings are stolen or broken, because the venue's policy never does.
+Both sides of a claim are insured. The venue holds one package policy with a liability part and a property part: its general liability pays the attendee's medical bills, and its property policy pays for the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first. The attendee's own policy pays when their belongings are stolen or broken, because the venue's policy never does.
 
 Money moves on a double-entry ledger. A payout lands in the attendee's wallet, their Capital One Nessie API account.
 
@@ -99,7 +99,7 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | Type | Who claims | Which policy pays | Who is charged |
 |---|---|---|---|
 | `fall`, `sos`: an attendee is hurt | the attendee | the venue's policy, medical payments cover; the attendee's health plan is the other insurance | nobody |
-| `property`: the venue's own equipment is broken | the venue | the venue's policy, property cover; the venue carries the deductible | the attendee who broke it, when security names one |
+| `property`: the venue's own equipment is broken | the venue | the venue's property policy, the property part of its package policy; the venue carries the deductible | the attendee who broke it, when security names one |
 | `theft`: an attendee's belonging is stolen | the attendee | the attendee's own policy, personal property cover | the attendee who took it, when security names one |
 | `breakage`: an attendee's belonging is broken by someone else | the attendee | the attendee's own policy, personal property cover | the attendee who broke it, when security names one |
 
