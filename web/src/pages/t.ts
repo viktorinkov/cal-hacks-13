@@ -2,6 +2,8 @@
 // the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
 // PDFs, the Capital One wallet, then a thank-you.
 // When the host ends the event, the same page turns into the recap.
+// After a fall or a call for help, the top of the page asks what happened and files the claim, then
+// shows how it is going until the payout lands in the wallet.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
 // for first aid.
 
@@ -35,6 +37,8 @@ const QUERIES = [
   'SELECT * FROM my_roles',
   'SELECT * FROM open_incidents',
   'SELECT * FROM medic_medical_cards',
+  'SELECT * FROM my_incidents',
+  'SELECT * FROM my_claims',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
@@ -286,6 +290,48 @@ function setup() {
   }
 }
 
+// --- Claims ---------------------------------------------------------------------------------
+
+/** What a claim's status means for the attendee, in plain words. */
+function claimStatus(tag: string, payoutCents: bigint): string {
+  switch (tag) {
+    case 'AwaitingRecord': return 'Waiting for the hospital report';
+    case 'ReadingRecord': case 'Verifying': case 'Reviewing': return 'Being reviewed';
+    case 'Routed': return 'With the organizer for a decision';
+    case 'Paying': return 'Approved, paying into your wallet';
+    case 'Settled': case 'Reconciled': return `Paid ${money(payoutCents)} into your wallet`;
+    case 'Refused': return 'Not covered. The organizer can tell you why.';
+    default: return 'Being reviewed';
+  }
+}
+
+const KIND_WORDS: Record<string, string> = { fall: 'a fall', sos: 'a call for help' };
+
+/** After a fall or a call for help: file a claim in your own words, then follow it to the payout. */
+function claims() {
+  const open = [...conn.db.myIncidents.iter()].filter(i => i.resolved && i.claimId === 0n).sort((a, b) => Number(a.incidentId - b.incidentId));
+  const mine = [...conn.db.myClaims.iter()].sort((a, b) => Number(a.id - b.id));
+  const file = (incidentId: bigint) => async (e: Event) => {
+    e.preventDefault();
+    const statement = ((e.target as HTMLFormElement).elements.namedItem(`statement-${incidentId}`) as HTMLTextAreaElement).value.trim();
+    await act(() => conn.reducers.fileClaim({ incidentId, statement }));
+  };
+  return [
+    open.length > 0 && h('section', {},
+      h('h3', {}, 'Hurt at the event?'),
+      open.map(i => h('form', { onsubmit: file(i.incidentId) },
+        h('p', {}, `Your band flagged ${KIND_WORDS[i.kind] ?? 'an alert'} at the ${i.zoneName} at ${time(i.openedAt)}. If you were hurt, tell us what happened and the venue's insurance can pay for your treatment.`),
+        h('textarea', { name: `statement-${i.incidentId}`, rows: 4, required: true, placeholder: 'Tell us what happened…' }),
+        h('button', {}, 'File a claim')))),
+    mine.length > 0 && h('section', {},
+      h('h3', {}, 'Your claim'),
+      mine.map(c => h('div', {},
+        h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents)),
+        h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an injury'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
+        c.statement && h('p', {}, `You said: "${c.statement}"`)))),
+  ];
+}
+
 // --- Medic view -------------------------------------------------------------------------------
 
 function isMedic(): boolean {
@@ -329,7 +375,8 @@ function medicView() {
 }
 
 function render() {
-  if (!conn) return;
+  // While someone types what happened, the page holds still so the phone keeps its keyboard up.
+  if (!conn || document.activeElement instanceof HTMLTextAreaElement) return;
   const mb = conn.db.myBand.iter().next().value;
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
@@ -338,9 +385,9 @@ function render() {
   if (isMedic()) return mount('app', top, medicView());
   if (mb && mb.bandId === bandId && mb.status === 'claimed') {
     if (ended) {
-      return mount('app', top, recap(conn, render));
+      return mount('app', top, claims(), recap(conn, render));
     }
-    return mount('app', top, setup());
+    return mount('app', top, claims(), setup());
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));

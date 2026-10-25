@@ -24,6 +24,7 @@ pub enum Finish {
     MerchPaid { merchant_id: String, purchase_id: String },
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
+    ClinicReport { record_json: String, file_hash: String },
     PhotoFeatures { people_count: u32, caption: String },
     MerchPicks { picks: Vec<MerchPickIn> },
 }
@@ -71,13 +72,13 @@ macro_rules! reduce {
 pub(crate) use reduce;
 
 impl Sink {
-    /// Registers a letter blob the handler stored.
-    pub async fn register_letter(&self, blob: &BlobInfo) -> Result<()> {
+    /// Registers a text blob the handler stored (a letter or a hospital report) for staff.
+    pub async fn register_text(&self, blob: &BlobInfo, purpose: &str) -> Result<()> {
         let (hash, size) = (blob.sha256.clone(), blob.size_bytes);
         match self {
-            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), "letter".into(), "text/plain".into(), size)),
+            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), purpose.into(), "text/plain".into(), size)),
             Sink::Print => {
-                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": "letter", "content_type": "text/plain", "size_bytes": size}));
+                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": purpose, "content_type": "text/plain", "size_bytes": size}));
                 Ok(())
             }
         }
@@ -101,6 +102,18 @@ impl Sink {
             Sink::Db(conn) => reduce!(conn, report_venue_setup_step_then(job_id, name, detail)),
             Sink::Print => {
                 print_call("report_venue_setup_step", json!({"job_id": job_id, "name": name, "detail": detail}));
+                Ok(())
+            }
+        }
+    }
+
+    /// Reports a step of a claim's investigation, so the decision history shows it as it happens.
+    pub async fn claim_step(&self, job_id: u64, step: &bandit_insurance::decision::Step) -> Result<()> {
+        let (actor, what, why) = (step.actor.clone(), step.summary.clone(), step.detail.clone());
+        match self {
+            Sink::Db(conn) => reduce!(conn, report_claim_step_then(job_id, actor, what, why)),
+            Sink::Print => {
+                print_call("report_claim_step", json!({"job_id": job_id, "actor": actor, "what": what, "why": why}));
                 Ok(())
             }
         }
@@ -134,6 +147,7 @@ impl Sink {
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
+            Finish::ClinicReport { record_json, file_hash } => reduce!(conn, file_clinic_report_then(job_id, record_json, file_hash, required())),
             Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
             Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
         }
@@ -204,6 +218,9 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
         Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
+        Finish::ClinicReport { record_json, file_hash } => {
+            ("file_clinic_report", json!({"record_json": parse_or_text(record_json), "file_hash": file_hash, "call": call}))
+        }
         Finish::VenueSetup { result: r } => (
             "finish_venue_setup",
             json!({

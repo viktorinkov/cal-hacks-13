@@ -82,5 +82,5 @@ export function drawHistory(head: HTMLElement, list: HTMLElement, v: HistoryView
       approve);
   });
   seen = top;
-  list.replaceChildren(...(items.length ? items : [h('li', { class: 'empty' }, 'No decisions yet. They appear here as the bands, the medic, Claude, the Evidence Engine, the Decision Engine and the organizer act.')]));
+  list.replaceChildren(...(items.length ? items : [h('li', { class: 'empty' }, 'No decisions yet. They appear here as the bands, the medic, the Evidence Engine, the Decision Engine and the organizer act.')]));
 }

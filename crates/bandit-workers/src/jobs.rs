@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use crate::model::{Claude, Failed};
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{extract, letters, medical, merch, payout, photo, review, shop, venue, verify, wallet};
+use crate::{clinic, extract, investigate, letters, medical, merch, payout, photo, shop, venue, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -93,10 +93,11 @@ pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
     match job.kind.as_str() {
         KIND_RECORD_EXTRACT => extract::run(ctx, job, job.payload()?).await,
         KIND_VERIFY => verify::run(ctx, job, job.payload()?).await,
-        KIND_REVIEW => review::run(ctx, job, job.payload()?).await,
+        KIND_REVIEW => investigate::run(ctx, job, job.payload()?).await,
         KIND_DRAFT => letters::run_draft(ctx, job, job.payload()?).await,
         KIND_RECOVERY => letters::run_recovery(ctx, job, job.payload()?).await,
         KIND_PAYOUT => payout::run(ctx, job, job.payload()?).await,
+        KIND_CLINIC => clinic::run(ctx, job, job.payload()?).await,
         wallet::KIND => wallet::run(ctx, job, job.payload()?).await,
         merch::KIND => merch::run(ctx, job, job.payload()?).await,
         medical::KIND => medical::run(ctx, job, job.payload()?).await,

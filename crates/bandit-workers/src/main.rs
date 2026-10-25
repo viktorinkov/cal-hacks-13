@@ -9,7 +9,9 @@
 //!                                           the reducer calls instead of making them
 //! ```
 
+mod clinic;
 mod extract;
+mod investigate;
 mod jobs;
 mod letters;
 mod medical;
@@ -19,7 +21,6 @@ mod nessie;
 mod payout;
 mod photo;
 mod prompts;
-mod review;
 mod runner;
 mod shop;
 mod sink;

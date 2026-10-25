@@ -58,6 +58,7 @@ pub const TABLES: &[&str] = &[
     "claim_line",
     "claim_precedent",
     "claim_review",
+    "decision",
     "approval",
     "settlement_rule",
     "ledger_entry",

@@ -18,6 +18,8 @@ pub struct MyClaim {
     pub payout_reference: String,
     pub opened_at: __sdk::Timestamp,
     pub settled_at: Option<__sdk::Timestamp>,
+    pub incident_id: u64,
+    pub statement: String,
 }
 
 impl __sdk::InModule for MyClaim {
@@ -37,6 +39,8 @@ pub struct MyClaimCols {
     pub payout_reference: __sdk::__query_builder::Col<MyClaim, String>,
     pub opened_at: __sdk::__query_builder::Col<MyClaim, __sdk::Timestamp>,
     pub settled_at: __sdk::__query_builder::Col<MyClaim, Option<__sdk::Timestamp>>,
+    pub incident_id: __sdk::__query_builder::Col<MyClaim, u64>,
+    pub statement: __sdk::__query_builder::Col<MyClaim, String>,
 }
 
 impl __sdk::__query_builder::HasCols for MyClaim {
@@ -52,6 +56,8 @@ impl __sdk::__query_builder::HasCols for MyClaim {
             payout_reference: __sdk::__query_builder::Col::new(table_name, "payout_reference"),
             opened_at: __sdk::__query_builder::Col::new(table_name, "opened_at"),
             settled_at: __sdk::__query_builder::Col::new(table_name, "settled_at"),
+            incident_id: __sdk::__query_builder::Col::new(table_name, "incident_id"),
+            statement: __sdk::__query_builder::Col::new(table_name, "statement"),
         }
     }
 }

@@ -159,7 +159,7 @@ function drawBar() {
 }
 
 function account() {
-  if (cfg.auth_client_id && !idToken()) return h('button', { class: 'ghost', onclick: signIn }, 'Sign in');
+  if (cfg.auth_client_id && !idToken()) return h('button', { class: 'primary', onclick: signIn }, 'Sign in to run the event');
   const email = signedInEmail();
   return email ? h('span', { class: 'who' }, email, ' ', h('button', { class: 'link', onclick: signOut }, 'Sign out')) : null;
 }
@@ -381,6 +381,8 @@ function wire(c: DbConnection) {
 }
 
 async function main() {
+  // The 3D venue lives on the organizer portal's Live tab; opened on its own, this page goes there.
+  if (window.top === window) return location.replace('/organizer#live');
   cfg = await config();
   venue = new Venue($('stage'));
   crowd = new Crowd(venue.scene);

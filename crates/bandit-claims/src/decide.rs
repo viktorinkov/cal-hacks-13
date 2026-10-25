@@ -50,7 +50,7 @@ pub fn grid(app: &App, claim_id: u64, verbose: bool) -> Result<Grid> {
             say!(app, "               fail {} ({}): {}", k.name, k.reader, k.detail);
         }
         if !c.review_verdict.is_empty() {
-            say!(app, "  agent        {}", c.review_verdict);
+            say!(app, "  Claude       {}", c.review_verdict);
         }
     }
     Ok(Grid { payout_cents: c.payout_cents, pack_hash: c.pack_hash.clone() })

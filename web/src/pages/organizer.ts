@@ -1,6 +1,6 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// medic's filing to the named approver's decision, the event graph with its photos, the merch templates
-// and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
+// attendee's filing (or staff filing for them) to the named approver's decision, the event graph with its photos,
+// the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
@@ -10,8 +10,9 @@ import {
   signOut, signedInEmail, time, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
+import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
-import { MAP_LEGEND, present, venueMap } from '../venue-map';
+import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -26,7 +27,6 @@ const QUERIES = [
   'SELECT * FROM booth',
   'SELECT * FROM organization',
   'SELECT * FROM band',
-  'SELECT * FROM venue_plan',
   'SELECT * FROM station',
   'SELECT * FROM gateway',
   'SELECT * FROM settings',
@@ -34,10 +34,13 @@ const QUERIES = [
   'SELECT * FROM board_notes',
   'SELECT * FROM board_attendees',
   'SELECT * FROM claims_board',
+  'SELECT * FROM unclaimed_injuries',
+  'SELECT * FROM board_clinic_reports',
   'SELECT * FROM board_facts',
   'SELECT * FROM board_checks',
   'SELECT * FROM board_lines',
   'SELECT * FROM board_reviews',
+  'SELECT * FROM decision',
   'SELECT * FROM board_precedents',
   'SELECT * FROM board_records',
   'SELECT * FROM board_approvals',
@@ -186,12 +189,8 @@ function live() {
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
           h('a', { href: '#claims' }, 'open in Claims'))))),
     h('section', {},
-      h('h3', {}, 'Venue'),
-      h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands. Every dot is a band row in SpacetimeDB, moving as the module writes it.`),
-      venueMap(conn),
-      h('p', { class: 'legend' }, MAP_LEGEND.map(([c, label]) => h('span', {}, h('i', { class: 'dot', style: `background:${c}` }), label)))),
-    h('section', {},
       h('h3', {}, 'Zones'),
+      h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands.`),
       h('p', {}, settings?.lowVis
         ? [h('b', {}, 'Low visibility is on: every band guides its wearer to the exit colour of its zone. '), h('button', { onclick: () => act(() => conn.reducers.setLowVis({ on: false })) }, 'Turn it off')]
         : h('button', { onclick: () => confirm('Fire or smoke? Every band starts guiding its wearer to the exit.') && act(() => conn.reducers.setLowVis({ on: true })) }, 'Low visibility: guide everyone to the exits')),
@@ -319,6 +318,69 @@ function medicCard(incidentId: bigint) {
   return m ? medicalCard(m) : null;
 }
 
+/** The hospital report staff ask for when they file for an attendee. */
+const REPORTS: [string, string][] = [['matches', 'Matches'], ['mismatch', "Doesn't match"], ['random', 'Random']];
+
+/** What staff typed and picked for each injury, by incident id; the page redraws every second. */
+const drafts = new Map<bigint, { story: string; report: string }>();
+/** The incident staff just filed a claim for: its claim opens once it appears. */
+let openWhenFiled: bigint | undefined;
+
+/** Short first-person stories, one press each, from the incident's kind and zone. */
+function stories(kind: string, zone: string): [string, string][] {
+  return kind === 'sos'
+    ? [
+      ['Felt faint', `I felt faint and short of breath near the ${zone}, so I pressed the button on my band.`],
+      ['Crushed at the barrier', `I got crushed against the barrier at the ${zone} and hurt my ribs, so I called for help with my band.`],
+      ['Cut on broken glass', `I cut my hand on a broken glass near the ${zone} and pressed my band for help.`],
+    ]
+    : [
+      ['Slipped on a drink', `I slipped on a spilled drink near the ${zone} and landed on my right wrist.`],
+      ['Knocked over in the crowd', `Someone knocked into me in the crowd at the ${zone}. I fell and twisted my left ankle.`],
+      ['Tripped on a cable', `I tripped over a cable near the ${zone} and hit my knee hard on the floor.`],
+    ];
+}
+
+/** Resolved falls and SOS calls nobody filed a claim for: staff file it for the wearer, in their words. */
+function injuriesWithoutClaim() {
+  if (!can('ops', 'medic')) return null;
+  const rows = [...conn.db.unclaimedInjuries.iter()].sort((a, b) => Number(a.incidentId - b.incidentId));
+  return h('section', {},
+    h('h3', {}, `Injuries without a claim (${rows.length})`),
+    !rows.length && h('p', { class: 'muted' }, 'None right now. A resolved fall or SOS shows here until the attendee files a claim from their band page.'),
+    rows.map(r => {
+      const id = r.incidentId;
+      const d = drafts.get(id) ?? { story: '', report: 'random' };
+      drafts.set(id, d);
+      const name = r.wearerName || 'the wearer';
+      const box = `story-${id}`;
+      const fill = (text: string) => {
+        d.story = text;
+        const el = document.querySelector(`[name="${box}"]`) as HTMLTextAreaElement | null;
+        if (el) el.value = text;
+      };
+      const file = async (e: Event) => {
+        e.preventDefault();
+        const ok = await act(() => conn.reducers.fileClaimForWearer({ incidentId: id, statement: d.story.trim(), report: d.report }));
+        if (!ok) return;
+        drafts.delete(id);
+        openWhenFiled = id;
+        render();
+      };
+      return h('div', { class: 'incident' },
+        h('p', {}, h('b', {}, name), `, band ${bandCode(r.bandId)}: ${r.kind === 'sos' ? 'SOS' : 'fall'} in ${r.zoneName} at ${time(r.openedAt)}${r.resolvedAt ? `, resolved at ${time(r.resolvedAt)}` : ''}`),
+        r.notes.length > 0 ? h('ul', {}, r.notes.map(n => h('li', {}, n))) : h('p', { class: 'muted' }, 'No staff notes.'),
+        h('form', { onsubmit: file },
+          h('label', {}, 'What happened, in their words',
+            h('textarea', { name: box, rows: 3, required: true, value: d.story, oninput: (e: Event) => { d.story = (e.target as HTMLTextAreaElement).value; } })),
+          h('p', {}, 'Fill in: ', stories(r.kind, r.zoneName || 'stage').map(([label, text]) => h('button', { type: 'button', onclick: () => fill(text) }, label))),
+          h('label', {}, 'Hospital report',
+            h('select', { name: `report-${id}`, onchange: (e: Event) => { d.report = (e.target as HTMLSelectElement).value; } },
+              REPORTS.map(([value, label]) => h('option', { value, selected: value === d.report || undefined }, label)))),
+          h('button', {}, `File the claim as ${name}`)));
+    }));
+}
+
 // --- Bands ---------------------------------------------------------------------------------
 
 async function post(path: string) {
@@ -360,6 +422,15 @@ function bandsTab() {
     zones.map(z => h('button', { class: 'test', onclick: () => act(() => post(`/api/dev/property/${z.stationId}`)).then(toClaims) }, `Speaker breaks in ${z.name}`)));
 }
 
+/** Opens a claim's detail and scrolls to it after the redraw. */
+let scrollToClaim = false;
+
+function showClaim(id: bigint) {
+  openClaim = id;
+  scrollToClaim = true;
+  render();
+}
+
 function statusOf(c: Claim) {
   return c.status.tag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
 }
@@ -378,7 +449,7 @@ function myQueue() {
     h('h3', {}, `Waiting for your decision (${mine.length})`),
     !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Claims a learned rule covers settle on their own.'),
     h('ul', {}, mine.map(c => h('li', {},
-      h('button', { class: 'link', onclick: () => { openClaim = c.id; render(); } }, `#${c.id}`),
+      h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`),
       ` ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}, ${money(c.payoutCents)}: ${c.statusNote}`))));
 }
 
@@ -386,11 +457,11 @@ function claimList() {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(b.id - a.id));
   return h('section', {},
     h('h3', {}, 'All claims'),
-    !claims.length && h('p', { class: 'muted' }, 'No claims yet. Resolving an injury incident with a note opens one.'),
+    !claims.length && h('p', { class: 'muted' }, 'No claims yet. An attendee files one from their band page after an injury, or staff file it for them above.'),
     claims.length > 0 && h('table', {},
       h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Payout'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
-        h('td', {}, h('button', { class: 'link', onclick: () => { openClaim = c.id; render(); } }, `#${c.id}`)),
+        h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
         h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
         h('td', {}, money(c.payoutCents)),
@@ -443,52 +514,137 @@ function decide(c: Claim) {
       h('button', {}, 'Refuse')));
 }
 
+/** A Nessie deposit that failed leaves the claim in Paying with this in its note. */
+function payoutFailed(c: Claim): boolean {
+  return c.status.tag === 'Paying' && /payout failed/i.test(c.statusNote);
+}
+
+/** What the claim is waiting for, and for whom. */
+function waiting(c: Claim, hospital: boolean): string {
+  const name = c.claimantName || 'the claimant';
+  switch (c.status.tag) {
+    case 'AwaitingRecord': return hospital ? 'Waiting for the hospital report.' : 'Waiting for the medical record: upload the clinic\'s report below.';
+    case 'ReadingRecord': return `Waiting for Claude to read the ${hospital ? 'hospital report' : 'medical record'}.`;
+    case 'Verifying': return 'Waiting for the Elastic checks.';
+    case 'Reviewing': return 'Waiting for the claims agent\'s review.';
+    case 'Routed': return decides(c) ? 'Waiting for your decision.' : `Waiting for the ${c.routedToName.toLowerCase()} to decide.`;
+    case 'Paying': return payoutFailed(c) ? `Approved. The payout to ${name}'s wallet failed and waits for a retry.` : `Approved. Paying ${money(c.payoutCents)} into ${name}'s wallet.`;
+    case 'Settled': return `Settled. Waiting for the insurer to pay ${money(c.recoverableCents)}.`;
+    case 'Refused': return 'Refused. Nothing is waiting.';
+    case 'Reconciled': return 'Closed: the insurer paid. Nothing is waiting.';
+    default: return '';
+  }
+}
+
+/** Claims the organizer asked a recovery letter for since the page loaded. */
+const recoveryAsked = new Set<bigint>();
+
+/** For the organizer once a claim is decided: its letters, a payout retry, the insurer's payment and a recovery letter. */
+function afterDecision(c: Claim) {
+  if (!can('ops')) return null;
+  const letters = ([
+    [c.fnolHash, 'First notice of loss to the insurer'],
+    [c.summaryHash, 'Approver summary'],
+    [c.determinationHash, 'Claimant letter'],
+    [c.recoveryHash, 'Recovery letter'],
+  ] as [string, string][]).filter(([hash]) => hash);
+  const settled = c.status.tag === 'Settled';
+  const recover = c.coverKind === 'property' && (settled || c.status.tag === 'Reconciled');
+  const pay = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const amount = Number(field(f, `paid-${c.id}`));
+    await act(async () => {
+      if (!(amount >= 0)) throw new Error('The amount is in dollars, for example 180.00.');
+      await conn.reducers.recordInsurerPayment({ claimId: c.id, amountCents: BigInt(Math.round(amount * 100)), reference: field(f, `paid-ref-${c.id}`) });
+    });
+  };
+  const ask = async (e: Event) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement;
+    const ok = await act(() => conn.reducers.requestRecoveryLetter({ claimId: c.id, counterpartyName: field(f, `handler-${c.id}`), counterpartyContact: field(f, `handler-contact-${c.id}`) }));
+    if (ok) {
+      recoveryAsked.add(c.id);
+      f.reset();
+      render();
+    }
+  };
+  return [
+    letters.length > 0 && [h('h4', {}, 'Letters'), h('ul', {}, letters.map(([hash, label]) => h('li', {}, h('a', { href: `/blobs/${hash}`, target: '_blank' }, label))))],
+    payoutFailed(c) && h('p', {}, h('button', { onclick: () => act(() => conn.reducers.retryClaimPayout({ claimId: c.id })) }, 'Retry the payout')),
+    settled && h('form', { onsubmit: pay },
+      h('h4', {}, 'Record the insurer\'s payment'),
+      h('label', {}, 'Amount in dollars', h('input', { name: `paid-${c.id}`, inputmode: 'decimal', required: true, value: (Number(c.recoverableCents) / 100).toFixed(2) })),
+      h('label', {}, 'Reference', h('input', { name: `paid-ref-${c.id}`, placeholder: 'Cheque or transfer reference' })),
+      h('button', {}, 'Record the payment')),
+    recover && h('form', { onsubmit: ask },
+      h('h4', {}, 'Ask for a recovery letter'),
+      h('label', {}, 'Who was handling the equipment', h('input', { name: `handler-${c.id}`, required: true })),
+      h('label', {}, 'Their contact', h('input', { name: `handler-contact-${c.id}`, placeholder: 'Email or phone', required: true })),
+      h('button', {}, 'Ask for the letter'),
+      recoveryAsked.has(c.id) && !c.recoveryHash && h('p', { class: 'muted' }, 'Asked. The letter shows under Letters once it is drafted.')),
+  ];
+}
+
 function claimDetail(id: bigint) {
   const c = [...conn.db.claimsBoard.iter()].find(x => x.id === id);
   if (!c) return null;
   const v = c.packVersion;
+  const byId = <T extends { id: bigint }>(rows: T[]) => rows.sort((a, b) => Number(a.id - b.id));
   const facts = [...conn.db.boardFacts.iter()].filter(f => f.claimId === id && f.packVersion === v).sort((a, b) => a.seq - b.seq);
   const checks = [...conn.db.boardChecks.iter()].filter(x => x.claimId === id && x.packVersion === v);
-  const record = [...conn.db.boardRecords.iter()].filter(r => r.claimId === id).pop();
+  const record = byId([...conn.db.boardRecords.iter()].filter(r => r.claimId === id)).pop();
+  const hospital = byId([...conn.db.boardClinicReports.iter()].filter(r => r.claimId === id)).pop();
   const lines = [...conn.db.boardLines.iter()].filter(l => l.claimId === id).sort((a, b) => a.lineNo - b.lineNo);
-  const review = [...conn.db.boardReviews.iter()].filter(r => r.claimId === id).pop();
+  const review = byId([...conn.db.boardReviews.iter()].filter(r => r.claimId === id)).pop();
   const precedents = [...conn.db.boardPrecedents.iter()].filter(p => p.claimId === id && p.packVersion === v);
   const approvals = [...conn.db.boardApprovals.iter()].filter(a => a.claimId === id);
   const ledger = [...conn.db.boardLedger.iter()].filter(l => l.claimId === id);
   const rule = c.settlementRuleId ? [...conn.db.boardRules.iter()].find(r => r.id === c.settlementRuleId) : undefined;
-  return h('section', {},
+  const open = hospital ? 'Open the report' : 'Open the PDF';
+  const verdict = (x: string) => x.replace('_', ' ');
+  return h('section', { id: 'claim-detail' },
     h('h3', {}, `Claim #${c.id}: ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}`, ' ', h('button', { class: 'link', onclick: () => { openClaim = undefined; render(); } }, 'close')),
-    h('p', {}, h('b', {}, statusOf(c)), `: ${c.statusNote}`),
+    h('p', { class: 'big' }, h('b', {}, statusOf(c)), c.statusNote && `: ${c.statusNote}`),
+    h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claude decided: ${verdict(review.verdict)}.`),
+    c.statement && h('p', {}, h('b', {}, 'In their words: '), `"${c.statement}"`),
+    evidenceTrail(conn, c),
+    hospital && [h('h4', {}, 'Hospital report'),
+      hospital.status === 'requested' && h('p', {}, 'Hospital report requested', h('span', { class: 'muted' }, ` at ${time(hospital.requestedAt)}`)),
+      hospital.status === 'received' && h('p', {}, `Hospital report from ${hospital.providerName}, visit ${hospital.visitDate}. `, h('a', { href: `/blobs/${hospital.fileHash}`, target: '_blank' }, 'Open the report')),
+      hospital.status === 'failed' && h('p', { class: 'fail' }, `The hospital report failed: ${hospital.problems.join('; ')}`)],
+    // Claims the scripted claims run files have no hospital report: staff upload the clinic's PDF.
+    !hospital && c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
+      h('h4', {}, 'Upload the clinic\'s report'),
+      h('label', {}, 'Clinic report PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
+      cfg.test_mode && h('label', {}, 'or a test report, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
+      h('button', {}, 'Upload it, Claude reads it')),
+    review && [h('h4', {}, `Claude's decision: ${verdict(review.verdict)}`),
+      h('p', {}, review.summary), review.causation && h('p', {}, `Causation: ${review.causation}`),
+      review.concerns.length > 0 && h('ul', {}, review.concerns.map(x => h('li', {}, x))),
+      review.innocentExplanations.length > 0 && h('p', {}, `Innocent readings: ${review.innocentExplanations.join('; ')}`),
+      review.missingEvidence.length > 0 && h('p', {}, `Missing: ${review.missingEvidence.join('; ')}`),
+      review.citedFactIds.length > 0 && h('p', { class: 'muted' }, `Rests on facts ${review.citedFactIds.map(n => `[${n}]`).join(' ')}`),
+      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code set Claude's decision aside: ${review.rejected.join('; ')}`)],
+    c.status.tag === 'Routed' && decides(c) && h('div', {}, h('h4', {}, 'Your decision'), decide(c)),
+    afterDecision(c),
     h('p', {}, `Cost ${money(c.costCents)} · payout ${money(c.payoutCents)} · recoverable from the insurer ${money(c.recoverableCents)} · venue pays ${money(c.venueCostCents)}`),
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
-    c.status.tag === 'AwaitingRecord' && can('medic', 'ops') && h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => fileRecord(c.id, e.target as HTMLFormElement)); } },
-      h('h4', {}, 'File the medical record'),
-      h('label', {}, 'Clinic PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
-      cfg.test_mode && h('label', {}, 'or a test record, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
-      h('button', {}, 'File it, Claude reads it')),
-    c.status.tag === 'Routed' && (decides(c)
-      ? h('div', {}, h('h4', {}, 'Your decision'), decide(c))
-      : h('p', {}, h('b', {}, `Waiting for the ${c.routedToName.toLowerCase()}.`))),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
-    record && record.status !== 'extracted' && [h('h4', {}, 'Medical record'),
-      h('p', {}, record.status === 'reading' ? 'Claude is reading the PDF.' : `Claude could not read it: ${record.dropped.join('; ')}`, ' ',
-        h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, 'Open the PDF'))],
-    record && record.status === 'extracted' && [h('h4', {}, 'Medical record, read by Claude'),
+    record && record.status !== 'extracted' && [h('h4', {}, hospital ? 'Hospital report' : 'Medical record'),
+      h('p', {}, record.status === 'reading' ? `Claude is reading the ${hospital ? 'report' : 'PDF'}.` : `Claude could not read it: ${record.dropped.join('; ')}`, ' ',
+        h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, open))],
+    record && record.status === 'extracted' && [h('h4', {}, `${hospital ? 'Hospital report' : 'Medical record'}, read by Claude`),
       h('p', {}, `${record.documentKind} for ${record.patientName} from ${record.providerName} on ${record.dateOfService}, invoice ${record.invoiceNumber}. Billed ${money(record.billedCents)}, covered ${money(record.coveredCents)}.`),
       record.reasonForVisit && h('p', {}, `Reason: ${record.reasonForVisit}. ${record.history}`),
       h('p', {}, `Diagnoses: ${record.diagnoses.join('; ')}`),
       record.dropped.length > 0 && h('p', {}, `Dropped: ${record.dropped.join('; ')}`),
-      h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, 'Open the PDF')],
+      h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, open)],
     lines.length > 0 && [h('h4', {}, 'Billed lines'), h('table', {},
       h('tr', {}, h('th', {}, 'Code'), h('th', {}, 'Service'), h('th', {}, 'Billed'), h('th', {}, 'Allowed'), h('th', {}, 'Covered'), h('th', {}, 'Outcome')),
       lines.map(l => h('tr', {}, h('td', {}, l.code), h('td', {}, l.description), h('td', {}, money(l.billedCents)), h('td', {}, money(l.allowedCents)),
         h('td', {}, money(l.coveredCents)), h('td', { class: l.outcome === 'excluded' ? 'fail' : '' }, `${l.outcome}${l.reason ? `: ${l.reason}` : ''}`))))],
-    review && [h('h4', {}, `Claims agent review (Claude): ${review.verdict}`),
-      h('p', {}, review.summary), review.causation && h('p', {}, `Causation: ${review.causation}`),
-      review.concerns.length > 0 && h('ul', {}, review.concerns.map(x => h('li', {}, x))),
-      review.missingEvidence.length > 0 && h('p', {}, `Missing: ${review.missingEvidence.join('; ')}`),
-      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code rejected the review: ${review.rejected.join('; ')}`)],
     precedents.length > 0 && [h('h4', {}, 'Similar past claims (Elastic)'),
       h('ul', {}, precedents.map(p => h('li', {}, `${p.reference}: ${p.outcome}, ${money(p.payoutCents)}, score ${p.score.toFixed(2)}. ${p.narrative}`)))],
     h('h4', {}, 'Evidence facts'),
@@ -511,7 +667,14 @@ function rules() {
 }
 
 function claimsTab() {
-  return [incidentDesk(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+  // A claim staff just filed opens as soon as the module creates it.
+  const filed = openWhenFiled !== undefined && [...conn.db.claimsBoard.iter()].find(c => c.incidentId === openWhenFiled);
+  if (filed) {
+    openWhenFiled = undefined;
+    openClaim = filed.id;
+    scrollToClaim = true;
+  }
+  return [incidentDesk(), injuriesWithoutClaim(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
 }
 
 // --- Photos -------------------------------------------------------------------------------
@@ -557,25 +720,6 @@ function thumb(url: string, title: string, slot: string) {
 /** The attendee the organizer is buying as, by node id. */
 let shopper: bigint | undefined;
 
-/** How a photo becomes merch, with how far tonight's event has got at each step. */
-function merchFlow() {
-  const photos = [...conn.db.boardPhotos.iter()];
-  const picked = new Set([...conn.db.boardMerchPicks.iter()].map(p => p.nodeId));
-  const orders = [...conn.db.boardMerchOrders.iter()];
-  const steps: [string, string, string][] = [
-    [`${photos.length} photos`, 'A photographer takes a photo', 'The people whose bands stood together in that zone at that moment are tagged.'],
-    [`${photos.filter(p => p.read).length} read`, 'Claude reads the photo', 'It counts the people and writes a caption; the tags keep that many, the ones standing closest.'],
-    [`${picked.size} people`, 'The shopping agent picks', 'When the event ends, Claude picks three products for each person in a photo, from the booths they stayed at, on the photo with the people they met, with a line to print.'],
-    [`${orders.length} order${orders.length === 1 ? '' : 's'}`, 'The attendee buys', 'One tap in their recap pays from their BandIt wallet, which holds the money until the purchase goes through.'],
-    [`${orders.filter(o => o.status === 'paid').length} paid`, 'Capital One records it', 'The worker makes the Nessie purchase at the merch shop and the order keeps its receipt.'],
-  ];
-  return h('section', {},
-    h('h3', {}, 'How merch works'),
-    h('div', { class: 'flow' }, steps.map(([count, title, detail], i) => [
-      i > 0 && h('span', { class: 'arrow' }, '→'),
-      h('div', { class: 'step' }, h('div', { class: 'count' }, count), h('b', {}, title), h('div', { class: 'muted' }, detail))])));
-}
-
 /** A button for every attendee with a wallet; the chosen one's shop follows, laid out as the same steps. */
 function buyAs() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
@@ -614,7 +758,7 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
     const size = kind === 'tee' ? field(e.target as HTMLElement, `as-size-${p.templateId}`) : '';
     act(() => conn.reducers.buyMerchAs({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size }));
   };
-  return h('div', { class: 'flow down' },
+  return h('div', { class: 'flow' },
     h('div', { class: 'step' },
       h('b', {}, `1. ${who}'s photo`),
       !photos.length && h('p', { class: 'muted' }, 'None picked yet.'),
@@ -676,14 +820,13 @@ function merchPicks() {
       })));
 }
 
-/** How merch works, buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
+/** Buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
 function merchTab() {
   const templates = [...conn.db.merchTemplate.iter()].sort((a, b) => Number(a.id - b.id));
   const orders = [...conn.db.boardMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
   const paid = orders.filter(o => o.status === 'paid');
   const booths = (ids: bigint[]) => ids.map(id => conn.db.booth.id.find(id)?.name ?? `booth ${id}`).join(', ');
   return [
-    merchFlow(),
     can('ops') && buyAs(),
     merchPicks(),
     h('section', {},
@@ -722,8 +865,8 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
     views: [
       ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
       ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
-      ['bandit-organize runs, step by step', '/app/workflows'],
-      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+      ['bandit-organize runs, step by step', '/app/workflows/bandit-organize'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder/agents/bandit-organizer'],
     ],
   },
   {
@@ -762,13 +905,32 @@ document.addEventListener('pointerdown', () => { pressing = true; }, true);
 document.addEventListener('pointerup', () => setTimeout(() => { pressing = false; }, 100), true);
 
 function render() {
-  if (!conn || pressing) return;
+  // Typing in a story box or choosing from a list holds redraws too, so the text and the open list stay put.
+  const busy = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLSelectElement;
+  if (!conn || pressing || busy) return;
   const open = tabs();
-  if (!open.length) return mount('app', header(), noRole());
+  mount('head', header());
+  if (!open.length) {
+    showLive3d(false);
+    return mount('app', noRole());
+  }
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
+  showLive3d(tab === 'live');
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : live();
-  mount('app', header(), body);
+  mount('app', body);
+  if (scrollToClaim) {
+    scrollToClaim = false;
+    document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });
+  }
+}
+
+/** The 3D venue on the Live tab loads the first time the tab shows, then stays loaded while hidden. */
+function showLive3d(on: boolean) {
+  const box = document.getElementById('live3d')!;
+  box.hidden = !on;
+  const frame = box.querySelector('iframe')!;
+  if (on && !frame.getAttribute('src')) frame.src = '/live' + location.search;
 }
 
 async function main() {

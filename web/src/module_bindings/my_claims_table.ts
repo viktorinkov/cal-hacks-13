@@ -26,4 +26,6 @@ export default __t.row({
   payoutReference: __t.string().name("payout_reference"),
   openedAt: __t.timestamp().name("opened_at"),
   settledAt: __t.option(__t.timestamp()).name("settled_at"),
+  incidentId: __t.u64().name("incident_id"),
+  statement: __t.string(),
 });

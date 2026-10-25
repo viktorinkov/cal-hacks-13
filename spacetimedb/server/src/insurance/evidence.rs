@@ -305,7 +305,10 @@ pub struct Pack {
 pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
     let input = gather(ctx, claim);
     let s = settings(ctx);
-    let facts = build_facts(&input);
+    let mut facts = build_facts(&input);
+    if !claim.statement.is_empty() {
+        facts.push(statement_fact(claim, facts.len() as u32 + 1));
+    }
     let hash = bandit_insurance::pack::pack_sha256(&facts);
     let (corroboration, mut checks) = bandit_insurance::corroboration::corroborate(&input, &config(&s));
     checks.extend(record_checks(ctx, claim, &input));
@@ -340,6 +343,20 @@ pub fn build_pack(ctx: &ReducerContext, claim: &Claim) -> Pack {
         checks: checks.iter().map(Check::line).collect::<Vec<_>>().join("\n"),
     });
     Pack { version, hash, facts, corroboration, checks, input }
+}
+
+/// The attendee's own words from filing, as the pack's last fact. The core has
+/// no claimant source, so it sits with the incident's facts.
+fn statement_fact(claim: &Claim, seq: u32) -> Fact {
+    Fact {
+        seq,
+        source: bandit_insurance::Source::IncidentSnapshot,
+        key: "claimant_statement".into(),
+        value: claim.statement.clone(),
+        observed_at: micros(claim.opened_at),
+        reader: bandit_insurance::Reader::Code,
+        reference: format!("claim:{}", claim.id),
+    }
 }
 
 pub fn store_check(ctx: &ReducerContext, claim_id: u64, pack_version: u32, c: &Check) {

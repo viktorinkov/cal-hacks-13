@@ -1,6 +1,7 @@
-//! A claim's life: open from a resolved incident, file and read the medical
-//! record, verify in Elastic, review by the claims agent, decide in code,
-//! approve or refuse by the organizer, pay, reconcile with the insurer.
+//! A claim's life: open from a resolved incident (or the attendee's filing, in
+//! `filing`), read the medical record, verify in Elastic, Claude investigates
+//! and decides, code holds the decision to its limits, the organizer decides
+//! what comes to them, pay, reconcile with the insurer.
 
 use super::evidence::*;
 use super::*;
@@ -11,19 +12,19 @@ use crate::safety::*;
 use bandit_insurance::coverage::{Amounts, compute_amounts};
 use bandit_insurance::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
 use bandit_insurance::letters::LetterData;
-use bandit_insurance::medical::{ExtractedRecord, validate_record};
+use bandit_insurance::medical::{ExtractedRecord, ValidRecord, validate_record};
 use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
 use bandit_insurance::payloads::*;
-use bandit_insurance::review::{AgentReview, gate, validate_review};
+use bandit_insurance::decision::{AgentDecision, GuardInput, Investigation, guard, required_reading, validate_decision};
 use bandit_insurance::rules::{SettlementRule, learned_ceiling, matching_rule, next_version};
-use bandit_insurance::{Check, CoverKind, Verdict};
+use bandit_insurance::{Check, CoverKind};
 use spacetimedb::{Identity, ReducerContext, Table};
 
-fn claim_by_id(ctx: &ReducerContext, claim_id: u64) -> Result<Claim, String> {
+pub(super) fn claim_by_id(ctx: &ReducerContext, claim_id: u64) -> Result<Claim, String> {
     ctx.db.claim().id().find(claim_id).ok_or_else(|| format!("no claim {claim_id}"))
 }
 
-fn save(ctx: &ReducerContext, claim: Claim) -> Claim {
+pub(super) fn save(ctx: &ReducerContext, claim: Claim) -> Claim {
     let before = ctx.db.claim().id().find(claim.id);
     let saved = ctx.db.claim().id().update(Claim { updated_at: ctx.timestamp, ..claim });
     crate::live::on_claim_saved(ctx, before.as_ref(), &saved);
@@ -91,18 +92,18 @@ fn post(ctx: &ReducerContext, claim_id: u64, journal: bandit_insurance::ledger::
     Ok(())
 }
 
-/// Opens a claim when a resolved incident qualifies: an injury with at least
-/// one staff note, or property damage with a logged cost.
+/// Opens the venue's own claim when a resolved property incident has a logged
+/// repair cost. Injury claims wait for the attendee who wore the band to file
+/// them (`file_claim`), or staff to file for them.
 pub fn on_incident_resolved(ctx: &ReducerContext, incident: &Incident) -> Result<(), String> {
-    let notes: Vec<IncidentNote> = ctx.db.incident_note().incident_id().filter(incident.id).collect();
-    let qualifies = match incident.kind {
-        IncidentKind::Sos | IncidentKind::Fall => !notes.is_empty(),
-        IncidentKind::Property => notes.iter().any(|n| n.cost_cents.is_some_and(|c| c > 0)),
-    };
-    if !qualifies || ctx.db.claim().incident_id().find(incident.id).is_some() {
+    if incident.kind != IncidentKind::Property || ctx.db.claim().incident_id().find(incident.id).is_some() {
         return Ok(());
     }
-    open_claim_for(ctx, incident).map(|_| ())
+    let has_cost = ctx.db.incident_note().incident_id().filter(incident.id).any(|n| n.cost_cents.is_some_and(|c| c > 0));
+    if !has_cost {
+        return Ok(());
+    }
+    open_claim_for(ctx, incident, None, String::new()).map(|_| ())
 }
 
 /// Opens a claim by hand for a resolved incident the hook skipped.
@@ -116,17 +117,16 @@ pub fn open_claim(ctx: &ReducerContext, incident_id: u64) -> Result<(), String> 
     if ctx.db.claim().incident_id().find(incident_id).is_some() {
         return Err(format!("incident {incident_id} already has a claim"));
     }
-    open_claim_for(ctx, &incident).map(|_| ())
+    let claimant = super::people::wore_band_at(ctx, incident.subject_band, incident.opened_at);
+    open_claim_for(ctx, &incident, claimant, String::new()).map(|_| ())
 }
 
-fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, String> {
+/// Opens the claim and builds its first pack. An injury claim then waits for its record.
+pub(super) fn open_claim_for(ctx: &ReducerContext, incident: &Incident, claimant: Option<Identity>, statement: String) -> Result<Claim, String> {
     let policy = ctx.db.insurance_policy().iter().max_by_key(|p| p.id).ok_or("no insurance policy is set up")?;
     let kind = incident.kind.core();
     let cover = CoverKind::for_incident(kind);
-    let (claimant, claimant_name) = match super::people::claimant_for_band(ctx, incident.subject_band) {
-        Some((id, name)) => (Some(id), name),
-        None => (None, String::new()),
-    };
+    let claimant_name = claimant.map(|c| super::people::display_name(ctx, c)).unwrap_or_default();
     let zone_name = ctx.db.zone().id().find(incident.zone_id).map(|z| z.name).unwrap_or_else(|| "unzoned".into());
     let claim = ctx.db.claim().insert(Claim {
         id: 0,
@@ -167,19 +167,22 @@ fn open_claim_for(ctx: &ReducerContext, incident: &Incident) -> Result<Claim, St
         settled_at: None,
         reconciled_at: None,
         updated_at: ctx.timestamp,
+        statement,
     });
     crate::live::on_claim_saved(ctx, None, &claim);
     let claim = rebuild(ctx, claim)?;
-    if claim.status == ClaimStatus::Refused || !kind.is_injury() {
+    // Refused, or disputed and already on its way to Claude.
+    if claim.status != ClaimStatus::AwaitingRecord || !kind.is_injury() {
         return Ok(claim);
     }
     Ok(save(ctx, Claim { status: ClaimStatus::AwaitingRecord, status_note: "waiting for the medical record".into(), ..claim }))
 }
 
-/// Builds the next pack version and moves the claim on: disputed evidence is
-/// refused at once; otherwise the amounts are fixed, the reserve is posted
-/// and, once there is something to pay for, Elastic verification is queued.
-fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
+/// Builds the next pack version and moves the claim on: the amounts are
+/// fixed, the reserve is posted and, once there is something to pay for,
+/// Elastic verification is queued. Disputed evidence does not wait for a
+/// medical record: Claude weighs it next, and refuses on the failed check or asks.
+pub(super) fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
     let pack = build_pack(ctx, &claim);
     let claim = save(
         ctx,
@@ -193,11 +196,8 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
     if let Some(staff) = pack.checks.iter().find(|c| c.name == "claimant_not_staff" && c.result == bandit_insurance::CheckResult::Fail) {
         return refuse(ctx, claim, format!("medical payments cover excludes staff: {}", staff.detail), "code");
     }
-    if pack.corroboration == bandit_insurance::Corroboration::Disputed {
-        let failed = bandit_insurance::outcome::failed_check_names(&pack.checks);
-        return refuse(ctx, claim, format!("evidence disputed: {}", failed.join(", ")), "code");
-    }
-    let needs_record = cover_of(&claim) == CoverKind::MedicalPayments && extracted_record(ctx, claim.id).is_none();
+    let disputed = pack.corroboration == bandit_insurance::Corroboration::Disputed;
+    let needs_record = !disputed && cover_of(&claim) == CoverKind::MedicalPayments && extracted_record(ctx, claim.id).is_none();
     if needs_record {
         return Ok(claim);
     }
@@ -209,7 +209,7 @@ fn rebuild(ctx: &ReducerContext, claim: Claim) -> Result<Claim, String> {
     }
     let payload = verify_payload(ctx, &claim, &pack.input);
     jobs::enqueue(ctx, KIND_VERIFY, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
-    Ok(save(ctx, Claim { status: ClaimStatus::Verifying, status_note: "Elastic is validating the evidence".into(), ..claim }))
+    Ok(save(ctx, Claim { status: ClaimStatus::Verifying, status_note: "checking the evidence".into(), ..claim }))
 }
 
 fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance::evidence::EvidenceInput) -> VerifyPayload {
@@ -262,10 +262,20 @@ pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: Str
     if page_count == 0 {
         return Err("a record has at least one page".into());
     }
-    let record = ctx.db.medical_record().insert(MedicalRecord {
+    let record = insert_record(ctx, claim_id, file_hash.clone(), page_count);
+    let payload = RecordExtractPayload { claim_id, record_id: record.id, file_hash, page_count };
+    let job_id = jobs::enqueue(ctx, KIND_RECORD_EXTRACT, serde_json::to_string(&payload).unwrap(), "claim", claim_id);
+    ctx.db.medical_record().id().update(MedicalRecord { job_id, ..record });
+    save(ctx, Claim { status: ClaimStatus::ReadingRecord, status_note: "reading the medical record".into(), ..claim });
+    Ok(())
+}
+
+/// A record row for a file in the blob store, before anything is read from it.
+pub(super) fn insert_record(ctx: &ReducerContext, claim_id: u64, file_hash: String, page_count: u32) -> MedicalRecord {
+    ctx.db.medical_record().insert(MedicalRecord {
         id: 0,
         claim_id,
-        file_hash: file_hash.clone(),
+        file_hash,
         page_count,
         status: "reading".into(),
         job_id: 0,
@@ -285,12 +295,7 @@ pub fn submit_medical_record(ctx: &ReducerContext, claim_id: u64, file_hash: Str
         submitted_by: ctx.sender(),
         submitted_at: ctx.timestamp,
         extracted_at: None,
-    });
-    let payload = RecordExtractPayload { claim_id, record_id: record.id, file_hash, page_count };
-    let job_id = jobs::enqueue(ctx, KIND_RECORD_EXTRACT, serde_json::to_string(&payload).unwrap(), "claim", claim_id);
-    ctx.db.medical_record().id().update(MedicalRecord { job_id, ..record });
-    save(ctx, Claim { status: ClaimStatus::ReadingRecord, status_note: "Claude is reading the medical record".into(), ..claim });
-    Ok(())
+    })
 }
 
 /// The worker's reading of the record. Code validates it, decides which
@@ -315,11 +320,18 @@ pub fn apply_medical_record(ctx: &ReducerContext, job_id: u64, record_json: Stri
             return Ok(());
         }
     };
+    jobs::finish(ctx, job, "record extracted");
+    apply_record(ctx, claim, record, &valid, call_id)
+}
+
+/// Stores a validated record on its claim: code decides which service lines
+/// are covered and for how much, then the pack is rebuilt.
+pub(super) fn apply_record(ctx: &ReducerContext, claim: Claim, record: MedicalRecord, valid: &ValidRecord, call_id: u64) -> Result<(), String> {
     let s = settings(ctx);
     let incident = ctx.db.incident().id().find(claim.incident_id).ok_or("no incident")?;
     let incident_date = bandit_insurance::time::local_date(micros(incident.opened_at), s.tz_offset_minutes);
     let window = policy_rule(ctx, claim.policy_id, cover_of(&claim)).map(|r| r.service_window_days).unwrap_or(0);
-    let lines = cover_lines(&valid, &incident_date, window);
+    let lines = cover_lines(valid, &incident_date, window);
     for l in &lines {
         ctx.db.claim_line().insert(ClaimLine {
             id: 0,
@@ -357,7 +369,6 @@ pub fn apply_medical_record(ctx: &ReducerContext, job_id: u64, record_json: Stri
         extracted_at: Some(ctx.timestamp),
         ..record
     });
-    jobs::finish(ctx, job, "record extracted");
     if let Some(r) = ctx.db.medical_record().id().find(record.id) {
         crate::live::record_read(ctx, &claim, &r);
     }
@@ -406,7 +417,7 @@ pub fn submit_claim_checks(ctx: &ReducerContext, job_id: u64, checks: Vec<CheckI
 fn queue_review(ctx: &ReducerContext, claim: Claim) {
     let payload = review_payload(ctx, &claim);
     jobs::enqueue(ctx, KIND_REVIEW, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
-    save(ctx, Claim { status: ClaimStatus::Reviewing, status_note: "the claims agent is reviewing the pack".into(), ..claim });
+    save(ctx, Claim { status: ClaimStatus::Reviewing, status_note: "reviewing the claim".into(), ..claim });
 }
 
 fn core_lines(ctx: &ReducerContext, claim_id: u64) -> Vec<LineDecision> {
@@ -485,18 +496,43 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         record_reason: rec.as_ref().map(|r| r.reason_for_visit.clone()).unwrap_or_default(),
         precedents,
         policy_summary: policy_summary(ctx, claim),
+        claimant_statement: claim.statement.clone(),
     }
 }
 
-/// The claims agent's review. Code validates it, then decides: settle under a
-/// learned rule, route to the named person, or refuse.
+/// A step of Claude's investigation, while it runs: what it read and what the
+/// Evidence Engine found, for the decision history.
+#[spacetimedb::reducer]
+pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what: String, why: String) -> Result<(), String> {
+    require_role(ctx, &["worker"])?;
+    let job = jobs::leased_by_caller(ctx, job_id)?;
+    if job.kind != KIND_REVIEW {
+        return Err(format!("job {job_id} is not a claim investigation"));
+    }
+    if !["Claude", "Evidence Engine"].contains(&actor.as_str()) {
+        return Err(format!("{actor:?} does not investigate claims"));
+    }
+    let claim = claim_by_id(ctx, job.subject_id)?;
+    if claim.status != ClaimStatus::Reviewing {
+        return Ok(());
+    }
+    let cut = |s: String, n: usize| if s.chars().count() > n { s.chars().take(n).collect::<String>() + "…" } else { s };
+    crate::live::record(ctx, claim.incident_id, claim.id, &actor, &actor, cut(what, 200), cut(why, 600));
+    Ok(())
+}
+
+/// Claude's investigation and decision. Code validates the decision again,
+/// then holds it to its limits (`decision::guard`): Claude pays inside the
+/// authority a learned rule gives and refuses on failed checks; anything else
+/// goes to the organizer. An invalid decision is set aside and the claim is
+/// decided as if Claude were unavailable.
 #[spacetimedb::reducer]
 pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: String, call: ModelCallIn) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
     let job = jobs::leased_by_caller(ctx, job_id)?;
     let p: ReviewPayload = serde_json::from_str(&job.payload).map_err(|e| e.to_string())?;
     let call_id = jobs::record_call(ctx, job_id, &call);
-    jobs::finish(ctx, job, "review received");
+    jobs::finish(ctx, job, "decision received");
     let claim = claim_by_id(ctx, p.claim_id)?;
     if claim.pack_version != p.pack_version || claim.status != ClaimStatus::Reviewing {
         return Ok(());
@@ -504,34 +540,40 @@ pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: Strin
     let seqs: Vec<u32> = p.facts.iter().map(|f| f.seq).collect();
     let mut allowed: Vec<u64> = p.amounts.figures().to_vec();
     allowed.extend(p.lines.iter().flat_map(|l| [l.billed_cents, l.allowed_cents, l.covered_cents]));
-    let review: Result<AgentReview, Vec<String>> = serde_json::from_str::<AgentReview>(&review_json)
-        .map_err(|e| vec![format!("not a review: {e}")])
-        .and_then(|r| validate_review(&r, &seqs, &allowed).map(|_| r));
-    let (review_gate, verdict) = match &review {
-        Ok(r) => (gate(r), r.verdict.as_str().to_string()),
-        Err(_) => (ReviewGate::Missing, "invalid".to_string()),
-    };
-    let r = review.as_ref().ok();
+    let must_read = required_reading(&p);
+    let checked: Result<AgentDecision, Vec<String>> = serde_json::from_str::<Investigation>(&review_json)
+        .map_err(|e| vec![format!("not an investigation: {e}")])
+        .and_then(|inv| {
+            let d: AgentDecision = serde_json::from_value(inv.decision).map_err(|e| vec![format!("not a decision: {e}")])?;
+            validate_decision(&d, &seqs, &p.checks, &allowed, &inv.sources_read, &must_read).map(|_| d)
+        });
+    let verdict = checked.as_ref().map(|d| d.decision.as_str().to_string()).unwrap_or_else(|_| "invalid".into());
+    let d = checked.as_ref().ok();
     ctx.db.claim_review().insert(ClaimReview {
         id: 0,
         claim_id: claim.id,
         pack_version: claim.pack_version,
         verdict: verdict.clone(),
-        causation: r.map(|r| r.causation.as_str().to_string()).unwrap_or_default(),
-        summary: r.map(|r| r.summary.clone()).unwrap_or_default(),
-        concerns: r
-            .map(|r| r.concerns.iter().map(|c| format!("{}: {} {:?}", c.kind, c.detail, c.fact_ids)).collect())
+        causation: d.map(|d| d.causation.as_str().to_string()).unwrap_or_default(),
+        summary: d.map(|d| d.summary.clone()).unwrap_or_default(),
+        concerns: d
+            .map(|d| d.concerns.iter().map(|c| format!("{}: {} {:?}", c.kind, c.detail, c.fact_ids)).collect())
             .unwrap_or_default(),
-        innocent_explanations: r.map(|r| r.innocent_explanations.clone()).unwrap_or_default(),
-        missing_evidence: r.map(|r| r.missing_evidence.clone()).unwrap_or_default(),
-        cited_fact_ids: r.map(|r| r.cited_fact_ids.clone()).unwrap_or_default(),
-        rejected: review.as_ref().err().cloned().unwrap_or_default(),
+        innocent_explanations: d.map(|d| d.innocent_explanations.clone()).unwrap_or_default(),
+        missing_evidence: d.map(|d| d.missing_evidence.clone()).unwrap_or_default(),
+        cited_fact_ids: d.map(|d| d.cited_fact_ids.clone()).unwrap_or_default(),
+        rejected: checked.as_ref().err().cloned().unwrap_or_default(),
         model_call_id: call_id,
         created_at: ctx.timestamp,
     });
-    crate::live::reviewed(ctx, &claim, &verdict, &r.map(|r| r.summary.clone()).unwrap_or_default());
     let claim = save(ctx, Claim { review_verdict: verdict, ..claim });
-    decide_claim(ctx, claim, review_gate)
+    match checked {
+        Ok(d) => decide_with_claude(ctx, claim, &d),
+        Err(problems) => {
+            crate::live::set_aside(ctx, &claim, &problems);
+            decide_claim(ctx, claim, ReviewGate::Missing)
+        }
+    }
 }
 
 fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
@@ -553,42 +595,74 @@ fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
         .collect()
 }
 
-fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Result<(), String> {
-    let checks = pack_checks(ctx, claim.id, claim.pack_version);
-    let rules = core_rules(ctx);
-    let rule = matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id);
-    let corroboration = match claim.corroboration.as_str() {
+fn corroboration_of(claim: &Claim) -> bandit_insurance::Corroboration {
+    match claim.corroboration.as_str() {
         "corroborated" => bandit_insurance::Corroboration::Corroborated,
         "disputed" => bandit_insurance::Corroboration::Disputed,
         _ => bandit_insurance::Corroboration::Uncorroborated,
-    };
+    }
+}
+
+/// Why nothing of this claim's occurrence settles on its own, when enough people were hurt in it.
+fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
+    let occurrence = occurrence(ctx, claim.incident_id);
+    (occurrence.len() >= MASS_OCCURRENCE).then(|| {
+        format!(
+            "{} people hurt in {} within 5 minutes: auto-settle is off and the organizer decides every claim of the occurrence",
+            occurrence.len(),
+            claim.zone_name
+        )
+    })
+}
+
+/// Claude's valid decision, held to its limits.
+fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> Result<(), String> {
+    let checks = pack_checks(ctx, claim.id, claim.pack_version);
+    let rules = core_rules(ctx);
+    let guarded = guard(
+        d,
+        &GuardInput {
+            has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
+            corroboration: corroboration_of(&claim),
+            amounts: amounts(&claim),
+            checks: &checks,
+            rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
+            mass_occurrence: mass_occurrence(ctx, &claim),
+        },
+    );
+    apply(ctx, claim, guarded.decision, guarded.decided_by)
+}
+
+/// The code-only decision, when Claude is unavailable or its decision was set aside.
+fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Result<(), String> {
+    let checks = pack_checks(ctx, claim.id, claim.pack_version);
+    let rules = core_rules(ctx);
     let decision = decide(&DecisionInput {
         has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
-        corroboration,
+        corroboration: corroboration_of(&claim),
         amounts: amounts(&claim),
         checks: &checks,
         review,
         review_required: settings(ctx).review_required,
-        rule,
+        rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
     });
-    let occurrence = occurrence(ctx, claim.incident_id);
-    if occurrence.len() >= MASS_OCCURRENCE && !matches!(decision, Decision::Refuse { .. }) {
-        let reason = format!(
-            "{} people hurt in {} within 5 minutes: auto-settle is off and the organizer decides every claim of the occurrence",
-            occurrence.len(),
-            claim.zone_name
-        );
+    if let (Some(reason), false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. })) {
         route(ctx, claim, reason);
         return Ok(());
     }
+    let by = if matches!(decision, Decision::AutoSettle { .. }) { "rule" } else { "code" };
+    apply(ctx, claim, decision, by)
+}
+
+fn apply(ctx: &ReducerContext, claim: Claim, decision: Decision, decided_by: &str) -> Result<(), String> {
     match decision {
-        Decision::Refuse { reason } => refuse(ctx, claim, reason, "code").map(|_| ()),
+        Decision::Refuse { reason } => refuse(ctx, claim, reason, decided_by).map(|_| ()),
         Decision::Route { reason } => {
             route(ctx, claim, reason);
             Ok(())
         }
         Decision::AutoSettle { rule_id, rule_version } => {
-            let claim = save(ctx, Claim { decided_by: "rule".into(), settlement_rule_id: rule_id, settlement_rule_version: rule_version, ..claim });
+            let claim = save(ctx, Claim { decided_by: decided_by.into(), settlement_rule_id: rule_id, settlement_rule_version: rule_version, ..claim });
             settle(ctx, claim, "auto_settled")
         }
     }
@@ -601,7 +675,7 @@ const MASS_OCCURRENCE: usize = 3;
 const ORGANIZER: &str = "Organizer";
 
 /// Sends the claim to the organizer: anyone with `ops`, after the event.
-fn route(ctx: &ReducerContext, claim: Claim, reason: String) {
+pub(super) fn route(ctx: &ReducerContext, claim: Claim, reason: String) {
     save(
         ctx,
         Claim {
@@ -666,7 +740,7 @@ fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), Strin
         memo: format!("BandIt claim {} payout", claim.id),
     };
     jobs::enqueue(ctx, KIND_PAYOUT, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
-    let note = format!("{outcome}; paying {} into the claimant's Nessie account", bandit_insurance::money::format_cents(claim.payout_cents));
+    let note = format!("{outcome}; paying {} into the claimant's wallet", bandit_insurance::money::format_cents(claim.payout_cents));
     save(ctx, Claim { status: ClaimStatus::Paying, status_note: note, ..claim });
     Ok(())
 }
@@ -676,13 +750,14 @@ fn paid(ctx: &ReducerContext, claim: Claim, reference: String, outcome: &str) ->
     post(ctx, claim.id, bandit_insurance::ledger::claimant_payment(claim.payout_cents), outcome)?;
     let note = match claim.decided_by.as_str() {
         "rule" => format!("settled automatically under rule v{}", claim.settlement_rule_version),
+        "claude" => format!("paid on Claude's decision, inside the authority of rule v{}", claim.settlement_rule_version),
         _ => format!("approved by {}", claim.routed_to_name),
     };
     let claim = save(
         ctx,
         Claim { status: ClaimStatus::Settled, status_note: note, payout_reference: reference, settled_at: Some(ctx.timestamp), ..claim },
     );
-    let outcome = if claim.decided_by == "rule" { "auto_settled" } else { "approved" };
+    let outcome = if matches!(claim.decided_by.as_str(), "rule" | "claude") { "auto_settled" } else { "approved" };
     let payload = DraftPayload { claim_id: claim.id, pack_version: claim.pack_version, outcome: outcome.into(), letter: letter_data(ctx, &claim, "", "") };
     jobs::enqueue(ctx, KIND_DRAFT, serde_json::to_string(&payload).unwrap(), "claim", claim.id);
     Ok(())
@@ -730,6 +805,16 @@ fn decision_text(ctx: &ReducerContext, claim: &Claim) -> String {
                 None => "settled automatically under a learned rule".into(),
             }
         }
+        "claude" if claim.status != ClaimStatus::Refused => match ctx.db.settlement_rule().id().find(claim.settlement_rule_id) {
+            Some(r) => format!(
+                "paid by the insurance Decision Engine inside the {} authority of rule v{}, which {} ({}) approved",
+                bandit_insurance::money::format_cents(r.ceiling_cents),
+                r.version,
+                r.approver_name,
+                r.approver_role
+            ),
+            None => "paid by the insurance Decision Engine inside a learned rule".into(),
+        },
         "approver" => format!("approved by {} ({})", claim.routed_to_name, claim.routed_to_role),
         _ => claim.status_note.clone(),
     }
@@ -969,12 +1054,18 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
             }
             route(ctx, claim, "the medical record could not be read; a person must enter it".into());
         }
+        KIND_CLINIC if claim.status == ClaimStatus::AwaitingRecord => {
+            if let Some(r) = ctx.db.clinic_report().claim_id().filter(claim.id).find(|r| r.job_id == job.id) {
+                ctx.db.clinic_report().id().update(ClinicReport { status: "failed".into(), problems: vec![job.error.clone()], ..r });
+            }
+            route(ctx, claim, "the hospital report did not arrive; a person must file the record".into());
+        }
         KIND_VERIFY if claim.status == ClaimStatus::Verifying => {
             store_check(ctx, claim.id, claim.pack_version, &Check::info("elastic", "Elastic was unavailable; no validation or precedents").by(bandit_insurance::Reader::Elastic));
             queue_review(ctx, claim);
         }
         KIND_PAYOUT if claim.status == ClaimStatus::Paying => {
-            save(ctx, Claim { status_note: format!("the Nessie payout failed: {}; retry_claim_payout queues it again", job.error), ..claim });
+            save(ctx, Claim { status_note: format!("the payout failed: {}; retry_claim_payout queues it again", job.error), ..claim });
         }
         KIND_REVIEW if claim.status == ClaimStatus::Reviewing => {
             let claim = save(ctx, Claim { review_verdict: "unavailable".into(), ..claim });
@@ -982,9 +1073,4 @@ pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
         }
         _ => {}
     }
-}
-
-/// Exposed for tests and the CLI: the verdict values the agent may return.
-pub fn verdict_names() -> [&'static str; 3] {
-    [Verdict::Consistent.as_str(), Verdict::NeedsHuman.as_str(), Verdict::Inconsistent.as_str()]
 }
