@@ -12,7 +12,7 @@ import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
 import { Rng } from './sim/rng'
 
 /** Simulated attendees on the floor. A smaller page of them carries the live band ids. */
-const COUNT = 1000
+const COUNT = 1500
 const DT = 0.1
 const WALK = ['theater', 'food', 'entrance', 'sponsor', 'broadway', 'atrium', 'mezzanine']
 
