@@ -1,0 +1,144 @@
+{
+  "capture_method": "Official OpenAI browser runtime, Chrome Work profile. Native JPEG screenshots; no pixel changes, fabricated content, DOM edits, or overlays.",
+  "entry_route": "Landing page https://band1t.vip/ \u2192 Try a test band \u2192 /t/AJMN-676X \u2192 existing prototype desk navigation.",
+  "scope": "Current product artwork for Devpost only. Screenshots must not be placed in Excalidraw diagrams.",
+  "actions": "Read-only navigation, camera fit/zoom/rotation, page scrolling. Dev used normal sign-in with the existing UCSB owner session, then the built-in read-only View as for Jordan Alvarez. No role grants, data creation, operational scenario, settlement, charge, payout, or purchase actions.",
+  "limitations": [
+    "Venue shows an existing scripted crowd: 1,000 people, All quiet, zero of 10 bands online. It is not authenticated staff or live hardware/response proof.",
+    "Graph shows 1,540 links, 974 named people, 51 booths and 51 companies from existing current prototype state. Do not describe these counts as measured live conference attendance.",
+    "Dev attendee captures show Jordan Alvarez through the owner\u2019s built-in read-only View as. Existing product data was used unchanged; Buy/Share controls are disabled by that preview.",
+    "The personalized products contain the existing three-person crew illustration. Do not describe it as a newly captured photograph or a completed purchase from this task.",
+    "Dev Costs totals reflect existing prototype history, not real commercial sales. The screen distinguishes amounts received from outstanding amounts.",
+    "Public organizer Photos showed repeated illustrations and zero identified names; public organizer Merch showed raw green replacement fields and zero visible orders. Those catalog pages were excluded; the fuller dev personalized preview was captured instead."
+  ],
+  "recommended_captions": {
+    "venue": "The venue map shows crowd levels across the event.",
+    "graph": "Meetings and booth visits appear as connections in the event graph.",
+    "recap": "The attendee recap shows people met, time together and booth interests.",
+    "merch": "Personal merch picks include a preview and a reason for the suggestion.",
+    "costs": "The organizer can see sales, event costs and money still owed."
+  },
+  "captures": [
+    {
+      "file": "venue-current.jpg",
+      "captured_at_utc": "2026-10-25T11:23:54.119Z",
+      "url": "https://band1t.vip/t/AJMN-676X",
+      "screen": "Venue overview",
+      "framing": "Full viewport; Fit the venue and one Zoom in.",
+      "status": "Approved context alternative; superseded by wider venue-landscape-current.jpg.",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "format": "JPEG",
+      "sha256": "3ebd9ed52a2fe82f9eda7c438033a9a9e025986e05be7249bcf5b45660195fe5"
+    },
+    {
+      "file": "venue-landscape-current.jpg",
+      "captured_at_utc": "2026-10-25T11:25:39.762Z",
+      "url": "https://band1t.vip/organizer",
+      "screen": "Venue overview, landscape camera",
+      "framing": "Full viewport; three Rotate right clicks and one Zoom in after navigating back to Map.",
+      "status": "Independently approved for article use.",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "format": "JPEG",
+      "sha256": "eb109859b57735b965f8823e7d09f8fdedb9d2a3c3c59b5fee943294e9f4cf44"
+    },
+    {
+      "file": "event-graph-detail-current.jpg",
+      "captured_at_utc": "2026-10-25T11:24:38.651Z",
+      "url": "https://band1t.vip/graph",
+      "screen": "Event graph with relationship legend",
+      "framing": "Native screenshot clip x223,y92,width1282,height841 after normal page scroll.",
+      "status": "Independently approved for article use.",
+      "dimensions": [
+        1282,
+        841
+      ],
+      "format": "JPEG",
+      "sha256": "a91ae584d629f83203acb2d417346dfbc7240441f8da246344cff4b8c4798f99"
+    },
+    {
+      "file": "event-graph-current.jpg",
+      "captured_at_utc": "2026-10-25T11:24:06.905Z",
+      "url": "https://band1t.vip/graph",
+      "screen": "Event graph with page heading",
+      "framing": "Initial full-page screenshot request returned current viewport; bottom legend is offscreen.",
+      "status": "Context alternative; prefer event-graph-detail-current.jpg.",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "format": "JPEG",
+      "sha256": "06a23b3af00ee17cbb5393eb17b25c4541f041e6c09f109a31a1ea916b3e97a0"
+    },
+    {
+      "file": "dev-recap-connections.jpg",
+      "captured_at_utc": "2026-10-25T11:29:36.713Z",
+      "url": "https://dev.band1t.vip/organizer#viewas",
+      "screen": "Jordan\u2019s populated attendee connections",
+      "framing": "Full native viewport from read-only View as.",
+      "status": "Approved surrounding context; prefer tighter detail after review.",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "format": "JPEG",
+      "sha256": "43122ed047dd9ca94da9db9d7073f79e51f462d83f3f0070f3c8c5343b5deccc"
+    },
+    {
+      "file": "dev-recap-connections-detail.jpg",
+      "captured_at_utc": "2026-10-25T11:30:44.078Z",
+      "url": "https://dev.band1t.vip/organizer#viewas",
+      "screen": "Jordan\u2019s populated attendee connections, tight detail",
+      "framing": "Native screenshot clip x435,y1886,width863,height588; document scrollY1553.",
+      "status": "Independently approved for article use.",
+      "dimensions": [
+        863,
+        588
+      ],
+      "format": "JPEG",
+      "sha256": "348b2aca4aec13b995a7fe43c3ae19a3796e1a27901b3117d5b7a2aba4c78027"
+    },
+    {
+      "file": "dev-personalized-merch.jpg",
+      "captured_at_utc": "2026-10-25T11:30:27.245Z",
+      "url": "https://dev.band1t.vip/organizer#viewas",
+      "screen": "Personalized attendee merchandise and shipping fields",
+      "framing": "Native screenshot clip x450,y1730,width832,height706; document scrollY1553.",
+      "status": "Independently approved for article use.",
+      "dimensions": [
+        832,
+        706
+      ],
+      "format": "JPEG",
+      "sha256": "fa5cfc876ccad59ea90a5bbaf8855ac747f04c7a58ee2b9bcb7e8ba4bd6bfce1"
+    },
+    {
+      "file": "dev-costs-summary.jpg",
+      "captured_at_utc": "2026-10-25T11:31:18.162Z",
+      "url": "https://dev.band1t.vip/organizer#costs",
+      "screen": "Organizer revenue, net cost and payments",
+      "framing": "Native screenshot clip x433,y1109,width863,height514; document scrollY1033.5.",
+      "status": "Independently approved for article use.",
+      "dimensions": [
+        863,
+        514
+      ],
+      "format": "JPEG",
+      "sha256": "4d54b09cb227561faffd68ccee77c1fbc3913d309bc6671a10cafc13af278de7"
+    }
+  ],
+  "dev_entry_route": "https://dev.band1t.vip/organizer \u2192 Sign in with email (existing provider session restored owner+ops) \u2192 View as \u2192 Jordan Alvarez; Costs tab used for financial summary.",
+  "recommended_article_files": [
+    "venue-landscape-current.jpg",
+    "event-graph-detail-current.jpg",
+    "dev-recap-connections-detail.jpg",
+    "dev-personalized-merch.jpg",
+    "dev-costs-summary.jpg"
+  ],
+  "assets_frozen_at_utc": "2026-10-25T11:31:51.183288Z"
+}
