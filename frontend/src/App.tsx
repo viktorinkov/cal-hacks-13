@@ -5,6 +5,7 @@ import { ClaimsDesk } from '@/components/claims/ClaimsDesk'
 import { CommandCenter } from '@/components/dashboard/CommandCenter'
 import { AttendeesPage } from '@/components/desk/AttendeesPage'
 import { BandsPage } from '@/components/desk/BandsPage'
+import { CamerasPage } from '@/components/desk/CamerasPage'
 import { CostsPage } from '@/components/desk/CostsPage'
 import { RulesPage } from '@/components/desk/RulesPage'
 import { GraphPage } from '@/components/desk/GraphPage'
@@ -78,6 +79,7 @@ function Pages() {
   if (path === '/attendees') return <AttendeesPage />
   if (path === '/run') return <RunPage />
   if (path === '/bands') return <BandsPage />
+  if (path === '/cameras') return <CamerasPage />
   if (path === '/test-bands') return <TestBandsPage />
   if (path === '/photos') return <PhotosPage />
   if (path === '/photo') return <PhotographerPage />

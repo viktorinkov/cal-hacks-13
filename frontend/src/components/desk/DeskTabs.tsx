@@ -4,6 +4,7 @@ import { useRoute } from '@/cover/route'
 const ITEMS = [
   { to: '/', label: 'Map', on: (path: string) => path === '/' || path === '/organizer' },
   { to: '/payments', label: 'Payments', on: (path: string) => path === '/payments' },
+  { to: '/cameras', label: 'Cameras', on: (path: string) => path === '/cameras' },
   { to: '/run', label: 'Run', on: (path: string) => path === '/run' },
   { to: '/venue', label: 'Venue', on: (path: string) => path === '/venue' },
   { to: '/attendees', label: 'Attendees', on: (path: string) => path === '/attendees' },
