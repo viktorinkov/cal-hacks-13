@@ -45,7 +45,7 @@ const SHAPES = Array.from({ length: COUNT }, (_, i) => segment(i, 0.02, 0.98, GA
 const CORES = Array.from({ length: COUNT }, (_, i) => segment(i, 0.3, 0.72, GAP + 4))
 
 /** Direction of each light from the centre of the face, in the photo, degrees clockwise from east. */
-const ANGLES = Array.from({ length: COUNT }, (_, i) => {
+export const ANGLES = Array.from({ length: COUNT }, (_, i) => {
   const [x, y] = between(geo.phase + (i + 0.5) * geo.pitch, 0.5)
   return (Math.atan2(y - geo.center[1], x - geo.center[0]) * 180) / Math.PI
 })
@@ -91,6 +91,16 @@ export class Ring {
   /** How strongly the ring follows the show's beat (0 to 1). */
   beatGlow = 0
   calm = false
+  /** Work out the lights without drawing them, for a model that lights its own segments. */
+  headless = false
+
+  get levels(): ArrayLike<number> {
+    return this.level
+  }
+
+  get colours(): readonly RGB[] {
+    return this.colour
+  }
 
   constructor(canvas: HTMLCanvasElement, opts: RingOptions = {}) {
     this.canvas = canvas
@@ -230,7 +240,7 @@ export class Ring {
       this.level[i] += (target[i] - this.level[i]) * (1 - Math.exp(-dt * rate))
       this.colour[i] = target[i] > 0.01 ? mix(this.colour[i], colour[i], 1 - Math.exp(-dt * 14)) : this.colour[i]
     }
-    this.draw()
+    if (!this.headless) this.draw()
   }
 
   private draw() {

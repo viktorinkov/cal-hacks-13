@@ -1,8 +1,9 @@
 import '@fontsource-variable/epilogue/wght.css'
 import './home.css'
+import type { Band3D } from './band3d'
 import { fitTitle, prepareTitle, runIntro } from './intro'
-import { Ring, faceIn } from './ring'
-import { ALERT_RED, dropAt } from './show'
+import { ANGLES, Ring, faceIn } from './ring'
+import { ALERT_RED, beatAt, dropAt, kick, palette } from './show'
 import { createStage, type Stage } from './stage'
 
 const root = document.documentElement
@@ -48,6 +49,40 @@ heroRing.rotation = POSE
 const view = { w: 0, h: 0, horizon: 0, face: { x: 0, y: 0, r: 100 } }
 let turnPx = 900
 
+/* The modelled band replaces the photograph once three.js has loaded; the photograph stays as the
+   fallback without WebGL. */
+let band: Band3D | null = null
+const pointerNow = { x: 0, y: 0, on: 0 }
+
+function placeBand() {
+  if (!band) return
+  const unit = Math.min(view.h * 0.3, view.w * 0.5)
+  band.place(view.w / 2, view.h * (view.w < 600 ? 0.58 : 0.675), unit)
+}
+
+async function loadBand() {
+  const canvas = document.createElement('canvas')
+  try {
+    const { createBand } = await import('./band3d')
+    canvas.className = 'band-3d'
+    canvas.setAttribute('role', 'img')
+    canvas.setAttribute('aria-label', one<HTMLImageElement>('.act-band').alt)
+    stageEl.insertBefore(canvas, act)
+    const made = createBand(canvas, ANGLES)
+    if (!made) throw new Error('no WebGL')
+    band = made
+    heroRing.headless = true
+    heroRing.rotation = 0
+    placeBand()
+    if (calm) drawStill()
+    requestAnimationFrame(() => root.classList.add('has-3d'))
+  } catch {
+    band = null
+    canvas.remove()
+    root.classList.add('no-3d')
+  }
+}
+
 function measure() {
   stage?.resize()
   heroRing.resize()
@@ -62,6 +97,7 @@ function measure() {
   view.horizon = sr.height * (sr.width < 600 ? 0.6 : 0.64)
   stage?.setFace(view.face.x, view.face.y, view.face.r)
   stage?.setHorizon(view.horizon)
+  placeBand()
   fitTitle(title)
   if (calm) drawStill()
 }
@@ -136,6 +172,9 @@ function aimAt(x: number, y: number) {
 stageEl.addEventListener('pointermove', (e) => {
   const { x, y } = local(e)
   pointerSeen = true
+  pointerNow.x = x
+  pointerNow.y = y
+  pointerNow.on = 1
   stage?.pointer(x, y, true)
   if (heroRing.mode === 'compass') aimScreen = aimAt(x, y)
   tiltTo.x = clamp((y - view.face.y) / view.h, -0.6, 0.6) * -14
@@ -152,6 +191,7 @@ stageEl.addEventListener('pointermove', (e) => {
 })
 
 stageEl.addEventListener('pointerleave', () => {
+  pointerNow.on = 0
   stage?.pointer(0, 0, false)
   tiltTo.x = 0
   tiltTo.y = 0
@@ -169,7 +209,8 @@ function fallAt(x: number, y: number) {
   heroRing.set('alert', now, { mode: 'away', after: 2600 })
   fallEnds = now + 6400
   if (!calm) {
-    act.animate(
+    const shaken: HTMLElement = band?.canvas ?? act
+    shaken.animate(
       [{ translate: '0 0' }, { translate: '-7px 0' }, { translate: '7px 0' }, { translate: '-4px 0' }, { translate: '0 0' }],
       { duration: 360, easing: 'linear', composite: 'add' },
     )
@@ -260,29 +301,66 @@ function loop(now: number) {
 
   const rock = strikeAt >= 0 ? Math.sin(now / 2600) * 7 : 0
   const turn = spinNow + rock
+  heroRing.spin = energy
+  heroRing.beatGlow = stage ? stage.levels.on : 1
+
+  if (band) {
+    const local = band.aimLocal(aimScreen)
+    if (local !== null) heroRing.aim = local
+    heroRing.frame(now)
+    showBand(now, turn, strikeAt >= 0 ? flicker(now - strikeAt) : 0, stage ? stage.levels.on : 1)
+    stage?.frame(now)
+    return
+  }
+
   spinner.style.transform = `rotateY(${turn.toFixed(2)}deg)`
   tilt.style.transform = `rotateX(${tiltNow.x.toFixed(2)}deg) rotateY(${tiltNow.y.toFixed(2)}deg)`
   /* Seen from behind the ring is mirrored left to right, so its arc has to be aimed mirrored too. */
   const fromBehind = Math.cos(((turn + tiltNow.y) * Math.PI) / 180) < 0
   heroRing.aim = fromBehind ? 180 - aimScreen : aimScreen
-  heroRing.spin = energy
-  heroRing.beatGlow = stage ? stage.levels.on : 1
   stage?.frame(now)
   heroRing.frame(now)
   copyBack(turn + tiltNow.y)
 }
 
+/* Draws the model and points the follow spot at its face, wherever the turntable has carried it. */
+function showBand(now: number, turn: number, lit: number, on: number) {
+  if (!band) return
+  const beat = beatAt(now)
+  band.frame({
+    turn,
+    tiltX: tiltNow.x,
+    tiltY: tiltNow.y,
+    lit,
+    on,
+    palette: palette(beat),
+    kick: calm ? 0 : kick(beat),
+    pointer: pointerNow,
+    levels: heroRing.levels,
+    colours: heroRing.colours,
+  })
+  const f = band.face()
+  view.face = { x: f.x, y: f.y, r: f.r }
+  stage?.setFace(f.x, f.y, f.r * (0.6 + 0.4 * Math.max(0, f.facing)))
+}
+
 function drawStill() {
   const now = performance.now()
+  if (heroRing.mode === 'off') heroRing.set('compass', now)
+  if (band) {
+    heroRing.aim = band.aimLocal(-50) ?? -50
+    heroRing.frame(now)
+    showBand(now, 0, 1, 0.8)
+  } else {
+    spinner.style.transform = ''
+    heroRing.aim = -50
+    heroRing.frame(now)
+  }
   if (stage) {
     stage.levels.on = 0.8
     stage.levels.spot = 1
     stage.frame(now)
   }
-  spinner.style.transform = ''
-  heroRing.aim = -50
-  if (heroRing.mode === 'off') heroRing.set('compass', now)
-  heroRing.frame(now)
 }
 
 /* ---------- Start ---------- */
@@ -294,6 +372,7 @@ async function start() {
   const skipIntro = calm || window.scrollY > 40 || !root.classList.contains('intro')
   measure()
   window.addEventListener('resize', () => requestAnimationFrame(measure))
+  void loadBand()
 
   if (!calm) {
     buildEdge()

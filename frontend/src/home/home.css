@@ -246,6 +246,32 @@ button {
   opacity: 0;
 }
 
+/* The modelled band; the script sizes and places it round the turntable's axis. */
+.band-3d {
+  position: absolute;
+  z-index: 2;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out);
+}
+
+.has-3d .band-3d {
+  opacity: 1;
+}
+
+/* The cut-out only shows if the model can't be drawn. */
+.js .act {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.no-3d .act {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 600ms var(--ease-out);
+}
+
 .hero-copy {
   position: absolute;
   inset: 0 var(--m) auto;
