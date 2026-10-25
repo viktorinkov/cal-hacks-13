@@ -1,0 +1,170 @@
+//! Insurance PDFs, one page per document in `<prefix>-documents`. Its default
+//! pipeline `<prefix>-documents-extract` takes each page's text layer and marks a
+//! page without one, a scan, for transcription. The `bandit-read-document`
+//! workflow writes what it read to `<prefix>-document-terms`.
+
+use anyhow::{Context, Result, bail};
+use base64::Engine;
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use crate::{ClaimsIndex, INFERENCE_ID, check_id, hits};
+
+/// Most pages a document can have (the module accepts 1 to 50).
+const MAX_PAGES: usize = 50;
+
+/// One page as stored, after the pipeline.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StoredPage {
+    /// 1-based.
+    pub page: u32,
+    pub text: String,
+    /// The page has no text layer and no transcription yet.
+    pub needs_transcription: bool,
+}
+
+impl ClaimsIndex {
+    /// `<prefix>-documents`, one document per page.
+    pub fn documents_index(&self) -> String {
+        format!("{}-documents", self.prefix)
+    }
+
+    /// `<prefix>-document-terms`, the workflow's answer, one document per PDF.
+    pub fn terms_index(&self) -> String {
+        format!("{}-document-terms", self.prefix)
+    }
+
+    fn extract_pipeline(&self) -> String {
+        format!("{}-documents-extract", self.prefix)
+    }
+
+    /// Creates or updates the extract pipeline, and creates the page and answer indices if they are missing.
+    pub async fn ensure_document_indices(&self) -> Result<()> {
+        let pipeline = self.extract_pipeline();
+        self.call(Method::PUT, &format!("_ingest/pipeline/{pipeline}"), Some(extract_pipeline_body())).await?;
+        let pages = json!({ "settings": { "index.default_pipeline": pipeline }, "mappings": page_mappings() });
+        self.ensure_index(&self.documents_index(), pages).await?;
+        self.ensure_index(&self.terms_index(), json!({ "mappings": terms_mappings() })).await?;
+        Ok(())
+    }
+
+    /// Writes page `page` (1-based) of a PDF through the extract pipeline as
+    /// `<sha>-p<n>`. `text` is the transcription of a scanned page; without it
+    /// the pipeline takes the page's own text layer.
+    pub async fn put_page(&self, document_hash: &str, kind: &str, page: u32, pdf: &[u8], text: Option<&str>) -> Result<()> {
+        let id = page_id(document_hash, page);
+        check_id(&id)?;
+        let path = format!("{}/_doc/{id}?refresh=wait_for", self.documents_index());
+        let doc = page_doc(document_hash, kind, page, pdf, text);
+        self.call(Method::PUT, &path, Some(doc)).await.with_context(|| format!("writing page {page} of {document_hash}"))?;
+        Ok(())
+    }
+
+    /// Every stored page of a document, in page order.
+    pub async fn document_pages(&self, document_hash: &str) -> Result<Vec<StoredPage>> {
+        let query = json!({
+            "size": MAX_PAGES,
+            "query": { "term": { "document_hash": document_hash } },
+            "sort": [{ "page": "asc" }],
+            "_source": ["page", "text", "needs_transcription"]
+        });
+        let v = self.call(Method::POST, &format!("{}/_search", self.documents_index()), Some(query)).await?;
+        hits(&v).map(|h| serde_json::from_value(h["_source"].clone()).context("a stored page has the wrong shape")).collect()
+    }
+
+    /// The workflow's answer for a document.
+    pub async fn document_terms(&self, document_hash: &str) -> Result<Value> {
+        check_id(document_hash)?;
+        let v = self.call(Method::GET, &format!("{}/_doc/{document_hash}", self.terms_index()), None).await?;
+        if v["found"] != true {
+            bail!("{} has no answer for {document_hash}", self.terms_index());
+        }
+        Ok(v["_source"].clone())
+    }
+}
+
+pub(crate) fn page_id(document_hash: &str, page: u32) -> String {
+    format!("{document_hash}-p{page}")
+}
+
+fn page_doc(document_hash: &str, kind: &str, page: u32, pdf: &[u8], text: Option<&str>) -> Value {
+    let mut doc = json!({
+        "document_hash": document_hash,
+        "kind": kind,
+        "page": page,
+        "data": base64::engine::general_purpose::STANDARD.encode(pdf),
+    });
+    if let Some(t) = text {
+        doc["text"] = json!(t);
+        doc["transcribed"] = json!(true);
+    }
+    doc
+}
+
+fn extract_pipeline_body() -> Value {
+    json!({
+        "description": "BandIt insurance documents: the text layer of one PDF page; a page without one is marked for transcription",
+        "processors": [
+            { "attachment": {
+                "field": "data", "target_field": "attachment", "properties": ["content"],
+                "indexed_chars": -1, "remove_binary": true, "ignore_missing": true
+            }},
+            { "set": {
+                "description": "the text layer, unless the worker sent a transcription",
+                "if": "ctx.attachment?.content != null && ctx.attachment.content.trim() != '' && (ctx.text == null || ctx.text == '')",
+                "field": "text", "copy_from": "attachment.content"
+            }},
+            { "script": {
+                "lang": "painless",
+                "source": "ctx.needs_transcription = ctx.text == null || ctx.text.trim().isEmpty();"
+            }},
+            { "remove": { "field": "attachment", "ignore_missing": true } },
+            { "set": { "field": "indexed_at", "value": "{{{_ingest.timestamp}}}" } }
+        ]
+    })
+}
+
+fn page_mappings() -> Value {
+    let kw = json!({ "type": "keyword" });
+    json!({
+        "dynamic": false,
+        "properties": {
+            "document_hash": kw, "kind": kw, "page": { "type": "integer" },
+            "text": { "type": "semantic_text", "inference_id": INFERENCE_ID },
+            "needs_transcription": { "type": "boolean" }, "transcribed": { "type": "boolean" },
+            "indexed_at": { "type": "date" }
+        }
+    })
+}
+
+/// `read` is the reader's structured answer, kept as it came and not indexed.
+fn terms_mappings() -> Value {
+    let kw = json!({ "type": "keyword" });
+    json!({
+        "dynamic": false,
+        "properties": {
+            "document_hash": kw, "kind": kw, "model": kw, "pages_indexed": { "type": "integer" },
+            "read": { "type": "object", "enabled": false }
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_page_carries_its_bytes_and_any_transcription() {
+        let doc = page_doc("ab12", "venue_policy", 2, b"%PDF-1.5", None);
+        assert_eq!(page_id("ab12", 2), "ab12-p2");
+        assert_eq!(doc["data"], "JVBERi0xLjU=");
+        assert!(doc.get("text").is_none());
+        let doc = page_doc("ab12", "venue_policy", 2, b"%PDF-1.5", Some("SCHEDULE OF BENEFITS"));
+        assert_eq!((doc["text"].as_str(), doc["transcribed"].as_bool()), (Some("SCHEDULE OF BENEFITS"), Some(true)));
+        for key in ["document_hash", "kind", "page", "text", "transcribed"] {
+            assert!(page_mappings()["properties"].get(key).is_some(), "{key} is not mapped");
+        }
+    }
+}

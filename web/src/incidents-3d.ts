@@ -1,10 +1,11 @@
 // The incidents in the venue's 3D view on the Live tab, one per `incident_marker` row of the run: a pulsing ring
 // and a beam of light where it happened (red while open, amber while the medic responds, green once resolved),
 // and a tag with who, where and, once there is a claim, how far the claim is. When the medic takes it, a medic
-// walks in from the nearest door along the aisles. A resolved incident fades out 20 s later.
+// walks in from the nearest door along the aisles. A resolved incident fades out 20 s later. The tags are page
+// text over the canvas, above the names on the floor, and climb above each other instead of covering one another.
 
 import * as THREE from 'three';
-import { money } from './lib';
+import { h, money } from './lib';
 import { Floor, type P } from './floor-path';
 import type { IncidentMarker } from './module_bindings/types';
 
@@ -21,23 +22,14 @@ const MEDIC_MAX_MS = 9_000;
 /** The medic stops this far from the person. */
 const MEDIC_GAP_M = 1.4;
 const BEAM_M = 6;
-const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-/** Canvas pixels per CSS pixel, so tags stay sharp on retina screens. */
-const RATIO = 2;
-const PAD = 6;
-/** Tags that would overlap on screen stack up with this gap, at most this many places. */
-const STACK_GAP_PX = 3;
+/** The medic's cross floats this high. */
+const CROSS_M = 2.2;
+/** Tags keep this gap between them when they climb, at most this many places. */
+const GAP_PX = 3;
 const MAX_LIFT = 6;
 const RANK: Record<string, number> = { open: 0, responding: 1, resolved: 2 };
 
 const ms = (t: { microsSinceUnixEpoch: bigint } | undefined) => (t ? Number(t.microsSinceUnixEpoch / 1000n) : 0);
-
-type Line = { text: string; px: number; color: string; bold?: boolean };
-type Tag = { lines: Line[]; pill?: { text: string; color: string }; background: string };
-
-/** The camera and the canvas's size in CSS pixels at the last frame drawn, to see where tags land on screen. */
-let seen: { camera: THREE.Camera; w: number; h: number } | undefined;
-const ANCHOR = new THREE.Vector3();
 
 type Pin = {
   row: IncidentMarker;
@@ -46,18 +38,25 @@ type Pin = {
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   ripple: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   beam: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
-  tag: THREE.Sprite;
+  tag: HTMLElement;
+  /** The tag's text, to redraw it only when it changes. */
+  said: string;
+  alpha: number;
   medic?: Medic;
 };
 
-/** A medic on their way: the figure, and the walk from the door to beside the person. */
-type Medic = { group: THREE.Group; way: P[]; along: number[]; length: number; routed: number };
+/** A medic on their way: the figure and its cross, and the walk from the door to beside the person. */
+type Medic = { group: THREE.Group; cross: HTMLElement; way: P[]; along: number[]; length: number; routed: number };
+
+/** What the incidents draw on: the 3D view's layer, the page box over its canvas and its camera. */
+export type IncidentView = { layer: THREE.Object3D; view: HTMLElement; camera: THREE.PerspectiveCamera };
 
 const ringGeometry = new THREE.RingGeometry(1.7, 2.1, 56).rotateX(-Math.PI / 2);
 const discGeometry = new THREE.CircleGeometry(2.1, 56).rotateX(-Math.PI / 2);
 const beamGeometry = new THREE.CylinderGeometry(0.22, 0.22, BEAM_M, 12, 1, true).translate(0, BEAM_M / 2, 0);
 const medicGeometry = new THREE.CapsuleGeometry(0.34, 1.0, 3, 10);
 const medicRingGeometry = new THREE.RingGeometry(0.6, 0.85, 32).rotateX(-Math.PI / 2);
+const AT = new THREE.Vector3();
 
 /** A see-through colour that does not hide what is under it. */
 function tint(colour: string, opacity: number) {
@@ -80,87 +79,11 @@ export function incidentState(m: IncidentMarker, arrived: boolean): string {
   return m.kind === 'property' ? 'Waiting for staff' : 'Waiting for the medic';
 }
 
-// --- Tags -------------------------------------------------------------------------------------
-
-/** A tag that stands above its anchor point and keeps the same size on screen however far the camera is. */
-function tagSprite(tag: Tag, order = 20): THREE.Sprite {
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ sizeAttenuation: false, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
-  sprite.center.set(0.5, 0);
-  sprite.renderOrder = order;
-  sprite.frustumCulled = false;
-  // Without size attenuation a sprite's scale is a share of the view's height: this many per CSS pixel.
-  sprite.onBeforeRender = (renderer, _scene, camera) => {
-    seen = { camera, w: renderer.domElement.clientWidth, h: renderer.domElement.clientHeight };
-    const fov = (camera as THREE.PerspectiveCamera).fov ?? 35;
-    const k = (2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2)) / Math.max(1, renderer.domElement.clientHeight);
-    const [w, h] = sprite.userData.px as [number, number];
-    if (Math.abs(sprite.scale.x - w * k) > 1e-9 || Math.abs(sprite.scale.y - h * k) > 1e-9) {
-      sprite.scale.set(w * k, h * k, 1);
-      sprite.updateMatrixWorld();
-    }
-  };
-  drawTag(sprite, tag);
-  return sprite;
-}
-
-/** Redraws the tag when its text changed. */
-function drawTag(sprite: THREE.Sprite, tag: Tag) {
-  const key = JSON.stringify(tag);
-  if (sprite.userData.key === key) return;
-  sprite.userData.key = key;
-  const g = document.createElement('canvas').getContext('2d')!;
-  const font = (l: Line) => `${l.bold ? 600 : 400} ${l.px}px ${FONT}`;
-  const pillPx = Math.round((tag.lines[0]?.px ?? 12) * 0.72);
-  g.font = `700 ${pillPx}px ${FONT}`;
-  const pillW = tag.pill ? g.measureText(tag.pill.text).width + 12 : 0;
-  const widths = tag.lines.map((l, i) => {
-    g.font = font(l);
-    return g.measureText(l.text).width + (i === 0 && tag.pill ? pillW + 6 : 0);
-  });
-  const w = Math.ceil(Math.max(1, ...widths) + 2 * (PAD + 2));
-  const h = Math.ceil(tag.lines.reduce((s, l) => s + l.px * 1.3, 0) + 2 * PAD);
-  g.canvas.width = w * RATIO;
-  g.canvas.height = h * RATIO;
-  g.scale(RATIO, RATIO);
-  g.fillStyle = tag.background;
-  g.beginPath();
-  g.roundRect(0, 0, w, h, 6);
-  g.fill();
-  let y = PAD;
-  tag.lines.forEach((l, i) => {
-    const lh = l.px * 1.3;
-    let x = PAD + 2;
-    g.textBaseline = 'middle';
-    if (i === 0 && tag.pill) {
-      g.fillStyle = tag.pill.color;
-      g.beginPath();
-      g.roundRect(x, y + lh / 2 - pillPx * 0.8, pillW, pillPx * 1.6, 4);
-      g.fill();
-      g.font = `700 ${pillPx}px ${FONT}`;
-      g.fillStyle = '#0a0e18';
-      g.fillText(tag.pill.text, x + 6, y + lh / 2 + 0.5);
-      x += pillW + 6;
-    }
-    g.font = font(l);
-    g.fillStyle = l.color;
-    g.fillText(l.text, x, y + lh / 2 + 0.5);
-    y += lh;
-  });
-  const old = sprite.material.map;
-  const map = new THREE.CanvasTexture(g.canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 4;
-  sprite.material.map = map;
-  sprite.material.needsUpdate = true;
-  old?.dispose();
-  sprite.userData.px = [w, h];
-}
-
-// --- Incidents --------------------------------------------------------------------------------
-
 export class Incidents {
   private pins = new Map<bigint, Pin>();
-  private layer: THREE.Object3D;
+  private v: IncidentView;
+  /** The tags and crosses, over the canvas. */
+  private box = h('div', { class: 'venue-incidents' });
   /** The module's time now, in ms since the epoch. */
   private now: () => number;
   private floor?: Floor;
@@ -168,9 +91,10 @@ export class Incidents {
   /** Goes up as the floor and the doors arrive, so a medic who set off before takes the better way. */
   private loaded = 0;
 
-  constructor(layer: THREE.Object3D, now: () => number) {
-    this.layer = layer;
+  constructor(v: IncidentView, now: () => number) {
+    this.v = v;
     this.now = now;
+    v.view.append(this.box);
     // The doors the medic comes in through, and the floor they walk on.
     Floor.load().then(f => { this.floor = f; this.loaded++; });
     fetch('/venue/spots.json').then(r => r.json()).then((spots: { kind: string; x: number; z: number }[]) => {
@@ -186,10 +110,9 @@ export class Incidents {
     for (const m of rows) this.upsert(m);
   }
 
-  /** Where an incident is on the floor, if it shows. */
-  where(id: bigint): { x: number; z: number } | undefined {
-    const p = this.pins.get(id);
-    return p ? { x: p.row.xM, z: p.row.yM } : undefined;
+  /** The incidents showing on the floor now. */
+  shown(): IncidentMarker[] {
+    return [...this.pins.values()].filter(p => p.alpha > 0).map(p => p.row);
   }
 
   private upsert(row: IncidentMarker) {
@@ -204,11 +127,11 @@ export class Incidents {
       ring.position.y = 0.07;
       ripple.position.y = 0.08;
       for (const o of [disc, ring, ripple, beam]) o.renderOrder = 3;
-      const tag = tagSprite({ lines: [{ text: '', px: 13, color: '#fff' }], background: 'rgba(10, 14, 24, 0.86)' });
-      tag.position.y = BEAM_M + 0.4;
-      group.add(disc, ring, ripple, beam, tag);
-      this.layer.add(group);
-      p = { row, group, disc, ring, ripple, beam, tag };
+      group.add(disc, ring, ripple, beam);
+      this.v.layer.add(group);
+      const tag = h('div', { class: 'venue-incident' });
+      this.box.append(tag);
+      p = { row, group, disc, ring, ripple, beam, tag, said: '', alpha: 1 };
       this.pins.set(row.incidentId, p);
     }
     const moved = p.row.xM !== row.xM || p.row.yM !== row.yM;
@@ -217,7 +140,7 @@ export class Incidents {
     const colour = STATUS_COLOURS[row.status] ?? STATUS_COLOURS.open;
     for (const m of [p.disc.material, p.ring.material, p.ripple.material, p.beam.material]) m.color.set(colour);
     if (p.medic && moved) p.medic.way = [];
-    if (row.respondingAt && row.kind !== 'property' && !p.medic) p.medic = { group: this.medicFigure(), way: [], along: [], length: 0, routed: -1 };
+    if (row.respondingAt && row.kind !== 'property' && !p.medic) p.medic = this.medic();
     this.label(p);
   }
 
@@ -225,13 +148,11 @@ export class Incidents {
     const p = this.pins.get(id);
     if (!p) return;
     for (const g of [p.group, p.medic?.group]) {
-      g?.traverse(o => {
-        const mat = (o as THREE.Mesh).material as THREE.Material & { map?: THREE.Texture | null } | undefined;
-        mat?.map?.dispose();
-        mat?.dispose();
-      });
+      g?.traverse(o => ((o as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
       g?.removeFromParent();
     }
+    p.tag.remove();
+    p.medic?.cross.remove();
     this.pins.delete(id);
   }
 
@@ -241,33 +162,34 @@ export class Incidents {
 
   private label(p: Pin, now = this.now()) {
     const m = p.row;
-    drawTag(p.tag, {
-      pill: { text: KIND_WORDS[m.kind] ?? m.kind.toUpperCase(), color: STATUS_COLOURS[m.status] ?? STATUS_COLOURS.open },
-      lines: [
-        { text: incidentTitle(m), px: 13, bold: true, color: '#ffffff' },
-        { text: incidentState(m, this.arrived(p, now)), px: 11, color: m.claimStatus === 'waiting for the organizer' ? '#ffd166' : '#c9d3e3' },
-      ],
-      background: 'rgba(10, 14, 24, 0.86)',
-    });
+    const kind = KIND_WORDS[m.kind] ?? m.kind.toUpperCase();
+    const state = incidentState(m, this.arrived(p, now));
+    const said = `${m.status}|${kind}|${incidentTitle(m)}|${state}`;
+    if (said === p.said) return;
+    p.said = said;
+    p.tag.replaceChildren(
+      h('span', { class: 'pill', style: `background: ${STATUS_COLOURS[m.status] ?? STATUS_COLOURS.open}` }, kind),
+      h('b', {}, incidentTitle(m)),
+      h('div', { class: m.claimStatus === 'waiting for the organizer' ? 'waiting' : '' }, state));
   }
 
   /** A medic: a white figure with a green ring and a cross above. It walks across the hall, so it is not part of
    *  the incident's group. */
-  private medicFigure(): THREE.Group {
-    const medic = new THREE.Group();
+  private medic(): Medic {
+    const group = new THREE.Group();
     const body = new THREE.Mesh(medicGeometry, new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#1d6b4a', transparent: true, toneMapped: false }));
     body.position.y = 0.34 + 0.5 + 0.04;
     const ring = new THREE.Mesh(medicRingGeometry, tint('#2fe08a', 0.95));
     ring.position.y = 0.07;
-    const cross = tagSprite({ lines: [{ text: '+', px: 15, bold: true, color: '#ffffff' }], background: 'rgba(22, 163, 74, 0.95)' }, 15);
-    cross.position.y = 2.2;
-    medic.add(body, ring, cross);
-    medic.visible = false;
-    this.layer.add(medic);
-    return medic;
+    group.add(body, ring);
+    group.visible = false;
+    this.v.layer.add(group);
+    const cross = h('div', { class: 'venue-medic' }, '+');
+    this.box.append(cross);
+    return { group, cross, way: [], along: [], length: 0, routed: -1 };
   }
 
-  /** The medic's way: from the nearest door along the aisles to beside the person. */
+  /** The medic's way: from the nearest door along the aisles to a step short of the person. */
   private route(p: Pin, medic: Medic) {
     const to: P = [p.row.xM, p.row.yM];
     let door: P = [to[0], to[1] + 15];
@@ -279,7 +201,6 @@ export class Incidents {
     const f = this.floor;
     let way = f ? f.path(f.snap(door), f.snap(to)) : undefined;
     if (!way || way.length < 2) way = [door, to];
-    // The walk ends a step short of the person.
     const along = [0];
     for (let i = 1; i < way.length; i++) along.push(along[i - 1] + Math.hypot(way[i][0] - way[i - 1][0], way[i][1] - way[i - 1][1]));
     medic.way = way;
@@ -313,6 +234,7 @@ export class Incidents {
         const since = now - (ms(m.resolvedAt) || now);
         alpha = since < STAY_MS - FADE_MS ? 1 : Math.max(0, (STAY_MS - since) / FADE_MS);
       }
+      p.alpha = alpha;
       const visible = alpha > 0;
       p.group.visible = visible;
       if (p.medic) p.medic.group.visible = visible;
@@ -326,35 +248,11 @@ export class Incidents {
       p.ring.material.opacity = (live ? 0.75 + 0.25 * Math.sin(seconds * 6) : 0.7) * alpha;
       p.disc.material.opacity = 0.14 * alpha;
       p.beam.material.opacity = (live ? 0.3 + 0.12 * Math.sin(seconds * 4) : 0.12) * alpha;
-      p.tag.material.opacity = alpha;
       if (p.medic) this.walk(p, p.medic, now, alpha);
       // The tag's second line says when the medic arrives.
       if (m.status === 'responding' && !m.claimId) this.label(p, now);
     }
-    this.stack();
-  }
-
-  /** Lifts tags that would cover another on screen above it: the open incidents first, the newest first. */
-  private stack() {
-    if (!seen) return;
-    const placed: [number, number, number, number][] = [];
-    const pins = [...this.pins.values()].filter(p => p.group.visible)
-      .sort((a, b) => (RANK[a.row.status] ?? 0) - (RANK[b.row.status] ?? 0) || (b.row.incidentId > a.row.incidentId ? 1 : -1));
-    for (const p of pins) {
-      const [w, h] = p.tag.userData.px as [number, number];
-      ANCHOR.set(p.row.xM, p.tag.position.y, p.row.yM).project(seen.camera);
-      const x = ((ANCHOR.x + 1) / 2) * seen.w;
-      const y = ((1 - ANCHOR.y) / 2) * seen.h;
-      let bottom = y;
-      for (let lift = 0; lift < MAX_LIFT; lift++) {
-        const hit = placed.find(r => x - w / 2 < r[2] && x + w / 2 > r[0] && bottom - h < r[3] && bottom > r[1]);
-        if (!hit) break;
-        bottom = hit[1] - STACK_GAP_PX;
-      }
-      placed.push([x - w / 2, bottom - h, x + w / 2, bottom]);
-      // A sprite's centre is a share of its size: below 0 the tag stands that many heights above its anchor.
-      p.tag.center.y = -(y - bottom) / h;
-    }
+    this.place();
   }
 
   /** The medic walks from the nearest door, setting off when the incident was taken. */
@@ -369,4 +267,54 @@ export class Incidents {
       if (mat) mat.opacity = alpha;
     });
   }
+
+  /** Puts the tags over their beams and the crosses over the medics. A tag that would cover another climbs above
+   *  it: the open incidents first, then the newest. */
+  private place() {
+    const w = this.box.clientWidth;
+    const ht = this.box.clientHeight;
+    const shown = this.v.layer.visible && w > 0;
+    const onScreen = (x: number, y: number, z: number): [number, number] | undefined => {
+      AT.set(x, y, z).project(this.v.camera);
+      return AT.z > 1 ? undefined : [((AT.x + 1) / 2) * w, ((1 - AT.y) / 2) * ht];
+    };
+    const placed: [number, number, number, number][] = [];
+    const covers = (r: [number, number, number, number]) => placed.some(o => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1]);
+    const pins = [...this.pins.values()]
+      .sort((a, b) => (RANK[a.row.status] ?? 0) - (RANK[b.row.status] ?? 0) || (b.row.incidentId > a.row.incidentId ? 1 : -1));
+    for (const p of pins) {
+      const medic = p.medic;
+      if (medic) {
+        const c = shown && p.alpha > 0 ? onScreen(medic.group.position.x, CROSS_M, medic.group.position.z) : undefined;
+        show(medic.cross, c && [c[0] - medic.cross.offsetWidth / 2, c[1] - medic.cross.offsetHeight], p.alpha);
+      }
+      const at = shown && p.alpha > 0 ? onScreen(p.row.xM, BEAM_M, p.row.yM) : undefined;
+      if (!at) {
+        show(p.tag, undefined, 0);
+        continue;
+      }
+      const tw = p.tag.offsetWidth;
+      const th = p.tag.offsetHeight;
+      const rect = (lift: number): [number, number, number, number] => {
+        const top = at[1] - th - lift * (th + GAP_PX);
+        return [at[0] - tw / 2, top, at[0] + tw / 2, top + th];
+      };
+      let lift = 0;
+      let r = rect(0);
+      while (covers(r) && lift < MAX_LIFT) r = rect(++lift);
+      placed.push(r);
+      show(p.tag, [r[0], r[1]], p.alpha);
+    }
+  }
+}
+
+/** Shows an element with its top left corner at `at`, or hides it. */
+function show(el: HTMLElement, at: number[] | undefined, alpha: number) {
+  if (!at || alpha <= 0) {
+    el.style.visibility = 'hidden';
+    return;
+  }
+  el.style.visibility = 'visible';
+  el.style.opacity = String(alpha);
+  el.style.transform = `translate(${Math.round(at[0])}px, ${Math.round(at[1])}px)`;
 }

@@ -16,8 +16,14 @@ use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+mod clauses;
+mod documents;
 mod history;
+pub mod reader;
+pub use clauses::PolicyClause;
+pub use documents::StoredPage;
 pub use history::history_claims;
+pub use reader::Kibana;
 
 /// Index prefix used when `ELASTIC_INDEX_PREFIX` is not set (Maincloud).
 pub const DEFAULT_PREFIX: &str = "bandit";
@@ -176,12 +182,14 @@ pub fn narrative_for(p: &NarrativeParts) -> String {
     format!("{}.", parts.join("; "))
 }
 
-/// Client for the `<prefix>-claims` index. Debug output never shows the API key.
+/// Client for the `<prefix>-claims` index and the insurance document indices.
+/// Debug output never shows the API key.
 #[derive(Clone)]
 pub struct ClaimsIndex {
     http: Client,
     url: String,
     auth: HeaderValue,
+    prefix: String,
     index: String,
     pipeline: String,
 }
@@ -198,14 +206,16 @@ impl ClaimsIndex {
             .context("ELASTICSEARCH_API_KEY is not a valid header value")?;
         auth.set_sensitive(true);
         let http = Client::builder().timeout(Duration::from_secs(120)).build()?;
-        Ok(Self { http, url: url.trim().trim_end_matches('/').to_string(), auth, index: INDEX.into(), pipeline: PIPELINE.into() }
-            .with_prefix(DEFAULT_PREFIX))
+        let url = url.trim().trim_end_matches('/').to_string();
+        Ok(Self { http, url, auth, prefix: DEFAULT_PREFIX.into(), index: INDEX.into(), pipeline: PIPELINE.into() }.with_prefix(DEFAULT_PREFIX))
     }
 
     /// Uses `<prefix>-claims` and `<prefix>-claims-validate`, so a local run
     /// (`bandit-e2e`) never mixes its claims into the live index's precedents.
+    /// The document indices take the same prefix.
     pub fn with_prefix(mut self, prefix: &str) -> Self {
         let prefix = prefix.trim().trim_end_matches('-');
+        self.prefix = prefix.to_string();
         self.index = format!("{prefix}-claims");
         self.pipeline = format!("{prefix}-claims-validate");
         self
@@ -229,20 +239,47 @@ impl ClaimsIndex {
     /// (an existing index gets the current mapping, which only adds fields).
     pub async fn ensure_setup(&self) -> Result<()> {
         self.call(Method::PUT, &format!("_ingest/pipeline/{}", self.pipeline), Some(pipeline_body())).await?;
-        let (status, _) = self.send(self.req(Method::HEAD, &self.index)).await?;
+        let body = json!({ "settings": { "index.default_pipeline": self.pipeline }, "mappings": mappings() });
+        if self.ensure_index(&self.index, body).await? {
+            self.seed_history().await?;
+        }
+        Ok(())
+    }
+
+    /// Creates `index` from `body` if it is missing, else puts `body`'s mappings
+    /// on it (which only adds fields). True when it was created.
+    async fn ensure_index(&self, index: &str, body: Value) -> Result<bool> {
+        let (status, _) = self.send(self.req(Method::HEAD, index)).await?;
         match status {
             StatusCode::OK => {
-                self.call(Method::PUT, &format!("{}/_mapping", self.index), Some(mappings())).await?;
+                self.call(Method::PUT, &format!("{index}/_mapping"), Some(body["mappings"].clone())).await?;
+                Ok(false)
             }
             StatusCode::NOT_FOUND => {
-                let body = json!({ "settings": { "index.default_pipeline": self.pipeline }, "mappings": mappings() });
-                let (status, v) = self.send(self.req(Method::PUT, &self.index).json(&body)).await?;
+                let (status, v) = self.send(self.req(Method::PUT, index).json(&body)).await?;
                 if !status.is_success() && v["error"]["type"] != "resource_already_exists_exception" {
-                    bail!("PUT {} returned {status}: {}", self.index, short(&v));
+                    bail!("PUT {index} returned {status}: {}", short(&v));
                 }
-                self.seed_history().await?;
+                Ok(true)
             }
-            other => bail!("HEAD {} returned {other}", self.index),
+            other => bail!("HEAD {index} returned {other}"),
+        }
+    }
+
+    /// Sends `_bulk` index actions, one `(index, id, document)` each, and fails on the first rejected item.
+    async fn bulk(&self, query: &str, docs: impl IntoIterator<Item = (String, String, Value)>) -> Result<()> {
+        let mut body = String::new();
+        for (index, id, doc) in docs {
+            body.push_str(&json!({ "index": { "_index": index, "_id": id } }).to_string());
+            body.push('\n');
+            body.push_str(&doc.to_string());
+            body.push('\n');
+        }
+        let req = self.req(Method::POST, &format!("_bulk?{query}")).header(CONTENT_TYPE, "application/x-ndjson").body(body);
+        let (status, v) = self.send(req).await?;
+        if !status.is_success() || v["errors"] == true {
+            let first = v["items"].as_array().and_then(|items| items.iter().find(|i| i["index"]["error"].is_object()));
+            bail!("bulk indexing returned {status}: {}", short(first.unwrap_or(&v)));
         }
         Ok(())
     }
@@ -320,20 +357,8 @@ impl ClaimsIndex {
     /// every one of them passed validation. Returns how many were indexed.
     pub async fn seed_history(&self) -> Result<usize> {
         let docs = history_claims();
-        let mut body = String::new();
-        for d in &docs {
-            body.push_str(&json!({ "index": { "_index": self.index, "_id": d.doc_id } }).to_string());
-            body.push('\n');
-            body.push_str(&serde_json::to_string(d)?);
-            body.push('\n');
-        }
-        let path = format!("_bulk?pipeline={}&refresh=wait_for", self.pipeline);
-        let req = self.req(Method::POST, &path).header(CONTENT_TYPE, "application/x-ndjson").body(body);
-        let (status, v) = self.send(req).await?;
-        if !status.is_success() || v["errors"] == true {
-            let first = v["items"].as_array().and_then(|items| items.iter().find(|i| i["index"]["error"].is_object()));
-            bail!("bulk seeding returned {status}: {}", short(first.unwrap_or(&v)));
-        }
+        let lines = docs.iter().map(|d| Ok((self.index.clone(), d.doc_id.clone(), serde_json::to_value(d)?))).collect::<Result<Vec<_>>>()?;
+        self.bulk(&format!("pipeline={}&refresh=wait_for", self.pipeline), lines).await.context("seeding the claims history")?;
         let query = json!({
             "size": docs.len(),
             "_source": ["doc_id", "validation.errors"],

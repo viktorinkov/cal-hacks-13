@@ -59,6 +59,9 @@ pub struct VerifyPayload {
     pub payout_cents: Cents,
     /// For property claims: what the staff note says was damaged.
     pub property_description: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
 }
 
 /// A similar past claim Elastic found, as the module stored it.
@@ -97,6 +100,9 @@ pub struct ReviewPayload {
     /// What the attendee wrote when they filed the claim, in their own words.
     #[serde(default)]
     pub claimant_statement: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

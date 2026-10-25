@@ -3,8 +3,9 @@
 
 use crate::complications::{ClaimState, complications, reason};
 use crate::coverage::Amounts;
+use crate::money::format_cents;
 use crate::rules::SettlementRule;
-use crate::{Check, CheckResult, Corroboration};
+use crate::{Cents, Check, CheckResult, Corroboration};
 use serde::{Deserialize, Serialize};
 
 /// What the claims agent's review means for automation.
@@ -24,6 +25,8 @@ pub struct DecisionInput<'a> {
     pub has_cover: bool,
     pub corroboration: Corroboration,
     pub amounts: Amounts,
+    /// The cover's minimum payout from the confirmed policy terms.
+    pub minimum_payout_cents: Cents,
     /// Code and Elastic checks of the current pack version.
     pub checks: &'a [Check],
     pub review: ReviewGate,
@@ -41,10 +44,11 @@ pub enum Decision {
 }
 
 /// First match wins:
-/// 1. a complication (no cover, a bill over the policy's limit, a service the
-///    fee schedule does not list) -> `Route("Complication: " + every one)`;
+/// 1. a complication (no cover, a bill over the policy's limit) ->
+///    `Route("Complication: " + every one)`;
 /// 2. `Disputed` -> `Refuse("evidence disputed: " + names of failed checks, comma-joined)`;
 /// 3. payout 0 -> `Refuse("payout is zero after limits")`;
+///    payout below the cover's minimum -> `Route("payout below the policy's minimum of $X")`;
 /// 4. any check with result `Fail` -> `Route("failed checks: " + names)`;
 /// 5. `review_required` and the review is not `Consistent` ->
 ///    `Route("claims agent: " + concerns text)` or `Route("claims agent review unavailable")`;
@@ -61,7 +65,7 @@ pub fn decide(input: &DecisionInput) -> Decision {
     let route = |reason: String| Decision::Route { reason };
     let payout = input.amounts.payout_cents;
 
-    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts });
     if !found.is_empty() {
         return route(reason("", &found));
     }
@@ -74,6 +78,9 @@ pub fn decide(input: &DecisionInput) -> Decision {
     }
     if payout == 0 {
         return refuse("payout is zero after limits".into());
+    }
+    if payout < input.minimum_payout_cents {
+        return route(format!("payout below the policy's minimum of {}", format_cents(input.minimum_payout_cents)));
     }
     let failed = failed_check_names(input.checks);
     if !failed.is_empty() {
@@ -144,6 +151,7 @@ mod tests {
             has_cover: true,
             corroboration: Corroboration::Corroborated,
             amounts: amounts(18000),
+            minimum_payout_cents: 0,
             checks,
             review: ReviewGate::Consistent,
             review_required: true,
@@ -190,6 +198,13 @@ mod tests {
         let (checks, rule) = (failing(), rule());
         let input = DecisionInput { amounts: amounts(0), corroboration: Corroboration::Uncorroborated, ..happy(&checks, &rule) };
         assert_eq!(decide(&input), refused("payout is zero after limits"));
+    }
+
+    #[test]
+    fn rule_3_payout_below_the_minimum_routes() {
+        let (checks, rule) = (passing(), rule());
+        let input = DecisionInput { minimum_payout_cents: 25_000, ..happy(&checks, &rule) };
+        assert_eq!(decide(&input), routed("payout below the policy's minimum of $250.00"));
     }
 
     #[test]

@@ -4,13 +4,14 @@
 // runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, money, time } from './lib';
+import { act, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { Incidents } from './incidents-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
-import { venueView, type LiveView } from './venue-setup';
+import { dragBar, dragged } from './resize';
+import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { IncidentMarker, LiveRun } from './module_bindings/types';
 
@@ -55,7 +56,7 @@ function setUp(c: DbConnection) {
   conn.db.livePause.onDelete(pause);
   pause();
   // This run's incidents, as they open, change and resolve.
-  incidentPins = new Incidents(v.layer, () => crowd.moduleNow());
+  incidentPins = new Incidents(v, () => crowd.moduleNow());
   const sync = () => incidentPins.sync(markers(run()));
   for (const t of [conn.db.incidentMarker, conn.db.liveRun]) {
     t.onInsert(sync);
@@ -63,7 +64,13 @@ function setUp(c: DbConnection) {
     t.onDelete(sync);
   }
   sync();
-  v.onFrame(now => { crowd.frame(now); incidentPins.frame(now); });
+  v.onFrame(now => {
+    crowd.frame(now);
+    incidentPins.frame(now);
+    // Our bands' tags: the name typed when the band was placed, over its code.
+    const ours = crowd.ours();
+    v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
+  });
   dropPin.visible = false;
   v.layer.add(dropPin);
   window.addEventListener('pointermove', moveDrag);
@@ -282,8 +289,8 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
               waiting && [h('br'), h('button', {
-                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]),
+                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: !complicated(c!) })),
+              }, complicated(c!) ? 'Approve' : 'Approve and teach a rule')]),
             h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
         }))));
 }
@@ -310,16 +317,35 @@ function legend() {
       h('td', {}, meaning)))));
 }
 
+/** The side panels' widths until their bars are dragged. */
+const SIDES = { left: 300, right: 340 };
+/** The 3D view keeps at least this much of the window's width between the side panels. */
+const MIN_VIEW = 320;
+
+/** The bar between a side panel and the 3D view, which drags the panel wider or narrower. */
+function sideBar(side: 'left' | 'right') {
+  const other = side === 'left' ? 'right' : 'left';
+  const width = (s: 'left' | 'right') => dragged(`live ${s}`) ?? SIDES[s];
+  return dragBar(`live ${side}`, 'x', side === 'left' ? 1 : -1, () => width(side),
+    px => (document.querySelector('.live') as HTMLElement | null)?.style.setProperty(`--${side}`, `${px}px`),
+    180, () => innerWidth - width(other) - MIN_VIEW);
+}
+
 /** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the decisions and our
- * bands on the right. */
+ * bands on the right. The bars between them and under the view resize them. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
   incidentPins.sync(markers(r));
-  return h('div', { class: 'live' },
+  const height = dragged('live height');
+  if (height) setLiveHeight(height);
+  const sides = (['left', 'right'] as const).map(s => `--${s}: ${dragged(`live ${s}`) ?? SIDES[s]}px`).join('; ');
+  return h('div', { class: 'live', style: sides },
     h('div', {}, incidents(r, canRun), legend()),
-    h('div', {}, h('section', {}, v!.view, v!.note)),
+    sideBar('left'),
+    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240), v!.note)),
+    sideBar('right'),
     h('div', {}, history(), canRun && placeBands()));
 }

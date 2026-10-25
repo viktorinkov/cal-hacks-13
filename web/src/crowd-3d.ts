@@ -211,6 +211,11 @@ export class Crowd {
     return w?.shown ? { x: w.x, z: w.z } : undefined;
   }
 
+  /** Our bands on the floor, where they stand now. */
+  ours(): { id: number; x: number; z: number; down: boolean }[] {
+    return this.list.filter(w => w.shown && isOurs(w.band.id)).map(w => ({ id: w.band.id, x: w.x, z: w.z, down: isDown(w.band) }));
+  }
+
   /** How many crowd bands and how many of our bands are on the floor. */
   counts(): { crowd: number; ours: number } {
     let crowd = 0;
