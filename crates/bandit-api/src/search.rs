@@ -1,4 +1,5 @@
-//! bandit-api's Elastic side: it ranks the recap's suggestions by meaning, and keeps each attendee's
+//! bandit-api's Elastic side: it ranks the recap's suggestions by meaning, finds the closest booths of
+//! people who share none with the attendee, and keeps each attendee's
 //! latest ranking in `<prefix>-recap-rankings` for the Kibana recap dashboard.
 //! The people and booths indices and their fields are written by bandit-indexer.
 
@@ -22,7 +23,17 @@ pub struct Elastic {
 pub struct Ranking {
     pub people: Vec<(u64, f64)>,
     pub booths: Vec<(u64, f64)>,
+    /// The booths of the people who share none with the attendee, closest to their interests first.
+    pub theirs: Vec<Closest>,
     pub interests: String,
+}
+
+/// A booth Elastic matched by meaning, with its tags: the booth's own, then its organisation's.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Closest {
+    pub booth_id: u64,
+    pub score: f64,
+    pub tags: Vec<String>,
 }
 
 /// The index of each attendee's latest ranked recap, read only by Kibana.
@@ -67,7 +78,11 @@ impl Elastic {
             .send()
             .await?;
         if exists.status().is_success() {
-            return Ok(());
+            // Adds the fields a newer bandit-api writes; the ones already there keep their type.
+            return self
+                .call(Method::PUT, &format!("{RANKINGS}/_mapping"), &rankings_mapping())
+                .await
+                .map(|_| ());
         }
         self.call(Method::PUT, RANKINGS, &json!({ "mappings": rankings_mapping() }))
             .await
@@ -82,13 +97,15 @@ impl Elastic {
     }
 
     /// Ranks the candidate people (node ids) and booths (booth ids) by how well they match the
-    /// attendee's own interests: their people document, or `fallback` when they have none.
+    /// attendee's own interests: their people document, or `fallback` when they have none. `theirs`, the
+    /// booths of the people who share none with the attendee, are ordered the same way.
     pub async fn rank(
         &self,
         attendee_id: &str,
         fallback: &str,
         people: &[u64],
         booths: &[u64],
+        theirs: &[u64],
     ) -> Result<Ranking> {
         let own = self
             .search("people", &own_interests_query(attendee_id))
@@ -102,15 +119,27 @@ impl Elastic {
         }
         let people_query = rank_query("interests", "node_id", interests, people);
         let booths_query = rank_query("description", "booth_id", interests, booths);
-        let (people, booths) = tokio::try_join!(
+        let (people, booths, theirs) = tokio::try_join!(
             self.search("people", &people_query),
             self.search("booths", &booths_query),
+            self.closest(interests, theirs),
         )?;
         Ok(Ranking {
             people: scores(&people, "node_id"),
             booths: scores(&booths, "booth_id"),
+            theirs,
             interests: interests.to_string(),
         })
+    }
+
+    /// The booths among `ids` closest by meaning to `text`, best first, with their tags. No call when
+    /// there are no `ids`.
+    pub async fn closest(&self, text: &str, ids: &[u64]) -> Result<Vec<Closest>> {
+        if ids.is_empty() || text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let found = self.search("booths", &closest_query(text, ids)).await?;
+        Ok(closest_hits(&found))
     }
 }
 
@@ -127,6 +156,9 @@ pub fn rankings_mapping() -> Value {
         "booths": keyword,
         "first_person": keyword,
         "first_person_score": float,
+        "also_there": keyword,
+        "first_also_there": keyword,
+        "first_also_there_score": float,
         "first_booth": keyword,
         "first_booth_zone": keyword,
         "first_booth_score": float,
@@ -154,6 +186,30 @@ pub fn rank_query(semantic_field: &str, id_field: &str, text: &str, ids: &[u64])
             "filter": { "terms": { id_field: ids } },
         } },
     })
+}
+
+/// The booths `ids` ranked by the meaning of their `description` against `text`, with their tags.
+pub fn closest_query(text: &str, ids: &[u64]) -> Value {
+    let mut query = rank_query("description", "booth_id", text, ids);
+    query["_source"] = json!(["booth_id", "tags"]);
+    query
+}
+
+/// The booth id, score and tags of each hit, in Elastic's order.
+pub fn closest_hits(response: &Value) -> Vec<Closest> {
+    let hits = response["hits"]["hits"].as_array().cloned().unwrap_or_default();
+    hits.iter()
+        .filter_map(|h| {
+            Some(Closest {
+                booth_id: h["_source"]["booth_id"].as_u64()?,
+                score: h["_score"].as_f64()?,
+                tags: h["_source"]["tags"]
+                    .as_array()
+                    .map(|t| t.iter().filter_map(|t| t.as_str().map(String::from)).collect())
+                    .unwrap_or_default(),
+            })
+        })
+        .collect()
 }
 
 /// The id and score of each hit, in Elastic's order.
@@ -198,6 +254,24 @@ mod tests {
         assert_eq!(
             booths["query"]["bool"]["must"]["semantic"]["field"],
             "description"
+        );
+    }
+
+    #[test]
+    fn closest_brings_back_the_tags() {
+        let q = closest_query("drones", &[3, 4]);
+        assert_eq!(q["_source"], json!(["booth_id", "tags"]));
+        assert_eq!(q["query"]["bool"]["filter"], json!({ "terms": { "booth_id": [3, 4] } }));
+        let response = json!({ "hits": { "hits": [
+            { "_score": 0.7, "_source": { "booth_id": 4, "tags": ["drones", "robotics"] } },
+            { "_score": 0.2, "_source": { "booth_id": 3 } },
+        ] } });
+        assert_eq!(
+            closest_hits(&response),
+            vec![
+                Closest { booth_id: 4, score: 0.7, tags: vec!["drones".into(), "robotics".into()] },
+                Closest { booth_id: 3, score: 0.2, tags: vec![] },
+            ]
         );
     }
 

@@ -1,8 +1,10 @@
 //! The post-event summary behind an attendee's special link, assembled from the subscription cache.
 //! Other people appear only when they are findable, with their name, photo and socials.
-//! The suggestions are the people they hung out with and the booths where they spent time; Elastic
-//! orders them by how well they match the attendee's own interests (see `apply_ranking`).
+//! The suggestions are the people they hung out with, the people they were near but never met, and the
+//! booths where they spent time; Elastic orders them by how well they match the attendee's own interests
+//! (see `apply_ranking`), and finds the closest booths of people who share none (see `apply_similar`).
 
+use crate::search::Closest;
 use bandit_bindings::{
     Attendee, Booth, Photo, PhotoTag, SharedVisit, SocialEncounter, SocialHandle, Visit, Zone,
 };
@@ -44,6 +46,8 @@ pub struct Summary {
     pub photos: Vec<PhotoOut>,
     /// The people you hung out with, best match for your interests first.
     pub suggested_people: Vec<SuggestedPerson>,
+    /// The people you were in the same zone with but never met, best match for your interests first.
+    pub also_there: Vec<AlsoThere>,
     /// The booths in the zones you visited, best match for your interests first.
     pub suggested_booths: Vec<SuggestedBooth>,
     /// False when Elastic could not rank the suggestions: they are then ordered by minutes.
@@ -65,7 +69,45 @@ pub struct SuggestedPerson {
     pub interests: Vec<Interest>,
     /// How many photos you are both tagged in.
     pub photos_together: u32,
+    /// When you share no booth: the closest pair of booths by meaning.
+    pub similar: Option<Similar>,
     pub score: Option<f64>,
+}
+
+/// Someone you were in the same zone with for a while but never met.
+#[derive(Serialize, Debug)]
+pub struct AlsoThere {
+    pub node_id: u64,
+    pub name: String,
+    pub photo_url: String,
+    pub handles: BTreeMap<String, String>,
+    /// All your shared minutes with them.
+    pub minutes: f32,
+    /// Each place you were both in, most minutes first.
+    pub places: Vec<Place>,
+    /// The booths their band stood at: the ones you both stood at first, then theirs, most minutes first.
+    pub interests: Vec<Interest>,
+    /// When you share no booth: the closest pair of booths by meaning.
+    pub similar: Option<Similar>,
+    pub score: Option<f64>,
+}
+
+/// One shared visit: where, from when, and for how long you were both there.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Place {
+    pub zone_name: String,
+    pub started_at: String,
+    pub minutes: f32,
+}
+
+/// Why two people who share no booth still match: their booth closest to your interests, your booth
+/// closest to that one, and a tag both booths carry.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Similar {
+    pub your_booth: String,
+    pub their_booth: String,
+    /// Empty when the two booths share no tag.
+    pub topic: String,
 }
 
 /// A booth someone's band stood at, with their minutes there and yours.
@@ -275,6 +317,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
         .collect();
 
     let suggested_people = suggested_people(rows, who, &zone_name);
+    let also_there = also_there(rows, who, &zone_name);
     Some(Summary {
         node_id: me.node_id,
         display_name: me.display_name.clone(),
@@ -285,6 +328,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
         shared_visits,
         photos,
         suggested_people,
+        also_there,
         suggested_booths,
         suggestions_ranked: false,
     })
@@ -321,6 +365,7 @@ fn suggested_people(
                 met_at: time(e.started_at),
                 interests: interests(rows, &mine, other),
                 photos_together: photos_together(rows, who, other),
+                similar: None,
                 score: None,
             });
         p.minutes = round(p.minutes + round(e.seconds_together as f32 / 60.0));
@@ -332,6 +377,64 @@ fn suggested_people(
             .then(a.node_id.cmp(&b.node_id))
     });
     out
+}
+
+/// The people you shared a zone with but never met, one per person with every place you shared,
+/// most shared minutes first. Anyone you met has a card under the people you hung out with instead.
+fn also_there(rows: &Rows, who: Identity, zone_name: &dyn Fn(u64) -> String) -> Vec<AlsoThere> {
+    let mine = booth_minutes(rows, who);
+    let met: Vec<Identity> = rows
+        .encounters
+        .iter()
+        .filter_map(|e| other_of(e.attendee_a, e.attendee_b, who))
+        .collect();
+    let mut shared: Vec<&SharedVisit> = rows.shared_visits.iter().collect();
+    shared.sort_by_key(|s| (s.started_at, s.id));
+    let mut by_node: BTreeMap<u64, AlsoThere> = BTreeMap::new();
+    for s in shared {
+        let Some(other) = other_of(s.attendee_a, s.attendee_b, who) else {
+            continue;
+        };
+        if met.contains(&other) {
+            continue;
+        }
+        let Some(card) = person(rows, other) else {
+            continue;
+        };
+        let p = by_node.entry(card.node_id).or_insert_with(|| AlsoThere {
+            node_id: card.node_id,
+            name: card.name,
+            photo_url: card.photo_url,
+            handles: card.handles,
+            minutes: 0.0,
+            places: Vec::new(),
+            interests: interests(rows, &mine, other),
+            similar: None,
+            score: None,
+        });
+        p.places.push(Place {
+            zone_name: zone_name(s.zone_id),
+            started_at: time(s.started_at),
+            minutes: round(s.overlap_minutes),
+        });
+        p.minutes = round(p.minutes + round(s.overlap_minutes));
+    }
+    let mut out: Vec<AlsoThere> = by_node.into_values().collect();
+    for p in &mut out {
+        // Stable, so places with equal minutes stay in time order.
+        p.places.sort_by(|a, b| b.minutes.total_cmp(&a.minutes));
+    }
+    out.sort_by(|a, b| {
+        b.minutes
+            .total_cmp(&a.minutes)
+            .then(a.node_id.cmp(&b.node_id))
+    });
+    out
+}
+
+/// The booths `who` stood at, by id.
+pub fn booths_of(rows: &Rows, who: Identity) -> Vec<u64> {
+    booth_minutes(rows, who).into_keys().collect()
 }
 
 /// The minutes `who` stood at each booth, from the visits that name one. A visit that names only its
@@ -442,11 +545,17 @@ pub fn visited_text(rows: &Rows, who: Identity) -> String {
     lines.join("\n")
 }
 
-/// Puts the suggestions in Elastic's order with its scores. Candidates Elastic did not return
-/// (no interests indexed yet) follow without a score, still by minutes.
+/// Puts the suggestions in Elastic's order with its scores. `people` ranks both lists of people.
+/// Candidates Elastic did not return (no interests indexed yet) follow without a score, still by minutes.
 pub fn apply_ranking(s: &mut Summary, people: &[(u64, f64)], booths: &[(u64, f64)]) {
     order_by(
         &mut s.suggested_people,
+        people,
+        |p| p.node_id,
+        |p, score| p.score = Some(score),
+    );
+    order_by(
+        &mut s.also_there,
         people,
         |p| p.node_id,
         |p, score| p.score = Some(score),
@@ -460,11 +569,95 @@ pub fn apply_ranking(s: &mut Summary, people: &[(u64, f64)], booths: &[(u64, f64
     s.suggestions_ranked = true;
 }
 
+/// The interests of every person in both lists, in list order.
+fn everyones_interests(s: &Summary) -> impl Iterator<Item = &[Interest]> {
+    let met = s.suggested_people.iter().map(|p| p.interests.as_slice());
+    met.chain(s.also_there.iter().map(|p| p.interests.as_slice()))
+}
+
+/// Every person in both lists, in list order, with their interests and the slot for `similar`.
+fn everyone(s: &mut Summary) -> impl Iterator<Item = (&[Interest], &mut Option<Similar>)> {
+    let met = s.suggested_people.iter_mut().map(|p| (p.interests.as_slice(), &mut p.similar));
+    let near = s.also_there.iter_mut().map(|p| (p.interests.as_slice(), &mut p.similar));
+    met.chain(near)
+}
+
+/// True for someone who stood at booths, none of them yours.
+fn shares_no_booth(interests: &[Interest]) -> bool {
+    !interests.is_empty() && !interests.iter().any(|i| i.shared)
+}
+
+/// The booths of everyone in the recap who shares no booth with you: the candidates Elastic orders by how
+/// close they are to your interests.
+pub fn unshared_booths(s: &Summary) -> Vec<u64> {
+    let ids: BTreeSet<u64> = everyones_interests(s)
+        .filter(|i| shares_no_booth(i))
+        .flat_map(|i| i.iter().map(|b| b.booth_id))
+        .collect();
+    ids.into_iter().collect()
+}
+
+/// Their booth that Elastic put closest to your interests, from `theirs` (best first).
+fn their_best<'a>(interests: &[Interest], theirs: &'a [Closest]) -> Option<&'a Closest> {
+    theirs
+        .iter()
+        .find(|c| interests.iter().any(|i| i.booth_id == c.booth_id))
+}
+
+/// The closest booth of each person who shares no booth with you, people in list order, at most `max`
+/// different booths: the ones to match against your own booths.
+pub fn their_best_booths(s: &Summary, theirs: &[Closest], max: usize) -> Vec<u64> {
+    let mut out: Vec<u64> = Vec::new();
+    for interests in everyones_interests(s).filter(|i| shares_no_booth(i)) {
+        if let Some(best) = their_best(interests, theirs) {
+            if !out.contains(&best.booth_id) && out.len() < max {
+                out.push(best.booth_id);
+            }
+        }
+    }
+    out
+}
+
+/// Gives each person who shares no booth with you the closest pair: their booth closest to your
+/// interests (`theirs`), your booth closest to that one (`yours`, keyed by their booth) and a tag both
+/// carry. Someone whose pair Elastic did not find keeps none.
+pub fn apply_similar(s: &mut Summary, booths: &[Booth], theirs: &[Closest], yours: &BTreeMap<u64, Closest>) {
+    let name = |id: u64| booths.iter().find(|b| b.id == id).map(|b| b.name.clone());
+    for (interests, similar) in everyone(s).filter(|(i, _)| shares_no_booth(i)) {
+        let Some(best) = their_best(interests, theirs) else {
+            continue;
+        };
+        let Some(mine) = yours.get(&best.booth_id) else {
+            continue;
+        };
+        let (Some(your_booth), Some(their_booth)) = (name(mine.booth_id), name(best.booth_id)) else {
+            continue;
+        };
+        let topic = best
+            .tags
+            .iter()
+            .find(|t| mine.tags.iter().any(|m| m.eq_ignore_ascii_case(t)))
+            .cloned()
+            .unwrap_or_default();
+        *similar = Some(Similar { your_booth, their_booth, topic });
+    }
+}
+
+/// A booth as one line of text, as the interests text writes it: the query that finds your closest booth.
+pub fn booth_text(booths: &[Booth], id: u64) -> String {
+    booths
+        .iter()
+        .find(|b| b.id == id)
+        .map(|b| format!("{}: {} ({})", b.name, b.description, b.tags.join(", ")))
+        .unwrap_or_default()
+}
+
 /// The Kibana record of a ranked recap: the zones and booths the interests text names (each line
 /// starts with one), the order Elastic chose, and the booth that minutes alone put first
 /// (`first_by_minutes`, taken before `apply_ranking`).
 pub fn ranking_doc(s: &Summary, interests: &str, first_by_minutes: Option<&str>, at_ms: u64) -> Value {
     let person = s.suggested_people.first();
+    let near = s.also_there.first();
     let booth = s.suggested_booths.first();
     let spots: Vec<&str> = interests.lines().filter_map(|l| l.split(':').next()).map(str::trim).filter(|l| !l.is_empty()).collect();
     json!({
@@ -475,6 +668,9 @@ pub fn ranking_doc(s: &Summary, interests: &str, first_by_minutes: Option<&str>,
         "booths": s.suggested_booths.iter().map(|b| &b.name).collect::<Vec<_>>(),
         "first_person": person.map(|p| &p.name),
         "first_person_score": person.and_then(|p| p.score),
+        "also_there": s.also_there.iter().map(|p| &p.name).collect::<Vec<_>>(),
+        "first_also_there": near.map(|p| &p.name),
+        "first_also_there_score": near.and_then(|p| p.score),
         "first_booth": booth.map(|b| &b.name),
         "first_booth_zone": booth.map(|b| &b.zone_name),
         "first_booth_score": booth.and_then(|b| b.score),
@@ -647,6 +843,20 @@ mod tests {
             started_at: at(100),
             last_seen_at: at(100 + seconds as i64),
             met: true,
+            updated_at: at(0),
+        }
+    }
+
+    fn shared(id: u64, a: u8, b: u8, zone_id: u64, start: i64, minutes: f32) -> SharedVisit {
+        SharedVisit {
+            id,
+            attendee_a: who(a),
+            attendee_b: who(b),
+            zone_id,
+            visit_a: 0,
+            visit_b: 0,
+            started_at: at(start),
+            overlap_minutes: minutes,
             updated_at: at(0),
         }
     }
@@ -883,6 +1093,81 @@ mod tests {
     }
 
     #[test]
+    fn also_there_is_everyone_you_never_met_once_each() {
+        let mut rows = rows();
+        rows.attendees.push(attendee(6, "Fay", true));
+        rows.shared_visits.extend([
+            shared(6, 1, 5, 1, 100, 6.0),
+            shared(7, 5, 1, 2, 900, 9.0),
+            // Cy is not findable, Ada met Di, and Ed and Fay's own visit is not Ada's.
+            shared(8, 1, 3, 1, 100, 30.0),
+            shared(9, 1, 4, 2, 900, 20.0),
+            shared(10, 6, 1, 1, 2000, 12.0),
+            shared(11, 5, 6, 1, 100, 40.0),
+        ]);
+        let s = summary(&rows, who(1)).unwrap();
+        let people: Vec<(&str, f32)> = s.also_there.iter().map(|p| (p.name.as_str(), p.minutes)).collect();
+        // Bo shares a visit with Ada too, but they met, so Bo is under the people she spent time with.
+        assert_eq!(people, vec![("Ed", 15.0), ("Fay", 12.0)]);
+        let place = |zone: &str, start, minutes| Place { zone_name: zone.into(), started_at: time(at(start)), minutes };
+        assert_eq!(s.also_there[0].places, vec![place("Stage", 900, 9.0), place("Expo", 100, 6.0)]);
+        assert!(s.also_there.iter().all(|p| p.similar.is_none() && p.score.is_none()));
+    }
+
+    #[test]
+    fn people_who_share_no_booth_get_the_closest_pair() {
+        let mut rows = rows();
+        rows.booths.push(booth(13, 2, "Skydio"));
+        rows.attendees.push(attendee(6, "Fay", true));
+        rows.shared_visits.push(shared(6, 1, 6, 1, 100, 6.0));
+        let at_booth = |id, n, booth_id, minutes| Visit {
+            booth_id,
+            ..visit(id, n, 1, 3000, minutes)
+        };
+        // Ada stood at the drone show and the robot arms, and Bo at the robot arms too.
+        rows.visits.push(at_booth(30, 1, 12, 5.0));
+        rows.visits.push(at_booth(31, 1, 11, 2.0));
+        rows.visits.push(at_booth(32, 2, 11, 3.0));
+        // Di stood only at the Elastic booth, Fay at Skydio and the Elastic booth.
+        rows.visits.push(at_booth(33, 4, 10, 4.0));
+        rows.visits.push(at_booth(34, 6, 13, 8.0));
+        rows.visits.push(at_booth(35, 6, 10, 1.0));
+        let mut s = summary(&rows, who(1)).unwrap();
+        assert_eq!(booths_of(&rows, who(1)), vec![11, 12]);
+        assert_eq!(unshared_booths(&s), vec![10, 13]);
+
+        let closest = |booth_id, tags: &[&str]| Closest {
+            booth_id,
+            score: 0.5,
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+        };
+        // Skydio is the closest to Ada's interests, then the Elastic booth.
+        let theirs = vec![closest(13, &["Drones", "hardware"]), closest(10, &["search"])];
+        // Di comes first, under the people Ada met, then Fay.
+        assert_eq!(their_best_booths(&s, &theirs, 12), vec![10, 13]);
+        assert_eq!(their_best_booths(&s, &theirs, 1), vec![10]);
+
+        let yours = BTreeMap::from([(13, closest(12, &["drones"])), (10, closest(11, &["robots"]))]);
+        apply_similar(&mut s, &rows.booths, &theirs, &yours);
+        let similar = |yours: &str, theirs: &str, topic: &str| Some(Similar {
+            your_booth: yours.into(),
+            their_booth: theirs.into(),
+            topic: topic.into(),
+        });
+        assert_eq!(s.also_there[0].similar, similar("Drone show", "Skydio", "Drones"));
+        let of = |name: &str| &s.suggested_people.iter().find(|p| p.name == name).unwrap().similar;
+        assert_eq!(of("Di"), &similar("Robot arms", "Elastic booth", ""));
+        // Bo shares the robot arms, which say why on their own.
+        assert_eq!(of("Bo"), &None);
+    }
+
+    #[test]
+    fn booth_text_reads_like_interests() {
+        assert_eq!(booth_text(&rows().booths, 12), "Drone show: Drone show showcases. (showcase)");
+        assert_eq!(booth_text(&rows().booths, 99), "");
+    }
+
+    #[test]
     fn ranking_follows_elastic_then_minutes() {
         let mut s = summary(&rows(), who(1)).unwrap();
         apply_ranking(&mut s, &[(2, 0.9)], &[(12, 0.8), (10, 0.5)]);
@@ -899,6 +1184,21 @@ mod tests {
             .map(|b| (b.booth_id, b.score))
             .collect();
         assert_eq!(booths, vec![(12, Some(0.8)), (10, Some(0.5)), (11, None)]);
+    }
+
+    #[test]
+    fn people_also_there_follow_the_same_people_scores() {
+        let mut rows = rows();
+        rows.attendees.push(attendee(6, "Fay", true));
+        rows.shared_visits.extend([shared(6, 1, 5, 1, 100, 20.0), shared(7, 1, 6, 1, 100, 6.0)]);
+        let mut s = summary(&rows, who(1)).unwrap();
+        apply_ranking(&mut s, &[(6, 0.9), (2, 0.5)], &[]);
+        let near: Vec<(u64, Option<f64>)> = s.also_there.iter().map(|p| (p.node_id, p.score)).collect();
+        assert_eq!(near, vec![(6, Some(0.9)), (5, None)]);
+        let doc = ranking_doc(&s, "Expo", None, 7);
+        assert_eq!(doc["also_there"], json!(["Fay", "Ed"]));
+        assert_eq!(doc["first_also_there"], "Fay");
+        assert_eq!(doc["first_also_there_score"], 0.9);
     }
 
     #[test]
