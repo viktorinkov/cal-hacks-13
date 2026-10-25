@@ -3170,7 +3170,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "19 \u00b7 Band data flow",
+   "name": "21 \u00b7 Band data flow",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -7873,7 +7873,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "20 \u00b7 Band wiring",
+   "name": "22 \u00b7 Band wiring",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -11283,7 +11283,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "21 \u00b7 Exit markers and gateway",
+   "name": "23 \u00b7 Exit markers and gateway",
    "customData": {
     "diagramStyleVersion": 1
    }
@@ -15039,7 +15039,7 @@
    "updated": 1792828800000,
    "link": null,
    "locked": false,
-   "name": "22 \u00b7 Band firmware",
+   "name": "24 \u00b7 Band firmware",
    "customData": {
     "diagramStyleVersion": 1
    }

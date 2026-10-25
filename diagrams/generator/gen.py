@@ -144,7 +144,7 @@ def architecture(y0):
     workers = B(2610, 1130, "bandit-workers", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
     indexer = B(2610, 1530, "bandit-indexer", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
     bright = SV(3580, 160, BRIGHT, "source acquisition", w=600, h=260)
-    elastic = SV(3580, 730, ELASTIC, "Evidence Engine", w=600, h=660)
+    elastic = SV(3580, 730, ELASTIC, "search + model tasks", w=600, h=660)
     wallet = SV(3580, 1530, CAPONE, "Nessie wallet", w=600, h=260)
     Z(20, 590, 580, 1030, "venue", "device")
     Z(760, 590, 620, 1030, "venue laptop", "rust", LAPTOP)
@@ -244,33 +244,8 @@ def jobs(y0):
 
 
 def prepare_event(y0):
-    S.begin_frame("Prepare the event", 0, y0, 3560, 1700)
-    event = B(60, 180, "configured event", "web", w=540, h=260, wordmark=USER, mark_h=100)
-    start = SV(800, 180, STDB, "start_event_import", kind="stdb", w=660, h=260)
-    worker = B(1660, 180, "server importer", "rust", w=660, h=260, wordmark=RUST, mark_h=100)
-    sources = SV(2520, 180, BRIGHT, "source acquisition", w=900, h=260)
-    organize = SV(2520, 650, ELASTIC, "Evidence Engine", w=900, h=260)
-    bundle = B(1660, 650, "worker validation", "rust", w=660, h=260, wordmark=SHIELD, mark_h=100)
-    finish = SV(800, 650, STDB, "finish_event_import", kind="stdb", w=660, h=260)
-    ready = B(60, 650, "event ready", "good", w=540, h=260, wordmark=MONITOR, mark_h=100)
-    H(event, start, "organizer starts")
-    H(start, worker, "queues import")
-    H(worker, sources, "fetch records", y=worker.y + 70)
-    H(sources, worker, "source evidence", y=worker.bottom - 70)
-    R(worker, "b", organize, "l", [(worker.cx, S.oy + 550), (S.ox + 2450, S.oy + 550), (S.ox + 2450, organize.y + organize.h*.2)],
-      label="asks to organize", seg=1, fb=.2)
-    H(organize, bundle, "candidate records", y=organize.bottom - 65)
-    H(bundle, finish, "validated bundle")
-    H(finish, ready, "atomic import")
-    lookup = B(60, 1230, "event name", "web", w=540, h=260, wordmark=USER, mark_h=100)
-    setup = SV(800, 1230, STDB, "start_venue_setup", kind="stdb", w=660, h=260)
-    discover = B(1660, 1230, "venue discovery", "rust", w=660, h=260, icons={0: BRIGHT, 1: ELASTIC})
-    choose = B(2520, 1230, "choose returned venue", "web", w=900, h=260, wordmark=MONITOR, mark_h=100)
-    Z(20, 1090, 3440, 500, "venue selection", "web")
-    H(lookup, setup, "organizer starts")
-    H(setup, discover, "queues lookup")
-    H(discover, choose, "model + source links")
-    return S.end_frame()
+    return _import_acquisition_frame(y0, "event-import-source.excalidraw",
+                                     "event_import_", frame_id="frame477", reserve_ids=62)
 
 
 
@@ -306,53 +281,39 @@ def respond_incident(y0):
 
 
 def routes_space(y0):
-    import math
-    from lib import Box
-    S.begin_frame("Routes and clear space", 0, y0, 3500, 2330)
-    floor = B(60, 180, "floor geometry", "note", w=620, h=220, wordmark=GRAPH3D, mark_h=100)
-    marker = B(880, 180, "incident location", "stdb", w=620, h=220, wordmark=PIN, mark_h=100)
-    entry = B(880, 620, "nearest door", "rust", w=620, h=220, wordmark=PIN, mark_h=100)
-    clear = B(60, 620, "clear aisle?", "rust", w=620, h=220, shape="diamond")
-    direct = B(880, 1060, "straight route", "web", w=620, h=220, wordmark=WALK, mark_h=100)
-    astar = B(60, 1060, "A* detour", "rust", w=620, h=220, wordmark=WALK, mark_h=100)
-    p = LOGOS.parent / "medic-routing/floor-paths.png"
-    ph = 1160 / aspect(p)
-    picture = Box(S.image(S.ox + 60, S.oy + 1530, p, ph))
-    V(floor, clear, "walkable cells")
-    V(marker, entry, "selects entry")
-    H(entry, clear, "checks route")
-    V(clear, astar, "blocked")
-    D(clear, "r", .7, direct, "l", .3, "clear")
-    D(direct, "b", .5, picture, "t", .75, "draws route")
-    D(astar, "b", .5, picture, "t", .25, "draws detour")
-    Z(20, 70, 1520, 2230, "medic route display", "web")
+    """Append the two reviewed native flows while retaining their existing IDs."""
+    import copy
+    import random
 
-    center_x, center_y, scale = 2530, 900, 90
-    def ring(x, y, r, stroke, fill="transparent", dashed=False):
-        return S.base("ellipse", S.ox+x-r, S.oy+y-r, 2*r, 2*r,
-                      strokeColor=stroke, backgroundColor=fill, roughness=0,
-                      strokeStyle="dashed" if dashed else "solid", strokeWidth=3)
-    ring(center_x, center_y, 4.2*scale, "#1971c2", "#e7f5ff")
-    ring(center_x, center_y, 3*scale, "#1971c2", dashed=True)
-    ring(center_x, center_y, 44, "#c92a2a", "#ff8787")
-    for k in range(8):
-        a=math.radians(k*45+20); r=(1.2+.18*(k%4))*scale
-        p0=(center_x+r*math.cos(a),center_y+r*math.sin(a))
-        p1=(center_x+4.2*scale*math.cos(a),center_y+4.2*scale*math.sin(a))
-        ring(*p0,18,"#868e96","#dee2e6",True);ring(*p1,22,"#1864ab","#4dabf7")
-        S.arrow(None,None,[(S.ox+p0[0],S.oy+p0[1]),(S.ox+p1[0],S.oy+p1[1])],color="#1864ab")
-    tick = B(1820, 180, "crowd_tick", "stdb", w=620, h=220, wordmark=CLOCK, mark_h=100)
-    down = B(2640, 180, "incident position", "stdb", w=620, h=220, wordmark=HEART, mark_h=100)
-    near = B(1820, 1530, "within 3 metres", "stdb", w=620, h=220)
-    back = B(2640, 1530, "4.2-metre boundary", "stdb", w=620, h=220)
-    reset = B(2640, 1960, "return to team", "good", w=620, h=220, wordmark=USERS, mark_h=100)
-    closed = B(1820, 1960, "incident resolved", "stdb", w=620, h=220, wordmark=HEART, mark_h=100)
-    H(down, tick, "incident position")
-    V(tick, near, "checks distance", x=tick.x + 80)
-    H(near, back, "steps back")
-    H(closed, reset, "resumes movement")
-    Z(1740, 70, 1600, 2230, "scripted crowd clearance", "stdb")
-    return S.end_frame()
+    source_names = (
+        "medic-route-display-source.excalidraw",
+        "crowd-clearance-source.excalidraw",
+    )
+    offset = y0
+    existing_ids = {element["id"] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(element for element in source["elements"] if element["type"] == "frame")
+        assert not existing_ids.intersection(element["id"] for element in source["elements"]), filename
+        for original in source["elements"]:
+            element = copy.deepcopy(original)
+            element["y"] += offset - frame["y"]
+            S.elements.append(element)
+            existing_ids.add(element["id"])
+        for file_id, record in source.get("files", {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]["dataURL"] == record["dataURL"]
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame["height"] + GAP
+
+    # The original combined function reserved numeric IDs 931 through 1018.
+    # Keep the following generated hardware IDs and random metadata unchanged.
+    S.n = max(S.n + 88, 1018)
+    for _ in range(176):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
+
 
 
 
@@ -406,87 +367,111 @@ def elastic_evidence(y0):
 
 
 def elastic_execution(y0):
-    """Fixed-schema tasks and bounded agents share the configured model."""
-    S.begin_frame("Elastic execution", 0, y0, 3320, 1980)
-    x = [80, 760, 1440, 2120, 2800]
-    w, h = 440, 360
+    """Import the reviewed investigation while preserving later element identities."""
+    import random
 
-    text = B(x[0], 160, "Private text", "note", w=w, h=h,
-             wordmark=FILE, mark_h=90)
-    prompt = SV(x[1], 160, ELASTIC, "Workflows\nai.prompt", w=w, h=h)
-    text_model = B(x[2], 160, "Claude\nconfigured model", "claude", w=w, h=h,
-                   wordmark=CLAUDE, mark_h=100)
-    schema = _elastic_component(x[3], 160, w, h, "Schema check", "rust", RUST)
-    schema.el["customData"]["diagramCenteredHeader"] = True
-    _elastic_property(schema, x[3] + 30, 370, w - 60, "JSON answer")
-    H(text, prompt, "worker starts run")
-    H(prompt, text_model, "calls connector")
-    H(text_model, schema, "worker validates")
+    source_path = LOGOS.parent / "elastic-claim-investigation-source.excalidraw"
+    source = json.loads(source_path.read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    frame_id = "frame" + str(S.n + 1)
+    id_map = {element["id"]: frame_id if element["type"] == "frame" else "exec04v2_" + element["id"]
+              for element in source["elements"]}
+    existing_ids = {element["id"] for element in S.elements}
+    assert not existing_ids.intersection(id_map.values())
 
-    image = B(x[0], 880, "Image attachment", "note", w=w, h=h,
-              wordmark=IMAGE, mark_h=90)
-    workflow = SV(x[1], 880, ELASTIC, "Workflows\nai.agent", w=w, h=h)
-    agent = SV(x[2], 880, ELASTIC, "Agent Builder", w=w, h=h)
-    agent_model = B(x[3], 880, "Claude\nconfigured model", "claude", w=w, h=h,
-                    wordmark=CLAUDE, mark_h=100)
-    validation = _elastic_component(x[4], 880, w, h, "Worker validation", "rust", RUST)
-    validation.el["customData"]["diagramCenteredHeader"] = True
-    _elastic_property(validation, x[4] + 30, 1090, w - 60, "Agent answer")
-    H(image, workflow, "worker attaches")
-    H(workflow, agent, "runs scoped agent")
-    H(agent, agent_model, "calls connector")
-    H(agent_model, validation, "checks answer")
+    # The former frame allocated 58 IDs and generated two random values per element.
+    # Reserve the same sequence so all later IDs, seeds and nonces remain stable.
+    S.n += 58
+    for _ in range(58):
+        original_seed = random.randint(1, 2**31 - 1)
+        random.randint(1, 2**31 - 1)
 
-    evidence = B(x[0], 1520, "Claim evidence", "note", w=w, h=h,
-                 wordmark=FILE, mark_h=90)
-    tools = B(x[2], 1520, "Claim-scoped reads", "rust", w=w, h=h,
-              wordmark=RUST, mark_h=90)
-    R(evidence, "r", workflow, "b",
-      [S.P(640, 1700), S.P(640, 1400), S.P(980, 1400)],
-      "starts investigation", seg=1)
-    V(agent, tools, "requests read", x=agent.x + 110)
-    V(tools, agent, "returns evidence", x=agent.x + 330)
-    return S.end_frame()
+    def remap(value, key=None):
+        if isinstance(value, dict):
+            return {k: remap(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            if key == "groupIds":
+                return ["exec04v2_" + group for group in value]
+            return [remap(item) for item in value]
+        if isinstance(value, str) and key in {
+            "id", "frameId", "containerId", "elementId", "diagramParentComponent"
+        }:
+            return id_map.get(value, value)
+        return value
+
+    origin_x, origin_y = frame["x"], frame["y"]
+    for element in remap(source["elements"]):
+        element["x"] -= origin_x
+        element["y"] += y0 - origin_y
+        if element["type"] == "frame":
+            element["seed"] = original_seed
+            element["version"] = 2
+        S.elements.append(element)
+
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    return frame["height"]
+
+
+def _import_acquisition_frame(y0, filename, prefix, frame_id=None, reserve_ids=0):
+    """Import reviewed native artwork without changing later generated element IDs."""
+    import random
+    source_dir = pathlib.Path(globals().get("_ACQUISITION_SOURCE_DIR", LOGOS.parent))
+    source = json.loads((source_dir / filename).read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    id_map = {element["id"]: prefix + element["id"] for element in source["elements"]}
+    if frame_id:
+        id_map[frame["id"]] = frame_id
+    origin_x, origin_y = frame["x"], frame["y"]
+    height = frame["height"]
+    for element in source["elements"]:
+        element["id"] = id_map[element["id"]]
+        element["x"] -= origin_x
+        element["y"] = y0 + element["y"] - origin_y
+        for key in ("frameId", "containerId"):
+            if element.get(key):
+                element[key] = id_map[element[key]]
+        element["groupIds"] = [prefix + group for group in element.get("groupIds", [])]
+        for bound in element.get("boundElements") or []:
+            bound["id"] = id_map[bound["id"]]
+        for key in ("startBinding", "endBinding"):
+            binding = element.get(key)
+            if binding:
+                binding["elementId"] = id_map[binding["elementId"]]
+        custom = element.get("customData") or {}
+        for key in ("diagramParentComponent",):
+            if custom.get(key) in id_map:
+                custom[key] = id_map[custom[key]]
+        if element["type"] == "frame":
+            custom.update(diagramStyleVersion=1, diagramImportedSource="diagrams/" + filename)
+            element["customData"] = custom
+        S.elements.append(element)
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    # The old generator consumed one ID and two seeded draws per element.
+    # New artwork uses prefixed IDs; reserve the old allocation for later frames.
+    S.n += reserve_ids
+    for _ in range(reserve_ids * 2):
+        random.randint(1, 2**31 - 1)
+    return height
 
 
 def bright_data(y0):
-    """Three acquisition products, with server callers and concrete outputs."""
-    S.begin_frame("Bright Data", 0, y0, 3140, 1800)
-    x = [80, 900, 1720, 2540]
-    w, h = 480, 360
+    return _import_acquisition_frame(y0, "policy-discovery-source.excalidraw",
+                                     "policy_lookup_", frame_id="frame296", reserve_ids=55)
 
-    caller = B(x[0], 160, "Server acquisition", "rust", w=w, h=h,
-               wordmark=RUST, mark_h=90)
-    mcp = SV(x[1], 160, BRIGHT, "Web MCP", w=w, h=h)
-    sources = B(x[2], 160, "Public sources", "note", w=w, h=h,
-                wordmark=FILE, mark_h=90)
-    engine = SV(x[3], 160, ELASTIC, "Evidence Engine", w=w, h=h)
-    H(caller, mcp, "calls search + read")
-    H(mcp, sources, "returns source records")
-    H(sources, engine, "worker supplies evidence")
 
-    fetcher = B(x[0], 760, "Server worker", "rust", w=w, h=h,
-                wordmark=RUST, mark_h=90)
-    unlocker = SV(x[1], 760, BRIGHT, "Web Unlocker API", w=w, h=h)
-    document = B(x[2], 760, "Raw document", "note", w=w, h=h,
-                 wordmark=FILE, mark_h=90)
-    checked = B(x[3], 760, "Document parsing", "rust", w=w, h=h,
-                wordmark=RUST, mark_h=90)
-    H(fetcher, unlocker, "fetches known URL")
-    H(unlocker, document, "returns bytes")
-    H(document, checked, "worker parses")
-
-    exporter = B(x[0], 1360, "Venue exporter", "rust", w=w, h=h,
-                 wordmark=PYTHON, mark_h=90)
-    browser = SV(x[1], 1360, BRIGHT, "Browser API", w=w, h=h)
-    page = B(x[2], 1360, "Interactive page", "web", w=w, h=h,
-             wordmark=MONITOR, mark_h=90)
-    model = B(x[3], 1360, "Captured venue model", "good", w=w, h=h,
-              wordmark=GRAPH3D, mark_h=90)
-    H(exporter, browser, "connects over CDP")
-    H(browser, page, "renders source")
-    H(page, model, "exporter captures")
-    return S.end_frame()
+def capture_venue_map(y0):
+    return _import_acquisition_frame(y0, "venue-map-capture-source.excalidraw",
+                                     "venue_capture_")
 
 
 def _elastic_component(x, y, w, h, label, kind="ext", logo_=None):
@@ -534,7 +519,7 @@ def find_people(y0):
               wordmark=PHONE, mark_h=100)
     api = B(880, 160, "attendee search", "rust", w=560, h=260,
             wordmark=RUST, mark_h=100)
-    engine = SV(1660, 160, ELASTIC, "Evidence Engine", w=600, h=260)
+    engine = SV(1660, 160, ELASTIC, "candidate ranking", w=600, h=260)
     result = _social_component(2500, 160, 600, 440, "closest connections", "web", USER)
     _social_property(result, 2540, 350, 520, "recorded evidence reason", h=100)
     _social_property(result, 2540, 480, 520, "social links", h=80)
@@ -570,7 +555,7 @@ def photo_memories(y0):
     _social_property(photo, 100, 530, 490, "capture time", h=100)
     worker = B(880, 170, "photo worker", "rust", w=560, h=260,
                wordmark=RUST, mark_h=110)
-    engine = SV(1660, 170, ELASTIC, "Evidence Engine", w=600, h=260)
+    engine = SV(1660, 170, ELASTIC, "photo analysis", w=600, h=260)
     analysis = _social_component(2500, 170, 600, 620, "photo analysis result", "rust", FILE)
     reading = _social_property(analysis, 2540, 390, 520, "people count", h=100)
     caption = _social_property(analysis, 2540, 550, 520, "photo caption", h=160)
@@ -1326,7 +1311,7 @@ def band_firmware(y0):
 
 
 FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
-          nessie, jobs, prepare_event, find_people, photo_memories,
+          nessie, jobs, prepare_event, capture_venue_map, find_people, photo_memories,
           settle_claim, policy_amounts, approve_rule, respond_incident,
           routes_space, fire_evacuation, photo_product_flow, merch_product_flow, hardware, band_wiring, exit_markers_gateway,
           band_firmware, vision, venue_reconstruction)

@@ -1,6 +1,6 @@
 # Diagram review, 25 October 2026
 
-SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The current canonical Plus product-flow revision has 24 frames and passed exact readback verification. Earlier 24- and 21-frame revisions remain saved historical checkpoints.
+SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The current canonical Plus revision has 26 frames and passed exact readback verification. It makes each service flow’s purpose explicit and partitions the existing medic-route and crowd-clearance content. Earlier revisions remain saved historical checkpoints.
 
 ## What each sponsor contribution means
 
@@ -14,25 +14,27 @@ SpacetimeDB and Elastic are the primary presentation priorities. This review com
 
 ## Board organization
 
-The current verified product-flow board has 24 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. The earlier reduction retained Interest suggestions, Buy a memory and Exit guidance in prose and saved their drawings. This new consolidation adds separate supplied product journeys for fire evacuation, photo matching and photo merchandise; their technical details remain in the existing engine diagrams. Hardware and vision detail stays on the main board.
+The current verified purpose-focused board has 26 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. The earlier reduction retained Interest suggestions, Buy a memory and Exit guidance in prose and saved their drawings. This new consolidation adds separate supplied product journeys for fire evacuation, photo matching and photo merchandise; their technical details remain in the existing engine diagrams. Hardware and vision detail stays on the main board.
 
 | Diagram | Question or responsibility |
 |---|---|
 | Architecture | How devices, services and externally hosted platforms connect. |
 | SpacetimeDB | How committed writes reach tailored audience subscriptions and where subscription limits remain. |
 | Elastic evidence | How scoped retrieval, ranking and cited precedents work. |
-| Elastic execution | How checked workflows and model execution return validated results. |
-| Bright Data | How workers acquire event, policy and venue source material. |
+| Elastic claim investigation | How an Elastic agent requests scoped evidence and policy clauses before returning a cited recommendation that the worker validates. |
+| Find policy documents | How a lookup worker finds candidate PDFs, checks printed identity against the requested policy and saves matched source evidence. |
 | Capital One Nessie | How account, purchase and injury-deposit API operations work. |
 | Jobs | Who queues, claims, executes and records work. |
-| Prepare the event | How the organizer starts server-side event preparation. |
+| Prepare the event | How the organizer starts a server import, Bright Data supplies public records, Elastic organizes names, and code validates and applies the event atomically. |
+| Capture a public venue map | How a venue-setup worker discovers public pages, selects known URLs and uses Bright Data Browser API to export the chosen interactive map. |
 | Find people again | How typed reconnection uses recorded meeting and place evidence. |
 | Memories engine | How capture context becomes candidate tags, sharing and communities built from encounters and visits; minutes remain inside their parent cards. |
 | Settle a claim | Who recommends, authorizes and pays. |
 | Policy amounts | How code derives medical and property amounts. |
 | Approve a reusable rule | How precedents become explicitly approved, code-guarded authority. |
 | Respond to an incident | How incident response reaches the appropriate people. |
-| Routes and clear space | How routes and nearby bands support response. |
+| Medic route display | How floor geometry and the incident location select an entry and produce a straight route or an A* detour for display. |
+| Crowd clearance | How the scripted crowd steps back from the incident and returns to its team after resolution. |
 | Fire evacuation | How the organizer starts evacuation and attendees follow paths toward exits, with incident subjects waiting for help. The paths and positions are illustrative. |
 | How your photos find you | How a photographer’s event-area and time context combines with band records and image people-counting to suggest photo identities, without face identification. |
 | Your photo on your merch | How a tagged photo and booth interests become a prepared-design suggestion that the attendee previews and chooses to buy. |
@@ -48,6 +50,8 @@ The rule diagram removes historical repair detail and a repeated individual-deci
 The canonical style uses large original artwork/logos, soft fills and dark text. Each main actor, component or object remains a visible outer card; its descriptive properties become small filled rectangles inside it. Actual actors and workflow/calculation stages may stand alone with arrows, while related formula inputs and conditions stay within their calculation group. Descriptive properties do not become artificial process steps. A short label may use several lines for one concept. App screenshots are excluded. Imported hardware source remains unchanged; editable checkpoints precede major rewrites.
 
 ## Diagram errors corrected
+
+The purpose-focused revision replaces broad provider overviews with specific claim-investigation and policy-discovery flows, and separates event import from public venue-map capture. Existing Routes and clear space content is partitioned into Medic route display and Crowd clearance, with original artwork retained. Three context labels now name their actual role: search and model tasks in Architecture, candidate ranking in Find people again, and photo analysis in Memories engine. Claim-specific Evidence Engine wording remains. Finance formulas and firmware colors are unchanged.
 
 The new product-flow revision preserves all existing technical frames; hardware and vision are only renumbered after the inserted product journeys. The Nessie layout is compacted; all wording and API relationships are preserved. The supplied Fire evacuation, photo-flow and merch-image source boards are kept separately, together with three original photo illustrations. The export `policy-calculations.svg` contains only the 54 formula elements from Policy amounts, excluding the 24 tagged numeric-example elements. It is an export-only view, not a board change or an extra frame.
 
@@ -94,3 +98,7 @@ The [prior grouped 24-frame public checkpoint](https://excalidraw.com/#json=p0Gi
 The [current allocation checkpoint](https://excalidraw.com/#json=uav7aeS1XhZXosyIEQVoi,PYVd5M9WtmWod1yIAwgk5Q) passed exact public readback for all 1,574 elements and 40 assets. Canonical Plus verification is stored in `.builds/diagram-history/20261025T111217Z-before-policy-allocation/apply/verification.json`.
 
 The subsequent product-flow consolidation passed independent source and native-export review and exact canonical Plus readback: 1,728 active elements, 24 frames, 214 images and 45 assets, with the user’s station-position adjustment preserved and zero errors. The reviewed generator source is `471cd6fae0887675c10524bdd490e17ffb0938de2e8f9f525b4b23dd095ad276`; the saved live-content hash is `5491c810297b389fc883f4a2e8da5f87a85b8baafdf38671c2c0072a04aa05ec`. Proof is `.builds/diagram-history/20261025-before-product-flows/apply/verification.json`. Earlier 21-frame readbacks above describe historical revisions, not the current frame count.
+
+The latest purpose-focused revision passed independent source and native-export review, followed by exact canonical Plus readback: 1,808 active elements, 26 frames, 207 images and 45 assets. The reviewed generator source is `336a5b43901cf2aa1c2a3d5bc3c8ca86f430fde82fd4f911958f767fe9db0c4c`; the saved live-content hash is `301ba842bf889e4db4dffe769eb9895bb50d888c625c212601c616d7d08f6647`. Proof is `.builds/diagram-history/20261025-before-purpose-flows/apply/verification.json`. The patch preserves historical elements while replacing broad overviews and partitioning existing route content; prior 24- and 21-frame readbacks above are historical. Finance and firmware colors are unchanged in this revision.
+
+This 26-frame board is a reviewed checkpoint, not the completed presentation. Pending refinements cover the external Claude provider, combined policy and map discovery, SpacetimeDB grouping and colors, and replacing the scripted Crowd clearance drawing with approved attendee/band behavior after source verification. The current scripted-crowd description remains factual, but it is not the chosen final presentation.
