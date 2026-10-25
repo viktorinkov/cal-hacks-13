@@ -18,6 +18,7 @@ Responsibilities:
 - Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
+- Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab.
 - Elastic.md: link to the Elastic Kibana dashboards from the Kibana tab.
 - Social.md: draw the event graph in 3D for the big screen, with the event photos among the people in them, and list every event photo on the Photos tab.
 
@@ -49,6 +50,7 @@ Not responsible for:
 | Merch.md | in | module to organizer portal | the Merch tab: the public `merch_template` table and, for `ops`, the view `board_merch_orders` | SDK |
 | Test-Bands.md | both | module and `bandit-api` to organizer portal | the band id (test bands are 90 to 99, the crowd's bands from 100) for the map and the counts; the crowd attendees in `board_attendees`; the Bands tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Bright-Data.md | in | module to organizer portal | the booths and organisations the import loaded: the booths on the venue map, the organisations in the attendee list's Company column | SDK |
+| Bright-Data.md | both | organizer portal, module and `bandit-api` | the Venue setup tab: `venue_setup`, `venue_setup_step` and `chosen_venue` in; `start_venue_setup` and `choose_venue` out, for `ops`; the model from `/venue/venue.glb` or the setup's blob | SDK and HTTPS |
 
 ## Design
 
@@ -77,7 +79,8 @@ The tabs are the same on every device, in this order: Live ("Alerts", "Venue" wi
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
 - Social.md: the Event graph tab, then the Photos tab, after Claims (see Event graph and Photos tab below).
 - Merch.md: the Merch tab, after Photos (see Merch tab below).
-- Elastic.md: the Kibana tab, after Merch (see Kibana tab below).
+- Bright-Data.md: the Venue setup tab, after Merch (see Venue setup tab below).
+- Elastic.md: the Kibana tab, after Merch and Venue setup (see Kibana tab below).
 - Test-Bands.md: the Bands tab, last, shown in test mode only (see Bands tab below).
 
 Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeDB SpacetimeAuth magic link, the same sign-in attendees use, and sees the no-role screen with their identity code. A Rust service prints its identity on first start.
@@ -314,11 +317,21 @@ Merch.md: the Merch tab shows the merch on sale and what attendees bought ([Merc
 
 The tab has no controls: orders are placed and paid from the attendee's recap.
 
+### Venue setup tab (Bright-Data.md)
+
+Bright-Data.md: the Venue setup tab sets up a venue from the event's name and picks the venue the portal shows ([Bright-Data](../7-integrations/Bright-Data.md)).
+
+- "Venue": the "Shown venue" list holds "Cal Hacks 13.0 at the Palace of Fine Arts", the default, and every ready setup as "<event> at <venue>", newest first. Choosing one calls `choose_venue`, and only `ops` can change it. Below the list come the venue's name and address, its meshes, triangles, named parts and size in metres, the page the model came from, and the model in 3D ("Drag to turn, scroll to zoom.").
+- "Set up a venue": for `ops`, a field for the event's name and "Find the venue" (`start_venue_setup`). Everyone else reads "The organizer sets up the venue."
+- "Setups (n)": one block per run, newest first. Each shows the event's name and its status ("Working", "Ready", "No 3D model found" or "Failed"), the venue and its address, the event site, the 3D map and the floor plans as links, "Pages used (n)", any error, and every step with its time.
+
+The default model loads from `/venue/venue.glb`, which `bandit-api` serves; a setup's model loads from its blob at `/blobs/<sha256>`. The Live tab's venue map does not change: it draws zones and bands from `venue_plan`.
+
 ### Kibana tab (Elastic.md)
 
 Elastic.md: the Kibana tab is a list of links, each opening one Elastic Kibana dashboard in a new tab. They are "Scrape pipeline" and "Sponsors and prizes", the two event dashboards that `bandit-ingest` installs ([Elastic](../7-integrations/Elastic.md)), and, Insurance.md: "Claims", the claims evidence dashboard. Nothing on the tab reads Elastic or starts a run.
 
-Bright-Data.md: the scrape is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event ([Bright-Data](../7-integrations/Bright-Data.md)).
+Bright-Data.md: the event import is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event. The one Bright Data run the portal starts is a venue setup ([Bright-Data](../7-integrations/Bright-Data.md)).
 
 ### Bands tab (Test-Bands.md)
 
@@ -351,6 +364,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | Social.md: `event_graph` | event graph |
 | Social.md: `board_photos` | the Photos tab and the photos in the event graph |
 | Merch.md: `merch_template`, `board_merch_orders` | the Merch tab |
+| Bright-Data.md: `venue_setup`, `venue_setup_step`, `chosen_venue` | the Venue setup tab |
 
 The page redraws at most every 500 ms, however many rows change, and at least once a second; the venue map moves its dots between redraws. Test-Bands.md: the crowd adds up to 2,000 `band` rows that change every 2 s ([Test-Bands](../3-services/Test-Bands.md)).
 
@@ -386,7 +400,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 
 - The organizer loses the Live tab, the incident desk, the attendee list and "Event ended". Low visibility and taking, noting and resolving incidents would need another client calling the same reducers, such as the SpacetimeDB command line.
 - Remove the organizer portal row from the component table in Architecture.md and the organizer portal's subscriptions from SpacetimeDB.md's "subscriptions per client".
-- Remove the organizer portal bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", filing the hospital report), Medical-Card.md (the medical card in the incident desk, medical access log), Social.md (the Event graph and Photos tabs), Merch.md (the Merch tab and `board_merch_orders`), Vision.md (camera tile, the security camera's count in the zone table), Elastic.md (the Kibana tab), Test-Bands.md (the test bands and the crowd on the map, the Bands tab) and Bright-Data.md (the booths on the map).
+- Remove the organizer portal bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", filing the hospital report), Medical-Card.md (the medical card in the incident desk, medical access log), Social.md (the Event graph and Photos tabs), Merch.md (the Merch tab and `board_merch_orders`), Vision.md (camera tile, the security camera's count in the zone table), Elastic.md (the Kibana tab), Test-Bands.md (the test bands and the crowd on the map, the Bands tab) and Bright-Data.md (the booths on the map, the Venue setup tab).
 
 ## Decisions
 
@@ -411,6 +425,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | The page redraws at most every 500 ms, however many rows change, and the venue map glides its dots between redraws | one redraw takes every change at once; Test-Bands.md: the crowd's 1,000 bands change many rows every 2 s |
 | The venue map draws `venue_plan`, one anonymous view of zone rectangles and booth spots | every screen draws the same plan, computed once, and the bands' spots are in the same metres |
 | Merch.md: the Merch tab shows orders to `ops` only, through `board_merch_orders` | an order names the attendee who placed it; the medic needs none of it |
+| Bright-Data.md: the Venue setup tab draws the shown venue in 3D and leaves the Live tab's venue map as it is | the venue map shows zones and bands from `venue_plan`; the 3D model is the venue's picture, and a new setup never moves a band |
 | Elastic.md: the Kibana tab holds links only | the live screen stays on SpacetimeDB, and Elastic Kibana shows what Elastic holds in its own window |
 | Test-Bands.md: the Bands tab is shown in test mode only and calls the dev routes; scenarios also start from the `bandit-claims` command line | a tester runs a fall or a property claim from the laptop with one tap, and outside test mode the tab does not exist |
 | Social.md: the event graph names everyone on the big screen by display name: its links and names come from `event_graph`, and its photos and the people in them from `board_photos` as node ids | everyone at the venue sees who met whom; SpacetimeDB pushes the measured links and each new photo live |

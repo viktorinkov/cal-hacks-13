@@ -39,6 +39,7 @@ Every connection in the system. Names match the component docs.
 | Elastic.md: `bandit-api` | Elastic Serverless | `GET /recap/order`: semantic queries that order the recap's people and booths, over candidates SpacetimeDB listed | HTTPS |
 | Bright-Data.md: `bandit-ingest` | Bright Data Web MCP, Anthropic Claude API, `band1t` module | page fetches and extraction; `floorplan_check`; `import_event` | HTTPS; SDK |
 | Bright-Data.md: `pipeline/venue_model.py`, run by hand before the event | Bright Data Browser API | the Cal Hacks venue map opened in a remote browser; its 3D scene back as the file `web/venue/venue.glb` | CDP over WebSocket, through Playwright |
+| Bright-Data.md: `bandit-workers`, job `venue_setup` | Bright Data Web MCP, Bright Data Web Unlocker API, Anthropic Claude API, Bright Data Browser API | a venue set up from the event's name on the organizer portal: search, pages, the picks `venue_find` and `venue_map`, and the model exported by `pipeline/venue_model.py` | HTTPS; CDP over WebSocket, through Playwright |
 | Elastic.md: `bandit-ingest` | Elastic Serverless | parsed JSON records in; the bundle back from `bandit-organize` in Elastic Workflows | HTTPS |
 | Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`; the ids and scores of similar past claims back, written through `submit_claim_checks` | HTTPS; SDK |
 | Elastic.md: the Elastic Agent Builder agent `bandit-organizer` | Bright Data Web MCP | at most 10 gap-fill `extract` calls per run, through an Agent Builder MCP tool | HTTPS |
@@ -144,6 +145,7 @@ flowchart LR
   Workers <-->|"jobs"| STDB
   Workers -->|"HTTPS"| AnthropicAPI
   Workers -->|"HTTPS"| NessieAPI
+  Workers -->|"venue setup"| Bright
   Workers <-->|"claim copies out, precedent ids back"| Elastic
   Indexer -->|"subscribe"| STDB
   Indexer -->|"bulk index"| Elastic
