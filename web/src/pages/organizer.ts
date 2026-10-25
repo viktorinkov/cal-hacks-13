@@ -18,6 +18,7 @@ import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { liveRunSection, runBar } from '../live-run';
+import { rulesTab } from '../rule-proposals';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { matches, redrawOnSearch, searchWords, searchable } from '../table-search';
 import { keepTableHeights } from '../resize';
@@ -54,6 +55,8 @@ const QUERIES = [
   'SELECT * FROM board_approvals',
   'SELECT * FROM board_ledger',
   'SELECT * FROM board_rules',
+  'SELECT * FROM board_rule_proposals',
+  'SELECT * FROM board_organizer_precedents',
   'SELECT * FROM board_policies',
   'SELECT * FROM board_covers',
   'SELECT * FROM board_policy_documents',
@@ -116,7 +119,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['costs', 'Costs'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['rules', 'Proposed rules'], ['costs', 'Costs'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
   const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff'], ['viewas', 'View as']] : all;
   return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
@@ -800,13 +803,13 @@ function whoPays(c: Claim) {
   return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents)))))];
 }
 
-/** The organizer's queue: claims no learned rule settled, oldest first. */
+/** The organizer's queue: claims no approved rule settled, oldest first. */
 function myQueue() {
   const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && decides(c)).sort((a, b) => Number(a.id - b.id));
   if (!can('ops')) return null;
   return h('section', { class: mine.length ? 'alert' : '' },
     h('h3', {}, `Payments waiting for your sign-off (${mine.length})`),
-    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Payments a learned rule covers go out on their own.'),
+    !mine.length && h('p', { class: 'muted' }, 'Nothing right now.'),
     h('ul', {}, mine.map(c => h('li', {},
       h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`),
       ` ${money(c.payoutCents)} to ${payee(c)}, ${c.incidentKind} in ${c.zoneName}: ${c.statusNote}`))));
@@ -843,20 +846,11 @@ async function fileRecord(claimId: bigint, form: HTMLFormElement) {
   await conn.reducers.submitMedicalRecord({ claimId, fileHash: blob.hash, pageCount: blob.pages });
 }
 
-/** Claims whose approver unticked "learn"; kept here because each redraw makes a fresh checkbox. */
-const noLearn = new Set<bigint>();
-
 function decide(c: Claim) {
   const gap = complicated(c);
   const approve = async (e: Event) => {
     e.preventDefault();
-    const f = e.target as HTMLFormElement;
-    const ceiling = field(f, 'ceiling');
-    await act(() => conn.reducers.approveClaim({
-      claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash,
-      requestedCeilingCents: ceiling ? BigInt(Math.round(Number(ceiling) * 100)) : undefined,
-      learn: !gap && !noLearn.has(c.id),
-    }));
+    await act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash }));
   };
   const refuse = async (e: Event) => {
     e.preventDefault();
@@ -865,11 +859,7 @@ function decide(c: Claim) {
   };
   return h('div', {},
     h('form', { onsubmit: approve },
-      gap
-        ? h('p', { class: 'muted' }, 'A gap in the policy is decided one by one, so this teaches no rule. Your decision is shown on the next claim with the same gap.')
-        : [h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
-            onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims are paid on their own'),
-          h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' }))],
+      gap && h('p', { class: 'muted' }, 'Decided one by one: a gap in the policy makes no rule.'),
       h('button', {}, `Approve paying ${money(c.payoutCents)} to ${payee(c)}`)),
     h('form', { onsubmit: refuse },
       h('input', { name: 'reason', placeholder: 'Reason for refusing', required: true }),
@@ -1011,21 +1001,9 @@ function claimDetail(id: bigint) {
       h('ul', {}, precedents.map(p => h('li', {}, `${p.reference}: ${p.outcome}, ${money(p.payoutCents)}, score ${p.score.toFixed(2)}. ${p.narrative}`)))],
     h('h4', {}, 'Evidence facts'),
     h('table', {}, facts.map(f => h('tr', {}, h('td', {}, `[${f.seq}]`), h('td', {}, f.key), h('td', {}, f.value), h('td', { class: 'muted' }, `${f.source}, ${f.reader}`)))),
-    approvals.length > 0 && [h('h4', {}, 'Decisions'), h('ul', {}, approvals.map(a => h('li', {}, `${date(a.decidedAt)} ${a.approverName} (${a.approverRole}) ${a.decision} at ${money(a.amountSeenCents)}${a.learn ? ', learned a rule' : ''}${a.reason ? `: ${a.reason}` : ''}`)))],
+    approvals.length > 0 && [h('h4', {}, 'Decisions'), h('ul', {}, approvals.map(a => h('li', {}, `${date(a.decidedAt)} ${a.approverName} (${a.approverRole}) ${a.decision} at ${money(a.amountSeenCents)}${a.reason ? `: ${a.reason}` : ''}`)))],
     ledger.length > 0 && [h('h4', {}, 'Ledger'), h('table', {}, ledger.map(l => h('tr', {}, h('td', {}, l.journal), h('td', {}, l.account),
       h('td', {}, l.debitCents ? `Dr ${money(l.debitCents)}` : ''), h('td', {}, l.creditCents ? `Cr ${money(l.creditCents)}` : ''), h('td', { class: 'muted' }, l.memo))))]);
-}
-
-function rules() {
-  const rows = [...conn.db.boardRules.iter()].sort((a, b) => b.version - a.version);
-  const policy = conn.db.boardPolicies.iter().next().value;
-  return h('section', {},
-    h('h3', {}, 'Learned payment rules'),
-    !rows.length && h('p', { class: 'muted' }, 'None yet. An approval with "learn" checked creates one.'),
-    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${COVER_WORDS[r.coverKind] ?? r.coverKind} cover`),
-      h('td', {}, `pays up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
-      h('td', {}, `from ${r.approverName} (${r.approverRole})`), h('td', {}, r.status)))),
-    policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
 }
 
 function claimsTab() {
@@ -1036,7 +1014,7 @@ function claimsTab() {
     openClaim = filed.id;
     scrollToClaim = true;
   }
-  return [incidentDesk(), injuriesWithoutClaim(), fileAs(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList(), rules()];
+  return [incidentDesk(), injuriesWithoutClaim(), fileAs(), myQueue(), openClaim !== undefined && claimDetail(openClaim), claimList()];
 }
 
 /** The attendee staff file a claim as from the Settlements tab, by key. */
@@ -1312,9 +1290,9 @@ function render() {
     const drawn = peopleList(people);
     if (drawn) mount('people', drawn);
   }
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live(people);
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'rules' ? rulesTab(conn, can('ops'), toClaim) : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live(people);
   mount('app', body);
-  if (tab === 'claims' || tab === 'costs') defineTerms(document.getElementById('app')!);
+  if (tab === 'claims' || tab === 'rules' || tab === 'costs') defineTerms(document.getElementById('app')!);
   keepTableHeights(document.getElementById('app')!);
   if (scrollToClaim) {
     scrollToClaim = false;

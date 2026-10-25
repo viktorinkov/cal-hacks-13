@@ -313,6 +313,7 @@ Code checks the answer in the worker, which asks once more with the problems lis
 |---|---|---|
 | a valid proposal | `proposed`, waiting for the organizer | the cited ones stay cited; offered ones it does not cite are released for a later proposal |
 | `propose: false`: the precedents share no pattern | `declined`, with Claude's summary | stay cited, so the same ones do not come back |
+| code sets it aside: it breaks a check | `failed`, with the problems | released |
 | the job dies | `failed` | released |
 
 **The organizer decides.** `approve_rule_proposal(proposal_id, ceiling_seen_cents)` is for `ops` or the module owner. It is refused, writing nothing, when:
@@ -334,11 +335,12 @@ A fresh live run (`start_live_run` with `fresh`) deletes the decision history an
 
 | When | `actor` | `what` | `why` |
 |---|---|---|---|
-| the organizer approves a simple claim | `organizer` | `Approved {name}'s claim` | `precedent 2 of 3 for falls under medical payments`, or `kept as a precedent` past 3 |
-| a proposal opens | `Decision Engine` | `Proposing a rule from claims 2, 4 and 7` | `three approved falls under medical payments` |
-| Claude proposes | `Claude` | `Proposed rule: {rule}` | `{summary} Waits for the organizer.` |
+| the organizer approves a simple claim | `organizer` | `Approved {name}'s claim` | `precedent 2 of 3 for a rule on falls under medical payments cover`, then `precedent 3 of 3: Claude proposes a rule on ...`, or `kept as a precedent` past it |
+| a proposal opens | `Decision Engine` | `Proposing a rule from claims 2, 4 and 7` | `3 approved falls under medical payments cover no rule pays yet` |
+| Claude proposes | `Claude` | `Proposed a rule: {rule}` | `{summary} From claims 2, 4 and 7; waits for the organizer.` |
+| code sets it aside | `Decision Engine` | `Set Claude's proposed rule aside` | the problems |
 | Claude proposes no rule | `Claude` | `Proposed no rule` | the summary |
-| the organizer approves it | `organizer` | `Approved rule v1: falls under medical payments up to $180.00` | `from claims 2, 4 and 7, proposed by Claude` |
+| the organizer approves it | `organizer` | `Approved rule v1: falls under medical payments cover up to $180.00` | `from claims 2, 4 and 7, proposed by Claude` |
 | the organizer rejects it | `organizer` | `Rejected the proposed rule` | the reason |
 
 The question this diagram answers: how three approvals become a payment rule that pays the fourth claim.
