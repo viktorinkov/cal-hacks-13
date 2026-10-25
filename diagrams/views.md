@@ -6,9 +6,9 @@ Comparison branch `vik-elastic-workflows` at `4aa9c4c49382e8fd91720d3c45019aaf65
 
 This is source wiring, not evidence of runtime delivery. Generated bindings and tests do not count as production subscribers. The owner CLI subscribes to raw tables.
 
-## Diagram 23 scope
+## Diagram 02 SpacetimeDB scope
 
-Frame 23 uses compact audience cards for attendees, granted medic access, staff boards, service API/indexer and workers. Anonymous projections and raw public floor/commands use a separate path. The frame shows representative view names; this inventory contains every declared view.
+Frame 02 uses compact audience cards for attendees, granted medic access, staff boards, service API/indexer and workers. Anonymous projections and raw public floor/commands use a separate path. The frame shows representative view names; this inventory contains every declared view.
 
 ## Access rules that affect the drawing
 
