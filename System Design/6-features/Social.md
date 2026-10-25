@@ -25,7 +25,7 @@ Responsibilities:
 Non-responsibilities:
 
 - It does not write `band`, `zone_visit`, `encounter` or `event`; it only reads them ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](Safety.md)).
-- It does not analyse images itself. People counts and captions come from the `photo_features` job in `bandit-workers`, where Claude reads the photo, through `submit_photo_features`. Claude counts people and never says who anyone is.
+- It does not analyse images itself. People counts and captions come from the `photo_features` job in `bandit-workers`, where an Elastic image workflow reads the photo, through `submit_photo_features`. The workflow counts people and never says who anyone is.
 - It does not scrape people. Nobody's social profile is scraped; a handle comes only from its owner.
 - Elastic.md: it does not rank by meaning. The order of the recap's people, people also there and booths comes from Elastic, through `GET /api/recap` in `bandit-api`, over a one-way copy of this file's findable rows ([Elastic](../7-integrations/Elastic.md)); the lists themselves come from this file's views.
 - It does not make merch; it supplies the visits and photos that [Merch](Merch.md) builds its suggestions from.
@@ -232,14 +232,15 @@ The photographer route `/photo` is served with the tap page, gated by the `photo
 
 The route then calls `register_photo` with that URL, the capture time, the zone and an optional caption. The photographer picks the zone the photo was taken in from the venue's zones.
 
-The question this diagram answers: how a photo becomes tags, and where Claude joins in.
+The question this diagram answers: how a photo becomes tags, and where the Elastic image workflow joins in.
 
 ```mermaid
 sequenceDiagram
     participant PH as photographer route
     participant API as bandit-api
     participant M as band1t module
-    participant V as bandit-workers (Claude)
+    participant V as bandit-workers
+    participant E as Elastic image workflow
     participant AT as attendee's recap
     PH->>API: POST /api/blobs, purpose photo
     API->>API: store bytes under their SHA-256
@@ -249,8 +250,10 @@ sequenceDiagram
     M->>M: bands in that zone at taken_at
     M->>M: photo_tag rows, ranked, cap 8
     M-->>V: photo_features job
+    V->>E: read temporary photo attachment
+    E-->>V: people count and caption
     V->>M: submit_photo_features, people count, caption
-    M->>M: re-cap to the people count
+    M->>M: set tags to the people count
     M-->>AT: my_photos shows the photo after the event
 ```
 
@@ -258,13 +261,13 @@ Candidate rule: photo tags come from the bands in the photo's zone at the moment
 
 Test-Bands.md: crowd attendees are candidates through their stays, and people who tapped their bands rank before the crowd.
 
-The list starts with up to 8 candidates until Claude reports a people count. It then takes that many candidates in ranked order. When fewer eligible candidates are available, it tags all of them. The module applies no additional fixed tag maximum after the count arrives. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
+The list starts with up to 8 candidates until the image workflow reports a people count. It then takes that many candidates in ranked order. When fewer eligible candidates are available, it tags all of them. The module applies no additional fixed tag maximum after the count arrives. Each candidate gets a `photo_tag`, and the photo goes straight into their recap with a Share button and counts for merch. There is no confirm step.
 
-Photos never go to Elastic. Identity always comes from the band, never from a face.
+Photos are read through temporary image attachments and are not indexed for search. Identity always comes from the band, never from a face.
 
 Staff see each photo as soon as it is registered: `board_photos` puts it on the organizer portal's Photos tab and, once it has `findable` people in it, in the event graph among them.
 
-`register_photo` enqueues a `photo_features` job for a photo in the blob store, and `bandit-workers` answers with `submit_photo_features`. The worker shrinks the photo to 1568 px on its longest side and asks Claude for the number of people clearly in it and a caption of at most 12 words with no names, hashtags or @ mentions. The module re-caps the tags to the people count and uses the caption when the photographer gave none; the recap's Share button uses it.
+`register_photo` enqueues a `photo_features` job for a photo in the blob store, and `bandit-workers` answers with `submit_photo_features`. The worker shrinks the photo to 1568 px on its longest side and asks the Elastic image workflow for the number of people clearly in it and a caption of at most 12 words with no names, hashtags or @ mentions. The module sets the tags to the people count and uses the caption when the photographer gave none; the recap's Share button uses it.
 
 | `photo` field | Meaning |
 |---|---|
@@ -273,8 +276,8 @@ Staff see each photo as soon as it is registered: `board_photos` puts it on the 
 | `url` | `/blobs/<sha256>`: where the bytes are served from, access class `shared` |
 | `taken_at` | Capture time from the file, else upload time |
 | `zone_id` | The zone the photographer picked, where the photo was taken |
-| `caption` | From the photographer, or from Claude |
-| `people_count` | From Claude, 0 until the photo is read |
+| `caption` | The photographer's caption; the image workflow fills an empty caption |
+| `people_count` | From the image workflow, 0 until the photo is read |
 | `features_call_id` | The model call that read the photo, 0 until then |
 | `status` | `uploaded`, `tagged`, `hidden` |
 
