@@ -149,6 +149,7 @@ pub mod encounter_table;
 pub mod encounter_type;
 pub mod end_event_reducer;
 pub mod end_live_run_reducer;
+pub mod evacuate_live_run_reducer;
 pub mod event_bundle_type;
 pub mod event_graph_table;
 pub mod event_kind_type;
@@ -219,6 +220,8 @@ pub mod ledger_entry_table;
 pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
+pub mod live_evacuation_table;
+pub mod live_evacuation_type;
 pub mod live_pause_table;
 pub mod live_pause_type;
 pub mod live_phase_type;
@@ -605,6 +608,7 @@ pub use encounter_table::*;
 pub use encounter_type::Encounter;
 pub use end_event_reducer::end_event;
 pub use end_live_run_reducer::end_live_run;
+pub use evacuate_live_run_reducer::evacuate_live_run;
 pub use event_bundle_type::EventBundle;
 pub use event_graph_table::*;
 pub use event_kind_type::EventKind;
@@ -675,6 +679,8 @@ pub use ledger_entry_table::*;
 pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
+pub use live_evacuation_table::*;
+pub use live_evacuation_type::LiveEvacuation;
 pub use live_pause_table::*;
 pub use live_pause_type::LivePause;
 pub use live_phase_type::LivePhase;
@@ -1037,6 +1043,9 @@ pub enum Reducer {
     },
     EndEvent,
     EndLiveRun,
+    EvacuateLiveRun {
+        on: bool,
+    },
     ExtendJobLease {
         job_id: u64,
     },
@@ -1497,6 +1506,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::DisputeCharge { .. } => "dispute_charge",
             Reducer::EndEvent => "end_event",
             Reducer::EndLiveRun => "end_live_run",
+            Reducer::EvacuateLiveRun { .. } => "evacuate_live_run",
             Reducer::ExtendJobLease { .. } => "extend_job_lease",
             Reducer::FailJob { .. } => "fail_job",
             Reducer::FileClaim { .. } => "file_claim",
@@ -1792,6 +1802,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::EndEvent => __sats::bsatn::to_vec(&end_event_reducer::EndEventArgs {}),
             Reducer::EndLiveRun => __sats::bsatn::to_vec(&end_live_run_reducer::EndLiveRunArgs {}),
+            Reducer::EvacuateLiveRun { on } => {
+                __sats::bsatn::to_vec(&evacuate_live_run_reducer::EvacuateLiveRunArgs {
+                    on: on.clone(),
+                })
+            }
             Reducer::ExtendJobLease { job_id } => {
                 __sats::bsatn::to_vec(&extend_job_lease_reducer::ExtendJobLeaseArgs {
                     job_id: job_id.clone(),
@@ -2639,6 +2654,7 @@ pub struct DbUpdate {
     job_reaper_timer: __sdk::TableUpdate<JobReaperTimer>,
     ledger_entry: __sdk::TableUpdate<LedgerEntry>,
     link: __sdk::TableUpdate<Link>,
+    live_evacuation: __sdk::TableUpdate<LiveEvacuation>,
     live_pause: __sdk::TableUpdate<LivePause>,
     live_plan: __sdk::TableUpdate<LivePlan>,
     live_run: __sdk::TableUpdate<LiveRun>,
@@ -2998,6 +3014,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "link" => db_update
                     .link
                     .append(link_table::parse_table_update(table_update)?),
+                "live_evacuation" => db_update
+                    .live_evacuation
+                    .append(live_evacuation_table::parse_table_update(table_update)?),
                 "live_pause" => db_update
                     .live_pause
                     .append(live_pause_table::parse_table_update(table_update)?),
@@ -3435,6 +3454,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.link = cache
             .apply_diff_to_table::<Link>("link", &self.link)
             .with_updates_by_pk(|row| &row.key);
+        diff.live_evacuation = cache
+            .apply_diff_to_table::<LiveEvacuation>("live_evacuation", &self.live_evacuation)
+            .with_updates_by_pk(|row| &row.id);
         diff.live_pause = cache
             .apply_diff_to_table::<LivePause>("live_pause", &self.live_pause)
             .with_updates_by_pk(|row| &row.id);
@@ -4018,6 +4040,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "live_evacuation" => db_update
+                    .live_evacuation
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "live_pause" => db_update
                     .live_pause
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4550,6 +4575,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "live_evacuation" => db_update
+                    .live_evacuation
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "live_pause" => db_update
                     .live_pause
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4906,6 +4934,7 @@ pub struct AppliedDiff<'r> {
     job_reaper_timer: __sdk::TableAppliedDiff<'r, JobReaperTimer>,
     ledger_entry: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     link: __sdk::TableAppliedDiff<'r, Link>,
+    live_evacuation: __sdk::TableAppliedDiff<'r, LiveEvacuation>,
     live_pause: __sdk::TableAppliedDiff<'r, LivePause>,
     live_plan: __sdk::TableAppliedDiff<'r, LivePlan>,
     live_run: __sdk::TableAppliedDiff<'r, LiveRun>,
@@ -5312,6 +5341,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Link>("link", &self.link, event);
+        callbacks.invoke_table_row_callbacks::<LiveEvacuation>(
+            "live_evacuation",
+            &self.live_evacuation,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<LivePause>("live_pause", &self.live_pause, event);
         callbacks.invoke_table_row_callbacks::<LivePlan>("live_plan", &self.live_plan, event);
         callbacks.invoke_table_row_callbacks::<LiveRun>("live_run", &self.live_run, event);
@@ -6317,6 +6351,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         job_reaper_timer_table::register_table(client_cache);
         ledger_entry_table::register_table(client_cache);
         link_table::register_table(client_cache);
+        live_evacuation_table::register_table(client_cache);
         live_pause_table::register_table(client_cache);
         live_plan_table::register_table(client_cache);
         live_run_table::register_table(client_cache);
@@ -6485,6 +6520,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "job_reaper_timer",
         "ledger_entry",
         "link",
+        "live_evacuation",
         "live_pause",
         "live_plan",
         "live_run",

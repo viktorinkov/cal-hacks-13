@@ -62,6 +62,7 @@ import ConnectWalletReducer from "./connect_wallet_reducer";
 import DisputeChargeReducer from "./dispute_charge_reducer";
 import EndEventReducer from "./end_event_reducer";
 import EndLiveRunReducer from "./end_live_run_reducer";
+import EvacuateLiveRunReducer from "./evacuate_live_run_reducer";
 import ExtendJobLeaseReducer from "./extend_job_lease_reducer";
 import FailJobReducer from "./fail_job_reducer";
 import FileClaimReducer from "./file_claim_reducer";
@@ -213,6 +214,7 @@ import ImportRunRow from "./import_run_table";
 import IncidentBandsRow from "./incident_bands_table";
 import IncidentMarkerRow from "./incident_marker_table";
 import LinkRow from "./link_table";
+import LiveEvacuationRow from "./live_evacuation_table";
 import LivePauseRow from "./live_pause_table";
 import LivePlanRow from "./live_plan_table";
 import LiveRunRow from "./live_run_table";
@@ -494,6 +496,17 @@ const tablesSchema = __schema({
       { name: 'link_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, LinkRow),
+  liveEvacuation: __table({
+    name: 'live_evacuation',
+    indexes: [
+      { accessor: 'id', name: 'live_evacuation_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_evacuation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LiveEvacuationRow),
   livePause: __table({
     name: 'live_pause',
     indexes: [
@@ -1271,6 +1284,7 @@ const reducersSchema = __reducers(
   __reducerSchema("dispute_charge", DisputeChargeReducer),
   __reducerSchema("end_event", EndEventReducer),
   __reducerSchema("end_live_run", EndLiveRunReducer),
+  __reducerSchema("evacuate_live_run", EvacuateLiveRunReducer),
   __reducerSchema("extend_job_lease", ExtendJobLeaseReducer),
   __reducerSchema("fail_job", FailJobReducer),
   __reducerSchema("file_claim", FileClaimReducer),
@@ -1384,6 +1398,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "import_run": Omit<typeof tablesSchema.schemaType.tables["importRun"], "accessorName"> & { readonly accessorName: "import_run" };
     /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
     readonly "incident_marker": Omit<typeof tablesSchema.schemaType.tables["incidentMarker"], "accessorName"> & { readonly accessorName: "incident_marker" };
+    /** @deprecated Use `liveEvacuation` instead. This alias will be removed in the next major version. */
+    readonly "live_evacuation": Omit<typeof tablesSchema.schemaType.tables["liveEvacuation"], "accessorName"> & { readonly accessorName: "live_evacuation" };
     /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
     readonly "live_pause": Omit<typeof tablesSchema.schemaType.tables["livePause"], "accessorName"> & { readonly accessorName: "live_pause" };
     /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
@@ -1573,6 +1589,7 @@ const tableAccessorAliases = {
   "event_state": "eventState",
   "import_run": "importRun",
   "incident_marker": "incidentMarker",
+  "live_evacuation": "liveEvacuation",
   "live_pause": "livePause",
   "live_plan": "livePlan",
   "live_run": "liveRun",
@@ -1687,6 +1704,8 @@ export type DbView = __DbViewBase & {
   readonly "import_run": __DbViewBase["importRun"];
   /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
   readonly "incident_marker": __DbViewBase["incidentMarker"];
+  /** @deprecated Use `liveEvacuation` instead. This alias will be removed in the next major version. */
+  readonly "live_evacuation": __DbViewBase["liveEvacuation"];
   /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
   readonly "live_pause": __DbViewBase["livePause"];
   /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
@@ -1867,6 +1886,8 @@ export type Tables = __TablesBase & {
   readonly "import_run": __TablesBase["importRun"];
   /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
   readonly "incident_marker": __TablesBase["incidentMarker"];
+  /** @deprecated Use `liveEvacuation` instead. This alias will be removed in the next major version. */
+  readonly "live_evacuation": __TablesBase["liveEvacuation"];
   /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
   readonly "live_pause": __TablesBase["livePause"];
   /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */

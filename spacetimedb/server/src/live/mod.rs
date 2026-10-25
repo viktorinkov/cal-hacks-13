@@ -91,6 +91,17 @@ pub struct LivePause {
     pub paused_by: Identity,
 }
 
+/// One row, id 0, while the venue is evacuated: everyone walks out by the nearest door, nobody comes in and no
+/// incident is staged. Calling it off lets everyone back in. The bands get no command.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = live_evacuation, public)]
+pub struct LiveEvacuation {
+    #[primary_key]
+    pub id: u8,
+    pub started_at: Timestamp,
+    pub started_by: Identity,
+}
+
 #[spacetimedb::table(accessor = live_run_timer, scheduled(crate::live::live_tick))]
 pub struct LiveRunTimer {
     #[primary_key]
@@ -187,9 +198,14 @@ pub fn pace(ctx: &ReducerContext) -> f32 {
     }
 }
 
-/// True while the doors are closed and the crowd walks out.
+/// True while the venue is evacuated.
+pub fn evacuating(ctx: &ReducerContext) -> bool {
+    ctx.db.live_evacuation().id().find(0).is_some()
+}
+
+/// True while the crowd walks out: the doors are closed or the venue is evacuated.
 pub fn leaving(ctx: &ReducerContext) -> bool {
-    run(ctx).is_some_and(|r| r.phase == LivePhase::Closing)
+    run(ctx).is_some_and(|r| r.phase == LivePhase::Closing) || evacuating(ctx)
 }
 
 /// A crowd band that is down: its incident, where it lies, and whether it fell or pressed SOS.
@@ -256,6 +272,7 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
         ctx.db.incident_marker().incident_id().update(IncidentMarker { status: "resolved".into(), resolved_at: Some(ctx.timestamp), ..m });
     }
     ctx.db.live_pause().id().delete(0);
+    ctx.db.live_evacuation().id().delete(0);
     crate::web::set_ended_by(ctx, false)?;
     let row = LiveRun {
         id: 0,
@@ -333,6 +350,11 @@ pub fn pause_live_run(ctx: &ReducerContext) -> Result<(), String> {
 pub fn resume_live_run(ctx: &ReducerContext) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
     let p = ctx.db.live_pause().id().find(0).ok_or("the run is not paused")?;
+    resume(ctx, p);
+    Ok(())
+}
+
+fn resume(ctx: &ReducerContext, p: LivePause) {
     ctx.db.live_pause().id().delete(0);
     let gap = TimeDuration::from_micros(safety::micros_between(p.paused_at, ctx.timestamp));
     if let Some(r) = run(ctx) {
@@ -345,12 +367,48 @@ pub fn resume_live_run(ctx: &ReducerContext) -> Result<(), String> {
     }
     crowd::resume(ctx, gap);
     record(ctx, 0, 0, "venue", &safety::caller_name(ctx), "Resumed".into(), format!("paused for {} s", gap.to_micros() / 1_000_000));
+}
+
+/// Evacuates the venue, for a fire or another emergency: every team walks out by the door nearest to it, nobody
+/// comes in and no incident is staged, and the medic finishes what is open. `on` false calls it off: everyone
+/// walks back in to their home spot and the incidents start again a minute later. A paused run resumes first.
+#[spacetimedb::reducer]
+pub fn evacuate_live_run(ctx: &ReducerContext, on: bool) -> Result<(), String> {
+    require_role(ctx, &["ops"])?;
+    let r = run(ctx).ok_or("no live run")?;
+    if r.phase != LivePhase::Running {
+        return Err("the doors are not open".into());
+    }
+    if on == evacuating(ctx) {
+        return Err(if on { "the venue is already evacuated" } else { "the venue is not evacuated" }.into());
+    }
+    if let Some(p) = ctx.db.live_pause().id().find(0) {
+        resume(ctx, p);
+    }
+    let who = safety::caller_name(ctx);
+    if on {
+        ctx.db.live_evacuation().insert(LiveEvacuation { id: 0, started_at: ctx.timestamp, started_by: ctx.sender() });
+        crowd::head_for_exits(ctx);
+        record(ctx, 0, 0, "venue", &who, "Evacuation: everyone walks out by the nearest door".into(), "nobody comes in and no incident happens until it is called off; the medic finishes what is open".into());
+        return Ok(());
+    }
+    let e = ctx.db.live_evacuation().id().find(0).ok_or("the venue is not evacuated")?;
+    ctx.db.live_evacuation().id().delete(0);
+    crowd::walk_back_in(ctx);
+    if let Some(r) = run(ctx) {
+        ctx.db.live_run().id().update(LiveRun { next_incident_at: ctx.timestamp + seconds(FIRST_INCIDENT_SECS), ..r });
+    }
+    let secs = safety::micros_between(e.started_at, ctx.timestamp) / 1_000_000;
+    record(ctx, 0, 0, "venue", &who, "Evacuation called off: everyone walks back in".into(), format!("evacuated for {secs} s"));
     Ok(())
 }
 
 fn close_doors(ctx: &ReducerContext, r: LiveRun) {
     ctx.db.live_run().id().update(LiveRun { phase: LivePhase::Closing, closing_at: Some(ctx.timestamp), ..r });
-    crowd::head_for_exits(ctx);
+    // An evacuated crowd is already walking out.
+    if !ctx.db.live_evacuation().id().delete(0) {
+        crowd::head_for_exits(ctx);
+    }
     let open = ctx.db.incident_marker().status().filter("open").count()
         + ctx.db.incident_marker().status().filter("responding").count();
     let why = if open == 0 {
@@ -373,12 +431,13 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
     if paused(ctx) {
         return Ok(());
     }
-    if r.phase == LivePhase::Running && ctx.timestamp < r.ends_at {
+    let evacuating = evacuating(ctx);
+    if r.phase == LivePhase::Running && ctx.timestamp < r.ends_at && !evacuating {
         maybe_send_home(ctx, &r);
     }
     match r.phase {
         LivePhase::Running if ctx.timestamp >= r.ends_at => close_doors(ctx, r),
-        LivePhase::Running if ctx.timestamp >= r.next_incident_at => {
+        LivePhase::Running if ctx.timestamp >= r.next_incident_at && !evacuating => {
             let step = r.step;
             let mut rng = step_rng(r.seed, step);
             let gap = rng.gen_range(INCIDENT_GAP_SECS.0..=INCIDENT_GAP_SECS.1);

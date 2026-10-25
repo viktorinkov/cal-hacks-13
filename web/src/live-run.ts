@@ -305,6 +305,8 @@ function phaseWords(r: LiveRun | undefined): string {
   if (!r || r.phase.tag === 'Idle') return 'Not started';
   const paused = conn.db.livePause.id.find(0);
   if (paused) return `Paused since ${time(paused.pausedAt)}`;
+  const evacuation = conn.db.liveEvacuation.id.find(0);
+  if (r.phase.tag === 'Running' && evacuation) return `Evacuating since ${time(evacuation.startedAt)}, everyone walking out`;
   if (r.phase.tag === 'Running') return 'Running';
   if (r.phase.tag === 'Closing') return `Doors closed at ${time(r.closingAt)}, everyone walking out`;
   return `Ended at ${time(r.endedAt)}`;
@@ -321,7 +323,7 @@ function status(r: LiveRun | undefined, list: IncidentMarker[]) {
   const paid = list.filter(m => m.claimStatus.startsWith('paid')).length;
   // The first incident comes a minute in, once the crowd has reached its tables.
   const secs = Math.max(0, Math.round((Number(r.nextIncidentAt.microsSinceUnixEpoch / 1000n) - now) / 1000));
-  const next = r.phase.tag === 'Running' && !conn.db.livePause.id.find(0) ? `, next in ${secs} s` : '';
+  const next = r.phase.tag === 'Running' && !conn.db.livePause.id.find(0) && !conn.db.liveEvacuation.id.find(0) ? `, next in ${secs} s` : '';
   const ids = new Set(list.map(m => m.incidentId));
   const charges = [...conn.db.boardCharges.iter()].filter(c => ids.has(c.incidentId));
   const charged = (...s: string[]) => charges.filter(c => s.includes(c.status)).length;
@@ -349,6 +351,12 @@ function controls(r: LiveRun | undefined) {
       paused
         ? h('button', { onclick: () => act(() => conn.reducers.resumeLiveRun({})) }, 'Resume')
         : h('button', { onclick: () => act(() => conn.reducers.pauseLiveRun({})) }, 'Pause'),
+      ' ',
+      r!.phase.tag === 'Running' && (conn.db.liveEvacuation.id.find(0)
+        ? h('button', { onclick: () => act(() => conn.reducers.evacuateLiveRun({ on: false })) }, 'Call off the evacuation')
+        : h('button', {
+          onclick: () => confirm('Evacuate? Everyone walks out by the nearest door, and nobody comes back in until you call it off.') && act(() => conn.reducers.evacuateLiveRun({ on: true })),
+        }, 'Evacuate')),
       ' ',
       r!.phase.tag === 'Running' && h('button', {
         onclick: () => confirm('End the event? The doors close, everyone walks out, and then every tap link switches to the recap.') && act(() => conn.reducers.endLiveRun({})),
