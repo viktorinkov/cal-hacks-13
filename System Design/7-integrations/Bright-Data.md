@@ -58,9 +58,9 @@ Non-responsibilities:
 | Venue setup steps and result | out | `bandit-workers` (role `worker`) to the module | `report_venue_setup_step` for each step; `finish_venue_setup` with the venue, the model and layout hashes, and the model's size and part counts | SpacetimeDB reducer calls |
 | Plan lookup (next to build) | in | tap page (/t/code), signed in as the attendee | `look_up_plan` with the kind (`health` or `belongings`), the insurer, the plan, the state, and for `belongings` the personal property limit and deductible from the attendee's declarations page; `my_plan_lookups` back | SpacetimeDB reducer call and subscription |
 | Bright Data Web MCP, plan lookup (next to build) | out | `bandit-workers`, job `plan_lookup` | `search_engine` with two queries about the insurer and the plan | MCP `tools/call` over HTTPS, with `BRIGHTDATA_API_TOKEN` |
-| Anthropic Claude API, plan lookup (next to build) | out | `bandit-workers`, through `claude-client` | `plan_find`: the search results in; up to 3 addresses of this plan's own document out, best first, each with why | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Claude-API](Anthropic-Claude-API.md)) |
+| Anthropic Claude API, plan lookup (next to build) | out | `bandit-workers`, through `claude-client` | `plan_find`: the search results in; up to 3 addresses of this plan's own document out, best first, each with why. `plan_check`: a fetched PDF in; the insurer, plan and year it prints, each with its page, out | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Claude-API](Anthropic-Claude-API.md)) |
 | Bright Data Web Unlocker API, plan PDF (next to build) | out | `bandit-workers`, job `plan_lookup` | each picked address in turn; back comes the file, kept only when it is a PDF | HTTPS `POST https://api.brightdata.com/request` with the zone `BRIGHTDATA_ZONE` and format `raw` |
-| Plan lookup result (next to build) | out | `bandit-workers` (role `worker`) to the module | `finish_plan_lookup` with the document's address and title, its SHA-256 and page count, or the reason nothing was found; the PDF is an `owner_only` blob of the attendee with purpose `plan_wording` | SpacetimeDB reducer call; blob store |
+| Plan lookup result (next to build) | out | `bandit-workers` (role `worker`) to the module | `finish_plan_lookup` with the document's address, the printed insurer, plan and year, its SHA-256 and page count, or the reason nothing was found; the PDF is an `owner_only` blob of the attendee with purpose `plan_wording` | SpacetimeDB reducer call; blob store |
 | Loaded rows | out | `bandit-indexer` ([Elastic](Elastic.md)), tap page, organizer portal | `organization`, `booth`, `zone` and `schedule_slot` by subscription to `bandit-indexer`; `venue`, `organization`, `person` and `claimed_people` to the tap page; `venue`, `zone`, `booth` and `organization` to the organizer portal | SpacetimeDB subscription |
 
 ## Design
@@ -270,12 +270,14 @@ Because the public wording of a `belongings` policy has no limit or deductible, 
 1. **Start.** On the tap page, "Name your plan instead" calls `look_up_plan(kind, insurer, plan, state, limit_cents, deductible_cents)`. It needs a claimed band, an insurer and a plan of 2 to 80 characters each, and a two-letter state; for `belongings`, a limit above $0 and a deductible below it. It writes a `plan_lookup` row in status `searching` and a job of kind `plan_lookup`.
 2. **Search.** The worker calls the Bright Data Web MCP's `search_engine` twice. For `health`: "<insurer> <plan> <state> <year> summary of benefits and coverage pdf" and "<insurer> <plan> SBC <year>". For `belongings`: "<insurer> <plan> insurance policy form <state> pdf" and "<insurer> <plan> policy booklet pdf".
 3. **Pick.** The Anthropic Claude API (`plan_find`) reads the results and returns up to 3 addresses of this plan's own document, best first, each with why. It passes over broker pages, comparison sites, other plans and other years. Code keeps only addresses the results named.
-4. **Fetch.** The worker fetches each address in turn through the Bright Data Web Unlocker API. The first answer that starts with `%PDF-` and is at most 15 MB wins.
-5. **Hand over.** The worker stores the PDF in the blob store, registers it as an `owner_only` blob of the attendee with purpose `plan_wording`, and calls `finish_plan_lookup` with the address, the document's title, its SHA-256 and its page count. The lookup turns `reading`, and the module files the PDF for the Evidence Engine like an upload: kind `health_plan` or `attendee_policy`, source `plan_lookup`.
-6. **Read.** The Evidence Engine reads the terms and clauses. Code compares the insurer and plan it read with what the attendee typed; when no word of the typed plan name is on the document, the lookup turns `wrong_plan` and nothing is written.
-7. **Land.** A `health` lookup fills an empty insurer and plan on the attendee's `medical_card`, and its clauses become the attendee's health plan in `bandit-policy-clauses`. A `belongings` lookup writes the attendee's `attendee_policy`: source `plan_lookup`, the insurer, the typed limit as both the per-claim and the yearly limit, the typed deductible, and the PDF's SHA-256. The lookup turns `found`.
+4. **Fetch.** The worker fetches the addresses in turn through the Bright Data Web Unlocker API. An answer counts only when it starts with `%PDF-` and is at most 15 MB.
+5. **Check.** The Anthropic Claude API (`plan_check`) reads the PDF and returns the insurer, the plan and the plan year as printed, each with its page, and whether the document is a Summary of Benefits and Coverage or a policy form. Code compares them with what the attendee typed: a word of the typed insurer and a word of the typed plan must be in what is printed. A PDF of another plan is passed over, and the next address is fetched.
+6. **Land.** The worker stores the first PDF that passes in the blob store, registers it as an `owner_only` blob of the attendee with purpose `plan_wording`, and calls `finish_plan_lookup` with the address, the printed insurer, plan and year, the SHA-256 and the page count. In one transaction the module turns the lookup `found` and writes what it gives:
+   - `health`: an empty insurer and plan on the attendee's `medical_card`, from what is printed;
+   - `belongings`: the attendee's `attendee_policy`, source `plan_lookup`, the printed insurer, the typed limit as both the per-claim and the yearly limit, the typed deductible, and the PDF's SHA-256.
+7. **Read.** The module files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `health_plan` or `attendee_policy`, source `plan_lookup`, the address it came from. Its terms and clauses become the attendee's policy in `bandit-policy-clauses` ([Elastic](Elastic.md)).
 
-When no picked address gives a PDF, the lookup turns `not_found`, and the tap page offers the upload: "We couldn't find your plan's documents online. Upload your policy instead."
+When no address gives a PDF, the lookup turns `not_found`; when PDFs came back but none was this plan's, it turns `wrong_plan`. Either way nothing is written, and the tap page offers the upload: "We couldn't find your plan's documents online. Upload your policy instead."
 
 The question this diagram answers: what happens between an attendee's plan name and the terms the insurance Decision Engine reads?
 
@@ -284,19 +286,19 @@ flowchart LR
   TAP["tap page (/t/code): Name your plan instead"] -->|"insurer + plan, look_up_plan"| MOD["band1t module"]
   MOD -->|"plan_lookup job"| W["bandit-workers"]
   W -->|"2 queries, search_engine"| MCP["Bright Data Web MCP"]
-  W -->|"results, plan_find"| CL["Anthropic Claude API"]
+  W -->|"results, plan_find; PDF, plan_check"| CL["Anthropic Claude API"]
   W -->|"picked addresses"| WU["Bright Data Web Unlocker API"]
   W -->|"plan PDF"| BLOB[("blob store")]
   W -->|"address + SHA-256, finish_plan_lookup"| MOD
-  MOD -->|"document_read, as an upload"| EE["Evidence Engine"]
-  EE -->|"terms + clauses"| MOD
-  MOD -->|"source plan_lookup"| POL["attendee_policy, medical_card"]
+  MOD -->|"printed names, typed limits"| POL["attendee_policy, medical_card"]
+  MOD -->|"queue_document_read, as an upload"| EE["Evidence Engine"]
+  EE -->|"terms + clauses"| CLS["bandit-policy-clauses"]
   MOD -->|"status, my_plan_lookups"| TAP
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
   classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
-  class MCP,CL,WU,EE ext
+  class MCP,CL,WU,EE,CLS ext
   class TAP web
   class MOD,POL stdb
   class W,BLOB rust
@@ -311,8 +313,8 @@ flowchart LR
 | `kind` | text | `health` or `belongings` |
 | `insurer`, `plan`, `state` | text | as the attendee typed them |
 | `limit_cents`, `deductible_cents` | u64 | for `belongings`, from the attendee's declarations page; 0 for `health` |
-| `status` | text | `searching`, `reading`, `found`, `not_found`, `wrong_plan` or `failed` |
-| `source_url`, `source_title` | text | the document the lookup found |
+| `status` | text | `searching`, `found`, `not_found`, `wrong_plan` or `failed` |
+| `source_url`, `printed_insurer`, `printed_plan`, `plan_year` | text | the document the lookup found, and what it prints |
 | `file_hash`, `page_count` | text, u32 | the PDF in the blob store |
 | `job_id` | id | the `plan_lookup` job |
 | `note` | text | why it ended `not_found`, `wrong_plan` or `failed`, in plain words |
@@ -458,7 +460,7 @@ sequenceDiagram
 | The Anthropic Claude API names an address it was not given | A made-up page | Code refuses the answer and asks a second time with the problems listed; when that fails too, the job fails and is retried |
 | A venue setup job uses up its attempts | The run stops | The module marks the setup `failed` with the job's error; the organizer can start it again |
 | A plan lookup finds no PDF of the plan | No public wording for that plan, common for an employer's plan | The lookup ends `not_found`, and the tap page offers the upload instead |
-| The PDF a plan lookup found is another plan's | Wrong terms for the attendee | Code compares the plan the Evidence Engine read with the plan the attendee typed; a mismatch ends the lookup `wrong_plan`, and nothing is written |
+| The PDF a plan lookup found is another plan's | Wrong terms for the attendee | Code compares the insurer and plan the PDF prints (`plan_check`) with what the attendee typed; the next address is tried, and when none matches the lookup ends `wrong_plan` with nothing written |
 | The attendee types a wrong limit or deductible | A wrong payout on their own policy | Every pay that rests on a `plan_lookup` policy goes to the organizer, who sees the plan's wording and the typed numbers side by side |
 
 ## Dependencies
@@ -468,7 +470,7 @@ sequenceDiagram
 - [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone` (with `plan_x_m`, `plan_y_m`), `booth` (with `organization_id`, `plan_x_m`, `plan_y_m`, `placement`, `source_url`, `fetched_at`), `schedule_slot`, `import_run`, `venue_spot`, `band_owner`, `attendee`, `blob_ref`; reducers `import_event`, `grant_role`, `place_booth`, `load_venue_spots`; the `ingest`, `ops` and `worker` roles.
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that serves `/venue`; `bandit-workers`, which runs the job `venue_setup` and, for it, `pipeline/venue_model.py` with Python and Playwright on the Vultr VM.
 - [Elastic](Elastic.md): the raw indices and the Elastic Workflow `bandit-organize` for the organize stage. Without it, no bundle is assembled.
-- [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `venue_find`, `venue_map` and `plan_find` calls, `model_call`.
+- [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `venue_find`, `venue_map`, `plan_find` and `plan_check` calls, `model_call`.
 - [Elastic](Elastic.md): the job `document_read`, which reads a plan lookup's PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`, `attendee_policy`, and the guard that sends a pay on a `plan_lookup` policy to the organizer (next to build).
 - [Social](../6-features/Social.md): the onboarding socials step, which comes before the profile claim (optional; without it a claimed `person` simply has no handles).
 - A Bright Data account with credits and an API token for the Bright Data Web MCP; a Bright Data Web Unlocker API zone; a Bright Data Browser API zone with its customer id, zone name and password.
@@ -518,7 +520,7 @@ sequenceDiagram
 | The Anthropic Claude API may name only addresses that the search results and the pages gave it | code checks every address in its answer, so a setup never opens a page that nothing linked |
 | An attendee may name their plan instead of uploading its PDF; Bright Data finds and fetches the plan's public wording, and the Evidence Engine reads it like an upload | attendees know their insurer and plan but rarely carry the PDF; a health plan's SBC is a standard public form, and one reading path serves both ways in |
 | The venue's policy and the hospital report stay uploads | neither is public: the venue's policy is its own contract, and a hospital report is the attendee's medical record |
-| The Anthropic Claude API picks the plan's document among the search results; code keeps only addresses the results named and only a real PDF | a search for a plan returns broker pages, comparison sites and other years' forms, and telling them apart is judgment; whether a file is a PDF is not |
+| The Anthropic Claude API picks the plan's document among the search results and reads what the PDF prints; code keeps only addresses the results named, only a real PDF, and only a PDF whose printed insurer and plan match what the attendee typed | a search for a plan returns broker pages, comparison sites and other years' forms, and telling them apart is judgment; whether a file is a PDF, and whether two names share a word, is not |
 | A `belongings` lookup takes the limit and deductible the attendee types, and every pay resting on them goes to the organizer | the public wording never holds a policyholder's own limit or deductible; the organizer is the check on the attendee's word |
 | Each step of a venue setup is a `venue_setup_step` row, and the organizer picks the shown venue (`chosen_venue`) | the tab shows the run live by subscription, and a new setup never replaces the venue on screen by itself |
 | The Elastic Workflow `bandit-organize` is the one place facts are merged across sources, and `bandit-ingest` checks its answer twice, once after the workflow and once while assembling | one owner per step, and a wrong key never reaches SpacetimeDB |
