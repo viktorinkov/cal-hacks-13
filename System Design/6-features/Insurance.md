@@ -39,7 +39,7 @@ flowchart TB
   Ref["Refused, every check listed"]:::stdb
   Org["Organizer decides<br/>approve_claim or refuse_claim"]:::web
   Prec["Organizer precedents<br/>one per decision"]:::stdb
-  Prop["Anthropic Claude API proposes a rule<br/>from 3 approved precedents, code checks it"]:::ext
+  Prop["The Evidence Engine's agent proposes a rule<br/>counting 3 approved precedents with ES|QL, code checks it"]:::ext
   Rule["Payment rule vN"]:::stdb
   Pay["Capital One Nessie API<br/>deposit into the wallet"]:::ext
 
@@ -87,7 +87,7 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | Is the claim complicated: a gap or mismatch in the policies? | code, the guard, from the cover and the amounts | sends it to the organizer whatever Claude decided, with every complication listed |
 | Does the decision go through? | code, the guard | lets a pay or a refusal through only inside the terms and the checks; otherwise sends it to the organizer |
 | A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses; every decision is kept as an `organizer_precedent` |
-| Do the organizer's approvals share a pattern? | the Anthropic Claude API, from 3 or more approved simple precedents of one shape (`rule_proposal`); code checks the claims it cites and its ceiling | proposes a rule; nothing is paid under it until the organizer approves it |
+| Do the organizer's approvals share a pattern? | the Evidence Engine's agent `bandit-rule-proposer`, counting 3 or more approved simple precedents of one shape in `bandit-claims` with an Elastic ES\|QL tool (`rule_proposal`); code checks the claims it cites and its ceiling | proposes a rule; nothing is paid under it until the organizer approves it |
 | What the next similar claim does | the organizer, approving Claude's proposal (`approve_rule_proposal`), never the identity that proposed it; it becomes a `settlement_rule` version | the ceiling under which a pay goes through |
 | The wording of the letters | the Anthropic Claude API, `claim_draft` and `recovery_letter`; code checks every figure | words only |
 | Who broke or took something? (next to build) | staff name the band (`name_responsible_band`); code accepts only a band at the spot; the organizer approves or waives the charge | a charge that person pays from their wallet |
@@ -292,7 +292,14 @@ Hyphenate's workshop puts it as "every correction becomes precedent": the agent 
 
 The module then writes a `rule_proposal` row in `proposing`, marks those precedents as cited by it, and queues the `rule_proposal` job. The payload holds the shape, the venue's policy number, the cover's per-claim limit and minimum payout, and the active rule's version and ceiling when there is one. It also holds every approved precedent offered (claim id, claimant, zone, payout, billed and covered amounts, diagnoses, service codes, approver, when) and the shape's refused simple precedents with their reasons, which give context and cannot be cited.
 
-**What Claude returns.** The `rule_proposal` job in `bandit-workers` asks Claude for structured output:
+**What the Evidence Engine returns.** The `rule_proposal` job in `bandit-workers` hands the counting to the Evidence Engine ([Elastic](../7-integrations/Elastic.md#propose-a-payment-rule-from-the-organizers-approvals)). The organizer's approvals already sit in `bandit-claims`, one de-identified copy per claim with its diagnosis and service codes, corroboration, outcome and payout.
+
+1. For each precedent offered, the worker finds the claim's newest copy in `bandit-claims`. When the claim's letters have not yet recorded the organizer's approval on it, the worker records it (`set_outcome`), so the count never misses the approval that opened the proposal.
+2. The worker starts the Elastic Workflow `bandit-propose-rule` with those copies' ids and the precedents as text: claim, claimant, zone, payout, diagnoses, service codes, who approved it and when, and the refused ones with their reasons.
+3. Its one `ai.agent` step calls the Elastic Agent Builder agent `bandit-rule-proposer` with a JSON schema. The agent runs on the project's Elastic Managed LLM, an Anthropic Claude model, so the decision history still names Claude. Its only tool is the Elastic ES|QL tool `bandit.claim_precedents`, which counts those copies by outcome, diagnosis code and kind of item, with each group's claim ids, its highest and lowest payout, and its service codes.
+4. `save_proposal` (`elasticsearch.index`) writes the answer to `bandit-rule-proposals`, and the worker reads it back.
+
+The agent answers with structured output:
 
 | Field | Values |
 |---|---|
@@ -302,7 +309,7 @@ The module then writes a `rule_proposal` row in `proposing`, marks those precede
 | `rule` | the rule in one sentence, for example "Pay falls under medical payments cover up to $180.00 when the evidence is corroborated and every check passes" |
 | `summary` | why, citing the claims |
 
-Code checks the answer in the worker, which asks once more with the problems listed, and again in the module's `submit_rule_proposal`:
+Code checks the answer in the worker, which runs the workflow once more with the problems listed, and again in the module's `submit_rule_proposal`. The worker records the agent's run as the proposal's `model_call`: the agent, the model it ran on, the time it took and its answer.
 
 - at least 3 cited claim ids, all from the approved precedents offered, with no repeats;
 - the ceiling equals the highest payout among the cited claims, so a rule never pays more than the organizer already approved for that shape;
@@ -349,13 +356,14 @@ sequenceDiagram
   participant O as Organizer (organizer portal)
   participant M as band1t module
   participant W as bandit-workers
-  participant C as Anthropic Claude API
+  participant E as The Evidence Engine (Elastic)
   O->>M: approve_claim, three simple falls under medical payments
   M->>M: three organizer_precedent rows, none cited yet
   M->>M: rule_proposal in proposing, the precedents cited
   M->>W: job rule_proposal: the shape, the policy, the precedents
-  W->>C: the precedents and the cover's limit
-  C-->>W: propose, precedent_claim_ids, ceiling_cents, rule, summary
+  W->>E: bandit-propose-rule: the precedents, their copies in bandit-claims, the cover's limit
+  E->>E: bandit-rule-proposer counts the copies with bandit.claim_precedents (ES|QL)
+  E-->>W: propose, precedent_claim_ids, ceiling_cents, rule, summary
   W->>M: submit_rule_proposal, checked again: proposed
   M-->>O: Proposed rules: waits for the organizer
   O->>M: approve_rule_proposal (ceiling seen)
@@ -454,7 +462,7 @@ Responsibilities:
 - Compute coverage and amounts in integer cents.
 - Refuse in code what no one could pay. Write each decision, and each step of Claude's investigation, to `decision`.
 - Keep every organizer decision as an `organizer_precedent`.
-- Have the Anthropic Claude API propose a rule once 3 approved simple precedents of one shape agree (`rule_proposal`), check it in code, and turn the organizer's approval of it into a versioned `settlement_rule`.
+- Have the Evidence Engine's agent count the approved simple precedents of one shape in `bandit-claims` and propose a rule once 3 agree (`rule_proposal`), check it in code, and turn the organizer's approval of it into a versioned `settlement_rule`.
 - Post balanced `ledger_entry` journals for every money movement.
 - Pay the claimant into their wallet through the `claim_payout` job ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)).
 - Draft the first notice of loss, the claim summary, the determination letter and recovery letters through `bandit-workers` jobs.
@@ -487,7 +495,7 @@ Non-responsibilities:
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | in | the organizer (`ops`) at event setup; `worker` | the policy PDF's hash; the terms The Evidence Engine read; the organizer's confirmation of the terms they saw | reducers; `policy_document`, `policy_term`, then the event's policy rows |
 | `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen | reducer; keeps an `organizer_precedent`, and may open a `rule_proposal` |
 | `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer; keeps an `organizer_precedent` |
-| `submit_rule_proposal` | in | `worker` | job id, Claude's proposal JSON, the `model_call` | reducer; checks it again, then `proposed` or `declined` |
+| `submit_rule_proposal` | in | `worker` | job id, the agent's proposal JSON, the `model_call` | reducer; checks it again, then `proposed` or `declined` |
 | `approve_rule_proposal` | in | `ops` or the module owner, never the identity that proposed it | proposal id, ceiling seen | reducer; writes the `settlement_rule` version, decides the waiting claims of the shape again |
 | `reject_rule_proposal` | in | `ops` or the module owner | proposal id, reason | reducer; `rejected` |
 | `close_claim_without_injury` | in | `ops`, `medic`; the live run's floor staff | claim id, reason; the claim must be `AwaitingRecord`, for an incident where the medic treated no injury | reducer; `Refused` with the reason |
@@ -867,7 +875,7 @@ erDiagram
 | `name_responsible_band` | `ops`, `medic` | names the band responsible for an incident, and how they know |
 | `approve_claim` | `ops` or the module owner | stale checks, `approval`, `organizer_precedent`, J2, payout; opens a `rule_proposal` and enqueues its job when the shape's uncited approved simple precedents reach 3 (see Proposed rules) |
 | `refuse_claim` | `ops` or the module owner | `approval`, `organizer_precedent`, J1r, `Refused` |
-| `submit_rule_proposal` | `worker` | checks Claude's proposal again; `proposed`, or `declined` with its summary; releases the precedents it does not cite |
+| `submit_rule_proposal` | `worker` | checks the agent's proposal again; `proposed`, or `declined` with its summary; releases the precedents it does not cite |
 | `approve_rule_proposal` | `ops` or the module owner, never the identity that proposed it | separation of duties and stale checks, `settlement_rule` version n+1, the older version `superseded`, then decides the waiting claims of the shape again |
 | `reject_rule_proposal` | `ops` or the module owner | `rejected` with the reason; its precedents stay cited |
 | `record_claim_payout` | `worker` | the wallet's `payout` entry, J3, `Settled`, enqueues `claim_draft` |
@@ -889,7 +897,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Claude's answer fails `validate_decision` twice, or the job dies | no usable decision | the answer is set aside and code decides alone; nothing is paid on it |
 | A policy term cannot be read, or code rejects it (next to build) | that term is unknown | it keeps its default and is flagged for the organizer before they confirm |
 | The organizer's screen is out of date | the amount or SHA-256 seen is stale, or the ceiling seen on a proposal | `approve_claim` and `approve_rule_proposal` fail closed and write nothing |
-| Claude's proposal cites a claim it was not offered, sets a ceiling other than the highest payout it cites, or one above the policy's limit | a rule would pay more than the organizer approved | the worker asks once more with the problems listed, and `submit_rule_proposal` checks again |
+| The agent's proposal cites a claim it was not offered, sets a ceiling other than the highest payout it cites, or one above the policy's limit | a rule would pay more than the organizer approved | the worker runs `bandit-propose-rule` once more with the problems listed, and `submit_rule_proposal` checks again |
 | The `rule_proposal` job dies | no proposal | the proposal is `failed`, and its precedents are released for a later proposal |
 | Claude's worker calls `approve_rule_proposal` on its own proposal | the proposer would approve its own rule | refused: the caller is the identity that proposed it (separation of duties) |
 | Someone without `ops` tries to decide | the wrong person would move money | `claim N is waiting for Organizer (ops)`; the portal hides the buttons anyway |
@@ -941,7 +949,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Every routed claim goes to the organizer (`ops`), with no approval ladder | one person decides money after the event, and anyone with `ops` can act for them; the stale check and the approved rules guard the money |
 | `approve_claim` fails closed on a stale amount or pack | the guardrail finance reviewers ask about first |
 | Every organizer decision is kept as an `organizer_precedent`, and one approval makes no rule | Hyphenate's workshop: "every correction becomes precedent"; one exception is not yet a pattern |
-| Claude proposes a rule from 3 or more approved simple precedents of one shape, citing the claims it rests on; code checks the cited claims, the ceiling and the policy's limit | every rule traces back to the decisions behind it, and code, not the model, holds the ceiling to what the organizer approved |
+| The Evidence Engine's agent counts the approved simple precedents of one shape in `bandit-claims` and proposes a rule from 3 or more, citing the claims it rests on; code checks the cited claims, the ceiling and the policy's limit | every rule traces back to the decisions behind it, and code, not the model, holds the ceiling to what the organizer approved |
 | A payment rule's shape is (incident kind, cover kind, any zone), and its ceiling is the highest payout among the precedents it cites | the next claim of the same shape at or under that amount needs nobody, and a rule never pays more than the organizer already approved |
 | Only `ops` or the owner approves a proposal, never the identity that proposed it | separation of duties, as in Hyphenate's workshop: the agent proposes, a human controller approves |
 | Approving a rule decides again the waiting claims of its shape that Claude would pay | the claims the rule covers need no second look, so the fourth claim pays itself |

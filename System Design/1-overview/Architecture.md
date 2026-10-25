@@ -219,7 +219,7 @@ Insurance.md: the insurance Decision Engine is the Anthropic Claude API plus the
 5. The Evidence Engine validates the de-identified copy and finds the clauses of both policies that bear on it (`claim_verify`, then `submit_claim_checks`).
 6. The Anthropic Claude API investigates with tools, one evidence source at a time, searches the policies' clauses, and decides: pay, refuse or ask the organizer (`claim_review`, then `submit_claim_review`). Code rejects an answer that cites a fact or clause not on the claim, or a figure code did not compute.
 7. Code's guard lets a pay through only inside an approved rule's ceiling with every check passed, and a refusal only on a failed check. Everything else goes to the organizer.
-8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, Claude proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
+8. The organizer approves or refuses what comes to them, and each decision is kept as a precedent. After three approved claims of one shape, the Evidence Engine's agent `bandit-rule-proposer` counts them in `bandit-claims` with Elastic ES|QL and proposes a payment rule from them; the organizer's approval writes a `settlement_rule`, so the next similar claim is paid with nobody involved.
 
 Each step, what Claude reads and answers, and five worked claims are in [Insurance: How the insurance Decision Engine decides](../6-features/Insurance.md#how-the-insurance-decision-engine-decides).
 
@@ -363,7 +363,7 @@ These are the 18 job kinds in the code (`KIND` constants in `spacetimedb/server/
 | `claim_payout` | a pay that the guard lets through, `approve_claim`, `retry_claim_payout` | deposits the payout into the claimant's account | Capital One Nessie | `record_claim_payout` |
 | `claim_draft` | `record_claim_payout`, once the payout is in; a property claim queues it when it is paid | drafts the claim's letters | Anthropic Claude API | `attach_claim_letters` |
 | `recovery_letter` | `request_recovery_letter` (the organizer) | drafts the letter to the person responsible | Anthropic Claude API | `attach_recovery_letter` |
-| `rule_proposal` | `approve_claim`, once 3 approved claims of one shape agree | proposes the payment rule those claims share | Anthropic Claude API | `submit_rule_proposal` |
+| `rule_proposal` | `approve_claim`, once 3 approved claims of one shape agree | counts those claims' copies in `bandit-claims` with the Elastic Workflow `bandit-propose-rule` and its agent `bandit-rule-proposer`, which proposes the payment rule they share | Elastic | `submit_rule_proposal` |
 | `charge_payment` | `pay_charge`, when the charged attendee pays | pays the charge from their wallet to the venue | Capital One Nessie | `record_charge_payment` |
 | `wallet_open` | `connect_wallet`, at the wallet step of setup | opens the attendee's wallet with $200 | Capital One Nessie | `record_wallet` |
 | `merch_purchase` | `buy_merch` and `buy_merch_as` | records the order as a purchase from the wallet | Capital One Nessie | `settle_merch_order` |
@@ -389,7 +389,7 @@ This is the human in the loop. Code and Claude settle what they can, and everyth
 | Row | Gets here when | The organizer decides with |
 |---|---|---|
 | `claim` in `Routed` | the guard does not let Claude's decision through, or Claude asks the organizer | `approve_claim` or `refuse_claim` |
-| `rule_proposal` in `proposed` | Claude has proposed a payment rule (`submit_rule_proposal`) | `approve_rule_proposal`, which writes a `settlement_rule`, or `reject_rule_proposal` |
+| `rule_proposal` in `proposed` | the Evidence Engine's agent has proposed a payment rule (`submit_rule_proposal`) | `approve_rule_proposal`, which writes a `settlement_rule`, or `reject_rule_proposal` |
 | `charge` in `proposed` | staff named the band responsible for damage (`name_responsible_band`) | `approve_charge` or `waive_charge` |
 
 #### The timers

@@ -21,10 +21,12 @@ use serde_json::{Value, json};
 mod clause_search;
 mod clauses;
 mod documents;
+pub mod proposer;
 pub mod reader;
 pub use clause_search::{CLAUSE_SECTIONS, ClauseHit, sections_for_kind};
 pub use clauses::PolicyClause;
 pub use documents::StoredPage;
+pub use proposer::ClaimCopy;
 pub use reader::Kibana;
 
 /// Index prefix used when `ELASTIC_INDEX_PREFIX` is not set (Maincloud).

@@ -1,0 +1,11 @@
+{
+  "id": "bandit-rule-proposer",
+  "name": "BandIt rule proposer",
+  "description": "Counts the claims the organizer approved one by one for one shape of claim and proposes the payment rule they share, for the organizer to approve. Started by the bandit-propose-rule workflow.",
+  "labels": ["bandit"],
+  "access_control": { "access_mode": "public" },
+  "configuration": {
+    "tools": [{ "tool_ids": ["bandit.claim_precedents"] }],
+    "enable_elastic_capabilities": false
+  }
+}
