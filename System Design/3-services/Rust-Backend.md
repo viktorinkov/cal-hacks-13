@@ -30,7 +30,7 @@ Every process, where it runs, what it may do in the module, and what it talks to
 | `bandit-ingest` | `bandit-ingest` | venue laptop, before the event | `ingest` | the `band1t` module (seed mode); Bright-Data.md: the Bright Data Web MCP, the Anthropic Claude API for `floorplan_check`; Elastic.md: Elastic Serverless (raw indices, the `bandit-organize` workflow; Insurance.md: the 30 past claims into `bandit-claims`) | SpacetimeDB token; Bright-Data.md: Bright Data key, Anthropic key; Elastic.md: Elastic ingest key |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Vultr VM | `indexer` | Elastic Serverless: the one-way copy, including the `bandit-people` sync of each findable attendee's interests | SpacetimeDB token, Elastic key |
 | `bandit-api` | `bandit-api` | Vultr VM | `api` | browsers over HTTPS through Caddy, the blob store in `/var/lib/bandit`; Elastic.md: Elastic Serverless | SpacetimeDB token; Elastic.md: Elastic key; Test-Bands.md: the `tester` token for the dev routes |
-| `bandit-workers` | `bandit-workers` | Vultr VM | `worker` | the blob store in `/var/lib/bandit`; Anthropic-Claude-API.md: the Anthropic Claude API; Capital-One-Nessie.md: the Capital One Nessie API; Elastic.md, Insurance.md: Elastic Serverless (`bandit-claims`) | SpacetimeDB token; Anthropic-Claude-API.md: Anthropic key; Capital-One-Nessie.md: Capital One Nessie API base URL and key; Elastic.md, Insurance.md: Elastic claims key |
+| `bandit-workers` | `bandit-workers` | Vultr VM | `worker` | the blob store in `/var/lib/bandit`; Anthropic-Claude-API.md: the Anthropic Claude API; Capital-One-Nessie.md: the Capital One Nessie API; Elastic.md, Insurance.md: Elastic Serverless (`bandit-claims`); Bright-Data.md: the Bright Data Web MCP, the Bright Data Web Unlocker API and, through `pipeline/venue_model.py`, the Bright Data Browser API | SpacetimeDB token; Anthropic-Claude-API.md: Anthropic key; Capital-One-Nessie.md: Capital One Nessie API base URL and key; Elastic.md, Insurance.md: Elastic claims key; Bright-Data.md: the Bright Data API token, the Web Unlocker zone and the Browser API zone |
 | Vision.md (TBD -- LEO): `bandit-vision` | `bandit-vision` | venue laptop | `vision` | the pit's security camera, `bandit-api` for frame uploads; Anthropic-Claude-API.md: the Anthropic Claude API through `claude-client` | SpacetimeDB token, the workers' Anthropic key |
 
 ## Design
@@ -96,6 +96,7 @@ Each process reaches the module the same way, as a client of SpacetimeDB Mainclo
 - `bandit-api`, `bandit-workers` and `bandit-indexer` run side by side on one Debian VM on Vultr, as the systemd services `bandit@api`, `bandit@workers` and `bandit@indexer`, which restart on failure, so they keep running when the laptop sleeps. Caddy on the VM serves HTTPS for band1t.vip and www.band1t.vip and passes each request to `bandit-api` on 127.0.0.1:8080.
 - The three services share the data folder `/var/lib/bandit` (`BANDIT_DATA_DIR`): the service identities, the blob store and the rendered records. Both processes that write blobs, `bandit-api` and `bandit-workers`, run on that VM and share the folder directly.
 - `scripts/deploy-vm` copies the keys and the service identities to the VM over SSH and runs `deploy/setup.sh`, which builds the pages and the services from the repo and restarts them. Running it again updates the VM.
+- Bright-Data.md: `deploy/setup.sh` also makes a Python virtual environment in `var/venv` with Playwright, which `bandit-workers` uses to run `pipeline/venue_model.py` for a venue setup.
 - The VM runs with test mode on (`BANDIT_TEST_MODE=1` in the service file), so the test tools that features add are live at the event.
 - `bandit-api` serves the organizer portal (/organizer) and the tap page (/t/code) as static files from band1t.vip. The NFC tags hold that host, so judges open the tap page on their own phones, and the apps' uploads and API calls go to the same origin with no cross-origin setup.
 - The venue laptop runs `band1t-bridge`, because it needs the gateway's USB cable, and runs `bandit-ingest` once before the event.
@@ -135,6 +136,8 @@ sequenceDiagram
 `bandit-api` exists for the few things browsers cannot do directly against SpacetimeDB: serving the two web apps, calls that need a secret, large files, and public pages that features add.
 
 **App files.** `bandit-api` serves the built organizer portal and tap page as static files. Every tap page route, including the tap link `/t/<band code>`, returns the tap page, which reads the band's code from the path ([Tap-Page](../5-apps/Tap-Page.md)). After loading, both apps talk to SpacetimeDB directly over WebSocket; `bandit-api` is not on the live path.
+
+Bright-Data.md: `/venue` serves the `web/venue` folder, the default venue model and its preview page.
 
 **Who is calling.** Each browser app, the tap page and the organizer portal, generates a random session token on page load, registers its hash with the `open_api_session` reducer (bound to the caller's SpacetimeDB identity, with an expiry), then sends the token with each HTTPS request. `bandit-api` subscribes to the `api_sessions` view with its `api` role, hashes the presented token and looks up the identity. This needs no JWT verification and no sign-in of its own: the browser's SpacetimeDB identity comes from its SpacetimeDB SpacetimeAuth sign-in, and revoking a session is a row delete.
 
@@ -202,7 +205,7 @@ stateDiagram-v2
 - **Results.** The handler submits its result through the feature's reducer, which checks that the caller still holds the lease. A slow duplicate whose lease was handed on is rejected, so it cannot overwrite a newer result.
 - **External side effects.** A handler that changes something outside, such as a bank purchase or a payout, is safe to repeat. It keeps the ids it created in its data folder until the module stores them, and it reuses a purchase or deposit whose description equals the job's memo, so a retry after a crash never pays twice.
 - **Concurrency.** Each kind has its own concurrency limit, so a burst of one kind cannot starve a payment. Nothing in the safety path ever waits on a job.
-- **Dead jobs.** After 3 attempts (starting value, calibrate at the venue) the job is `dead` and the feature's fallback applies; the organizer portal's job monitor shows it.
+- **Dead jobs.** After 3 attempts (starting value, calibrate at the venue) the job is `dead`, its row keeps the last error, and the feature's fallback applies.
 
 **Handler registry.** Each optional feature owns its rows.
 
@@ -214,6 +217,7 @@ stateDiagram-v2
 | Insurance.md, Capital-One-Nessie.md: `claim_payout` | deposit an approved claim's payout into the claimant's wallet, opening a wallet if they have none, then `record_claim_payout` | [Insurance](../6-features/Insurance.md), [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md) |
 | Insurance.md: `claim_record_extract`, `claim_review`, `claim_draft`, `recovery_letter` | bill PDF to validated service lines through the Anthropic Claude API, priced later by the module; a causation verdict from the pack's facts, with no amounts; the first notice of loss in ACORD 3 layout and the claim summaries; the recovery query letter | [Insurance](../6-features/Insurance.md) |
 | Elastic.md, Insurance.md: `claim_verify` | build the de-identified claim copy in code, index it into `bandit-claims` through `bandit-claims-validate`, rank it against the seeded past claims, and submit the ids and scores with `submit_claim_checks` | [Insurance](../6-features/Insurance.md), [Elastic](../7-integrations/Elastic.md) |
+| Bright-Data.md: `venue_setup` | find an event's venue and its public 3D map from the event's name through the Bright Data Web MCP, the Bright Data Web Unlocker API and the Anthropic Claude API; export the model with `pipeline/venue_model.py`; store the model and its layout as `shared` blobs; report each step with `report_venue_setup_step`, then `finish_venue_setup` | [Bright-Data](../7-integrations/Bright-Data.md) |
 | Vision.md (TBD -- LEO): `photo_features` | not a `bandit-workers` handler; `bandit-vision` claims it with the `vision` role | [Vision](../4-devices/Vision.md) |
 
 ### Health and logs
@@ -240,7 +244,7 @@ Test-Bands.md: in the live event, the crowd (1,000 crowd bands inside the module
 | A service gets a new identity because its credentials file is lost | Its reducer calls are refused | The owner grants the role to the new identity from the command line; the refusal is logged loudly. A new identity for `band1t-bridge` is refused by `register_bridge` until the owner calls `reset_bridge`. |
 | `bandit-workers` crashes mid-job | Jobs stay leased | `job_reaper` returns them after the lease; an external call checks its recorded request id before it runs again. |
 | `bandit-api` is down | New phones cannot load the tap page; no uploads and no recap order | Phones that already loaded the tap page keep the thank-you screen and the recap, and the organizer portal keeps its incident desk, because they talk to SpacetimeDB directly. |
-| A secret is missing for one feature | That feature's handlers fail | Only those job kinds go `dead`; other features run, and the job monitor shows which kind is failing. |
+| A secret is missing for one feature | That feature's handlers fail | Only those job kinds go `dead`; other features run, and the dead `job` rows name the kind and its error. |
 | Bindings out of date after a schema change | A service fails to start or misreads rows | The Rust and TypeScript bindings are regenerated on every publish and every client is rebuilt before the next rehearsal ([SpacetimeDB](../2-data/SpacetimeDB.md)). |
 
 ## Dependencies

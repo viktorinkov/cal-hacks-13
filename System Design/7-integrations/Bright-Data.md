@@ -1,12 +1,12 @@
 # Bright Data
 
-BandIt uses two Bright Data products: the Bright Data Web MCP for every page the event import reads, and the Bright Data Browser API for a 3D model of the venue.
+BandIt uses three Bright Data products: the Bright Data Web MCP for every page the event import reads and for the venue setup's search, the Bright Data Web Unlocker API for the pages a venue setup reads, and the Bright Data Browser API for a 3D model of the venue.
 
 `bandit-ingest` is a Rust command-line tool the team runs before the event. It works for any event: it starts from the list of start URLs in the event's seed and fetches the event's public pages, its organisations' pages and its venue's Google Maps place through the Bright Data Web MCP, saves every fetch as a versioned snapshot kept with the project, has Elastic organize the records into one event bundle (organisations, booths with positions, halls, schedule, unclaimed people profiles), and loads the bundle into SpacetimeDB in one transaction with the `import_event` reducer. Everything downstream sees ordinary SpacetimeDB rows and never knows a scrape happened: the venue map in the organizer portal (/organizer), visits, the profile claim, the Elastic copy.
 
 Bright Data owns every step that touches the web, Elastic every step after the raw records land, and SpacetimeDB everything live or exact. The snapshots mean that no event or rerun depends on a live scrape. Cal Hacks 13.0 is the first event it runs at.
 
-The 3D model of the venue is exported once from the Cal Hacks venue map through the Bright Data Browser API (see The venue model).
+The 3D model of the venue is exported once from the Cal Hacks venue map through the Bright Data Browser API (see The venue model). For any other event, an organizer sets up the venue from the event's name on the organizer portal (see Venue setup from the event's name).
 
 ## Role in the system
 
@@ -17,7 +17,8 @@ Responsibilities:
 - Build unclaimed `person` profiles from event pages only (speakers, judges, sponsor representatives, exhibitor contacts, artists), and let an attendee who has claimed their band claim their profile at onboarding with one tap.
 - Validate the organized bundle in Rust, keep the last good bundle, and load it with `import_event`, keyed by stable source keys so reruns are idempotent. Every scraped row carries `source_url` and `fetched_at`.
 - Export the 3D model of the venue from the Cal Hacks venue map through the Bright Data Browser API (`pipeline/venue_model.py`), kept as `web/venue/venue.glb` with its preview page `web/venue/index.html`.
-- Own the optional tables `hall`, `organization`, `person` and `person_claim`, the reducers `import_event` and `claim_person`, and the view `claimed_people`.
+- Set up any event's venue from its name, started from the organizer portal: search, let the Anthropic Claude API pick the event site, the venue and its public 3D map, and save the venue's model (see Venue setup from the event's name).
+- Own the optional tables `hall`, `organization`, `person`, `person_claim`, `venue_setup`, `venue_setup_step` and `chosen_venue`, the reducers `import_event`, `claim_person`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup` and `choose_venue`, the view `claimed_people`, and the job kind `venue_setup`.
 
 Non-responsibilities:
 
@@ -27,7 +28,7 @@ Non-responsibilities:
 - Does not merge facts across sources. That is the job of the Elastic Workflow `bandit-organize` ([Elastic](Elastic.md)). Page extraction happens once, at fetch time, through the Bright Data Web MCP's `extract` with the null rule; Elastic receives JSON records, never page bodies.
 - Does not define zones. Each zone, with its station id and its exit colour, is written by hand in the event's `zones.json`, which `bandit-ingest` passes into the bundle unchanged; the scrape never changes a zone ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 - Does not scrape merch. [Merch](../6-features/Merch.md) loads its hand-made templates from `assets/merch/templates.json`.
-- Does not run during the event and is never on the safety path. Nothing in the organizer portal starts a scrape: the team runs `bandit-ingest` from the command line before the event. Elastic.md: the organizer portal's "Kibana" tab links to the run's scrape pipeline dashboard in Elastic Kibana as "Scrape pipeline" ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
+- The import does not run during the event, and no Bright Data call is ever on the safety path. The team runs `bandit-ingest` from the command line before the event; the one Bright Data run the organizer portal starts is a venue setup. Elastic.md: the organizer portal's "Kibana" tab links to the run's scrape pipeline dashboard in Elastic Kibana as "Scrape pipeline" ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
 - Does not own `booth`, `schedule_slot` or `venue` ([SpacetimeDB](../2-data/SpacetimeDB.md)); it fills them.
 
 Elastic.md: the organize stage turns the records into the bundle. Without Elastic.md there is no scraped bundle to load, and booths and their organisations are written by hand into the bundle that `import_event` loads.
@@ -46,7 +47,12 @@ Elastic.md: the organize stage turns the records into the bundle. Without Elasti
 | `claim_person` reducer | in | tap page (/t/code), signed in as the attendee | the `person` id the attendee says is them; refused unless the caller already owns a band | SpacetimeDB reducer call |
 | Bright Data Browser API | out | `pipeline/venue_model.py`, run by hand before the event | opens the Cal Hacks venue map in Bright Data's remote browser, captures its three.js scene and exports it in the page as binary glTF; back come the file in 3 MB parts and a screenshot | CDP over a secure WebSocket, through Playwright, with the Browser API zone's customer id, zone name and password (`BRIGHTDATA_CUSTOMER_ID`, `BRIGHTDATA_BROWSER_ZONE`, `BRIGHTDATA_BROWSER_PASSWORD`) |
 | Venue model file | out | `pipeline/venue_model.py` to the project | `web/venue/venue.glb` (metres, y up, no lights), copied only when under 20 MB; the run's own copy, screenshot and summary under `var/venue-3d/brightdata/palace-interior/` | file |
-| Venue preview page | out | `web/venue/index.html` to a browser | the model, drawn with three.js, GLTFLoader and OrbitControls, lit by the page | any static HTTP server for the `web/venue` folder |
+| Venue preview page | out | `web/venue/index.html` to a browser | the model, drawn with three.js, GLTFLoader and OrbitControls, lit by the page | `bandit-api` at `/venue`, or any static HTTP server for the `web/venue` folder |
+| Venue setup tab | in | organizer portal, role `ops` | `start_venue_setup` with the event's name; `choose_venue` with the setup to show | SpacetimeDB reducer call |
+| Bright Data Web MCP, venue setup | out | `bandit-workers`, job `venue_setup` | `search_engine` for the event's name, its venue map and its 3D map | the same MCP server, over HTTPS |
+| Bright Data Web Unlocker API | out | `bandit-workers`, job `venue_setup`; `pipeline/venue_model.py` for a model file link | each page the run reads, as raw HTML; a linked `.glb` or `.gltf` file | HTTPS `POST /request` with the Web Unlocker zone (`BRIGHTDATA_API_TOKEN`, `BRIGHTDATA_ZONE`) |
+| Anthropic Claude API, venue setup | out | `bandit-workers`, through `claude-client` | `venue_find`: the search results; back come the event site, the venue, its address and the pages to read. `venue_map`: the pages read; back come the 3D maps, the floor plans and the labelled sources, or the next pages | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Claude-API](Anthropic-Claude-API.md)) |
+| Venue setup steps and result | out | `bandit-workers` (role `worker`) to the module | `report_venue_setup_step` for each step; `finish_venue_setup` with the venue, the model and layout hashes, and the model's size and part counts | SpacetimeDB reducer calls |
 | Loaded rows | out | `bandit-indexer` ([Elastic](Elastic.md)), tap page, organizer portal | `organization`, `booth`, `hall`, `schedule_slot`, `person` rows by subscription; the tap page reads `person` and `claimed_people` in setup and `booth` on the recap | SpacetimeDB subscription |
 
 ## Design
@@ -199,9 +205,53 @@ flowchart LR
   class PY,GLB plain
 ```
 
-`web/venue/index.html` previews the model: three.js loads it with GLTFLoader, the page adds a sky light and a sun, and OrbitControls turn the view. Any static HTTP server for the folder shows it. `bandit-api` does not serve it, and neither the organizer portal nor the security view loads it.
+`web/venue/index.html` previews the model: three.js loads it with GLTFLoader, the page adds a sky light and a sun, and OrbitControls turn the view. Any static HTTP server for the folder shows it.
+
+`bandit-api` serves the folder at `/venue`, and the organizer portal's Venue setup tab draws this model as the default venue. The security view does not load it.
 
 The import also lists the venue map page as a start URL of kind `venue_map`. The fetch stage saves it as a snapshot like every page, and the parse stage takes no records from it, so each run records the page the model comes from, with its time and hash.
+
+### Venue setup from the event's name
+
+The Cal Hacks 13.0 model ships with the app and is the default venue. For any other event, an organizer (`ops`) types the event's name on the organizer portal's Venue setup tab, and `bandit-workers` finds the venue and its public 3D map and saves the venue's model.
+
+Each step lands in the module as it happens, so the tab shows the run live ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
+
+1. **Start.** "Find the venue" calls `start_venue_setup(event_name)`, which needs `ops`, a name of 1 to 200 characters and no running setup with the same name. It writes a `venue_setup` row in status `running`, its first step "Queued", and a job of kind `venue_setup`.
+2. **Search.** The worker searches through the Bright Data Web MCP's `search_engine` with three queries: the event's name, "<name> venue map" and "<name> venue 3D map floor plan".
+3. **Find the event.** The Anthropic Claude API (`venue_find`) reads the results and returns the event site, the venue's name and address, and the pages to read. Code checks that every address in the answer is one the results named.
+4. **Read the pages.** The worker reads up to 6 of those pages through the Bright Data Web Unlocker API and keeps each page's title, an excerpt and up to 80 links that look like maps, frames, 3D tours or model files. The Anthropic Claude API (`venue_map`) then picks up to 3 3D maps among those links, with the floor plans and the labelled pages it used. When it finds no map, it names the next pages to read, for one more round.
+5. **Export the model.** For each picked map in turn, the worker runs `pipeline/venue_model.py --url <map> --out <dir>` for at most 7 minutes. In the Bright Data Browser API's remote browser, the script catches a three.js scene, a Babylon.js scene or a glTF file the page loads; a link straight to a `.glb` or `.gltf` file is downloaded through the Bright Data Web Unlocker API instead. The first map that gives a model wins.
+6. **Finish.** The worker stores `model.glb` and `layout.json` (the model's named parts with their boxes) in the blob store, registers both as `shared` blobs with the purposes `venue_model` and `venue_layout`, and calls `finish_venue_setup`. The setup turns `ready` with its model, or `no model` when no map gave one.
+7. **Show it.** The tab's "Shown venue" list holds the default and every `ready` setup, and `choose_venue` stores the choice in the one `chosen_venue` row. The tab draws the chosen model with three.js.
+
+The worker calls `report_venue_setup_step` for each step and `finish_venue_setup` at the end, both only while it holds the job's lease. When the job uses up its attempts, the module marks the setup `failed` with the job's error.
+
+The question this diagram answers: what happens between an event's name and its venue model?
+
+```mermaid
+flowchart LR
+  ORG["organizer portal (/organizer): Venue setup"] -->|"start_venue_setup"| MOD["band1t module"]
+  MOD -->|"venue_setup job"| W["bandit-workers"]
+  W -->|"search_engine"| MCP["Bright Data Web MCP"]
+  W -->|"venue_find, venue_map"| CL["Anthropic Claude API"]
+  W -->|"reads pages"| WU["Bright Data Web Unlocker API"]
+  W -->|"venue_model.py --url"| BR["Bright Data Browser API"]
+  W -->|"model.glb, layout.json"| BLOB[("blob store")]
+  W -->|"steps, finish_venue_setup"| MOD
+  MOD -->|"steps, live"| ORG
+  ORG -->|"choose_venue"| MOD
+  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
+  classDef plain fill:#FFFFFF,stroke:#757575,color:#1A1A1A
+  class MCP,CL,WU,BR ext
+  class ORG web
+  class MOD stdb
+  class W rust
+  class BLOB plain
+```
 
 It is not Vision's 3D venue model: Leo's Gaussian splat is trained from a phone walk-through video and drawn in the security view ([Vision](../4-devices/Vision.md)), while this one is the Cal Hacks team's own 3D map, exported as it is.
 
@@ -350,24 +400,27 @@ sequenceDiagram
 | A reference inside the bundle does not resolve | `import_event` would create dangling rows | `import_event` validates everything first and aborts the whole call; the previous load stays as it was |
 | An attendee who owns no band tries to claim a profile | No proof of who they are | `claim_person` refuses with "claim your band first"; the tap page shows the band claim screen |
 | Two attendees try to claim the same profile | Identity conflict | `claim_person` refuses a profile that is already claimed; the first claim wins, and `claimed_people` hides it from everyone else's list |
+| A venue setup finds no 3D map, or no picked map gives a model | No model for that event | The setup ends `no model`, with its venue, floor plans and the pages it used; the shown venue stays as it was |
+| The Anthropic Claude API names an address it was not given | A made-up page | Code refuses the answer and asks a second time; when that fails too, the job fails and is retried |
+| A venue setup job uses up its attempts | The run stops | The module marks the setup `failed` with the job's error; the organizer can start it again |
 
 ## Dependencies
 
 **Depends on**
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone` (with `plan_x_m`, `plan_y_m`), `station`, `booth` (with `booth_number`, `organization_id`, `hall_id`, `plan_x_m`, `plan_y_m`, `placement`, `source_url`, `fetched_at`), `schedule_slot`, `band` (its `owner`), `attendee`, `blob_ref`, `api_session`; reducers `grant_role`, `register_blob`, `place_booth`; the `ingest` and `api` roles.
-- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that hosts the blob endpoint.
+- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that hosts the blob endpoint and serves `/venue`; `bandit-workers`, which runs the job `venue_setup` and, for it, `pipeline/venue_model.py` with Python and Playwright on the Vultr VM.
 - [Elastic](Elastic.md): the raw indices and the Elastic Workflow `bandit-organize` for the organize stage. Without it, no scraped bundle is loaded.
 - [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `floorplan_check` use case, `model_call`. Anthropic-Claude-API.md: without it, booths load without positions and an organizer places each one with `place_booth` from the command line.
 - [Social](../6-features/Social.md): the onboarding socials step, which comes before the profile claim (optional; without it a claimed `person` simply has no handles).
-- A Bright Data account with credits and a Bright Data Web MCP token in Pro mode; Elastic.md: a second zone token with its own spending limit for the gap-fill tool; for the venue model, a Bright Data Browser API zone with its customer id, zone name and password.
+- A Bright Data account with credits and a Bright Data Web MCP token in Pro mode; Elastic.md: a second zone token with its own spending limit for the gap-fill tool; for the venue model, a Bright Data Browser API zone with its customer id, zone name and password; for the venue setup, a Bright Data Web Unlocker API zone.
 
 **Used by**
 
 - [Elastic](Elastic.md): its Elastic Workflow `bandit-organize` runs on the raw records this pipeline writes, and its output is loaded by this pipeline (a hard dependency on this file); its indexer copies the loaded booths with their organisation facts and positions.
 - [Social](../6-features/Social.md): visits are "at booth B", the profile claim sits in its onboarding flow, and the people graph takes its `exhibits` links from `booth.organization_id` and its `works_at` links from claimed profiles.
 - [Tap-Page](../5-apps/Tap-Page.md): the schedule and the "Are you one of these?" step.
-- [Organizer-Portal](../5-apps/Organizer-Portal.md): the booths on the venue map and the organisations in the attendee list's Company column.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the booths on the venue map, the organisations in the attendee list's Company column, and the Venue setup tab.
 - [Merch](../6-features/Merch.md): a sponsor template names organisations, and `load_merch_templates` finds their booths through the imported `organization` rows.
 - [Test-Bands](../3-services/Test-Bands.md): the crowd staffs the biggest sponsors' booths first, bigger sponsors draw more of its attendees, and its booth staff work at the booth's organisation.
 
@@ -378,6 +431,7 @@ sequenceDiagram
 - Remove the Bright-Data.md rows from [Tap-Page](../5-apps/Tap-Page.md) and [Social](../6-features/Social.md) (the "Are you one of these?" step), the Bright-Data.md subscription row and the Bright-Data.md line under the "Kibana" tab from [Organizer-Portal](../5-apps/Organizer-Portal.md), and the Bright-Data.md row from the README components table.
 - Remove the `floorplan_check` row from [Anthropic-Claude-API](Anthropic-Claude-API.md).
 - Delete `pipeline/venue_model.py`, the `web/venue` folder (the model and its preview page) and the `venue_map` start URL, and remove the two Bright-Data.md lines in [Vision](../4-devices/Vision.md).
+- Remove `venue_setup`, `venue_setup_step`, `chosen_venue`, their four reducers and the job kind `venue_setup` from [SpacetimeDB](../2-data/SpacetimeDB.md), the job from `bandit-workers` in [Rust-Backend](../3-services/Rust-Backend.md), the Venue setup tab from [Organizer-Portal](../5-apps/Organizer-Portal.md), and the `venue_find` and `venue_map` rows from [Anthropic-Claude-API](Anthropic-Claude-API.md).
 - [Merch](../6-features/Merch.md) loads only its plain templates, because sponsor names have no organisations to match.
 - [Test-Bands](../3-services/Test-Bands.md)'s crowd still staffs and visits the booths, each with the same pull, and its booth staff get no `works_at` link; remove the Bright-Data.md lines there.
 - [Elastic](Elastic.md) loses the Elastic Workflow `bandit-organize` and keeps the copy of hand-entered booths. Booths, schedule slots and the venue row then come from the seed, written by hand. Behaviour elsewhere is unchanged, because everything reads SpacetimeDB rows either way.
@@ -392,10 +446,14 @@ sequenceDiagram
 | One profile per attendee and one attendee per profile; the first claim wins | A profile is one listed person, so a second claimant is refused rather than merged |
 | No merch scraping | [Merch](../6-features/Merch.md) loads a few hand-made templates from its own file |
 | The import uses only the Bright Data Web MCP, in Pro mode, with the tools named above | One product and one token for every page the import reads; the credits cover the Pro tools |
-| The venue model goes through the Bright Data Browser API, the one use of Bright Data outside the Bright Data Web MCP | The export puts a script in the map's page before it loads and runs three.js's exporter inside it, so it needs a remote browser session it drives itself over CDP |
+| The venue model goes through the Bright Data Browser API | The export puts a script in the map's page before it loads and runs the page's own exporter inside it, so it needs a remote browser session it drives itself over CDP |
 | The venue model is the Cal Hacks team's own 3D venue map, exported as it is | They built the hall in metres from their floor plans, with every table and chair, so one export gives the whole hall |
-| The model is exported once before the event and kept with the project as `web/venue/venue.glb`, at most 20 MB | Nothing at the event waits on Bright Data, and the file stays small enough to keep in the repository |
-| The export is a Python script in `pipeline/`, run by hand, not a Rust service | It runs once before the event and drives Bright Data's remote browser with Playwright over CDP |
+| The Cal Hacks 13.0 model is exported once before the event and kept with the project as `web/venue/venue.glb`, at most 20 MB, as the default venue | Nothing at the event waits on Bright Data, and the file stays small enough to keep in the repository |
+| The export is one Python script in `pipeline/`: run by hand for the default venue, and by `bandit-workers` for a venue setup | It drives Bright Data's remote browser with Playwright over CDP, so both paths share one exporter |
+| A venue setup starts from the event's name alone | An organizer at any event knows its name; the search, the Anthropic Claude API and the export find the rest |
+| The Anthropic Claude API may name only addresses that the search results and the pages gave it | Code checks every address in its answer, so a setup never opens a page that nothing linked |
+| Each step of a venue setup is a `venue_setup_step` row | The tab shows the run live by subscription |
+| The organizer picks the shown venue (`chosen_venue`), and the default stays in the list | A new setup never replaces the venue on screen by itself |
 | The venue map page is a start URL of kind `venue_map`, saved as a snapshot and parsed into no records | Each run records the page the model comes from, with its time and hash, next to every other source |
 | No merge of organisation facts by the Anthropic Claude API (`scrape_extract` is removed) | The Elastic Workflow `bandit-organize` is the one place facts are merged across sources |
 | Without Elastic.md no scraped bundle loads; booths are entered by hand | The Elastic Workflow `bandit-organize` is the only path from records to bundle, so there is no rules path to maintain |

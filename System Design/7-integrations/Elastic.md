@@ -1,12 +1,16 @@
 # Elastic
 
-Elastic Serverless does two jobs for BandIt, and nobody chats with it. Before the event it organizes the scraped data: `bandit-ingest` writes the raw Bright Data records into raw indices, the Elastic Workflow `bandit-organize` joins and links them into one event bundle, and `bandit-ingest` validates that bundle in Rust and loads it into SpacetimeDB with `import_event`. After the event it orders by meaning: `bandit-indexer` keeps a one-way copy of booths and of findable attendees' memories and interests, and `bandit-api` serves one route, `GET /recap/order`, that puts the people and booths on an attendee's recap in order of how close they are to what the attendee was into.
+Elastic Serverless works in the background for BandIt, and nobody chats with it. Each job below is one paragraph, and the team watches every job in Elastic Kibana.
 
-SpacetimeDB decides who and what is on the list (exact, private, live); Elastic decides the order by meaning (and organizes the scraped data, and finds claim precedents). There is no typed search.
+Recap suggestions rank the people and booths on each attendee's recap by interest match. `bandit-indexer` keeps a one-way copy of booths and of findable attendees' memories and interests, and `bandit-api` serves one route, `GET /recap/order`, that orders them by how close they are to what the attendee was into. SpacetimeDB decides who and what is on the list (exact, private, live); Elastic decides only the order, and there is no typed search.
+
+Elastic organizes the scraped event data before import. `bandit-ingest` writes the raw Bright Data records into raw indices, the Elastic Workflow `bandit-organize` joins and links them into one event bundle with the Elastic Agent Builder agent `bandit-organizer`, and `bandit-ingest` validates that bundle in Rust and loads it into SpacetimeDB with `import_event`.
+
+Vision.md: Elastic stores the raw radio data and the event photo records for Elastic Kibana and for matching photos against the band data after the event. Leo's recorders on the venue laptop write them, and nothing live reads them.
 
 Insurance.md: as The Evidence Engine, Elastic's part of a claim, it also ranks a de-identified copy of each insurance claim against 30 seeded past claims, and the similar past claims come back to SpacetimeDB only as checks on the claim, as ids and scores written through a reducer.
 
-The team shows both jobs in Elastic Kibana. Elastic never holds truth and never sits in the safety loop: if it disappears, the last good bundle stays loaded and the recap lists its suggestions by minutes together.
+Elastic never holds truth and never sits in the safety loop. If it disappears, the last good bundle stays loaded and the recap lists its suggestions by minutes together.
 
 ## Role in the system
 
