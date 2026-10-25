@@ -1,4 +1,4 @@
-// The recap the tap link shows once the host ends the event, top to bottom: where you were and when
+// The recap the tap link shows once the host ends the event or the attendee leaves early, top to bottom: where you were and when
 // (live from SpacetimeDB), the people and booths you spent time with (ranked by Elastic through
 // bandit-api) and who else was there, your photos with the people in them and tap-to-share, then merch
 // made from them, paid from the Nessie wallet.
@@ -24,9 +24,10 @@ let loadedFor = 0;
 let loading = false;
 let session = '';
 
-/** When the host ended the event; the night is drawn up to then. */
+/** When the attendee walked out early, else when the host ended the event; the night is drawn up to then. */
 function endedAt(conn: DbConnection): number {
-  return conn.db.eventState.id.find(0)?.endedAt?.toDate().getTime() ?? Date.now();
+  const left = conn.db.myDeparture.iter().next().value?.leftAt;
+  return (left ?? conn.db.eventState.id.find(0)?.endedAt)?.toDate().getTime() ?? Date.now();
 }
 
 /**

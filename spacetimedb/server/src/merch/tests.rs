@@ -336,7 +336,7 @@ fn a_purchase_holds_the_money_and_settles_into_the_wallet() {
     let tee = w.template("tee_spacetimedb.png");
 
     let err = w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err();
-    assert!(err.contains("once the event ends"), "{err}");
+    assert!(err.contains("once you leave or the event ends"), "{err}");
     w.end_event();
     assert!(w.try_as("Maya Chen", |ctx| buy_merch(ctx, tee.id, photo, String::new())).unwrap_err().contains("size"));
     assert!(w.try_as("Jordan Alvarez", |ctx| buy_merch(ctx, tee.id, photo, "M".into())).unwrap_err().contains("photo"));
@@ -501,4 +501,34 @@ fn the_shopping_agent_picks_replace_the_ranking_and_go_onto_the_order() {
 
     w.as_("Maya Chen", |ctx| buy_merch(ctx, mug.id, together, String::new()));
     assert_eq!(w.last_order().line, s[0].line);
+}
+
+#[test]
+fn an_attendee_who_leaves_early_shops_at_once_and_the_end_of_the_event_skips_them() {
+    let w = World::new();
+    w.sign_up("Maya Chen");
+    w.sign_up("Jordan Alvarez");
+    let hers = w.photo("Maya Chen", w.sponsor_row);
+    let his = w.photo("Jordan Alvarez", w.food);
+    let mug = w.template("mug_elastic.png");
+    let maya_node = w.t.db.attendee().identity().find(id("Maya Chen")).unwrap().node_id;
+
+    w.as_("Maya Chen", crate::departure::leave_event);
+    let gone = crate::departure::my_departure(&w.view("Maya Chen")).expect("she left");
+    assert!(gone.left_at.is_some(), "without a crowd band she is out at once");
+    assert!(crate::departure::my_departure(&w.view("Jordan Alvarez")).is_none());
+    let jobs: Vec<Job> = w.t.db.job().kind().filter(KIND_MERCH_PICKS).collect();
+    assert_eq!(jobs.iter().map(|j| j.subject_id).collect::<Vec<_>>(), [maya_node], "her shopping agent runs as she walks out");
+
+    w.as_("Maya Chen", |ctx| buy_merch(ctx, mug.id, hers, String::new()));
+    let err = w.try_as("Jordan Alvarez", |ctx| buy_merch(ctx, mug.id, his, String::new())).unwrap_err();
+    assert!(err.contains("once you leave or the event ends"), "{err}");
+    assert!(w.try_as("Maya Chen", crate::departure::leave_event).unwrap_err().contains("already left"));
+
+    w.end_event();
+    assert_eq!(w.t.db.job().kind().filter(KIND_MERCH_PICKS).count(), 2, "the end of the event runs it only for Jordan");
+    assert!(w.try_as("ops", |ctx| crate::departure::leave_early(ctx, maya_node)).unwrap_err().contains("already ended"));
+
+    w.as_("ops", crate::web::reopen_event);
+    assert!(crate::departure::my_departure(&w.view("Maya Chen")).is_none(), "everyone is back for the next run");
 }

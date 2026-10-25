@@ -206,8 +206,8 @@ pub fn buy_merch_as(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_
 }
 
 fn place_order(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u64, size: String) -> Result<(), String> {
-    if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) {
-        return Err("merch opens in your recap once the event ends".into());
+    if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) && !crate::departure::left(ctx, me) {
+        return Err("merch opens in your recap once you leave or the event ends".into());
     }
     let t = ctx.db.merch_template().id().find(template_id).ok_or("no such template")?;
     let size = match t.kind.as_str() {
@@ -377,8 +377,22 @@ fn friends_in_photo(ctx: &ReducerContext, me: Identity, photo_id: u64) -> Vec<St
         .collect()
 }
 
-/// When the event ends, every attendee who tapped a band and is in a photo gets a shopping agent run.
+/// When the event ends, every attendee who tapped a band and is in a photo gets a shopping agent run, except
+/// the ones who left early and had theirs then.
 pub fn on_event_ended(ctx: &ReducerContext) {
+    shop_for_everyone(ctx, false);
+}
+
+/// An attendee who left early gets their shopping agent run as they walk out, when they tapped a band and are
+/// in a photo.
+pub fn on_attendee_left(ctx: &ReducerContext, who: Identity) {
+    let shopper = ctx.db.attendee().identity().find(who).is_some_and(|a| !a.crowd) && ctx.db.photo_tag().attendee().filter(who).next().is_some();
+    if ctx.db.merch_template().count() > 0 && shopper {
+        shop_for(ctx, who);
+    }
+}
+
+fn shop_for_everyone(ctx: &ReducerContext, with_left: bool) {
     if ctx.db.merch_template().count() == 0 {
         return;
     }
@@ -389,11 +403,16 @@ pub fn on_event_ended(ctx: &ReducerContext) {
         .filter(0u64..)
         .map(|t| t.attendee)
         .filter(|who| ctx.db.attendee().identity().find(*who).is_some_and(|a| !a.crowd))
+        .filter(|who| with_left || !crate::departure::left(ctx, *who))
         .collect();
     for who in shoppers {
-        let payload = picks_payload(ctx, who);
-        jobs::enqueue(ctx, KIND_MERCH_PICKS, payload.to_string(), "attendee", ctx.db.attendee().identity().find(who).map(|a| a.node_id).unwrap_or_default());
+        shop_for(ctx, who);
     }
+}
+
+fn shop_for(ctx: &ReducerContext, who: Identity) {
+    let payload = picks_payload(ctx, who);
+    jobs::enqueue(ctx, KIND_MERCH_PICKS, payload.to_string(), "attendee", ctx.db.attendee().identity().find(who).map(|a| a.node_id).unwrap_or_default());
 }
 
 /// Runs the shopping agent again for everyone, for example after more photos came in.
@@ -403,7 +422,7 @@ pub fn rerun_shopping_agent(ctx: &ReducerContext) -> Result<(), String> {
     if !ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) {
         return Err("the shopping agent runs once the event ends".into());
     }
-    on_event_ended(ctx);
+    shop_for_everyone(ctx, true);
     Ok(())
 }
 

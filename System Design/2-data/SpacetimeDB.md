@@ -156,6 +156,20 @@ Conventions: "auto id" is an auto-increment primary key, used everywhere else as
 | `ended_at` | timestamp, optional | when the event ended; empty while it is live |
 | `ended_by` | identity | who last ended or reopened it |
 
+`departure`: one row per attendee who left before the event ended ([Tap-Page](../5-apps/Tap-Page.md)). Written by `leave_event` (the attendee), `leave_early` (role `ops`) and the live run; `crowd_tick` sets `left_at` when someone of the crowd walks out of the door. Every row is deleted when the event reopens or a new live run starts. Public, and not copied.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `attendee` | identity, primary key | who left |
+| `node_id` | u64 | their graph node, as `board_attendees` has it |
+| `name` | string | their display name |
+| `band_id` | u32 | the band they wore, 0 for none |
+| `door` | string | the exit they leave by, in words, or empty when the venue has no exits on its floor |
+| `x_m`, `y_m` | f32 | where that door is on the floor |
+| `asked_at` | timestamp | when they set off |
+| `left_at` | timestamp, optional | when they walked out: the end of the event for them. Empty while someone of the crowd is still walking to the door |
+| `by` | string | who sent them: their own name, the organizer's, or "live run" |
+
 `zone`: the part of the venue around one station marker, which stands at the zone's exit as its exit marker ([Safety](../6-features/Safety.md)). Written by `import_event` (roles `ingest`, `ops`) and `set_zone_station` (role `ops`, the station marker only).
 
 Public. Copied (name and centre folded into documents).
@@ -757,7 +771,9 @@ An organizer (`ops`) ends the event from the organizer portal ([Organizer-Portal
 | Reducer | Caller | What it does | Writes |
 |---|---|---|---|
 | `end_event` | `ops` | sets `event_state.ended`, `ended_at` to now and `ended_by` to the caller; calling it again only moves the time. Every open tap page, subscribed to `event_state`, turns into the recap; from then on the organizer portal hides "Take the band back", so every band keeps its owner for the recap | `event_state` |
-| `reopen_event` | `ops` | clears `event_state.ended` and `ended_at`, back to the live event, to run the event flow again; open pages leave the recap | `event_state` |
+| `reopen_event` | `ops` | clears `event_state.ended` and `ended_at`, back to the live event, to run the event flow again; open pages leave the recap, and every `departure` row is deleted | `event_state`, `departure` |
+| `leave_event` | any attendee | the caller leaves now, before the event ends: `departure` with `left_at` set, their placed band off the floor, the band offline and its stays closed; then their shopping agent job ([Merch](../6-features/Merch.md)). Refused once the event has ended or when they already left | `departure`, `band`, `band_place`, `zone_visit`, `job` |
+| `leave_early(node_id)` | `ops` | the same for one attendee, from the Live tab's person panel. Someone of the crowd is refused while they are down; otherwise they leave their team and walk to the nearest door, and `crowd_tick` sets `left_at` as they walk out | `departure`, `crowd_walk`, and as `leave_event` |
 
 #### Organizer actions and roles
 
@@ -846,6 +862,7 @@ Views use indexed lookups, so per-caller views are cheap at event scale: a few s
 | `my_owner` | any | the caller's `owner` row, if any, so the organizer portal treats the module owner as holding every role, as the module does |
 | `venue_plan` | anyone; anonymous and public | the venue plan the Live tab's map draws: one row per zone with a station marker, a rectangle around its centre sized from `area_sq_m`, and one row per booth, with the spot its staff stand at and the spot in front of it where attendees stand (station id, booth id, name, two points) |
 | `board_attendees` | staff | one row per attendee: display name, graph node id, the band they wear (0 for none), `findable`, organisation and socials. Test-Bands.md: also `crowd`, set for a crowd attendee, whose band comes from `crowd_member` |
+| `my_departure` | any | the caller's `departure` row, so the tap page opens the recap once they have left |
 | `open_incidents` | staff | every incident not yet resolved |
 | `incident_bands(incident_id)` | staff | the subject and witness rows of one incident |
 | `board_notes` | staff | every `incident_note` |

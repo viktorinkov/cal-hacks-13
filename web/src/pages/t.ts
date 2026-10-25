@@ -1,7 +1,7 @@
 // The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it is only
 // the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
 // PDFs, the Capital One wallet, then a thank-you.
-// When the host ends the event, the same page turns into the recap.
+// When the host ends the event, or once the attendee leaves early, the same page turns into the recap.
 // After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
 // shows how each claim is going until it lands in the wallet, a stolen or broken belonging's claim too.
 // Below it, any charge the organizer approved for something the wearer broke or took, to pay from the
@@ -33,6 +33,7 @@ const QUERIES = [
   'SELECT * FROM my_wallet_entries',
   'SELECT * FROM my_wallet',
   'SELECT * FROM event_state',
+  'SELECT * FROM my_departure',
   'SELECT * FROM venue',
   'SELECT * FROM organization',
   'SELECT * FROM person',
@@ -269,6 +270,7 @@ function thanks() {
     h('h2', {}, "You're all set"),
     h('p', { class: 'big' }, `Thanks, ${conn.db.myAttendee.iter().next().value?.displayName ?? ''}. Enjoy ${v?.name ?? 'the event'}.`),
     h('p', {}, 'Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos.'),
+    !viewing() && h('button', { onclick: () => confirm('Leave the event now? Your band stops and your recap opens.') && act(() => conn.reducers.leaveEvent({})) }, 'Leave the event'),
   ];
 }
 
@@ -469,7 +471,8 @@ function render() {
   // While someone types what happened, the page holds still so the phone keeps its keyboard up.
   if (!conn || document.activeElement instanceof HTMLTextAreaElement) return;
   const mb = conn.db.myBand.iter().next().value;
-  const ended = conn.db.eventState.id.find(0)?.ended ?? false;
+  // The event is over for an attendee once it ends, or once they walked out early.
+  const ended = (conn.db.eventState.id.find(0)?.ended ?? false) || !!conn.db.myDeparture.iter().next().value?.leftAt;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
     testMode && !viewing() && people.length > 0 && testAs(people));

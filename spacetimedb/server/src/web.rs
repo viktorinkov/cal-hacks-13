@@ -36,6 +36,8 @@ pub fn set_ended_by(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     }
     if ended {
         crate::merch::on_event_ended(ctx);
+    } else {
+        crate::departure::clear(ctx);
     }
     Ok(())
 }

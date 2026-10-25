@@ -1,8 +1,9 @@
 //! The crowd on the real Cal Hacks floor in an in-memory module: it walks in through the doors, walks the aisles
-//! from spot to spot at walking speed and never through a table or a wall, stays with someone who is down, and
-//! walks out of the doors when they close.
+//! from spot to spot at walking speed and never through a table or a wall, stays with someone who is down,
+//! walks out of the doors when they close, and lets someone who leaves early walk out alone.
 
 use super::tables::*;
+use crate::departure::departure;
 use crate::live::*;
 use crate::roles::*;
 use crate::tables::*;
@@ -261,4 +262,37 @@ fn a_team_stays_with_someone_who_is_down_and_they_walk_back_to_it() {
     assert_eq!((walk.path[0], walk.path[1]), (bx, by), "they walk on from where they fell");
     assert!(w.t.db.crowd_group().id().find(m.group_id).unwrap().next_move_at > now, "the team moved on");
     w.walk_for(60, &mut walked);
+}
+
+#[test]
+fn someone_who_leaves_early_walks_alone_to_the_nearest_door_and_is_out() {
+    let w = World::new();
+    w.as_("ops", |ctx| start_live_run(ctx, 120, 12, 8, false, 11));
+    let mut walked = HashMap::new();
+    w.walk_for(90, &mut walked);
+    let members: Vec<CrowdMember> = w.t.db.crowd_member().iter().collect();
+    let m = members
+        .iter()
+        .find(|m| members.iter().filter(|o| o.group_id == m.group_id).count() >= 2 && w.t.db.crowd_group().id().find(m.group_id).unwrap().staff_booth == 0)
+        .expect("a hacker in a team of several")
+        .clone();
+    let node = w.t.db.attendee().identity().find(m.identity).unwrap().node_id;
+    w.as_("ops", |ctx| crate::departure::leave_early(ctx, node));
+    let d = w.t.db.departure().attendee().find(m.identity).unwrap();
+    assert!(d.left_at.is_none() && !d.door.is_empty(), "they walk to a door first: {d:?}");
+    let walk = w.t.db.crowd_walk().band_id().find(m.band_id).unwrap();
+    let pts: Vec<(f32, f32)> = walk.path.chunks_exact(2).map(|p| (p[0], p[1])).collect();
+    assert!(pts.windows(2).all(|s| w.floor.clear(s[0], s[1])), "they walk around everything: {pts:?}");
+    assert_eq!(pts.last(), Some(&(d.x_m, d.y_m)), "to the door");
+
+    // Their team moves on without them, and they walk out of the door.
+    let g = w.t.db.crowd_group().id().find(m.group_id).unwrap();
+    w.t.db.crowd_group().id().update(CrowdGroup { next_move_at: w.t.clock.now(), ..g });
+    w.walk_for(120, &mut walked);
+    assert_eq!(w.t.db.crowd_walk().band_id().find(m.band_id).unwrap(), walk, "the team never took them along");
+    assert!(w.t.db.departure().attendee().find(m.identity).unwrap().left_at.is_some(), "out of the door");
+    assert!(!w.t.db.band().id().find(m.band_id).unwrap().online, "their band went quiet");
+    assert!(w.t.db.decision().iter().any(|e| e.what.contains("left early by the")), "the run's history says so");
+    let err = w.t.with_reducer_tx(auth("ops"), |ctx| crate::departure::leave_early(ctx, node)).unwrap_err();
+    assert!(err.contains("already left"), "{err}");
 }
