@@ -16,3 +16,6 @@ if [ "$E2E_TARGET" = local ]; then
 else
   stdb publish --bin-path "$WASM" -s "$STDB_SERVER" -y "$DB"
 fi
+
+# Existing rule approvals retain their wording. Flag legacy scopes and offer fresh approvals.
+stdb call -s "$STDB_SERVER" "$DB" review_rule_scopes

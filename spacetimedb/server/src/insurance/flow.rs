@@ -691,7 +691,7 @@ pub(super) fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
                 requires_corroborated: r.requires_corroborated,
                 ceiling_cents: r.ceiling_cents,
                 version: r.version,
-                active: r.status == "active",
+                active: super::proposals::rule_scope_approved(ctx, &r),
             })
         })
         .collect()
