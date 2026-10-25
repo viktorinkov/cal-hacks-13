@@ -95,7 +95,11 @@ impl Elastic {
             .await?;
         let interests = own["hits"]["hits"][0]["_source"]["interests"]
             .as_str()
+            .filter(|t| !t.trim().is_empty())
             .unwrap_or(fallback);
+        if interests.trim().is_empty() {
+            bail!("nothing to rank by: no interests and no visits");
+        }
         let people_query = rank_query("interests", "node_id", interests, people);
         let booths_query = rank_query("description", "booth_id", interests, booths);
         let (people, booths) = tokio::try_join!(
