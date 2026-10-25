@@ -51,7 +51,7 @@ function showPerson() {
 }
 
 describe('selected person actions', () => {
-  it.each([['Gets injured', 'injury'], ['Steals equipment', 'theft']])('starts %s for the exact selected bot', async (label, action) => {
+  it.each([['Gets injured', 'injury'], ['Steals equipment', 'theft']])('starts %s for the exact selected attendee', async (label, action) => {
     showPerson()
     expect(screen.getByRole('heading', { name: 'Jordan Alvarez' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: label }))
@@ -59,7 +59,7 @@ describe('selected person actions', () => {
     expect(screen.getByRole('status')).toHaveTextContent('started')
   })
 
-  it('does not offer bot actions for a real attendee, even with a crowd-range band ID', async () => {
+  it('does not offer staged actions for a real attendee, even with a crowd-range band ID', async () => {
     useUi.setState({ selection: { kind: 'device', id: 'band-101' } })
     showPerson()
     expect(screen.getByRole('heading', { name: 'Nia Patel' })).toBeInTheDocument()

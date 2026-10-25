@@ -163,7 +163,7 @@ export function incidentTitle(i: Incident): string {
     case 'imu_suspicion':
       return 'Possible fall'
     case 'camera_suspicion':
-      return 'Camera flagged someone'
+      return 'Camera saw a fall'
     case 'staff':
       return 'Reported by staff'
   }

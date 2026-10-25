@@ -225,6 +225,12 @@ type Reducers = {
 }
 
 let conn: DbConnection | null = null
+
+/** The open connection, for the 3D venue view and other table readers. */
+export function liveConnection(): DbConnection | null {
+  return conn
+}
+
 let opening: Promise<void> | null = null
 let noteDisconnect: (message: string) => void = () => {}
 let apiSession: Promise<string> | null = null

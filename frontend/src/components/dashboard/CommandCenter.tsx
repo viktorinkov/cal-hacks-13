@@ -4,7 +4,7 @@ import { IncidentPanel } from '@/components/incidents/IncidentPanel'
 import { PurchaseFeed } from './PurchaseFeed'
 import { PersonPanel } from './PersonPanel'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
-import { VenueMap } from '@/map/VenueMap'
+import { PortalVenue } from '@/portal3d/PortalVenue'
 import { useUi } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
 import { ConnectionBanner } from './ConnectionBanner'
@@ -79,7 +79,7 @@ export function CommandCenter() {
 
   return (
     <div ref={viewportRef} className="relative h-full w-full overflow-clip bg-ground">
-      <VenueMap />
+      <PortalVenue />
 
       {/* scrims so text over the map stays readable; neutral, not decorative */}
       <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-[520px] bg-[linear-gradient(90deg,rgba(10,10,11,0.88),rgba(10,10,11,0.5)_60%,rgba(10,10,11,0))]" />
