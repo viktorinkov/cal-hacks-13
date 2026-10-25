@@ -1463,17 +1463,30 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
   },
   {
     job: 'After the event: ordering the recap\'s suggestions',
-    what: 'Each recap suggests the people an attendee hung out with and the booths where they spent time. SpacetimeDB decides who and what is on the list; Elastic only orders it by meaning, matching the attendee\'s interests against each person\'s interests and each booth\'s description.',
+    what: 'SpacetimeDB supplies the people and booths eligible for each recap. Elastic combines keyword and meaning searches, then reranks the results against the attendee\'s interests.',
     views: [['Recap suggestions: each attendee\'s latest ranking next to the minutes order', '/app/dashboards#/view/bandit-recap']],
   },
   {
+    job: 'Documents and other model tasks',
+    what: 'The document reader extracts quoted facts from policies and hospital reports. Separate workflows handle medical cards, images, letters and recommendations. Rust checks each result before saving it.',
+    views: [
+      ['Document reading runs', '/app/workflows/bandit-read-document'],
+      ['Document reader and its page tools', '/app/agent_builder/agents/bandit-document-reader'],
+      ['Text extraction, drafting and recommendation runs', '/app/workflows/bandit-run-task'],
+    ],
+  },
+  {
     job: 'Claims: checking the evidence',
-    what: 'Each claim\'s evidence goes to Elastic as a copy with no names: codes, amounts, zone, time and a sentence written by code. The ingest pipeline bandit-claims-validate checks it on the way in, and a search by meaning finds the clauses of the venue\'s policy that bear on that kind of claim. Both come back to the claim on the Settlements tab, as checks and as its policy clauses; they never change an amount.',
-    views: [['Claims evidence: validation, outcomes and payouts', '/app/dashboards#/view/bandit-claims']],
+    what: 'Elastic checks claim copies without names and searches the venue and attendee policies for relevant clauses. The investigator requests evidence through Rust workers, which restrict every request to the claim. Code enforces policy amounts and approval rules before settlement.',
+    views: [
+      ['Claims evidence: validation, outcomes and approved amounts', '/app/dashboards#/view/bandit-claims'],
+      ['Claim investigation runs', '/app/workflows/bandit-investigate-claim'],
+      ['Claim investigator', '/app/agent_builder/agents/bandit-claim-investigator'],
+    ],
   },
   {
     job: 'Claims: proposing payment rules from the organizer\'s approvals',
-    what: 'Once the organizer has approved three claims of one kind one by one, the agent bandit-rule-proposer counts their copies in bandit-claims with one ES|QL query, by diagnosis and payout, and proposes a rule whose ceiling is the highest payout among them. Code checks the claims it cites and the ceiling, and the rule pays nothing until the organizer approves it on the Proposed rules tab.',
+    what: 'After three claims of one kind receive organizer approval, the rule proposer suggests their highest payout as the ceiling. Code checks the cited claims, enforced scope and ceiling. Future claims can use the rule only after the organizer approves that scope.',
     views: [
       ['bandit-propose-rule runs, step by step', '/app/workflows/bandit-propose-rule'],
       ['bandit-rule-proposer, the agent and its counts', '/app/agent_builder/agents/bandit-rule-proposer'],
