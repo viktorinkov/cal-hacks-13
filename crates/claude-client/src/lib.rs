@@ -1,8 +1,9 @@
 //! Minimal client for the Claude Messages API. This is the only code in BandIt that calls Claude.
 //!
-//! Non-streaming `POST /v1/messages` with API version `2026-10-21`: one user turn made of
-//! text, PDF and image blocks, optional effort and JSON-schema structured output, retries
-//! with backoff, and a stable request hash for audit records. No tools, no sampling parameters.
+//! Non-streaming `POST /v1/messages` with API version `2026-10-21`: a user turn made of
+//! text, PDF and image blocks, optional effort and JSON-schema structured output, strict
+//! client tools with an append-only tool loop ([`MessageRequest::next_turn`]), retries with
+//! backoff, and a stable request hash for audit records. No sampling parameters.
 
 use std::collections::hash_map::RandomState;
 use std::fmt;
@@ -74,7 +75,12 @@ impl ImageType {
 pub struct MessageRequest {
     model: Option<String>,
     system: Option<String>,
+    /// Earlier turns of a tool loop, sent before `content`.
+    history: Vec<Value>,
+    /// The current user turn.
     content: Vec<Value>,
+    tools: Vec<Value>,
+    tool_choice: Option<Value>,
     max_tokens: u32,
     effort: Option<Effort>,
     schema: Option<Value>,
@@ -92,7 +98,9 @@ impl fmt::Debug for MessageRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MessageRequest")
             .field("model", &self.model)
+            .field("turns", &(self.history.len() + 1))
             .field("blocks", &self.content.len())
+            .field("tools", &self.tools.len())
             .field("max_tokens", &self.max_tokens)
             .field("effort", &self.effort)
             .field("json_schema", &self.schema.is_some())
@@ -107,7 +115,10 @@ impl MessageRequest {
         Self {
             model: None,
             system: None,
+            history: Vec::new(),
             content: Vec::new(),
+            tools: Vec::new(),
+            tool_choice: None,
             max_tokens: DEFAULT_MAX_TOKENS,
             effort: None,
             schema: None,
@@ -169,6 +180,45 @@ impl MessageRequest {
         self
     }
 
+    /// Add a strict client tool: Claude's `tool_use` input always validates against `input_schema`
+    /// (every object needs `additionalProperties: false` and `required`).
+    pub fn tool(mut self, name: &str, description: &str, input_schema: Value) -> Self {
+        self.tools.push(json!({
+            "name": name,
+            "description": description,
+            "input_schema": input_schema,
+            "strict": true,
+        }));
+        self
+    }
+
+    /// `tool_choice: {type: "none"}`: Claude must answer without calling a tool.
+    /// (Claude Opus 5.5 rejects the forced `any` and `tool` choices.)
+    pub fn tool_choice_none(mut self) -> Self {
+        self.tool_choice = Some(json!({"type": "none"}));
+        self
+    }
+
+    /// The next request of a tool loop: the current user turn and Claude's answer
+    /// (`content`, every block unchanged, thinking included) move into the history,
+    /// and a new empty user turn starts for the tool results. History is only ever appended to.
+    pub fn next_turn(mut self, assistant_content: &[Value]) -> Self {
+        let user = std::mem::take(&mut self.content);
+        self.history.push(json!({"role": "user", "content": user}));
+        self.history.push(json!({"role": "assistant", "content": assistant_content}));
+        self
+    }
+
+    /// Append a `tool_result` block to the user turn.
+    pub fn tool_result(mut self, tool_use_id: &str, text: impl Into<String>, is_error: bool) -> Self {
+        let mut block = json!({"type": "tool_result", "tool_use_id": tool_use_id, "content": text.into()});
+        if is_error {
+            block["is_error"] = json!(true);
+        }
+        self.content.push(block);
+        self
+    }
+
     /// Whether a JSON schema was requested.
     pub fn wants_json(&self) -> bool {
         self.schema.is_some()
@@ -183,10 +233,15 @@ impl MessageRequest {
         if let Some(system) = &self.system {
             body.insert("system".into(), json!(system));
         }
-        body.insert(
-            "messages".into(),
-            json!([{"role": "user", "content": self.content}]),
-        );
+        let mut messages = self.history.clone();
+        messages.push(json!({"role": "user", "content": self.content}));
+        body.insert("messages".into(), Value::Array(messages));
+        if !self.tools.is_empty() {
+            body.insert("tools".into(), json!(self.tools));
+        }
+        if let Some(choice) = &self.tool_choice {
+            body.insert("tool_choice".into(), choice.clone());
+        }
         let mut output = Map::new();
         if let Some(effort) = self.effort {
             output.insert("effort".into(), json!(effort.as_str()));
@@ -277,13 +332,25 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// A `tool_use` block from Claude's answer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolUse {
+    pub id: String,
+    pub name: String,
+    pub input: Value,
+}
+
 /// Result of a successful call.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallOutcome {
     /// Concatenated text of all `text` blocks.
     pub text: String,
-    /// Parsed JSON when a schema was requested.
+    /// Parsed JSON when a schema was requested and Claude answered rather than called a tool.
     pub json: Option<Value>,
+    /// Every content block as returned, for [`MessageRequest::next_turn`].
+    pub content: Vec<Value>,
+    /// The tools Claude called, in order.
+    pub tool_uses: Vec<ToolUse>,
     pub stop_reason: Option<String>,
     /// Model that produced the message (differs from the requested one after a fallback).
     pub model: String,
@@ -562,9 +629,21 @@ fn parse_response(
         .filter(|block| block.get("type").and_then(Value::as_str) == Some("text"))
         .filter_map(|block| block.get("text").and_then(Value::as_str))
         .collect();
+    let tool_uses = message
+        .content
+        .iter()
+        .filter(|block| block.get("type").and_then(Value::as_str) == Some("tool_use"))
+        .map(|block| ToolUse {
+            id: block.get("id").and_then(Value::as_str).unwrap_or_default().to_string(),
+            name: block.get("name").and_then(Value::as_str).unwrap_or_default().to_string(),
+            input: block.get("input").cloned().unwrap_or(Value::Null),
+        })
+        .collect();
     let mut outcome = CallOutcome {
         text,
         json: None,
+        content: message.content,
+        tool_uses,
         stop_reason: message.stop_reason,
         model: message.model,
         input_tokens: message.usage.input_tokens,
@@ -582,7 +661,8 @@ fn parse_response(
             outcome: Box::new(outcome),
         });
     }
-    if wants_json {
+    // A turn that calls tools is not the answer yet.
+    if wants_json && outcome.tool_uses.is_empty() {
         match serde_json::from_str(outcome.text.trim()) {
             Ok(json) => outcome.json = Some(json),
             Err(e) => {
