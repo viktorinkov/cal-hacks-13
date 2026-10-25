@@ -158,6 +158,7 @@ pub mod force_state_reducer;
 pub mod gateway_table;
 pub mod gateway_type;
 pub mod gateway_up_reducer;
+pub mod give_band_reducer;
 pub mod grant_role_reducer;
 pub mod graph_link_type;
 pub mod handle_out_type;
@@ -571,6 +572,7 @@ pub use force_state_reducer::force_state;
 pub use gateway_table::*;
 pub use gateway_type::Gateway;
 pub use gateway_up_reducer::gateway_up;
+pub use give_band_reducer::give_band;
 pub use grant_role_reducer::grant_role;
 pub use graph_link_type::GraphLink;
 pub use handle_out_type::HandleOut;
@@ -976,6 +978,11 @@ pub enum Reducer {
         mac: String,
         fw: String,
     },
+    GiveBand {
+        band_id: u32,
+        node_id: u64,
+        name: String,
+    },
     GrantRole {
         identity: __sdk::Identity,
         role: String,
@@ -1347,6 +1354,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
+            Reducer::GiveBand { .. } => "give_band",
             Reducer::GrantRole { .. } => "grant_role",
             Reducer::Haptic { .. } => "haptic",
             Reducer::ImportEvent { .. } => "import_event",
@@ -1665,6 +1673,15 @@ impl __sdk::Reducer for Reducer {
                     fw: fw.clone(),
                 })
             }
+            Reducer::GiveBand {
+                band_id,
+                node_id,
+                name,
+            } => __sats::bsatn::to_vec(&give_band_reducer::GiveBandArgs {
+                band_id: band_id.clone(),
+                node_id: node_id.clone(),
+                name: name.clone(),
+            }),
             Reducer::GrantRole {
                 identity,
                 role,
