@@ -20,6 +20,7 @@ pub struct SettlementRuleRow {
     pub version: u32,
     pub status: String,
     pub created_at: __sdk::Timestamp,
+    pub proposal_id: u64,
 }
 
 impl __sdk::InModule for SettlementRuleRow {
@@ -43,6 +44,7 @@ pub struct SettlementRuleRowCols {
     pub version: __sdk::__query_builder::Col<SettlementRuleRow, u32>,
     pub status: __sdk::__query_builder::Col<SettlementRuleRow, String>,
     pub created_at: __sdk::__query_builder::Col<SettlementRuleRow, __sdk::Timestamp>,
+    pub proposal_id: __sdk::__query_builder::Col<SettlementRuleRow, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for SettlementRuleRow {
@@ -65,6 +67,7 @@ impl __sdk::__query_builder::HasCols for SettlementRuleRow {
             version: __sdk::__query_builder::Col::new(table_name, "version"),
             status: __sdk::__query_builder::Col::new(table_name, "status"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            proposal_id: __sdk::__query_builder::Col::new(table_name, "proposal_id"),
         }
     }
 }

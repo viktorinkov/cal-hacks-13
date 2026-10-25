@@ -218,8 +218,8 @@ pub fn down_bands(ctx: &ReducerContext) -> Vec<Down> {
 
 /// Starts the event on the 3D floor: `crowd` people walk in through the doors, incidents start after half a
 /// minute, and the doors close after `minutes`. `pace` speeds up how often people move (1 is real time).
-/// `fresh` clears the decision history and retires the learned settlement rules first, so the organizer
-/// teaches the Decision Engine again. `seed` seeds who falls, where and when; 0 picks a new one.
+/// `fresh` clears the decision history and the organizer's precedents, and retires the payment rules and
+/// open rule proposals first, so Claude proposes the rules again. `seed` seeds who falls, where and when; 0 picks a new one.
 #[spacetimedb::reducer]
 pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace: u8, fresh: bool, seed: u64) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
@@ -236,6 +236,7 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
         for r in ctx.db.settlement_rule().iter().filter(|r| r.status == "active").collect::<Vec<_>>() {
             ctx.db.settlement_rule().id().update(crate::insurance::SettlementRuleRow { status: "retired".into(), ..r });
         }
+        crate::insurance::proposals::start_fresh(ctx);
     }
     // Incidents a previous run left open are closed, so this run starts with a clear floor.
     for m in ctx.db.incident_marker().iter().filter(|m| m.status != "resolved").collect::<Vec<_>>() {

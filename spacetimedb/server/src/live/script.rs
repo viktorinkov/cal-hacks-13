@@ -1,13 +1,14 @@
 //! What happens during the live run, in order: what kind of incident, in which zone, what the medic finds and
 //! which clinic record follows. Who it happens to and where they stand comes from the run's seeded generator.
-//! The first beats show every path a claim can take (the organizer teaches a rule, the rule settles the next
-//! one on its own, a camera confirms equipment a guest knocked over and the guest is charged, an SOS with no
-//! claim, a bill above the learned ceiling, an attendee's phone taken, an attendee's laptop knocked off a
-//! table, a bag gone with nobody named, an injury from home); after that the run keeps going with everyday
-//! falls. Who broke or took it is drawn from the bands at the spot, and the floor staff name them. Injuries move between zones so no
-//! zone has three within five minutes, which would hand the whole occurrence to the organizer. The medic's notes
-//! match the clinic records the claims get (a first-aid sprain is always a slip on a spilled drink), so any
-//! mismatch the Evidence Engine or Claude flags is a real one.
+//! The first beats show every path a claim can take: three alike falls the organizer approves one by one, after
+//! which Claude proposes a payment rule from them; a camera confirms equipment a guest knocked over and the guest
+//! is charged; an SOS with no claim; an attendee's phone taken; a fourth alike fall the approved rule pays on its
+//! own; a bill above the rule's ceiling; an attendee's laptop knocked off a table; an injury from home; a bag gone
+//! with nobody named. After that the run keeps going with everyday falls. Who broke or took it is drawn from the
+//! bands at the spot, and the floor staff name them. Injuries move between zones so no zone has three within five
+//! minutes, which would hand the whole occurrence to the organizer. The medic's notes match the clinic records the
+//! claims get (a first-aid sprain is always a slip on a spilled drink), so any mismatch the Evidence Engine or
+//! Claude flags is a real one.
 
 use super::*;
 use crate::insurance::people::wearer;
@@ -40,6 +41,7 @@ const fn loss(kind: IncidentKind, zone: &'static str, note: &'static str, resolu
 const BEATS: &[Beat] = &[
     fall("floor", "first-aid-wrist", "on scene at the tables: slipped on a spilled drink, right wrist pain and mild swelling; ice and a wrap at first aid"),
     fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
+    fall("food", "first-aid-wrist", "in the food line: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
     loss(
         IncidentKind::Property,
         "stage",
@@ -68,6 +70,7 @@ const BEATS: &[Beat] = &[
         "the sponsor-tables camera shows this guest pocketing the phone and walking to the food line",
         true,
     ),
+    fall("floor", "first-aid-wrist", "at the tables: slipped on a spilled drink between the rows, right wrist sprain; ice and a wrap at first aid"),
     fall("stage", "urgent-care-wrist", "in the crowd in front of the stage: fell when the crowd surged, left wrist swelling; referring to urgent care"),
     loss(
         IncidentKind::Breakage,
@@ -79,7 +82,6 @@ const BEATS: &[Beat] = &[
         true,
     ),
     fall("floor", "urgent-care-ankle-home", "at the tables: right ankle pain and swelling after a stumble; splinting it, referring to urgent care"),
-    fall("food", "first-aid-wrist", "in the food line: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
     fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink by the stools, right wrist sprain; ice and a wrap at first aid"),
     loss(
         IncidentKind::Theft,

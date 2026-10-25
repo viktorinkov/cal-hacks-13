@@ -155,12 +155,8 @@ pub fn set_aside(ctx: &ReducerContext, c: &Claim, problems: &[String]) {
     record(ctx, c.incident_id, c.id, "Decision Engine", "code", "Set Claude's decision aside".into(), problems.join("; "));
 }
 
-/// The organizer's approval, and the rule it taught.
-pub fn approved(ctx: &ReducerContext, c: &Claim, approver: &str, rule: Option<(u32, u64)>) {
-    let why = match rule {
-        Some((v, ceiling)) => format!("learned rule v{v}: the next similar claim up to {} settles on its own", format_cents(ceiling)),
-        None => "approved without teaching a rule".into(),
-    };
+/// The organizer's approval, and what the precedent it keeps counts toward.
+pub fn approved(ctx: &ReducerContext, c: &Claim, approver: &str, why: String) {
     record(ctx, c.incident_id, c.id, "organizer", approver, format!("Approved {}'s claim", person(c)), why);
 }
 

@@ -61,6 +61,7 @@ pub const TABLES: &[&str] = &[
     "decision",
     "approval",
     "settlement_rule",
+    "rule_proposal",
     "ledger_entry",
     "insurance_policy",
     "coverage_rule",

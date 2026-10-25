@@ -210,8 +210,12 @@ impl World {
     }
 
     fn lease(&self, kind: &str, claim_id: u64) -> Job {
-        let job = self.open_job(kind, claim_id);
-        self.as_("worker", |ctx| claim_job(ctx, job.id));
+        self.lease_as("worker", kind, claim_id)
+    }
+
+    fn lease_as(&self, who: &str, kind: &str, subject_id: u64) -> Job {
+        let job = self.open_job(kind, subject_id);
+        self.as_(who, |ctx| claim_job(ctx, job.id));
         job
     }
 
@@ -322,8 +326,7 @@ fn call(kind: &str) -> ModelCallIn {
 }
 
 /// Jordan's urgent-care visit: covered $895.00 after the fee schedule, with no
-/// rule yet, so it goes to the organizer. The approval teaches the rule that
-/// settles the next small fall on its own.
+/// rule yet, so it goes to the organizer. The approval is kept as a precedent.
 fn approve_larger_fall(w: &World) -> Claim {
     let incident = w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]);
     let claim = w.injury_claim(incident);
@@ -341,10 +344,10 @@ fn approve_larger_fall(w: &World) -> Claim {
     assert!(c.status_note.starts_with("Claude would pay $895.00"), "{}", c.status_note);
     assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
-    let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
+    let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64)));
     assert!(stale.unwrap_err().starts_with("stale"));
-    assert!(w.try_as("medic", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true)).is_err());
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    assert!(w.try_as("medic", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone())).is_err());
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
     w.pay(claim.id);
     w.claim(claim.id)
 }
@@ -355,8 +358,11 @@ fn larger_fall_goes_to_the_organizer() {
     let c = approve_larger_fall(&w);
     assert_eq!(c.status, ClaimStatus::Settled);
     assert_eq!(c.decided_by, "approver");
-    let rule = w.t.db.settlement_rule().iter().find(|r| r.status == "active").unwrap();
-    assert_eq!((rule.incident_kind.as_str(), rule.ceiling_cents, rule.version, rule.approver_name.as_str()), ("fall", 89_500, 1, "Ops desk"));
+    assert_eq!(w.t.db.settlement_rule().iter().count(), 0, "one approval makes no rule");
+    let kept: Vec<OrganizerPrecedent> = w.t.db.organizer_precedent().iter().collect();
+    assert_eq!(kept.len(), 1);
+    assert_eq!((kept[0].claim_id, kept[0].decision.as_str(), kept[0].payout_cents, kept[0].proposal_id), (c.id, "approve", 89_500, 0));
+    assert!(w.t.db.decision().claim_id().filter(c.id).any(|d| d.why == "precedent 1 of 3 for a rule on falls under medical payments cover"));
     assert_eq!(
         w.ledger(c.id),
         [
@@ -373,36 +379,140 @@ fn larger_fall_goes_to_the_organizer() {
     assert_eq!(w.claim(c.id).status, ClaimStatus::Reconciled);
 }
 
-#[test]
-fn small_fall_settles_automatically_under_the_learned_rule() {
-    let w = World::new();
-    approve_larger_fall(&w);
-    w.advance(3600);
-    let incident = w.fall(3, 101, &[(1, 101), (5, 101)]);
-    let claim = w.injury_claim(incident);
-    assert_eq!(claim.claimant_name, "Maya Chen");
-    w.file_record(claim.id, FIRST_AID, 1);
+/// A first-aid sprain on `band` with its own invoice: Claude decides to pay $180.00.
+fn first_aid_fall(w: &World, band: u8, name: &str, invoice: u32) -> Claim {
+    // Minutes apart, so the falls stay on the record's date and are no single occurrence.
+    w.advance(360);
+    let claim = w.injury_claim(w.fall(band, 101, &[(1, 101), (5, 101)]));
+    let record = FIRST_AID.replace("Maya Chen", name).replace("FA-1024-0007", &format!("FA-1024-{invoice:04}"));
+    w.file_record(claim.id, &record, 1);
     assert_eq!(w.claim(claim.id).payout_cents, 18_000);
     w.verify(claim.id);
     w.claude_pays(claim.id);
-    w.pay(claim.id);
-    let c = w.claim(claim.id);
+    w.claim(claim.id)
+}
+
+/// Three alike first-aid falls, each approved by the organizer, and the rule proposal they open.
+fn three_approved_falls(w: &World) -> (Vec<u64>, RuleProposal) {
+    let mut ids = Vec::new();
+    for (n, (band, name)) in [(3u8, "Maya Chen"), (8, "Sam Patel"), (6, "Lee Park")].into_iter().enumerate() {
+        let c = first_aid_fall(w, band, name, 11 + n as u32);
+        assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
+        assert!(w.t.db.rule_proposal().iter().next().is_none(), "no proposal before the third approval");
+        w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
+        w.pay(c.id);
+        ids.push(c.id);
+    }
+    let p = w.t.db.rule_proposal().iter().next().expect("a proposal after three alike approvals");
+    assert_eq!((p.status.as_str(), p.claim_ids.clone(), p.limit_cents), ("proposing", ids.clone(), 500_000));
+    assert!(w.t.db.organizer_precedent().iter().all(|x| x.proposal_id == p.id));
+    (ids, p)
+}
+
+/// Claude's answer to the proposal job.
+fn claude_proposes(w: &World, who: &str, proposal: &RuleProposal, ids: &[u64], ceiling: u64) {
+    let job = w.lease_as(who, KIND_RULE_PROPOSAL, proposal.id);
+    let payload: RuleProposalPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!(payload.approved.iter().map(|a| (a.claim_id, a.payout_cents)).collect::<Vec<_>>(), ids.iter().map(|i| (*i, 18_000)).collect::<Vec<_>>());
+    assert!(payload.approved[0].diagnoses[0].starts_with("S63.501A"), "{:?}", payload.approved[0].diagnoses);
+    let answer = serde_json::json!({
+        "propose": true, "precedent_claim_ids": ids, "ceiling_cents": ceiling,
+        "rule": "Pay first-aid wrist sprains from falls under medical payments cover up to $180.00.",
+        "summary": "Three slips on spilled drinks, each a first-aid wrist sprain the organizer paid in full.",
+    });
+    w.as_(who, |ctx| super::proposals::submit_rule_proposal(ctx, job.id, answer.to_string(), call("rule_proposal")));
+}
+
+#[test]
+fn three_alike_approvals_make_a_rule_that_pays_the_fourth_on_its_own() {
+    use super::proposals::*;
+    let w = World::new();
+    let (ids, proposal) = three_approved_falls(&w);
+    assert!(w.t.db.decision().iter().any(|d| d.why == "precedent 2 of 3 for a rule on falls under medical payments cover"));
+    claude_proposes(&w, "worker", &proposal, &ids, 18_000);
+    let p = w.t.db.rule_proposal().id().find(proposal.id).unwrap();
+    assert_eq!((p.status.as_str(), p.ceiling_cents, p.proposed_by), ("proposed", 18_000, id("worker")));
+    assert!(w.t.db.decision().iter().any(|d| d.actor == "Claude" && d.what.starts_with("Proposed a rule: Pay first-aid wrist sprains")));
+
+    assert!(w.try_as("worker", |ctx| approve_rule_proposal(ctx, p.id, 18_000)).is_err(), "the worker that proposed it cannot approve it");
+    assert!(w.try_as("medic", |ctx| approve_rule_proposal(ctx, p.id, 18_000)).is_err());
+    assert!(w.try_as("ops", |ctx| approve_rule_proposal(ctx, p.id, 25_000)).unwrap_err().starts_with("stale"));
+    w.as_("ops", |ctx| approve_rule_proposal(ctx, p.id, 18_000));
+    let rule = w.t.db.settlement_rule().iter().find(|r| r.status == "active").unwrap();
+    assert_eq!((rule.incident_kind.as_str(), rule.ceiling_cents, rule.version, rule.approver_name.as_str(), rule.proposal_id), ("fall", 18_000, 1, "Ops desk", p.id));
+    let p = w.t.db.rule_proposal().id().find(p.id).unwrap();
+    assert_eq!((p.status.as_str(), p.settlement_rule_id, p.rule_version, p.decided_by_name.as_str()), ("approved", rule.id, 1, "Ops desk"));
+    assert!(w.t.db.decision().iter().any(|d| d.what == "Approved rule v1: falls under medical payments cover up to $180.00"));
+
+    let c = first_aid_fall(&w, 7, "Jordan Alvarez", 14);
+    w.pay(c.id);
+    let c = w.claim(c.id);
     assert_eq!(c.status, ClaimStatus::Settled, "{}", c.status_note);
     assert_eq!((c.decided_by.as_str(), c.settlement_rule_version), ("claude", 1));
     let history = w.history(c.id);
     assert!(history.contains(&("Claude".into(), "Read the light circle: 2 fact(s)".into())), "{history:?}");
-    assert!(history.iter().any(|(a, w)| a == "Decision Engine" && w == "Paid on Claude's decision: $180.00 to Maya Chen"), "{history:?}");
+    assert!(history.iter().any(|(a, w)| a == "Decision Engine" && w == "Paid on Claude's decision: $180.00 to Jordan Alvarez"), "{history:?}");
     assert_eq!(c.payout_reference, format!("Nessie deposit dep-{}", c.id));
-    let account = w.t.db.claimant_account().identity().find(id("Maya Chen")).unwrap();
+    let account = w.t.db.claimant_account().identity().find(id("Jordan Alvarez")).unwrap();
     assert_eq!(account.account_id, "acct-1");
     assert_eq!(w.t.db.approval().claim_id().filter(c.id).count(), 0);
+}
+
+#[test]
+fn approving_the_rule_pays_the_alike_claim_already_waiting() {
+    use super::proposals::*;
+    let w = World::new();
+    w.t.db.staff_role().insert(StaffRole { id: 0, identity: id("ops"), role: "worker".into(), label: "Ops desk".into(), granted_by: id("owner"), granted_at: w.t.clock.now() });
+    let (ids, proposal) = three_approved_falls(&w);
+    claude_proposes(&w, "ops", &proposal, &ids, 18_000);
+    let waiting = first_aid_fall(&w, 7, "Jordan Alvarez", 15);
+    assert_eq!(waiting.status, ClaimStatus::Routed, "{}", waiting.status_note);
+    let err = w.try_as("ops", |ctx| approve_rule_proposal(ctx, proposal.id, 18_000)).unwrap_err();
+    assert!(err.starts_with("separation of duties"), "{err}");
+    w.as_("owner", |ctx| approve_rule_proposal(ctx, proposal.id, 18_000));
+    let c = w.claim(waiting.id);
+    assert_eq!((c.status, c.decided_by.as_str(), c.settlement_rule_version), (ClaimStatus::Paying, "claude", 1), "{}", c.status_note);
+}
+
+#[test]
+fn a_proposal_above_its_precedents_is_set_aside_and_a_rejection_keeps_them_cited() {
+    use super::proposals::*;
+    let w = World::new();
+    let (ids, proposal) = three_approved_falls(&w);
+    claude_proposes(&w, "worker", &proposal, &ids, 25_000);
+    let p = w.t.db.rule_proposal().id().find(proposal.id).unwrap();
+    assert_eq!(p.status, "failed");
+    assert!(p.summary.contains("the ceiling must be 18000 cents"), "{}", p.summary);
+    assert!(w.t.db.organizer_precedent().iter().all(|x| x.proposal_id == 0), "set aside, its precedents are free again");
+    assert_eq!(w.t.db.settlement_rule().iter().count(), 0);
+
+    let c = first_aid_fall(&w, 7, "Jordan Alvarez", 16);
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
+    let second = w.t.db.rule_proposal().iter().find(|x| x.status == "proposing").expect("the four free precedents open a new proposal");
+    assert_eq!(second.claim_ids.len(), 4);
+    let cited = &second.claim_ids[..3];
+    claude_proposes_from(&w, &second, cited);
+    assert!(w.t.db.organizer_precedent().claim_id().filter(c.id).all(|x| x.proposal_id == 0), "the uncited one is released");
+    assert!(w.try_as("ops", |ctx| reject_rule_proposal(ctx, second.id, "  ".into())).is_err());
+    w.as_("ops", |ctx| reject_rule_proposal(ctx, second.id, "wait for the whole night".into()));
+    let p = w.t.db.rule_proposal().id().find(second.id).unwrap();
+    assert_eq!((p.status.as_str(), p.reason.as_str()), ("rejected", "wait for the whole night"));
+    assert_eq!(w.t.db.organizer_precedent().proposal_id().filter(second.id).count(), 3);
+    assert_eq!(w.t.db.settlement_rule().iter().count(), 0);
+}
+
+/// Claude proposes from `cited`, a part of the offered precedents.
+fn claude_proposes_from(w: &World, proposal: &RuleProposal, cited: &[u64]) {
+    let job = w.lease_as("worker", KIND_RULE_PROPOSAL, proposal.id);
+    let answer = serde_json::json!({"propose": true, "precedent_claim_ids": cited, "ceiling_cents": 18_000, "rule": "Pay alike falls up to $180.00.", "summary": "Alike."});
+    w.as_("worker", |ctx| super::proposals::submit_rule_proposal(ctx, job.id, answer.to_string(), call("rule_proposal")));
 }
 
 /// A gap in the policy is decided one by one: approving Jordan's claim over the
 /// per-claim limit teaches no rule, and Maya's claim over the same limit shows
 /// that decision to the organizer without applying it.
 #[test]
-fn a_claim_over_the_policy_limit_teaches_no_rule_and_shows_the_last_decision() {
+fn a_claim_over_the_policy_limit_makes_no_rule_and_shows_the_last_decision() {
     let w = World::new();
     w.as_("ops", |ctx| upsert_coverage_rule(ctx, "GL-2026-04417".into(), "medical_payments".into(), vec!["sos".into(), "fall".into()], 15_000, 2_500_000, 0, 365, true));
     let incident = w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]);
@@ -413,10 +523,12 @@ fn a_claim_over_the_policy_limit_teaches_no_rule_and_shows_the_last_decision() {
     let c = w.claim(jordan);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
     assert_eq!(c.status_note, "Complication: the covered cost $895.00 is over the policy's limit, which pays at most $150.00. Claude would pay $150.00");
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
     w.pay(jordan);
     assert_eq!(w.claim(jordan).status, ClaimStatus::Settled);
-    assert_eq!(w.t.db.settlement_rule().iter().count(), 0, "a gap in the policy teaches no rule");
+    assert_eq!(w.t.db.settlement_rule().iter().count(), 0, "a gap in the policy makes no rule");
+    let kept = w.t.db.organizer_precedent().claim_id().filter(jordan).next().unwrap();
+    assert_eq!(kept.complications, "over the policy's limit");
     assert!(w.history(jordan).contains(&("organizer".into(), "Precedent, over the policy's limit: approved $150.00 for Jordan Alvarez".into())));
 
     w.advance(3600);
@@ -584,7 +696,7 @@ fn broken_speaker_with_camera_evidence_and_a_recovery_query() {
     w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!((c.status, c.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
-    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone()));
     w.as_("ops", |ctx| request_recovery_letter(ctx, c.id, "Stagecraft AV".into(), "ops@stagecraft.test".into()));
     let job = w.open_job(KIND_RECOVERY, c.id);
     let p: RecoveryPayload = serde_json::from_str(&job.payload).unwrap();
@@ -636,7 +748,7 @@ fn three_people_hurt_at_once_go_to_the_organizer_on_one_notice() {
     let claim = w.claim(first.id);
     assert_eq!((claim.status, claim.routed_to_name.as_str()), (ClaimStatus::Routed, "Organizer"));
     assert!(claim.status_note.starts_with("3 people hurt in Main stage"), "{}", claim.status_note);
-    w.as_("ops", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone(), None, false));
+    w.as_("ops", |ctx| approve_claim(ctx, claim.id, claim.payout_cents, claim.pack_hash.clone()));
     w.pay(claim.id);
     let p: DraftPayload = serde_json::from_str(&w.open_job(KIND_DRAFT, claim.id).payload).unwrap();
     assert_eq!(p.letter.related_claims.len(), 2, "{:?}", p.letter.related_claims);

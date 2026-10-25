@@ -10,8 +10,6 @@ pub(super) struct ApproveClaimArgs {
     pub claim_id: u64,
     pub amount_seen_cents: u64,
     pub pack_hash_seen: String,
-    pub requested_ceiling_cents: Option<u64>,
-    pub learn: bool,
 }
 
 impl From<ApproveClaimArgs> for super::Reducer {
@@ -20,8 +18,6 @@ impl From<ApproveClaimArgs> for super::Reducer {
             claim_id: args.claim_id,
             amount_seen_cents: args.amount_seen_cents,
             pack_hash_seen: args.pack_hash_seen,
-            requested_ceiling_cents: args.requested_ceiling_cents,
-            learn: args.learn,
         }
     }
 }
@@ -46,17 +42,8 @@ pub trait approve_claim {
         claim_id: u64,
         amount_seen_cents: u64,
         pack_hash_seen: String,
-        requested_ceiling_cents: Option<u64>,
-        learn: bool,
     ) -> __sdk::Result<()> {
-        self.approve_claim_then(
-            claim_id,
-            amount_seen_cents,
-            pack_hash_seen,
-            requested_ceiling_cents,
-            learn,
-            |_, _| {},
-        )
+        self.approve_claim_then(claim_id, amount_seen_cents, pack_hash_seen, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `approve_claim` to run as soon as possible,
@@ -70,8 +57,6 @@ pub trait approve_claim {
         claim_id: u64,
         amount_seen_cents: u64,
         pack_hash_seen: String,
-        requested_ceiling_cents: Option<u64>,
-        learn: bool,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -85,8 +70,6 @@ impl approve_claim for super::RemoteReducers {
         claim_id: u64,
         amount_seen_cents: u64,
         pack_hash_seen: String,
-        requested_ceiling_cents: Option<u64>,
-        learn: bool,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -97,8 +80,6 @@ impl approve_claim for super::RemoteReducers {
                 claim_id,
                 amount_seen_cents,
                 pack_hash_seen,
-                requested_ceiling_cents,
-                learn,
             },
             callback,
         )

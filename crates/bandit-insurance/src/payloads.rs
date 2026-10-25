@@ -24,6 +24,9 @@ pub const KIND_CLINIC: &str = "clinic_report";
 /// The attendee pays a charge from their wallet: a Nessie purchase at the venue.
 pub const KIND_CHARGE_PAYMENT: &str = "charge_payment";
 
+/// Claude proposes a payment rule from approved precedents of one shape, for the organizer.
+pub const KIND_RULE_PROPOSAL: &str = "rule_proposal";
+
 pub const INSURANCE_KINDS: &[&str] =
     &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC, KIND_CHARGE_PAYMENT];
 
@@ -206,4 +209,54 @@ pub struct ClinicPayload {
     pub statement: String,
     /// The staff notes on the incident, oldest first.
     pub medic_notes: Vec<String>,
+}
+
+/// One approved claim offered to Claude as a precedent for a rule.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ApprovedPrecedent {
+    pub claim_id: u64,
+    pub claimant: String,
+    pub zone: String,
+    pub payout_cents: Cents,
+    pub billed_cents: Cents,
+    pub covered_cents: Cents,
+    pub diagnoses: Vec<String>,
+    pub service_codes: Vec<String>,
+    pub corroboration: String,
+    pub approver: String,
+    /// Local `YYYY-MM-DD HH:MM`.
+    pub decided_at: String,
+}
+
+/// A refused claim of the same shape, for context; a proposal never cites it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RefusedPrecedent {
+    pub claim_id: u64,
+    pub claimant: String,
+    pub zone: String,
+    pub payout_cents: Cents,
+    pub reason: String,
+}
+
+/// The shape's rule in force when the proposal opened.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RuleInForce {
+    pub version: u32,
+    pub ceiling_cents: Cents,
+}
+
+/// Input of `rule_proposal`: one shape's precedents and the policy terms a rule must stay inside.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RuleProposalPayload {
+    pub proposal_id: u64,
+    pub venue_name: String,
+    pub incident_kind: String,
+    pub cover_kind: String,
+    pub policy_number: String,
+    /// The cover's per-claim limit: no rule pays above it.
+    pub limit_cents: Cents,
+    pub minimum_payout_cents: Cents,
+    pub rule_in_force: Option<RuleInForce>,
+    pub approved: Vec<ApprovedPrecedent>,
+    pub refused: Vec<RefusedPrecedent>,
 }

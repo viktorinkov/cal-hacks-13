@@ -342,7 +342,7 @@ sequenceDiagram
 
 **The organizer sees them.** The claim's detail in the organizer portal shows each clause Claude cited, with its policy, section and page, next to the evidence.
 
-**What today's code does instead.** Today the copy is ranked against 30 seeded past claims and earlier events' decided claims (`similar_claims`, top 3). The results are stored as `claim_precedent` rows, shown as "Similar past claims (Elastic)", and given to Claude, whose first build also searched them (`search_past_claims`, `past_claim_stats`). The design drops past claims from the decision. Whether a claim is covered is written in the venue's contract, and what earlier approvals taught already lives in the organizer's learned rules. `claim_draft` still writes each paid claim's outcome back to its copy for the claims dashboard.
+**What today's code does instead.** Today the copy is ranked against 30 seeded past claims and earlier events' decided claims (`similar_claims`, top 3). The results are stored as `claim_precedent` rows, shown as "Similar past claims (Elastic)", and given to Claude, whose first build also searched them (`search_past_claims`, `past_claim_stats`). The design drops past claims from the decision. Whether a claim is covered is written in the venue's contract, and what earlier approvals decided already lives in the organizer's precedents and approved rules. `claim_draft` still writes each paid claim's outcome back to its copy for the claims dashboard.
 
 **The attendee's own words stay out of Elastic.** The `claimant_statement`, the attendee's own words from `file_claim`, goes to `claim_review` only, because `claim_doc` builds the Elastic copy from fixed fields and a fixed template.
 

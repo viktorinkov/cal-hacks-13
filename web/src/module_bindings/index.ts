@@ -42,6 +42,7 @@ import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApplyMedicalRecordReducer from "./apply_medical_record_reducer";
 import ApproveChargeReducer from "./approve_charge_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
+import ApproveRuleProposalReducer from "./approve_rule_proposal_reducer";
 import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
@@ -96,6 +97,7 @@ import RefuseClaimReducer from "./refuse_claim_reducer";
 import RegisterBlobReducer from "./register_blob_reducer";
 import RegisterBridgeReducer from "./register_bridge_reducer";
 import RegisterPhotoReducer from "./register_photo_reducer";
+import RejectRuleProposalReducer from "./reject_rule_proposal_reducer";
 import ReleaseBandReducer from "./release_band_reducer";
 import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import RemoveStaffReducer from "./remove_staff_reducer";
@@ -138,6 +140,7 @@ import SubmitMedicalRecordReducer from "./submit_medical_record_reducer";
 import SubmitMerchPicksReducer from "./submit_merch_picks_reducer";
 import SubmitPhotoFeaturesReducer from "./submit_photo_features_reducer";
 import SubmitPolicyDocumentReducer from "./submit_policy_document_reducer";
+import SubmitRuleProposalReducer from "./submit_rule_proposal_reducer";
 import SubmitVisionAssessmentReducer from "./submit_vision_assessment_reducer";
 import UnplaceBandReducer from "./unplace_band_reducer";
 import UpdateProfileReducer from "./update_profile_reducer";
@@ -169,6 +172,7 @@ import BoardMedicalAccessRow from "./board_medical_access_table";
 import BoardMerchOrdersRow from "./board_merch_orders_table";
 import BoardMerchPicksRow from "./board_merch_picks_table";
 import BoardNotesRow from "./board_notes_table";
+import BoardOrganizerPrecedentsRow from "./board_organizer_precedents_table";
 import BoardPhotosRow from "./board_photos_table";
 import BoardPoliciesRow from "./board_policies_table";
 import BoardPolicyDocumentsRow from "./board_policy_documents_table";
@@ -176,6 +180,7 @@ import BoardPolicyTermsRow from "./board_policy_terms_table";
 import BoardPrecedentsRow from "./board_precedents_table";
 import BoardRecordsRow from "./board_records_table";
 import BoardReviewsRow from "./board_reviews_table";
+import BoardRuleProposalsRow from "./board_rule_proposals_table";
 import BoardRulesRow from "./board_rules_table";
 import BoardStaffRow from "./board_staff_table";
 import BoardWalletsRow from "./board_wallets_table";
@@ -814,6 +819,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardNotesRow),
+  boardOrganizerPrecedents: __table({
+    name: 'board_organizer_precedents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardOrganizerPrecedentsRow),
   boardPhotos: __table({
     name: 'board_photos',
     indexes: [
@@ -863,6 +875,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardReviewsRow),
+  boardRuleProposals: __table({
+    name: 'board_rule_proposals',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardRuleProposalsRow),
   boardRules: __table({
     name: 'board_rules',
     indexes: [
@@ -1204,6 +1223,7 @@ const reducersSchema = __reducers(
   __reducerSchema("apply_medical_record", ApplyMedicalRecordReducer),
   __reducerSchema("approve_charge", ApproveChargeReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
+  __reducerSchema("approve_rule_proposal", ApproveRuleProposalReducer),
   __reducerSchema("assign_medic", AssignMedicReducer),
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
@@ -1258,6 +1278,7 @@ const reducersSchema = __reducers(
   __reducerSchema("register_blob", RegisterBlobReducer),
   __reducerSchema("register_bridge", RegisterBridgeReducer),
   __reducerSchema("register_photo", RegisterPhotoReducer),
+  __reducerSchema("reject_rule_proposal", RejectRuleProposalReducer),
   __reducerSchema("release_band", ReleaseBandReducer),
   __reducerSchema("remove_social_handle", RemoveSocialHandleReducer),
   __reducerSchema("remove_staff", RemoveStaffReducer),
@@ -1300,6 +1321,7 @@ const reducersSchema = __reducers(
   __reducerSchema("submit_merch_picks", SubmitMerchPicksReducer),
   __reducerSchema("submit_photo_features", SubmitPhotoFeaturesReducer),
   __reducerSchema("submit_policy_document", SubmitPolicyDocumentReducer),
+  __reducerSchema("submit_rule_proposal", SubmitRuleProposalReducer),
   __reducerSchema("submit_vision_assessment", SubmitVisionAssessmentReducer),
   __reducerSchema("unplace_band", UnplaceBandReducer),
   __reducerSchema("update_profile", UpdateProfileReducer),
@@ -1379,6 +1401,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_merch_picks": Omit<typeof tablesSchema.schemaType.tables["boardMerchPicks"], "accessorName"> & { readonly accessorName: "board_merch_picks" };
     /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
     readonly "board_notes": Omit<typeof tablesSchema.schemaType.tables["boardNotes"], "accessorName"> & { readonly accessorName: "board_notes" };
+    /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+    readonly "board_organizer_precedents": Omit<typeof tablesSchema.schemaType.tables["boardOrganizerPrecedents"], "accessorName"> & { readonly accessorName: "board_organizer_precedents" };
     /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
     readonly "board_photos": Omit<typeof tablesSchema.schemaType.tables["boardPhotos"], "accessorName"> & { readonly accessorName: "board_photos" };
     /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
@@ -1393,6 +1417,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_records": Omit<typeof tablesSchema.schemaType.tables["boardRecords"], "accessorName"> & { readonly accessorName: "board_records" };
     /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
     readonly "board_reviews": Omit<typeof tablesSchema.schemaType.tables["boardReviews"], "accessorName"> & { readonly accessorName: "board_reviews" };
+    /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+    readonly "board_rule_proposals": Omit<typeof tablesSchema.schemaType.tables["boardRuleProposals"], "accessorName"> & { readonly accessorName: "board_rule_proposals" };
     /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
     readonly "board_rules": Omit<typeof tablesSchema.schemaType.tables["boardRules"], "accessorName"> & { readonly accessorName: "board_rules" };
     /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
@@ -1537,6 +1563,7 @@ const tableAccessorAliases = {
   "board_merch_orders": "boardMerchOrders",
   "board_merch_picks": "boardMerchPicks",
   "board_notes": "boardNotes",
+  "board_organizer_precedents": "boardOrganizerPrecedents",
   "board_photos": "boardPhotos",
   "board_policies": "boardPolicies",
   "board_policy_documents": "boardPolicyDocuments",
@@ -1544,6 +1571,7 @@ const tableAccessorAliases = {
   "board_precedents": "boardPrecedents",
   "board_records": "boardRecords",
   "board_reviews": "boardReviews",
+  "board_rule_proposals": "boardRuleProposals",
   "board_rules": "boardRules",
   "board_staff": "boardStaff",
   "board_wallets": "boardWallets",
@@ -1673,6 +1701,8 @@ export type DbView = __DbViewBase & {
   readonly "board_merch_picks": __DbViewBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __DbViewBase["boardNotes"];
+  /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+  readonly "board_organizer_precedents": __DbViewBase["boardOrganizerPrecedents"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
   readonly "board_photos": __DbViewBase["boardPhotos"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
@@ -1687,6 +1717,8 @@ export type DbView = __DbViewBase & {
   readonly "board_records": __DbViewBase["boardRecords"];
   /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
   readonly "board_reviews": __DbViewBase["boardReviews"];
+  /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+  readonly "board_rule_proposals": __DbViewBase["boardRuleProposals"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __DbViewBase["boardRules"];
   /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */
@@ -1847,6 +1879,8 @@ export type Tables = __TablesBase & {
   readonly "board_merch_picks": __TablesBase["boardMerchPicks"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __TablesBase["boardNotes"];
+  /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
+  readonly "board_organizer_precedents": __TablesBase["boardOrganizerPrecedents"];
   /** @deprecated Use `boardPhotos` instead. This alias will be removed in the next major version. */
   readonly "board_photos": __TablesBase["boardPhotos"];
   /** @deprecated Use `boardPolicies` instead. This alias will be removed in the next major version. */
@@ -1861,6 +1895,8 @@ export type Tables = __TablesBase & {
   readonly "board_records": __TablesBase["boardRecords"];
   /** @deprecated Use `boardReviews` instead. This alias will be removed in the next major version. */
   readonly "board_reviews": __TablesBase["boardReviews"];
+  /** @deprecated Use `boardRuleProposals` instead. This alias will be removed in the next major version. */
+  readonly "board_rule_proposals": __TablesBase["boardRuleProposals"];
   /** @deprecated Use `boardRules` instead. This alias will be removed in the next major version. */
   readonly "board_rules": __TablesBase["boardRules"];
   /** @deprecated Use `boardStaff` instead. This alias will be removed in the next major version. */

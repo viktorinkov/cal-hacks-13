@@ -18,7 +18,7 @@ use bandit_insurance::medical::{ExtractedRecord, ValidRecord, validate_record};
 use bandit_insurance::outcome::{Decision, DecisionInput, ReviewGate, decide};
 use bandit_insurance::payloads::*;
 use bandit_insurance::decision::{AgentDecision, GuardInput, Investigation, guard, validate_review};
-use bandit_insurance::rules::{SettlementRule, learned_ceiling, matching_rule, next_version};
+use bandit_insurance::rules::{SettlementRule, matching_rule};
 use bandit_insurance::{Check, CoverKind};
 use spacetimedb::{Identity, ReducerContext, Table};
 
@@ -33,7 +33,7 @@ pub(super) fn save(ctx: &ReducerContext, claim: Claim) -> Claim {
     saved
 }
 
-fn amounts(claim: &Claim) -> Amounts {
+pub(super) fn amounts(claim: &Claim) -> Amounts {
     Amounts {
         cost_cents: claim.cost_cents,
         payout_cents: claim.payout_cents,
@@ -572,7 +572,7 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
 
 /// Claude's investigation and decision. Code validates the decision again,
 /// then holds it to its limits (`decision::guard`): Claude pays inside the
-/// authority a learned rule gives and refuses on failed checks; anything else,
+/// authority an approved rule gives and refuses on failed checks; anything else,
 /// and every claim with a gap or mismatch in the policies, goes to the organizer. An invalid decision is set aside and the claim is
 /// decided as if Claude were unavailable.
 #[spacetimedb::reducer]
@@ -625,7 +625,7 @@ pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: Strin
     }
 }
 
-fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
+pub(super) fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
     ctx.db
         .settlement_rule()
         .iter()
@@ -644,7 +644,7 @@ fn core_rules(ctx: &ReducerContext) -> Vec<SettlementRule> {
         .collect()
 }
 
-fn corroboration_of(claim: &Claim) -> bandit_insurance::Corroboration {
+pub(super) fn corroboration_of(claim: &Claim) -> bandit_insurance::Corroboration {
     match claim.corroboration.as_str() {
         "corroborated" => bandit_insurance::Corroboration::Corroborated,
         "disputed" => bandit_insurance::Corroboration::Disputed,
@@ -653,7 +653,7 @@ fn corroboration_of(claim: &Claim) -> bandit_insurance::Corroboration {
 }
 
 /// Why nothing of this claim's occurrence settles on its own, when enough people were hurt in it.
-fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
+pub(super) fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     let occurrence = occurrence(ctx, claim.incident_id);
     (occurrence.len() >= MASS_OCCURRENCE).then(|| {
         format!(
@@ -674,7 +674,7 @@ fn no_own_policy(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
 
 /// An active cover of the claim's policy pays this kind of incident, and the
 /// incident falls in the policy period when the confirmed policy states one.
-fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
+pub(super) fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
     let opened = ctx.db.incident().id().find(claim.incident_id).map(|i| i.opened_at).unwrap_or(ctx.timestamp);
     let in_period = cover_of(claim).is_attendee_policy() || super::documents::in_period(ctx, claim.policy_id, opened);
     policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active) && in_period
@@ -711,7 +711,7 @@ fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> 
 }
 
 /// The claim's complications: the gaps and mismatches in the policies that a person decides one by one.
-fn claim_complications(ctx: &ReducerContext, claim: &Claim) -> Vec<Complication> {
+pub(super) fn claim_complications(ctx: &ReducerContext, claim: &Claim) -> Vec<Complication> {
     complications(&ClaimState { has_cover: policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active), amounts: amounts(claim) })
 }
 
@@ -780,7 +780,7 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     apply(ctx, claim, decision, by)
 }
 
-fn apply(ctx: &ReducerContext, claim: Claim, decision: Decision, decided_by: &str) -> Result<(), String> {
+pub(super) fn apply(ctx: &ReducerContext, claim: Claim, decision: Decision, decided_by: &str) -> Result<(), String> {
     match decision {
         Decision::Refuse { reason } => refuse(ctx, claim, reason, decided_by).map(|_| ()),
         Decision::Route { reason } => {
@@ -815,8 +815,8 @@ pub(super) fn route(ctx: &ReducerContext, claim: Claim, reason: String) {
     );
 }
 
-/// The person deciding, for the approval and the learned rule: their `ops` label, else "Organizer".
-fn organizer_name(ctx: &ReducerContext) -> String {
+/// The person deciding, for the approval and the rule: their `ops` label, else "Organizer".
+pub(super) fn organizer_name(ctx: &ReducerContext) -> String {
     ctx.db.staff_role().identity().filter(ctx.sender()).find(|r| r.role == "ops").map(|r| r.label).unwrap_or_else(|| ORGANIZER.into())
 }
 
@@ -932,7 +932,7 @@ fn decision_text(ctx: &ReducerContext, claim: &Claim) -> String {
             let rule = ctx.db.settlement_rule().id().find(claim.settlement_rule_id);
             match rule {
                 Some(r) => format!("settled automatically under rule v{}, approved by {} ({})", r.version, r.approver_name, r.approver_role),
-                None => "settled automatically under a learned rule".into(),
+                None => "settled automatically under an approved rule".into(),
             }
         }
         "claude" if claim.status != ClaimStatus::Refused => match ctx.db.settlement_rule().id().find(claim.settlement_rule_id) {
@@ -943,7 +943,7 @@ fn decision_text(ctx: &ReducerContext, claim: &Claim) -> String {
                 r.approver_name,
                 r.approver_role
             ),
-            None => "paid by the insurance Decision Engine inside a learned rule".into(),
+            None => "paid by the insurance Decision Engine inside an approved rule".into(),
         },
         "approver" => format!("approved by {} ({})", claim.routed_to_name, claim.routed_to_role),
         _ => claim.status_note.clone(),
@@ -1020,21 +1020,13 @@ fn approver_check(ctx: &ReducerContext, claim: &Claim, pack_hash_seen: &str) -> 
     Ok(())
 }
 
+/// The organizer pays a claim waiting for them. The decision is kept as a precedent; three approved
+/// simple claims of one shape make Claude propose a payment rule (`proposals`).
 #[spacetimedb::reducer]
-pub fn approve_claim(
-    ctx: &ReducerContext,
-    claim_id: u64,
-    amount_seen_cents: u64,
-    pack_hash_seen: String,
-    requested_ceiling_cents: Option<u64>,
-    learn: bool,
-) -> Result<(), String> {
+pub fn approve_claim(ctx: &ReducerContext, claim_id: u64, amount_seen_cents: u64, pack_hash_seen: String) -> Result<(), String> {
     let claim = claim_by_id(ctx, claim_id)?;
     approver_check(ctx, &claim, &pack_hash_seen)?;
-    // A complicated claim has no rule by definition: approving it never teaches one,
-    // and the decision is kept as a precedent the next such claim shows instead.
     let found = claim_complications(ctx, &claim);
-    let learn = learn && found.is_empty();
     let now = current_amounts(ctx, &claim).ok_or("no cover for this claim")?;
     if claim.payout_cents == 0 {
         return Err("there is nothing to pay: the policy covers none of this claim, so refuse it with the reason".into());
@@ -1052,42 +1044,14 @@ pub fn approve_claim(
         decision: "approve".into(),
         amount_seen_cents,
         pack_hash_seen,
-        learn,
-        requested_ceiling_cents,
+        learn: false,
+        requested_ceiling_cents: None,
         reason: String::new(),
         decided_at: ctx.timestamp,
     });
-    let rules = core_rules(ctx);
-    let covered_already = matching_rule(&rules, kind_of(&claim), cover_of(&claim), 0).is_some_and(|r| r.ceiling_cents >= claim.payout_cents);
-    let mut taught: Option<(u32, u64)> = None;
-    if learn && !covered_already {
-        let kind = kind_of(&claim);
-        let cover = cover_of(&claim);
-        let version = next_version(&rules, kind, cover, 0);
-        for old in ctx.db.settlement_rule().iter().filter(|r| r.status == "active" && r.incident_kind == kind.as_str() && r.cover_kind == cover.as_str() && r.zone_id == 0) {
-            ctx.db.settlement_rule().id().update(SettlementRuleRow { status: "superseded".into(), ..old });
-        }
-        ctx.db.settlement_rule().insert(SettlementRuleRow {
-            id: 0,
-            incident_kind: kind.as_str().into(),
-            cover_kind: cover.as_str().into(),
-            zone_id: 0,
-            requires_corroborated: true,
-            ceiling_cents: {
-                let c = learned_ceiling(requested_ceiling_cents, claim.payout_cents, None);
-                taught = Some((version, c));
-                c
-            },
-            approver: ctx.sender(),
-            approver_name: approver_name.clone(),
-            approver_role: claim.routed_to_role.clone(),
-            approval_id: approval.id,
-            version,
-            status: "active".into(),
-            created_at: ctx.timestamp,
-        });
-    }
-    crate::live::approved(ctx, &claim, &approver_name, taught);
+    super::proposals::keep_precedent(ctx, &claim, &approval, &found);
+    let why = if found.is_empty() { super::proposals::after_approval(ctx, &claim) } else { "decided one by one: a gap in the policies makes no rule".into() };
+    crate::live::approved(ctx, &claim, &approver_name, why);
     let paid = format!("approved {} for {}", bandit_insurance::money::format_cents(claim.payout_cents), claim.claimant_name);
     record_precedent(ctx, &claim, &found, &approver_name, &paid, "");
     let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
@@ -1116,7 +1080,7 @@ pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String,
         return Err("a refusal needs a reason".into());
     }
     let approver_name = organizer_name(ctx);
-    ctx.db.approval().insert(Approval {
+    let approval = ctx.db.approval().insert(Approval {
         id: 0,
         claim_id,
         approver: ctx.sender(),
@@ -1131,7 +1095,9 @@ pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String,
         decided_at: ctx.timestamp,
     });
     let refused = format!("refused {}'s claim", claim.claimant_name);
-    record_precedent(ctx, &claim, &claim_complications(ctx, &claim), &approver_name, &refused, reason.trim());
+    let found = claim_complications(ctx, &claim);
+    super::proposals::keep_precedent(ctx, &claim, &approval, &found);
+    record_precedent(ctx, &claim, &found, &approver_name, &refused, reason.trim());
     refuse(ctx, claim, format!("refused by {approver_name}: {reason}"), "approver").map(|_| ())
 }
 

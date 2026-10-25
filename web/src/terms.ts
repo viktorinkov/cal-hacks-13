@@ -48,6 +48,8 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bmateriality(?: threshold)?\b/i, 'The size of difference small enough to accept without a person looking at it.'],
   [/\bevent close\b/i, 'The organizer\'s sign-off that the event\'s books are complete and reconciled.'],
   [/\bsegregation of duties\b/i, 'The person who requests a payment is never the one who approves it.'],
+  [/\bprecedents?\b/i, 'An earlier decision by the organizer on a claim of the same kind, kept as the evidence a rule rests on.'],
+  [/\bpolicy limit\b/i, 'The most the venue\'s insurance policy pays on one claim.'],
   [/\bcontroller\b/i, 'The person who keeps the event\'s books and signs them off.'],
 
   // Costs and bills.
@@ -99,8 +101,8 @@ const TERMS: [RegExp, string, string?][] = [
   [/^settled\b/i, 'Paid out to the claimant; the insurer may still owe its share.'],
   [/\bsettlements?\b/i, 'Paying a claim and recording who pays what on it.'],
   [/\bcopays?\b/i, 'The fixed amount the attendee\'s own plan leaves them to pay for a visit.'],
-  [/\brule ceiling\b|^ceiling\b|\bauthority\b/i, 'The most a learned rule lets the venue pay without asking a person.'],
-  [/\blearned (?:payment )?rules?\b/i, 'A standing approval: claims of this kind up to its ceiling are paid without asking.'],
+  [/\brule ceiling\b|^ceiling\b|\bauthority\b/i, 'The most an approved rule lets the venue pay without asking a person.'],
+  [/\bpayment rules?\b/i, 'A standing approval: claims of this kind up to its ceiling are paid without asking.'],
   [/\bapprovers?\b/i, 'The person who signs off a payment; never the one who asked for it.'],
 ];
 

@@ -5,7 +5,8 @@
 // is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, bandById, complicated, h, money, time } from './lib';
+import { act, bandById, h, money, time } from './lib';
+import { decideProposal, shapeWords, waitingProposals } from './rule-proposals';
 import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
 import { Incidents } from './incidents-3d';
@@ -366,7 +367,7 @@ function controls(r: LiveRun | undefined) {
       h('label', {}, 'People ', h('input', { name: 'crowd', type: 'number', min: 1, max: 2000, value: START.crowd })), ' ',
       h('label', {}, 'Minutes ', h('input', { name: 'minutes', type: 'number', min: 1, max: 240, value: START.minutes })), ' ',
       h('label', {}, 'Speed ', h('input', { name: 'pace', type: 'number', min: 1, max: 30, value: START.pace }), '×'), ' ',
-      h('label', { title: 'Clears the decision history and retires the learned rules, so the organizer teaches them again' },
+      h('label', { title: 'Clears the decision history and the precedents and retires the payment rules, so the rules are proposed again' },
         h('input', { name: 'fresh', type: 'checkbox', checked: true }), ' Start fresh'), ' ',
       h('button', {}, 'Start the event')),
     state?.ended
@@ -442,15 +443,24 @@ function whoWears() {
     list);
 }
 
-
-/** The organizer approves a claim waiting for them, and teaches the Decision Engine a rule for similar claims unless it is complicated. */
+/** The organizer approves a claim waiting for them; the approval is kept as a precedent. */
 function approveButton(c: Claim) {
   return h('button', {
     onclick: (e: Event) => {
       e.stopPropagation();
-      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: !complicated(c) }));
+      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash }));
     },
-  }, complicated(c) ? 'Approve' : 'Approve and teach a rule');
+  }, 'Approve');
+}
+
+/** The rules proposed from the organizer's precedents, waiting for them. */
+function waitingRules(canRun: boolean) {
+  const waiting = waitingProposals(conn);
+  return waiting.length > 0 && h('section', { class: 'alert' },
+    h('h4', {}, `Proposed rules (${waiting.length})`),
+    h('table', {}, waiting.map(p => h('tr', {},
+      h('td', {}, shapeWords(p.incidentKind, p.coverKind), h('br'), h('span', { class: 'muted' }, `claims ${p.claimIds.map(id => `#${id}`).join(', ')}`)),
+      h('td', {}, p.rule, h('br'), h('span', { class: 'muted' }, p.summary), canRun && decideProposal(conn, p))))));
 }
 
 /** Every decision, newest first; a click on a row of an incident flies to it and shows only its rows. The newest
@@ -573,5 +583,5 @@ export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picki
     h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240),
       h('p', {}, h('button', { onclick: showAll }, 'Whole hall')), v!.note)),
     sideBar('right'),
-    h('div', {}, picking?.panel, history(canRun), canRun && placeBands()));
+    h('div', {}, picking?.panel, waitingRules(canRun), history(canRun), canRun && placeBands()));
 }

@@ -299,7 +299,7 @@ fn finish_flow(app: &App, planted: &mut [Planted]) -> Result<()> {
     }
 }
 
-/// The named approvers: approve genuine claims (learning a rule), refuse planted fakes.
+/// The named approvers: approve genuine claims, refuse planted fakes, and approve the rules Claude proposes.
 fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
     for p in planted {
         let c = app.claim(p.claim)?;
@@ -309,7 +309,7 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let who = c.routed_to_name.clone();
         app.quiet.set(true);
         let r = if p.kind == Kind::Genuine {
-            decide::approve(app, p.claim, None, None, true, false, false)
+            decide::approve(app, p.claim, None, false, false)
         } else {
             decide::refuse(app, p.claim, None, &format!("planted fake: {}", p.kind.label()), false)
         };
@@ -317,6 +317,12 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let c = r?;
         let verb = if p.kind == Kind::Genuine { "approves" } else { "refuses" };
         println!("    {who} {verb} claim {} ({}, {}) -> {}", c.id, p.kind.label(), money(c.payout_cents), status_name(c.status));
+    }
+    app.quiet.set(true);
+    let rules = decide::approve_proposals(app);
+    app.quiet.set(false);
+    for p in rules? {
+        println!("    the organizer approves Claude's proposed rule from claims {:?}: {} up to {} -> rule v{}", p.claim_ids, p.incident_kind, money(p.ceiling_cents), p.rule_version);
     }
     Ok(())
 }
@@ -348,7 +354,7 @@ fn score(app: &App, planted: &[Planted], label: &str) -> Result<()> {
     let db = app.db()?;
     let rows: Vec<(&Planted, Claim)> = planted.iter().map(|p| app.claim(p.claim).map(|c| (p, c))).collect::<Result<_>>()?;
     let paid = |c: &Claim| matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled);
-    // Settled with no person: Claude's payment inside a learned rule, or the code-only rule.
+    // Settled with no person: Claude's payment inside an approved rule, or the code-only rule.
     let auto = |c: &Claim| paid(c) && matches!(c.decided_by.as_str(), "claude" | "rule");
     let genuine: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind == Kind::Genuine).collect();
     let fakes: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind != Kind::Genuine).collect();

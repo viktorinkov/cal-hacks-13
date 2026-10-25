@@ -101,14 +101,24 @@ enum Cmd {
         /// The actor who decides (default: ops, the organizer)
         #[arg(long = "as")]
         as_: Option<String>,
-        /// Ceiling for the learned rule, in dollars
-        #[arg(long)]
-        ceiling: Option<String>,
-        #[arg(long)]
-        no_learn: bool,
         /// Send a wrong amount on purpose to show the module failing closed
         #[arg(long)]
         stale: bool,
+    },
+    /// Approve the payment rule Claude proposed
+    ApproveRule {
+        proposal: u64,
+        /// The actor who decides (default: ops, the organizer)
+        #[arg(long = "as")]
+        as_: Option<String>,
+    },
+    /// Reject the payment rule Claude proposed
+    RejectRule {
+        proposal: u64,
+        #[arg(long = "as")]
+        as_: Option<String>,
+        #[arg(long)]
+        reason: String,
     },
     /// Show the approval grid and refuse
     Refuse {
@@ -211,10 +221,9 @@ fn run(cli: Cli) -> Result<()> {
         }
         Cmd::Claims => show::claims(&app),
         Cmd::Show { claim } => show::show(&app, claim),
-        Cmd::Approve { claim, as_, ceiling, no_learn, stale } => {
-            let ceiling = ceiling.as_deref().map(parse_money).transpose()?;
-            decide::approve(&app, claim, as_.as_deref(), ceiling, !no_learn, stale, true).map(|_| ())
-        }
+        Cmd::Approve { claim, as_, stale } => decide::approve(&app, claim, as_.as_deref(), stale, true).map(|_| ()),
+        Cmd::ApproveRule { proposal, as_ } => decide::approve_proposal(&app, proposal, as_.as_deref()).map(|_| ()),
+        Cmd::RejectRule { proposal, as_, reason } => decide::reject_proposal(&app, proposal, as_.as_deref(), &reason),
         Cmd::Refuse { claim, as_, reason } => decide::refuse(&app, claim, as_.as_deref(), &reason, true).map(|_| ()),
         Cmd::InsurerPaid { claim, amount, reference } => {
             decide::insurer_paid(&app, claim, parse_money(&amount)?, &reference, None).map(|_| ())
