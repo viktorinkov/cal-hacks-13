@@ -6,8 +6,9 @@ use serde_json::{Value, json};
 
 use crate::Kibana;
 
-pub const WORKFLOW: &str = "bandit-investigate-claim";
-pub const AGENT: &str = "bandit-claim-investigator";
+// The evidence-request protocol must not replace assets still used by v1 workers.
+pub const WORKFLOW: &str = "bandit-investigate-claim-v3";
+pub const AGENT: &str = "bandit-claim-investigator-v3";
 const AGENT_JSON: &str = include_str!("../elastic/agents/bandit-claim-investigator.json");
 const INSTRUCTIONS: &str = include_str!("../elastic/agents/bandit-claim-investigator.instructions.md");
 const WORKFLOW_YAML: &str = include_str!("../elastic/workflows/bandit-investigate-claim.yaml");
@@ -75,7 +76,7 @@ mod tests {
     fn reads_only_a_completed_agent_answer() {
         let execution = json!({"status": "completed", "stepExecutions": [
             {"stepId": "schema", "status": "completed", "output": {"type": "object"}},
-            {"stepId": "investigate", "status": "completed", "output": {"structured_output": {"tool_calls": [], "decision": {"decision": "ask_organizer"}}}}
+            {"stepId": "investigate", "status": "completed", "output": {"structured_output": {"evidence_requests": [], "decision": {"decision": "ask_organizer"}}}}
         ]});
         assert_eq!(answer(output(&execution).unwrap()).unwrap()["decision"]["decision"], "ask_organizer");
         assert!(output(&json!({"status": "failed", "error": "agent failed"})).is_err());

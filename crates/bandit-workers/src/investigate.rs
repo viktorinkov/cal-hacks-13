@@ -125,7 +125,7 @@ struct Investigator<'a> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AgentTurn {
-    tool_calls: Vec<RequestedTool>,
+    evidence_requests: Vec<RequestedTool>,
     decision: Option<Value>,
 }
 
@@ -133,8 +133,49 @@ struct AgentTurn {
 #[serde(deny_unknown_fields)]
 struct RequestedTool {
     id: String,
-    name: String,
-    input: Value,
+    operation: String,
+    arguments: Value,
+}
+
+fn needs_first_read(body: &Value) -> bool {
+    body["tool_choice"]["type"] != "none" && !body["messages"].as_array().into_iter().flatten()
+        .flat_map(|message| message["content"].as_array().into_iter().flatten())
+        .any(|block| block["type"] == "tool_result")
+}
+
+/// Keep the internal request carrier out of Agent Builder's native tool protocol.
+/// These are requests for the next worker turn, not tools the remote agent can call.
+fn worker_task(body: &Value, job_id: u64, attempt: u8) -> Value {
+    let available: Vec<Value> = body["tools"].as_array().into_iter().flatten().map(|tool| json!({
+        "operation": tool["name"], "description": tool["description"],
+        "arguments_schema": tool["input_schema"]
+    })).collect();
+    let mut history = Vec::new();
+    for message in body["messages"].as_array().into_iter().flatten() {
+        for block in message["content"].as_array().into_iter().flatten() {
+            match block["type"].as_str() {
+                Some("text") => history.push(json!({
+                    "kind": "note", "author": if message["role"] == "assistant" { "investigator" } else { "worker" },
+                    "text": block["text"]
+                })),
+                Some("tool_use") => history.push(json!({
+                    "kind": "evidence_request", "id": block["id"],
+                    "operation": block["name"], "arguments": block["input"]
+                })),
+                Some("tool_result") => history.push(json!({
+                    "kind": "evidence_result", "request_id": block["tool_use_id"],
+                    "text": block["content"], "is_error": block["is_error"].as_bool().unwrap_or(false)
+                })),
+                _ => unreachable!("investigation history contains only text, requests and results"),
+            }
+        }
+    }
+    json!({
+        "job_id": job_id, "attempt": attempt, "instructions": body["system"],
+        "next_step": if needs_first_read(body) { "Select evidence reads only. Return them as this step's final structured response; the worker runs them after this step ends." } else { "Use the worker results to select further reads or recommend a decision." },
+        "available_requests": available, "requests_allowed": body["tool_choice"]["type"] != "none",
+        "history": history
+    })
 }
 
 /// Each allowed request keeps its own argument schema; the agent cannot name
@@ -144,37 +185,41 @@ fn turn_schema(body: &Value) -> Value {
         "type": "object", "additionalProperties": false,
         "properties": {
             "id": {"type": "string", "minLength": 1, "maxLength": 80},
-            "name": {"type": "string", "enum": [tool["name"]]},
-            "input": tool["input_schema"]
+            "operation": {"type": "string", "enum": [tool["name"]]},
+            "arguments": tool["input_schema"]
         },
-        "required": ["id", "name", "input"]
+        "required": ["id", "operation", "arguments"]
     })).collect();
     json!({
         "type": "object", "additionalProperties": false,
         "properties": {
-            "tool_calls": {"type": "array", "maxItems": if body["tool_choice"]["type"] == "none" { 0 } else { TOOLS_PER_TURN },
+            "evidence_requests": {"type": "array", "minItems": if needs_first_read(body) { 1 } else { 0 },
+                "maxItems": if body["tool_choice"]["type"] == "none" { 0 } else { TOOLS_PER_TURN },
                 "items": {"anyOf": tools}},
-            "decision": {"anyOf": [agent_decision_schema(), {"type": "null"}]}
+            "decision": if needs_first_read(body) { json!({"type": "null"}) } else { json!({"anyOf": [agent_decision_schema(), {"type": "null"}]}) }
         },
-        "required": ["tool_calls", "decision"]
+        "required": ["evidence_requests", "decision"]
     })
 }
 
 /// Validate the bridge at runtime too. Schema conformance alone is not an
 /// authorization check, and rejected requests never reach an evidence handler.
 fn agent_turn(answer: &Value, body: &Value) -> anyhow::Result<(Vec<Value>, Vec<ToolUse>, Option<Value>)> {
-    if answer.as_object().is_none_or(|object| object.len() != 2 || !object.contains_key("tool_calls") || !object.contains_key("decision")) {
-        anyhow::bail!("investigator must return exactly tool_calls and decision");
+    if answer.as_object().is_none_or(|object| object.len() != 2 || !object.contains_key("evidence_requests") || !object.contains_key("decision")) {
+        anyhow::bail!("investigator must return exactly evidence_requests and decision");
     }
     let answer: AgentTurn = serde_json::from_value(answer.clone())?;
-    if !answer.tool_calls.is_empty() && answer.decision.is_some() {
+    if !answer.evidence_requests.is_empty() && answer.decision.is_some() {
         anyhow::bail!("investigator returned both a decision and tool requests");
     }
-    if answer.tool_calls.is_empty() {
+    if answer.evidence_requests.is_empty() {
+        if needs_first_read(body) {
+            anyhow::bail!("investigator must request evidence before recommending a decision");
+        }
         let decision = answer.decision.filter(Value::is_object).ok_or_else(|| anyhow::anyhow!("investigator returned neither tools nor a decision"))?;
         return Ok((vec![json!({"type": "text", "text": decision.to_string()})], vec![], Some(decision)));
     }
-    if body["tool_choice"]["type"] == "none" || answer.tool_calls.len() > TOOLS_PER_TURN {
+    if body["tool_choice"]["type"] == "none" || answer.evidence_requests.len() > TOOLS_PER_TURN {
         anyhow::bail!("investigator exceeded the tool request limit");
     }
     let mut ids: std::collections::HashSet<String> = body["messages"].as_array().into_iter().flatten()
@@ -183,15 +228,15 @@ fn agent_turn(answer: &Value, body: &Value) -> anyhow::Result<(Vec<Value>, Vec<T
         .filter_map(|block| block["id"].as_str().map(str::to_string))
         .collect();
     let mut tools = Vec::new();
-    for requested in answer.tool_calls {
+    for requested in answer.evidence_requests {
         if requested.id.is_empty() || requested.id.len() > 80 || !ids.insert(requested.id.clone()) {
             anyhow::bail!("investigator tool ids must be unique and 1 to 80 bytes");
         }
         let allowed = body["tools"].as_array().into_iter().flatten()
-            .find(|tool| tool["name"].as_str() == Some(requested.name.as_str()))
+            .find(|tool| tool["name"].as_str() == Some(requested.operation.as_str()))
             .ok_or_else(|| anyhow::anyhow!("investigator requested an unknown tool"))?;
         let props = allowed["input_schema"]["properties"].as_object().ok_or_else(|| anyhow::anyhow!("tool has no argument schema"))?;
-        let input = requested.input.as_object().ok_or_else(|| anyhow::anyhow!("tool arguments must be an object"))?;
+        let input = requested.arguments.as_object().ok_or_else(|| anyhow::anyhow!("tool arguments must be an object"))?;
         for (key, value) in input {
             let schema = props.get(key).ok_or_else(|| anyhow::anyhow!("tool has an unknown argument"))?;
             if !value.is_string() || schema.get("enum").and_then(Value::as_array).is_some_and(|choices| !choices.contains(value)) {
@@ -203,7 +248,7 @@ fn agent_turn(answer: &Value, body: &Value) -> anyhow::Result<(Vec<Value>, Vec<T
                 anyhow::bail!("tool is missing a required argument");
             }
         }
-        tools.push(ToolUse { id: requested.id, name: requested.name, input: requested.input });
+        tools.push(ToolUse { id: requested.id, name: requested.operation, input: requested.arguments });
     }
     let content = tools.iter().map(|tool| json!({"type": "tool_use", "id": tool.id, "name": tool.name, "input": tool.input})).collect();
     Ok((content, tools, None))
@@ -235,11 +280,7 @@ impl Model for Investigator<'_> {
 
     async fn turn(&self, kind: &str, _effort: Effort, request: MessageRequest) -> Result<Turn, Failed> {
         let body = request.body("");
-        let task = json!({
-            "job_id": self.job_id, "attempt": self.attempt,
-            "instructions": body["system"], "tools": body["tools"],
-            "tool_choice": body["tool_choice"], "transcript": body["messages"]
-        });
+        let task = worker_task(&body, self.job_id, self.attempt);
         let inputs = json!({"task": task.to_string(), "schema": turn_schema(&body).to_string()});
         let mut call = new_call(kind);
         call.model_requested = format!("elastic-agent:{}", investigator::AGENT);
@@ -608,6 +649,37 @@ mod tests {
     use crate::testdata;
 
     #[test]
+    fn worker_history_preserves_reads_and_results_without_native_tool_blocks() {
+        let earlier = vec![
+            json!({"type": "text", "text": "Check both sources."}),
+            json!({"type": "tool_use", "id": "r1", "name": "read_evidence", "input": {"source": "band", "reason": "timing"}}),
+            json!({"type": "tool_use", "id": "r2", "name": "read_checks", "input": {"reason": "corroboration"}}),
+        ];
+        let body = tools(MessageRequest::new().system(prompts::INVESTIGATE_SYSTEM).text("Claim brief"))
+            .next_turn(&earlier).tool_result("r1", "[7] band_report/fall_flag = 1", false)
+            .tool_result("r2", "check unavailable", true).tool_choice_none().body("");
+        let task = worker_task(&body, 25, 2);
+        assert_eq!(task["job_id"], 25);
+        assert_eq!(task["attempt"], 2);
+        assert_eq!(task["instructions"], prompts::INVESTIGATE_SYSTEM);
+        assert_eq!(task["requests_allowed"], false);
+        assert_eq!(task["available_requests"][0]["operation"], "read_evidence");
+        assert_eq!(task["history"], json!([
+            {"kind": "note", "author": "worker", "text": "Claim brief"},
+            {"kind": "note", "author": "investigator", "text": "Check both sources."},
+            {"kind": "evidence_request", "id": "r1", "operation": "read_evidence", "arguments": {"source": "band", "reason": "timing"}},
+            {"kind": "evidence_request", "id": "r2", "operation": "read_checks", "arguments": {"reason": "corroboration"}},
+            {"kind": "evidence_result", "request_id": "r1", "text": "[7] band_report/fall_flag = 1", "is_error": false},
+            {"kind": "evidence_result", "request_id": "r2", "text": "check unavailable", "is_error": true}
+        ]));
+        let serialized = task.to_string();
+        for forbidden in ["\"tools\":", "\"tool_choice\":", "\"tool_use\"", "\"tool_result\"", "\"role\":"] {
+            assert!(!serialized.contains(forbidden), "{forbidden}");
+        }
+        assert!(agent_turn(&json!({"tool_calls": [], "decision": {}}), &body).is_err());
+    }
+
+    #[test]
     fn failed_investigation_preserves_reported_usage_without_accepting_an_answer() {
         let execution = json!({"status": "failed", "stepExecutions": [{
             "stepId": "investigate", "status": "failed", "error": "connection ended",
@@ -625,7 +697,7 @@ mod tests {
     #[test]
     fn bridge_accepts_only_known_read_tools_with_exact_arguments() {
         let body = tools(MessageRequest::new()).body("");
-        let requested = |name: &str, input: Value| json!({"tool_calls": [{"id": "read-1", "name": name, "input": input}], "decision": null});
+        let requested = |name: &str, input: Value| json!({"evidence_requests": [{"id": "read-1", "operation": name, "arguments": input}], "decision": null});
         let valid = requested("read_evidence", json!({"source": "band", "reason": "check incident timing"}));
         let (content, calls, decision) = agent_turn(&valid, &body).unwrap();
         assert_eq!(calls.len(), 1);
@@ -646,26 +718,31 @@ mod tests {
     #[test]
     fn bridge_rejects_ambiguous_duplicate_and_excess_requests() {
         let body = tools(MessageRequest::new()).body("");
-        let request = json!({"id": "same", "name": "read_checks", "input": {"reason": "r"}});
+        let request = json!({"id": "same", "operation": "read_checks", "arguments": {"reason": "r"}});
+        assert_eq!(turn_schema(&body)["properties"]["evidence_requests"]["minItems"], 1);
+        assert_eq!(turn_schema(&body)["properties"]["decision"], json!({"type": "null"}));
         for invalid in [
-            json!({"tool_calls": [], "decision": null}),
-            json!({"tool_calls": [request]}),
-            json!({"tool_calls": [request], "decision": {"decision": "pay"}}),
-            json!({"tool_calls": [request, request], "decision": null}),
-            json!({"tool_calls": [], "decision": {}, "sources_read": ["band"]}),
-            json!({"tool_calls": vec![request.clone(); TOOLS_PER_TURN + 1], "decision": null}),
+            json!({"evidence_requests": [], "decision": {"decision": "ask_organizer"}}),
+            json!({"evidence_requests": [], "decision": null}),
+            json!({"evidence_requests": [request]}),
+            json!({"evidence_requests": [request], "decision": {"decision": "pay"}}),
+            json!({"evidence_requests": [request, request], "decision": null}),
+            json!({"evidence_requests": [], "decision": {}, "sources_read": ["band"]}),
+            json!({"evidence_requests": vec![request.clone(); TOOLS_PER_TURN + 1], "decision": null}),
         ] {
             assert!(agent_turn(&invalid, &body).is_err(), "{invalid}");
         }
         let no_tools = tools(MessageRequest::new()).tool_choice_none().body("");
-        assert!(agent_turn(&json!({"tool_calls": [request], "decision": null}), &no_tools).is_err());
-        assert_eq!(turn_schema(&no_tools)["properties"]["tool_calls"]["maxItems"], 0);
-        let (_, calls, decision) = agent_turn(&json!({"tool_calls": [], "decision": {"decision": "ask_organizer"}}), &no_tools).unwrap();
+        assert!(agent_turn(&json!({"evidence_requests": [request], "decision": null}), &no_tools).is_err());
+        assert_eq!(turn_schema(&no_tools)["properties"]["evidence_requests"]["maxItems"], 0);
+        let (_, calls, decision) = agent_turn(&json!({"evidence_requests": [], "decision": {"decision": "ask_organizer"}}), &no_tools).unwrap();
         assert!(calls.is_empty());
         assert_eq!(decision.unwrap()["decision"], "ask_organizer");
         let earlier = vec![json!({"type": "tool_use", "id": "same", "name": "read_checks", "input": {"reason": "r"}})];
         let repeated = tools(MessageRequest::new()).next_turn(&earlier).tool_result("same", "checks", false).body("");
-        assert!(agent_turn(&json!({"tool_calls": [request], "decision": null}), &repeated).is_err());
+        assert!(agent_turn(&json!({"evidence_requests": [request], "decision": null}), &repeated).is_err());
+        assert_eq!(turn_schema(&repeated)["properties"]["evidence_requests"]["minItems"], 0);
+        assert!(agent_turn(&json!({"evidence_requests": [], "decision": {"decision": "ask_organizer"}}), &repeated).is_ok());
     }
 
     /// The Evidence Engine with one venue exclusion for an injury, the venue's
