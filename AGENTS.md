@@ -1,5 +1,9 @@
 # Agent rules
 
+## Handoff
+
+- Read [HANDOFF.md](HANDOFF.md) first. It holds what the repo doesn't say: Viktor's standing rules and decisions, unfinished work, the steps that only work on his Mac and where the credentials live. The Git and Writing rules in CLAUDE.md apply to every agent, Codex included.
+
 ## User-facing UI
 
 - User-facing UI never names the underlying tech (Elastic, SpacetimeDB, Claude, Kibana, Bright Data) unless the user needs it to act.
