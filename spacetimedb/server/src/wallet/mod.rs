@@ -1,5 +1,5 @@
 //! The attendee's BandIt wallet: a Nessie sandbox account opened with $200 when the attendee saves
-//! their name, spent on merch after the event, and paid into by injury claims. Nessie holds the
+//! their name, spent on merch during and after the event, and paid into by injury claims. Nessie holds the
 //! accounts and records every purchase and deposit; the sandbox never moves an account's balance
 //! field, so the balance shown is the sum of the wallet's entries here, exact and live.
 
@@ -46,6 +46,41 @@ pub fn open_for(ctx: &ReducerContext, a: &Attendee) {
     jobs::enqueue(ctx, KIND_WALLET_OPEN, payload.to_string(), "attendee", a.node_id);
 }
 
+/// Only the live shopping schedule calls this, for a selected generated crowd member.
+/// A stable band identity keeps queued openings valid when a new run replaces attendee node IDs.
+pub(crate) fn open_for_live_shopper(ctx: &ReducerContext, a: &Attendee) -> bool {
+    let Some(member) = ctx.db.crowd_member().identity().find(a.identity) else { return false };
+    if !a.crowd || member.band_id < FIRST_CROWD_BAND || crowd_wallet_identity(member.band_id) != a.identity {
+        return false;
+    }
+    if ctx.db.claimant_account().identity().find(a.identity).is_some() || live_wallet_pending(ctx, a.identity) {
+        return true;
+    }
+    let payload = serde_json::json!({
+        "name": a.display_name, "opening_cents": OPENING_CENTS, "crowd_band_id": member.band_id,
+    });
+    jobs::enqueue(ctx, KIND_WALLET_OPEN, payload.to_string(), "attendee", a.node_id);
+    true
+}
+
+fn crowd_wallet_identity(band_id: u32) -> Identity {
+    Identity::from_claims("bandit-crowd", &format!("band-{band_id}"))
+}
+
+fn job_crowd_identity(job: &Job) -> Option<Identity> {
+    let value: serde_json::Value = serde_json::from_str(&job.payload).ok()?;
+    let band_id = u32::try_from(value.get("crowd_band_id")?.as_u64()?).ok()?;
+    (band_id >= FIRST_CROWD_BAND).then(|| crowd_wallet_identity(band_id))
+}
+
+pub(crate) fn live_wallet_pending(ctx: &ReducerContext, identity: Identity) -> bool {
+    ctx.db.job().open().filter(true).any(|j| j.kind == KIND_WALLET_OPEN && job_crowd_identity(&j) == Some(identity))
+}
+
+pub(crate) fn live_wallet_open_count(ctx: &ReducerContext) -> usize {
+    ctx.db.job().open().filter(true).filter(|j| j.kind == KIND_WALLET_OPEN && job_crowd_identity(j).is_some()).count()
+}
+
 /// The attendee connects their Capital One wallet during band setup; the worker opens it on Nessie.
 #[spacetimedb::reducer]
 pub fn connect_wallet(ctx: &ReducerContext) -> Result<(), String> {
@@ -62,13 +97,18 @@ pub fn connect_wallet(ctx: &ReducerContext) -> Result<(), String> {
 pub fn record_wallet(ctx: &ReducerContext, job_id: u64, customer_id: String, account_id: String) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
     let job = jobs::leased_by_caller(ctx, job_id)?;
-    let a = ctx.db.attendee().node_id().find(job.subject_id).ok_or("no such attendee")?;
+    if job.kind != KIND_WALLET_OPEN {
+        return Err("not a wallet opening job".into());
+    }
+    let identity = job_crowd_identity(&job)
+        .or_else(|| ctx.db.attendee().node_id().find(job.subject_id).map(|a| a.identity))
+        .ok_or("no such attendee")?;
     jobs::finish(ctx, job, account_id.clone());
-    if ctx.db.claimant_account().identity().find(a.identity).is_some() {
+    if ctx.db.claimant_account().identity().find(identity).is_some() {
         return Ok(());
     }
-    ctx.db.claimant_account().insert(ClaimantAccount { identity: a.identity, customer_id, account_id: account_id.clone(), created_at: ctx.timestamp });
-    add_entry(ctx, a.identity, "opening", OPENING_CENTS as i64, "BandIt wallet opened".into(), account_id);
+    ctx.db.claimant_account().insert(ClaimantAccount { identity, customer_id, account_id: account_id.clone(), created_at: ctx.timestamp });
+    add_entry(ctx, identity, "opening", OPENING_CENTS as i64, "BandIt wallet opened".into(), account_id);
     Ok(())
 }
 

@@ -235,6 +235,10 @@ pub mod live_run_table;
 pub mod live_run_timer_table;
 pub mod live_run_timer_type;
 pub mod live_run_type;
+pub mod live_shopper_table;
+pub mod live_shopper_type;
+pub mod live_shopping_table;
+pub mod live_shopping_type;
 pub mod live_tick_reducer;
 pub mod load_merch_templates_reducer;
 pub mod load_venue_floor_reducer;
@@ -701,6 +705,10 @@ pub use live_run_table::*;
 pub use live_run_timer_table::*;
 pub use live_run_timer_type::LiveRunTimer;
 pub use live_run_type::LiveRun;
+pub use live_shopper_table::*;
+pub use live_shopper_type::LiveShopper;
+pub use live_shopping_table::*;
+pub use live_shopping_type::LiveShopping;
 pub use live_tick_reducer::live_tick;
 pub use load_merch_templates_reducer::load_merch_templates;
 pub use load_venue_floor_reducer::load_venue_floor;
@@ -2717,6 +2725,8 @@ pub struct DbUpdate {
     live_plan: __sdk::TableUpdate<LivePlan>,
     live_run: __sdk::TableUpdate<LiveRun>,
     live_run_timer: __sdk::TableUpdate<LiveRunTimer>,
+    live_shopper: __sdk::TableUpdate<LiveShopper>,
+    live_shopping: __sdk::TableUpdate<LiveShopping>,
     medic_medical_cards: __sdk::TableUpdate<MedicCard>,
     medical_access_log: __sdk::TableUpdate<MedicalAccessLog>,
     medical_card: __sdk::TableUpdate<MedicalCard>,
@@ -3092,6 +3102,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "live_run_timer" => db_update
                     .live_run_timer
                     .append(live_run_timer_table::parse_table_update(table_update)?),
+                "live_shopper" => db_update
+                    .live_shopper
+                    .append(live_shopper_table::parse_table_update(table_update)?),
+                "live_shopping" => db_update
+                    .live_shopping
+                    .append(live_shopping_table::parse_table_update(table_update)?),
                 "medic_medical_cards" => db_update
                     .medic_medical_cards
                     .append(medic_medical_cards_table::parse_table_update(table_update)?),
@@ -3538,6 +3554,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.live_run_timer = cache
             .apply_diff_to_table::<LiveRunTimer>("live_run_timer", &self.live_run_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
+        diff.live_shopper = cache
+            .apply_diff_to_table::<LiveShopper>("live_shopper", &self.live_shopper)
+            .with_updates_by_pk(|row| &row.identity);
+        diff.live_shopping = cache
+            .apply_diff_to_table::<LiveShopping>("live_shopping", &self.live_shopping)
+            .with_updates_by_pk(|row| &row.id);
         diff.medical_access_log = cache
             .apply_diff_to_table::<MedicalAccessLog>("medical_access_log", &self.medical_access_log)
             .with_updates_by_pk(|row| &row.id);
@@ -4136,6 +4158,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "live_run_timer" => db_update
                     .live_run_timer
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "live_shopper" => db_update
+                    .live_shopper
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "live_shopping" => db_update
+                    .live_shopping
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "medic_medical_cards" => db_update
                     .medic_medical_cards
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -4680,6 +4708,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "live_run_timer" => db_update
                     .live_run_timer
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "live_shopper" => db_update
+                    .live_shopper
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "live_shopping" => db_update
+                    .live_shopping
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "medic_medical_cards" => db_update
                     .medic_medical_cards
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -5036,6 +5070,8 @@ pub struct AppliedDiff<'r> {
     live_plan: __sdk::TableAppliedDiff<'r, LivePlan>,
     live_run: __sdk::TableAppliedDiff<'r, LiveRun>,
     live_run_timer: __sdk::TableAppliedDiff<'r, LiveRunTimer>,
+    live_shopper: __sdk::TableAppliedDiff<'r, LiveShopper>,
+    live_shopping: __sdk::TableAppliedDiff<'r, LiveShopping>,
     medic_medical_cards: __sdk::TableAppliedDiff<'r, MedicCard>,
     medical_access_log: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
     medical_card: __sdk::TableAppliedDiff<'r, MedicalCard>,
@@ -5456,6 +5492,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<LiveRunTimer>(
             "live_run_timer",
             &self.live_run_timer,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LiveShopper>(
+            "live_shopper",
+            &self.live_shopper,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LiveShopping>(
+            "live_shopping",
+            &self.live_shopping,
             event,
         );
         callbacks.invoke_table_row_callbacks::<MedicCard>(
@@ -6471,6 +6517,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         live_plan_table::register_table(client_cache);
         live_run_table::register_table(client_cache);
         live_run_timer_table::register_table(client_cache);
+        live_shopper_table::register_table(client_cache);
+        live_shopping_table::register_table(client_cache);
         medic_medical_cards_table::register_table(client_cache);
         medical_access_log_table::register_table(client_cache);
         medical_card_table::register_table(client_cache);
@@ -6643,6 +6691,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "live_plan",
         "live_run",
         "live_run_timer",
+        "live_shopper",
+        "live_shopping",
         "medic_medical_cards",
         "medical_access_log",
         "medical_card",

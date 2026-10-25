@@ -15,6 +15,7 @@
 
 pub mod log;
 mod script;
+mod shopping;
 
 pub use log::*;
 
@@ -295,6 +296,7 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
     // The run's row first: the crowd walks in at its pace, and its seed sends everyone their way.
     crowd::start(ctx, crowd_size, pace.max(1) as f32)?;
     crowd::walk_in(ctx);
+    shopping::start(ctx, crowd_size, minutes);
     safety::ensure_watch(ctx);
     for t in ctx.db.live_run_timer().iter().collect::<Vec<_>>() {
         ctx.db.live_run_timer().scheduled_id().delete(t.scheduled_id);
@@ -366,6 +368,7 @@ fn resume(ctx: &ReducerContext, p: LivePause) {
         });
     }
     crowd::resume(ctx, gap);
+    shopping::resume(ctx, gap);
     record(ctx, 0, 0, "venue", &safety::caller_name(ctx), "Resumed".into(), format!("paused for {} s", gap.to_micros() / 1_000_000));
 }
 
@@ -395,6 +398,7 @@ pub fn evacuate_live_run(ctx: &ReducerContext, on: bool) -> Result<(), String> {
     let e = ctx.db.live_evacuation().id().find(0).ok_or("the venue is not evacuated")?;
     ctx.db.live_evacuation().id().delete(0);
     crowd::walk_back_in(ctx);
+    shopping::after_evacuation(ctx);
     if let Some(r) = run(ctx) {
         ctx.db.live_run().id().update(LiveRun { next_incident_at: ctx.timestamp + seconds(FIRST_INCIDENT_SECS), ..r });
     }
@@ -434,6 +438,7 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
     let evacuating = evacuating(ctx);
     if r.phase == LivePhase::Running && ctx.timestamp < r.ends_at && !evacuating {
         maybe_send_home(ctx, &r);
+        shopping::tick(ctx, &r);
     }
     match r.phase {
         LivePhase::Running if ctx.timestamp >= r.ends_at => close_doors(ctx, r),

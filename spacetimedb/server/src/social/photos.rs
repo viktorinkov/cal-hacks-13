@@ -116,6 +116,30 @@ pub fn register_photo(ctx: &ReducerContext, url: String, taken_at: Timestamp, zo
     Ok(())
 }
 
+/// A small live crowd snapshot. Every tag still needs current zone history; the
+/// selected group avoids repeatedly photographing the first people in a busy zone.
+/// The fixture shows three people. Ordinary photographer tagging stays unchanged.
+pub(crate) fn register_crowd_photo(ctx: &ReducerContext, zone_id: u64, group: &[Identity]) -> Option<Photo> {
+    let station = ctx.db.zone().id().find(zone_id)?.station_id;
+    let people: Vec<Identity> = group.iter().copied()
+        .filter(|who| {
+            let Some(m) = ctx.db.crowd_member().identity().find(*who) else { return false };
+            ctx.db.attendee().identity().find(*who).is_some_and(|a| a.crowd && a.findable)
+                && ctx.db.zone_visit().band_id().filter(m.band_id).any(|v| v.zone == station
+                    && v.entered <= ctx.timestamp && v.left.is_none_or(|left| left >= ctx.timestamp))
+        }).take(3).collect();
+    if people.is_empty() { return None; }
+    let photo = ctx.db.photo().insert(Photo {
+        id: 0, url: "/assets/photos/sponsor-row.jpg".into(), taken_at: ctx.timestamp,
+        zone_id, caption: "Friends at the event".into(), added_by: ctx.database_identity(),
+        created_at: ctx.timestamp, people_count: 3, features_call_id: 0,
+    });
+    for attendee in people {
+        ctx.db.photo_tag().insert(PhotoTag { id: 0, photo_id: photo.id, attendee, status: String::new(), updated_at: ctx.timestamp });
+    }
+    Some(photo)
+}
+
 /// The worker's reading of a photo: how many people it shows and a one-line caption. The tags become the
 /// first `people_count` candidates, and the caption fills in when the photographer gave none.
 #[spacetimedb::reducer]

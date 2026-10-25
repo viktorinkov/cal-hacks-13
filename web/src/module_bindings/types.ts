@@ -1027,6 +1027,27 @@ export const LiveRunTimer = __t.object("LiveRunTimer", {
 });
 export type LiveRunTimer = __Infer<typeof LiveRunTimer>;
 
+export const LiveShopper = __t.object("LiveShopper", {
+  identity: __t.identity(),
+  bandId: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  size: __t.string(),
+  shippingAddress: __t.string(),
+  selectedAt: __t.timestamp(),
+  pending: __t.bool(),
+});
+export type LiveShopper = __Infer<typeof LiveShopper>;
+
+export const LiveShopping = __t.object("LiveShopping", {
+  id: __t.u8(),
+  nextAt: __t.timestamp(),
+  gapSecs: __t.i64(),
+  target: __t.u16(),
+  selected: __t.u16(),
+});
+export type LiveShopping = __Infer<typeof LiveShopping>;
+
 export const MedicCard = __t.object("MedicCard", {
   incidentId: __t.u64(),
   bandId: __t.u8(),

@@ -209,7 +209,7 @@ pub fn buy_merch(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: St
 /// Buys from the attendee's wallet with a delivery address saved on this order.
 #[spacetimedb::reducer]
 pub fn buy_merch_with_shipping(ctx: &ReducerContext, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
-    place_order(ctx, ctx.sender(), template_id, photo_id, size, checked_shipping_address(&shipping_address)?)
+    place_with_shipping(ctx, ctx.sender(), template_id, photo_id, size, shipping_address)
 }
 
 /// The organizer buys for an attendee exactly as the attendee would from their tap page: the same
@@ -226,7 +226,12 @@ pub fn buy_merch_as(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_
 pub fn buy_merch_as_with_shipping(ctx: &ReducerContext, node_id: u64, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
     let a = ctx.db.attendee().node_id().find(node_id).ok_or("no such attendee")?;
-    place_order(ctx, a.identity, template_id, photo_id, size, checked_shipping_address(&shipping_address)?)
+    place_with_shipping(ctx, a.identity, template_id, photo_id, size, shipping_address)
+}
+
+/// Internal callers use the same address, photo ownership, wallet and balance checks as checkout.
+pub(crate) fn place_with_shipping(ctx: &ReducerContext, me: Identity, template_id: u64, photo_id: u64, size: String, shipping_address: String) -> Result<(), String> {
+    place_order(ctx, me, template_id, photo_id, size, checked_shipping_address(&shipping_address)?)
 }
 
 fn checked_shipping_address(address: &str) -> Result<String, String> {

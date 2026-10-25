@@ -327,11 +327,15 @@ function status(r: LiveRun | undefined, list: IncidentMarker[]) {
   const ids = new Set(list.map(m => m.incidentId));
   const charges = [...conn.db.boardCharges.iter()].filter(c => ids.has(c.incidentId));
   const charged = (...s: string[]) => charges.filter(c => s.includes(c.status)).length;
+  const orders = [...conn.db.boardMerchOrders.iter()].filter(o => o.createdAt.microsSinceUnixEpoch >= r.startedAt.microsSinceUnixEpoch);
+  const paidOrders = orders.filter(o => o.status === 'paid');
+  const sales = paidOrders.reduce((sum, o) => sum + o.amountCents, 0n);
   return h('table', {},
     row('Event run', `${phaseWords(r)}: started ${time(r.startedAt)}, ends ${time(r.endsAt)}, ${r.pace}× speed`),
     row('People', `${people.toLocaleString()} of ${r.crowd.toLocaleString()}`),
     row('Incidents', `${list.length}, ${open} open${next}`),
     row('Claims', `${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`),
+    row('Purchases this run', `${orders.filter(o => o.status === 'paying').length} processing, ${paidOrders.length} paid (${money(sales)} sales), ${orders.filter(o => o.status === 'failed').length} failed`),
     charges.length > 0 && row('Charges', `${charges.length} named: ${charged('proposed', 'disputed')} waiting for the organizer, ${charged('approved', 'paying')} to pay, ${charged('paid')} paid, ${charged('waived')} waived`),
     row('Seed', String(r.seed)));
 }
