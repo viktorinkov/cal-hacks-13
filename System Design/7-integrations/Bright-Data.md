@@ -2,8 +2,8 @@
 
 BandIt uses three Bright Data products, each for the job it does best:
 
-- the Bright Data Web MCP, for every page and dataset the event import reads, and for the search that starts a venue setup or a plan lookup;
-- the Bright Data Web Unlocker API, for the raw HTML of the pages a venue setup reads, for a linked model file, and for the PDF of an attendee's plan;
+- the Bright Data Web MCP, for every page and dataset the event import reads, and for the search that starts a venue setup, a plan lookup or a venue policy lookup;
+- the Bright Data Web Unlocker API, for the raw HTML of the pages a venue setup reads, for a linked model file, and for the PDF of an attendee's plan or of the venue's policy forms;
 - the Bright Data Browser API, for exporting a venue's 3D model from inside its own web page.
 
 `bandit-ingest` is a Rust command-line tool the team runs before the event. It reads the event's public pages and three Bright Data datasets through the Bright Data Web MCP, and saves every answer as a snapshot file kept with the project. The Evidence Engine in Elastic then organizes the records, and `bandit-ingest` loads the checked bundle into SpacetimeDB in one `import_event` transaction.
@@ -13,6 +13,8 @@ Everything downstream reads ordinary SpacetimeDB rows: the sponsors on the organ
 The 3D hall on the Live view (/live) and the organizer portal's Venue setup tab is a model exported through the Bright Data Browser API. For any other event, an organizer sets up the venue from the event's name alone (see Venue setup from the event's name).
 
 An attendee who has no policy PDF at hand names their insurer and plan instead. Bright Data finds the plan's public wording on the web and fetches its PDF, and the Evidence Engine reads it like an uploaded one (see Plan lookup from a plan's name).
+
+The organizer does the same for the venue's policy. They name the venue's insurer and the two forms of its package policy, and type the numbers from its declarations page. Bright Data finds and fetches both forms, and the Evidence Engine reads them like an uploaded policy (see Venue policy lookup from the policy's forms).
 
 ## Role in the system
 
@@ -26,16 +28,17 @@ Responsibilities:
 - Export the Cal Hacks venue map's 3D model through the Bright Data Browser API (`pipeline/venue_model.py`), kept as `web/venue/venue.glb`.
 - Set up any event's venue from its name, started from the organizer portal: search, let the Anthropic Claude API pick the event site, the venue and its public 3D map, and save the venue's model.
 - Find an attendee's plan from its name, started from the tap page: search, let the Anthropic Claude API pick the plan's own document, fetch its PDF and hand it to the Evidence Engine's reading.
-- Own the tables `organization`, `person`, `person_claim`, `venue_setup`, `venue_setup_step`, `chosen_venue` and `plan_lookup`, the reducers `claim_person`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup`, `choose_venue`, `look_up_plan` and `finish_plan_lookup`, the views `claimed_people` and `my_plan_lookups`, and the job kinds `venue_setup` and `plan_lookup`.
+- Find the venue's policy forms from their form numbers, started from the organizer portal's Venue setup tab: search, let the Anthropic Claude API pick each form's document, fetch both PDFs, join them into one policy PDF and hand it to the Evidence Engine's reading.
+- Own the tables `organization`, `person`, `person_claim`, `venue_setup`, `venue_setup_step`, `chosen_venue`, `plan_lookup` and `venue_policy_lookup`, the reducers `claim_person`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup`, `choose_venue`, `look_up_plan`, `finish_plan_lookup`, `look_up_venue_policy` and `finish_venue_policy_lookup`, the views `claimed_people`, `my_plan_lookups` and `board_venue_policy_lookups`, and the job kinds `venue_setup`, `plan_lookup` and `venue_policy_lookup`.
 
 Non-responsibilities:
 
-- **Never scrapes people.** No person scraper, no social profile, no lookup of a person by name. Every attendee types their own social handles at onboarding ([Social](../6-features/Social.md) owns `social_handle`). A plan lookup searches for the insurer's public document, never for the attendee: its queries hold the insurer, the plan, the state and the year, and never a name, a member id or a policy number.
+- **Never scrapes people.** No person scraper, no social profile, no lookup of a person by name. Every attendee types their own social handles at onboarding ([Social](../6-features/Social.md) owns `social_handle`). A plan lookup searches for the insurer's public document, never for the attendee: its queries hold the insurer, the plan, the state and the year, and never a name, a member id or a policy number. A venue policy lookup's queries hold the insurer and the form numbers, never the policy number.
 - Does not merge facts across sources. The Elastic Workflow `bandit-organize` does that ([Elastic](Elastic.md)).
 - Does not define zones. Each zone, with its station id and exit colour, is written by hand in the event's `zones.json`, which goes into the bundle unchanged ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 - Does not scrape merch. [Merch](../6-features/Merch.md) loads its hand-made templates from `assets/merch/templates.json`.
-- Runs no Bright Data call on the safety path. The only Bright Data run the organizer portal starts is a venue setup, and the only one the tap page starts is a plan lookup.
-- Does not read the plan's PDF. The Evidence Engine reads it into terms and clauses exactly like an uploaded PDF ([Elastic](Elastic.md)), and [Insurance](../6-features/Insurance.md) decides what those terms may set.
+- Runs no Bright Data call on the safety path. The only Bright Data runs the organizer portal starts are a venue setup and a venue policy lookup, and the only one the tap page starts is a plan lookup.
+- Does not read the plan's PDF or the venue's policy forms. The Evidence Engine reads it into terms and clauses exactly like an uploaded PDF ([Elastic](Elastic.md)), and [Insurance](../6-features/Insurance.md) decides what those terms may set.
 - Does not own `venue`, `zone`, `booth` or `schedule_slot` ([SpacetimeDB](../2-data/SpacetimeDB.md)); `import_event` fills them from the bundle.
 
 ## Interfaces
@@ -61,6 +64,11 @@ Non-responsibilities:
 | Anthropic Claude API, plan lookup | out | `bandit-workers`, through `claude-client` | `plan_find`: the search results in; up to 3 addresses of this plan's own document out, best first, each with why. `plan_check`: a fetched PDF in; the insurer, plan and year it prints, each with its page, out | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Claude-API](Anthropic-Claude-API.md)) |
 | Bright Data Web Unlocker API, plan PDF | out | `bandit-workers`, job `plan_lookup` | each picked address in turn; back comes the file, kept only when it is a PDF | HTTPS `POST https://api.brightdata.com/request` with the zone `BRIGHTDATA_ZONE` and format `raw` |
 | Plan lookup result | out | `bandit-workers` (role `worker`) to the module | `finish_plan_lookup` with the document's address, the printed insurer, plan and year, its SHA-256 and page count, or the reason nothing was found; the PDF is an `owner_only` blob of the attendee with purpose `plan_wording` | SpacetimeDB reducer call; blob store |
+| Venue policy lookup | in | organizer portal, Venue setup tab, role `ops` | `look_up_venue_policy` with the insurer, the state, the liability and property form numbers, and the declarations: policy number, period, claims contact, the medical expense limit and general aggregate, the property limit and deductible; `board_venue_policy_lookups` back | SpacetimeDB reducer call and subscription |
+| Bright Data Web MCP, venue policy lookup | out | `bandit-workers`, job `venue_policy_lookup` | `search_engine` with two queries for each form | MCP `tools/call` over HTTPS, with `BRIGHTDATA_API_TOKEN` |
+| Anthropic Claude API, venue policy lookup | out | `bandit-workers`, through `claude-client` | `venue_policy_find`: one form's search results in; up to 3 addresses of that form out, best first, each with why. `venue_policy_check`: a fetched PDF in; which form it is, its form number and title as printed, each with its page, out | HTTPS Messages API, structured output; recorded in `model_call` ([Anthropic-Claude-API](Anthropic-Claude-API.md)) |
+| Bright Data Web Unlocker API, policy forms | out | `bandit-workers`, job `venue_policy_lookup` | each picked address in turn; back comes the file, kept only when it is a PDF | HTTPS `POST https://api.brightdata.com/request` with the zone `BRIGHTDATA_ZONE` and format `raw` |
+| Venue policy lookup result | out | `bandit-workers` (role `worker`) to the module | `finish_venue_policy_lookup` with each form's address, form number and title as printed, the joined PDF's SHA-256 and page count and the page the property form starts on, or the reason nothing was found; the PDF is a `staff` blob with purpose `policy`, like an upload | SpacetimeDB reducer call; blob store |
 | Loaded rows | out | `bandit-indexer` ([Elastic](Elastic.md)), tap page, organizer portal | `organization`, `booth`, `zone` and `schedule_slot` by subscription to `bandit-indexer`; `venue`, `organization`, `person` and `claimed_people` to the tap page; `venue`, `zone`, `booth` and `organization` to the organizer portal | SpacetimeDB subscription |
 
 ## Design
@@ -81,8 +89,8 @@ Each tool was picked for what the step needs, and each is used for nothing else.
 |---|---|---|---|
 | `scrape_as_markdown` | Bright Data Web MCP (its Web Unlocker underneath) | every page in `sources.json`: the event site, the Devpost page, the Devpost dates page and the venue map page | the Rust parsers read markdown links and image alt text: a sponsor's link with its logo, a prize's sponsor tag in brackets, the venue line's maps.google.com link |
 | `run_scraper`, `get_scraper_progress`, `get_scraper_results` | Bright Data Web MCP (the Bright Data Web Scraper API underneath) | the LinkedIn company dataset `gd_l1vikfnt1wgvvqz95w` (41 company pages), the Crunchbase company dataset `gd_l1vijqt9jfj7olije` (4) and the Google Maps dataset `gd_m8ebnr0q2qlklc02fz` (the venue's place), each collected by URL | structured company and place records with no page to parse; `run_scraper` returns a snapshot id, and the fetch stage polls `get_scraper_progress` every 30 s until `get_scraper_results` has the rows |
-| `search_engine` | Bright Data Web MCP (the Bright Data SERP API underneath) | the venue setup's three searches: the event's name, "<name> venue map" and "<name> venue 3D map floor plan"; a plan lookup's two searches for the plan's document | a venue setup starts from a name alone, and a plan lookup from an insurer and a plan name, with no URL |
-| Web Unlocker `POST /request` | Bright Data Web Unlocker API | the pages a venue setup reads; a linked `.glb` or `.gltf` file; a plan's PDF | the raw answer keeps the `iframe`, `embed`, `object` and `model-viewer` tags and the model file links that a 3D map hides in, which markdown drops, and the bytes of a PDF, which the Evidence Engine reads page by page |
+| `search_engine` | Bright Data Web MCP (the Bright Data SERP API underneath) | the venue setup's three searches: the event's name, "<name> venue map" and "<name> venue 3D map floor plan"; a plan lookup's two searches for the plan's document; a venue policy lookup's two searches for each form | a venue setup starts from a name alone, a plan lookup from an insurer and a plan name, and a venue policy lookup from an insurer and two form numbers, with no URL |
+| Web Unlocker `POST /request` | Bright Data Web Unlocker API | the pages a venue setup reads; a linked `.glb` or `.gltf` file; a plan's PDF; the venue's policy forms | the raw answer keeps the `iframe`, `embed`, `object` and `model-viewer` tags and the model file links that a 3D map hides in, which markdown drops, and the bytes of a PDF, which the Evidence Engine reads page by page |
 | Remote browser over CDP | Bright Data Browser API | exporting a venue's 3D scene | only a real browser runs the page's three.js, and the export needs a script in the page before it loads |
 
 The MCP server marks scraped text as untrusted. Both MCP clients keep only the text between its `UNTRUSTED` markers, and the venue setup tells the Anthropic Claude API to treat every page as data and ignore any instruction in it.
@@ -322,6 +330,79 @@ flowchart LR
 
 `finish_plan_lookup` is callable only by the `worker` holding the job's lease. When the job uses up its attempts, the module marks the lookup `failed` with the job's error. A new lookup of the same kind replaces what the last one wrote.
 
+### Venue policy lookup from the policy's forms
+
+The venue's policy comes into BandIt in one of two ways, both in the insurance policy section of the Venue setup tab: the organizer uploads its PDF, or names it. Naming it works because most of a venue's policy is public.
+
+A venue holds one package policy with a liability part and a property part. Each part is a coverage form: most often the standard ISO Commercial General Liability Coverage Form, CG 00 01, and the ISO Building and Personal Property Coverage Form, CP 00 10, or the insurer's own version of each. The declarations page lists the forms in its forms schedule and prints the policy's own numbers. The forms are public, and the declarations page is not.
+
+**What the web has.**
+
+| Part | What the organizer types | The public document | What it gives | What it cannot give |
+|---|---|---|---|---|
+| `liability` | the form number from the declarations' forms schedule, such as "CG 00 01 04 13" | the commercial general liability coverage form | Coverage C, Medical Payments: what it pays, regardless of fault; the one-year window for expenses; its exclusions, such as any insured, hired persons and athletic activities; the other insurance and transfer of rights conditions | the medical expense limit, the general aggregate limit, the policy number, the period |
+| `property` | the form number, such as "CP 00 10 10 12" | the property coverage form | the property it covers, its deductible clause, how a loss is valued, its loss conditions | the limit of insurance and the deductible |
+
+The organizer types from the declarations page what no form prints: the insurer, the policy number, the policy period, where claims are reported, the medical expense limit for any one person, the general aggregate limit, and the property limit and deductible. They are the organizer's own word, so each shows in the terms table as `typed`, and the organizer confirms them with the terms the forms gave.
+
+**The run.**
+
+1. **Start.** "Find the policy online" calls `look_up_venue_policy(insurer, state, liability_form, property_form, declarations)`. It needs `ops`; an insurer of 2 to 80 characters and a two-letter state; two form numbers of 4 to 24 letters, digits and spaces; a policy number and a claims contact; a period that ends after it starts; a medical expense limit above $0 and at most the aggregate; and a property deductible below the property limit. No other lookup may be running. It writes a `venue_policy_lookup` row in status `searching` and a job of kind `venue_policy_lookup`.
+2. **Search.** For each form, the worker calls the Bright Data Web MCP's `search_engine` twice. For the liability form: "<insurer> <form> commercial general liability coverage form pdf" and "<form> commercial general liability coverage form pdf". For the property form: "<insurer> <form> commercial property coverage form pdf" and "<form> building and personal property coverage form pdf". The second query of each finds the standard form, which many insurers use as it is.
+3. **Pick.** For each form, the Anthropic Claude API (`venue_policy_find`) reads its results and returns up to 3 addresses of that form, best first, each with why. It prefers the insurer's own copy, then a state insurance department's filing, then any copy with that form number and edition, and passes over articles, broker pages and other forms. Code keeps only addresses the results named.
+4. **Fetch.** The worker fetches each form's addresses in turn through the Bright Data Web Unlocker API. An answer counts only when it starts with `%PDF-` and is at most 15 MB.
+5. **Check.** The Anthropic Claude API (`venue_policy_check`) reads the PDF and returns which form it is (`liability_form`, `property_form` or `other`), and its form number and title as printed, each with its page. Code compares the form number with what the organizer typed, letters and digits only: the printed number must start with the typed one. So "CG 00 01" finds "CG 00 01 04 13", but "CG 00 01 04 13" does not find the 2007 edition "CG 00 01 12 07". A PDF of another form is passed over, and the next address is fetched.
+6. **Join.** The worker joins the two forms into one PDF, the liability form first, as the forms schedule lists them. When both together would be over 50 pages, it keeps the liability form alone and notes it, because the reading takes 1 to 50 pages; CG 00 01 and CP 00 10 have 16 pages each.
+7. **Land.** The worker stores the PDF in the blob store, registers it as a `staff` blob with purpose `policy` like an upload, and calls `finish_venue_policy_lookup` with each form's address, form number, title and first page, the SHA-256 and the page count. In one transaction the module turns the lookup `found` and files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `venue_policy`, source `policy_lookup`, the liability form's address.
+8. **Read.** The Evidence Engine reads the PDF into terms and clauses, and every clause goes to `bandit-policy-clauses` as the venue's ([Elastic](Elastic.md)). When the module stores the terms (`apply_document_terms`), code puts the typed declarations over the terms they name: the insurer, the policy number, the claims contact, the period, the medical payments per-claim and aggregate limits, and the property limit, as both its per-claim and aggregate limit, and its deductible. Each becomes `typed`. The service window, the minimum payout, the exclusions, the other insurance and the schedule of benefits come from the forms, or keep their defaults.
+9. **Confirm.** The organizer sees every term next to its quote and page, or marked `typed`, and "Use these terms for the event" (`confirm_policy_terms`) makes them the event's policy, as for an upload. Until then claims keep the policy in effect.
+
+When neither form gives a PDF, the lookup turns `not_found`; when PDFs came back but none was a typed form, it turns `wrong_form`. Either way nothing is filed, and the tab offers the upload: "We couldn't find the policy's forms online. Upload the policy instead." When only one form is found, the lookup is still `found`, with that form alone, and its note names the missing one.
+
+The question this diagram answers: what happens between the forms the organizer names and the terms the insurance Decision Engine reads?
+
+```mermaid
+flowchart LR
+  ORG["organizer portal (/organizer): Venue setup, Find the policy online"] -->|"insurer + forms + declarations, look_up_venue_policy"| MOD["band1t module"]
+  MOD -->|"venue_policy_lookup job"| W["bandit-workers"]
+  W -->|"2 queries per form, search_engine"| MCP["Bright Data Web MCP"]
+  W -->|"results, venue_policy_find; PDF, venue_policy_check"| CL["Anthropic Claude API"]
+  W -->|"picked addresses"| WU["Bright Data Web Unlocker API"]
+  W -->|"both forms joined into one PDF"| BLOB[("blob store")]
+  W -->|"forms + SHA-256, finish_venue_policy_lookup"| MOD
+  MOD -->|"queue_document_read, as an upload"| EE["Evidence Engine"]
+  EE -->|"terms + clauses"| CLS["bandit-policy-clauses"]
+  EE -->|"terms, apply_document_terms"| MOD
+  MOD -->|"read terms + typed declarations"| ORG
+  ORG -->|"Use these terms for the event, confirm_policy_terms"| MOD
+  classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+  classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+  classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+  classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
+  class MCP,CL,WU,EE,CLS ext
+  class ORG web
+  class MOD stdb
+  class W,BLOB rust
+```
+
+**`venue_policy_lookup`** (one lookup of the venue's policy; staff only, through `board_venue_policy_lookups`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | auto id | row id |
+| `insurer`, `state`, `liability_form`, `property_form` | text | as the organizer typed them |
+| `policy_number`, `fnol_contact`, `period_start`, `period_end` | text | from the declarations page, as typed; the dates as `YYYY-MM-DD` |
+| `medical_limit_cents`, `medical_aggregate_cents`, `property_limit_cents`, `property_deductible_cents` | u64 | from the declarations page, as typed |
+| `status` | text | `searching`, `found`, `not_found`, `wrong_form` or `failed` |
+| `forms` | list | each form the lookup found: its part (`liability` or `property`), its address, its form number and title as printed, and the page it starts on in the joined PDF |
+| `file_hash`, `page_count` | text, u32 | the joined PDF in the blob store |
+| `document_id` | id | the `policy_document` the PDF was filed as |
+| `job_id` | id | the `venue_policy_lookup` job |
+| `note` | text | a form that was not found, or why the lookup ended `not_found`, `wrong_form` or `failed`, in plain words |
+| `requested_by`, `created_at`, `updated_at` | identity, timestamps | |
+
+`finish_venue_policy_lookup` is callable only by the `worker` holding the job's lease. When the job uses up its attempts, the module marks the lookup `failed` with the job's error.
+
 ### Records, the bundle and import_event
 
 Every record carries `source_key` (its source, then a stable key: `devpost:org:anthropic`, `site:person:enoreyes`, `linkedin:org:visa.com`), `source_url`, `fetched_at` and the snapshot's SHA-256. The bundle's own keys are `event:calhacks-13` for the venue, `org:<domain>` for an organisation and `booth:<domain>` for a booth.
@@ -462,6 +543,9 @@ sequenceDiagram
 | A plan lookup finds no PDF of the plan | No public wording for that plan, common for an employer's plan | The lookup ends `not_found`, and the tap page offers the upload instead |
 | The PDF a plan lookup found is another plan's | Wrong terms for the attendee | Code compares the insurer and plan the PDF prints (`plan_check`) with what the attendee typed; the next address is tried, and when none matches the lookup ends `wrong_plan` with nothing written |
 | The attendee types a wrong limit or deductible | A wrong payout on their own policy | Every pay that rests on a `plan_lookup` policy goes to the organizer, who sees the plan's wording and the typed numbers side by side |
+| A venue policy lookup finds neither form | No policy wording to read | The lookup ends `not_found`, or `wrong_form` when PDFs came back but none was the typed form, and nothing is filed; the tab offers the upload |
+| A venue policy lookup finds one form of the two | The other part's clauses are missing | The lookup ends `found` with the one form, and its note names the missing one; that part's terms are the typed ones and the defaults |
+| The organizer types a wrong number from the declarations page | A wrong limit for the event | Every typed term shows as `typed` in the terms table, next to what the forms say, and nothing sets money until the organizer confirms the terms |
 
 ## Dependencies
 
@@ -470,8 +554,8 @@ sequenceDiagram
 - [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone` (with `plan_x_m`, `plan_y_m`), `booth` (with `organization_id`, `plan_x_m`, `plan_y_m`, `placement`, `source_url`, `fetched_at`), `schedule_slot`, `import_run`, `venue_spot`, `band_owner`, `attendee`, `blob_ref`; reducers `import_event`, `grant_role`, `place_booth`, `load_venue_spots`; the `ingest`, `ops` and `worker` roles.
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that serves `/venue`; `bandit-workers`, which runs the job `venue_setup` and, for it, `pipeline/venue_model.py` with Python and Playwright on the Vultr VM.
 - [Elastic](Elastic.md): the raw indices and the Elastic Workflow `bandit-organize` for the organize stage. Without it, no bundle is assembled.
-- [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `venue_find`, `venue_map`, `plan_find` and `plan_check` calls, `model_call`.
-- [Elastic](Elastic.md): the job `document_read`, which reads a plan lookup's PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`, `attendee_policy`, and the guard that sends a pay on a `plan_lookup` policy to the organizer.
+- [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `venue_find`, `venue_map`, `plan_find`, `plan_check`, `venue_policy_find` and `venue_policy_check` calls, `model_call`.
+- [Elastic](Elastic.md): the job `document_read`, which reads a plan lookup's PDF and a venue policy lookup's joined PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`, `apply_document_terms`, `confirm_policy_terms`, `attendee_policy`, and the guard that sends a pay on a `plan_lookup` policy to the organizer.
 - [Social](../6-features/Social.md): the onboarding socials step, which comes before the profile claim (optional; without it a claimed `person` simply has no handles).
 - A Bright Data account with credits and an API token for the Bright Data Web MCP; a Bright Data Web Unlocker API zone; a Bright Data Browser API zone with its customer id, zone name and password.
 
@@ -481,7 +565,7 @@ sequenceDiagram
 - [Social](../6-features/Social.md): visits are "at booth B", the profile claim sits in its onboarding flow, and the people graph takes its `exhibits` links from `booth.organization_id` and its `works_at` links from claimed profiles.
 - [Tap-Page](../5-apps/Tap-Page.md): the "Are you one of these?" step, and "Name your plan instead" in the insurance steps.
 - [Insurance](../6-features/Insurance.md) and [Medical-Card](../6-features/Medical-Card.md): an attendee's own policy and health plan, when the attendee named them instead of uploading a PDF (next to build).
-- [Organizer-Portal](../5-apps/Organizer-Portal.md): the sponsors in the attendee list's Company column, and the Venue setup tab.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the sponsors in the attendee list's Company column, and the Venue setup tab with its insurance policy section.
 - [Merch](../6-features/Merch.md): a sponsor template names organisations, and `load_merch_templates` finds their booths through the imported `organization` rows.
 - [Test-Bands](../3-services/Test-Bands.md): the crowd staffs the sponsors' booths, sends visitors to their sponsor tables, and its booth staff work at the booth's organisation.
 
@@ -519,9 +603,13 @@ sequenceDiagram
 | A venue setup starts from the event's name alone | an organizer at any event knows its name; the search, the Anthropic Claude API and the export find the rest |
 | The Anthropic Claude API may name only addresses that the search results and the pages gave it | code checks every address in its answer, so a setup never opens a page that nothing linked |
 | An attendee may name their plan instead of uploading its PDF; Bright Data finds and fetches the plan's public wording, and the Evidence Engine reads it like an upload | attendees know their insurer and plan but rarely carry the PDF; a health plan's SBC is a standard public form, and one reading path serves both ways in |
-| The venue's policy and the hospital report stay uploads | neither is public: the venue's policy is its own contract, and a hospital report is the attendee's medical record |
+| The organizer may name the venue's policy forms instead of uploading the policy; Bright Data finds and fetches them, and the organizer types the declarations | a package policy's coverage forms are public, most often ISO's CG 00 01 and CP 00 10, while its declarations page, with the policy's own limits, is the venue's alone |
+| The two forms are joined into one PDF, the liability form first, and filed as one `venue_policy` document | an uploaded policy is one PDF with both parts, so the reading, the clause index and the organizer's confirmation stay one path |
+| Code checks a found form by the form number it prints, against the number the organizer typed from the declarations' forms schedule | a form number and its edition name one exact wording, which no title or insurer name does |
+| The hospital report stays an upload | it is the attendee's medical record and never public |
 | The Anthropic Claude API picks the plan's document among the search results and reads what the PDF prints; code keeps only addresses the results named, only a real PDF, and only a PDF whose printed insurer and plan match what the attendee typed | a search for a plan returns broker pages, comparison sites and other years' forms, and telling them apart is judgment; whether a file is a PDF, and whether two names share their words, is not |
 | A `belongings` lookup takes the limit and deductible the attendee types, and every pay resting on them goes to the organizer | the public wording never holds a policyholder's own limit or deductible; the organizer is the check on the attendee's word |
+| A venue policy lookup's typed declarations stand over whatever the forms read for the same terms, and show as `typed` | a public form only points at "the Declarations" for its limits; the organizer typed the venue's own numbers and confirms them with the rest |
 | Each step of a venue setup is a `venue_setup_step` row, and the organizer picks the shown venue (`chosen_venue`) | the tab shows the run live by subscription, and a new setup never replaces the venue on screen by itself |
 | The Elastic Workflow `bandit-organize` is the one place facts are merged across sources, and `bandit-ingest` checks its answer twice, once after the workflow and once while assembling | one owner per step, and a wrong key never reaches SpacetimeDB |
 | The scrape never changes a zone; zones, their station ids and their exit colours are hand-written in `zones.json` | the safety features stay the same whatever the scrape finds |

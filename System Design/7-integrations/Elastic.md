@@ -244,9 +244,9 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 #### Read every insurance document (next to build)
 
-**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their own policy or their insurance card, a plan lookup fetches the public wording of a plan the attendee named ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`.
+**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their own policy or their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`.
 
-**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `attendee_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, or `plan_lookup` with the address it came from.
+**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `attendee_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address.
 
 **In Elastic.**
 
@@ -735,7 +735,7 @@ What each kind's schema asks for:
 
 | Kind | Terms | Clauses |
 |---|---|---|
-| `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `care_custody_control`, `other`); the theft clause and its conditions; other insurance (`primary` or `excess`); the subrogation clause | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, theft, other insurance, subrogation |
+| `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `care_custody_control`, `other`); the theft clause and its conditions; other insurance (`primary` or `excess`); the subrogation clause. A venue policy lookup's public forms print no limits, policy number or period; the organizer types those from the declarations page, and they stand over what the forms gave | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, theft, other insurance, subrogation |
 | `attendee_policy` | insurer, policy number; the personal property cover's per-claim limit, yearly limit and deductible; its exclusions. A public policy form from a plan lookup has no limit or deductible; from it come what the cover pays for, theft away from home and the limits for kinds of items | every clause, with its section: insuring agreement, limits, exclusions, conditions, subrogation |
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
 | `health_plan` | a plan's Summary of Benefits and Coverage: insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | every row of its benefits table and its excluded services |
