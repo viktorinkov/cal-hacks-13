@@ -158,7 +158,7 @@ The investigation is the `claim_review` job, run by `crates/bandit-workers/src/i
 |---|---|---|
 | `read_evidence {source}` | the pack facts of one source: `band`, `light_circle`, `camera`, `medic`, `hospital_report`, `zone` or `policy`; `hospital_report` adds the priced fee-schedule lines and the report's own words | `evidence_fact` and `claim_line` in the module |
 | `read_checks` | every check of the pack version, with both values it compared | `claim_check`: code and The Evidence Engine |
-| `search_policy {query, policy}` (next to build) | the clauses of the venue's policy (`venue`) or the attendee's own policy (`attendee`) closest in meaning to Claude's own query, for example "injury that began before the event" or "services more than 30 days after the incident"; a query with a claimant's name is refused | The Evidence Engine: semantic search on `bandit-policy-clauses`, field `text`, filtered to the two policies on this claim |
+| `search_policy {query, policy}` | the clauses of the venue's policy (`venue`) or the attendee's own policy (`attendee`) closest in meaning to Claude's own query, for example "injury that began before the event" or "services more than 30 days after the incident"; a query with a claimant's name is refused | The Evidence Engine: hybrid search on `bandit-policy-clauses` (keyword on `text.words`, semantic on `text`, fused with RRF, reranked by `.jina-reranker-v3`), filtered to the two policies on this claim |
 | `read_clause {clause_id}` (next to build) | one clause in full, with its section and page | The Evidence Engine: `bandit-policy-clauses` |
 
 The first build of the two Evidence Engine tools searched decided past claims (`search_past_claims`, `past_claim_stats`). The design drops them: a claim is covered or excluded by what its policies say, and what earlier decisions settled already lives in the organizer's precedents and the payment rules approved from them.
@@ -182,7 +182,7 @@ sequenceDiagram
   C->>W: read_checks
   W->>M: every check with both values
   C->>W: search_policy venue, injury that began before the event
-  W->>E: semantic search on bandit-policy-clauses
+  W->>E: hybrid search on bandit-policy-clauses, reranked
   E-->>W: the closest clauses with scores
   C->>W: read_clause, the other-insurance clause
   W->>E: one clause in full
@@ -628,7 +628,7 @@ The speaker's $2,400 repair is a payout of $2,400, recoverable $1,900 and a venu
 
 When a pack has something to pay for, the module enqueues `claim_verify`. The worker builds a de-identified copy in code, with no names, no band ids and no note or medical free text, and a narrative from a fixed template, for example "Fall in zone Main stage at 22:14; 3 light-circle witnesses in the same zone; medic note within 4 minutes; ...".
 
-The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which marks it valid or invalid and never rejects it. It then searches `bandit-policy-clauses` with the narrative for the clauses of the venue's policy and this attendee's policy that bear on the claim (`semantic_text`, embedded by Elastic's inference endpoint `.jina-embeddings-v5-text-small`), and `submit_claim_checks` stores them as `claim_clause` rows next to the `elastic_validation` check (next to build). Claude then runs its own searches with `search_policy` and reads clauses in full with `read_clause`.
+The worker indexes it into `bandit-claims` through the ingest pipeline `bandit-claims-validate`, which marks it valid or invalid and never rejects it. It then searches `bandit-policy-clauses` with the narrative for the clauses of the venue's policy and this attendee's policy that bear on the claim. The search is hybrid: a keyword match on the clause's words and a meaning match on its `semantic_text` (embedded by `.jina-embeddings-v5-text-small`), fused with RRF and reranked by `.jina-reranker-v3`. `submit_claim_checks` stores them as `claim_clause` rows next to the `elastic_validation` check. Claude then runs its own searches with `search_policy` and reads clauses in full with `read_clause`.
 
 Today's code ranks the 3 closest decided past claims instead (`claim_precedent`, "Similar past claims (Elastic)", from 30 seeded claims of two earlier events at the venue). The design replaces that ranking with the clauses, because how other claims ended says nothing about what this venue's contract covers.
 

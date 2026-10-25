@@ -341,7 +341,7 @@ def evidence(y0):
     visit = B(80, r1, "visit\ntop 5 booths", "stdb", w=440, icons={0: WALK})
     indexer = B(780, r1, "bandit-indexer\nfindable only", "rust", w=480, icons={0: RUST})
     people = SV(1500, r1, ELASTIC, "bandit-people\nbandit-booths\nsemantic_text", w=600, h=r2 + BH - r1)
-    api = B(780, r2, "bandit-api\nGET /api/recap\nsemantic search", "rust", w=480, h=BH + 20, icons={0: RUST})
+    api = B(780, r2, "bandit-api\nGET /api/recap\nhybrid search, rerank", "rust", w=480, h=BH + 20, icons={0: RUST})
     recap = B(80, 0, "recap (/t/code)", "web", w=440, cy=L(api.cy), icons={0: PHONE})
     zones.append(Z(40, top, 2120, L(api.bottom) + 40 - top, "rank recap (bandit-indexer, bandit-api)", "ext"))
     H(visit, indexer, "sets interests")
@@ -483,7 +483,7 @@ def insurance(y0):
     H(claude, tz, "calls", y=tz.y + tz.h * 0.3)
     H(tz, claude, "returns", y=tz.y + tz.h * 0.7)
     R(search, "t", clauses, "b", [(search.cx, clauses.bottom + 80), (clauses.cx, clauses.bottom + 80)],
-      label="semantic search", seg=1)
+      label="hybrid search, rerank", seg=1)
     V(split, rchecks, "share per payer", x=rchecks.cx)
 
     # 6. code holds Claude to its limits; a gap or mismatch in the policies goes to the organizer
@@ -706,7 +706,7 @@ def interests(y0):
     H(text, people, "indexes")
 
     # 2. suggestions: the people you met, ordered by how close their interests are to yours
-    search = card(X3, ev[0], "semantic search\nyour interests\nvs their interests", "ext", ELASTIC, W3, 260, 60, **mk)
+    search = card(X3, ev[0], "hybrid search, rerank\nyour interests\nvs their interests", "ext", ELASTIC, W3, 260, 60, **mk)
     Z(X2 - 20, L(people.y) - 70, X3 + W3 + 20 - (X2 - 20), L(search.bottom) + 40 - (L(people.y) - 70),
       "Evidence Engine", "ext", ELASTIC)
     api = card(X1, (740 + ev[2] + 110) / 2, "bandit-api\nGET /api/recap\npeople you met\nmost minutes first\n"
