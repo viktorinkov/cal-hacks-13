@@ -2,9 +2,9 @@
 //! which clinic record follows. Who it happens to and where they stand comes from the run's seeded generator.
 //! The first beats show every path a claim can take (the organizer teaches a rule, the rule settles the next
 //! one on its own, a camera confirms equipment a guest knocked over and the guest is charged, an SOS with no
-//! claim, a bill above the learned ceiling, a sponsor's laptop taken, an attendee's own laptop knocked off a
-//! table and their bag gone, an injury from home); after that the run keeps going with everyday falls. Who
-//! broke or took it is drawn from the bands at the spot, and the floor staff name them. Injuries move between zones so no
+//! claim, a bill above the learned ceiling, an attendee's phone taken, an attendee's laptop knocked off a
+//! table, a bag gone with nobody named, an injury from home); after that the run keeps going with everyday
+//! falls. Who broke or took it is drawn from the bands at the spot, and the floor staff name them. Injuries move between zones so no
 //! zone has three within five minutes, which would hand the whole occurrence to the organizer. The medic's notes
 //! match the clinic records the claims get (a first-aid sprain is always a slip on a spilled drink), so any
 //! mismatch the Evidence Engine or Claude flags is a real one.
@@ -62,15 +62,15 @@ const BEATS: &[Beat] = &[
     loss(
         IncidentKind::Theft,
         "sponsor",
-        "a sponsor's display laptop is gone from its table; the sponsor's receipt puts it at $1,299.00",
-        "security reviewed the footage; the sponsor filed the loss",
-        129_900,
-        "the sponsor-tables camera shows this guest lifting the laptop off the table and walking to the food line",
+        "an attendee's phone was taken from the sponsor table while they talked to the sponsor; $899.00 to replace",
+        "security reviewed the footage; the owner's own policy answers it",
+        89_900,
+        "the sponsor-tables camera shows this guest pocketing the phone and walking to the food line",
         true,
     ),
     fall("stage", "urgent-care-wrist", "in the crowd in front of the stage: fell when the crowd surged, left wrist swelling; referring to urgent care"),
     loss(
-        IncidentKind::Belongings,
+        IncidentKind::Breakage,
         "floor",
         "an attendee's laptop was knocked off their table by someone squeezing past; the screen is cracked, $1,199.00 to replace",
         "security took both names; the owner's own policy answers it",
@@ -82,7 +82,7 @@ const BEATS: &[Beat] = &[
     fall("food", "first-aid-wrist", "in the food line: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
     fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink by the stools, right wrist sprain; ice and a wrap at first aid"),
     loss(
-        IncidentKind::Belongings,
+        IncidentKind::Theft,
         "food",
         "an attendee's backpack is gone from under their seat in the food line: headphones and a charger inside, $340.00",
         "security walked the area; no camera covers the seats",
@@ -107,8 +107,8 @@ pub fn stage(ctx: &ReducerContext, step: u16, rng: &mut StdRng) {
         return;
     };
     match beat.kind {
-        IncidentKind::Property | IncidentKind::Theft => property(ctx, beat, &zone, rng),
-        IncidentKind::Belongings => belongings(ctx, beat, &zone, rng),
+        IncidentKind::Property => property(ctx, beat, &zone, rng),
+        IncidentKind::Theft | IncidentKind::Breakage => belonging(ctx, beat, &zone, rng),
         IncidentKind::Sos | IncidentKind::Fall => person(ctx, beat, &zone, rng),
     }
 }
@@ -142,9 +142,9 @@ fn culprit(ctx: &ReducerContext, beat: &Beat, station: u8, x: f32, y: f32, not: 
     if near.is_empty() { 0 } else { near[rng.gen_range(0..near.len())] }
 }
 
-/// An attendee's own things are lost, stolen or broken: they tell staff where they stand, and staff report
-/// it for them. Whoever did it is drawn from the bands around them.
-fn belongings(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
+/// An attendee's own belonging is stolen or broken: they tell staff where they stand, and staff report it
+/// for them. Whoever did it is drawn from the bands around them.
+fn belonging(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
     let mut pool = hackers(ctx, Some(zone.station_id));
     if pool.is_empty() {
         pool = hackers(ctx, None);
@@ -154,11 +154,12 @@ fn belongings(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng:
     }
     let owner = &pool[rng.gen_range(0..pool.len())];
     let by = culprit(ctx, beat, owner.zone, owner.x_m, owner.y_m, owner.id, rng);
-    let incident = safety::open(ctx, IncidentKind::Belongings, zone.id, owner.zone, owner.id, "ops", Some((owner.x_m, owner.y_m)));
+    let incident = safety::open(ctx, beat.kind, zone.id, owner.zone, owner.id, "ops", Some((owner.x_m, owner.y_m)));
     plan(ctx, &incident, beat, by);
     let who = wearer(ctx, owner.id).map(|(_, n)| n).unwrap_or_else(|| "an attendee".into());
     let place = place_name(ctx, owner.x_m, owner.y_m);
-    record(ctx, incident.id, 0, "organizer", "Security", format!("{who} reports their things lost or broken at {place}"), beat.note.into());
+    let what = if beat.kind == IncidentKind::Theft { "something of theirs stolen" } else { "something of theirs broken" };
+    record(ctx, incident.id, 0, "organizer", "Security", format!("{who} reports {what} at {place}"), beat.note.into());
 }
 
 /// Someone in the zone falls or presses SOS: their band goes down where they stand and raises it. The crowd
@@ -204,7 +205,7 @@ fn person(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mu
     record(ctx, incident.id, 0, "band", &crate::band_code::band_code(b.id), what, why.into());
 }
 
-/// Equipment breaks or goes missing where a camera sees it. Whoever did it is drawn from the bands at the spot.
+/// Equipment breaks where a camera sees it. Whoever did it is drawn from the bands at the spot.
 fn property(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
     let spots: Vec<(f32, f32)> = ctx
         .db
@@ -216,15 +217,10 @@ fn property(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &
     let at = if spots.is_empty() { None } else { Some(spots[rng.gen_range(0..spots.len())]) };
     let (x, y) = at.unwrap_or_else(|| crate::venue::station_spot(ctx, zone.station_id));
     let by = culprit(ctx, beat, zone.station_id, x, y, 0, rng);
-    let theft = beat.kind == IncidentKind::Theft;
-    let incident = safety::open(ctx, beat.kind, zone.id, zone.station_id, 0, if theft { "ops" } else { "vision" }, Some((x, y)));
+    let incident = safety::open(ctx, IncidentKind::Property, zone.id, zone.station_id, 0, "vision", Some((x, y)));
     plan(ctx, &incident, beat, by);
     let place = place_name(ctx, x, y);
-    if theft {
-        record(ctx, incident.id, 0, "organizer", "Security", format!("Theft reported at {place}"), beat.note.into());
-    } else {
-        record(ctx, incident.id, 0, "camera", "Overhead camera", format!("Equipment down at {place}"), beat.note.into());
-    }
+    record(ctx, incident.id, 0, "camera", "Overhead camera", format!("Equipment down at {place}"), beat.note.into());
 }
 
 fn plan(ctx: &ReducerContext, incident: &safety::Incident, beat: &Beat, culprit_band: u32) {

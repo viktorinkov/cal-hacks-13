@@ -1,5 +1,5 @@
-//! The attendee's own policy. Its personal property cover pays for the attendee's own things lost, stolen
-//! or broken (`belongings`), which the venue's policy excludes. Its terms come from the attendee's policy
+//! The attendee's own policy. Its personal property cover pays for the attendee's own belongings stolen
+//! (`theft`) or broken by someone else (`breakage`), which the venue's policy excludes as guests' property. Its terms come from the attendee's policy
 //! document or a plan lookup; the live run's crowd has neither, so each crowd attendee's terms are drawn
 //! once from a generator seeded with their identity, and the same attendee always has the same policy.
 
@@ -131,7 +131,7 @@ pub fn cover_rule(p: &AttendeePolicy) -> super::CoverageRuleRow {
         id: p.id,
         policy_id: p.id,
         cover_kind: bandit_insurance::CoverKind::PersonalProperty.as_str().into(),
-        incident_kinds: vec![bandit_insurance::IncidentKind::Belongings.as_str().into()],
+        incident_kinds: vec![bandit_insurance::IncidentKind::Theft.as_str().into(), bandit_insurance::IncidentKind::Breakage.as_str().into()],
         per_claim_limit_cents: p.per_claim_limit_cents,
         aggregate_limit_cents: p.aggregate_limit_cents,
         deductible_cents: p.deductible_cents,

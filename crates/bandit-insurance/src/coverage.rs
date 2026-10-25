@@ -140,7 +140,7 @@ mod tests {
     fn attendee_carries_their_own_deductible() {
         let own = CoverageRule {
             cover_kind: CoverKind::PersonalProperty,
-            incident_kinds: vec![IncidentKind::Belongings],
+            incident_kinds: vec![IncidentKind::Theft, IncidentKind::Breakage],
             per_claim_limit_cents: 150000,
             aggregate_limit_cents: 1000000,
             deductible_cents: 25000,

@@ -771,7 +771,7 @@ export const IncidentKind = __t.enum("IncidentKind", {
   Fall: __t.unit(),
   Property: __t.unit(),
   Theft: __t.unit(),
-  Belongings: __t.unit(),
+  Breakage: __t.unit(),
 });
 export type IncidentKind = __Infer<typeof IncidentKind>;
 

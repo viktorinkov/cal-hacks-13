@@ -17,6 +17,7 @@ use crate::social::tables::*;
 use crate::tables::*;
 use crate::venue::*;
 use crate::vision::*;
+use crate::wallet::wallet_entry;
 use bandit_insurance::payloads::*;
 use bandit_insurance::time::micros_at;
 use spacetimedb::test_utils::{TestAuth, TestContext};
@@ -895,24 +896,25 @@ fn a_band_that_was_not_at_the_spot_cannot_be_named() {
     let w = World::new();
     let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
     w.set_band(8, |b| b.zone = 102);
-    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 0, "a sponsor's display laptop is gone".into()));
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 3, "Maya's phone is gone from her table".into()));
     let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
     let err = w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 8, "looked like them".into())).unwrap_err();
     assert!(err.contains("neither in the zone nor at the spot"), "{err}");
-    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "the sponsor's receipt: $1,299.00".into(), Some(129_900)));
-    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "the sponsor filed the loss".into()));
+    assert!(w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 3, "her own band".into())).is_err());
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "her phone, $899.00 to replace".into(), Some(89_900)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "security walked the area".into()));
     let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
-    // A theft of venue property is the venue's claim under its property cover.
-    assert_eq!((claim.cover_kind.as_str(), claim.claimant, claim.payout_cents, claim.recoverable_cents), ("property", None, 129_900, 79_900));
+    // A theft of an attendee's belonging is their claim on their own policy; with none on file it pays nothing yet.
+    assert_eq!((claim.cover_kind.as_str(), claim.claimant_name.as_str(), claim.policy_id), ("personal_property", "Maya Chen", 0));
 }
 
 #[test]
-fn an_attendees_own_laptop_is_paid_from_their_own_policy() {
+fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
     let w = World::new();
     let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
     w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Maya Chen"), "Golden Gate Mutual".into(), "PP-000123".into(), 150_000, 600_000, 25_000, "document".into(), "AB".repeat(32)));
-    w.as_("ops", |ctx| open_incident(ctx, "belongings".into(), zone, 3, "Maya's laptop was knocked off her table".into()));
-    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Belongings).unwrap();
+    w.as_("ops", |ctx| open_incident(ctx, "breakage".into(), zone, 3, "Maya's laptop was knocked off her table".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Breakage).unwrap();
     w.as_("ops", |ctx| name_responsible_band(ctx, incident.id, 7, "his bag swept it off the table".into()));
     w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "cracked screen, $1,199.00 to replace".into(), Some(119_900)));
     w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "both names taken".into()));
@@ -936,11 +938,11 @@ fn an_attendees_own_laptop_is_paid_from_their_own_policy() {
 }
 
 #[test]
-fn an_attendees_own_things_with_no_policy_go_to_the_organizer() {
+fn a_stolen_bag_with_no_policy_on_file_goes_to_the_organizer() {
     let w = World::new();
     let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
-    w.as_("ops", |ctx| open_incident(ctx, "belongings".into(), zone, 6, "Lee's backpack is gone".into()));
-    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Belongings).unwrap();
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 6, "Lee's backpack is gone".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
     w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "headphones and a charger, $340.00".into(), Some(34_000)));
     w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "no camera covers the seats".into()));
     let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();

@@ -85,8 +85,8 @@ fn save(ctx: &ReducerContext, c: Charge) -> Charge {
 fn kind_words(kind: IncidentKind) -> &'static str {
     match kind {
         IncidentKind::Property => "the broken equipment",
-        IncidentKind::Theft => "the stolen property",
-        IncidentKind::Belongings => "an attendee's lost or broken things",
+        IncidentKind::Theft => "an attendee's stolen belonging",
+        IncidentKind::Breakage => "an attendee's broken belonging",
         IncidentKind::Sos | IncidentKind::Fall => "an injury",
     }
 }
@@ -401,7 +401,7 @@ pub fn my_held_cents(ctx: &ViewContext, who: Identity) -> i64 {
 pub struct MyCharge {
     pub id: u64,
     pub incident_id: u64,
-    /// `property`, `theft` or `belongings`.
+    /// `property`, `theft` or `breakage`.
     pub incident_kind: String,
     pub zone_name: String,
     pub happened_at: Timestamp,

@@ -11,12 +11,12 @@ pub type Cents = u64;
 pub enum IncidentKind {
     Sos,
     Fall,
-    /// Venue or sponsor equipment was broken.
+    /// The venue's own equipment was broken.
     Property,
-    /// Venue or sponsor property was taken, such as merch or a laptop from a booth.
+    /// An attendee's own belonging was stolen.
     Theft,
-    /// An attendee's own things were lost, stolen or broken.
-    Belongings,
+    /// An attendee's own belonging was broken by someone else.
+    Breakage,
 }
 
 impl IncidentKind {
@@ -26,7 +26,7 @@ impl IncidentKind {
             IncidentKind::Fall => "fall",
             IncidentKind::Property => "property",
             IncidentKind::Theft => "theft",
-            IncidentKind::Belongings => "belongings",
+            IncidentKind::Breakage => "breakage",
         }
     }
 
@@ -36,7 +36,7 @@ impl IncidentKind {
             "fall" => Some(IncidentKind::Fall),
             "property" => Some(IncidentKind::Property),
             "theft" => Some(IncidentKind::Theft),
-            "belongings" => Some(IncidentKind::Belongings),
+            "breakage" => Some(IncidentKind::Breakage),
             _ => None,
         }
     }
@@ -57,7 +57,7 @@ impl IncidentKind {
 pub enum CoverKind {
     MedicalPayments,
     Property,
-    /// The attendee's own policy: their own things lost, stolen or broken.
+    /// The attendee's own policy: their own belongings stolen or broken.
     PersonalProperty,
 }
 
@@ -80,15 +80,14 @@ impl CoverKind {
     }
 
     /// The venue's general liability policy pays injuries from medical-payments
-    /// cover and broken or stolen equipment from property cover (a theft only
-    /// where its theft clause covers it). It excludes property in the venue's
-    /// care, so an attendee's own things are paid from the attendee's own
-    /// policy, its personal property cover.
+    /// cover and the venue's own equipment from property cover. It excludes
+    /// guests' property, so a theft or a breakage of an attendee's belonging is
+    /// paid from the attendee's own policy, its personal property cover.
     pub fn for_incident(kind: IncidentKind) -> Self {
         match kind {
             IncidentKind::Sos | IncidentKind::Fall => CoverKind::MedicalPayments,
-            IncidentKind::Property | IncidentKind::Theft => CoverKind::Property,
-            IncidentKind::Belongings => CoverKind::PersonalProperty,
+            IncidentKind::Property => CoverKind::Property,
+            IncidentKind::Theft | IncidentKind::Breakage => CoverKind::PersonalProperty,
         }
     }
 

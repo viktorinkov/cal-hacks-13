@@ -96,9 +96,9 @@ pub(super) fn post(ctx: &ReducerContext, claim_id: u64, journal: bandit_insuranc
     Ok(())
 }
 
-/// Opens the claim when a resolved incident of broken or taken property, or of
-/// an attendee's own things, has a logged cost: the venue claims for its
-/// property, the attendee who wore the band for their own things. Injury claims
+/// Opens the claim when a resolved incident of the venue's broken equipment, or
+/// of an attendee's stolen or broken belonging, has a logged cost: the venue
+/// claims for its equipment, the attendee who wore the band for their belonging. Injury claims
 /// wait for the attendee who wore the band to file them (`file_claim`), or
 /// staff to file for them.
 pub fn on_incident_resolved(ctx: &ReducerContext, incident: &Incident) -> Result<(), String> {
@@ -110,7 +110,7 @@ pub fn on_incident_resolved(ctx: &ReducerContext, incident: &Incident) -> Result
         return Ok(());
     }
     let claimant = match incident.kind {
-        IncidentKind::Belongings => super::people::wore_band_at(ctx, incident.subject_band, incident.opened_at),
+        IncidentKind::Theft | IncidentKind::Breakage => super::people::wore_band_at(ctx, incident.subject_band, incident.opened_at),
         _ => None,
     };
     open_claim_for(ctx, incident, claimant, String::new()).map(|_| ())
@@ -476,7 +476,7 @@ fn core_lines(ctx: &ReducerContext, claim_id: u64) -> Vec<LineDecision> {
 fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     let Some(r) = policy_rule(ctx, claim.policy_id, cover_of(claim)) else {
         if cover_of(claim).is_attendee_policy() {
-            return "The venue's general liability policy excludes property in the venue's care, custody or control, so it does not pay for an attendee's own things; the attendee has no policy of their own on file, so the organizer decides.".into();
+            return "The venue's general liability policy excludes guests' property and property in the venue's care, custody or control, so it does not pay for an attendee's own belongings; the attendee has no policy of their own on file, so the organizer decides.".into();
         }
         return "no cover".into();
     };
@@ -484,18 +484,11 @@ fn policy_summary(ctx: &ReducerContext, claim: &Claim) -> String {
     if cover_of(claim).is_attendee_policy() {
         let p = ctx.db.attendee_policy().id().find(claim.policy_id);
         return format!(
-            "The attendee's own policy ({}, {}), personal property cover: pays for the attendee's own things lost, stolen or broken away from home, up to {} per claim and {} a year, less a {} deductible the attendee carries. The venue's general liability policy excludes property in the venue's care, custody or control.",
+            "The attendee's own policy ({}, {}), personal property cover: pays for the attendee's own belongings stolen or broken away from home, up to {} per claim and {} a year, less a {} deductible the attendee carries. The venue's general liability policy excludes guests' property.",
             p.as_ref().map(|p| p.insurer_name.clone()).unwrap_or_default(),
             p.as_ref().map(|p| p.policy_number.clone()).unwrap_or_default(),
             f(r.per_claim_limit_cents),
             f(r.aggregate_limit_cents),
-            f(r.deductible_cents)
-        );
-    }
-    if kind_of(claim) == bandit_insurance::IncidentKind::Theft {
-        return format!(
-            "Venue general liability, property cover, theft clause: pays for the venue's or a sponsor's property taken during the event where there are signs of theft, up to {} per claim, after a {} deductible the venue carries. The venue may recover the loss from the person who took it.",
-            f(r.per_claim_limit_cents),
             f(r.deductible_cents)
         );
     }
@@ -671,11 +664,11 @@ fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     })
 }
 
-/// Why an attendee's own things go to the organizer whatever is decided: they have no policy of their
-/// own on file, and the venue's policy excludes property in its care.
+/// Why an attendee's stolen or broken belonging goes to the organizer whatever is decided: they have no
+/// policy of their own on file, and the venue's policy excludes guests' property.
 fn no_own_policy(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     (cover_of(claim).is_attendee_policy() && ctx.db.attendee_policy().id().find(claim.policy_id).is_none()).then(|| {
-        "an attendee's own things: the venue's policy excludes property in its care and the attendee has no policy of their own on file, so the organizer decides".to_string()
+        "an attendee's own belonging: the venue's policy excludes guests' property and the attendee has no policy of their own on file, so the organizer decides".to_string()
     })
 }
 
@@ -803,8 +796,7 @@ fn settle(ctx: &ReducerContext, claim: Claim, outcome: &str) -> Result<(), Strin
     }
     let claim = save(ctx, Claim { decided_at: Some(ctx.timestamp), routed_to: Identity::ZERO, ..claim });
     if cover_of(&claim) == CoverKind::Property {
-        let to = if kind_of(&claim) == bandit_insurance::IncidentKind::Theft { "the venue, for the stolen property" } else { "repair vendor" };
-        return paid(ctx, claim, to.into(), outcome);
+        return paid(ctx, claim, "repair vendor".into(), outcome);
     }
     let account = claim.claimant.and_then(|c| ctx.db.claimant_account().identity().find(c));
     let payload = PayoutPayload {

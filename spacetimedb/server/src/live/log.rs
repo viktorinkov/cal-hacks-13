@@ -75,17 +75,11 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
             "an injury with a medic's note is a medical payments claim; it waits for the clinic record".into(),
         ),
         ClaimStatus::ReadingRecord => ("Claude", "Claude".into(), "Reading the clinic record".into(), "the medic filed it on the claim".into()),
-        ClaimStatus::Verifying if c.incident_kind == "theft" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
+        ClaimStatus::Verifying if c.cover_kind == "personal_property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
             format!("claim {}", c.id),
-            format!("Theft claim opened for {}", format_cents(c.cost_cents)),
-            "venue property taken: the venue's property cover answers it where its theft clause covers the loss".into(),
-        ),
-        ClaimStatus::Verifying if c.incident_kind == "belongings" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
-            "Decision Engine",
-            format!("claim {}", c.id),
-            format!("Claim opened for {}'s own things: {}", person(c), format_cents(c.cost_cents)),
-            "the venue's policy excludes property in its care; the attendee's own policy answers it".into(),
+            format!("{} claim opened for {}: {}", if c.incident_kind == "theft" { "Theft" } else { "Breakage" }, person(c), format_cents(c.cost_cents)),
+            "the venue's policy excludes guests' property; the attendee's own policy answers it, less its deductible".into(),
         ),
         ClaimStatus::Verifying if c.cover_kind == "property" && before.is_some_and(|b| b.status == ClaimStatus::AwaitingRecord) => (
             "Decision Engine",
@@ -116,9 +110,6 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
                 ),
                 _ => ("organizer", c.routed_to_name.clone(), format!("Approved: {} to {}", format_cents(c.payout_cents), person(c)), paying.into()),
             }
-        }
-        ClaimStatus::Settled if c.incident_kind == "theft" => {
-            ("wallet", "Ledger".into(), format!("Stolen property paid: {}", format_cents(c.payout_cents)), c.status_note.clone())
         }
         ClaimStatus::Settled if c.cover_kind == "property" => {
             ("wallet", "Ledger".into(), format!("Repair paid: {}", format_cents(c.payout_cents)), c.status_note.clone())

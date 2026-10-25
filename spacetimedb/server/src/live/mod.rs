@@ -124,7 +124,7 @@ pub struct LivePlan {
 pub struct IncidentMarker {
     #[primary_key]
     pub incident_id: u64,
-    /// `fall`, `sos`, `property`, `theft` or `belongings`.
+    /// `fall`, `sos`, `property`, `theft` or `breakage`.
     pub kind: String,
     #[index(btree)]
     pub band_id: u32,
