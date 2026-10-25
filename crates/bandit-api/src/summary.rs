@@ -61,11 +61,23 @@ pub struct SuggestedPerson {
     /// Where and when you first met: the zone and start of your earliest encounter.
     pub met_zone_name: String,
     pub met_at: String,
-    /// The booths you both visited, by name, the ones you spent the most minutes at first.
-    pub shared_booths: Vec<String>,
+    /// The booths their band stood at: the ones you both stood at first, then theirs, most minutes first.
+    pub interests: Vec<Interest>,
     /// How many photos you are both tagged in.
     pub photos_together: u32,
     pub score: Option<f64>,
+}
+
+/// A booth someone's band stood at, with their minutes there and yours.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Interest {
+    pub booth_id: u64,
+    pub name: String,
+    pub minutes: f32,
+    /// 0 when you never stood there.
+    pub your_minutes: f32,
+    /// True when you both stood at the booth.
+    pub shared: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -279,7 +291,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
 }
 
 /// Everyone you hung out with, minutes added up per person, most minutes first, with how you met:
-/// where and when you first met, the booths you both visited and the photos you are both in.
+/// where and when you first met, their interests and the photos you are both in.
 fn suggested_people(
     rows: &Rows,
     who: Identity,
@@ -307,7 +319,7 @@ fn suggested_people(
                 minutes: 0.0,
                 met_zone_name: zone_name(e.zone_id),
                 met_at: time(e.started_at),
-                shared_booths: shared_booths(rows, &mine, other),
+                interests: interests(rows, &mine, other),
                 photos_together: photos_together(rows, who, other),
                 score: None,
             });
@@ -322,30 +334,40 @@ fn suggested_people(
     out
 }
 
-/// The minutes `who` spent at each booth they visited.
+/// The minutes `who` stood at each booth, from the visits that name one. A visit that names only its
+/// zone says nothing about which of the zone's booths they were into.
 fn booth_minutes(rows: &Rows, who: Identity) -> BTreeMap<u64, f32> {
     let mut minutes: BTreeMap<u64, f32> = BTreeMap::new();
-    for v in rows.visits.iter().filter(|v| v.attendee == who) {
-        for b in rows.booths.iter().filter(|b| in_visit(b, v)) {
-            *minutes.entry(b.id).or_default() += v.minutes;
-        }
+    for v in rows.visits.iter().filter(|v| v.attendee == who && v.booth_id != 0) {
+        *minutes.entry(v.booth_id).or_default() += v.minutes;
     }
     minutes
 }
 
-/// The booths `other` visited too, by name, the ones with the most of your minutes first.
-fn shared_booths(rows: &Rows, mine: &BTreeMap<u64, f32>, other: Identity) -> Vec<String> {
-    let theirs = booth_minutes(rows, other);
-    let mut both: Vec<(u64, f32)> = mine
-        .iter()
-        .filter(|(id, _)| theirs.contains_key(id))
-        .map(|(&id, &m)| (id, m))
+/// `other`'s interests: the booths they stood at, the ones you stood at too first, by both your minutes,
+/// then the rest by theirs.
+fn interests(rows: &Rows, mine: &BTreeMap<u64, f32>, other: Identity) -> Vec<Interest> {
+    let mut out: Vec<Interest> = booth_minutes(rows, other)
+        .into_iter()
+        .filter_map(|(id, minutes)| {
+            let booth = rows.booths.iter().find(|b| b.id == id)?;
+            let yours = mine.get(&id).copied();
+            Some(Interest {
+                booth_id: id,
+                name: booth.name.clone(),
+                minutes: round(minutes),
+                your_minutes: round(yours.unwrap_or(0.0)),
+                shared: yours.is_some(),
+            })
+        })
         .collect();
-    both.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
-    both.into_iter()
-        .filter_map(|(id, _)| rows.booths.iter().find(|b| b.id == id))
-        .map(|b| b.name.clone())
-        .collect()
+    out.sort_by(|a, b| {
+        b.shared
+            .cmp(&a.shared)
+            .then((b.minutes + b.your_minutes).total_cmp(&(a.minutes + a.your_minutes)))
+            .then(a.booth_id.cmp(&b.booth_id))
+    });
+    out
 }
 
 /// How many photos `who` and `other` are both tagged in.
@@ -802,16 +824,6 @@ mod tests {
         stage.zone_id = 2;
         stage.started_at = at(50);
         rows.encounters.push(stage);
-        // Ada stayed longer at the robot arms; Di stopped only at the Elastic booth in the expo.
-        rows.visits.push(Visit {
-            booth_id: 11,
-            ..visit(24, 1, 1, 3000, 5.0)
-        });
-        rows.visits.push(Visit {
-            booth_id: 10,
-            ..visit(25, 4, 1, 100, 3.0)
-        });
-        rows.visits.push(visit(26, 4, 2, 900, 4.0));
         rows.photo_tags.push(tag(8, 2, 2));
         let s = summary(&rows, who(1)).unwrap();
         let names: Vec<&str> = s.suggested_people.iter().map(|p| p.name.as_str()).collect();
@@ -821,14 +833,53 @@ mod tests {
         assert_eq!(bo.minutes, 15.0);
         assert_eq!(bo.met_zone_name, "Stage");
         assert_eq!(bo.met_at, time(at(50)));
-        assert_eq!(bo.shared_booths, vec!["Robot arms", "Elastic booth"]);
         assert_eq!(bo.photos_together, 2);
 
         let di = &s.suggested_people[0];
         assert_eq!(di.met_zone_name, "Expo");
         assert_eq!(di.met_at, time(at(100)));
-        assert_eq!(di.shared_booths, vec!["Elastic booth", "Drone show"]);
         assert_eq!(di.photos_together, 1);
+    }
+
+    fn interest(booth_id: u64, name: &str, minutes: f32, your_minutes: f32) -> Interest {
+        Interest {
+            booth_id,
+            name: name.into(),
+            minutes,
+            your_minutes,
+            shared: your_minutes > 0.0,
+        }
+    }
+
+    #[test]
+    fn suggested_people_show_their_booths_shared_ones_first() {
+        let mut rows = rows();
+        let at_booth = |id, n, booth_id, minutes| Visit {
+            booth_id,
+            ..visit(id, n, 1, 3000, minutes)
+        };
+        // Ada stood at the robot arms and the drone show.
+        rows.visits.push(at_booth(30, 1, 11, 5.0));
+        rows.visits.push(at_booth(31, 1, 12, 2.0));
+        // Bo spent longer at the Elastic booth than at the robot arms, twice.
+        rows.visits.push(at_booth(32, 2, 10, 9.0));
+        rows.visits.push(at_booth(33, 2, 11, 3.0));
+        rows.visits.push(at_booth(34, 2, 11, 4.0));
+        // Di stood at the drone show and the Elastic booth.
+        rows.visits.push(at_booth(35, 4, 12, 4.0));
+        rows.visits.push(at_booth(36, 4, 10, 6.0));
+        let s = summary(&rows, who(1)).unwrap();
+        let of = |name: &str| &s.suggested_people.iter().find(|p| p.name == name).unwrap().interests;
+
+        // Bo's 99 minutes in the expo name no booth, so they add no interest.
+        assert_eq!(
+            of("Bo"),
+            &vec![interest(11, "Robot arms", 7.0, 5.0), interest(10, "Elastic booth", 9.0, 0.0)]
+        );
+        assert_eq!(
+            of("Di"),
+            &vec![interest(12, "Drone show", 4.0, 2.0), interest(10, "Elastic booth", 6.0, 0.0)]
+        );
     }
 
     #[test]

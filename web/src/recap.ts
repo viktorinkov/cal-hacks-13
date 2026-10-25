@@ -9,8 +9,11 @@ import type { MerchSuggestion, MyPhoto } from './module_bindings/types';
 
 type Person = { node_id: number; name: string; photo_url: string; handles: Record<string, string> };
 
-/** Someone you spent time with, and how you met. */
-type Suggested = Person & { minutes: number; met_zone_name: string; met_at: string; shared_booths: string[]; photos_together: number };
+/** A booth someone's band stood at, with their minutes and yours; `shared` when you both stood there. */
+type Interest = { booth_id: number; name: string; minutes: number; your_minutes: number; shared: boolean };
+
+/** Someone you spent time with, how you met, and their interests, the shared ones first. */
+type Suggested = Person & { minutes: number; met_zone_name: string; met_at: string; interests: Interest[]; photos_together: number };
 
 export type Recap = {
   display_name: string;
@@ -124,15 +127,27 @@ function socials(p: Person) {
 
 const and = (xs: string[]) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs.join('');
 
-/** "Met at Stage at 09:40 PM · 25 min together · You both visited A and B · 2 photos together", leaving out what is empty. */
+/** "Met at Stage at 09:40 PM · 25 min together · 2 shared interests · 2 photos together", leaving out what is empty. */
 function howYouMet(p: Suggested) {
-  const min = Math.round(p.minutes), n = p.photos_together;
+  const min = Math.round(p.minutes), n = p.photos_together, shared = p.interests.filter(i => i.shared).length;
   return [
     p.met_at && `Met${p.met_zone_name ? ` at ${p.met_zone_name}` : ''} at ${clock(Date.parse(p.met_at))}`,
     min > 0 && `${min} min together`,
-    p.shared_booths.length > 0 && `You both visited ${and(p.shared_booths)}`,
+    shared > 0 && `${shared} shared interest${shared > 1 ? 's' : ''}`,
     n > 0 && `${n} photo${n > 1 ? 's' : ''} together`,
   ].filter(Boolean).join(' · ');
+}
+
+const mins = (m: number) => `${Math.max(1, Math.round(m))} min`;
+
+/** The booths they stood at, with their minutes and yours: the ones you both stood at first, in bold. */
+function interests(p: Suggested) {
+  if (!p.interests.length) return false;
+  return h('table', {},
+    h('tr', {}, h('th', {}, 'Interests'), h('th', {}, p.name), h('th', {}, 'You')),
+    p.interests.map(i => i.shared
+      ? h('tr', { class: 'pass' }, h('td', {}, h('b', {}, i.name)), h('td', {}, h('b', {}, mins(i.minutes))), h('td', {}, h('b', {}, mins(i.your_minutes))))
+      : h('tr', {}, h('td', {}, i.name), h('td', {}, mins(i.minutes)), h('td', {}))));
 }
 
 function people() {
@@ -142,6 +157,7 @@ function people() {
     p.photo_url && h('img', { class: 'face', src: p.photo_url }),
     h('b', {}, p.name),
     h('div', { class: 'muted' }, howYouMet(p)),
+    interests(p),
     socials(p))));
 }
 
