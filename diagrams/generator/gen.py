@@ -259,9 +259,9 @@ def pipeline(y0):
     for top, lh, name, kind, lg in lanes:
         Z(40, top, W - 80, lh, name, kind, lg)
     H(seed, fetch, "gives URLs")
-    V(bd, fetch)
-    H(fetch, mp)
-    V(claude, mp, x=mp.cx)
+    V(bd, fetch, "fetches pages")
+    H(fetch, mp, "maps records")
+    V(claude, mp, "checks floorplan", x=mp.cx)
     R(mp, "r", wf, "t", [(wf.x + 80, mp.cy)], label="indexes records", fb=80 / wf.w)
     H(wf, agent, "merges")
     R(agent, "r", val, "b", [(val.x + 80, agent.cy)], label="returns bundle", fb=80 / val.w)
@@ -464,7 +464,7 @@ def insurance(y0):
     pack = B(1620, claim.y - S.oy, "evidence pack\nnumbered facts", "stdb", w=520, h=facts[-1].bottom - claim.y,
              wordmark=STDB, mark_h=50, **mk)
     for fact in facts:
-        H(fact, pack, y=fact.cy)
+        H(fact, pack, "adds facts", y=fact.cy)
 
     # 5. Claude investigates the claim with its tools
     claude = B(2360, pack.y - S.oy + 80, "Claude\ninvestigates claim\ncites clauses", "claude", w=760,
@@ -653,7 +653,7 @@ def claude_jobs(y0):
     Z(1680, 200, 520, bottom + 40 - 200, "band1t module", "stdb", STDB)
     for i, (job, res, verb) in enumerate(rows):
         H(queue, job, verb, y=job.cy)
-        H(job, res, "returns" if i == 0 else None)
+        H(job, res, "returns result")
     return S.end_frame()
 
 
@@ -818,7 +818,7 @@ def interests(y0):
     who = card(X5, L((facts[0].y + facts[-1].bottom) / 2), "suggested person\nphoto, name", "web", USER, W5,
                facts[-1].bottom - facts[0].y, 300, **mk)
     for f in facts:
-        H(f, who, y=f.cy)
+        H(f, who, "shows", y=f.cy)
 
     # 4. the recap opens when the organizer ends the event or the attendee leaves
     org = card(X0, 1820, "organizer\nEvent ended", "web", USER, W0, 280, 110, **mk)
@@ -862,7 +862,7 @@ def merch(y0):
     pay = SV(840, r2, CAPONE, "Nessie (wallet)", w=440)
     settle = B(80, r2, "settle_merch_order", "good", w=560)
     for b in ins:
-        H(b, view, y=b.cy)
+        H(b, view, "informs picks", y=b.cy)
     H(view, recap, "suggests")
     V(recap, buy, "taps buy")
     H(buy, pay, "queues purchase")
@@ -889,7 +889,7 @@ def nessie(y0):
     Z(1380, 200, 1220, zb - 200, "band1t module", "stdb", STDB)
     for a, b, c, v1, v2 in drawn:
         H(a, b, v1)
-        H(b, c)
+        H(b, c, "confirms")
         H(c, wallet, v2, y=c.cy)
     return S.end_frame()
 

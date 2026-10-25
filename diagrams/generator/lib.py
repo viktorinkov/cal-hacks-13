@@ -393,5 +393,7 @@ class Scene:
         }
 
     def dump(self, path):
+        from style import style_scene
+
         with open(path, "w") as f:
-            json.dump(self.scene(), f, indent=1)
+            json.dump(style_scene(self.scene()), f, indent=1)
