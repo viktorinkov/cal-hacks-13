@@ -1,0 +1,33 @@
+{
+  "black": {
+    "bases": 15,
+    "buttons": 15,
+    "rotated": true,
+    "grid": "5 x 3",
+    "extent": [
+      235.8,
+      200.0,
+      13.6
+    ],
+    "grams_pla": 194.7,
+    "triangles": 160860
+  },
+  "clear": {
+    "lids": 15,
+    "rotated": true,
+    "grid": "5 x 3",
+    "extent": [
+      216.0,
+      194.0,
+      1.2
+    ],
+    "grams_pla": 46.3,
+    "triangles": 51840
+  },
+  "bed": [
+    250.0,
+    220.0
+  ],
+  "margin": 5.0,
+  "gap": 4.0
+}

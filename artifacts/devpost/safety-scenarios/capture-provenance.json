@@ -1,0 +1,111 @@
+{
+  "recorded_at": "2026-10-25T11:49:50.459390+00:00",
+  "source_commit": "219d48e079651fc5851e32cf0cb172eebededa57",
+  "source_ref": "origin/vik-e2e",
+  "assets": [
+    {
+      "path": "artifacts/devpost/safety-scenarios/hall-sos-current.jpg",
+      "sha256": "91934737efe55a51e84f3097c9b3fcb1f0fcc055be59421ca32ba15507c10428",
+      "dimensions": [
+        1728,
+        907
+      ]
+    },
+    {
+      "path": "artifacts/devpost/safety-scenarios/hall-clear-path-current.jpg",
+      "sha256": "26a22bd0a85c979dd80fabe6fb1abcf2396a4d93cad06f970bf3f2c2bd358e5a",
+      "dimensions": [
+        1728,
+        907
+      ]
+    },
+    {
+      "path": "artifacts/devpost/safety-scenarios/medic-route-preview.jpg",
+      "sha256": "e0f0b5adef91166da1dc94f2290bc8f2982d73ba4e53d7ca6f8a14895b67623a",
+      "dimensions": [
+        1728,
+        907
+      ]
+    },
+    {
+      "path": "artifacts/devpost/safety-scenarios/evacuation-flow.jpg",
+      "sha256": "d51259145fca0ed808502c54c6c19fcd0f1cdc20abd37c898c457b01b6185f0c",
+      "dimensions": [
+        1600,
+        920
+      ]
+    },
+    {
+      "path": "artifacts/devpost/safety-scenarios/evacuation-flow.svg",
+      "sha256": "5dfed2d004b714f67d2c3c1fe01444e5addbe8bb26f3d3ebee247486a7288781"
+    },
+    {
+      "path": "artifacts/devpost/safety-scenarios/evacuation-flow.excalidraw",
+      "sha256": "3c0d0a52ae5958dd262127e80f2618cf9f7c15131b4e6ffc45ce794456031469"
+    }
+  ],
+  "hall_screenshots": {
+    "url": "https://band1t.vip/t/AJMN-676X",
+    "controls": [
+      "Hall dock SOS",
+      "Hall dock Acknowledge",
+      "Hall dock Path"
+    ],
+    "state": "Browser-local Hall story overlays existing venue state. No database writes and no band commands.",
+    "code": [
+      "frontend/src/components/dashboard/HallDemoDock.tsx",
+      "frontend/src/booth/hallGuide.ts",
+      "frontend/src/booth/hallDemo.ts"
+    ],
+    "capture": "Official Chrome browser runtime native JPEG. No app DOM or pixel changes."
+  },
+  "medic_screenshot": {
+    "url": "http://127.0.0.1:5175/?mode=mock",
+    "build_source": "git archive origin/vik-e2e frontend into .builds/safety-preview",
+    "command": "npm run dev -- --mode test --host 127.0.0.1 --port 5175",
+    "isolation": "frontend/src/stdb/session.ts:684 returns before connecting in test mode. ?mode=mock selects the in-browser adapter.",
+    "controls": [
+      "Venue: Simulation",
+      "Story: SOS",
+      "Incident: Acknowledge",
+      "Incident: Clear the path",
+      "Pause the simulation"
+    ],
+    "visible": "The current local frontend shows First Aid walking the cleared route, nearby people moving aside and light roles. On-screen counts, acknowledgments and medical movement are local preview values.",
+    "capture": "Official Chrome browser runtime native JPEG. No app DOM or pixel changes.",
+    "not_evidence_of": [
+      "Deployed feature state",
+      "Physical band command delivery",
+      "Real medical response",
+      "Measured evacuation or treatment performance"
+    ]
+  },
+  "evacuation_illustration": {
+    "type": "Authored vector product illustration, not an application screenshot",
+    "source": "make_evacuation_visual.py",
+    "evidence": "evacuation-evidence.md",
+    "render": "Native Chrome JPEG clip of authored SVG, no pixel edits",
+    "scope": "Organizer-triggered evacuation. Nearest door per team, loaded-floor paths, unresolved SOS/fall attendee waits for help then leaves after incident resolution.",
+    "limits": [
+      "Illustrative geometry and positions",
+      "No safest-path claim",
+      "No automatic fire detection claim",
+      "No physical command delivery claim"
+    ],
+    "title": "Fire evacuation",
+    "fire_context": "Fire is an example reason for the existing manual Evacuate control. It is not a separately detected or generated event.",
+    "fire_evidence": [
+      "web/src/live-run.ts:361-363 at 219d48e",
+      "spacetimedb/server/src/live/mod.rs:375-395 at 219d48e"
+    ],
+    "previous_checkpoint": "checkpoints/before-fire-title/",
+    "updated_at": "2026-10-25T11:50:48.569964+00:00"
+  },
+  "review": {
+    "hall_clear_path": "Approved by /root/devpost_images_review",
+    "medic_route": "Approved by /root/devpost_images_review",
+    "evacuation": "Approved by /root/devpost_images_review, including the Fire evacuation title and exact Evacuate button label; compared against the preserved prior revision and current 219d48e source."
+  },
+  "shared_state": "No shared live event, financial record, organizer role or hardware command changed.",
+  "cleanup": "Closed only task capture tabs, stopped local test-mode Vite server, and removed task-created .builds/safety-preview archive and dependencies. Saved assets, editable source and checkpoints remain."
+}

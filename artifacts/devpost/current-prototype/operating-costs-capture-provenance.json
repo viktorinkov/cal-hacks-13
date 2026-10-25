@@ -1,0 +1,60 @@
+{
+  "created_at_utc": "2026-10-25T12:20:48.645178+00:00",
+  "url": "https://dev.band1t.vip/organizer#costs",
+  "capture_method": "Official OpenAI Chrome browser runtime; native full-viewport JPEG. No cropping, pixel edits, rescaling, DOM changes or viewport resize.",
+  "authentication": "Existing v_minchev@ucsb.edu owner and ops session restored; no sign-in grant or account changes.",
+  "controls": [
+    "Costs navigation link",
+    "Native page scrolling to Costs and revenue",
+    "Native page scrolling to Booths table",
+    "For source-only repair image: Settlements navigation link and existing claim #73 button, then native scrolling"
+  ],
+  "state_scope": "Read-only inspection of existing scripted historical records. No event reset/start/reopen, charge, payout, approval, payment, report or role mutation.",
+  "visible_state": "Costs summary separates order revenue and printing costs, booked claims cost and approved recoveries, and payments received versus outstanding. Booth rows show sales, printing costs, fees, amounts owed, and incident losses and charges.",
+  "limitations": [
+    "Displayed figures are existing scripted records, not real commercial receipts or physical event outcomes.",
+    "Net cost deducts approved recoveries before collection; it is not a cash balance or profit.",
+    "Costs aggregate includes earlier histories and need not equal the latest event-run summary.",
+    "The existing repair settlement source includes older Claude attribution and should not prove current Elastic execution.",
+    "Existing property evidence identifies damage; band proximity alone does not establish who caused it."
+  ],
+  "files": [
+    {
+      "file": "operating-costs-summary-full.jpg",
+      "captured_at_utc": "2026-10-25T12:18:26.166382+00:00",
+      "sha256": "bec0a205d081f8e66a07bd875a381c41cf67f812761a1191eb076f004ee5a11d",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "caption": "The organizer tracks event earnings and claim costs, with money received and still owed shown separately.",
+      "recommended_use": "replace older dev-costs-summary.jpg if used; do not repeat both",
+      "supporting_text": "The net-cost figure includes approved recoveries; Payments separately shows what has arrived."
+    },
+    {
+      "file": "operating-costs-booth-breakdown-full.jpg",
+      "captured_at_utc": "2026-10-25T12:18:47.979699+00:00",
+      "sha256": "fbb69c8271d96977a227017e35bc1e61c541a2aa5f74b2351ddca589f447a114",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "caption": "The organizer sees each booth’s sales, printing costs and amount owed, alongside recorded incident losses and charges.",
+      "recommended_use": "additional view showing the per-booth breakdown"
+    },
+    {
+      "file": "venue-repair-settlement-full-source.jpg",
+      "captured_at_utc": "2026-10-25T12:20:27.414063+00:00",
+      "sha256": "ff7b925d5d5a700fc0d2a78d8335a20175dd9644ad09b54c284450cab5e2051d",
+      "dimensions": [
+        1728,
+        963
+      ],
+      "caption": "Venue repair settlements track the vendor payment, expected insurer recovery and the venue’s deductible.",
+      "recommended_use": "source only; repeats existing theft settlement and displays historical Claude decision label"
+    }
+  ],
+  "preserved_existing_sources": true,
+  "article_only": true,
+  "review": "Independent visual QA passed by devpost_images_review. Replace the older cropped summary rather than repeat it, add the distinct booth view, preserve entire native viewports, and omit the repair source by default. Amount owed is not paid earnings; charged is not collected."
+}

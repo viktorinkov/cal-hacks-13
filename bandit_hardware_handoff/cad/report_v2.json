@@ -1,0 +1,118 @@
+{
+  "heights": {
+    "slot_top": 1.3,
+    "floor_top": 2.3,
+    "batt_top": 7.8,
+    "seat": 8.8,
+    "ring_top": 12.0,
+    "lid_bot": 12.4,
+    "top": 13.6,
+    "switch_top": 12.8,
+    "usb_bot": 3.3,
+    "usb_top": 7.5
+  },
+  "params": {
+    "head": 42.0,
+    "tail_len": 43.0,
+    "R": 10.0,
+    "wall": 1.5,
+    "slot_w": 17.5,
+    "slot_h": 1.3,
+    "floor": 1.0,
+    "batt_h": 5.5,
+    "ring_lift": 1.0,
+    "ring_h": 3.2,
+    "ring_gap": 0.4,
+    "lid_t": 1.2,
+    "lip": 0.8,
+    "clr": 0.2,
+    "ring_od": 37.5,
+    "ring_id": 27.0,
+    "ring_pocket": 38.3,
+    "batt_pocket": [
+      37.0,
+      32.0,
+      3.0
+    ],
+    "bay_x_end": -41.5,
+    "flare_x": [
+      -18.5,
+      -24.0
+    ],
+    "bay_half": 19.5,
+    "divider": [
+      -20.0,
+      -18.5,
+      9.2
+    ],
+    "usb_w": 10.6,
+    "usb_z": [
+      3.3,
+      7.5
+    ],
+    "usb_cb": [
+      14.0,
+      0.7,
+      2.6,
+      8.2
+    ],
+    "switch_h": 5.0,
+    "button_hole": 6.5,
+    "led_window": [
+      26.0,
+      39.0,
+      0.6
+    ],
+    "N": 720
+  },
+  "parts": {
+    "bandit_v2_base": {
+      "triangles": 47676,
+      "volume_mm3": 10423.2,
+      "grams_pla": 12.92,
+      "bbox_min": [
+        -43.0,
+        -21.0,
+        0.0
+      ],
+      "bbox_max": [
+        21.0,
+        21.0,
+        13.6
+      ],
+      "open_edges": 0
+    },
+    "bandit_v2_lid": {
+      "triangles": 17280,
+      "volume_mm3": 2488.7,
+      "grams_pla": 3.09,
+      "bbox_min": [
+        -42.0,
+        -20.0,
+        12.4
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        13.6
+      ],
+      "open_edges": 0
+    },
+    "bandit_v2_lid_facedown": {
+      "triangles": 17280,
+      "volume_mm3": 2488.7,
+      "grams_pla": 3.09,
+      "bbox_min": [
+        -42.0,
+        -20.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        1.2
+      ],
+      "open_edges": 0
+    }
+  }
+}
