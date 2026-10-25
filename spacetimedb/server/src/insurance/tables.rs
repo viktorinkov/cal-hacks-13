@@ -103,7 +103,7 @@ pub struct Claim {
     pub cover_kind: String,
     pub claimant: Option<Identity>,
     pub claimant_name: String,
-    pub band_id: u8,
+    pub band_id: u32,
     pub zone_id: u64,
     pub zone_name: String,
     pub policy_id: u64,
