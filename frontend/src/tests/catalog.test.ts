@@ -21,4 +21,21 @@ describe('desk catalog', () => {
     expect(catalog.links[0]).toMatchObject({ kind: 'met', toKind: 'booth', toId: '2' })
     expect(catalog.booths[0].name).toBe('Northwind')
   })
+
+  it('prefers the organizer album and names the people in a frame', () => {
+    const catalog = readCatalog({
+      boardAttendees: table([
+        { nodeId: 7n, displayName: 'Maya Chen', bandId: 1, findable: true, simulated: false, organization: '', handles: [], createdAt: { toDate: () => new Date(0) } },
+      ]),
+      boardPhotos: table([
+        { id: 2n, url: '/blobs/b', takenAt: { toDate: () => new Date(2000) }, zoneName: 'Pit', caption: 'Encore', nodeIds: [7n], peopleCount: 1, read: false },
+        { id: 1n, url: '/blobs/a', takenAt: { toDate: () => new Date(1000) }, zoneName: 'Hall', caption: 'Earlier', nodeIds: [], peopleCount: 0, read: false },
+      ]),
+      socialPhotos: table([
+        { id: 9n, url: '/blobs/social', takenAt: { toDate: () => new Date(3000) }, zoneId: 1n, caption: 'Social' },
+      ]),
+    })
+    expect(catalog.photos.map((photo) => photo.id)).toEqual(['2', '1'])
+    expect(catalog.photos[0].people).toEqual(['Maya Chen'])
+  })
 })

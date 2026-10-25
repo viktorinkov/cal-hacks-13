@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useRoute } from '@/cover/route'
 import { useCatalog, type Photo } from '@/stdb/catalog'
 import { DeskFrame, Figure, when } from './DeskFrame'
 
 /** Event photographs, framed like the rest of the desk. People in a frame are named underneath. */
 export function PhotosPage() {
   const photos = useCatalog((s) => s.photos)
+  const { go } = useRoute()
   const [open, setOpen] = useState<Photo | null>(null)
   const named = photos.filter((photo) => photo.people.length > 0).length
 
@@ -22,6 +24,9 @@ export function PhotosPage() {
         </>
       }
     >
+      <button type="button" onClick={() => go('/photo')} className="mb-6 rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5">
+        Add frames
+      </button>
       {photos.length === 0 ? (
         <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>
       ) : (

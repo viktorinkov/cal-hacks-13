@@ -10,6 +10,7 @@ import { GraphPage } from '@/components/desk/GraphPage'
 import { MerchPage } from '@/components/desk/MerchPage'
 import { PaymentsPage } from '@/components/desk/PaymentsPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
+import { PhotographerPage } from '@/components/photo/PhotographerPage'
 import { VenuePage } from '@/components/desk/VenuePage'
 import { JoinPage } from '@/components/join/JoinPage'
 import { RegisterPage } from '@/components/join/RegisterPage'
@@ -72,6 +73,7 @@ function Pages() {
   if (path === '/attendees') return <AttendeesPage />
   if (path === '/bands') return <BandsPage />
   if (path === '/photos') return <PhotosPage />
+  if (path === '/photo') return <PhotographerPage />
   if (path === '/merch') return <MerchPage />
   if (path === '/graph') return <GraphPage />
   if (path === '/costs') return <CostsPage />

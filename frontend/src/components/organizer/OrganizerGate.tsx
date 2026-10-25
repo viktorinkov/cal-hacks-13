@@ -17,6 +17,8 @@ function GateCopy({ children }: { children: ReactNode }) {
 
 /** Email sign-in, the same client the live organizer portal uses. A `?as=` test identity skips it. */
 export function OrganizerGate({ children }: { children: ReactNode }) {
+  const { path } = useRoute()
+  const frames = path === '/photo'
   const [host, setHost] = useState<HostConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const as = new URLSearchParams(window.location.search).get('as')
@@ -49,9 +51,9 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     return (
       <GateCopy>
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
-        <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
+        <h1 className="font-display text-[28px] leading-none text-ink">{frames ? 'Photographer' : 'Organizer'}</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">
-          Sign in with your email to run the event.
+          {frames ? 'Sign in with your email to file frames from the night.' : 'Sign in with your email to run the event.'}
         </p>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
@@ -64,7 +66,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
         >
           Sign in with email
         </button>
-        {!here && (
+        {!here && !frames && (
           <p className="text-[13px] leading-relaxed text-ink-muted">
             Email sign-in is registered for band1t.vip. On this machine, open the{' '}
             <a className="text-ink underline underline-offset-2" href="https://band1t.vip/organizer">
@@ -73,16 +75,26 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
             or continue with the ops test identity.
           </p>
         )}
-        {!here && (
+        {!here && frames && (
+          <p className="text-[13px] leading-relaxed text-ink-muted">
+            Email sign-in is registered for band1t.vip. On this machine, continue with the photographer test identity.
+          </p>
+        )}
+        {!here && !frames && (
           <button type="button" className={gateButton} onClick={() => window.location.assign('/organizer?as=ops')}>
             Continue as ops
+          </button>
+        )}
+        {!here && frames && (
+          <button type="button" className={gateButton} onClick={() => window.location.assign('/photo?as=photographer')}>
+            Continue as photographer
           </button>
         )}
       </GateCopy>
     )
   }
 
-  if (host.authClientId && staffSignedIn() && !as && !staff &&
+  if (!frames && host.authClientId && staffSignedIn() && !as && !staff &&
       staffQueries['SELECT * FROM my_roles'] === 'open' && staffQueries['SELECT * FROM my_owner'] === 'open') {
     return (
       <GateCopy>
@@ -104,8 +116,11 @@ export function SignInCallback() {
   useEffect(() => {
     let cancel = false
     void finishSignIn()
-      .then(() => {
-        if (!cancel) go('/organizer')
+      .then((back) => {
+        if (cancel) return
+        const next = back.startsWith('/') && !back.startsWith('//') ? back : '/organizer'
+        window.history.replaceState(null, '', next)
+        window.dispatchEvent(new PopStateEvent('popstate'))
       })
       .catch((reason: unknown) => {
         if (!cancel) setError(reason instanceof Error ? reason.message : 'Sign-in did not complete.')

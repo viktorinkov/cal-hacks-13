@@ -1,10 +1,11 @@
 import { create } from 'zustand'
+import { Timestamp } from 'spacetimedb'
 import type { BoardClaim, BoardFact, BoardCheck } from '@/cover/liveClaims'
 import { scheduleCatalog } from './catalog'
 import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
-import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
+import { sha256, uploadBlob, uploadPhoto, validateMedicalFile, type MedicalDocumentKind } from './uploads'
 import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
 import { schedulePayments } from '@/payments/store'
 
@@ -33,6 +34,7 @@ const STAFF_QUERIES = [
   'SELECT * FROM board_facts',
   'SELECT * FROM board_attendees',
   'SELECT * FROM my_photos',
+  'SELECT * FROM board_photos',
   'SELECT * FROM my_merch_orders',
   'SELECT * FROM board_ledger',
   'SELECT * FROM board_lines',
@@ -173,6 +175,7 @@ type Reducers = {
   disputeCharge(args: { chargeId: bigint; text: string }): Promise<unknown>
   buyMerch(args: { templateId: bigint; photoId: bigint; size: string }): Promise<unknown>
   rerunShoppingAgent(args: Record<string, never>): Promise<unknown>
+  registerPhoto(args: { url: string; takenAt: Timestamp; zoneId: bigint; caption: string }): Promise<unknown>
 }
 
 let conn: DbConnection | null = null
@@ -847,6 +850,26 @@ export const useSession = create<SessionState>((set, get) => ({
     await call(() => reducers().rerunShoppingAgent({}))
   },
 }))
+
+/** Upload one frame and file it on the organizer photos page. */
+export async function fileFrame(file: File, zoneId: string, takenAtMs: number, caption: string): Promise<string> {
+  if (!conn) throw new Error('The database is not connected.')
+  if (!/^\d+$/.test(zoneId)) throw new Error('Choose the zone where this frame was taken.')
+  const uploaded = await uploadPhoto(file)
+  try {
+    await call(() => reducers().registerPhoto({
+      url: uploaded.url,
+      takenAt: Timestamp.fromDate(new Date(takenAtMs || Date.now())),
+      zoneId: BigInt(zoneId),
+      caption: caption.trim().slice(0, 140),
+    }))
+  } catch (error) {
+    const message = messageOf(error)
+    if (message.includes('needs one of these roles')) throw new Error('This sign-in cannot file frames.')
+    throw error instanceof Error ? error : new Error(message)
+  }
+  return uploaded.url
+}
 
 noteDisconnect = (message) => useSession.setState({
   phase: 'error', error: message,

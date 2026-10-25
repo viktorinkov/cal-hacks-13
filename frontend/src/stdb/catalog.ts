@@ -184,6 +184,11 @@ function handles(value: unknown): Handle[] {
   })
 }
 
+function idList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => idOf(item)).filter(Boolean)
+}
+
 function people(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
@@ -229,6 +234,15 @@ export function readCatalog(db: unknown): Catalog {
     caption: text(row.caption),
     people: [],
   }))
+  const names = new Map(attendees.map((person) => [person.nodeId, person.displayName]))
+  const board = rowsOf(tables.boardPhotos).map((row) => ({
+    id: idOf(row.id),
+    url: text(row.url),
+    takenAt: millis(row.takenAt),
+    zoneName: text(row.zoneName),
+    caption: text(row.caption),
+    people: idList(row.nodeIds).map((id) => names.get(id) ?? '').filter(Boolean),
+  }))
   const seen = new Set(social.map((photo) => photo.id))
   const links: GraphLink[] = []
   let linkCount = 0
@@ -268,7 +282,9 @@ export function readCatalog(db: unknown): Catalog {
       lastSeen: millis(row.lastSeen),
     })),
     zones,
-    photos: social.length > 0 ? social : myPhotos.filter((photo) => !seen.has(photo.id)),
+    photos: (board.length > 0 ? board : social.length > 0 ? social : myPhotos.filter((photo) => !seen.has(photo.id)))
+      .slice()
+      .sort((a, b) => b.takenAt - a.takenAt),
     merch: rowsOf(tables.merchTemplate).map((row) => ({
       id: idOf(row.id),
       name: text(row.name),
