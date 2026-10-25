@@ -691,33 +691,35 @@ def interests(y0):
     X0, X1, X2, X3, X4, X5 = 60, 800, 1560, 2360, 3220, 4020
     W0, W1, W2, W3, W4, W5 = 500, 520, 560, 620, 560, 760
     mk = dict(fill=WHITE)
-    ev = [460, 820, 1100, 1360, 1620, 1880, 2140]  # one row per fact on a suggested person
+    ev = [820, 1100, 1360, 1620, 1880, 2140, 2400]  # one row per fact on a suggested person
 
     # 1. interests: the 5 spots where a person spent the most minutes, as booth text read by meaning
     visit = card(X0, 590, "visit\nminutes per booth", "stdb", WALK, W0, 220, 80)
     booth = card(X0, 330, "booth\nname, description, tags", "stdb", STORE, W0, 220, 80)
     indexer = card(X1, 460, "bandit-indexer\ntop 5 spots\nmost minutes\nfindable only", "rust", RUST, W1, 480, 90)
-    text = card(X2, ev[0], "interests\nzone description\nbooth description, tags", "ext", SPARKLES, W2, 300, 100,
+    text = card(X2, 460, "interests\nzone description\nbooth description, tags", "ext", SPARKLES, W2, 300, 100,
                 **mk)
-    people = card(X3, ev[0], "bandit-people\nbandit-booths\nread by meaning", "ext", ELASTIC, W3, 300, 70, **mk)
+    people = card(X3, 460, "bandit-people\nbandit-booths\nread by meaning", "ext", ELASTIC, W3, 300, 70, **mk)
     H(visit, indexer, "minutes", y=visit.cy)
     H(booth, indexer, "descriptions", y=booth.cy)
     H(indexer, text, "top 5 spots", y=text.cy)
     H(text, people, "indexes")
 
     # 2. suggestions: the people you met, ordered by how close their interests are to yours
-    search = card(X3, ev[1], "semantic search\nyour interests\nvs their interests", "ext", ELASTIC, W3, 260, 60, **mk)
+    search = card(X3, ev[0], "semantic search\nyour interests\nvs their interests", "ext", ELASTIC, W3, 260, 60, **mk)
     Z(X2 - 20, L(people.y) - 70, X3 + W3 + 20 - (X2 - 20), L(search.bottom) + 40 - (L(people.y) - 70),
       "Evidence Engine", "ext", ELASTIC)
-    api = card(X1, 970, "bandit-api\nGET /api/recap\npeople you met\nmost minutes first", "rust", RUST, W1, 420, 90)
-    D(visit, "b", 0.8, api, "l", 0.2, "visits")
+    api = card(X1, (740 + ev[2] + 110) / 2, "bandit-api\nGET /api/recap\npeople you met\nmost minutes first\n"
+               "booths they stood at", "rust", RUST, W1, ev[2] + 110 - 740, 90)
+    D(visit, "b", 0.8, api, "l", 0.1, "visits")
     H(api, search, "candidates", y=search.cy)
     V(people, search, "both interests", x=search.cx)
 
-    # 3. every fact on a suggested person is its own card
-    facts = [card(X4, ev[0], "their interests\nInto: Anthropic, Elastic", "ext", SPARKLES, W4, 220, 70),
-             card(X4, ev[1], "order\nclosest interests first\nminutes if no answer", "ext", SEARCH, W4, 260, 70),
-             card(X4, ev[2], "shared booths\nyou both visited", "rust", STORE, W4, 220, 70),
+    # 3. every fact on a suggested person is its own card; a booth both stood at is a shared interest
+    facts = [card(X4, ev[0], "order\nclosest interests first\nminutes if no answer", "ext", SEARCH, W4, 260, 70),
+             card(X4, ev[1], "their interests\nbooths they stood at\ntheir minutes", "rust", SPARKLES, W4, 220, 60),
+             card(X4, ev[2], "shared interests\nbooths you both stood at\nfirst, highlighted", "rust", STORE, W4,
+                  220, 60),
              card(X4, ev[3], "met at\nzone, time", "stdb", PIN, W4, 220, 70),
              card(X4, ev[4], "minutes together", "stdb", TIMER, W4, 220, 90),
              card(X4, ev[5], "photos together", "stdb", IMAGE, W4, 220, 90),
@@ -726,9 +728,9 @@ def interests(y0):
                ev[4] - ev[3] + 220, 110)
     tags = card(X3, ev[5], "photo_tag\nboth in photo", "stdb", IMAGE, W3, 220, 80)
     handles = socials_card(X3, ev[6], "set_social_handle", W3)
-    H(people, facts[0], "top spots")
-    H(search, facts[1], "ranks")
-    H(api, facts[2], "both visited", y=facts[2].cy)
+    H(search, facts[0], "ranks")
+    H(api, facts[1], "their booths", y=facts[1].cy)
+    H(api, facts[2], "both stood at", y=facts[2].cy)
     H(met, facts[3], "where, when", y=facts[3].cy)
     H(met, facts[4], "minutes", y=facts[4].cy)
     H(tags, facts[5], "counts")
@@ -740,9 +742,9 @@ def interests(y0):
         H(f, who, y=f.cy)
 
     # 4. the recap opens when the organizer ends the event or the attendee leaves
-    org = card(X0, 1560, "organizer\nEvent ended", "web", USER, W0, 280, 110, **mk)
-    leaver = card(X0, 1960, "attendee\nLeave the event", "web", USER, W0, 280, 110, **mk)
-    page = card(X1, 1760, "recap\n(/t/code)", "web", PHONE, W1, 700, 260, **mk)
+    org = card(X0, 1820, "organizer\nEvent ended", "web", USER, W0, 280, 110, **mk)
+    leaver = card(X0, 2220, "attendee\nLeave the event", "web", USER, W0, 280, 110, **mk)
+    page = card(X1, 2020, "recap\n(/t/code)", "web", PHONE, W1, 680, 260, **mk)
     H(org, page, "ends event", y=org.cy)
     H(leaver, page, "leaves", y=leaver.cy)
     top = L(facts[-1].bottom) + 160
@@ -763,7 +765,7 @@ def interests(y0):
     S.arrow(sec[3], None, [(sec[3].cx, sec[3].bottom), (sec[3].cx, sy - s / 2 - 12)], label="shares photo", fs=AFS)
     for i, path in enumerate(SOCIALS):
         S.image(lx + i * (s + 26), sy - s / 2, path, s)
-    for box, n in ((indexer, 1), (search, 2), (facts[0], 3), (who, 4), (page, 5)):
+    for box, n in ((indexer, 1), (search, 2), (facts[1], 3), (who, 4), (page, 5)):
         badge(box, n)
     return S.end_frame()
 
