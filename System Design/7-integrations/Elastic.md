@@ -79,7 +79,7 @@ Non-responsibilities:
 | Insurance.md: `bandit-claims`, through the pipeline `bandit-claims-validate` | in | `bandit-workers`: job `claim_verify`, the seed when it first creates the index, and job `claim_draft` | one de-identified document per pack version (`claim-<id>-v<n>`); the 30 seeded past claims (`history-01` to `history-30`); the outcome and payout once a claim is paid | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: `bandit-documents`, through the pipeline `bandit-documents-extract` (next to build) | in | `bandit-workers`: job `document_read` | one document per page of an insurance PDF (`<sha256>-p<n>`), with the page's bytes for the `attachment` processor | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: Elastic Workflows API, `bandit-read-document` (next to build) | in | `bandit-workers`: job `document_read` | start one execution per document with its SHA-256 and kind (`venue_policy`, `insurance_card`, `hospital_report`); poll it every 5 s; read back the terms and clauses from `bandit-document-terms` | HTTPS to Elastic Kibana, `KIBANA_API_KEY` |
-| Insurance.md: `bandit-policy-clauses` (next to build) | in | `bandit-workers`: job `document_read` | one document per clause of the venue's policy or an attendee's card, once code found its text word for word on its page | HTTPS, `ELASTICSEARCH_API_KEY` |
+| Insurance.md: `bandit-policy-clauses` (next to build) | in | `bandit-workers`: job `document_read`; Bright-Data.md: the plan lookup and the venue policy lookup | one document per clause of the venue's policy or an attendee's card, once code found its text word for word on its page; and one document per chunk of each page of a PDF a lookup fetched, the moment it arrives | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: policy clause search (next to build) | out | `bandit-workers`: job `claim_verify`, and Claude's tools `search_policy` and `read_clause` in job `claim_review` | a `semantic` query on `bandit-policy-clauses` `text`, filtered to the venue's policy and this attendee's card; each clause's id, policy, section, page, text and score, written through `submit_claim_checks` or handed to Claude | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: precedent search (today; the clause search replaces it) | out | `bandit-workers` | one semantic query on `narrative` per claim copy; the top 3 decided past claims, written through `submit_claim_checks` | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Elastic Kibana | in | the team, signed in to the Elastic Cloud project | the Elastic Workflows execution view, Elastic Agent Builder, and the five dashboards: scrape pipeline, sponsors and prizes, band radio and photos, recap suggestions and (Insurance.md) claims evidence; read only on every BandIt index | HTTPS in a browser; Elastic Cloud logins, never attendees |
@@ -106,7 +106,7 @@ flowchart LR
     PIPE["bandit-claims-validate (ingest pipeline: Painless script -> bandit-claims)"]
     CLM["bandit-claims: de-identified claim copies"]
     RD["bandit-documents-extract -> bandit-documents, then bandit-read-document with the agent bandit-document-reader (next to build)"]
-    CLS["bandit-policy-clauses: each clause of the venue's and the attendee's policy (next to build)"]
+    CLS["bandit-policy-clauses: each clause of the venue's and the attendee's policy, and each chunk of a fetched PDF (next to build)"]
     RP["bandit-propose-rule with the agent bandit-rule-proposer and its tool bandit.claim_precedents (ES|QL -> bandit-claims)"]
     RAW["bandit-raw-pages, bandit-raw-orgs, bandit-raw-plan"]
     WF["bandit-organize (Elastic Workflow: ES|QL LOOKUP JOIN -> bandit-raw-orgs, bandit-raw-plan)"]
@@ -207,7 +207,7 @@ One row per index. "Names" means names of people; company and booth names are pu
 | `bandit-documents` (next to build) | one page of one insurance PDF, id `<sha256>-p<n>`: `document_hash`, `kind` (`venue_policy`, `insurance_card`, `hospital_report`), `page`, `text` | `bandit-workers`: job `document_read`, `PUT _doc` through `bandit-documents-extract` | the agent's tool `bandit.document_pages` (Elastic ES\|QL); `bandit-workers`, to check each quote word for word; never a dashboard | an attendee's, on their card and hospital report; deleted once the claim is decided |
 | `bandit-document-terms` (next to build) | what `bandit-read-document` read from one document, id = its SHA-256: its kind, the reader's version (a hash of the agent's instructions, the workflow, the tool and the kind's schema), the terms with their quotes and pages, the clauses, and what it prints about itself | the workflow's last step, `save_terms` (`elasticsearch.index`) | `bandit-workers`, `_doc` by id | as `bandit-documents`, and deleted with it |
 | `bandit-rule-proposals` | what `bandit-propose-rule` proposed for one try of one proposal, id `proposal-<id>-<try>`: `proposal_key`, `model` (the connector), `answer` (the structured output) and `usage` | the workflow's last step, `save_proposal` (`elasticsearch.index`) | `bandit-workers`, `_doc` by id | none: claim ids, codes and amounts |
-| `bandit-policy-clauses` (next to build) | one clause of the venue's policy or an attendee's insurance card, id `<sha256>-c<n>`: `clause_id`, `policy` (`venue`, `attendee`), `document_hash`, `section`, `page`, `text` | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page | `bandit-workers`: `semantic` on `text`, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause` | none in the venue's; an attendee's clauses are deleted with the claim |
+| `bandit-policy-clauses` (next to build) | one passage of a policy PDF, of one of two kinds: a clause of the venue's policy or an attendee's insurance card (`kind` `clause`, id `<sha256>-c<n>`), or a chunk of one page of a PDF a lookup fetched (`kind` `chunk`, id `<sha256>-p<page>-k<n>`). Each has `clause_id`, `kind`, `policy` (`venue`, `attendee`), `document_hash`, `section` (empty for a chunk), `page`, `text` | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page; Bright-Data.md: the plan lookup and the venue policy lookup, `_bulk`, each fetched PDF's chunks before anything reads it, and the joined PDF's chunks when the venue policy lookup files it | `bandit-workers`: `semantic` on `text` over clauses only, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause`; the lookups' chunk search, `semantic` on `text` over one PDF's chunks, for the chunk each check cites | none in the venue's; an attendee's clauses are deleted with the claim |
 | `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway`, `bandit-raw-photos` | one gateway line, heard list or photo record | `feed.py` and `photos.py` on the venue laptop, `_bulk` | only the band radio and photos dashboard (Elastic ES\|QL), after the event | none |
 
 Every `semantic_text` field names the inference endpoint `.jina-embeddings-v5-text-small` on the Elastic Inference Service: `text` in the three import raw indices, `description`, `interests` and `narrative`, and `text` in `bandit-documents` and `bandit-policy-clauses` (next to build). Elastic embeds a document's text when it is written and the query text when it is searched, so no BandIt process computes a vector.
@@ -255,7 +255,7 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 #### Read every insurance document (next to build)
 
-**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`. A plan lookup and a venue policy lookup run the same steps on each PDF they fetch before they keep it, to read what it prints about itself ([Bright-Data](Bright-Data.md)).
+**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`. A plan lookup and a venue policy lookup run the same steps on each PDF they fetch before they keep it, to read what it prints about itself, and put the PDF's chunks in `bandit-policy-clauses` first, so it is searchable by meaning the moment it arrives ([Fetched PDFs](#fetched-pdfs-searchable-by-meaning-the-moment-they-arrive), [Bright-Data](Bright-Data.md)).
 
 **Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address.
 
@@ -785,9 +785,40 @@ What each kind's schema asks for:
 | `coverage_form` | one coverage form a venue policy lookup fetched, maybe inside a longer PDF such as a specimen policy; read only to check it, never filed: which form it is (`liability_form`, `property_form` or `other`), its form number with its edition and its title, each copied exactly with its page, and the pages where the form starts and ends | none |
 | `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
 
-**The clause search.** `claim_verify` and Claude's `search_policy` run one `semantic` query on `bandit-policy-clauses` `text`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card, and take the top 5: clause id, policy, section, page, text and score. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.
+**The clause search.** `claim_verify` and Claude's `search_policy` run one `semantic` query on `bandit-policy-clauses` `text`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card, and take the top 5: clause id, policy, section, page, text and score. They read clauses only: a document of `kind` `chunk` never comes back, so a claim is decided on clauses code checked. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.
 
-**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses` once the claim is decided.
+#### Fetched PDFs, searchable by meaning the moment they arrive
+
+A plan lookup and a venue policy lookup fetch PDFs from the web through Bright Data ([Bright-Data](Bright-Data.md)). Each fetched PDF goes into `bandit-policy-clauses` the moment it arrives, before the reader reads it, so the Evidence Engine can search its wording by meaning at once. The lookup's check then cites the chunk that matched what was typed.
+
+1. **Pages.** `bandit-workers` writes each page through `bandit-documents-extract`, as for any PDF, and the `attachment` processor takes its text.
+2. **Chunks.** Code cuts each page's text into chunks at line breaks, at most 60 words each, and writes them to `bandit-policy-clauses` with `_bulk`: `kind` `chunk`, id `<sha256>-p<page>-k<n>`, the policy they belong to (`attendee` for a plan, `venue` for a coverage form), the page and the text. `semantic_text` embeds each chunk with `.jina-embeddings-v5-text-small`. A chunk is the page's own words, so it needs no check.
+3. **Read.** `bandit-read-document` reads the PDF, and code checks what it prints about itself, as before.
+4. **Cite.** For a PDF that passes, one `semantic` query on `bandit-policy-clauses` `text`, filtered to `kind` `chunk` and this PDF's `document_hash`, with what was typed as the query text. For a plan that is the insurer and the plan, with "summary of benefits and coverage". For a coverage form it is the form number and the form's title, and the query is also filtered to the form's own pages. Of the top 5 hits, code keeps the first that holds the printed plan name or form number, else the first hit. The lookup records it: chunk id, page, text and score.
+5. **Keep or drop.** A PDF that is passed over leaves Elastic: its pages, its answer and its chunks. A PDF the blob store holds stays, because a lookup kept it: when two attendees have the same plan, its PDF has the same SHA-256, so it is stored, read and chunked once, and the second lookup's check reuses all three. The plan's PDF keeps its chunks. The venue policy lookup writes the chunks of the joined PDF it files, with the joined page numbers, moves each citation onto them, and deletes the fetched PDFs' chunks when the job ends.
+
+The question this diagram answers: what does Elastic do with a PDF a lookup fetched, from its arrival to the chunk the check cites?
+
+```mermaid
+sequenceDiagram
+  participant W as bandit-workers (plan or venue policy lookup)
+  participant D as bandit-documents
+  participant C as bandit-policy-clauses
+  participant R as bandit-read-document
+  W->>D: each page, through bandit-documents-extract
+  D-->>W: each page's text
+  W->>C: the page texts cut into chunks, kind chunk, _bulk
+  C->>C: semantic_text embeds each chunk
+  W->>R: read the PDF (health_plan or coverage_form)
+  R-->>W: what it prints about itself, with pages
+  W->>W: code checks the printed names against what was typed
+  W->>C: semantic query with what was typed, this PDF's chunks only
+  C-->>W: top 5 chunks by meaning, with scores
+  W->>W: keep the first chunk that holds the printed name
+  W-->>W: the found plan or form, with the chunk it cites
+```
+
+**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses`, chunks and clauses, once the claim is decided.
 
 ### Vision.md: the raw radio log and photos
 
@@ -862,6 +893,7 @@ Leo's recorders on the venue laptop write four more raw indices through `pipelin
 | Insurance.md: The Evidence Engine reads every insurance PDF in one workflow, `bandit-read-document`, with a JSON schema per kind, and every term quotes its clause and page (next to build) | Reading documents into searchable, quoted terms is search work; code can check every quote word for word, and the organizer confirms what they read |
 | Insurance.md: a scanned page is transcribed word for word by the Anthropic Claude API before Elastic reads it (next to build) | OCR through an API is enough for a scan, and the extraction itself stays in Elastic |
 | Insurance.md: `bandit-claims-validate` is the index's default pipeline; it never rejects a document, it marks it valid or invalid, and an invalid copy routes the claim to the organizer | Elastic checks data and never decides money; a person looks at anything it flags |
+| Bright-Data.md: every PDF a lookup fetches is cut into chunks in `bandit-policy-clauses` the moment it arrives, and each check cites the chunk Elastic found by meaning | The wording of a fetched plan or form is searchable before anything reads it, and a check shows the person the passage it rests on. Code cuts the chunks from the page's own text, so they need no check, and the claim searches still read only checked clauses |
 | Insurance.md: a claim is matched against the clauses of the venue's and the attendee's policies, not against past claims (next to build) | Whether a claim is covered is written in the contract; how other claims ended says nothing about this one, and the organizer's learned rules carry what earlier approvals taught |
 | Elastic Kibana Graph is not used, and no Elastic Kibana view draws a network | Elastic Kibana Graph is unavailable on Elastic Cloud Serverless, and it discovers links from co-occurring terms, while the links are already rows in SpacetimeDB, drawn live on the big screen's event graph ([Social](../6-features/Social.md)) |
 | SpacetimeDB decides who and what is on the recap list; Elastic only orders it, through `GET /api/recap` | The list is exact and private and comes from what the bands measured; meaning is the one thing only Elastic's embeddings add, and a stranger can never appear |
