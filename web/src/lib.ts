@@ -4,7 +4,7 @@
 
 import { Identity, Timestamp } from 'spacetimedb';
 import { DbConnection } from './module_bindings';
-import type { MedicCard } from './module_bindings/types';
+import type { Band, MedicCard } from './module_bindings/types';
 import { bandCode } from './band-code';
 
 export type Config = {
@@ -227,6 +227,22 @@ function watch(conn: DbConnection, onChange: () => void) {
   }
 }
 
+/** The bands by id, kept in step with the table: the SDK's `band.id.find` walks every row, and with a crowd of a
+ *  thousand the pages look bands up thousands of times per redraw. */
+const bandMaps = new WeakMap<DbConnection, Map<number, Band>>();
+
+export function bandById(conn: DbConnection, id: number): Band | undefined {
+  let bands = bandMaps.get(conn);
+  if (!bands) {
+    const m = new Map([...conn.db.band.iter()].map(b => [b.id, b]));
+    conn.db.band.onInsert((_ctx, b) => m.set(b.id, b));
+    conn.db.band.onUpdate((_ctx, _old, b) => m.set(b.id, b));
+    conn.db.band.onDelete((_ctx, b) => m.delete(b.id));
+    bandMaps.set(conn, bands = m);
+  }
+  return bands.get(id);
+}
+
 /** Opens a bandit-api session for this identity, so bandit-api knows who calls it. */
 export async function apiSession(conn: DbConnection): Promise<string> {
   const token = randomString();
@@ -263,6 +279,11 @@ export function medicalCard(m: MedicCard): HTMLElement {
 export function money(cents: bigint | number): string {
   const n = Number(cents) / 100;
   return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** A claim with a gap or mismatch in the policies: the organizer decides it one by one, and approving it teaches no rule. */
+export function complicated(c: { statusNote: string }): boolean {
+  return c.statusNote.startsWith('Complication');
 }
 
 export function time(t: Timestamp | undefined): string {

@@ -12,7 +12,7 @@ Everything downstream reads ordinary SpacetimeDB rows: the sponsors on the organ
 
 The 3D hall on the Live view (/live) and the organizer portal's Venue setup tab is a model exported through the Bright Data Browser API. For any other event, an organizer sets up the venue from the event's name alone (see Venue setup from the event's name).
 
-An attendee who has no policy PDF at hand names their insurer and plan instead. Bright Data finds the plan's public wording on the web and fetches its PDF, and the Evidence Engine reads it like an uploaded one (see Plan lookup from a plan's name, next to build).
+An attendee who has no policy PDF at hand names their insurer and plan instead. Bright Data finds the plan's public wording on the web and fetches its PDF, and the Evidence Engine reads it like an uploaded one (see Plan lookup from a plan's name).
 
 ## Role in the system
 
@@ -25,7 +25,7 @@ Responsibilities:
 - Build unclaimed `person` profiles from event pages only (the event site's speakers), and let an attendee who has claimed their band claim their profile at onboarding with one tap.
 - Export the Cal Hacks venue map's 3D model through the Bright Data Browser API (`pipeline/venue_model.py`), kept as `web/venue/venue.glb`.
 - Set up any event's venue from its name, started from the organizer portal: search, let the Anthropic Claude API pick the event site, the venue and its public 3D map, and save the venue's model.
-- Find an attendee's plan from its name, started from the tap page: search, let the Anthropic Claude API pick the plan's own document, fetch its PDF and hand it to the Evidence Engine's reading (next to build).
+- Find an attendee's plan from its name, started from the tap page: search, let the Anthropic Claude API pick the plan's own document, fetch its PDF and hand it to the Evidence Engine's reading.
 - Own the tables `organization`, `person`, `person_claim`, `venue_setup`, `venue_setup_step`, `chosen_venue` and `plan_lookup`, the reducers `claim_person`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup`, `choose_venue`, `look_up_plan` and `finish_plan_lookup`, the views `claimed_people` and `my_plan_lookups`, and the job kinds `venue_setup` and `plan_lookup`.
 
 Non-responsibilities:
@@ -157,7 +157,7 @@ flowchart TB
 The event's pages give no booth positions, so the team places them. There are two steps: a booth row per sponsor, then the sponsor tables on the 3D floor.
 
 1. **A booth per sponsor.** The assemble stage gives every organisation of kind `sponsor` one booth, `booth:<domain>`. Its spot comes from `booths.json`: the entry for its domain gives `placement` `plan`, and no entry gives the file's `default_spot` with `placement` `zone`. Its zone is the one whose centre (`plan_x_m`, `plan_y_m` in `zones.json`) is nearest the spot.
-2. **The 3D floor.** `pipeline/venue_spots.py` writes `web/venue/spots.json` from the venue map's named locations and the hall's floor layout: the hacker tables by number, the sponsor tables with the way they face, the stage, the food line and the doors, in the 3D model's metres. `load_venue_spots` (role `ops`, from `scripts/e2e-setup`) stores them as `venue_spot` rows and gives each sponsor table the booth whose name or organisation name matches it; booths left over take the tables left over. The live view names every sponsor over its tables on the 3D floor, once per row of that sponsor's tables.
+2. **The 3D floor.** `pipeline/venue_spots.py` writes `web/venue/spots.json` from the venue map's named locations and the hall's floor layout: the hacker tables by number, the sponsor tables with the way they face, the stage, the food line and the doors, in the 3D model's metres. `load_venue_spots` (role `ops`, from `scripts/e2e-setup`) stores them as `venue_spot` rows and gives each sponsor table the booth whose name or organisation name matches it; booths left over take the tables left over. The Live tab's 3D view names every sponsor over its tables, once per row of that sponsor's tables.
 3. **By hand.** `place_booth` (role `ops`) moves a booth to a zone and a spot and marks it `manual`. A rerun of `import_event` keeps a `manual` booth's zone and spot.
 
 For Cal Hacks 13.0, `booths.json` lists no spots, so all 51 booths load at the sponsor row's centre with `placement` `zone`. The crowd and the Live view send each booth's visitors to its sponsor table.
@@ -250,7 +250,7 @@ flowchart LR
 
 It is not Vision's 3D venue model: Leo's Gaussian splat is trained from a phone walk-through video and drawn in the security view ([Vision](../4-devices/Vision.md)), while this one is the Cal Hacks team's own 3D map, exported as it is.
 
-### Plan lookup from a plan's name (next to build)
+### Plan lookup from a plan's name
 
 An attendee's own insurance comes into BandIt in one of two ways: they upload its PDF, or they name it. Naming it is quicker, because most attendees know their insurer and plan but have no PDF on their phone.
 
@@ -274,8 +274,8 @@ Because the public wording of a `belongings` policy has no limit or deductible, 
 5. **Check.** The Anthropic Claude API (`plan_check`) reads the PDF and returns the insurer, the plan and the plan year as printed, each with its page, and whether the document is a Summary of Benefits and Coverage or a policy form. Code compares them with what the attendee typed: at least half the words of the typed insurer, and of the typed plan, must be in what is printed, so "Blue Shield" finds "Blue Shield of California" but not "Anthem Blue Cross". A PDF of another plan is passed over, and the next address is fetched.
 6. **Land.** The worker stores the first PDF that passes in the blob store, registers it as an `owner_only` blob of the attendee with purpose `plan_wording`, and calls `finish_plan_lookup` with the address, the printed insurer, plan and year, the SHA-256 and the page count. In one transaction the module turns the lookup `found` and writes what it gives:
    - `health`: an empty insurer and plan on the attendee's `medical_card`, from what is printed;
-   - `belongings`: the attendee's `attendee_policy`, source `plan_lookup`, the printed insurer, the typed limit as both the per-claim and the yearly limit, the typed deductible, and the PDF's SHA-256.
-7. **Read.** The module files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `health_plan` or `attendee_policy`, source `plan_lookup`, the address it came from. Its terms and clauses become the attendee's policy in `bandit-policy-clauses` ([Elastic](Elastic.md)).
+   - `belongings`: the attendee's `attendee_policy`, source `plan_lookup`, the printed insurer, the typed limit as both the per-claim and the yearly limit, the typed deductible, and the PDF's SHA-256 (next to build; until then the `plan_lookup` row holds the typed limit and deductible).
+7. **Read.** The module files the PDF for the Evidence Engine like an upload (`queue_document_read`): kind `health_plan` or `attendee_policy`, source `plan_lookup`, the address it came from. Its terms and clauses become the attendee's policy in `bandit-policy-clauses` ([Elastic](Elastic.md)). A PDF over 50 pages stays `found` but is not read, since the reading takes 1 to 50 pages.
 
 When no address gives a PDF, the lookup turns `not_found`; when PDFs came back but none was this plan's, it turns `wrong_plan`. Either way nothing is written, and the tap page offers the upload: "We couldn't find your plan's documents online. Upload your policy instead."
 
@@ -471,7 +471,7 @@ sequenceDiagram
 - [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that serves `/venue`; `bandit-workers`, which runs the job `venue_setup` and, for it, `pipeline/venue_model.py` with Python and Playwright on the Vultr VM.
 - [Elastic](Elastic.md): the raw indices and the Elastic Workflow `bandit-organize` for the organize stage. Without it, no bundle is assembled.
 - [Anthropic-Claude-API](Anthropic-Claude-API.md): `claude-client`, the `venue_find`, `venue_map`, `plan_find` and `plan_check` calls, `model_call`.
-- [Elastic](Elastic.md): the job `document_read`, which reads a plan lookup's PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`, `attendee_policy`, and the guard that sends a pay on a `plan_lookup` policy to the organizer (next to build).
+- [Elastic](Elastic.md): the job `document_read`, which reads a plan lookup's PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`; `attendee_policy` and the guard that sends a pay on a `plan_lookup` policy to the organizer (next to build).
 - [Social](../6-features/Social.md): the onboarding socials step, which comes before the profile claim (optional; without it a claimed `person` simply has no handles).
 - A Bright Data account with credits and an API token for the Bright Data Web MCP; a Bright Data Web Unlocker API zone; a Bright Data Browser API zone with its customer id, zone name and password.
 

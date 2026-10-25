@@ -39,6 +39,15 @@ pub struct InsurancePolicy {
     pub medical_used_cents: u64,
     pub property_used_cents: u64,
     pub updated_at: Timestamp,
+    /// `primary` or `excess`: whether the venue pays before the attendee's own plan.
+    #[default("primary")]
+    pub other_insurance: String,
+    /// The policy excludes injuries to the venue's staff (workers' compensation pays them).
+    #[default(true)]
+    pub staff_excluded: bool,
+    /// The confirmed policy states its period, so an incident outside it has no cover.
+    #[default(false)]
+    pub period_checked: bool,
 }
 
 /// One cover under the policy: `medical_payments` or `property`.
@@ -58,6 +67,9 @@ pub struct CoverageRuleRow {
     pub service_window_days: u32,
     pub active: bool,
     pub updated_at: Timestamp,
+    /// A payout below this goes to the organizer instead of being paid on its own.
+    #[default(0)]
+    pub minimum_payout_cents: u64,
 }
 
 /// One rung of the former authority matrix. Nothing writes or reads it since every claim goes to the

@@ -4,7 +4,7 @@ Insurance resolves the money after an incident: who is paid, how much, from whic
 
 - **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own policy, their health insurance card or health plan, and the hospital report. An attendee who names their plan instead of uploading it gets the plan's public wording through Bright Data, read the same way. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
-- **The organizer** decides each claim that Claude or the guard sends them. Each approval can teach a rule, and the next claim of that shape is then paid with nobody involved.
+- **The organizer** decides each claim that Claude or the guard sends them. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Approving any other claim can teach a rule, and the next claim of that shape is then paid with nobody involved. A complicated claim teaches no rule: the decision is kept as a precedent that the next such claim shows.
 
 Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first. The attendee's own policy pays when their belongings are stolen or broken, because the venue's policy never does.
 
@@ -57,7 +57,7 @@ flowchart TB
   Terms -->|"gates"| Guard
   Guard -->|"pay holds"| Paid
   Guard -->|"refuse on a failed check"| Ref
-  Guard -->|"ask, or a decision it will not let through"| Org
+  Guard -->|"a complication, ask, or a decision it will not let through"| Org
   Org -->|"approve_claim, learn on"| Rule
   Rule -.->|"ceiling for the next pay"| Guard
   Org -->|"approved"| Paid
@@ -80,8 +80,9 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | Do the sources agree on time and zone? | code, `corroborate` | a pay needs `corroborated` |
 | Is the copy valid, and what do the two policies say about this claim? | The Evidence Engine, `claim_verify`, then Claude's policy searches (next to build) | a failed validation is a failed check; the clauses are what Claude cites |
 | Pay, refuse or ask the organizer? | the Anthropic Claude API, investigating with tools (`claim_review`) | proposes the decision, with the facts it rests on |
+| Is the claim complicated: a gap or mismatch in the policies? | code, the guard, from the cover and the amounts | sends it to the organizer whatever Claude decided, with every complication listed |
 | Does the decision go through? | code, the guard | lets a pay or a refusal through only inside the terms and the checks; otherwise sends it to the organizer |
-| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses, and can teach a rule |
+| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses; teaches a rule only from a claim that is not complicated, and keeps a precedent from one that is |
 | What the next similar claim does | the organizer's approval, as a `settlement_rule` version | the ceiling under which a pay goes through |
 | The wording of the letters | the Anthropic Claude API, `claim_draft` and `recovery_letter`; code checks every figure | words only |
 | Who broke or took something? (next to build) | security names the band (`name_responsible`); code accepts only a band at the spot; the organizer approves or drops the charge | a charge collected from that person's wallet |
@@ -101,17 +102,46 @@ The venue's policy never pays for an attendee's own belongings, because a genera
 
 ## How the insurance Decision Engine decides
 
-A claim is decided in four steps. Code refuses what no one could pay. Claude investigates and decides. The guard lets that decision through or sends it to the organizer. A mass occurrence sends every claim of it to the organizer.
+A claim is decided in four steps. Code refuses what no one could pay. Claude investigates and decides. The guard lets that decision through or sends it to the organizer. A complicated claim, and every claim of a mass occurrence, goes to the organizer.
+
+### Complicated claims: gaps and mismatches in the policies
+
+A claim is complicated when the policies leave a serious gap or contradict each other. No rule fits such a claim, so the organizer decides each one, one by one, whatever Claude decided. Every other claim settles or is refused under the guard, and once an organizer has approved a claim of its shape, it settles with nobody involved.
+
+Code finds each complication from stored rows and lists every one the claim has, not only the first.
+
+| Complication | How code finds it | For example |
+|---|---|---|
+| No policy covers it | no active cover of the venue's policy pays for this kind of incident | an attendee's phone stolen from a booth; venue merch taken when the policy has no theft cover |
+| The bill is over the policy's limit | the covered cost is above the per-claim limit or what is left of the aggregate, so the policy pays only part of it, or nothing | a $7,200 emergency room bill against the $5,000 per-claim limit |
+| The policies disagree on who pays (next to build) | the attendee's own plan is on file, and the two other-insurance clauses do not settle which pays first: both say they pay second, or the venue's term is not confirmed | the venue's medical payments cover is excess, and the attendee's plan also pays only after any other medical cover |
+| The clauses conflict (next to build) | a clause Claude cites covers the claim while another cited clause excludes it, or Claude's `paying_policy` differs from the confirmed other-insurance term | the theft clause covers stolen merch, but its condition excludes a loss with no sign of forced entry |
+
+A billed service the fee schedule does not list is not a complication: the schedule answers it, so the line is excluded, the rest is paid and the `record_lines` check records it. Jordan's Tdap shot, `90715`, is one.
+
+A complicated claim goes to the organizer as `Complication: {each complication}. {Claude's decision}`, for example `Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00`.
+
+Approving a complicated claim never teaches a rule, because the policies give it none: `approve_claim` ignores `learn` for one, and the organizer screens offer no "teach a rule" or rule ceiling on it. Hyphenate's track still asks that "what happened in March should change what the system does in June", so the organizer's decision is kept as a precedent instead, a `decision` row for each kind of gap:
+
+| The organizer | Precedent row (`what`, then `why`) |
+|---|---|
+| approves | `Precedent, over the policy's limit: approved $150.00 for Jordan Alvarez` |
+| refuses | `Precedent, no cover: refused {name}'s claim`, with the reason |
+
+The next claim with the same kind of gap shows the latest one at the end of its route reason, for example `... Claude would pay $150.00. Precedent, not applied: Ops desk approved $150.00 for Jordan Alvarez (claim 4)`. It still waits for the organizer: a precedent is shown, never applied, and it names the person who decided so the call traces back to them.
+
+When the policy covers none of the claim, there is nothing to approve, and the organizer refuses it with the reason; the attendee keeps the incident record for their own insurer.
 
 ### Step 1: what code refuses before Claude
 
-Three cases are refused in code, with every check listed. No judgment is needed for them, and no model is asked.
+Two cases are refused in code, with every check listed. No judgment is needed for them, and no model is asked.
 
 | Case | `refusal_reason` | Why code and not a person |
 |---|---|---|
 | The claimant holds a staff role (the policy's staff exclusion) | `medical payments cover excludes staff: {name} holds the staff role {role}` | workers' compensation pays staff, so the organizer could not pay it either |
-| No active cover for this incident kind | `no active cover for this incident kind` | there is nothing to pay from |
-| The payout is $0 after limits | `payout is zero after limits` | there is nothing to pay |
+| The payout is $0 and the covered cost is $0 | `payout is zero after limits` | there is nothing to pay |
+
+No cover for the incident kind, and a payout cut to $0 by a used-up aggregate, are not refused in code. Both are gaps in the policy, so they go to the organizer as complicated claims.
 
 Disputed evidence is not refused here. A claim whose camera check failed, or whose light circle formed in another zone, goes straight to Claude without waiting for a hospital report, and Claude decides it.
 
@@ -189,6 +219,8 @@ A rejected answer is asked once more with code's problems listed. A second rejec
 
 Then the guard holds the decision to the policy terms and the checks:
 
+First, a complicated claim goes to the organizer, whatever Claude decided. Otherwise:
+
 | Claude decides | Goes through only when | Otherwise |
 |---|---|---|
 | `pay` | every check of the pack passed, the payout is above $0 and above the policy's minimum, the evidence is `corroborated`, there is no mass occurrence, the payout is at or under the ceiling of a learned rule for this kind of claim, and a belongings claim's `attendee_policy` is not from a plan lookup | sent to the organizer with Claude's recommendation |
@@ -203,7 +235,7 @@ A decision that goes through is stored with `decided_by` = `claude`. Claude neve
 
 A claim is paid with nobody involved only when all of these hold:
 
-1. An active cover of the policy covers this incident kind.
+1. The claim is not complicated: an active cover of the policy covers this incident kind, and the covered cost fits inside the policy's limits.
 2. The claimant is not excluded as staff.
 3. The payout is above $0 and above the policy's minimum payout.
 4. No check of the current pack version failed, from code or from The Evidence Engine.
@@ -232,7 +264,7 @@ Today the limits are seeded and `FEE_SCHEDULE` is compiled into the code. The de
 
 ### Step 4: the organizer, and what an approval teaches
 
-The organizer sees "Waiting for your decision" on the organizer portal's Claims tab. Each claim shows why it is there, Claude's decision and summary, its findings per source, the checks, the hospital report as read, the billed lines, and each policy clause Claude cited with its page (next to build).
+The organizer sees "Waiting for your decision" on the organizer portal's Claims tab. Each claim shows why it is there (for a complicated claim, every complication first), Claude's decision and summary, its findings per source, the checks, the hospital report as read, the billed lines, and each policy clause Claude cited with its page (next to build).
 
 `approve_claim` carries the amount and the pack SHA-256 the organizer saw. It fails closed, writing nothing, when either is out of date:
 
@@ -367,6 +399,7 @@ Non-responsibilities:
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | in | the organizer (`ops`) at event setup; `worker` | the policy PDF's hash; the terms The Evidence Engine read; the organizer's confirmation of the terms they saw | reducers; `policy_document`, `policy_term`, then the event's policy rows |
 | `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen, rule ceiling, learn flag | reducer |
 | `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer |
+| `close_claim_without_injury` | in | `ops`, `medic`; the live run's floor staff | claim id, reason; the claim must be `AwaitingRecord`, for an incident where the medic treated no injury | reducer; `Refused` with the reason |
 | `record_claim_payout` | in | `worker` | job id, the wallet's customer and account, the deposit id | reducer; J3, `Settled` |
 | `retry_claim_payout` | in | `ops` | claim id of a claim stuck in `Paying` | reducer; queues the deposit again |
 | `record_insurer_payment` | in | `ops` | claim id, amount received, insurer reference | reducer; J4, `Reconciled` |
@@ -518,6 +551,7 @@ stateDiagram-v2
   [*] --> AwaitingRecord: file_claim or file_claim_for_wearer
   [*] --> Verifying: property claim opens on resolve
   AwaitingRecord --> Refused: staff claimant
+  AwaitingRecord --> Refused: close_claim_without_injury
   AwaitingRecord --> Verifying: disputed, Claude decides at once
   AwaitingRecord --> Verifying: file_clinic_report
   AwaitingRecord --> Routed: report off its case or never arrived
@@ -525,8 +559,8 @@ stateDiagram-v2
   ReadingRecord --> Routed: record rejected or unreadable
   ReadingRecord --> Verifying: apply_medical_record
   Verifying --> Reviewing: submit_claim_checks
-  Reviewing --> Refused: no cover, payout 0, or Claude refuses on a failed check
-  Reviewing --> Routed: ask, or the guard holds the decision
+  Reviewing --> Refused: payout 0, or Claude refuses on a failed check
+  Reviewing --> Routed: a complication, ask, or the guard holds the decision
   Reviewing --> Paying: Claude pays and the guard lets it through
   Routed --> Paying: approve_claim
   Routed --> Refused: refuse_claim
@@ -788,7 +822,9 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | Claude investigates with tools and decides pay, refuse or ask the organizer | the judgment of whether a story hangs together belongs to the part that can read every source and weigh them |
 | The guard lets a pay through only inside a learned rule's ceiling with every check passed and the evidence corroborated, and a refusal only on a failed check | Claude decides, but it never pays outside what an organizer approved, and never refuses on something no one can re-run |
 | Code computes every amount; Claude never sets a figure | a model must never decide a payable |
-| Code refuses a staff claimant, a claim with no cover and a $0 payout before Claude | those need no judgment |
+| Code refuses a staff claimant and a claim with nothing to pay before Claude | those need no judgment |
+| A complicated claim, one with a gap or mismatch in the policies, always goes to the organizer, one by one | no rule can settle what the contract does not answer; the organizer sees every gap at once |
+| A complicated claim teaches no rule; the organizer's decision is kept as a precedent the next claim with the same gap shows, never applied | the system remembers what a person decided without turning one exception into a policy |
 | Disputed evidence goes to Claude at once, without waiting for a hospital report | the sources already contradict each other, so there is nothing to wait for |
 | Every routed claim goes to the organizer (`ops`), with no approval ladder | one person decides money after the event, and anyone with `ops` can act for them; the stale check and the learned rule guard the money |
 | `approve_claim` fails closed on a stale amount or pack | the guardrail finance reviewers ask about first |

@@ -6,9 +6,11 @@
 use super::evidence::*;
 use super::*;
 use crate::jobs::{self, Job, ModelCallIn, blob_ref, job};
+use crate::live::decision;
 use crate::venue::zone;
 use crate::roles::*;
 use crate::safety::*;
+use bandit_insurance::complications::{ClaimState, Complication, complications};
 use bandit_insurance::coverage::{Amounts, compute_amounts};
 use bandit_insurance::fee_schedule::{LineDecision, LineOutcome, cover_lines, covered_total};
 use bandit_insurance::letters::LetterData;
@@ -123,7 +125,7 @@ pub fn open_claim(ctx: &ReducerContext, incident_id: u64) -> Result<(), String> 
 
 /// Opens the claim and builds its first pack. An injury claim then waits for its record.
 pub(super) fn open_claim_for(ctx: &ReducerContext, incident: &Incident, claimant: Option<Identity>, statement: String) -> Result<Claim, String> {
-    let policy = ctx.db.insurance_policy().iter().max_by_key(|p| p.id).ok_or("no insurance policy is set up")?;
+    let policy = super::documents::current_policy(ctx).ok_or("no insurance policy is set up")?;
     let kind = incident.kind.core();
     let cover = CoverKind::for_incident(kind);
     let claimant_name = claimant.map(|c| super::people::display_name(ctx, c)).unwrap_or_default();
@@ -244,6 +246,7 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance:
         } else {
             String::new()
         },
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
 
@@ -331,7 +334,7 @@ pub(super) fn apply_record(ctx: &ReducerContext, claim: Claim, record: MedicalRe
     let incident = ctx.db.incident().id().find(claim.incident_id).ok_or("no incident")?;
     let incident_date = bandit_insurance::time::local_date(micros(incident.opened_at), s.tz_offset_minutes);
     let window = policy_rule(ctx, claim.policy_id, cover_of(&claim)).map(|r| r.service_window_days).unwrap_or(0);
-    let lines = cover_lines(valid, &incident_date, window);
+    let lines = cover_lines(valid, &incident_date, window, &super::documents::fee_schedule_for(ctx, claim.policy_id));
     for l in &lines {
         ctx.db.claim_line().insert(ClaimLine {
             id: 0,
@@ -497,6 +500,7 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         precedents,
         policy_summary: policy_summary(ctx, claim),
         claimant_statement: claim.statement.clone(),
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
 
@@ -523,8 +527,8 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
 
 /// Claude's investigation and decision. Code validates the decision again,
 /// then holds it to its limits (`decision::guard`): Claude pays inside the
-/// authority a learned rule gives and refuses on failed checks; anything else
-/// goes to the organizer. An invalid decision is set aside and the claim is
+/// authority a learned rule gives and refuses on failed checks; anything else,
+/// and every claim with a gap or mismatch in the policies, goes to the organizer. An invalid decision is set aside and the claim is
 /// decided as if Claude were unavailable.
 #[spacetimedb::reducer]
 pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: String, call: ModelCallIn) -> Result<(), String> {
@@ -615,6 +619,13 @@ fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     })
 }
 
+/// An active cover of the claim's policy pays this kind of incident, and the
+/// incident falls in the policy period when the confirmed policy states one.
+fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
+    let opened = ctx.db.incident().id().find(claim.incident_id).map(|i| i.opened_at).unwrap_or(ctx.timestamp);
+    policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active) && super::documents::in_period(ctx, claim.policy_id, opened)
+}
+
 /// Claude's valid decision, held to its limits.
 fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> Result<(), String> {
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
@@ -622,15 +633,59 @@ fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> 
     let guarded = guard(
         d,
         &GuardInput {
-            has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
+            has_cover: has_cover(ctx, &claim),
             corroboration: corroboration_of(&claim),
             amounts: amounts(&claim),
+            minimum_payout_cents: super::documents::minimum_payout(ctx, claim.policy_id, cover_of(&claim)),
             checks: &checks,
             rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
             mass_occurrence: mass_occurrence(ctx, &claim),
         },
     );
-    apply(ctx, claim, guarded.decision, guarded.decided_by)
+    let decision = with_precedent(ctx, &claim, guarded.decision);
+    apply(ctx, claim, decision, guarded.decided_by)
+}
+
+/// The claim's complications: the gaps and mismatches in the policies that a person decides one by one.
+fn claim_complications(ctx: &ReducerContext, claim: &Claim) -> Vec<Complication> {
+    complications(&ClaimState { has_cover: policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active), amounts: amounts(claim) })
+}
+
+/// The decision history line that keeps the organizer's call on a complicated claim, one per kind of gap.
+fn precedent_line(c: &Complication) -> String {
+    format!("Precedent, {}:", c.label())
+}
+
+/// Adds the organizer's last decision on a claim with the same kind of gap to a complicated
+/// claim's route: shown for the next decision, never applied by itself.
+fn with_precedent(ctx: &ReducerContext, claim: &Claim, decision: Decision) -> Decision {
+    let Decision::Route { reason } = decision else { return decision };
+    let lines: Vec<String> = claim_complications(ctx, claim).iter().map(precedent_line).collect();
+    let last = ctx
+        .db
+        .decision()
+        .iter()
+        .filter(|d| d.actor == "organizer" && d.claim_id != claim.id)
+        .filter_map(|d| {
+            let what = lines.iter().find_map(|l| d.what.strip_prefix(l.as_str()))?.trim().to_string();
+            Some((what, d))
+        })
+        .max_by_key(|(_, d)| d.id);
+    let reason = match last {
+        Some((what, d)) => {
+            let why = if d.why.is_empty() { String::new() } else { format!(": {}", d.why) };
+            format!("{reason}. Precedent, not applied: {} {what} (claim {}){why}", d.who, d.claim_id)
+        }
+        None => reason,
+    };
+    Decision::Route { reason }
+}
+
+/// Keeps the organizer's decision on a complicated claim as a precedent for the next one.
+fn record_precedent(ctx: &ReducerContext, claim: &Claim, found: &[Complication], who: &str, verb: &str, why: &str) {
+    for c in found {
+        crate::live::record(ctx, claim.incident_id, claim.id, "organizer", who, format!("{} {verb}", precedent_line(c)), why.into());
+    }
 }
 
 /// The code-only decision, when Claude is unavailable or its decision was set aside.
@@ -638,15 +693,18 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
     let rules = core_rules(ctx);
     let decision = decide(&DecisionInput {
-        has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
+        has_cover: has_cover(ctx, &claim),
         corroboration: corroboration_of(&claim),
         amounts: amounts(&claim),
+        minimum_payout_cents: super::documents::minimum_payout(ctx, claim.policy_id, cover_of(&claim)),
         checks: &checks,
         review,
         review_required: settings(ctx).review_required,
         rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
     });
-    if let (Some(reason), false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. })) {
+    let decision = with_precedent(ctx, &claim, decision);
+    let complicated = !claim_complications(ctx, &claim).is_empty();
+    if let (Some(reason), false, false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. }), complicated) {
         route(ctx, claim, reason);
         return Ok(());
     }
@@ -891,7 +949,14 @@ pub fn approve_claim(
 ) -> Result<(), String> {
     let claim = claim_by_id(ctx, claim_id)?;
     approver_check(ctx, &claim, &pack_hash_seen)?;
+    // A complicated claim has no rule by definition: approving it never teaches one,
+    // and the decision is kept as a precedent the next such claim shows instead.
+    let found = claim_complications(ctx, &claim);
+    let learn = learn && found.is_empty();
     let now = current_amounts(ctx, &claim).ok_or("no cover for this claim")?;
+    if claim.payout_cents == 0 {
+        return Err("there is nothing to pay: the policy covers none of this claim, so refuse it with the reason".into());
+    }
     if now.payout_cents != claim.payout_cents || amount_seen_cents != claim.payout_cents {
         return Err(format!("stale: the payout is now {}", bandit_insurance::money::format_cents(now.payout_cents)));
     }
@@ -941,8 +1006,24 @@ pub fn approve_claim(
         });
     }
     crate::live::approved(ctx, &claim, &approver_name, taught);
+    let paid = format!("approved {} for {}", bandit_insurance::money::format_cents(claim.payout_cents), claim.claimant_name);
+    record_precedent(ctx, &claim, &found, &approver_name, &paid, "");
     let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
     settle(ctx, claim, "approved")
+}
+
+/// Staff close an injury claim that waits for a record nobody will file, because the medic treated no injury.
+#[spacetimedb::reducer]
+pub fn close_claim_without_injury(ctx: &ReducerContext, claim_id: u64, reason: String) -> Result<(), String> {
+    require_role(ctx, &["ops", "medic"])?;
+    let claim = claim_by_id(ctx, claim_id)?;
+    if claim.status != ClaimStatus::AwaitingRecord {
+        return Err(format!("claim {claim_id} is not waiting for a record"));
+    }
+    if reason.trim().is_empty() {
+        return Err("closing a claim needs a reason".into());
+    }
+    refuse(ctx, claim, format!("closed by {}: {}", caller_name(ctx), reason.trim()), "staff").map(|_| ())
 }
 
 #[spacetimedb::reducer]
@@ -967,6 +1048,8 @@ pub fn refuse_claim(ctx: &ReducerContext, claim_id: u64, pack_hash_seen: String,
         reason: reason.clone(),
         decided_at: ctx.timestamp,
     });
+    let refused = format!("refused {}'s claim", claim.claimant_name);
+    record_precedent(ctx, &claim, &claim_complications(ctx, &claim), &approver_name, &refused, reason.trim());
     refuse(ctx, claim, format!("refused by {approver_name}: {reason}"), "approver").map(|_| ())
 }
 

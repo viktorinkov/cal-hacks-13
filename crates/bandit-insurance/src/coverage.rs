@@ -12,6 +12,9 @@ pub struct CoverageRule {
     pub per_claim_limit_cents: Cents,
     pub aggregate_limit_cents: Cents,
     pub deductible_cents: Cents,
+    /// A payout below this goes to a person instead of being paid on its own.
+    #[serde(default)]
+    pub minimum_payout_cents: Cents,
     /// Medical services count only when dated on or after the incident date
     /// and at most this many days later.
     pub service_window_days: u32,
@@ -71,6 +74,7 @@ mod tests {
             per_claim_limit_cents: 500000,
             aggregate_limit_cents: 2500000,
             deductible_cents: 0,
+            minimum_payout_cents: 0,
             service_window_days: 30,
             active: true,
         }
@@ -83,6 +87,7 @@ mod tests {
             per_claim_limit_cents: 1000000,
             aggregate_limit_cents: 5000000,
             deductible_cents: 50000,
+            minimum_payout_cents: 0,
             service_window_days: 0,
             active: true,
         }

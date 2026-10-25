@@ -119,19 +119,21 @@ async fn recap(State(app): AppState, headers: HeaderMap) -> ApiResult<Json<crate
 
 #[derive(Deserialize)]
 struct UploadQuery {
-    /// `medical` (a clinic bill the medic files), `photo`, or the attendee's own `history` or
-    /// `insurance` PDF, which needs their session and stays theirs.
+    /// `medical` (a clinic bill the medic files), `policy` (the venue's insurance policy the
+    /// organizer uploads), `photo`, or the attendee's own `history` or `insurance` PDF, which
+    /// needs their session and stays theirs.
     purpose: String,
 }
 
 /// Stores the file in the blob store and registers it, so the page can file it on a claim
-/// (medical), register it as an event photo (photo), or file it on the attendee's medical card.
+/// (medical), read it as the venue's policy (policy), register it as an event photo (photo), or
+/// file it on the attendee's medical card.
 async fn upload(State(app): AppState, Query(q): Query<UploadQuery>, headers: HeaderMap, body: Bytes) -> ApiResult<Json<Value>> {
     let (access, default_type, owner) = match q.purpose.as_str() {
-        "medical" => ("staff", "application/pdf", None),
+        "medical" | "policy" => ("staff", "application/pdf", None),
         "photo" => ("shared", "image/jpeg", None),
         "history" | "insurance" => ("owner_only", "application/pdf", Some(session_identity(&app, &headers)?)),
-        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical, photo, history or insurance")),
+        _ => return Err(error(StatusCode::BAD_REQUEST, "purpose is medical, policy, photo, history or insurance")),
     };
     if body.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "empty file"));

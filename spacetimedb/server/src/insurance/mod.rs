@@ -7,6 +7,7 @@
 //! settle under a learned rule, send to the organizer, or refuse and show every
 //! check. Money moves on a double-entry ledger.
 
+pub mod documents;
 pub mod evidence;
 pub mod filing;
 pub mod flow;
@@ -20,6 +21,7 @@ pub mod views;
 mod tests;
 
 pub use flow::{on_incident_resolved, on_job_dead};
+pub use documents::{FeeScheduleLine, PolicyDocument, PolicyTerm, fee_schedule_line, policy_document, policy_term};
 pub use tables::*;
 
 use spacetimedb::{ReducerContext, Table, Timestamp};
