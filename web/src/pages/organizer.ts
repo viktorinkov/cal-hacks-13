@@ -559,7 +559,7 @@ function merchFlow() {
     [`${photos.length} photos`, 'A photographer takes a photo', 'The people whose bands stood together in that zone at that moment are tagged.'],
     [`${photos.filter(p => p.read).length} read`, 'Claude reads the photo', 'It counts the people and writes a caption; the tags keep that many, the ones standing closest.'],
     [`${picked.size} people`, 'The shopping agent picks', 'When the event ends, Claude picks three products for each person in a photo, from the booths they stayed at, on the photo with the people they met, with a line to print.'],
-    [`${orders.length} orders`, 'The attendee buys', 'One tap in their recap pays from their BandIt wallet, which holds the money until the purchase goes through.'],
+    [`${orders.length} order${orders.length === 1 ? '' : 's'}`, 'The attendee buys', 'One tap in their recap pays from their BandIt wallet, which holds the money until the purchase goes through.'],
     [`${orders.filter(o => o.status === 'paid').length} paid`, 'Capital One records it', 'The worker makes the Nessie purchase at the merch shop and the order keeps its receipt.'],
   ];
   return h('section', {},
@@ -607,7 +607,7 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
     const size = kind === 'tee' ? field(e.target as HTMLElement, `as-size-${p.templateId}`) : '';
     act(() => conn.reducers.buyMerchAs({ nodeId: w.nodeId, templateId: p.templateId, photoId: p.photoId, size }));
   };
-  return h('div', { class: 'flow' },
+  return h('div', { class: 'flow down' },
     h('div', { class: 'step' },
       h('b', {}, `1. ${who}'s photo`),
       !photos.length && h('p', { class: 'muted' }, 'None picked yet.'),
@@ -615,8 +615,8 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
         h('div', {}, p.caption || 'Event photo'),
         h('div', { class: 'muted' }, `${p.zoneName}, ${date(p.takenAt)}${p.read ? `, ${p.peopleCount} people counted` : ''}`),
         h('div', {}, `With ${p.nodeIds.filter(id => id !== w.nodeId).map(id => people.get(id) ?? 'no name yet').join(', ') || 'nobody else tagged'}`)])),
-    h('span', { class: 'arrow' }, '→'),
-    h('div', { class: 'step wide' },
+    h('span', { class: 'arrow' }, '↓'),
+    h('div', { class: 'step' },
       h('b', {}, '2. The shopping agent\'s picks'),
       !picks.length && h('p', { class: 'muted' }, ended ? 'No picks for them yet: the agent picks for everyone in a photo.' : 'The agent picks when the event ends.'),
       h('div', { class: 'merch' }, picks.map(p => {
@@ -631,19 +631,19 @@ function shopFor(w: BoardWallet, people: Map<bigint, string>, ended: boolean) {
                 ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
               h('button', { disabled: !ended || w.balanceCents < t.priceCents || undefined }, `Buy as ${who}`))));
       }))),
-    h('span', { class: 'arrow' }, '→'),
+    h('span', { class: 'arrow' }, '↓'),
     h('div', { class: 'step' },
       h('b', {}, '3. Their wallet'),
       h('div', { class: 'count' }, money(w.balanceCents)),
       h('div', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}`)),
-    h('span', { class: 'arrow' }, '→'),
+    h('span', { class: 'arrow' }, '↓'),
     h('div', { class: 'step' },
       h('b', {}, '4. Paid on Nessie'),
       !orders.length && h('p', { class: 'muted' }, 'No orders yet.'),
       orders.map(o => h('p', {},
         `#${o.id} ${o.title}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: `,
         h('span', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status),
-        o.nessiePurchaseId && h('div', { class: 'muted' }, `receipt ${o.nessiePurchaseId.slice(0, 8)}`),
+        o.nessiePurchaseId && h('div', { class: 'muted' }, 'Nessie purchase ', h('code', {}, o.nessiePurchaseId)),
         o.failure && h('div', { class: 'muted' }, o.failure)))));
 }
 
