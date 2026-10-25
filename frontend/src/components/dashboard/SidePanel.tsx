@@ -69,10 +69,10 @@ function useDrag(onMove: (dx: number, dy: number) => void, onEnd: () => void) {
 }
 
 /**
- * Zones (or the with/without comparison) and the bands list, bottom left. Starts as a small box;
- * opened, it can be resized from its top-right corner and the divider between the two cards.
+ * Zones and the band roster share a card in the control rail. The divider changes their height;
+ * standalone uses also keep the outer size handle.
  */
-export function SidePanel({ maxHeight }: { maxHeight: number }) {
+export function SidePanel({ maxHeight, docked = false }: { maxHeight: number; docked?: boolean }) {
   const open = useUi((s) => s.sidePanelOpen)
   const setOpen = useUi((s) => s.setSidePanelOpen)
   const cmp = useWorld((s) => s.scenario?.comparison)
@@ -126,7 +126,7 @@ export function SidePanel({ maxHeight }: { maxHeight: number }) {
     const bands = Object.values(devices).filter((d) => d.hardwareVariant === 'full' || d.hardwareVariant === 'light')
     const online = bands.filter((d) => d.connectionStatus !== 'disconnected').length
     return (
-      <section aria-labelledby="side-h" className="nc-panel pointer-events-auto flex w-[236px] flex-col gap-1.5 self-end p-3">
+      <section aria-labelledby="side-h" className={`nc-panel pointer-events-auto flex flex-col gap-1.5 self-end p-3 ${docked ? 'w-full' : 'w-[236px]'}`}>
         <h2 id="side-h" className="text-[12.5px] font-medium text-ink">
           {cmp ? 'With the bands, and without' : 'Zones and bands'}
         </h2>
@@ -143,7 +143,7 @@ export function SidePanel({ maxHeight }: { maxHeight: number }) {
   }
 
   return (
-    <section aria-label={cmp ? 'Comparison and bands' : 'Zones and bands'} className="pointer-events-auto relative flex flex-col self-end" style={{ width: size.w, height: h }}>
+    <section aria-label={cmp ? 'Comparison and bands' : 'Zones and bands'} className="pointer-events-auto relative flex flex-col self-end" style={{ width: docked ? '100%' : size.w, height: h }}>
       <div className="mb-2 flex items-center justify-between pl-1">
         <span className="text-[12px] font-medium text-ink-dim">{cmp ? 'Comparison and bands' : 'Zones and bands'}</span>
         <button
@@ -176,7 +176,7 @@ export function SidePanel({ maxHeight }: { maxHeight: number }) {
       <div className="flex min-h-0 flex-1 flex-col">
         <BandsPanel />
       </div>
-      <div
+      {!docked && <div
         role="separator"
         aria-label="Resize the panel. Arrow keys change width and height."
         tabIndex={0}
@@ -187,7 +187,7 @@ export function SidePanel({ maxHeight }: { maxHeight: number }) {
         <svg aria-hidden width="10" height="10" viewBox="0 0 10 10" className="text-ink-muted">
           <path d="M1 1h8v8M4 1h5v5" fill="none" stroke="currentColor" strokeWidth="1.2" />
         </svg>
-      </div>
+      </div>}
     </section>
   )
 }
