@@ -46,3 +46,9 @@ In your final summary, from the information about where you hung out it, let's s
 Imagine after the event getting shirts and cups with you and the memories with your friends. 
 
 Instead of having to buy merch at the event, and not being able to get more because your hands got full, you can now, just get what you like most in the end. This is how we reimagine shopping using agents.
+
+## Diagrams
+
+All diagrams are on one Excalidraw board: https://excalidraw.com/#json=EUInNms8MAMRyj9i6BWbt,Yz6Qklo6BbLrhV84sZz9ew
+
+It has 19 frames: Overview, Architecture, SpacetimeDB live loop, Queues, Vision, Event data pipeline, The Evidence Engine, Claim Settlement, Claude jobs, Social, Interests, Merch and wallet, Nessie wallet, Vultr server, Hardware basics, Medic routing, Medic walk, Light circle and Exits. The board's source file is [diagrams/bandit-system-design.excalidraw](diagrams/bandit-system-design.excalidraw).
