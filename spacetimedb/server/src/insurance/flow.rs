@@ -125,7 +125,7 @@ pub fn open_claim(ctx: &ReducerContext, incident_id: u64) -> Result<(), String> 
 
 /// Opens the claim and builds its first pack. An injury claim then waits for its record.
 pub(super) fn open_claim_for(ctx: &ReducerContext, incident: &Incident, claimant: Option<Identity>, statement: String) -> Result<Claim, String> {
-    let policy = ctx.db.insurance_policy().iter().max_by_key(|p| p.id).ok_or("no insurance policy is set up")?;
+    let policy = super::documents::current_policy(ctx).ok_or("no insurance policy is set up")?;
     let kind = incident.kind.core();
     let cover = CoverKind::for_incident(kind);
     let claimant_name = claimant.map(|c| super::people::display_name(ctx, c)).unwrap_or_default();
@@ -246,6 +246,7 @@ fn verify_payload(ctx: &ReducerContext, claim: &Claim, input: &bandit_insurance:
         } else {
             String::new()
         },
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
 
@@ -333,7 +334,7 @@ pub(super) fn apply_record(ctx: &ReducerContext, claim: Claim, record: MedicalRe
     let incident = ctx.db.incident().id().find(claim.incident_id).ok_or("no incident")?;
     let incident_date = bandit_insurance::time::local_date(micros(incident.opened_at), s.tz_offset_minutes);
     let window = policy_rule(ctx, claim.policy_id, cover_of(&claim)).map(|r| r.service_window_days).unwrap_or(0);
-    let lines = cover_lines(valid, &incident_date, window);
+    let lines = cover_lines(valid, &incident_date, window, &super::documents::fee_schedule_for(ctx, claim.policy_id));
     for l in &lines {
         ctx.db.claim_line().insert(ClaimLine {
             id: 0,
@@ -499,6 +500,7 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
         precedents,
         policy_summary: policy_summary(ctx, claim),
         claimant_statement: claim.statement.clone(),
+        venue_policy_hash: super::documents::venue_policy_hash(ctx, claim.policy_id),
     }
 }
 
@@ -617,6 +619,13 @@ fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     })
 }
 
+/// An active cover of the claim's policy pays this kind of incident, and the
+/// incident falls in the policy period when the confirmed policy states one.
+fn has_cover(ctx: &ReducerContext, claim: &Claim) -> bool {
+    let opened = ctx.db.incident().id().find(claim.incident_id).map(|i| i.opened_at).unwrap_or(ctx.timestamp);
+    policy_rule(ctx, claim.policy_id, cover_of(claim)).is_some_and(|r| r.active) && super::documents::in_period(ctx, claim.policy_id, opened)
+}
+
 /// Claude's valid decision, held to its limits.
 fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> Result<(), String> {
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
@@ -624,9 +633,10 @@ fn decide_with_claude(ctx: &ReducerContext, claim: Claim, d: &AgentDecision) -> 
     let guarded = guard(
         d,
         &GuardInput {
-            has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
+            has_cover: has_cover(ctx, &claim),
             corroboration: corroboration_of(&claim),
             amounts: amounts(&claim),
+            minimum_payout_cents: super::documents::minimum_payout(ctx, claim.policy_id, cover_of(&claim)),
             checks: &checks,
             rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
             mass_occurrence: mass_occurrence(ctx, &claim),
@@ -683,9 +693,10 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
     let checks = pack_checks(ctx, claim.id, claim.pack_version);
     let rules = core_rules(ctx);
     let decision = decide(&DecisionInput {
-        has_cover: policy_rule(ctx, claim.policy_id, cover_of(&claim)).is_some_and(|r| r.active),
+        has_cover: has_cover(ctx, &claim),
         corroboration: corroboration_of(&claim),
         amounts: amounts(&claim),
+        minimum_payout_cents: super::documents::minimum_payout(ctx, claim.policy_id, cover_of(&claim)),
         checks: &checks,
         review,
         review_required: settings(ctx).review_required,
@@ -999,6 +1010,20 @@ pub fn approve_claim(
     record_precedent(ctx, &claim, &found, &approver_name, &paid, "");
     let claim = save(ctx, Claim { decided_by: "approver".into(), routed_to_name: approver_name, ..claim });
     settle(ctx, claim, "approved")
+}
+
+/// Staff close an injury claim that waits for a record nobody will file, because the medic treated no injury.
+#[spacetimedb::reducer]
+pub fn close_claim_without_injury(ctx: &ReducerContext, claim_id: u64, reason: String) -> Result<(), String> {
+    require_role(ctx, &["ops", "medic"])?;
+    let claim = claim_by_id(ctx, claim_id)?;
+    if claim.status != ClaimStatus::AwaitingRecord {
+        return Err(format!("claim {claim_id} is not waiting for a record"));
+    }
+    if reason.trim().is_empty() {
+        return Err("closing a claim needs a reason".into());
+    }
+    refuse(ctx, claim, format!("closed by {}: {}", caller_name(ctx), reason.trim()), "staff").map(|_| ())
 }
 
 #[spacetimedb::reducer]

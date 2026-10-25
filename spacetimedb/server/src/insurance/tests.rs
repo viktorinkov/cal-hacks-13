@@ -849,3 +849,133 @@ fn the_wearer_sees_their_incidents_and_staff_see_the_unclaimed_ones() {
     assert_eq!(board_clinic_reports(&w.view("ops")).len(), 1);
     assert!(board_clinic_reports(&w.view("Maya Chen")).is_empty());
 }
+
+/// The text layer of the venue's policy, one string per page.
+fn policy_pages() -> Vec<String> {
+    vec![
+        "Insurer: Northwind Mutual Insurance Company. Policy number: NWM-GL-2026-0413. Policy period: 2026-10-01 to 2027-09-30. \
+         Coverage C medical payments: $5,000 each person. We will not pay a medical payments claim of less than $250.00. \
+         Expenses must be incurred within 365 days of the accident."
+            .into(),
+        "Exclusions. This insurance does not apply to bodily injury to any employee or volunteer of the insured.".into(),
+    ]
+}
+
+/// What the Evidence Engine read from those pages.
+fn policy_read() -> String {
+    let term = |name: &str, cover: &str, value: &str, quote: &str, page: u32| serde_json::json!({"name": name, "cover": cover, "value": value, "quote": quote, "page": page});
+    serde_json::json!({
+        "terms": [
+            term("insurer_name", "", "Northwind Mutual Insurance Company", "Insurer: Northwind Mutual Insurance Company", 1),
+            term("policy_number", "", "NWM-GL-2026-0413", "Policy number: NWM-GL-2026-0413", 1),
+            term("period_start", "", "2026-10-01", "Policy period: 2026-10-01 to 2027-09-30", 1),
+            term("period_end", "", "2027-09-30", "Policy period: 2026-10-01 to 2027-09-30", 1),
+            term("per_claim_limit", "medical_payments", "$5,000", "Coverage C medical payments: $5,000 each person", 1),
+            term("minimum_payout", "medical_payments", "$250.00", "We will not pay a medical payments claim of less than $250.00.", 1),
+            term("service_window_days", "medical_payments", "365 days", "within 365 days of the accident", 1),
+            term("deductible", "property", "$900", "a $900 deductible", 1)
+        ],
+        "fee_schedule": [],
+        "exclusions": [{"kind": "staff", "quote": "This insurance does not apply to bodily injury to any employee or volunteer of the insured.", "page": 2}],
+        "clauses": [{"section": "exclusions", "page": 2, "text": "This insurance does not apply to bodily injury to any employee or volunteer of the insured."}]
+    })
+    .to_string()
+}
+
+/// The organizer uploads the policy and the worker hands back what was read.
+fn upload_policy(w: &World) -> PolicyDocument {
+    let hash = "ab".repeat(32);
+    w.as_("ops", |ctx| register_blob(ctx, hash.clone(), None, "staff".into(), "policy".into(), "application/pdf".into(), 4000));
+    w.as_("ops", |ctx| documents::submit_policy_document(ctx, hash.clone(), 2));
+    let doc = w.t.db.policy_document().iter().max_by_key(|d| d.id).unwrap();
+    assert_eq!((doc.status.as_str(), doc.kind.as_str()), ("reading", "venue_policy"));
+    let job = w.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, doc.id);
+    w.as_("worker", |ctx| documents::apply_document_terms(ctx, job.id, policy_read(), policy_pages()));
+    w.t.db.policy_document().id().find(doc.id).unwrap()
+}
+
+#[test]
+fn an_uploaded_policy_sets_the_terms_once_the_organizer_confirms() {
+    let w = World::new();
+    let doc = upload_policy(&w);
+    assert_eq!((doc.status.as_str(), doc.clause_count), ("read", 1));
+    let terms: Vec<PolicyTerm> = w.t.db.policy_term().document_id().filter(doc.id).collect();
+    let term = |cover: &str, name: &str| terms.iter().find(|t| t.cover_kind == cover && t.name == name).unwrap().clone();
+    let min = term("medical_payments", "minimum_payout");
+    assert_eq!((min.value.as_str(), min.status.as_str(), min.page), ("25000", "read", 1));
+    let ded = term("property", "deductible");
+    assert_eq!((ded.status.as_str(), ded.value.as_str(), ded.problem.as_str()), ("flagged", "50000", "the quote is not on page 1"));
+    let staff = terms.iter().find(|t| t.name == "exclusion" && t.code == "staff").unwrap();
+    assert_eq!(staff.clause_id, format!("{}-c1", "ab".repeat(32)));
+    assert_eq!(terms.iter().filter(|t| t.name == "fee_cap").count(), 21, "no schedule stated: the default one");
+
+    let before = w.as_("ops", |ctx| Ok(documents::current_policy(ctx).map(|p| p.policy_number)));
+    assert_eq!(before.as_deref(), Some("GL-2026-04417"));
+    assert!(w.try_as("medic", |ctx| documents::confirm_policy_terms(ctx, doc.id)).is_err());
+    w.as_("ops", |ctx| documents::confirm_policy_terms(ctx, doc.id));
+
+    let policy = w.t.db.insurance_policy().policy_number().find("NWM-GL-2026-0413".to_string()).unwrap();
+    assert!(policy.period_checked && policy.staff_excluded);
+    assert_eq!(policy.insurer_name, "Northwind Mutual Insurance Company");
+    let medical = w.t.db.coverage_rule().policy_id().filter(policy.id).find(|r| r.cover_kind == "medical_payments").unwrap();
+    assert_eq!((medical.per_claim_limit_cents, medical.minimum_payout_cents, medical.service_window_days), (500_000, 25_000, 365));
+    assert_eq!(w.t.db.fee_schedule_line().policy_id().filter(policy.id).count(), 21);
+    let doc = w.t.db.policy_document().id().find(doc.id).unwrap();
+    assert_eq!((doc.status.as_str(), doc.policy_id), ("confirmed", policy.id));
+
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    assert_eq!(claim.policy_id, policy.id, "new claims take the confirmed policy");
+}
+
+#[test]
+fn a_payout_below_the_confirmed_minimum_goes_to_the_organizer() {
+    let w = World::new();
+    approve_larger_fall(&w);
+    let doc = upload_policy(&w);
+    w.as_("ops", |ctx| documents::confirm_policy_terms(ctx, doc.id));
+    w.advance(3600);
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record(claim.id, FIRST_AID, 1);
+    assert_eq!(w.claim(claim.id).payout_cents, 18_000);
+    w.verify(claim.id);
+    let job = w.open_job(KIND_REVIEW, claim.id);
+    let p: ReviewPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!(p.venue_policy_hash, "ab".repeat(32));
+    w.claude_pays(claim.id);
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    assert_eq!(c.status_note, "Claude would pay $180.00, below the policy's minimum payout of $250.00");
+}
+
+#[test]
+fn an_incident_outside_the_policy_period_has_no_cover() {
+    let w = World::new();
+    let doc = upload_policy(&w);
+    w.as_("ops", |ctx| documents::confirm_policy_terms(ctx, doc.id));
+    w.t.clock.set(spacetimedb::Timestamp::from_micros_since_unix_epoch(micros_at(2027, 10, 2, 22, 0, 0, PDT)));
+    let claim = w.injury_claim(w.fall(3, 101, &[(1, 101), (5, 101)]));
+    w.file_record(claim.id, FIRST_AID, 1);
+    w.verify(claim.id);
+    w.claude_pays(claim.id);
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    assert!(c.status_note.contains("no cover in the venue's policy pays for this kind of incident"), "{}", c.status_note);
+}
+
+#[test]
+fn a_policy_that_cannot_be_read_is_marked_failed() {
+    let w = World::new();
+    let hash = "cd".repeat(32);
+    w.as_("ops", |ctx| register_blob(ctx, hash.clone(), None, "staff".into(), "policy".into(), "application/pdf".into(), 4000));
+    w.as_("ops", |ctx| documents::submit_policy_document(ctx, hash.clone(), 3));
+    let doc = w.t.db.policy_document().iter().max_by_key(|d| d.id).unwrap();
+    for _ in 0..MAX_ATTEMPTS {
+        let job = w.lease(bandit_insurance::policy::KIND_DOCUMENT_READ, doc.id);
+        w.as_("worker", |ctx| fail_job(ctx, job.id, "the reader timed out".into(), None));
+        w.advance(60);
+    }
+    let doc = w.t.db.policy_document().id().find(doc.id).unwrap();
+    assert_eq!((doc.status.as_str(), doc.error.as_str()), ("failed", "the reader timed out"));
+    assert!(w.try_as("ops", |ctx| documents::confirm_policy_terms(ctx, doc.id)).is_err());
+    assert!(w.try_as("ops", |ctx| documents::submit_policy_document(ctx, "ef".repeat(32), 2)).is_err(), "the file must be stored first");
+}

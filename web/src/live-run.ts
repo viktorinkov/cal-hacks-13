@@ -1,13 +1,14 @@
 // The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
-// resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
+// resume, end the event), and on the Live tab the crowd, the incidents and the medic in the venue's 3D view from
 // the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. Clicking a
-// person opens them beside the view; hovering a person, an incident's pole or a zone's circle on the floor says
-// what it is. The module runs everything; this page only shows it.
+// person opens them beside the view; hovering a person, an incident or a zone's circle on the floor says what it
+// is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
 import { act, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd, isDown } from './crowd-3d';
+import { Incidents } from './incidents-3d';
 import { ZoneCircles, zoneWords } from './zones-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
@@ -22,13 +23,14 @@ const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 const HISTORY_ROWS = 60;
 /** A click moves the pointer less than this; more is a drag of the camera. */
 const CLICK_PX = 5;
-/** A pole is picked this far off the pointer's ray per metre from the camera, as a person is. */
+/** An incident is picked this far off the pointer's ray per metre from the camera, as a person is. */
 const PICK_RADIANS = 0.006;
 const LIGHTS = ['Calm around them', 'Busy around them', 'Very busy around them'];
 
 let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
+let incidentPins: Incidents;
 let zones: ZoneCircles;
 /** What the portal does with a person clicked in the view, and the band of the person it has open. */
 let pick: Picking | undefined;
@@ -50,10 +52,6 @@ const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.Do
 const dropPin = new THREE.Group().add(
   new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
   new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
-/** A red pole over each open incident. */
-const poles = new Map<bigint, THREE.Mesh>();
-const poleShape = new THREE.CylinderGeometry(0.35, 0.35, 3.6, 12).translate(0, 1.8, 0);
-const poleColour = new THREE.MeshBasicMaterial({ color: '#e00020' });
 
 function setUp(c: DbConnection) {
   conn = c;
@@ -73,6 +71,15 @@ function setUp(c: DbConnection) {
   conn.db.livePause.onInsert(pause);
   conn.db.livePause.onDelete(pause);
   pause();
+  // This run's incidents, as they open, change and resolve.
+  incidentPins = new Incidents(v, () => crowd.moduleNow());
+  const sync = () => incidentPins.sync(markers(run()));
+  for (const t of [conn.db.incidentMarker, conn.db.liveRun]) {
+    t.onInsert(sync);
+    t.onUpdate(sync);
+    t.onDelete(sync);
+  }
+  sync();
   zones = new ZoneCircles(v.layer);
   mark.renderOrder = 3;
   v.layer.add(mark);
@@ -80,6 +87,7 @@ function setUp(c: DbConnection) {
   v.view.append(tip);
   v.onFrame(now => {
     crowd.frame(now);
+    incidentPins.frame(now);
     // Our bands' tags: the name typed when the band was placed, over its code.
     const ours = crowd.ours();
     v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
@@ -95,8 +103,8 @@ function setUp(c: DbConnection) {
     const ray = v!.rayAt(e);
     const b = crowd.pick(ray);
     if (b) return openBand(b);
-    const pole = poleAt(ray);
-    if (pole) focusOn(pole);
+    const incident = incidentAt(ray);
+    if (incident) focusOn(incident);
   });
   let moved: PointerEvent | undefined;
   v.canvas.addEventListener('pointermove', e => {
@@ -200,18 +208,18 @@ function showAll() {
   v!.overview();
 }
 
-/** What is under the pointer, nearest first: a person, an open incident's pole, then a zone's circle. */
+/** What is under the pointer, nearest first: a person, an incident's ring, then a zone's circle. */
 function hover(e: PointerEvent) {
   tip.hidden = true;
   v!.canvas.style.cursor = '';
   if (e.buttons || dragging) return zones.hover(undefined);
   const ray = v!.rayAt(e);
   const b = crowd.pick(ray);
-  const pole = b ? undefined : poleAt(ray);
+  const incident = b ? undefined : incidentAt(ray);
   const floor = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
-  const circle = b || pole || !floor ? undefined : zones.at(floor.x, floor.z);
+  const circle = b || incident || !floor ? undefined : zones.at(floor.x, floor.z);
   zones.hover(circle);
-  const [title, lines] = b ? personWords(b) : pole ? poleWords(pole) : circle ? zoneWords(conn, circle) : ['', []];
+  const [title, lines] = b ? personWords(b) : incident ? incidentWords(incident) : circle ? zoneWords(conn, circle) : ['', []];
   if (!title) return;
   if (b) v!.canvas.style.cursor = 'pointer';
   tip.replaceChildren(h('b', {}, title), ...lines.map(l => h('div', {}, l)));
@@ -233,26 +241,26 @@ function personWords(b: Band): [string, string[]] {
   ].filter(Boolean)];
 }
 
-/** The open incident whose pole the ray passes, within its width or a few pixels when it is far away. */
-function poleAt(ray: THREE.Ray): IncidentMarker | undefined {
+/** The incident on the floor whose ring the ray passes, or a few pixels from it when it is far away. */
+function incidentAt(ray: THREE.Ray): IncidentMarker | undefined {
   const at = new THREE.Vector3();
   let best: IncidentMarker | undefined;
   let score = 1;
-  for (const pole of poles.values()) {
-    at.set(pole.position.x, 1.8, pole.position.z);
+  for (const m of incidentPins.shown()) {
+    at.set(m.xM, 1, m.yM);
     const along = at.clone().sub(ray.origin).dot(ray.direction);
     if (along <= 0) continue;
-    const reach = Math.max(1.8, along * PICK_RADIANS);
+    const reach = Math.max(2.5, along * PICK_RADIANS);
     const off = ray.distanceSqToPoint(at) / (reach * reach);
     if (off < score) {
       score = off;
-      best = pole.userData.marker as IncidentMarker;
+      best = m;
     }
   }
   return best;
 }
 
-function poleWords(m: IncidentMarker): [string, string[]] {
+function incidentWords(m: IncidentMarker): [string, string[]] {
   return [`Incident ${m.incidentId}: ${m.kind}`, [
     'Click to fly to it and show its decisions.',
     [m.person, m.place && `at ${m.place}`].filter(Boolean).join(' '),
@@ -273,21 +281,6 @@ function going(r: LiveRun | undefined): boolean {
 function markers(r: LiveRun | undefined): IncidentMarker[] {
   if (!r) return [];
   return [...conn.db.incidentMarker.iter()].filter(m => m.openedAt.microsSinceUnixEpoch >= r.startedAt.microsSinceUnixEpoch);
-}
-
-function syncPoles(open: IncidentMarker[]) {
-  const keep = new Set(open.map(m => m.incidentId));
-  for (const [id, pole] of poles) if (!keep.has(id)) { pole.removeFromParent(); poles.delete(id); }
-  for (const m of open) {
-    let pole = poles.get(m.incidentId);
-    if (!pole) {
-      pole = new THREE.Mesh(poleShape, poleColour);
-      poles.set(m.incidentId, pole);
-      v!.layer.add(pole);
-    }
-    pole.position.set(m.xM, 0, m.yM);
-    pole.userData.marker = m;
-  }
 }
 
 function phaseWords(r: LiveRun | undefined): string {
@@ -463,7 +456,10 @@ const LEGEND: [string, string][] = [
   ['#ff1030', 'SOS or a fall: red strobe; someone who fell lies down'],
   ['#2f6bff', 'The light circle around them: blue pulse'],
   ['#3d8bff', 'Our hardware and test bands'],
-  ['#e00020', 'Pole: an open incident'],
+  ['#ff2f45', 'Ring and beam: an open incident, with a tag saying who, where and how far the claim is'],
+  ['#ffb020', 'Amber ring: the medic is responding'],
+  ['#34d399', 'Green ring: resolved; it fades out 20 s later'],
+  ['#2fe08a', 'White figure with a green ring and a cross: the medic, walking in from the nearest door'],
   ['#2fd27a', 'Circle on the floor: a zone, coloured by how crowded it is now (green, amber, red). Hover it for its risk'],
   ['#111111', 'Dark ring: the person open beside the view. Click anyone to open them'],
 ];
@@ -502,7 +498,7 @@ export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picki
   else venueView(c);
   crowd.recheck();
   const r = run();
-  syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
+  incidentPins.sync(markers(r));
   const height = dragged('live height');
   if (height) setLiveHeight(height);
   const sides = (['left', 'right'] as const).map(s => `--${s}: ${dragged(`live ${s}`) ?? SIDES[s]}px`).join('; ');

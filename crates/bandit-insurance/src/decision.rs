@@ -371,6 +371,8 @@ pub struct GuardInput<'a> {
     pub has_cover: bool,
     pub corroboration: Corroboration,
     pub amounts: Amounts,
+    /// The cover's minimum payout from the confirmed policy terms.
+    pub minimum_payout_cents: Cents,
     /// Code and Evidence Engine checks of the current pack version.
     pub checks: &'a [Check],
     /// The authority an organizer's approval gave for this shape of claim.
@@ -435,6 +437,13 @@ pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
             }
             if input.amounts.payout_cents == 0 {
                 return refuse("payout is zero after limits".into(), "code", "nothing is payable after the fee schedule and the limits");
+            }
+            if input.amounts.payout_cents < input.minimum_payout_cents {
+                let minimum = format_cents(input.minimum_payout_cents);
+                return route(
+                    format!("Claude would pay {payout}, below the policy's minimum payout of {minimum}"),
+                    format!("the policy pays on its own only from {minimum}"),
+                );
             }
             if input.corroboration != Corroboration::Corroborated {
                 return route(
@@ -547,6 +556,7 @@ mod tests {
             has_cover: true,
             corroboration: Corroboration::Corroborated,
             amounts: Amounts { cost_cents: 18_000, payout_cents: 18_000, recoverable_cents: 18_000, venue_cost_cents: 0 },
+            minimum_payout_cents: 0,
             checks,
             rule,
             mass_occurrence: None,
@@ -683,6 +693,16 @@ mod tests {
             route(guard(&pay(), &GuardInput { amounts: capped, ..input(&checks, Some(&rule)) })),
             "Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00"
         );
+    }
+
+    #[test]
+    fn a_payout_below_the_policy_minimum_goes_to_a_person() {
+        let (checks, rule) = (passing(), rule());
+        let small = GuardInput { minimum_payout_cents: 25_000, ..input(&checks, Some(&rule)) };
+        let g = guard(&pay(), &small);
+        assert_eq!(g.decision, Decision::Route { reason: "Claude would pay $180.00, below the policy's minimum payout of $250.00".into() });
+        let at = GuardInput { minimum_payout_cents: 18_000, ..input(&checks, Some(&rule)) };
+        assert!(matches!(guard(&pay(), &at).decision, Decision::AutoSettle { .. }));
     }
 
     #[test]

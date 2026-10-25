@@ -122,25 +122,35 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
     }
 }
 
-/// Injury claims from earlier runs left waiting for a record PDF that nobody files: the medic's record goes
-/// on each, one at a time in the background so the run is not held up.
+/// Claims from earlier runs left waiting for a record PDF that nobody files. The medic's record goes on each
+/// injury, one at a time in the background so the run is not held up; a claim where the medic treated no
+/// injury is closed.
 fn file_left_records(app: &App, db: &DbConnection) -> Result<()> {
-    let left: Vec<(u64, String)> = db
+    let left: Vec<(u64, LivePlan)> = db
         .db
         .claim()
         .iter()
         .filter(|c| c.status == ClaimStatus::AwaitingRecord && c.status_note == "waiting for the medical record")
-        .filter_map(|c| db.db.live_plan().incident_id().find(&c.incident_id).filter(|p| !p.record.is_empty()).map(|p| (c.id, p.record)))
+        .filter_map(|c| db.db.live_plan().incident_id().find(&c.incident_id).map(|p| (c.id, p)))
         .collect();
-    if left.is_empty() {
+    let (records, none): (Vec<_>, Vec<_>) = left.into_iter().partition(|(_, p)| !p.record.is_empty());
+    for (claim, plan) in none {
+        let reason = format!("the medic treated no injury ({})", plan.resolution);
+        let closed = app.actor("medic").and_then(|medic| call!(medic, close_claim_without_injury_then(claim, reason.clone())));
+        match closed {
+            Ok(_) => say!(app, "medic      claim {claim}: closed, {reason}"),
+            Err(e) => say!(app, "live       claim {claim}: {e:#}"),
+        }
+    }
+    if records.is_empty() {
         return Ok(());
     }
-    say!(app, "live       filing the medic's record on {} claims left waiting for one", left.len());
+    say!(app, "live       filing the medic's record on {} claims left waiting for one", records.len());
     let exe = std::env::current_exe()?;
     std::thread::spawn(move || {
-        for (claim, template) in left {
+        for (claim, plan) in records {
             let _ = Command::new(&exe)
-                .args(["attach-record", "--claim", &claim.to_string(), "--template", &template, "--for-claimant"])
+                .args(["attach-record", "--claim", &claim.to_string(), "--template", &plan.record, "--for-claimant"])
                 .stdin(Stdio::null())
                 .status();
         }
