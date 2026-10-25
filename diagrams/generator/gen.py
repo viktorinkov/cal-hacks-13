@@ -1,4 +1,4 @@
-"""BandIt system design in Excalidraw: thirteen frames stacked top to bottom. Labels follow LABELS.md."""
+"""BandIt system design in Excalidraw: fourteen frames stacked top to bottom. Labels follow LABELS.md."""
 import pathlib
 import sys
 
@@ -100,8 +100,8 @@ def R(a, sa, b, sb, via, label=None, seg=0, fa=0.5, fb=0.5, **kw):
     return S.arrow(a, b, pts, label=label, fs=AFS, **kw)
 
 
-def Z(x, y, w, h, label, kind, logo_=None):
-    return S.zone(x, y, w, h, label, kind, fs=ZFS, logo=logo_)
+def Z(x, y, w, h, label, kind, logo_=None, indent=0):
+    return S.zone(x, y, w, h, label, kind, fs=ZFS, logo=logo_, indent=indent)
 
 
 SCREENS = "tap page (/t/code)\norganizer portal (/organizer)"
@@ -558,48 +558,200 @@ def claude_jobs(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 9. Social and recap
+USERS, CLOCK, PIN, STORE, SPARKLES, BUILDING, TIMER, HANDS, SEARCH = (logo(f"icon-{n}.svg") for n in (
+    "users", "clock", "map-pin", "store", "sparkles", "building-2", "timer", "handshake", "search-check"))
+GRAPH_SHOT = str(LOGOS.parent / "images" / "event-graph.jpg")  # the organizer portal's Event graph tab
+
+
+def card(x, cy, label, kind, icon, w, h, mh=80, **kw):
+    """A big card: its picture on top, the name and the rule under it."""
+    return B(x, 0, label, kind, w=w, h=h, wordmark=icon, mark_h=mh, cy=cy, **kw)
+
+
+def logo_row(icons, h, step):
+    """Turn the card just drawn's centred picture into a row: extra pictures left and right of it."""
+    mark = S.elements[-1]
+    for i, icon in icons:
+        S.image(mark["x"] + i * step + (mark["width"] - h * aspect(icon)) / 2, mark["y"], icon, h)
+
+
+def socials_card(x, cy, label, w, h=220):
+    box = card(x, cy, label, "stdb", SOCIALS[1], w, h, 60)
+    logo_row(((-1, SOCIALS[0]), (1, SOCIALS[2])), 60, 90)
+    return box
+
+
+# ---------------------------------------------------------------- 9. Social: how links between people form
 def social(y0):
-    S.begin_frame("9 · Social and recap flow", 0, y0, 1000, 600)
-    title("Social")
-    c1, c2, c3, c4 = 60, 820, 1640, 2340
-    r1, r2, r3 = 260, 480, 700
-    gh = 4 * 35 + 50  # the event graph box holds four lines
-    attendee = B(c1, r1, "attendee\ntap page (/t/code)", "web", w=520, icons={0: USER, 1: PHONE})
-    auth = SV(c1, r2, STDB, "SpacetimeAuth (sign-in)", w=520)
-    setup = B(c1, r3, "claim_band\nconfirm_medical_card\nconnect_wallet", "stdb", w=520, h=150)
-    photo = B(c2, r1, "photo page (/photo)\nregister_photo", "web", w=560, icons={0: IMAGE})
-    tick = B(c2, r2, "social_tick\nvisit, social_encounter", "stdb", w=560)
-    graph = B(c2, r3, "Event graph\norganizer portal\n(/organizer)\n3d-force-graph, graphology", "web", w=560,
-              h=gh, icons={0: (GRAPH3D, 34), 1: MONITOR})
-    org = B(c3, r1, "organizer portal\n(/organizer)", "web", w=440, icons={0: MONITOR})
-    recap = B(c3, r2, "recap (/t/code)", "web", w=440, h=r3 + gh - r2, icons={0: PHONE})
-    ee = SV(c4, 0, ELASTIC, "(Evidence Engine)", w=440, cy=L(recap.cy) - 70)
-    zt, zb = 190, r3 + gh + 40
-    Z(40, zt, 560, zb - zt, "at door", "web")
-    Z(c2 - 20, zt, 600, zb - zt, "during event", "stdb")
-    Z(c3 - 20, zt, c4 + 440 + 20 - (c3 - 20), zb - zt, "after event", "plain")
-    V(attendee, auth, "signs in")
-    V(auth, setup, "sets up")
-    D(setup, "r", 0.3, tick, "l", 0.7, "wears band")
-    V(tick, graph, "writes links")
-    V(tick, photo, "tags people")
-    H(tick, recap, "lists people", y=tick.cy)
-    D(photo, "r", 0.5, recap, "t", 0.12, "adds photos")
-    V(org, recap, "ends event")
-    H(ee, recap, "ranks lists", y=ee.cy)
-    # the recap's share button: the photo goes out through the phone's share sheet
-    sy, s = recap.bottom - 70, 44
-    lx = ee.x + 40
-    S.arrow(recap, None, [(recap.right, sy), (lx - 14, sy)], label="shares photo", fs=AFS)
-    for i, path in enumerate(SOCIALS):
-        S.image(lx + i * (s + 22), sy - s / 2, path, s)
+    S.begin_frame("9 · Social", 0, y0, 1000, 600)
+    S.text(40, 28, "Social", fs=64)
+    X0, X1, X2, X3, X4, X5 = 60, 760, 1600, 2440, 3320, 4180
+    mk = dict(fill=WHITE)
+
+    # 1. sign up: the attendee taps their band and fills in the tap page
+    su = [335, 555, 775, 995]
+    attendee = card(X0, 665, "attendee", "web", USER, 440, 240, 120, **mk)
+    tap = card(X1, 665, "tap page\n(/t/code)", "web", PHONE, 560, 400, 150, **mk)
+    claim = card(X2, su[0], "claim_band\npress band button", "stdb", WATCH, 560, 190, 70)
+    profile = card(X2, su[1], "update_profile\nname, findable on", "stdb", SHIELD, 560, 190, 70)
+    person = card(X2, su[2], "claim_person\ncompany", "stdb", BUILDING, 560, 190, 70)
+    handles = socials_card(X2, su[3], "set_social_handle\nInstagram, Facebook, Threads", 560, 190)
+    Z(40, 170, X2 + 560 + 20 - 40, 1130 - 170, "sign up", "web")
+    H(attendee, tap, "taps band")
+    for box, verb in zip((claim, profile, person, handles), ("claims band", "sets name", "picks profile", "adds socials")):
+        D(tap, "r", 0.5, box, "l", 0.5, verb)
+
+    # 2. the band hears station markers and other bands
+    rz, rc, rp = 1435, 1860, 2230  # zone row, up close row, photo row
+    band = card(X0, (1300 + 1985) / 2, "band", "device", WATCH, 440, 640, 200, **mk)
+    marker = card(X1, rz, "station marker\nloudest one\nsets zone", "device", RADIO, 560, 280, 90, **mk)
+    other = card(X1, rc, "other band\n-62 dBm or louder", "device", WATCH, 560, 250, 90, **mk)
+    Z(40, 1170, X1 + 560 + 20 - 40, 2045 - 1170, "venue", "device", indent=40)
+    D(band, "r", 0.3, marker, "l", 0.5, "hears")
+    D(band, "r", 0.7, other, "l", 0.5, "hears")
+    stay = card(X2, rz, "zone_visit\nstay in a zone", "stdb", PIN, 560, 250, 80)
+    enc = card(X2, rc, "encounter\nseconds up close", "stdb", TIMER, 560, 250, 80)
+    H(marker, stay, "opens stay")
+    H(other, enc, "adds seconds")
+
+    # 3. social_tick turns stays and seconds into visits, shared visits and meetings
+    visit = card(X3, 1300, "visit\n2 min in a zone", "stdb", WALK, 600, 230, 80)
+    shared = card(X3, 1570, "shared_visit\n5 min, same zone\nsame time", "stdb", USERS, 600, 260, 80)
+    met = card(X3, rc, "social_encounter\nmet: 3 min up close\nboth findable", "stdb", HANDS, 600, 260, 80)
+    tick = Z(X3 - 20, 1115, 640, L(met.bottom) + 40 - 1115, "social_tick (every 1 s)", "stdb", indent=40)
+    D(stay, "r", 0.3, visit, "l", 0.5, "stays")
+    D(stay, "r", 0.7, shared, "l", 0.5, "overlaps")
+    H(enc, met, "minutes")
+
+    # 4. photos: the photographer picks the zone, Claude counts the people, the bands say who they are
+    shooter = card(X0, rp, "photographer", "web", CAMERA, 440, 260, 130, **mk)
+    page = card(X1, rp, "photo page (/photo)\nregister_photo\nzone, time", "web", IMAGE, 560, 300, 100, **mk)
+    counts = card(X2, rp, "Claude\ncounts people\ncaption, no names", "claude", CLAUDE, 560, 300, 100, **mk)
+    tags = card(X3, rp, "photo_tag\nbands in that zone then\nnear most others first\nas many as counted", "stdb",
+                IMAGE, 600, 320, 80)
+    H(shooter, page, "uploads")
+    H(page, counts, "photo")
+    H(counts, tags, "people count")
+    gx = X2 + 560 + 110  # down the gap between the stays and the rules
+    R(stay, "r", tags, "t", [(S.ox + gx, stay.y + stay.h * 0.92), (S.ox + gx, tags.y - 45),
+                              (tags.x + 120, tags.y - 45)], label="zone stays", seg=1, fa=0.92, fb=120 / tags.w)
+    D(enc, "b", 0.85, tags, "l", 0.2, "near others")
+
+    # 5. the people graph: one link per pair, weighed in minutes
+    works = card(X4, su[2], "works_at\nperson to company", "stdb", BUILDING, 600, 190, 70)
+    exhibits = card(X4, 1030, "exhibits\nbooth to company", "stdb", STORE, 600, 190, 70)
+    visited = card(X4, 1300, "visited\nperson to booth\nweight: minutes", "stdb", WALK, 600, 260, 80)
+    metl = card(X4, rc, "met\nperson to person\nweight: minutes together", "stdb", HANDS, 600, 260, 80)
+    links = Z(X4 - 20, su[2] - 95 - 70, 640, L(metl.bottom) + 40 - (su[2] - 95 - 70), "people_link", "stdb", STDB,
+              indent=40)
+    inph = card(X4, rp, "in_photo\nphoto to person\ncounts as 30 min", "web", IMAGE, 600, 300, 80, **mk)
+    H(person, works, "company")
+    H(visit, visited, "minutes")
+    D(visit, "r", 0.2, exhibits, "l", 0.6, "booth company")
+    H(met, metl, "minutes")
+    H(tags, inph, "tags")
+
+    # 6. the event graph draws every link live; Memories groups people around a booth
+    gtop, gbot = links.y, inph.bottom
+    graph = card(X5, L((gtop + gbot) / 2), "Event graph\norganizer portal (/organizer)", "web", GRAPH_SHOT, 1340,
+                 gbot - gtop, 1120, **mk)
+    memories = card(X5, L(gbot) + 260, "Memories\ngroups around a booth\nmet, visited, in_photo", "web", GRAPH3D,
+                    1340, 300, 100, **mk)
+    H(links, graph, "draws links", y=links.cy)
+    H(inph, graph, "draws photos", y=inph.cy)
+    V(graph, memories, "colours by")
+    for box, n in ((tap, 1), (band, 2), (tick, 3), (page, 4), (links, 5), (graph, 6)):
+        badge(box, n)
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 10. Merch and wallet
+# ---------------------------------------------------------------- 10. Interests: booth time ranks the people you met
+def interests(y0):
+    S.begin_frame("10 · Interests", 0, y0, 1000, 600)
+    S.text(40, 28, "Interests", fs=64)
+    X0, X1, X2, X3, X4, X5 = 60, 800, 1560, 2360, 3220, 4020
+    W0, W1, W2, W3, W4, W5 = 500, 520, 560, 620, 560, 760
+    mk = dict(fill=WHITE)
+    ev = [460, 820, 1100, 1360, 1620, 1880, 2140]  # one row per fact on a suggested person
+
+    # 1. interests: the 5 spots where a person spent the most minutes, as booth text read by meaning
+    visit = card(X0, 590, "visit\nminutes per booth", "stdb", WALK, W0, 220, 80)
+    booth = card(X0, 330, "booth\nname, description, tags", "stdb", STORE, W0, 220, 80)
+    indexer = card(X1, 460, "bandit-indexer\ntop 5 spots\nmost minutes\nfindable only", "rust", RUST, W1, 480, 90)
+    text = card(X2, ev[0], "interests\nzone description\nbooth description, tags", "ext", SPARKLES, W2, 300, 100,
+                **mk)
+    people = card(X3, ev[0], "bandit-people\nbandit-booths\nread by meaning", "ext", ELASTIC, W3, 300, 70, **mk)
+    H(visit, indexer, "minutes", y=visit.cy)
+    H(booth, indexer, "descriptions", y=booth.cy)
+    H(indexer, text, "top 5 spots", y=text.cy)
+    H(text, people, "indexes")
+
+    # 2. suggestions: the people you met, ordered by how close their interests are to yours
+    search = card(X3, ev[1], "semantic search\nyour interests\nvs their interests", "ext", ELASTIC, W3, 260, 60, **mk)
+    Z(X2 - 20, L(people.y) - 70, X3 + W3 + 20 - (X2 - 20), L(search.bottom) + 40 - (L(people.y) - 70),
+      "Evidence Engine", "ext", ELASTIC)
+    api = card(X1, 970, "bandit-api\nGET /api/recap\npeople you met\nmost minutes first", "rust", RUST, W1, 420, 90)
+    D(visit, "b", 0.8, api, "l", 0.2, "visits")
+    H(api, search, "candidates", y=search.cy)
+    V(people, search, "both interests", x=search.cx)
+
+    # 3. every fact on a suggested person is its own card
+    facts = [card(X4, ev[0], "their interests\nInto: Anthropic, Elastic", "ext", SPARKLES, W4, 220, 70),
+             card(X4, ev[1], "order\nclosest interests first\nminutes if no answer", "ext", SEARCH, W4, 260, 70),
+             card(X4, ev[2], "shared booths\nyou both visited", "rust", STORE, W4, 220, 70),
+             card(X4, ev[3], "met at\nzone, time", "stdb", PIN, W4, 220, 70),
+             card(X4, ev[4], "minutes together", "stdb", TIMER, W4, 220, 90),
+             card(X4, ev[5], "photos together", "stdb", IMAGE, W4, 220, 90),
+             socials_card(X4, ev[6], "socials\nInstagram, Facebook, Threads", W4)]
+    met = card(X3, (ev[3] + ev[4]) / 2, "social_encounter\nmet, minutes together", "stdb", HANDS, W3,
+               ev[4] - ev[3] + 220, 110)
+    tags = card(X3, ev[5], "photo_tag\nboth in photo", "stdb", IMAGE, W3, 220, 80)
+    handles = socials_card(X3, ev[6], "set_social_handle", W3)
+    H(people, facts[0], "top spots")
+    H(search, facts[1], "ranks")
+    H(api, facts[2], "both visited", y=facts[2].cy)
+    H(met, facts[3], "where, when", y=facts[3].cy)
+    H(met, facts[4], "minutes", y=facts[4].cy)
+    H(tags, facts[5], "counts")
+    H(handles, facts[6], "links")
+    R(met, "l", api, "b", [(api.cx, met.y + 50)], label="met people", seg=0, fa=50 / met.h)
+    who = card(X5, L((facts[0].y + facts[-1].bottom) / 2), "suggested person\nphoto, name", "web", USER, W5,
+               facts[-1].bottom - facts[0].y, 300, **mk)
+    for f in facts:
+        H(f, who, y=f.cy)
+
+    # 4. the recap opens when the organizer ends the event or the attendee leaves
+    org = card(X0, 1560, "organizer\nEvent ended", "web", USER, W0, 280, 110, **mk)
+    leaver = card(X0, 1960, "attendee\nLeave the event", "web", USER, W0, 280, 110, **mk)
+    page = card(X1, 1760, "recap\n(/t/code)", "web", PHONE, W1, 700, 260, **mk)
+    H(org, page, "ends event", y=org.cy)
+    H(leaver, page, "leaves", y=leaver.cy)
+    top = L(facts[-1].bottom) + 160
+    row = top + 70 + 150
+    secs = [("Where you were\ntime chart", CLOCK), ("Also there with you\nshared_visit", USERS),
+            ("Booths you spent\ntime at\nclosest interests first", STORE), ("Your photos\nYou with ...", IMAGE),
+            ("Make it merch\nphoto, booths", WALLET), ("People you spent\ntime with", USERS)]
+    sec = [card(x, row, label, "web", icon, w, 300, 100)
+           for x, w, (label, icon) in zip((X0, X1, X2, X3, X4, X5), (W0, W1, W2, W3, W4, W5), secs)]
+    share_y = row + 150 + 170
+    recap = Z(40, top, X5 + W5 + 20 - 40, share_y + 80 - top, "recap (/t/code)", "web", PHONE)
+    V(page, recap, "shows", x=page.cx)
+    V(who, sec[5], "one card each", x=who.cx)
+    # the photo goes out through the phone's share sheet
+    s = 60
+    lx = sec[3].cx - (3 * s + 2 * 26) / 2
+    sy = S.oy + share_y
+    S.arrow(sec[3], None, [(sec[3].cx, sec[3].bottom), (sec[3].cx, sy - s / 2 - 12)], label="shares photo", fs=AFS)
+    for i, path in enumerate(SOCIALS):
+        S.image(lx + i * (s + 26), sy - s / 2, path, s)
+    for box, n in ((indexer, 1), (search, 2), (facts[0], 3), (who, 4), (page, 5)):
+        badge(box, n)
+    return S.end_frame()
+
+
+# ---------------------------------------------------------------- 11. Merch and wallet
 def merch(y0):
-    S.begin_frame("10 · Merch and wallet", 0, y0, 1000, 600)
+    S.begin_frame("11 · Merch and wallet", 0, y0, 1000, 600)
     title("Merch and wallet")
     ins = [B(80, 260 + i * (BH + 40), lbl, "stdb", w=560, icons=ic) for i, (lbl, ic) in enumerate([
         ("my_visits", None), ("my_photos", {0: IMAGE}), ("merch_template\ntee $25, mug $18, poster $15", None)])]
@@ -618,9 +770,9 @@ def merch(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 11. Capital One Nessie wallet
+# ---------------------------------------------------------------- 12. Capital One Nessie wallet
 def nessie(y0):
-    S.begin_frame("11 · Nessie wallet", 0, y0, 1000, 600)
+    S.begin_frame("12 · Nessie wallet", 0, y0, 1000, 600)
     title("Capital One Nessie")
     rows = [(("connect_wallet", "web"), "Nessie (account)", "record_wallet", "opens account", "adds $200"),
             (("buy_merch", "web"), "Nessie (purchase)", "settle_merch_order", "buys", "subtracts price"),
@@ -642,9 +794,9 @@ def nessie(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 12. Vultr server
+# ---------------------------------------------------------------- 13. Vultr server
 def vultr(y0):
-    S.begin_frame("12 · Vultr server", 0, y0, 1000, 600)
+    S.begin_frame("13 · Vultr server", 0, y0, 1000, 600)
     title("Vultr")
     c1, c2, c3, c4 = 60, 740, 1440, 2240
     r1 = 340
@@ -676,9 +828,9 @@ def vultr(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 13. Hardware basics
+# ---------------------------------------------------------------- 14. Hardware basics
 def hardware(y0):
-    S.begin_frame("13 · Hardware basics", 0, y0, 1000, 600)
+    S.begin_frame("14 · Hardware basics", 0, y0, 1000, 600)
     title("Hardware")
     phone = B(80, 200, "phone", "web", w=480, icons={0: NFC})
     lite = SV(80, 510, SEEED, "lite band x6\nXIAO ESP32-C3", kind="device", h=150, w=480, fill=None)
@@ -701,7 +853,7 @@ def hardware(y0):
     return S.end_frame()
 
 
-FRAMES = (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, merch,
+FRAMES = (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, interests, merch,
           nessie, vultr, hardware)
 only = sys.argv[2:]  # frame function names, for a board of just those frames
 y = 0
