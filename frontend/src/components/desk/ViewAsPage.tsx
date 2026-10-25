@@ -1,23 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Identity } from 'spacetimedb'
-import { useDesk, type ViewablePerson } from '@/stdb/deskOps'
+import { useDesk } from '@/stdb/deskOps'
 import { linkReducers } from '@/stdb/link'
 import { useSession } from '@/stdb/session'
-import { isViewing, type ViewerHost } from '@/stdb/viewing'
+import { isViewing, personScreens, personViewUrl, type ViewerHost } from '@/stdb/viewing'
 import { DeskFrame } from './DeskFrame'
 import { ViewedScreen } from './ViewedScreen'
-
-export function personScreens(person: ViewablePerson): [string, string][] {
-  if (person.role === 'attendee') return [['now', 'Their band page now'], ['card', 'Medical card'], ['recap', 'Recap'], ['wallet', 'Wallet and merch']]
-  if (person.role === 'photographer') return [['photo', 'Photo page']]
-  return [['claims', 'Organizer portal']]
-}
-
-export function personViewUrl(person: ViewablePerson, screen: string): string {
-  const query = new URLSearchParams({ view: person.hex, screen, bandId: String(person.bandId) })
-  if (person.bandId) query.set('band', `band-${String(person.bandId).padStart(2, '0')}`)
-  return `/view-as?${query}`
-}
 
 type ViewReducers = { viewAs(args: { viewer: Identity; target: Identity }): Promise<unknown> }
 

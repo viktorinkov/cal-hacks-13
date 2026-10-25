@@ -202,10 +202,6 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
     savedHeading.current?.focus({ preventScroll: true })
   }, [saved])
 
-  useEffect(() => {
-    if (isViewing() && attendee) setDraft((current) => ({ ...current, name: attendee.displayName }))
-  }, [attendee])
-
   const set = (key: keyof Registration) => (value: string) => setDraft((current) => ({ ...current, [key]: value }))
 
   const sendFile = async (upload: LocalUpload) => {
@@ -323,7 +319,7 @@ function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'>
         {(errors.form || session.signupError || session.error || claimError) && <p role="alert" className="rounded border border-signal/30 bg-signal/5 p-4 text-[14px] leading-6 text-signal">{errors.form || claimError || session.signupError || session.error}</p>}
         <Step sectionId="your-details" title="Your details" note="The person wearing the band, and someone to call.">
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field id="name" label="Name" value={draft.name} onChange={set('name')} error={errors.name} autoComplete="name" />
+            <Field id="name" label="Name" value={isViewing() ? (attendee?.displayName ?? '') : draft.name} onChange={set('name')} error={errors.name} autoComplete="name" />
             <Field id="email" label="Email" type="email" value={draft.email} onChange={set('email')} error={errors.email} autoComplete="email" inputMode="email" />
             <Field id="emergency-name" label="Emergency contact" value={draft.emergencyName} onChange={set('emergencyName')} error={errors.emergencyName} autoComplete="section-emergency name" />
             <Field id="emergency-phone" label="Emergency phone" type="tel" value={draft.emergencyPhone} onChange={set('emergencyPhone')} error={errors.emergencyPhone} autoComplete="section-emergency tel" inputMode="tel" />

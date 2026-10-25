@@ -1,3 +1,5 @@
+import type { ViewablePerson } from './deskOps'
+
 /** A View As frame always uses a fresh identity, never the owner's browser credentials. */
 export function isViewing(search = window.location.search): boolean {
   return new URLSearchParams(search).has('view')
@@ -27,4 +29,16 @@ export function protectViewerReducers(reducers: object): void {
       calls[name] = () => Promise.reject(new Error('View As is read-only.'))
     }
   }
+}
+
+export function personScreens(person: ViewablePerson): [string, string][] {
+  if (person.role === 'attendee') return [['now', 'Their band page now'], ['card', 'Medical card'], ['recap', 'Recap'], ['wallet', 'Wallet and merch']]
+  if (person.role === 'photographer') return [['photo', 'Photo page']]
+  return [['claims', 'Organizer portal']]
+}
+
+export function personViewUrl(person: ViewablePerson, screen: string): string {
+  const query = new URLSearchParams({ view: person.hex, screen, bandId: String(person.bandId) })
+  if (person.bandId) query.set('band', `band-${String(person.bandId).padStart(2, '0')}`)
+  return `/view-as?${query}`
 }
