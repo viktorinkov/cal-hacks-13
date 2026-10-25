@@ -401,23 +401,24 @@ def insurance(y0):
     H(checks, split, "valid lines", y=checks.cy)
 
     # 4. the claim and its evidence, every source its own card
-    e = [1660, 1980, 2280, 2560, 2840, 3120]
+    e = [1660, 1980, 2280, 2560, 2840, 3120, 3400]
     claim = B(A, 0, "tap page (/t/code)\nHurt at the event?\nSomething stolen or broken?", "web", w=560, h=290, wordmark=PHONE,
               mark_h=110, cy=e[0], **mk)
     venue_claim = B(A, 0, "organizer portal\n(/organizer, Claims)\nrepair cost, responsible", "web", w=560, h=270,
                     wordmark=MONITOR, mark_h=100, cy=e[1], **mk)
     srcs = [B(A, 0, label, "device", w=560, h=240, wordmark=icon, mark_h=110, cy=y, **mk)
             for (label, icon), y in zip((("band", WATCH), ("light circle", RADIO), ("security camera", CAMERA),
-                                         ("medic", USER)), e[2:])]
+                                         ("medic", USER), ("live run\n(/organizer#live)", THREE)), e[2:])]
     facts = [B(880, 0, "file_claim\nown words, item, value", "stdb", w=560, h=200, cy=e[0]),
              B(880, 0, "name_responsible\nband at spot, 10 m", "rust", w=560, h=200, cy=e[1]),
              B(880, 0, "incident\nSOS or fall", "stdb", w=560, h=200, cy=e[2]),
              B(880, 0, "witnesses\n2+ bands, same zone", "rust", w=560, h=200, cy=e[3]),
              B(880, 0, "camera sighting\nsame zone, 2 min", "rust", w=560, h=200, cy=e[4]),
-             B(880, 0, "medic note\nwithin 30 min", "rust", w=560, h=200, cy=e[5])]
+             B(880, 0, "medic note\nwithin 30 min", "rust", w=560, h=200, cy=e[5]),
+             B(880, 0, "seeded crowd\nincidents, losses, notes", "stdb", w=560, h=200, cy=e[6])]
     V(attendee, claim, "files claim", x=attendee.cx)
     for src, fact, label in zip([claim, venue_claim] + srcs, facts, ("own words", "names band", "SOS or fall",
-                                                                     "witness bands", "flash", "note")):
+                                                                     "witness bands", "flash", "note", "writes")):
         H(src, fact, label, y=fact.cy)
     pack = B(1620, claim.y - S.oy, "evidence pack\nnumbered facts", "stdb", w=520, h=facts[-1].bottom - claim.y,
              wordmark=STDB, mark_h=50, **mk)
@@ -463,28 +464,38 @@ def insurance(y0):
 
     # 7. the organizer decides what code and Claude hand over
     r4 = r3 + 650
-    org = B(2200, 0, "Organizer decides\nclaims, charges\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
+    org = B(2200, 0, "Organizer decides\nclaims, charges, rules\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
             wordmark=USER, mark_h=260, cy=r4)
     stale = B(3720, 0, "amount and evidence\nunchanged", "rust", w=640, h=240, wordmark=RUST, mark_h=60, cy=r4)
     insurer = B(4600, 0, "notice of loss\nvenue insurer\nattendee insurer", "claude", w=500, h=240, wordmark=CLAUDE,
                 mark_h=90, cy=r4, **mk)
-    rules = B(1240, 0, "learned rules\nversion, approver", "stdb", w=640, h=220, wordmark=STDB, mark_h=50,
-              cy=L(org.y) + org.h * 0.72, **mk)
+    prec = B(1240, 0, "precedents\none per decision\ncomplicated: one by one", "stdb", w=680, h=260, wordmark=STDB,
+             mark_h=50, cy=r4 + 40, **mk)
+    propose = B(300, 0, "Claude\nproposes payment rule\nfrom 3 alike precedents\nceiling under policy limit", "claude",
+                w=680, h=340, wordmark=CLAUDE, mark_h=110, cy=r4 + 40, **mk)
+    rules = B(300, 0, "payment rule vN\nshape, ceiling\nprecedents, approver", "stdb", w=680, h=260, wordmark=STDB,
+              mark_h=50, cy=r3, **mk)
     history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",
-                w=3860, h=200, wordmark=STDB, mark_h=50, **mk)
+                w=3060, h=200, wordmark=STDB, mark_h=50, **mk)
+    costs = B(4600, 0, "organizer portal\n(/organizer, Costs)\nwho pays what\njournals, trial balance", "web", w=560,
+              h=330, wordmark=MONITOR, mark_h=100, cy=L(history.cy) - 60, **mk)
     V(guard, org, "asks organizer", x=guard.cx + 120)
     H(org, stale, "approves", y=org.cy)
     V(stale, payout, "unchanged", x=stale.cx)
-    R(payout, "r", insurer, "l", [(payout.right + 110, payout.y + payout.h * 0.85), (payout.right + 110, insurer.cy)],
+    R(payout, "r", insurer, "l", [(payout.right + 140, payout.y + payout.h * 0.85), (payout.right + 140, insurer.cy)],
       label="collects", seg=1, fa=0.85)
     D(org, "t", 0.06, refused, "b", 0.85, "refuses")
-    teach = H(org, rules, "teaches a rule", dashed=True, color="#2b8a3e", y=rules.cy)
-    teach["strokeWidth"] = 4
-    R(rules, "t", guard, "b", [(rules.x + 120, org.y - 70), (guard.x + 120, org.y - 70)], label="rule ceiling",
-      seg=1, fa=120 / rules.w, fb=120 / guard.w, dashed=True, color="#2b8a3e")
+    H(org, prec, "every decision", y=prec.cy)
+    H(prec, propose, "3 alike", y=prec.cy)
+    learn = V(propose, rules, "organizer approves", x=propose.cx, color="#2b8a3e")
+    learn["strokeWidth"] = 4
+    R(rules, "t", guard, "t", [(rules.cx, pack.bottom + 80), (guard.x + 90, pack.bottom + 80)],
+      label="rule ceiling", seg=1, fb=90 / guard.w, dashed=True, color="#2b8a3e")
+    R(payout, "r", costs, "l", [(payout.right + 50, payout.y + payout.h * 0.95), (payout.right + 50, costs.cy)],
+      label="journals", seg=2, fa=0.95)
     V(history, org, "shows", x=org.cx)
     for box, n in ((venue_pdf, 1), (ingest, 2), (reader, 3), (claim, 4), (pack, 5), (split, 6), (claude, 7),
-                   (guard, 8), (org, 9), (payout, 10)):
+                   (guard, 8), (org, 9), (payout, 10), (propose, 11)):
         badge(box, n)
     return S.end_frame()
 
