@@ -266,6 +266,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
         <WalletStatus />
         <div className="mt-8 flex flex-wrap items-center gap-5">
           <Button type="button" className="signup-primary" onClick={() => setSaved(null)}>Edit this band</Button>
+          <button type="button" onClick={() => go('/wallet')} className="min-h-11 text-[14px]">Open your wallet</button>
           <button type="button" onClick={() => go('/claims')} className="min-h-11 text-[14px]">Claims desk</button>
         </div>
       </div>
@@ -288,6 +289,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
               : linked ? <span className="flex items-center gap-2"><Check size={15} className="text-teal" aria-hidden="true" /> Connected · ready for your details</span>
               : 'Connecting to your band…'}
           </div>
+          {owned && <button type="button" onClick={() => go('/wallet')} className="mt-1 min-h-11 text-[14px] text-champagne underline underline-offset-4">Open your wallet</button>}
         </div>
         <div className="signup-preview" role="group" aria-label="Band details preview">
           <p>{draft.name.trim() || 'Your name goes here'}</p>
