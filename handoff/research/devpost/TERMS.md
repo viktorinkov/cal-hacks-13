@@ -41,6 +41,10 @@ The plain portal uses `/organizer` on `dev.band1t.vip` and `/portal` on the main
 
 Viktor's standing rule: write short paragraphs, never long ones.
 
+For Devpost only, use ordinary exact words and natural connected sentences; explain technical terms once, remove repeated explanations and mechanical first/second enumerations, and keep important facts. Preserve sponsor quotations, use one live-site URL in Try it out, and keep the closing disclosure brief. This writing preference does not override the diagram guide below.
+
+For the Devpost narrative, order the product story as safety, social, shopping, then insurance. This does not change the established sponsor ranking or the board’s organization.
+
 1. At most 3 sentences per paragraph.
 2. One idea per paragraph.
 3. Each example gets its own small paragraph.
@@ -61,12 +65,13 @@ Always name the company and then the API or product, every time, never the bare 
 
 This is the single guide for the board, excerpts and exports. Use the names defined above.
 
-1. **Make the artwork large.** Use original logos, useful photos and illustrations. Preserve their proportions and put labels below them. A wordmark already supplies the product name. Never put app screenshots in a diagram.
+1. **Make the artwork large.** Use original logos, useful photos and illustrations. Preserve their proportions and put labels below them. A wordmark already supplies the product name. Never put app screenshots in a diagram. Group operations inside one provider container when that clarifies ownership and avoids excessive repeated logos. This is a readability preference, not a one-logo limit: repeat a provider where separate contexts or clearer arrows make the flow easier to follow.
 2. **Use soft colored fills and dark text.** Keep colors consistent for the same roles. Borders are subtle separators; color should be visible across the whole card. Keep failures red and successful outcomes green; workers should not look like errors.
-3. **Keep each frame focused.** Answer one question in a compact layout that reads at fit-to-frame. Put full job, view, field and timing inventories in documents. Refer to another frame's output instead of repeating its flow.
-4. **Keep labels readable and consistent.** Use Excalifont, short labels and the native frame title once. Preserve the board's two-digit frame numbers in excerpts. Do not add duplicate headings, subtitles or numbered card badges.
-5. **Show who calls what.** Label directional arrows with the action or data. Use actual code names and page routes when needed, including the correct production portal route. Leave enough space around text and artwork.
-6. **Explain the real behavior.** Show policy inputs and formulas for settlement amounts. Keep approved intended behavior; record code gaps and sponsor reasoning in the factual review instead of adding status placeholders to the drawing. Do not add track names or unsupported claims.
-7. **Save each revision.** Preserve imported source boards unchanged. Keep editable checkpoints before major changes and publish reviewed updates promptly. Git and `.builds/diagram-history/` preserve saved versions, not every browser edit.
+3. **Keep property cells inside their parent.** Keep the main actor, component or object as a visible outer card. Replace a long property list with small filled text rectangles inside that card. Distinct actors and actual workflow or calculation stages may have their own cards and arrows; descriptive properties must not become artificial process steps. Related formula inputs and conditions belong inside their calculation group. Short labels may use several lines for one concept, and a coherent packet payload may stay together.
+4. **Keep each frame focused.** Answer one question in a compact layout that reads at fit-to-frame. Put full job, view, field and timing inventories in documents. Refer to another frame's output instead of repeating its flow. There is no fixed diagram-count limit: keep distinct technical detail on the same board. Assess a diagram’s standalone visual value separately from whether it can merge with another. Prefer Devpost prose when a linear flow or parameter list adds little beyond text and the feature facts remain clear. Combine frames only when their shared question stays readable; preserve the agreed sponsor and hardware priorities.
+5. **Keep labels readable and consistent.** Use Excalifont, short labels and the native frame title once. Preserve the board's two-digit frame numbers in excerpts. Do not add duplicate headings, subtitles or numbered card badges. Prefer plain phrases over unnecessary slash shorthand in prose labels; preserve meaningful slashes in API paths, URLs, units, formulas and code identifiers.
+6. **Show who calls what.** Label directional arrows with the action or data. Use actual code names and page routes when needed, including the correct production portal route. Leave enough space around text and artwork.
+7. **Explain the real behavior.** Show policy inputs and formulas for settlement amounts. Keep approved intended behavior; record code gaps and sponsor reasoning in the factual review instead of adding status placeholders to the drawing. Do not add track names or unsupported claims.
+8. **Save each revision.** Preserve imported source boards unchanged. Keep editable checkpoints before major changes and publish reviewed updates promptly. Git and `.builds/diagram-history/` preserve saved versions, not every browser edit.
 
 Logos live in `diagrams/logos/`.

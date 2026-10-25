@@ -7,9 +7,12 @@ Snapshot: 2026-10-25 09:10 UTC, vik-e2e at `26ed950` plus this file, deployed on
 ## Verified follow-up, 25 October 2026
 
 - Elastic migration and explicit rule-scope review are deployed in `5029dca9414c1d4b665c1353992b6be1764dd9f2`, verified at 10:03:25 UTC. Worker model tasks use Elastic Workflows and Agent Builder, with Claude as a configured model. Older narrower-looking rules require explicit review; the automated runner cannot grant that approval. Eddie's latest frontend changes were preserved.
-- [The current 23-frame board](https://excalidraw.com/#json=RVs5MKFQ6Nqkq3atzgMFl,5aolZTUddATQge1NYA23Zw) uses colored fills and large original artwork, compact queues and decisions, the three supplied hardware additions, and Live views. The original hardware board is unchanged. See [saved versions](diagrams/HISTORY.md), [all 75 views](diagrams/views.md), and the [current gap audit](handoff/research/audits/diagram-review-2026-10-25.md).
-- Organizer-triggered full event import is approved and being tested in `vik-organizer-event-import`. It runs on server workers; an organizer must not run the importer on a laptop. Existing venue discovery/map setup is already a separate organizer action.
-- Automatic recap ranking uses booth interests among event-grounded candidates. Typed natural-language friend search is not implemented. The complete plain recap is on the dev site's attendee flow; the public attendee frontend has not integrated it.
+- The [main Plus board](https://app.excalidraw.com/s/8CxNdcrvsHz/65Xc8JRcGo5) now has all 21 distinct frames, verified online: dedicated sponsor/API integrations connect to feature journeys, claims have separate settlement/amount/rule diagrams, and all hardware/vision detail remains on this board. The current reduced revision is verified online: 1,550 active elements, 21 frames and 40 assets. Descriptive property cells are nested inside their parent cards; the user’s small station-position adjustment is preserved. The separate claims scene is a saved checkpoint only. See [saved versions](diagrams/HISTORY.md), [all 75 views](diagrams/views.md), and the [current gap audit](handoff/research/audits/diagram-review-2026-10-25.md).
+- Approved diagram reduction: keep 21 distinct titles on the same board. Interest suggestions, Buy a memory and Exit guidance move to existing Devpost prose, with their feature facts and the saved 24-frame source retained. The rule presentation drops historical repair detail and a repeated decision lane; code approval guards are unchanged. This reduction is published and verified on the canonical Plus board.
+- Viktor confirmed that Leo created the supplied hardware drawing and is still implementing it. Preserve that approved design and the unchanged original hardware source. Fetched firmware differences are implementation gaps owned by Leo, not a reason to weaken the drawing.
+- Organizer-triggered full event import is deployed in `ec63ce0` and verified end to end: import 1 reached Ready and job 852 reached Done on its first attempt, creating exactly one import run. Existing IDs, zone mappings and financial/rule state were preserved. Server workers run the importer. An organizer does not run it on a laptop; venue discovery/map setup is a separate organizer action.
+- Typed friend search `517c63d` is deployed (10:31:21 UTC) and verified in an authenticated production browser at [band1t.vip/friends](https://band1t.vip/friends). It uses recorded, findable encounters and named-place evidence before Elastic ranks eligible candidates. Automatic suggestions separately use booth interests; interest similarity is never proof of a meeting.
+- Latest checkout decision: catalog purchases are available during and after the event. Personalized recommendations remain tied to departure or event end. Commits `530820a` and `8b63c89` implement this intentional scope; do not restore an event-end gate to catalog checkout.
 - `devpost.md` received targeted corrections and independent review. It remains intentionally untracked. The older snapshot and unfinished-work lists below are historical context; check the current audit and code before treating an item as still open.
 
 ## Read first
@@ -85,6 +88,7 @@ These were the Claude project's instructions from Viktor, adapted for one agent.
 ### Design priorities
 
 - Design before code. The System Design docs and the Excalidraw board show the intended behavior. Settle them first, then write the code to match.
+- Updated on 2026-10-25: use one architecture overview, dedicated diagrams for major API integrations, and feature journeys that refer to those engines with their logos. Fold standalone Vultr hosting into architecture. Keep useful vision, wiring, firmware and transmitted-data detail on the same board; there is no fixed diagram-count limit. Keep each main actor, component or object as an outer card, with small filled property rectangles inside it. Only actual actors and workflow/calculation stages become separate process cards with arrows. Related formula inputs and conditions stay within their calculation group; descriptive properties must not become artificial process steps.
 - SpacetimeDB is the most important sponsor, but show the unique strengths of both SpacetimeDB and Elastic. SpacetimeDB owns live state, transactional coordination and settlement authority. Updated by Viktor on 2026-10-25: Elastic owns suitable model execution, including the Decision Engine investigation. Bounded tasks use Workflows; retrieval and investigation use Agent Builder with worker-controlled tools and code guards. Claude may be the model behind Elastic's connector; it is not a separate direct-call decision layer.
 - Elastic reads every insurance document: the venue's policy PDFs, each attendee's own policy PDFs and the medical records. Policy terms (minimum payout, limits, deductible) are per-event or per-attendee variables that drive the Decision Engine.
 - Show the human in the loop (the organizer's review) clearly.
@@ -116,7 +120,7 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 
 - The README's happy path is the spec. Bandshake was invented and removed. Paying at the venue with a band was cut. The table of proposed firmware extensions was cut: "you are not working on the hardware".
 - The bands vibrate and point people along dispersion routes. That stays.
-- Capital One Nessie is the wallet: a $200 sandbox account per attendee, merch bought after the event, and insurance payouts paid into it.
+- Capital One Nessie is the wallet: a $200 sandbox account per attendee, catalog purchases during and after the event, and insurance payouts paid into it. Personalized recommendations start at departure or event end.
 - Sharing a recap photo is one tap: the phone's share menu with a caption that tags everyone's Instagram handles. Socials are Meta's only (Instagram, Facebook, Threads), because Meta has the track.
 - Test attendees get full made-up identities so the people graph looks like a crowd. Viktor offered his own Instagram, `viktorinkovski`.
 - Every role wears a band (hackers, booth staff, speakers, organizers, photographers), except medics.
@@ -133,7 +137,7 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - Tapping a band in a browser signed in as a medic opens that person's medical info. Everyone else gets the sign-in screen.
 - Sponsor merch belongs to the Cal Hacks booths and is assumed to exist before the event. Each sponsor gets merch, smaller sponsors one type only. The images were made with Gemini through computer use, not by an API in the product.
 - The shopping agent suggests merch for that one person and never buys by itself. The organizer does not rerun it.
-- A person who leaves early can buy merch right after leaving: the event has ended for them.
+- Catalog checkout is available during and after the event. A person who leaves early gets personalized merch recommendations after leaving; other attendees get them when the event ends.
 - The organizer has a Merch tab with the templates and every order. Staff, photographers included, are added by email.
 - Venue setup: the organizer names the event and Bright Data scrapes the rest, with Cal Hacks as the default in a dropdown. Judges don't need a live scrape. Bright Data also finds the insurance policies on the web, the attendee's plan and the venue's policy, instead of agents fetching them by hand.
 - On 2026-10-25 Viktor explicitly rejected running the full event importer on the organizer's laptop. The approved flow is the organizer's app action, a queued server import, and live progress/results. Keep full event ingestion separate from name-based venue discovery and 3D capture; do not describe the configured Cal Hacks importer as arbitrary-event ingestion. The CLI is a maintainer tool.
@@ -169,6 +173,8 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 
 ### The Devpost
 
+- Devpost product/story order is safety, social, shopping, insurance. This writing order is separate from the established sponsor ranking; do not reorder sponsor-track sections or the main diagram board from this preference.
+- Devpost writing only: use ordinary, exact words and natural, connected sentences. Explain each technical term once; remove repeated explanations and mechanical first/second enumerations while keeping important facts. Keep one live-site URL in "Try it out" and a brief closing disclosure. Preserve sponsor quotations. This preference does not replace the diagram guide.
 - The Devpost may describe things that are not built yet, as long as the rest of the rules hold.
 - Lean heavily on Meta for connecting people. The social part and the interests need detailed diagrams and their own detailed section.
 - Each sponsor has its own section, the four big ones above all, quoting the sponsor's prompt word for word (never paraphrased, and not the prizes).
@@ -196,6 +202,7 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 | Leo | vision, firmware and hardware: the bands, the gateway, the station markers, the security view (`pipeline/security*.py`), camera sightings | `leopozh` (commits as `pullbro`) |
 
 - Never change firmware or hardware. Leo's branches (`firmware`, `bridge-hardware`, `security-vision`, `venue-photos-1080p`) and Eddie's (`venue-splat`) stay theirs.
+- Viktor confirmed that Leo made the supplied [hardware board](https://excalidraw.com/#json=SV8r2zpCNd0WMnaBi5Y17,BXzlynJTGvIPFxko8A9lag) and is still implementing it. Follow that drawing's intended behavior, including its 100 Hz sensor path, free-fall sequence, three helpers, zone hysteresis and SOS precedence. Record differences in fetched firmware as ongoing implementation; do not silently weaken the design. Preserve `diagrams/hardware-source.excalidraw` unchanged.
 - "(TBD -- LEO)" in the System Design docs and "LEO TBD" in devpost.md mark Leo's open parts. List them with `grep -rn "TBD -- LEO" "System Design"` and `grep -n "LEO TBD" devpost.md`. `System Design/README.md` (Legend) says what they cover: the security cameras and the security view, the band's zone pick, exit routing and the medic approach.
 - Viktor's call on 2026-10-25: Leo fixes the camera side, including the `report_camera_sighting` reducer that devpost.md names but the module doesn't have. Exit colors per zone, low visibility guiding every band and SOS above the other ring states are firmware, so they are Leo's too.
 - Eddie's desk now serves band1t.vip/organizer. Viktor's own organizer page is at band1t.vip/portal and at dev.band1t.vip/organizer, which serves all of Viktor's plain pages for testing. The desk has no Live tab, View as, Proposed rules, Venue setup or Kibana tab, and its crowd runs in each browser. Its control panel and `frontend/README.md` use banned words. Tell Viktor rather than editing Eddie's code.
@@ -216,7 +223,7 @@ Names and locations only. Never copy a value into the repo, a commit or a messag
 | VM: `/var/lib/bandit/identities/` | the services' identities on the VM | copied by `scripts/deploy-vm` |
 | Claude project files: `/mnt/project-files/bandit-cloud.env` | the cloud threads' keys (lost at handoff) | `BANDIT_ENV_B64`, `BANDIT_SPACETIME_TOKEN`, `BANDIT_DEPLOY_KEY_B64`, `BANDIT_IDENTITIES_B64`: base64 copies of the Mac's `.env`, owner token and identities, plus a separate deploy key for root@band1t.vip. `deploy/cloud-setup.sh` shows how they were unpacked |
 
-Accounts behind the keys: GitHub `viktorinkov`, SpacetimeDB Maincloud (signed in with GitHub), Elastic Cloud (Kibana link in `LINKS.md`), Bright Data, Capital One Nessie, the Anthropic Console (prepaid credits with auto-reload off), Vultr (server `bandit`), Porkbun (the band1t.vip DNS, account `leopoz`) and Excalidraw (Viktor's UCSB email). The SpacetimeAuth client id is public and is in `LINKS.md`. The Anthropic API key pays for the app's Claude calls. It is separate from Claude Code usage, so the app keeps working after the Claude setup stops, as long as the API credits last.
+Accounts behind the keys: GitHub `viktorinkov`, SpacetimeDB Maincloud (signed in with GitHub), Elastic Cloud (Kibana link in `LINKS.md`), Bright Data, Capital One Nessie, the Anthropic Console (prepaid credits with auto-reload off), Vultr (server `bandit`), Porkbun (the band1t.vip DNS, account `leopoz`) and Excalidraw Plus (GitHub `viktorinkov`, `vikitominchev@gmail.com`; the earlier UCSB account assumption was wrong). The SpacetimeAuth client id is public and is in `LINKS.md`. The Anthropic API key pays for the app's Claude calls. It is separate from Claude Code usage, so the app keeps working after the Claude setup stops, as long as the API credits last.
 
 ## Mac-only steps and blocked paths
 
@@ -269,9 +276,10 @@ Open PRs: #22 (vik-e2e into main, the team's PR), #41 (`vik-cloud-config` into m
 ## Devpost
 
 - The master is `devpost.md` at the root of the Mac checkout. It is uncommitted on purpose and Viktor edits it by hand. Make only targeted edits: read the file right before you write, and change only the sentences in question. Never rewrite or reformat it.
+- Viktor explicitly requested the Simple English skill in Plain mode for future Devpost edits. Preserve sponsor quotations, facts, the agreed fit order, intended features and unrelated prose. Keep implementation status in review notes instead of deleting intended features to match incomplete code.
 - The style guide is `handoff/research/devpost/TERMS.md`: one word for one thing, paragraphs of at most 3 sentences, each example in its own paragraph, each service named as company plus product. Viktor said the Devpost may describe things that are not built yet.
 - The Devpost is written around the best-fit tracks. The research behind that order is in `handoff/research/artifacts/track-fit-and-devpost-reorder.md`.
-- Diagrams use big images and logos, every evidence item on its own card and labeled arrows, with no implementation details such as hashes. Share them only as excalidraw.com links: build the board with `python3 diagrams/generator/gen.py`, upload it with `diagrams/generator/share.py`, and put the link in `LINKS.md` and in devpost.md's "Try it out".
+- Diagrams follow the single guide in `handoff/research/devpost/TERMS.md#diagrams`: large original images/logos, filled parent cards with nested property cells, and arrows between actual process stages. Keep all current diagrams on the canonical Plus board linked in `LINKS.md` and devpost.md; public share links are saved checkpoints. The generator and share script preserve editable source and publication history.
 
 ### Gaps the Devpost reworded instead of fixing, or still states
 

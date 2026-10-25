@@ -1,9 +1,9 @@
-"""BandIt system design in Excalidraw: twenty-three frames stacked top to bottom, the last four drawn by\n../medic-routing/medic.py. Labels follow LABELS.md."""
+"""Band1t system design in Excalidraw: API integrations, feature journeys and engineering details on one board. Labels follow LABELS.md."""
 import json
 import pathlib
 import sys
 
-from lib import GLYPH, ICON, Scene, aspect, wrap
+from lib import GLYPH, ICON, Box, Scene, aspect, wrap
 
 S = Scene()
 GAP = 220
@@ -109,951 +109,1142 @@ SCREENS = "attendee portal\norganizer desk + portal"
 SCREEN_ICONS = {0: PHONE, 1: MONITOR}
 
 
-# ---------------------------------------------------------------- 1. Overview
-def overview(y0):
-    S.begin_frame("1 · Overview", 0, y0, 1000, 600)
-    title("Band1t")
-    A, C1, C2, C3 = 60, 760, 1660, 2420
-    r1, r2, r3, r4 = 250, 800, 1200, 1500
-    bands = B(A, r1, "band\nstation marker", "device", w=400, icons={0: WATCH, 1: RADIO})
-    bridge = B(A, r2, "band1t-bridge\nvenue laptop", "rust", w=400, icons={0: RUST, 1: LAPTOP})
-    screens = B(C1, r1, SCREENS, "web", w=640, icons=SCREEN_ICONS)
-    stdb = SV(C1, r2, STDB, "Maincloud (band1t module)", kind="stdb", w=640)
-    api = B(C1, r3, "bandit-api", "rust", w=420, icons={0: RUST})
-    indexer = B(C2, r3, "bandit-indexer", "rust", w=520, icons={0: RUST})
-    bd = SV(C2, r1, BRIGHT, "Web MCP (scraper)", w=520)
-    ingest = B(C2, 520, "bandit-ingest", "rust", w=520, icons={0: RUST})
-    ee = SV(C2, r2, ELASTIC, "Search + Workflows", w=520)
-    de = B(C2, r4, "bandit-workers\n(Decision Engine)", "rust", w=520, h=2 * BH + 40, icons={0: RUST})
-    claude = B(C3, r4, "Anthropic Claude\n(configured model)", "ext", w=500, icons={0: CLAUDE}, fill=WHITE)
-    nessie = SV(C3, r4 + BH + 40, CAPONE, "Nessie (wallet)", w=500)
-    Z(40, r1 - 70, 440, L(bridge.bottom) + 40 - (r1 - 70), "venue", "device")
-    Z(C1 - 20, r3 - 150, C2 + 520 + 20 - (C1 - 20), L(de.bottom) + 30 - (r3 - 150),
-      "Vultr Cloud Compute", "rust", VULTR)
-    V(bands, bridge, "sends state")
-    H(bridge, stdb, "calls ingest_band")
-    V(stdb, screens, "live rows", x=stdb.x + 160)
-    V(screens, stdb, "reducer calls", x=stdb.right - 160)
-    V(ingest, bd, "fetches pages", both=True)
-    V(ingest, ee, "raw records", x=ingest.x + 100)
-    V(ee, ingest, "event bundle", x=ingest.right - 100)
-    D(ingest, "l", 0.5, stdb, "r", 0.5, "calls import_event")
-    V(stdb, api, "live rows", x=api.right - 70)
-    D(stdb, "r", 0.5, indexer, "l", 0.5, "live rows")
-    V(indexer, ee, "indexes rows")
-    D(stdb, "b", 1 - 50 / stdb.w, de, "l", 0.5, "jobs, results", both=True)
-    R(de, "t", ee, "r", [S.P(C2 + 260, 1420), S.P(2300, 1420), S.P(2300, r2 + BH / 2)],
-      "runs tasks", seg=2, both=True)
-    R(ee, "r", claude, "t", [(claude.cx, ee.cy)], "runs model", seg=1)
-    H(de, nessie, "pays", y=nessie.cy)
-    return S.end_frame()
 
-
-# ---------------------------------------------------------------- 2. Architecture
-def architecture(y0):
-    S.begin_frame("2 · Architecture", 0, y0, 1000, 600)
-    title("Architecture")
-    A, Bc, C, D_, E = 60, 720, 1440, 2380, 3120
-    r0, z, r1, r2, r3 = 210, 450, 520, 720, 920
-    web = B(C, r0, "tap page (/t/code)\norganizer portal (/portal)", "web", w=640, icons=SCREEN_ICONS)
-    auth = SV(D_, r0, STDB, "SpacetimeAuth (sign-in)", w=480)
-    bd = SV(E, r0, BRIGHT, "Web MCP + Unlocker\nBrowser API", w=500, h=180)
-    bands = B(A, r1, "band\nstation marker", "device", w=400, icons={0: WATCH, 1: RADIO})
-    gateway = B(A, r2, "gateway", "device", w=400, icons={0: RADIO})
-    cams = B(A, r3, "security camera\none per zone", "device", w=400, icons={0: CAMERA})
-    bridge = B(Bc, r2, "band1t-bridge", "rust", w=400, icons={0: RUST})
-    secview = B(Bc, r3, "security view", "rust", w=400, icons={0: OPENCV})
-    stdb = SV(C, r1, STDB, "Maincloud (band1t module)", kind="stdb", w=640, h=r3 + 220 - r1)
-    api = B(D_, r2, "bandit-api\nbandit-indexer", "rust", w=460, icons={0: RUST})
-    workers = B(D_, r3, "bandit-workers\nevent importer", "rust", w=460, h=220, icons={0: RUST})
-    ee = SV(E, r1, ELASTIC, "Search + Workflows\nAgent Builder", w=500, h=r3 + 220 - r1)
-    zb = r3 + 220 + 30
-    claude = B(E, zb + 110, "Anthropic Claude\n(configured model)", "ext", w=500, icons={0: CLAUDE}, fill=WHITE)
-    nessie = SV(D_ + 280, zb + 110, CAPONE, "Nessie (wallet)", w=420)
-    Z(40, z, 440, zb - z, "venue", "device")
-    Z(Bc - 20, z, 500, zb - z, "venue laptop", "rust")
-    Z(D_ - 20, z, 500, zb - z, "Vultr Cloud Compute", "rust", VULTR)
-    V(bands, gateway, "radio state", x=bands.x + 90)
-    V(gateway, bands, "commands", x=bands.right - 90)
-    H(gateway, bridge, "USB state", y=bridge.y + 30)
-    H(bridge, gateway, "USB commands", y=bridge.bottom - 30)
-    H(bridge, stdb, "calls ingest_band", y=bridge.y + 30)
-    H(stdb, bridge, "pending commands", y=bridge.bottom - 30)
-    H(cams, secview, "streams video")
-    H(secview, stdb, "reports sighting", y=secview.cy)
-    V(stdb, web, "row changes", x=stdb.x + 160)
-    V(web, stdb, "reducer calls", x=stdb.right - 160)
-    H(auth, web, "signs in")
-    H(stdb, api, "row changes")
-    H(stdb, workers, "open jobs", y=workers.y + 30)
-    H(workers, stdb, "job results + bundle", y=workers.bottom - 30)
-    R(workers, "t", bd, "l",
-      [S.P(workers.x + workers.w * .7, 880), S.P(2960, 880), S.P(2960, L(bd.cy))],
-      label="search + fetch", seg=2, fa=.7, both=True)
-    H(api, ee, "copies, ranks", both=True)
-    H(workers, ee, "model + import tasks", y=workers.y + 30)
-    H(ee, workers, "task results", y=workers.bottom - 30)
-    V(ee, claude, "uses model")
-    V(workers, nessie, "pays")
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- 3. SpacetimeDB live loop
-def spacetimedb(y0):
-    S.begin_frame("3 · SpacetimeDB live loop", 0, y0, 1000, 600)
-    title("SpacetimeDB")
-    r1, r2, r3 = 290, 520, 800
-    bridge = B(60, r1, "band1t-bridge", "rust", w=400, icons={0: RUST})
-    ingest = B(640, r1, "ingest_band", "stdb", w=420)
-    watch = B(1340, r1, "watch_bands\n500 ms", "stdb", w=420)
-    incident = B(2040, r1, "incident", "stdb", w=420)
-    resolve = B(2740, r1, "resolve_incident", "stdb", w=420)
-    organizer = B(3440, 180, "organizer", "web", w=400, icons={0: USER})
-    medic = B(3440, 440, "medic", "web", w=400, icons={0: USER})
-    B(640, r2, "timers\nsweep, social_tick, live_tick\ncrowd_tick, job_reaper", "stdb", w=800, h=150)
-    views = B(2360, r2, "views\nmy_band, my_wallet, claims_board", "stdb", w=800)
-    screens = B(2360, r3, "tap page (/t/code)\norganizer portal (/portal)\nphoto page (/photo)", "web", w=800,
-                h=150, icons={0: PHONE, 1: MONITOR, 2: IMAGE})
-    auth = SV(640, 0, STDB, "SpacetimeAuth (sign-in)", w=480, cy=L(screens.cy))
-    Z(600, 220, 2600, r2 + BH + 40 - 220, "band1t module", "stdb", STDB)
-    H(bridge, ingest, "calls")
-    H(ingest, watch, "writes band")
-    H(watch, incident, "opens incident")
-    H(resolve, incident, "closes incident")
-    D(organizer, "l", 0.5, resolve, "r", 0.25, "resolves")
-    D(medic, "l", 0.5, resolve, "r", 0.75, "resolves")
-    ch = S.oy + (r1 + BH + r2) / 2
-    R(resolve, "b", bridge, "b", [(resolve.cx, ch), (bridge.cx, ch)], label="pending clear command", seg=1)
-    V(views, screens, "pushes rows")
-    H(auth, screens, "signs in")
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- 4. Vision
-def vision(y0):
-    S.begin_frame("4 · Vision", 0, y0, 1000, 600)
-    title("Vision")
-    c1, c2, c3, c4, c5 = 60, 780, 1500, 2200, 2860
-    r0, z, r1, r2 = 180, 100, 490, 800
-    cam = B(c1, r1, "security camera\none per zone", "device", w=440, icons={0: CAMERA})
-    view = B(c2, 0, "security view\nOpenCV · NumPy\n4 Hz red flash", "rust", w=440, h=160,
-             cy=r1 + BH / 2, icons={0: OPENCV, 1: NUMPY})
-    log = B(c2, r0, "radio log\nradio_*.jsonl", "note", w=440, icons={0: RADIO})
-    band = B(c3, r1, "matched band", "device", w=420, icons={0: WATCH})
-    mod = SV(c4, r1, STDB, "report_camera_sighting", kind="stdb", w=460)
-    gateway = B(c1, r0, "gateway\npyserial", "device", w=440, icons={0: RADIO, 1: PYTHON})
-    page = B(c2, r2, "security page\nthree.js", "web", w=440, h=150,
-             icons={0: MONITOR, 1: THREE, 2: SPARK})
-    cy = L(page.cy)
-    brush = B(c3, 0, "Brush\n(Gaussian splat)", "ext", w=420, cy=cy, fill=WHITE)
-    colmap = B(c4, 0, "COLMAP\n(poses)", "ext", w=360, cy=cy, icons={0: COLMAP}, fill=WHITE)
-    walk = B(c5, 0, "phone walk", "web", w=460, cy=cy, icons={0: WALK})
-    Z(c2 - 20, z, c3 + 420 + 20 - (c2 - 20), r1 + BH + 70 - z, "venue laptop", "rust", PYTHON)
-    Z(c2 - 20, r2 - 70, c5 + 460 + 20 - (c2 - 20), L(page.bottom) + 30 - (r2 - 70), "3D venue", "plain")
-    H(gateway, log, "writes beacons")
-    V(log, view, "SOS flags")
-    H(cam, view, "streams video")
-    H(view, band, "matches SOS")
-    H(band, mod, "reports sighting")
-    V(view, page, "serves page")
-    H(walk, colmap, "picks frames")
-    H(colmap, brush, "places frames")
-    H(brush, page, "exports splat")
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- 5. Event data pipeline
-def pipeline(y0):
-    S.begin_frame("06 · Event data", 0, y0, 2980, 2170)
-    x0, x1, x2, x3 = 80, 760, 1480, 2300
-
-    organizer = B(x0, 220, "organizer\nconfigured event sources", "web", w=480, h=240,
-                  wordmark=USER, mark_h=90)
-    queue = SV(x1, 220, STDB, "event_import job", kind="stdb", w=520, h=240)
-    importer = B(x2, 220, "server worker\nevent importer", "rust", w=600, h=240,
-                 wordmark=RUST, mark_h=90)
-    fetched = SV(x3, 220, BRIGHT, "Web MCP\npages + datasets", w=560, h=240)
-    organized = SV(x3, 670, ELASTIC, "Workflows + Agent Builder\nES|QL exact joins\norganizes source records", w=560, h=280)
-    imported = SV(x2, 670, STDB, "validated event rows\npeople · booths · schedule\none transaction", kind="stdb", w=600, h=280)
-    live = B(x1, 670, "live event views", "web", w=520, h=280,
-             wordmark=MONITOR, mark_h=90)
-    Z(40, 80, 2900, 950, "event import", "rust")
-
-    H(organizer, queue, "start import")
-    H(queue, importer, "live job")
-    H(importer, fetched, "fetch records", y=importer.y + 65)
-    H(fetched, importer, "returns records", y=importer.bottom - 65)
-    D(importer, "r", .85, organized, "l", .35, "organize + return", both=True)
-    V(importer, imported, "save event bundle", x=importer.x + 180)
-    H(imported, live, "live rows")
-
-    requester = B(x0, 1300, "organizer\nevent name", "web", w=480, h=240,
-                  wordmark=USER, mark_h=90)
-    setup = SV(x1, 1300, STDB, "venue_setup job", kind="stdb", w=520, h=240)
-    worker = B(x2, 1300, "server worker\nvenue setup", "rust", w=600, h=240,
-               wordmark=RUST, mark_h=90)
-    browser = SV(x3, 1300, BRIGHT, "Web MCP · search\nUnlocker API · pages\nBrowser API · 3D model", w=560, h=240)
-    select = SV(x3, 1750, ELASTIC, "venue_find + venue_map\nselect known URLs", w=560, h=280)
-    result = SV(x2, 1750, STDB, "venue_setup result\nmodel + source links", kind="stdb", w=600, h=280)
-    choice = B(x1, 1750, "organizer\nselects ready venue", "web", w=520, h=280,
-               wordmark=USER, mark_h=90)
-    chosen = SV(x0, 1750, STDB, "chosen_venue\nportal display", kind="stdb", w=480, h=280)
-    Z(40, 1160, 2900, 950, "venue model", "rust")
-
-    H(requester, setup, "start setup")
-    H(setup, worker, "live job")
-    H(worker, browser, "search + capture", y=worker.y + 65)
-    H(browser, worker, "returns results", y=worker.bottom - 65)
-    D(worker, "r", .85, select, "l", .35, "select + return", both=True)
-    V(worker, result, "save venue model", x=worker.x + 180)
-    H(result, choice, "ready result")
-    H(choice, chosen, "choose venue")
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- 6. The Evidence Engine
-def evidence(y0):
-    S.begin_frame("7 · Evidence Engine", 0, y0, 3680, 1800)
-    title("Evidence Engine")
-    x = [80, 820, 1560, 2300, 3040]
-    w = 560
-    r1, r2 = 240, 740
-    policies = B(x[0], r1, "policy PDFs\nvenue + attendee health", "note", w=w, h=240, icons={0: FILE})
-    pages = SV(x[1], r1, ELASTIC, "bandit-documents\nindexed PDF pages", w=w, h=240)
-    reader = SV(x[2], r1, ELASTIC, "bandit-read-document\nquotes + page numbers", w=w, h=240)
-    checked = B(x[3], r1, "bandit-workers\nchecks each quote", "rust", w=w, h=240, icons={0: RUST})
-    clauses = SV(x[4], r1, ELASTIC, "bandit-policy-clauses\nvalidated clauses", w=w, h=240)
-    claim = B(x[0], r2, "de-identified claim\ncodes, facts, amounts", "note", w=w, h=260, icons={0: FILE})
-    validation = SV(x[1], r2, ELASTIC, "bandit-claims-validate\nbandit-claims\nPainless checks", w=w, h=260)
-    search = SV(x[2], r2, ELASTIC, "hybrid search + rerank\nup to 5 clauses\nvenue + injury health plan", w=w, h=260)
-    checks = SV(x[3], r2, STDB, "submit_claim_checks\nvalidation + citations", kind="stdb", w=w, h=260)
-    decision = B(x[4], r2, "Decision Engine\nevidence + quoted clauses", "rust", w=w, h=260, icons={0: SHIELD})
-    Z(40, 170, 3600, 1110, "Policy evidence", "ext")
-    H(policies, pages, "indexes pages")
-    H(pages, reader, "reads pages")
-    H(reader, checked, "returns quotes")
-    H(checked, clauses, "indexes clauses")
-    H(claim, validation, "validates fields")
-    H(validation, search, "queries narrative")
-    R(clauses, "b", search, "t",
-      [(clauses.cx, S.oy + 590), (search.cx, S.oy + 590)],
-      label="filters policies", seg=1)
-    H(search, checks, "returns clauses")
-    R(validation, "b", checks, "b",
-      [(validation.cx, S.oy + 1140), (checks.cx, S.oy + 1140)],
-      label="adds validation", seg=1)
-    H(checks, decision, "informs decision")
-    r3 = 1420
-    visits = B(x[0], r3, "visit + booth rows\ntop 5 spots by minutes\nbooths + whole zones", "stdb", w=w, h=240, icons={0: WALK})
-    indexer = B(x[1], r3, "bandit-indexer\nfindable attendees", "rust", w=w, h=240, icons={0: RUST})
-    people = SV(x[2], r3, ELASTIC, "bandit-people\nbandit-booths\nsemantic_text", w=w, h=240)
-    api = B(x[3], r3, "bandit-api\nhybrid search + rerank\neligible IDs only", "rust", w=w, h=240, icons={0: RUST})
-    recap = B(x[4], r3, "recap\ndev.band1t.vip/t/code\nranked people + booths", "web", w=w, h=240, icons={0: PHONE})
-    Z(40, 1320, 3600, 430, "Interests and discovery", "ext")
-    H(visits, indexer, "builds interests")
-    H(indexer, people, "indexes text")
-    H(people, api, "ranks candidates")
-    H(api, recap, "orders suggestions")
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- 7. The insurance Decision Engine
-def badge(box, n):
-    """A numbered stage marker on the top left corner of a box."""
-    d = 64
-    rid, tid = S.uid("bg"), S.uid("bt")
-    S.base("ellipse", box.x - 26, box.y - 26, d, d, id=rid, backgroundColor="#1e1e1e", strokeColor="#1e1e1e",
-           boundElements=[{"type": "text", "id": tid}])
-    s = str(n)
-    tw, th = len(s) * 32 * 0.64 + 4, 32 * 1.25
-    S.base("text", box.x - 26 + (d - tw) / 2, box.y - 26 + (d - th) / 2, tw, th, id=tid, strokeColor=WHITE, text=s,
-           originalText=s, fontSize=32, fontFamily=5, textAlign="center", verticalAlign="middle", containerId=rid,
-           autoResize=True, lineHeight=1.25)
-
-
-def insurance(y0):
-    S.begin_frame("08 · Decision Engine", 0, y0, 2400, 1620)
-
-    # Scope and one decision path; evidence mechanics are in frame 07,
-    # payment operations in frame 13.
-    injury = B(36, 120, "attendee injury\nvenue + health plan", "device", w=408, h=240,
-               wordmark=HEART, mark_h=96, fill=WHITE)
-    property_ = B(36, 450, "venue property\ndamage / theft\nvenue policy", "device", w=408, h=240,
-                  wordmark=HAMMER, mark_h=96, fill=WHITE)
-    agent = SV(624, 264, ELASTIC, "Agent Builder\n(investigation)\ncompares evidence\nrequests clause search\ncompares + cites", w=444, h=312)
-    guard = SV(1224, 264, STDB, "code guards\ncoverage + amounts\napproved rule ceiling\nrefusal needs failed check", kind="stdb", w=444, h=312)
-    settlement = B(1818, 264, "settlement\ninjury payout\nproperty booking\nledger entries", "good", w=444, h=312,
-                   wordmark=WALLET, mark_h=96)
-
-    D(injury, "r", 0.5, agent, "l", 0.25, "injury evidence")
-    D(property_, "r", 0.5, agent, "l", 0.75, "loss evidence")
-    H(agent, guard, "recommends")
-    H(guard, settlement, "within rule")
-
-    formula = B(36, 774,
-                "Policy amounts (code)\n"
-                "eligible bill = capped service lines\n"
-                "medical basis = eligible bill after plan share\n"
-                "property basis = logged repair / replacement\n"
-                "payout = min(basis, per-claim, remaining cover)\n"
-                "recovery = max(payout − deductible, 0)\n"
-                "deductible changes recovery, not payout",
-                "rust", w=1032, h=360)
-    refused = B(1224, 774, "refused\nreason shown", "bad", w=444, h=312,
-                wordmark=SHIELD, mark_h=96)
-    review = B(1818, 774, "organizer\ncase-by-case decision\npolicy gap / mismatch:\nnever teaches a rule", "web", w=444, h=312,
-               wordmark=USER, mark_h=96, fill=WHITE)
-    R(formula, "t", guard, "l", [(formula.cx, S.oy + 726), (S.ox + 1140, S.oy + 726),
-                                (S.ox + 1140, guard.y + 234)], label="code amounts", seg=1, fb=0.75)
-    V(guard, refused, "checked refusal")
-    D(guard, "r", 0.8, review, "l", 0.2, "needs review")
-    V(review, settlement, "approves")
-    H(review, refused, "refuses")
-
-    # The learning loop is deliberately prominent and separate from coverage.
-    # Only simple organizer approvals become reusable payment authority.
-    precedents = B(36, 1308, "3 alike approvals\nsimple claims\nsame kind + cover", "note", w=444, h=264,
-                   wordmark=FILE, mark_h=96)
-    proposal = SV(624, 1308, ELASTIC, "Agent Builder\n(rule proposer)\nES|QL precedents\nhighest payout ceiling", w=444, h=264)
-    approval = B(1224, 1308, "organizer\napproves the rule\nchecks its ceiling", "web", w=444, h=264,
-                 wordmark=USER, mark_h=96, fill=WHITE)
-    rule = SV(1818, 1308, STDB, "approved rule\nfuture matching claims\ninside policy + ceiling", kind="good", w=444, h=264)
-    R(review, "b", precedents, "t", [(review.cx, S.oy + 1194), (precedents.cx, S.oy + 1194)],
-      label="simple approvals", seg=1)
-    H(precedents, proposal, "finds pattern")
-    H(proposal, approval, "proposed rule")
-    H(approval, rule, "grants authority")
-    R(rule, "r", guard, "t", [(S.ox + 2358, rule.cy), (S.ox + 2358, S.oy + 60),
-                               (guard.cx, S.oy + 60)], label="future claims", seg=2)
-    return S.end_frame()
-
-
-# ---------------------------------------------------------------- Queues
-CLAUDE_JOBS = [  # job kind, result reducer, what Claude does
-    ("medical_extract", "apply_medical_extract", "reads medical history"),
-    ("clinic_report", "file_clinic_report", "writes hospital report"),
-    ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
-    ("claim_draft", "attach_claim_letters", "drafts letters"),
-    ("recovery_letter", "attach_recovery_letter", "drafts letter"),
-    ("merch_picks", "submit_merch_picks", "picks merch"),
-    ("photo_features", "submit_photo_features", "counts people"),
-]
-JOB_KINDS = [  # every job kind in the code, by the outside service its worker calls
-    ("Anthropic Claude API", "ext", CLAUDE, "asks", [k for k, _, _ in CLAUDE_JOBS]),
-    ("(Evidence Engine)", "ext", ELASTIC, "reads, checks, counts", ["claim_verify", "document_read", "rule_proposal"]),
-    ("Web MCP (scraper)", "ext", BRIGHT, "scrapes", ["venue_setup", "plan_lookup", "venue_policy_lookup"]),
-    ("Nessie (wallet)", "ext", CAPONE, "pays", ["wallet_open", "merch_purchase", "charge_payment", "claim_payout"]),
-]
-KIND_W, KIND_H, KIND_STEP = 460, 96, 30  # one job kind box, and the gap between boxes
-
-
-def queues(y0):
-    """One shared work lifecycle; the task catalogue belongs in the design docs."""
-    S.begin_frame("Queues", 0, y0, 2240, 600)
-    title("Queues")
-
-    producer = SV(60, 280, STDB, "feature reducers", "stdb", w=420, h=220)
-    queued = SV(760, 200, STDB, "job · worker_jobs\n60 s lease\ndocuments + photos\nclaims + rules\nletters + merch\nevent + policies\nwallet actions", "stdb", w=600, h=380)
-    worker = B(1710, 280, "bandit-workers\nchecks responses", "rust", w=450, h=220,
-               wordmark=RUST, mark_h=75)
-    H(producer, queued, "queues job")
-    H(worker, queued, "claim_job", y=S.oy + 320)
-    H(queued, worker, "live job rows", y=S.oy + 420)
-    R(worker, "t", queued, "t", [S.P(1935, 100), S.P(1120, 100)],
-      "fail_job", seg=1, fb=0.6)
-
-    # The scheduled reducer and a reported failure share the same retry policy.
-    timer = SV(60, 720, STDB, "job_reaper\nexpired leases", "stdb", w=420, h=210)
-    retry = B(760, 720, "retry delay\n5 s × attempt\nDead after 3 attempts", "stdb", w=600, h=210)
-    H(timer, retry, "checks every 10 s")
-    V(queued, retry, "failed attempt", x=S.ox + 930)
-    V(retry, queued, "requeues", x=S.ox + 1210)
-
-    # A service group shows the worker boundary, with no provider-to-provider call.
-    external = Z(1590, 700, 610, 620, "External execution", "ext")
-    SV(1630, 780, ELASTIC, "Workflows\nai.prompt · text tasks\nai.agent → Agent Builder\n(decisions + reading)", w=530, h=245)
-    SV(1630, 1080, BRIGHT, "Web MCP\nUnlocker API\nBrowser API", w=295, h=190)
-    SV(1960, 1080, CAPONE, "Nessie API", w=200, h=190)
-    V(worker, external, "calls", x=S.ox + 1810)
-    V(external, worker, "returns", x=S.ox + 2070)
-
-    result = SV(760, 1040, STDB, "result reducer\nchecks lease\napplies + completes", "stdb", w=600, h=250)
-    views = B(60, 1040, "live views", "web", w=420, h=250,
-              wordmark=MONITOR, mark_h=75)
-    R(worker, "l", result, "r", [S.P(1490, 456), S.P(1490, 1165)],
-      "submits result", seg=1, fa=0.8)
-    H(result, views, "streams rows")
-
-    # Review decisions are explicit actions; model output cannot approve them.
-    Z(40, 1390, 2160, 290, "Human approval", "plain")
-    pending = B(70, 1480, "claims · rules\ncharges", "stdb", w=470, h=150)
-    organizer = B(800, 1480, "organizer", "web", w=420, h=150,
-                  wordmark=USER, mark_h=64)
-    approval = B(1560, 1480, "approve_claim\napprove_rule_proposal\napprove_charge", "stdb", w=600, h=150)
-    H(pending, organizer, "shows for review")
-    H(organizer, approval, "approves")
-    R(result, "b", pending, "t", [S.P(1060, 1350), S.P(305, 1350)],
-      "claim + rule review", seg=1)
-    return S.end_frame()
-
-
-def claude_jobs(y0):
-    S.begin_frame("09 · Elastic workflows", 0, y0, 1000, 600)
-    title("Elastic workflows")
-
-    caller = B(100, 180, "bandit-workers\ntask + answer schema", "rust", w=650, h=260,
-               icons={0: RUST})
-    provider = SV(1350, 150, ELASTIC, "Workflows + Agent Builder", w=700, h=320)
-    model = B(2720, 200, "Claude\n(model)", "ext", w=600, h=220,
-              icons={0: CLAUDE}, fill=WHITE)
-    H(caller, provider, "starts execution")
-    H(provider, model, "calls model", y=model.y + 55)
-    H(model, provider, "returns answer", y=model.bottom - 55)
-
-    xs = [80, 960, 1840, 2720]
-    top, lower = 770, 1330
-    prompt = B(xs[0], top, "ai.prompt\nform fields, merch, letters", "ext", w=680, h=320,
-               icons={0: FILE}, fill=WHITE)
-    evidence = B(xs[1], top, "ai.agent\npolicy clauses\nrule proposals", "ext", w=680, h=320,
-                 icons={0: SEARCH}, fill=WHITE)
-    investigator = B(xs[2], top, "ai.agent\nclaim investigation", "ext", w=680, h=320,
-                     icons={0: SHIELD}, fill=WHITE)
-    reader = B(xs[3], top, "ai.agent\nphoto count + caption\nmedical page text", "ext", w=680, h=320,
-               icons={0: IMAGE}, fill=WHITE)
-
-    answer = B(xs[0], lower, "structured answer\nfixed JSON schema", "web", w=680, h=280)
-    records = B(xs[1], lower, "document pages\napproved claim history", "ext", w=680, h=280,
-                icons={0: FILE})
-    scoped = B(xs[2], lower, "claim-scoped tools\nread_evidence · read_checks\nsearch_policy · read_clause", "rust",
-               w=680, h=280, icons={0: RUST})
-    pixels = B(xs[3], lower, "photo / scanned page\ntemporary attachment", "web", w=680, h=280,
-               icons={0: IMAGE})
-    checked = B(1250, 1980, "bandit-workers\nvalidates + submits\nexecution, model, usage\nclaim evidence steps", "rust",
-                w=1050, h=280, icons={0: RUST})
-
-    for fraction, mode in zip((0.12, 0.37, 0.63, 0.88), (prompt, evidence, investigator, reader)):
-        D(provider, "b", fraction, mode, "t", 0.5, "runs")
-    V(prompt, answer, "fills schema")
-    V(records, evidence, "grounds answer")
-    D(investigator, "b", 0.25, scoped, "t", 0.25, "requests read")
-    D(scoped, "t", 0.75, investigator, "b", 0.75, "returns evidence")
-    V(pixels, reader, "supplies image")
-
-    R(answer, "b", checked, "l", [(answer.cx, checked.cy)], label="checks fields", seg=1)
-    R(evidence, "r", checked, "t", [(S.ox + 1730, evidence.y + evidence.h * 0.8),
-                                      (S.ox + 1730, S.oy + 1770),
-                                      (checked.x + checked.w * 0.15, S.oy + 1770)],
-      label="returns citations", seg=2, fa=0.8, fb=0.15)
-    R(investigator, "r", checked, "t", [(S.ox + 2620, investigator.y + investigator.h * 0.8),
-                                         (S.ox + 2620, S.oy + 1860),
-                                         (checked.x + checked.w * 0.75, S.oy + 1860)],
-      label="recommends decision", seg=2, fa=0.8, fb=0.75)
-    R(reader, "r", checked, "r", [(S.ox + 3530, reader.y + reader.h * 0.8),
-                                   (S.ox + 3530, checked.cy)],
-      label="returns fields", seg=2, fa=0.8)
-    return S.end_frame()
 
 
 USERS, CLOCK, PIN, STORE, SPARKLES, BUILDING, TIMER, HANDS, SEARCH = (logo(f"icon-{n}.svg") for n in (
-    "users", "clock", "map-pin", "store", "sparkles", "building-2", "timer", "handshake", "search-check"))
+    "users", "clock", "map-pin", "store", "sparkles", "building", "timer", "hand", "search"))
+HERE = LOGOS.parent / "medic-routing"
 
 
-def card(x, cy, label, kind, icon, w, h, mh=80, **kw):
-    """A big card: its picture on top, the name and the rule under it."""
-    return B(x, 0, label, kind, w=w, h=h, wordmark=icon, mark_h=mh, cy=cy, **kw)
+def picture(x, y, path, w):
+    """A standalone floor drawing with a thin border."""
+    h = w / aspect(path)
+    el = S.image(S.ox + x, S.oy + y, path, h)
+    S.base("rectangle", S.ox + x, S.oy + y, w, h, strokeColor="#868e96", strokeWidth=2, roughness=0)
+    return Box(el)
 
 
-def logo_row(icons, h, step):
-    """Turn the card just drawn's centred picture into a row: extra pictures left and right of it."""
-    mark = S.elements[-1]
-    for i, icon in icons:
-        S.image(mark["x"] + i * step + (mark["width"] - h * aspect(icon)) / 2, mark["y"], icon, h)
+
+def card(x, y, label, icon, kind="web", w=520, h=240):
+    return B(x, y, label, kind, w=w, h=h, wordmark=icon, mark_h=120, fill=WHITE)
 
 
-def socials_card(x, cy, label, w, h=220):
-    box = card(x, cy, label, "stdb", SOCIALS[1], w, h, 60)
-    logo_row(((-1, SOCIALS[0]), (1, SOCIALS[2])), 60, 90)
+
+def architecture(y0):
+    S.begin_frame("Architecture", 0, y0, 4260, 1880)
+    bands = B(60, 730, "radio devices", "device", w=500, h=260, icons={0: WATCH, 1: RADIO})
+    cameras = B(60, 1260, "security cameras", "device", w=500, h=260, wordmark=CAMERA, mark_h=110)
+    bridge = B(800, 730, "radio bridge", "rust", w=540, h=260, icons={0: RADIO, 1: RUST})
+    vision = B(800, 1260, "security view", "rust", w=540, h=260, wordmark=OPENCV, mark_h=110)
+    browser = B(1610, 160, "web clients", "web", w=680, h=260, icons={0: PHONE, 1: MONITOR})
+    module = SV(1610, 730, STDB, "Maincloud module", kind="stdb", w=680, h=790)
+    caddy = B(2610, 160, "Caddy", "ext", w=600, h=260, wordmark=CADDY, mark_h=100)
+    api = B(2610, 730, "bandit-api", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    workers = B(2610, 1130, "bandit-workers", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    indexer = B(2610, 1530, "bandit-indexer", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    bright = SV(3580, 160, BRIGHT, "source acquisition", w=600, h=260)
+    elastic = SV(3580, 730, ELASTIC, "Evidence Engine", w=600, h=660)
+    wallet = SV(3580, 1530, CAPONE, "Nessie wallet", w=600, h=260)
+    Z(20, 590, 580, 1030, "venue", "device")
+    Z(760, 590, 620, 1030, "venue laptop", "rust", LAPTOP)
+    Z(2570, 50, 680, 1780, "Vultr Cloud Compute", "plain", VULTR)
+    H(bands, bridge, "radio → USB", y=bands.y + 80)
+    H(bridge, bands, "band commands", y=bands.bottom - 70)
+    H(cameras, vision, "video")
+    H(bridge, module, "band reports", y=bridge.y + 70)
+    H(module, bridge, "pending commands", y=bridge.bottom - 70)
+    H(vision, module, "camera sightings")
+    V(browser, module, "reducer calls", x=browser.x + 160)
+    V(module, browser, "live rows", x=browser.right - 160)
+    H(browser, caddy, "HTTPS", both=True)
+    V(caddy, api, "API requests")
+    H(module, api, "event rows")
+    H(module, workers, "jobs", y=workers.y + 70)
+    H(workers, module, "checked results", y=workers.bottom - 70)
+    D(module, "b", .7, indexer, "l", .5, "event rows")
+    H(api, elastic, "search + rerank", both=True, y=api.cy)
+    H(workers, elastic, "tasks + evidence", both=True, y=workers.cy)
+    D(indexer, "r", .5, elastic, "b", .5, "indexes rows")
+    R(workers, "r", bright, "l", [(S.ox + 3400, workers.y + 45), (S.ox + 3400, bright.cy)],
+      label="fetch sources", seg=1, fa=.17, both=True)
+    R(workers, "r", wallet, "r", [(S.ox + 3420, workers.y + workers.h*.85),
+      (S.ox + 3420, S.oy + 1440), (S.ox + 3620, S.oy + 1440),
+      (S.ox + 4220, S.oy + 1440), (S.ox + 4220, wallet.cy)],
+      label="wallet operations", seg=2, fa=.85, both=True)
+    return S.end_frame()
+
+
+def spacetimedb(y0):
+    S.begin_frame("SpacetimeDB", 0, y0, 3670, 1940)
+    call = B(60, 170, "SDK reducer call", "web", w=720, h=300, wordmark=TS, mark_h=100)
+    reducer = B(990, 170, "Rust reducer", "rust", w=720, h=300, wordmark=RUST, mark_h=100)
+    commit = SV(1920, 170, STDB, "atomic commit", kind="stdb", w=720, h=300)
+    query = B(2850, 170, "SQL subscription", "web", w=720, h=300, wordmark=MONITOR, mark_h=100)
+    H(call, reducer, "invokes")
+    H(reducer, commit, "writes together")
+    H(query, commit, "selects rows")
+    audiences = [
+      (60, 660, "attendee", "my_band", "identity filter", PHONE, "web"),
+      (990, 660, "medic", "medic_medical_cards", "granted reader", HEART, "web"),
+      (1920, 660, "staff desk", "claims_board", "staff role", MONITOR, "web"),
+      (2850, 660, "API + indexer", "social_visits", "service role", RUST, "rust"),
+      (60, 1260, "workers", "worker_jobs", "worker role", RUST, "rust"),
+      (990, 1260, "shared graph", "event_graph", "public projection", GRAPH3D, "web"),
+      (1920, 1260, "radio bridge", "pending command rows", "client query", RADIO, "rust"),
+      (2850, 1260, "public venue tables", "floor rows", "client-selected rows", GRAPH3D, "web"),
+    ]
+    feeds = Z(20, 570, 3590, 1310, "subscription results", "stdb")
+    for x, y, who, view_name, scope, art, kind in audiences:
+        first = len(S.elements)
+        parent = Z(x, y, 720, 520, who, kind, art)
+        parent.el.update(backgroundColor="#e9edf2" if kind == "rust" else "#d0ebff", strokeColor="#b5bfca")
+        parent.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        for dy, label in ((220, view_name), (360, scope)):
+            cell = B(x + 40, y + dy, label, "stdb", w=640, h=100)
+            cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+            cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    S.link(commit, "b", feeds, "t", fa=.5, fb=(commit.cx-feeds.x)/feeds.w,
+           label="pushes committed changes", fs=AFS)
+    return S.end_frame()
+
+
+def jobs(y0):
+    S.begin_frame("Jobs", 0, y0, 3050, 1540)
+    action = B(60, 180, "feature action", "web", w=560, h=260, wordmark=USER, mark_h=100)
+    queue = SV(840, 180, STDB, "queued job", kind="stdb", w=560, h=260)
+    worker = B(1620, 180, "server worker", "rust", w=560, h=260, wordmark=RUST, mark_h=100)
+    lease = B(2400, 180, "live lease", "stdb", w=560, h=260, wordmark=CLOCK, mark_h=100)
+    services = B(2400, 760, "external API call", "ext", w=560, h=280, icons={0: ELASTIC, 1: BRIGHT, 2: CAPONE})
+    check = B(1620, 760, "validate response", "rust", w=560, h=280, wordmark=SHIELD, mark_h=100)
+    result = SV(840, 760, STDB, "result reducer", kind="stdb", w=560, h=280)
+    clients = B(60, 760, "updated feature view", "web", w=560, h=280, wordmark=MONITOR, mark_h=100)
+    retry = B(2400, 1270, "retry policy", "note", w=560, h=200, wordmark=CLOCK, mark_h=80)
+    H(action, queue, "queues work")
+    H(queue, worker, "live job row")
+    H(worker, lease, "claims job")
+    V(lease, services, "must be current", x=lease.right - 110)
+    D(worker, "r", .8, services, "l", .3, "calls API")
+    H(services, check, "returns data")
+    H(check, result, "submits result")
+    H(result, clients, "pushes rows")
+    R(lease, "b", result, "r", [(lease.x + 90, S.oy + 520), (result.right + 100, S.oy + 520), (result.right + 100, result.y + 75)],
+      label="checked again", seg=1, fa=90/lease.w, fb=.27)
+    V(services, retry, "error or timeout")
+    R(retry, "b", queue, "b", [(retry.cx, S.oy + 1510), (S.ox + 20, S.oy + 1510),
+      (S.ox + 20, S.oy + 540), (queue.cx, S.oy + 540)],
+      label="eligible retry", seg=1)
+    return S.end_frame()
+
+
+def prepare_event(y0):
+    S.begin_frame("Prepare the event", 0, y0, 3560, 1700)
+    event = B(60, 180, "configured event", "web", w=540, h=260, wordmark=USER, mark_h=100)
+    start = SV(800, 180, STDB, "start_event_import", kind="stdb", w=660, h=260)
+    worker = B(1660, 180, "server importer", "rust", w=660, h=260, wordmark=RUST, mark_h=100)
+    sources = SV(2520, 180, BRIGHT, "source acquisition", w=900, h=260)
+    organize = SV(2520, 650, ELASTIC, "Evidence Engine", w=900, h=260)
+    bundle = B(1660, 650, "worker validation", "rust", w=660, h=260, wordmark=SHIELD, mark_h=100)
+    finish = SV(800, 650, STDB, "finish_event_import", kind="stdb", w=660, h=260)
+    ready = B(60, 650, "event ready", "good", w=540, h=260, wordmark=MONITOR, mark_h=100)
+    H(event, start, "organizer starts")
+    H(start, worker, "queues import")
+    H(worker, sources, "fetch records", y=worker.y + 70)
+    H(sources, worker, "source evidence", y=worker.bottom - 70)
+    R(worker, "b", organize, "l", [(worker.cx, S.oy + 550), (S.ox + 2450, S.oy + 550), (S.ox + 2450, organize.y + organize.h*.2)],
+      label="asks to organize", seg=1, fb=.2)
+    H(organize, bundle, "candidate records", y=organize.bottom - 65)
+    H(bundle, finish, "validated bundle")
+    H(finish, ready, "atomic import")
+    lookup = B(60, 1230, "event name", "web", w=540, h=260, wordmark=USER, mark_h=100)
+    setup = SV(800, 1230, STDB, "start_venue_setup", kind="stdb", w=660, h=260)
+    discover = B(1660, 1230, "venue discovery", "rust", w=660, h=260, icons={0: BRIGHT, 1: ELASTIC})
+    choose = B(2520, 1230, "choose returned venue", "web", w=900, h=260, wordmark=MONITOR, mark_h=100)
+    Z(20, 1090, 3440, 500, "venue selection", "web")
+    H(lookup, setup, "organizer starts")
+    H(setup, discover, "queues lookup")
+    H(discover, choose, "model + source links")
+    return S.end_frame()
+
+
+
+
+def respond_incident(y0):
+    S.begin_frame("Respond to an incident", 0, y0, 3440, 1820)
+    band = B(60, 200, "SOS or fall flags", "device", w=560, h=240, wordmark=WATCH, mark_h=100)
+    telemetry = B(820, 200, "hardware telemetry", "rust", w=560, h=240, icons={0: RADIO, 1: RUST})
+    incident = SV(1580, 200, STDB, "incident transaction", kind="stdb", w=560, h=240)
+    desk = B(2340, 200, "incident on desk", "web", w=560, h=240, wordmark=MONITOR, mark_h=100)
+    assign = B(2340, 720, "medic takes incident", "stdb", w=560, h=240, wordmark=HEART, mark_h=100)
+    medic = B(1580, 720, "assigned medic", "web", w=560, h=240, wordmark=USER, mark_h=100)
+    route = B(820, 720, "route display", "web", w=560, h=240, wordmark=WALK, mark_h=100)
+    attendee = B(60, 720, "attendee", "web", w=560, h=240, wordmark=HEART, mark_h=100)
+    tap = B(60, 1240, "tap band", "web", w=560, h=240, wordmark=NFC, mark_h=100)
+    grant = B(820, 1240, "medical-card grant", "stdb", w=560, h=240, wordmark=SHIELD, mark_h=100)
+    card = B(1580, 1240, "medical card", "web", w=560, h=240, wordmark=FILE, mark_h=100)
+    resolve = B(2340, 1240, "resolve incident", "stdb", w=560, h=240, wordmark=HEART, mark_h=100)
+    H(band, telemetry, "reports state")
+    H(telemetry, incident, "ingest + watch")
+    H(incident, desk, "live rows")
+    V(desk, assign, "Take it")
+    H(assign, medic, "assigns")
+    H(medic, route, "opens route")
+    H(route, attendee, "medic walks")
+    V(attendee, tap, "medic taps")
+    H(tap, grant, "requests access")
+    H(grant, card, "granted view")
+    H(card, resolve, "medic resolves")
+    R(resolve, "b", telemetry, "t", [(resolve.cx, S.oy + 1680), (S.ox + 3320, S.oy + 1680),
+      (S.ox + 3320, S.oy + 80), (telemetry.cx, S.oy + 80)], label="clear command", seg=2)
+    return S.end_frame()
+
+
+def routes_space(y0):
+    import math
+    from lib import Box
+    S.begin_frame("Routes and clear space", 0, y0, 3500, 2330)
+    floor = B(60, 180, "floor geometry", "note", w=620, h=220, wordmark=GRAPH3D, mark_h=100)
+    marker = B(880, 180, "incident location", "stdb", w=620, h=220, wordmark=PIN, mark_h=100)
+    entry = B(880, 620, "nearest door", "rust", w=620, h=220, wordmark=PIN, mark_h=100)
+    clear = B(60, 620, "clear aisle?", "rust", w=620, h=220, shape="diamond")
+    direct = B(880, 1060, "straight route", "web", w=620, h=220, wordmark=WALK, mark_h=100)
+    astar = B(60, 1060, "A* detour", "rust", w=620, h=220, wordmark=WALK, mark_h=100)
+    p = LOGOS.parent / "medic-routing/floor-paths.png"
+    ph = 1160 / aspect(p)
+    picture = Box(S.image(S.ox + 60, S.oy + 1530, p, ph))
+    V(floor, clear, "walkable cells")
+    V(marker, entry, "selects entry")
+    H(entry, clear, "checks route")
+    V(clear, astar, "blocked")
+    D(clear, "r", .7, direct, "l", .3, "clear")
+    D(direct, "b", .5, picture, "t", .75, "draws route")
+    D(astar, "b", .5, picture, "t", .25, "draws detour")
+    Z(20, 70, 1520, 2230, "medic route display", "web")
+
+    center_x, center_y, scale = 2530, 900, 90
+    def ring(x, y, r, stroke, fill="transparent", dashed=False):
+        return S.base("ellipse", S.ox+x-r, S.oy+y-r, 2*r, 2*r,
+                      strokeColor=stroke, backgroundColor=fill, roughness=0,
+                      strokeStyle="dashed" if dashed else "solid", strokeWidth=3)
+    ring(center_x, center_y, 4.2*scale, "#1971c2", "#e7f5ff")
+    ring(center_x, center_y, 3*scale, "#1971c2", dashed=True)
+    ring(center_x, center_y, 44, "#c92a2a", "#ff8787")
+    for k in range(8):
+        a=math.radians(k*45+20); r=(1.2+.18*(k%4))*scale
+        p0=(center_x+r*math.cos(a),center_y+r*math.sin(a))
+        p1=(center_x+4.2*scale*math.cos(a),center_y+4.2*scale*math.sin(a))
+        ring(*p0,18,"#868e96","#dee2e6",True);ring(*p1,22,"#1864ab","#4dabf7")
+        S.arrow(None,None,[(S.ox+p0[0],S.oy+p0[1]),(S.ox+p1[0],S.oy+p1[1])],color="#1864ab")
+    tick = B(1820, 180, "crowd_tick", "stdb", w=620, h=220, wordmark=CLOCK, mark_h=100)
+    down = B(2640, 180, "incident position", "stdb", w=620, h=220, wordmark=HEART, mark_h=100)
+    near = B(1820, 1530, "within 3 metres", "stdb", w=620, h=220)
+    back = B(2640, 1530, "4.2-metre boundary", "stdb", w=620, h=220)
+    reset = B(2640, 1960, "return to team", "good", w=620, h=220, wordmark=USERS, mark_h=100)
+    closed = B(1820, 1960, "incident resolved", "stdb", w=620, h=220, wordmark=HEART, mark_h=100)
+    H(down, tick, "incident position")
+    V(tick, near, "checks distance", x=tick.x + 80)
+    H(near, back, "steps back")
+    H(closed, reset, "resumes movement")
+    Z(1740, 70, 1600, 2230, "scripted crowd clearance", "stdb")
+    return S.end_frame()
+
+
+
+def elastic_evidence(y0):
+    """Indexed evidence and scoped retrieval, without the feature journeys."""
+    S.begin_frame("Elastic evidence", 0, y0, 3320, 2040)
+    x = [80, 760, 1440, 2120, 2800]
+    w, h = 440, 360
+
+    pages = B(x[0], 160, "Policy pages", "note", w=w, h=h,
+              wordmark=FILE, mark_h=90)
+    indexed = SV(x[1], 160, ELASTIC, "Document index", w=w, h=h)
+    reader = SV(x[2], 160, ELASTIC, "Document reader", w=w, h=h)
+    checked = B(x[3], 160, "Quote validation", "rust", w=w, h=h,
+                wordmark=RUST, mark_h=90)
+    clauses = SV(x[4], 160, ELASTIC, "Clause index", w=w, h=h)
+    H(pages, indexed, "worker indexes")
+    H(indexed, reader, "reads pages")
+    H(reader, checked, "returns quotes")
+    H(checked, clauses, "indexes checked text")
+
+    query = B(x[1], 880, "Worker query", "rust", w=w, h=h,
+              wordmark=RUST, mark_h=90)
+    search = _elastic_component(x[2], 880, w, h, "Hybrid search", "ext", ELASTIC)
+    _elastic_property(search, x[2] + 30, 1090, w - 60, "policy IDs")
+    rerank = SV(x[3], 880, ELASTIC, "Jina rerank", w=w, h=h)
+    citations = B(x[4], 880, "Cited clauses", "good", w=w, h=h,
+                  wordmark=FILE, mark_h=90)
+    H(query, search, "scoped retrieval")
+    H(search, rerank, "ranks candidates")
+    H(rerank, citations, "returns evidence")
+    R(clauses, "b", search, "t",
+      [S.P(3020, 680), S.P(1660, 680)], "searches clauses", seg=1)
+
+    history = B(x[0], 1600, "Approved claims", "note", w=w, h=h,
+                wordmark=FILE, mark_h=90)
+    esql = SV(x[1], 1600, ELASTIC, "ES|QL", w=w, h=h)
+    precedents = B(x[2], 1600, "Precedents", "good", w=w, h=h,
+                   wordmark=SHIELD, mark_h=90)
+    api = B(x[3], 1600, "bandit-api", "rust", w=w, h=h,
+            wordmark=RUST, mark_h=90)
+    matches = B(x[4], 1600, "Ranked people", "good", w=w, h=h,
+                wordmark=USERS, mark_h=90)
+    H(history, esql, "queries offered IDs")
+    H(esql, precedents, "returns prior decisions")
+    V(api, rerank, "query + eligible evidence", x=api.x + 120)
+    R(rerank, "r", matches, "t",
+      [S.P(2670, 1060), S.P(2670, 1440), S.P(3020, 1440)],
+      "returns ranking", seg=2)
+    return S.end_frame()
+
+
+def elastic_execution(y0):
+    """Fixed-schema tasks and bounded agents share the configured model."""
+    S.begin_frame("Elastic execution", 0, y0, 3320, 1980)
+    x = [80, 760, 1440, 2120, 2800]
+    w, h = 440, 360
+
+    text = B(x[0], 160, "Private text", "note", w=w, h=h,
+             wordmark=FILE, mark_h=90)
+    prompt = SV(x[1], 160, ELASTIC, "Workflows\nai.prompt", w=w, h=h)
+    text_model = B(x[2], 160, "Claude\nconfigured model", "claude", w=w, h=h,
+                   wordmark=CLAUDE, mark_h=100)
+    schema = _elastic_component(x[3], 160, w, h, "Schema check", "rust", RUST)
+    _elastic_property(schema, x[3] + 30, 370, w - 60, "JSON answer")
+    H(text, prompt, "worker starts run")
+    H(prompt, text_model, "calls connector")
+    H(text_model, schema, "worker validates")
+
+    image = B(x[0], 880, "Image attachment", "note", w=w, h=h,
+              wordmark=IMAGE, mark_h=90)
+    workflow = SV(x[1], 880, ELASTIC, "Workflows\nai.agent", w=w, h=h)
+    agent = SV(x[2], 880, ELASTIC, "Agent Builder", w=w, h=h)
+    agent_model = B(x[3], 880, "Claude\nconfigured model", "claude", w=w, h=h,
+                    wordmark=CLAUDE, mark_h=100)
+    validation = _elastic_component(x[4], 880, w, h, "Worker validation", "rust", RUST)
+    _elastic_property(validation, x[4] + 30, 1090, w - 60, "Agent answer")
+    H(image, workflow, "worker attaches")
+    H(workflow, agent, "runs scoped agent")
+    H(agent, agent_model, "calls connector")
+    H(agent_model, validation, "checks answer")
+
+    evidence = B(x[0], 1520, "Claim evidence", "note", w=w, h=h,
+                 wordmark=FILE, mark_h=90)
+    tools = B(x[2], 1520, "Claim-scoped reads", "rust", w=w, h=h,
+              wordmark=RUST, mark_h=90)
+    R(evidence, "r", workflow, "b",
+      [S.P(640, 1700), S.P(640, 1400), S.P(980, 1400)],
+      "starts investigation", seg=1)
+    V(agent, tools, "requests read", x=agent.x + 110)
+    V(tools, agent, "returns evidence", x=agent.x + 330)
+    return S.end_frame()
+
+
+def bright_data(y0):
+    """Three acquisition products, with server callers and concrete outputs."""
+    S.begin_frame("Bright Data", 0, y0, 3140, 1800)
+    x = [80, 900, 1720, 2540]
+    w, h = 480, 360
+
+    caller = B(x[0], 160, "Server acquisition", "rust", w=w, h=h,
+               wordmark=RUST, mark_h=90)
+    mcp = SV(x[1], 160, BRIGHT, "Web MCP", w=w, h=h)
+    sources = B(x[2], 160, "Public sources", "note", w=w, h=h,
+                wordmark=FILE, mark_h=90)
+    engine = SV(x[3], 160, ELASTIC, "Evidence Engine", w=w, h=h)
+    H(caller, mcp, "calls search + read")
+    H(mcp, sources, "returns source records")
+    H(sources, engine, "worker supplies evidence")
+
+    fetcher = B(x[0], 760, "Server worker", "rust", w=w, h=h,
+                wordmark=RUST, mark_h=90)
+    unlocker = SV(x[1], 760, BRIGHT, "Web Unlocker API", w=w, h=h)
+    document = B(x[2], 760, "Raw document", "note", w=w, h=h,
+                 wordmark=FILE, mark_h=90)
+    checked = B(x[3], 760, "Document parsing", "rust", w=w, h=h,
+                wordmark=RUST, mark_h=90)
+    H(fetcher, unlocker, "fetches known URL")
+    H(unlocker, document, "returns bytes")
+    H(document, checked, "worker parses")
+
+    exporter = B(x[0], 1360, "Venue exporter", "rust", w=w, h=h,
+                 wordmark=PYTHON, mark_h=90)
+    browser = SV(x[1], 1360, BRIGHT, "Browser API", w=w, h=h)
+    page = B(x[2], 1360, "Interactive page", "web", w=w, h=h,
+             wordmark=MONITOR, mark_h=90)
+    model = B(x[3], 1360, "Captured venue model", "good", w=w, h=h,
+              wordmark=GRAPH3D, mark_h=90)
+    H(exporter, browser, "connects over CDP")
+    H(browser, page, "renders source")
+    H(page, model, "exporter captures")
+    return S.end_frame()
+
+
+def _elastic_component(x, y, w, h, label, kind="ext", logo_=None):
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el.update(backgroundColor={"ext": "#c3fae8", "rust": "#e9edf2"}.get(kind, "#dbe4ff"), strokeColor="#b5bfca")
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
     return box
 
 
-# ---------------------------------------------------------------- 9. Social: how links between people form
-def social(y0):
-    S.begin_frame("9 · Social", 0, y0, 1000, 600)
-    S.text(40, 28, "Social", fs=64)
-    X0, X1, X2, X3, X4, X5 = 60, 760, 1600, 2440, 3320, 4180
-    mk = dict(fill=WHITE)
+def _elastic_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
 
-    # 1. sign up: the attendee taps their band and fills in the tap page
-    su = [335, 555, 775, 995]
-    attendee = card(X0, 665, "attendee", "web", USER, 440, 240, 120, **mk)
-    tap = card(X1, 665, "tap page\n(/t/code)", "web", PHONE, 560, 400, 150, **mk)
-    claim = card(X2, su[0], "claim_band\npress band button", "stdb", WATCH, 560, 190, 70)
-    profile = card(X2, su[1], "update_profile\nname, findable on", "stdb", SHIELD, 560, 190, 70)
-    person = card(X2, su[2], "claim_person\ncompany", "stdb", BUILDING, 560, 190, 70)
-    handles = socials_card(X2, su[3], "set_social_handle\nInstagram, Facebook, Threads", 560, 190)
-    Z(40, 170, X2 + 560 + 20 - 40, 1130 - 170, "sign up", "web")
-    H(attendee, tap, "taps band")
-    for box, verb in zip((claim, profile, person, handles), ("claims band", "sets name", "picks profile", "adds socials")):
-        D(tap, "r", 0.5, box, "l", 0.5, verb)
 
-    # 2. the band hears station markers and other bands
-    rz, rc, rp = 1435, 1860, 2230  # zone row, up close row, photo row
-    band = card(X0, (1300 + 1985) / 2, "band", "device", WATCH, 440, 640, 200, **mk)
-    marker = card(X1, rz, "station marker\nloudest one\nsets zone", "device", RADIO, 560, 280, 90, **mk)
-    other = card(X1, rc, "other band\n-62 dBm or louder", "device", WATCH, 560, 250, 90, **mk)
-    Z(40, 1170, X1 + 560 + 20 - 40, 2045 - 1170, "venue", "device", indent=40)
-    D(band, "r", 0.3, marker, "l", 0.5, "hears")
-    D(band, "r", 0.7, other, "l", 0.5, "hears")
-    stay = card(X2, rz, "zone_visit\nstay in a zone", "stdb", PIN, 560, 250, 80)
-    enc = card(X2, rc, "encounter\nseconds up close", "stdb", TIMER, 560, 250, 80)
-    H(marker, stay, "opens stay")
-    H(other, enc, "adds seconds")
 
-    # 3. social_tick turns stays and seconds into visits, shared visits and meetings
-    visit = card(X3, 1300, "visit\n2 min in a zone", "stdb", WALK, 600, 230, 80)
-    shared = card(X3, 1570, "shared_visit\n5 min, same zone\nsame time", "stdb", USERS, 600, 260, 80)
-    met = card(X3, rc, "social_encounter\nmet: 3 min up close\nboth findable", "stdb", HANDS, 600, 260, 80)
-    tick = Z(X3 - 20, 1115, 640, L(met.bottom) + 40 - 1115, "social_tick (every 1 s)", "stdb", indent=40)
-    D(stay, "r", 0.3, visit, "l", 0.5, "stays")
-    D(stay, "r", 0.7, shared, "l", 0.5, "overlaps")
-    H(enc, met, "minutes")
+def _social_component(x, y, w, h, label, kind="stdb", logo_=None):
+    """One owning component; its properties are nested data, not process steps."""
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el["backgroundColor"] = {"stdb": "#dbe4ff", "rust": "#e9edf2", "device": "#ffe8cc", "ext": "#c3fae8"}.get(kind, "#d0ebff")
+    box.el["strokeColor"] = "#b5bfca"
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
 
-    # 4. photos: the photographer picks the zone, Elastic counts the people, the bands say who they are
-    shooter = card(X0, rp, "photographer", "web", CAMERA, 440, 260, 130, **mk)
-    page = card(X1, rp, "photo page (/photo)\nregister_photo\nzone, time", "web", IMAGE, 560, 300, 100, **mk)
-    counts = SV(X2, 0, ELASTIC, "counts people\ncaption, no names", w=560, h=300, cy=rp)
-    tags = card(X3, rp, "photo_tag\nbands in that zone then\nclaimed bands first\nthen near most others\nup to people count", "stdb",
-                IMAGE, 600, 320, 80)
-    H(shooter, page, "uploads")
-    H(page, counts, "photo")
-    H(counts, tags, "people count")
-    gx = X2 + 560 + 110  # down the gap between the stays and the rules
-    R(stay, "r", tags, "t", [(S.ox + gx, stay.y + stay.h * 0.92), (S.ox + gx, tags.y - 45),
-                              (tags.x + 120, tags.y - 45)], label="zone stays", seg=1, fa=0.92, fb=120 / tags.w)
-    D(enc, "b", 0.85, tags, "l", 0.2, "near others")
 
-    # 5. the people graph: one link per pair, weighed in minutes
-    works = card(X4, su[2], "works_at\nperson to company", "stdb", BUILDING, 600, 190, 70)
-    exhibits = card(X4, 1030, "exhibits\nbooth to company", "stdb", STORE, 600, 190, 70)
-    visited = card(X4, 1300, "visited\nperson to booth\nweight: minutes", "stdb", WALK, 600, 260, 80)
-    metl = card(X4, rc, "met\nperson to person\nweight: minutes together", "stdb", HANDS, 600, 260, 80)
-    links = Z(X4 - 20, su[2] - 95 - 70, 640, L(metl.bottom) + 40 - (su[2] - 95 - 70), "people_link", "stdb", STDB,
-              indent=40)
-    inph = card(X4, rp, "in_photo\nphoto to person\ncounts as 30 min", "web", IMAGE, 600, 300, 80, **mk)
-    H(person, works, "company")
-    H(visit, visited, "minutes")
-    D(visit, "r", 0.2, exhibits, "l", 0.6, "booth company")
-    H(met, metl, "minutes")
-    H(tags, inph, "tags")
+def _social_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
 
-    # The link types above explain the graph; its destination only needs a name.
-    graph_y = L((links.y + inph.bottom) / 2)
-    graph = B(X5, 0, "Event graph\norganizer portal (/portal)", "web", w=800,
-              h=220, cy=graph_y, fill=WHITE)
-    memories = B(X5, 0, "Memories\ngroups named by booth", "web", w=800,
-                 h=180, cy=L(graph.bottom) + 250, fill=WHITE)
-    D(links, "r", 0.5, graph, "l", 0.25, "draws links")
-    D(inph, "r", 0.5, graph, "l", 0.8, "draws photos")
-    V(graph, memories, "groups links")
-    for box, n in ((tap, 1), (band, 2), (tick, 3), (page, 4), (links, 5), (graph, 6)):
-        badge(box, n)
+
+def find_people(y0):
+    S.begin_frame("Find people again", 0, y0, 3380, 1450)
+    query = B(60, 160, "Who did I meet\nat the Meta booth?\n/friends", "web", w=600, h=260,
+              wordmark=PHONE, mark_h=100)
+    api = B(880, 160, "attendee search", "rust", w=560, h=260,
+            wordmark=RUST, mark_h=100)
+    engine = SV(1660, 160, ELASTIC, "Evidence Engine", w=600, h=260)
+    result = _social_component(2500, 160, 600, 440, "closest connections", "web", USER)
+    _social_property(result, 2540, 350, 520, "recorded evidence reason", h=100)
+    _social_property(result, 2540, 480, 520, "social links", h=80)
+
+    met = _social_component(60, 660, 600, 420, "candidate evidence", "stdb", STDB)
+    _social_property(met, 100, 850, 520, "your recorded meetings", h=90)
+    _social_property(met, 100, 970, 520, "findable people", h=70)
+    place = B(880, 660, "named-place check", "note", w=560, h=260,
+              wordmark=PIN, mark_h=100)
+    reconnect = B(2500, 820, "reconnect", "web", w=600, h=260,
+                  icons={0: SOCIALS[0], 1: SOCIALS[1], 2: SOCIALS[2]})
+    visits = SV(880, 1140, STDB, "overlapping booth visits", kind="stdb", w=560, h=240)
+
+    H(query, api, "search phrase")
+    H(api, engine, "query + eligible facts", y=api.y + 70)
+    H(engine, api, "ranked candidates", y=api.bottom - 70)
+    R(api, "t", result, "t", [(api.cx, S.oy + 70), (result.cx, S.oy + 70)],
+      label="orders + explains", seg=1)
+    H(met, place, "eligible people")
+    V(visits, place, "booth + time overlap")
+    V(api, place, "place phrase", x=api.x + 100)
+    V(place, api, "eligible facts", x=api.x + 450)
+    V(result, reconnect, "opens socials")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 10. Interests: booth time ranks the people you met
-def interests(y0):
-    S.begin_frame("11 · Interests", 0, y0, 1000, 600)
-    x0, x1, x2, x3 = 60, 800, 1600, 2480
-    visits = B(x0, 200, "booth / zone minutes\ndescriptions + tags", "stdb",
-               w=500, h=240, icons={0: WALK, 1: STORE})
-    indexer = B(x1, 200, "bandit-indexer\ntop 5 spots by minutes\nfindable only", "rust",
-                w=560, h=240, icons={0: RUST})
-    indexed = SV(x2, 200, ELASTIC, "people + booth interests", w=640, h=240)
-    social = SV(x0, 650, STDB, "visits + shared places\npeople met or nearby\nphotos + socials",
-                kind="stdb", w=500, h=400)
-    api = B(x1, 650, "bandit-api\npeople + booths\nmost minutes first", "rust",
-            w=560, h=400, icons={0: RUST})
-    ranked = SV(x2, 650, ELASTIC,
-                "hybrid search + rerank\nclosest interests first\nminutes if no answer",
-                w=640, h=400)
-    person = B(x3, 510, "suggested person\nphoto + name\ntheir booths + minutes\nshared booths first\nmet at + time\nminutes together\nphotos together",
-               "web", w=660, h=590,
-               icons={0: USER, 1: SOCIALS[0], 2: SOCIALS[1], 3: SOCIALS[2]})
 
-    ended = B(x0, 1300, "event ends\nattendee leaves", "web", w=500, h=240,
-              icons={0: USER})
-    recap = B(x1, 1300, "recap\ndev.band1t.vip/t/code\nplaces + minutes\npeople + booths", "web",
-              w=560, h=240, icons={0: PHONE})
-    photos = B(x2, 1300, "your photos\nshare photo + @handles", "web", w=640, h=240,
-               icons={0: IMAGE, 1: SOCIALS[0], 2: SOCIALS[1], 3: SOCIALS[2]})
-    merch = B(x3, 1300, "make it merch\nphoto + booth memories", "web", w=660, h=240,
-              wordmark=str(LOGOS.parent.parent / "assets" / "merch" / "tee.png"), mark_h=100)
 
-    H(visits, indexer, "visits + booths")
-    H(indexer, indexed, "indexes interests")
-    V(indexed, ranked, "interest text")
-    H(social, api, "recap rows")
-    H(api, ranked, "candidates", y=api.y + 100)
-    H(ranked, api, "ranked results", y=api.bottom - 100)
-    R(api, "b", person, "b",
-      [(api.x + api.w * 0.85, S.oy + 1170), (person.cx, S.oy + 1170)],
-      label="person details", seg=1, fa=0.85)
-    V(api, recap, "shows recap", x=api.x + 150)
-    H(ended, recap, "opens")
-    H(recap, photos, "your memories")
-    H(photos, merch, "personalizes")
+def photo_memories(y0):
+    S.begin_frame("Photos and Memories", 0, y0, 3420, 1680)
+    photo = _social_component(60, 170, 570, 600, "photographer's photo", "web", CAMERA)
+    _social_property(photo, 100, 390, 490, "capture zone", h=100)
+    _social_property(photo, 100, 530, 490, "capture time", h=100)
+    worker = B(880, 170, "photo worker", "rust", w=560, h=260,
+               wordmark=RUST, mark_h=110)
+    engine = SV(1660, 170, ELASTIC, "Evidence Engine", w=600, h=260)
+    analysis = _social_component(2500, 170, 600, 620, "photo analysis result", "rust", FILE)
+    reading = _social_property(analysis, 2540, 390, 520, "people count", h=100)
+    caption = _social_property(analysis, 2540, 550, 520, "photo caption", h=160)
+    tags = SV(1660, 690, STDB, "band/time candidate tags", kind="stdb", w=600, h=240)
+    recap = B(880, 690, "your tagged photos", "web", w=560, h=240,
+              wordmark=IMAGE, mark_h=110)
+    share = B(60, 1280, "share photo + @handles", "web", w=570, h=280,
+              icons={0: SOCIALS[0], 1: SOCIALS[1], 2: SOCIALS[2]})
+    memories = _social_component(880, 1280, 560, 320, "Memories", "web", STORE)
+    _social_property(memories, 920, 1470, 480, "groups named by booth", h=90)
+    graph = B(1660, 1280, "portal event graph", "web", w=600, h=280,
+              wordmark=GRAPH3D, mark_h=120)
+    relations = _social_component(2500, 1160, 600, 440, "event relationships", "stdb", STDB)
+    _social_property(relations, 2540, 1360, 520, "encounters with minutes", h=80)
+    _social_property(relations, 2540, 1470, 520, "booth visits with minutes", h=80)
+
+    H(photo, worker, "uploads photo")
+    H(worker, engine, "reads photo", y=worker.y + 70)
+    H(engine, worker, "count + caption", y=worker.bottom - 70)
+    R(worker, "t", analysis, "t", [(worker.cx, S.oy + 70), (analysis.cx, S.oy + 70)],
+      label="records result", seg=1)
+    D(reading, "l", .5, tags, "r", .2, "up to count")
+    R(photo, "r", tags, "l", [(S.ox + 740, photo.y + photo.h*.8),
+                                 (S.ox + 740, S.oy + 1000),
+                                 (S.ox + 1550, S.oy + 1000),
+                                 (S.ox + 1550, tags.y + tags.h * .8)],
+      label="bands present then", seg=2, fa=.8, fb=.8)
+    H(tags, recap, "selected candidates")
+    R(caption, "b", recap, "r", [(caption.cx, S.oy + 1060),
+                                  (S.ox + 1510, S.oy + 1060),
+                                  (S.ox + 1510, recap.y + recap.h * .8)],
+      label="caption", seg=1, fb=.8)
+    D(recap, "b", .25, share, "t", .75, "phone share sheet")
+    V(tags, graph, "photo-person links")
+    H(relations, graph, "encounters + visits")
+    H(graph, memories, "groups communities")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 11. Merch and wallet
-def merch(y0):
-    S.begin_frame("12 · Merch and wallet", 0, y0, 3200, 1600)
-    template_image = str(LOGOS.parent.parent / "assets" / "merch" / "tee.png")
-    x0, x1, x2, x3 = 60, 820, 1640, 2460
-    visits = B(x0, 200, "my_visits\nplaces + minutes", "stdb", w=640, h=220, icons={0: WALK})
-    photos = B(x0, 560, "my_photos\nattendee's own photos", "stdb", w=640, h=220, icons={0: IMAGE})
-    templates = B(x0, 920, "merch_template\nproduct + price", "stdb", w=640, h=220,
-                  wordmark=template_image, mark_h=150)
-    ended = B(x1, 80, "attendee leaves\nevent ends", "web", w=640, h=220, icons={0: WALK})
-    workflow = SV(x1, 460, ELASTIC, "(shopping workflow)\nmerch_picks", w=640, h=520)
-    suggestions = B(x2, 460, "my_merch_suggestions\nup to 3 choices\nown photo + printed line\ntemplate price",
-                    "stdb", w=640, h=520, icons={0: STORE})
-    attendee = B(x3, 460, "attendee\nchooses item\nsize + shipping address\nduring / after event",
-                 "web", w=640, h=520, icons={0: PHONE})
-    checkout = B(x3, 1260, "buy_merch_with_shipping", "stdb", w=640, h=260, icons={0: STORE})
-    payment = B(x2, 1260, "wallet payment\norder price", "ext", w=640, h=260, icons={0: WALLET})
-    paid = B(x1, 1260, "my_merch_orders\npaid order", "good", w=640, h=260, icons={0: FILE})
 
-    V(ended, workflow, "queues picks")
-    D(visits, "r", .5, workflow, "l", .2, "visits")
-    D(photos, "r", .5, workflow, "l", .5, "captions + tags")
-    D(templates, "r", .5, workflow, "l", .8, "catalogue")
-    R(visits, "t", suggestions, "t", [(visits.cx, S.oy + 30), (suggestions.cx, S.oy + 30)],
-      label="ranks until picks", seg=1)
-    H(workflow, suggestions, "submit_merch_picks")
-    H(suggestions, attendee, "suggests")
-    V(attendee, checkout, "buys with address")
-    H(checkout, payment, "pays")
-    H(payment, paid, "payment confirmed")
+def settle_claim(y0):
+    """A current claim's decision and distinct financial outcomes."""
+    S.begin_frame("Settle a claim", 0, y0, 3520, 1770)
+    injury = B(60, 160, "attendee injury", "device", w=500, h=240,
+               wordmark=HEART, mark_h=96)
+    property_ = B(60, 510, "venue property loss", "device", w=500, h=240,
+                  wordmark=HAMMER, mark_h=96)
+    evidence_ = SV(760, 335, ELASTIC, "Evidence Engine\ncited evidence", w=560, h=300)
+    decision = SV(1460, 335, ELASTIC, "Decision Engine\nrecommendation", w=560, h=300)
+    guard = SV(2160, 335, STDB, "settlement guard\nchecks authority", kind="stdb", w=560, h=300)
+    injury_paid = SV(2860, 160, CAPONE, "Nessie\ninjury deposit", w=560, h=240)
+    property_paid = B(2860, 510, "venue or repair vendor\nproperty booking", "good", w=560, h=240,
+                      wordmark=HAMMER, mark_h=96)
+    amounts = SV(760, 930, STDB, "Policy amounts\nfixed by code", kind="stdb", w=560, h=240)
+    organizer = B(2160, 930, "organizer\nindividual decision", "web", w=560, h=240,
+                  wordmark=USER, mark_h=96)
+    refused = B(2860, 930, "refused claim\nreason retained", "bad", w=560, h=240,
+                wordmark=SHIELD, mark_h=96)
+
+    D(injury, "r", .5, evidence_, "l", .25, "medical evidence")
+    D(property_, "r", .5, evidence_, "l", .75, "loss evidence")
+    H(evidence_, decision, "checked facts")
+    R(amounts, "r", decision, "l", [S.P(1390, 1050), S.P(1390, 485)], "fixed figures", seg=1)
+    H(decision, guard, "proposes decision")
+    D(guard, "r", .25, injury_paid, "l", .5, "authorized injury")
+    D(guard, "r", .75, property_paid, "l", .5, "authorized property")
+    V(guard, organizer, "needs review", x=guard.x + 140)
+    V(organizer, guard, "approves", x=guard.x + 420)
+    D(guard, "r", .9, refused, "l", .2, "checked refusal")
+    H(organizer, refused, "refuses")
+
+    responsibility = B(60, 1450, "organizer names\nresponsible attendee", "web", w=500, h=240,
+                       wordmark=USER, mark_h=96)
+    charge = B(760, 1450, "proposed charge\nlogged loss", "stdb", w=560, h=240,
+               wordmark=FILE, mark_h=96)
+    decided = B(1460, 930, "claim decided", "stdb", w=560, h=240,
+                wordmark=SHIELD, mark_h=96)
+    approval = B(1460, 1450, "organizer\napproves charge", "web", w=560, h=240,
+                 wordmark=USER, mark_h=96)
+    payer = B(2160, 1450, "attendee\npays charge", "web", w=560, h=240,
+              wordmark=USER, mark_h=96)
+    charged = SV(2860, 1450, CAPONE, "Nessie\ncharge purchase", w=560, h=240)
+    V(property_, responsibility, "records responsibility", x=property_.x + 140)
+    H(responsibility, charge, "proposes")
+    R(guard, "l", decided, "t", [S.P(2090, 545), S.P(2090, 850), S.P(1740, 850)],
+      "records outcome", seg=2, fa=.7)
+    V(decided, approval, "required first")
+    H(charge, approval, "awaits approval")
+    H(approval, payer, "approved charge")
+    H(payer, charged, "confirms payment")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 12. Capital One Nessie wallet
-def nessie(y0):
-    S.begin_frame("13 · Capital One Nessie", 0, y0, 1000, 600)
-    title("Capital One Nessie")
-    rows = [
-        (350, "connect_wallet", "wallet_open", "Nessie (account)", "record_wallet", "opens account", "initial $200 credit"),
-        (770, "buy_merch_with_shipping", "merch_purchase", "Nessie (purchase)", "settle_merch_order", "records purchase", "subtracts price"),
-        (1190, "injury approved", "claim_payout", "Nessie (deposit)", "record_claim_payout", "deposits injury payout", "adds injury payout"),
-        (1850, "pay_charge", "charge_payment", "Nessie (purchase)", "record_charge_payment", "records venue purchase", "subtracts charge"),
-    ]
-    drawn = []
-    for y, trigger, job, operation, reducer, request, entry in rows:
-        action = B(60, y, trigger, "good" if job == "claim_payout" else "stdb", w=560, h=180,
-                   **({"icons": {0: HEART}} if job == "claim_payout" else {}))
-        worker = B(980, y, job, "rust", w=420, h=180)
-        api = SV(1760, y, CAPONE, operation, w=420, h=180)
-        callback = B(2520, y, reducer, "stdb", w=600, h=180)
-        drawn.append((action, worker, api, callback, request, entry))
-    approval = B(60, 1590, "approve_charge", "stdb", w=560, h=180)
-    V(approval, drawn[-1][0], "organizer approves")
-    top, bottom = drawn[0][0].y, drawn[-1][0].bottom
-    wallet = B(3460, L(top), "my_wallet\nwallet_entry", "stdb", w=420, h=bottom - top, icons={0: WALLET})
-    zb = L(bottom) + 320
-    Z(20, 220, 640, zb - 220, "triggers", "plain")
-    Z(940, 220, 500, zb - 220, "bandit-workers", "rust")
-    Z(1720, 220, 500, zb - 220, "Capital One Nessie API", "ext")
-    Z(2480, 220, 1440, zb - 220, "band1t module", "stdb", STDB)
-    for action, worker, api, callback, request, entry in drawn:
-        H(action, worker, "attendee pays" if worker == drawn[-1][1] else "queues")
-        D(worker, "r", 0.25, api, "l", 0.25, request)
-        D(api, "l", 0.75, worker, "r", 0.75, "returns IDs")
-        channel = worker.bottom + 100
-        middle = (worker.cx + callback.cx) / 2
-        R(worker, "b", callback, "b", [(worker.cx, channel), (middle - 160, channel),
-            (middle + 160, channel), (callback.cx, channel)], label="calls reducer", seg=2)
-        H(callback, wallet, entry, y=callback.cy)
+def policy_amounts(y0):
+    """Related inputs and formulas belong inside their calculation component."""
+    S.begin_frame("Policy amounts", 0, y0, 3920, 1500)
+    medical = _claim_component(60, 80, 1320, 990, "medical basis", "device", HEART)
+    _claim_property(medical, 100, 280, 380, "billed amount")
+    _claim_property(medical, 520, 280, 380, "fee cap per unit")
+    _claim_property(medical, 940, 280, 400, "service units")
+    _claim_property(medical, 100, 410, 1240, "eligible line = min(billed, cap × units)")
+    _claim_property(medical, 100, 540, 1240, "covered bill = sum eligible lines")
+    _claim_property(medical, 100, 670, 1240, "health-plan copay · when available")
+    _claim_property(medical, 100, 800, 1240, "excess cover + copay: min(copay, covered bill)")
+    _claim_property(medical, 100, 930, 1240, "otherwise: covered bill")
+
+    property_ = _claim_component(60, 1130, 1320, 310, "property basis", "device", HAMMER)
+    _claim_property(property_, 100, 1320, 1240, "Recorded property costs")
+
+    payout = _claim_component(1630, 250, 1000, 990, "settlement payout", "stdb", STDB)
+    _claim_property(payout, 1670, 450, 920, "per-claim limit")
+    _claim_property(payout, 1670, 580, 440, "aggregate limit")
+    _claim_property(payout, 2150, 580, 440, "aggregate used")
+    _claim_property(payout, 1670, 710, 920, "remaining = max(aggregate limit − used, 0)")
+    _claim_property(payout, 1670, 840, 920, "payout = min(basis, per-claim, remaining)", h=130)
+    _claim_property(payout, 1670, 1020, 920, "deductible does not reduce payout")
+
+    recovery = _claim_component(2880, 450, 980, 650, "insurer recovery + venue cost", "rust", WALLET)
+    _claim_property(recovery, 2920, 650, 900, "deductible")
+    _claim_property(recovery, 2920, 780, 900, "recovery = max(payout − deductible, 0)")
+    _claim_property(recovery, 2920, 910, 900, "venue cost = payout − recovery")
+    D(medical, "r", .5, payout, "l", .33, "injury basis")
+    R(property_, "r", payout, "l", [S.P(1500, 1285), S.P(1500, 1040)], "property basis", seg=1, fb=.8)
+    H(payout, recovery, "payout")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 13. Vultr server
-def vultr(y0):
-    S.begin_frame("14 · Vultr", 0, y0, 1000, 600)
-    title("Vultr")
-    c1, c2, c3, c4 = 60, 840, 1740, 2580
-    r1, r2, r3 = 400, 760, 1120
-    api = B(c3, r1, "bandit-api", "rust", w=420, icons={0: RUST})
-    workers = B(c3, r2, "bandit-workers", "rust", w=420, h=320, icons={0: RUST})
-    indexer = B(c3, r3 + 60, "bandit-indexer", "rust", w=420, icons={0: RUST})
-    caddy = B(c2, r1, "Caddy\n(HTTPS, files)", "ext", w=600, h=180, icons={0: CADDY}, fill=WHITE)
-    desk = B(c2, r2, "desk (/organizer, /cc/)\nportal (/portal)\nband1t.vip", "web", w=600, h=220,
-             icons={0: MONITOR})
-    pages = B(c2, r3, "plain pages, assets\n/photo, /js\ndev.band1t.vip pages", "web", w=600, h=220,
-              icons={0: MONITOR})
-    users = B(c1, r1, "attendee, staff\nband1t.vip\ndev.band1t.vip", "web", w=500, h=180,
-              icons={0: USER})
-    deploy = B(c1, r3, "scripts/deploy-vm\ndeploy/setup.sh\nBun (build)", "note", w=500, h=220,
-               icons={2: BUN})
-    stdb = SV(c4, r1, STDB, "Maincloud (band1t module)", kind="stdb", w=560)
-    workflows = SV(c4, r2, ELASTIC, "(Workflows)", w=560)
-    nessie = SV(c4, r2 + 200, CAPONE, "Nessie (wallet)", w=560)
-    elastic = SV(c4, L(indexer.y), ELASTIC, "(Evidence Engine)", w=560)
-    inner_b = max(L(indexer.bottom), L(pages.bottom)) + 40
-    Z(800, 200, 1440, inner_b + 40 - 200, "Vultr Cloud Compute", "plain", VULTR)
-    Z(1700, 320, 500, inner_b - 320, "systemd (bandit@.service)", "rust")
-    H(users, caddy, "visits")
-    H(caddy, api, "other paths")
-    V(caddy, desk, "serves")
-    D(api, "l", 0.8, pages, "r", 0.2, "serves")
-    H(deploy, pages, "builds")
-    D(deploy, "r", 0.2, desk, "l", 0.8, "builds")
-    ym = S.oy + 660
-    R(deploy, "t", caddy, "l", [(deploy.cx, ym), (caddy.x - 100, ym), (caddy.x - 100, caddy.cy)],
-      label="installs", seg=1, fb=0.8, dashed=True)
-    H(api, stdb, "subscribes")
-    H(workers, workflows, "runs workflows", y=workflows.cy)
-    H(workers, nessie, "pays", y=nessie.cy)
-    H(indexer, elastic, "copies rows")
+def _claim_component(x, y, w, h, label, kind="stdb", logo_=None):
+    """A real component, with small filled property cells inside its boundary."""
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el["backgroundColor"] = {"stdb": "#dbe4ff", "rust": "#e9edf2", "device": "#ffe8cc", "ext": "#c3fae8"}.get(kind, "#d0ebff")
+    box.el["strokeColor"] = "#b5bfca"
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _claim_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+def approve_rule(y0):
+    """Simple precedents become explicitly approved, code-bounded authority."""
+    S.begin_frame("Approve a reusable rule", 0, y0, 3700, 980)
+    precedents = _claim_component(60, 150, 560, 680, "approved precedents", "device", FILE)
+    _claim_property(precedents, 100, 350, 480, "at least 3 approved\nsimple claims", h=100)
+    _claim_property(precedents, 100, 500, 480, "same incident kind\nand cover kind", h=100)
+    _claim_property(precedents, 100, 650, 480, "complicated claims\nnever teach a rule", h=100)
+    proposal = SV(760, 350, ELASTIC, "Decision Engine\nproposes from precedents", w=480, h=280)
+    scope = _claim_component(1380, 100, 920, 780, "proposed rule · code-enforced scope", "stdb", STDB)
+    _claim_property(scope, 1420, 300, 400, "incident kind")
+    _claim_property(scope, 1860, 300, 400, "cover kind")
+    _claim_property(scope, 1420, 430, 400, "all event zones")
+    _claim_property(scope, 1860, 430, 400, "corroboration\nrequired")
+    _claim_property(scope, 1420, 560, 840, "ceiling = highest cited payout")
+    _claim_property(scope, 1420, 690, 840, "ceiling ≤ policy per-claim limit")
+    organizer = B(2440, 350, "organizer\nreviews scope + ceiling", "web", w=480, h=280,
+                  wordmark=USER, mark_h=96)
+    rule = SV(3060, 350, STDB, "approved rule version\nfuture guarded authority", kind="stdb", w=560, h=280)
+    H(precedents, proposal, "cites claims")
+    H(proposal, scope, "validated proposal")
+    H(scope, organizer, "shown for approval")
+    H(organizer, rule, "approves")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 14. Hardware basics
+
+
 def hardware(y0):
-    S.begin_frame("14 · Hardware basics", 0, y0, 1000, 600)
-    title("Hardware")
-    phone = B(80, 200, "phone", "web", w=480, icons={0: NFC})
-    lite = SV(80, 510, SEEED, "lite band x6\nXIAO ESP32-C3", kind="device", h=150, w=480, fill=None)
-    full = B(80, 720, "full band x3\n+ IMU, vibration", "device", w=480, icons={0: WATCH})
-    bands = Z(60, 440, 520, 440, "9 bands, one firmware", "device")
-    cam = B(920, 200, "security camera\none per zone", "device", w=480, icons={0: CAMERA})
-    marker = B(920, 0, "station marker x2 to 5\nESP32-C3 SuperMini", "device", w=520, cy=L(lite.cy),
-               icons={1: ESP})
-    gateway = B(920, 0, "gateway\nESP32-C3 SuperMini", "device", h=150, w=480,
-                icons={0: ESP}, cy=L(full.cy))
-    laptop = B(1680, 0, "venue laptop\nband1t-bridge, security view", "device", w=560, cy=L(full.cy),
-               icons={0: LAPTOP})
-    Z(900, L(marker.y) - 70, 560, BH + 90, "at each exit", "device")
-    V(phone, bands, "taps NFC", x=phone.right - 80)
-    H(marker, bands, "loudest sets zone", y=marker.y + 32)
-    H(marker, bands, "sets exit color", y=marker.y + 88)
-    H(bands, gateway, "talks ESP-NOW", y=gateway.cy, both=True)
-    H(gateway, laptop, "serial reports", y=gateway.cy - 32)
-    H(laptop, gateway, "serial commands", y=gateway.cy + 32)
-    D(bands, "r", 0.12, cam, "l", 0.85, "flashes on alarm")
-    R(cam, "r", laptop, "t", [(laptop.cx, cam.cy)], label="streams video", seg=1)
+    S.begin_frame("15 · Band data flow", 0, y0, 4300, 2240)
+
+    band = B(60, 650, "band firmware\nXIAO ESP32-C3", "device",
+             w=520, h=350, wordmark=WATCH, mark_h=150)
+    beacon = B(860, 260,
+               "State beacon · 14 bytes\nid, flags, state, zone\nneigh, bat, seq, find target\n100 ms + jitter",
+               "note", w=600, h=330, icons={0: RADIO})
+    heard = B(860, 1120,
+              "Heard report\nup to 16 peer ID / RSSI pairs\nfresh within 2 s\n1 s + jitter",
+              "note", w=600, h=330, icons={0: RADIO})
+    station = B(1660, 150,
+                "Station beacon\nid + exit color · 5 Hz",
+                "device", w=600, h=260, icons={0: RADIO})
+    gateway = B(1660, 650, "gateway 200\nESP32-C3 SuperMini", "device",
+                w=600, h=350, wordmark=ESP, mark_h=150)
+    bridge = B(2460, 650, "band1t-bridge\nvenue laptop\nparse + route", "rust",
+               w=600, h=350, wordmark=RUST, mark_h=150)
+    ingest_state = B(3360, 470, "ingest_band", "stdb", w=700, h=180)
+    ingest_proximity = B(3360, 810, "ingest_heard", "stdb", w=700, h=180)
+    ingest_marker = B(3360, 1150, "ingest_station", "stdb", w=700, h=180)
+    receipt = B(3360, 1490, "command_sent", "stdb", w=700, h=180)
+    pending = B(3360, 1830, "command rows\npending = true", "stdb", w=700, h=180)
+    Z(3260, 190, 940, 1900, "Maincloud module", "stdb", STDB)
+    serial = B(2460, 1420,
+               "Serial command\ncmd target name [args]",
+               "note", w=600, h=280, icons={0: FILE})
+    radio = B(1660, 1420,
+              "Radio command · 14 bytes\ntarget, cmd, arg, arg2\n3 copies · 40 ms apart\nsame sequence",
+              "note", w=600, h=280, icons={0: RADIO})
+    ack = B(2460, 1860,
+            "Gateway ACK or error\nACK means queued\nfor radio transmission",
+            "note", w=600, h=280, icons={0: RADIO})
+
+    D(band, "r", .25, beacon, "l", .5, "state")
+    D(band, "r", .75, heard, "l", .5, "proximity")
+    D(beacon, "r", .5, gateway, "l", .25, "ESP-NOW")
+    D(heard, "r", .5, gateway, "l", .75, "ESP-NOW")
+    V(station, gateway, "ESP-NOW")
+    H(gateway, bridge, "JSON lines\n115200 baud", y=gateway.y + 100)
+    D(bridge, "r", .2, ingest_state, "l", .5, "band beacon")
+    D(bridge, "r", .45, ingest_proximity, "l", .5, "heard report")
+    D(bridge, "r", .7, ingest_marker, "l", .5, "station beacon")
+    R(pending, "l", bridge, "r",
+      [S.P(3180, L(pending.cy)), S.P(3180, L(bridge.bottom) - 30)],
+      label="new commands", seg=1, fb=.92)
+    V(bridge, serial, "formats")
+    H(serial, radio, "gateway queues")
+    R(radio, "b", band, "b",
+      [S.P(radio.cx, 1740), S.P(band.cx, 1740)],
+      label="ESP-NOW · band deduplicates sequence", seg=1)
+    R(gateway, "b", ack, "t",
+      [S.P(gateway.cx, 1110), S.P(2360, 1110), S.P(2360, 1790), S.P(ack.cx, 1790)],
+      label="queue receipt", seg=2)
+    D(ack, "r", .5, receipt, "l", .5, "bridge calls")
     return S.end_frame()
 
-
-def stack(path, y0, first):
-    """Add the frames another generator drew (its .excalidraw file) under the board, numbered on from first."""
-    scene = json.loads(pathlib.Path(path).read_text())
-    els = scene["elements"]
-    top = min(e["y"] for e in els)
-    ids = {e["id"]: "m" + e["id"] for e in els}  # a prefix keeps its ids apart from this board's
-    frames = sorted((e for e in els if e["type"] == "frame"), key=lambda e: e["y"])
-    names = {f["id"]: f"{first + i} · {f['name']}" for i, f in enumerate(frames)}
-    for e in els:
-        e = json.loads(json.dumps(e))
-        e["y"] += y0 - top
-        e["name"] = names.get(e["id"], e.get("name"))
-        e["id"] = ids[e["id"]]
-        e["groupIds"] = ["m" + group for group in e.get("groupIds", [])]
-        for k in ("frameId", "containerId"):
-            if e.get(k):
-                e[k] = ids[e[k]]
-        for k in ("startBinding", "endBinding"):
-            if e.get(k):
-                e[k]["elementId"] = ids[e[k]["elementId"]]
-        e["boundElements"] = [dict(b, id=ids[b["id"]]) for b in e.get("boundElements") or []]
-        if e["name"] is None:
-            del e["name"]
-        S.elements.append(e)
-    S.files.update(scene.get("files", {}))
-    return max(e["y"] + e["height"] for e in frames) - min(e["y"] for e in frames)
-
-
-def band_wiring(y0):
-    S.begin_frame("20 · Band wiring", 0, y0, 3540, 1850)
-    left, middle, right = 80, 1360, 2800
-    rows = (220, 520, 820, 1120)
-    board = B(middle, rows[0],
-              "XIAO ESP32-C3\nsame board + firmware\nUSB-C charging + serial\nLiPo charger · 380 mA\n3V3 regulator\nESP-NOW · 8 dBm",
-              "device", w=760, h=1120, icons={0: ESP}, wordmark=SEEED, mark_h=70)
-
-    ring = B(left, rows[0], "12-LED ring\nWS2812B\nbrightness 64 / 255", "device", w=600, h=220)
-    button = B(left, rows[1], "SOS button\nunder ring centre\npull-up · wakes deep sleep", "device", w=600, h=220)
-    imu = B(left, rows[2], "MPU-6050 (GY-521)\noptional · full bands\nI2C 0x68 · ±8 g\n100 reads/s",
-            "device", w=600, h=220, dashed=True)
-    motor = B(left, rows[3], "coin vibration motor\noptional · full bands\n2N2222 transistor\nPWM 20 kHz · 70%",
-              "device", w=600, h=220, dashed=True)
-
-    battery = B(right, rows[0], "500 mAh LiPo\nprotected cell\nring + motor supply", "device", w=660, h=220)
-    antenna = B(right, rows[1], "FPC antenna\noutside case · on lid", "device", w=660, h=220, icons={0: RADIO})
-    divider = B(right, rows[2], "battery divider\n2 × 200 kΩ\nnot fitted", "device", w=660, h=220, dashed=True)
-    B(right, rows[3], "NTAG215 NFC sticker\nno wires\nopens band1t.vip/t/BANDIT-0N",
-      "device", w=660, h=220, icons={0: NFC})
-
-    H(board, ring, "D1 · GPIO3 → 330 Ω → DIN\nbattery rail", y=ring.cy)
-    H(button, board, "D2 · GPIO4 → button → GND", y=button.cy)
-    H(board, imu, "D4 · GPIO6 SDA\nD5 · GPIO7 SCL\n3V3 + GND", y=imu.cy, both=True, dashed=True)
-    H(board, motor, "D6 · GPIO21 → 1 kΩ → base", y=motor.cy, dashed=True)
-    H(battery, board, "BAT+ / BAT− pads", y=battery.cy)
-    H(board, antenna, "U.FL", y=antenna.cy, both=True)
-    H(divider, board, "D0 · GPIO2 (A0)\nbattery % when fitted", y=divider.cy, dashed=True)
-
-    B(80, 1530, "D8 + D9: never wired\nstrapping pins\nD9 = BOOT", "bad", w=740, h=240)
-    B(960, 1530, "Ring + motor: battery rail\n5V live only on USB", "note", w=740, h=240)
-    B(1840, 1530, "No power switch\none click: deep sleep\none click: wake\nunlit ring ≈ 12 mA", "note", w=740, h=240)
-    B(2720, 1530, "Printed pill case · 64 × 42 mm\nring in head · battery below\nbutton hole · 6.5 mm", "device", w=740, h=240)
-    return S.end_frame()
 
 
 def exit_markers_gateway(y0):
-    S.begin_frame("21 · Exit markers and gateway", 0, y0, 1000, 600)
-    title("Exit markers and gateway")
+    S.begin_frame("21 · Exit markers and gateway", 0, y0, 3600, 1840)
 
-    power = B(100, 630, "power bank\nUSB 5 V", "device", w=350, h=140)
-    station = B(650, 520, "ESP32-C3 SuperMini\nstation 101–105\none per exit", "device",
-                w=500, h=360, icons={0: ESP})
-    diode = B(1300, 250, "1N4001 diode\nstripe toward ring", "device", w=500, h=180)
-    resistor = B(1300, 630, "330 Ω", "device", w=350, h=140)
-    ring = B(1900, 520, "12-LED ring\nexit color\nbrightness 120", "device", w=500, h=360)
-    modes = B(100, 1260, "gateway modes\nbreathe · chase · strobe · off\n101 blue · 102 magenta\nsaved exit color",
-              "device", w=1200, h=200)
-    beacon = B(1800, 1220, "beacon\nid + exit color\n5 Hz · 21 dBm", "device",
-               w=600, h=260, icons={0: RADIO})
-    Z(40, 180, 2420, 1380, "exit markers", "device")
+    def component(x, y, w, h, label, art=None, kind="device"):
+        first = len(S.elements)
+        box = Z(x, y, w, h, label, kind, art)
+        box.el.update(backgroundColor="#ffe8cc" if kind == "device" else "#e9edf2",
+                      strokeColor="#b5bfca")
+        box.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        return box
 
-    gateway = B(2700, 520, "ESP32-C3 SuperMini\ngateway 200\nUSB power", "device",
-                w=550, h=360, icons={0: ESP})
-    laptop = B(3900, 520, "venue laptop\nrecorder\nband1t-bridge", "rust",
-               w=700, h=360, icons={0: LAPTOP})
-    radio = B(2700, 1210, "hears every packet\ncommands ×3\n40 ms apart", "device",
-              w=550, h=300, icons={0: RADIO})
-    module = SV(3900, 1250, STDB, "Maincloud (band1t module)", kind="stdb", w=700, h=260)
-    Z(2560, 180, 2200, 1380, "gateway", "device")
+    def prop(parent, x, y, w, label, h=100):
+        cell = B(x, y, label, "stdb", w=w, h=h)
+        cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+        cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+        return cell
 
-    H(power, station, "USB-C")
+    power = component(60, 800, 300, 220, "Power bank")
+    prop(power, 80, 890, 260, "USB 5 V")
+
+    station = component(500, 500, 900, 1100, "ESP32-C3 SuperMini · exit station", ESP)
+    prop(station, 540, 720, 390, "Station IDs\n101–105")
+    prop(station, 970, 720, 390, "One per exit")
+    prop(station, 540, 850, 820, "Modes\nbreathe · chase · strobe · off")
+    for x, y, label, color in (
+        (540, 980, "101 · blue", "#0000ff"),
+        (970, 980, "102 · magenta", "#ff00ff"),
+        (540, 1100, "103 · cyan", "#00ffff"),
+        (970, 1100, "104 · white", "#ffffff"),
+        (540, 1220, "105 · orange", "#ffa500"),
+        (970, 1220, "Exit color\nsaved in flash", None),
+    ):
+        field = prop(station, x, y, 390, label)
+        if color:
+            S.base("rectangle", S.ox + x + 20, S.oy + y + 29, 42, 42,
+                   backgroundColor=color, strokeColor="#495057", strokeWidth=2,
+                   roughness=0, roundness={"type": 3},
+                   customData={"diagramParentComponent": field.id,
+                               "diagramSignalColor": label.split(" · ")[1]})
+    prop(station, 540, 1340, 820, "Beacon sends station ID + exit color")
+    prop(station, 540, 1460, 390, "Beacon rate\n5 Hz")
+    prop(station, 970, 1460, 390, "Radio power\n21 dBm")
+
+    diode = component(1500, 180, 500, 240, "1N4001 diode")
+    prop(diode, 1520, 280, 460, "Stripe toward ring")
+    resistor = component(1600, 850, 250, 180, "Resistor")
+    prop(resistor, 1620, 920, 210, "330 Ω", h=80)
+
+    ring = component(2000, 500, 600, 680, "Exit LED ring")
+    prop(ring, 2040, 650, 520, "LED count\n12", h=120)
+    prop(ring, 2040, 800, 520, "Brightness\n120", h=120)
+    prop(ring, 2040, 950, 520, "Shows station exit color", h=140)
+
+    gateway = component(2800, 300, 760, 920, "ESP32-C3 SuperMini · gateway", ESP)
+    prop(gateway, 2840, 540, 680, "Gateway ID\n200")
+    prop(gateway, 2840, 680, 680, "Radio\nESP-NOW")
+    prop(gateway, 2840, 820, 320, "Channel\n1")
+    prop(gateway, 3200, 820, 320, "Radio power\n21 dBm")
+    prop(gateway, 2840, 960, 680, "Powered by USB", h=140)
+    laptop = B(2800, 1450, "venue laptop\nband1t-bridge\nBand data flow", "rust",
+               w=760, h=330, wordmark=LAPTOP, mark_h=140)
+
+    H(power, station, "USB-C", y=power.cy)
     R(station, "t", diode, "l", [(station.cx, diode.cy)], label="5V pin", seg=1)
     R(diode, "r", ring, "t", [(ring.cx, diode.cy)], label="ring 5V")
-    H(station, resistor, "GPIO10")
-    H(resistor, ring, "DIN")
+    H(station, resistor, "GPIO10", y=resistor.cy)
+    H(resistor, ring, "DIN", y=resistor.cy)
     R(station, "b", ring, "b",
-      [(station.x + station.w * 0.8, S.oy + 1030), (ring.cx, S.oy + 1030)],
+      [(station.x + station.w * 0.8, S.oy + 1710), (ring.cx, S.oy + 1710)],
       label="G → GND", seg=1, fa=0.8)
-    R(station, "b", beacon, "t",
-      [(station.x + station.w * 0.15, S.oy + 1130), (beacon.cx, S.oy + 1130)],
-      label="broadcasts", seg=1, fa=0.15)
-
-    H(gateway, laptop, "USB serial\nJSON per packet", y=gateway.y + 110)
-    H(laptop, gateway, "cmd <target> <name> [args]", y=gateway.y + 270)
-    V(gateway, radio, "ESP-NOW", both=True)
-    V(laptop, module, "ingest_band, ingest_heard,\ningest_station, command_sent")
+    V(gateway, laptop, "USB-C\npower + serial", both=True)
     return S.end_frame()
+
+
+
+def vision(y0):
+    S.begin_frame("05 · Vision", 0, y0, 3100, 2010)
+
+    def G(x, y, w, label, items, kind="note", cols=2, image=None):
+        rows = (len(items) + cols - 1) // cols
+        h = 140 + rows * 160
+        zone = S.zone(x, y, w, h, label, "plain", fs=ZFS, logo=image)
+        cell_w = (w - 60 - (cols - 1) * 20) / cols
+        for i, item in enumerate(items):
+            B(x + 30 + (i % cols) * (cell_w + 20), y + 130 + (i // cols) * 160,
+              item, kind, w=cell_w, h=140)
+        return zone
+
+    camera = G(60, 180, 500, "Camera input", ["Video frames", "Frame time"],
+               "device", image=CAMERA)
+    spectrum = G(800, 180, 560, "Flash filter", ["1.5 s window", "4 Hz signal", "Red channel", "Reject nearby rates"],
+                 "rust", image=OPENCV)
+    tracks = G(1580, 180, 560, "Flash tracks", ["Blob grouping", "Stable IDs", "Spot position"],
+               "rust", image=NUMPY)
+    calibration = B(2360, 240, "Camera-to-plan\ntransform", "note",
+                    w=660, h=300, wordmark=GRAPH3D, mark_h=100)
+
+    radio = G(60, 790, 1300, "Radio and ranging inputs",
+              ["Band ID", "SOS/fall flags", "Zone", "Position", "Uncertainty", "Receive time"],
+              "note", cols=3, image=RADIO)
+    fusion = G(1580, 790, 560, "Match calling bands",
+               ["Fresh flags", "Radio match", "Uncertainty gate"], "rust", image=PYTHON)
+    located = G(2360, 790, 660, "Located observation",
+                ["Camera", "Band ID", "Zone", "Image point", "Plan point", "Time", "Radio offset"],
+                "note", cols=3, image=WATCH)
+
+    page = G(60, 1510, 800, "Security page",
+             ["State JSON\nGET /state", "Live video\nGET /live.mjpg", "Acknowledge\nPOST /ack"],
+             "web", image=SPARK)
+    archive = G(1120, 1510, 800, "Local evidence",
+                ["Event log", "Marked image", "3 s clip"], "note", cols=3, image=FILE)
+    module = SV(2220, 1570, STDB, "report_camera_sighting",
+                kind="stdb", w=800, h=300)
+
+    H(camera, spectrum, "timestamped frames")
+    H(spectrum, tracks, "flash blobs")
+    H(calibration, tracks, "maps pixels")
+    V(tracks, fusion, "tracked spots")
+    H(radio, fusion, "fresh radio state")
+    H(fusion, located, "band + spot")
+    D(fusion, "b", .2, page, "t", .9, "local HTTP", both=True)
+    D(located, "b", .15, archive, "t", .85, "saves evidence")
+    V(located, module, "reports sighting")
+    return S.end_frame()
+
+
+def venue_reconstruction(y0):
+    S.begin_frame("24 · Venue reconstruction", 0, y0, 3360, 1690)
+
+    def G(x, y, w, label, items, kind="note", cols=2, image=None):
+        rows = (len(items) + cols - 1) // cols
+        h = 140 + rows * 160
+        zone = S.zone(x, y, w, h, label, "plain", fs=ZFS, logo=image)
+        cell_w = (w - 60 - (cols - 1) * 20) / cols
+        for i, item in enumerate(items):
+            B(x + 30 + (i % cols) * (cell_w + 20), y + 130 + (i // cols) * 160,
+              item, kind, w=cell_w, h=140)
+        return zone
+
+    walk = B(60, 180, "Walk-through video", "device",
+             w=520, h=300, wordmark=PHONE, mark_h=100)
+    frames = G(820, 180, 600, "Frame selection",
+               ["Sharpness score", "Stillness filter"], "rust", image=OPENCV)
+    poses = G(1660, 180, 600, "COLMAP",
+              ["Feature matching", "Camera poses", "3D points", "Undistorted images"], "ext", image=COLMAP)
+    train = G(2500, 180, 780, "Brush",
+              ["Gaussian training", "splat.ply"], "ext", image=GRAPH3D)
+
+    camera = G(60, 900, 520, "Camera registration",
+               ["Camera frame", "Image matching", "Camera pose", "Lens calibration"], "device", image=CAMERA)
+    mapping = G(820, 900, 600, "Camera-to-plan mapping",
+                ["Wrist-height ray", "Plan coordinates"], "note", image=logo("icon-map-pin.svg"))
+    view = G(1660, 900, 600, "Security page",
+             ["venue.splat", "scene.json", "Camera coverage"], "web", image=SPARK)
+    align = G(2500, 900, 780, "Align model to venue",
+              ["Floor plane", "Plan landmarks", "Measured scale", "Venue transform", "Venue bounds"],
+              "rust", image=GRAPH3D)
+
+    H(walk, frames, "video")
+    H(frames, poses, "sharp images")
+    H(poses, train, "poses + images")
+    V(train, align, "trained splat")
+    H(align, view, "venue model")
+    R(poses, "b", camera, "t",
+      [(poses.cx, S.oy + 760), (camera.cx, S.oy + 760)],
+      label="registered model", seg=1)
+    H(camera, mapping, "camera pose")
+    H(mapping, view, "image-to-plan mapping")
+    R(align, "b", mapping, "b",
+      [(align.cx, S.oy + 1640), (mapping.cx, S.oy + 1640)],
+      label="venue transform", seg=1)
+    return S.end_frame()
+
+
+
+def nessie(y0):
+    """One provider, its operations and references, then local wallet accounting."""
+    S.begin_frame("Capital One Nessie", 0, y0, 4480, 2070)
+    provider = _nessie_component(1000, 100, 1600, 1430, "Nessie API", "ext")
+    brand = S.image(S.ox + 1070, S.oy + 155, CAPONE, 175)
+    brand.setdefault("customData", {})["diagramParentComponent"] = provider.id
+    customer = _nessie_component(1060, 350, 620, 360, "Create customer", "ext", parent=provider)
+    _nessie_property(customer, 1100, 560, 540, "returns customer_id")
+    account = _nessie_component(1920, 350, 620, 360, "Checking account", "ext", parent=provider)
+    _nessie_property(account, 1960, 560, 540, "returns account_id")
+    deposit = _nessie_component(1060, 1040, 620, 360, "Deposit", "ext", parent=provider)
+    _nessie_property(deposit, 1100, 1250, 540, "returns deposit_id")
+    purchase = _nessie_component(1920, 1040, 620, 360, "Purchase", "ext", parent=provider)
+    _nessie_property(purchase, 1960, 1250, 540, "returns purchase_id")
+    H(customer, account, "worker uses customer ID")
+
+    setup = B(80, 350, "Wallet setup", "web", w=550, h=360,
+              wordmark=PHONE, mark_h=100)
+    injury = B(80, 1040, "Approved injury payout", "good", w=550, h=360,
+               wordmark=HEART, mark_h=100)
+    H(setup, customer, "worker POST")
+    H(injury, deposit, "worker POST")
+
+    ledger = _nessie_component(2970, 1040, 620, 430, "wallet_entry", "stdb", STDB)
+    _nessie_property(ledger, 3010, 1250, 540, "signed amount_cents")
+    _nessie_property(ledger, 3010, 1370, 540, "Nessie reference", h=70)
+    total = _nessie_component(2970, 350, 620, 430, "Spendable balance", "rust", RUST)
+    _nessie_property(total, 3010, 560, 540, "sum wallet_entry cents")
+    _nessie_property(total, 3010, 680, 540, "subtract pending holds", h=70)
+    wallet = SV(3890, 350, STDB, "my_wallet", kind="stdb", w=500, h=430)
+    H(total, wallet, "available cents")
+    V(ledger, total, "wallet entries")
+    R(account, "r", ledger, "l", [S.P(2770, 530), S.P(2770, 1147.5)],
+      "worker records opening", seg=1, fb=.25)
+    H(purchase, ledger, "worker records debit", y=purchase.cy)
+    R(deposit, "b", ledger, "b", [S.P(1370, 1490), S.P(3280, 1490)],
+      "worker records credit", seg=1)
+
+    approval = B(80, 1690, "Organizer approves charge", "good", w=550, h=300,
+                 wordmark=USER, mark_h=100)
+    payment = B(920, 1690, "Attendee pays", "web", w=550, h=300,
+                wordmark=PHONE, mark_h=100)
+    merch = B(1940, 1690, "Merch checkout", "web", w=550, h=300,
+              wordmark=STORE, mark_h=100)
+    H(approval, payment, "permits payment")
+    R(payment, "t", purchase, "b", [S.P(1195, 1590), S.P(2050, 1590)],
+      "worker POST", seg=1, fb=.21)
+    V(merch, purchase, "worker POST", x=S.ox + 2390)
+    return S.end_frame()
+
+
+def _nessie_component(x, y, w, h, label, kind="stdb", logo_=None, parent=None):
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el.update(backgroundColor={"ext": "#c3fae8", "stdb": "#dbe4ff", "rust": "#e9edf2"}.get(kind, "#d0ebff"), strokeColor="#b5bfca")
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    if parent:
+        box.el["backgroundColor"] = "#e7fbf2"
+        box.el["customData"]["diagramParentComponent"] = parent.id
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _nessie_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+
+def band_wiring(y0):
+    S.begin_frame("20 · Band wiring", 0, y0, 3540, 3240)
+
+    def component(x, y, w, h, label, art=None, dashed=False):
+        first = len(S.elements)
+        box = Z(x, y, w, h, label, "device", art)
+        box.el.update(backgroundColor="#ffe8cc", strokeColor="#b5bfca",
+                      strokeStyle="dashed" if dashed else "solid")
+        box.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        return box
+
+    def prop(parent, x, y, label, w=310, h=130, dashed=False):
+        cell = B(x, y, label, "stdb", w=w, h=h, dashed=dashed)
+        cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+        cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+        return cell
+
+    left, middle, right = 80, 1360, 2800
+    rows = (180, 820, 1460, 2100)
+    board = component(middle - 20, rows[0], 800, 2480,
+                      "XIAO ESP32-C3 · band controller", SEEED)
+    values = (
+        ("Same firmware\nlite + full bands", "USB-C\ncharging + serial"),
+        ("LiPo charger\n380 mA", "3V3 regulator"),
+        ("ESP-NOW transmit\n8 dBm", "5V pin live\nonly on USB"),
+        ("D8 + D9\nnever wired", "D9\nBOOT"),
+        ("No power\nswitch", "Unlit ring\n≈12 mA"),
+        ("One click\ndeep sleep", "One click\nwake"),
+    )
+    for row, pair in enumerate(values):
+        for col, label in enumerate(pair):
+            prop(board, middle + 20 + col * 380, 540 + row * 330,
+                 label, w=350, h=240)
+
+    ring = component(left - 20, rows[0], 720, 560, "LED ring · WS2812B")
+    prop(ring, left, rows[0] + 270, "LED count\n12")
+    prop(ring, left + 350, rows[0] + 270, "Brightness\n64 / 255")
+    prop(ring, left, rows[0] + 420, "Power: battery rail", w=660)
+
+    button = component(left - 20, rows[1], 720, 560, "SOS control · button")
+    prop(button, left, rows[1] + 270, "Under ring\ncentre")
+    prop(button, left + 350, rows[1] + 270, "Pull-up input")
+    prop(button, left, rows[1] + 420, "Wakes deep sleep", w=660)
+
+    imu = component(left - 20, rows[2], 720, 560, "Motion · MPU-6050 · GY-521", dashed=True)
+    prop(imu, left, rows[2] + 270, "Optional\nfull bands", dashed=True)
+    prop(imu, left + 350, rows[2] + 270, "I2C address\n0x68")
+    prop(imu, left, rows[2] + 420, "Range\n±8 g")
+    prop(imu, left + 350, rows[2] + 420, "Read rate\n100 / second")
+
+    motor = component(left - 20, rows[3], 720, 560, "Haptics · coin vibration motor", dashed=True)
+    prop(motor, left, rows[3] + 270, "Optional\nfull bands", dashed=True)
+    prop(motor, left + 350, rows[3] + 270, "Driver\n2N2222")
+    prop(motor, left, rows[3] + 420, "PWM rate\n20 kHz")
+    prop(motor, left + 350, rows[3] + 420, "Duty cycle\n70%")
+
+    battery = component(right - 20, rows[0], 720, 560, "Battery supply · LiPo")
+    prop(battery, right, rows[0] + 270, "Capacity\n500 mAh")
+    prop(battery, right + 350, rows[0] + 270, "Protected cell")
+    prop(battery, right, rows[0] + 420, "Supplies ring + motor", w=660)
+
+    antenna = component(right - 20, rows[1], 720, 560, "FPC antenna", RADIO)
+    prop(antenna, right, rows[1] + 270, "Mounted on lid", w=660)
+    prop(antenna, right, rows[1] + 420, "Outside case", w=660)
+
+    divider = component(right - 20, rows[2], 720, 560, "Battery measurement · divider", dashed=True)
+    prop(divider, right, rows[2] + 270, "Resistance\n2 × 200 kΩ")
+    prop(divider, right + 350, rows[2] + 270, "Not fitted", dashed=True)
+    prop(divider, right, rows[2] + 420, "Battery % when fitted", w=660)
+
+    nfc = component(right - 20, rows[3], 720, 560, "Tap link · NTAG215 NFC sticker", NFC)
+    prop(nfc, right, rows[3] + 270, "No wires", w=660)
+    prop(nfc, right, rows[3] + 420, "Opens\nband1t.vip/t/BANDIT-0N", w=660)
+
+    H(board, ring, "D1 · GPIO3\n330 Ω → DIN", y=ring.cy)
+    H(button, board, "D2 · GPIO4\nbutton → GND", y=button.cy)
+    H(board, imu, "D4 · GPIO6 SDA\nD5 · GPIO7 SCL\n3V3 + GND", y=imu.cy,
+      both=True, dashed=True)
+    H(board, motor, "D6 · GPIO21\n1 kΩ → base", y=motor.cy, dashed=True)
+    H(battery, board, "BAT+ and BAT− pads", y=battery.cy)
+    H(board, antenna, "U.FL", y=antenna.cy, both=True)
+    H(divider, board, "D0 · GPIO2 (A0)", y=divider.cy, dashed=True)
+
+    case = component(2780, 2740, 720, 440, "Printed pill case")
+    prop(case, 2800, 2830, "Size\n64 × 42 mm", h=140)
+    prop(case, 3150, 2830, "Button hole\n6.5 mm", h=140)
+    prop(case, 2800, 3020, "Ring in head · battery below", w=660, h=140)
+    return S.end_frame()
+
 
 
 def band_firmware(y0):
-    S.begin_frame("22 · Band firmware", 0, y0, 3800, 1900)
+    S.begin_frame("22 · Band firmware", 0, y0, 4000, 2660)
 
-    def card(x, y, label, art, w=820, h=330, kind="device"):
-        return B(x, y, label, kind, w=w, h=h, fill=WHITE,
-                 wordmark=art, mark_h=160)
+    def cell(x, y, text, kind="device", w=600, h=220, art=None):
+        kw = {"wordmark": art, "mark_h": 130} if art else {}
+        return B(x, y, text, kind, w=w, h=h, **kw)
 
-    left, middle, right = 80, 1420, 2900
-    rows = (140, 580, 1020, 1460)
-    peers = card(left, rows[0], "nearby bands\nstates + heard lists", RADIO)
-    stations = card(left, rows[1], "station markers\nid + color + signal", RADIO)
-    button = card(left, rows[2], "SOS button\nhold 3 s", WATCH)
-    fall = card(left, rows[3], "fall sensor\nfree fall → impact\n→ stillness", HEART)
+    def component(x, y, w, h, label, art=None):
+        first = len(S.elements)
+        parent = Z(x, y, w, h, label, "device", art)
+        parent.el.update(backgroundColor="#ffe8cc", strokeColor="#b5bfca")
+        parent.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        return parent
 
-    band = card(middle, 580,
-                "band firmware\nESP32-C3\nnon-blocking main loop\nown SOS / fall first\nno internet needed",
-                WATCH, w=960, h=770)
+    def prop(parent, x, y, w, label, h=140, fill="#f5f7ff"):
+        child = B(x, y, label, "stdb", w=w, h=h)
+        child.el.update(backgroundColor=fill, strokeColor="#c0cbe4", strokeWidth=1)
+        child.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+        return child
 
-    helpers = card(right, rows[0],
-                   "3 nearest helpers\ncopy caller's SOS color\nfrom caller's heard list", WATCH)
-    alarm = card(right, rows[1],
-                 "12-LED ring\nmanual SOS: orange\nfall: red\nmotor on full bands", WATCH)
-    exits = card(right, rows[2],
-                 "nearest station color\n2 dB switching margin\nidle / crowd / low visibility", RADIO)
-    gateway = card(right, rows[3], "gateway\nband state + heard lists", RADIO)
+    firmware = component(40, 80, 3920, 430, "ESP32-C3 · band firmware", WATCH)
+    prop(firmware, 90, 290, 1080, "Non-blocking main loop")
+    prop(firmware, 1370, 290, 1200, "Own SOS or fall first")
+    prop(firmware, 2770, 290, 1100, "No internet needed")
 
-    for source, fraction, label in (
-        (peers, 0.10, "hears peers"),
-        (stations, 0.35, "hears stations"),
-        (button, 0.65, "raises SOS"),
-        (fall, 0.90, "detects fall"),
-    ):
-        D(source, "r", 0.5, band, "l", fraction, label)
-    for target, fraction, label in (
-        (helpers, 0.10, "selects helpers"),
-        (alarm, 0.35, "drives alarm"),
-        (exits, 0.65, "guides to exit"),
-        (gateway, 0.90, "broadcasts reports"),
-    ):
-        D(band, "r", fraction, target, "l", 0.5, label)
+    Z(40, 560, 3920, 780, "own incident — overrides helper and exit colors", "device")
+    button = component(90, 640, 1260, 340, "SOS button", WATCH)
+    prop(button, 130, 850, 1180, "Hold 3 s", h=90)
+    ring = component(2290, 640, 760, 650, "12-LED ring")
+    orange = prop(ring, 2370, 840, 600, "Orange SOS", fill="#fff4e6")
+    red = prop(ring, 2370, 1110, 600, "Red fall", fill="#ffe3e3")
+    motor = component(3210, 880, 650, 390, "Motor")
+    prop(motor, 3250, 1090, 570, "Full bands only", h=110)
+    freefall = cell(90, 1070, "Free fall", "note", w=540)
+    impact = cell(810, 1070, "Impact", "note", w=540)
+    stillness = cell(1530, 1070, "Stillness", "note", w=540)
+    H(button, orange, "raises SOS")
+    H(freefall, impact, "then")
+    H(impact, stillness, "then")
+    H(stillness, red, "raises fall")
+    D(orange, "r", .5, motor, "l", .25, "vibrates")
+    D(red, "r", .5, motor, "l", .75, "vibrates")
+
+    Z(40, 1400, 3920, 440, "nearby caller — when this band has no own incident", "device")
+    heard = cell(90, 1460, "Caller’s\nheard list", w=660, h=340, art=RADIO)
+    helpers = cell(1130, 1530, "Select 3\nnearest helpers", "rust", w=740)
+    selected = cell(2210, 1530, "This band\nis selected", "note", w=660)
+    copy = cell(3210, 1530, "Copy caller’s\nSOS color", w=650)
+    H(heard, helpers, "ranks peers")
+    H(helpers, selected, "checks")
+    H(selected, copy, "yes")
+
+    Z(40, 1900, 3920, 700, "exit guidance — when no incident color is active", "device")
+    station = cell(90, 2110, "Station beacon\nid + color + signal", w=600, h=340, art=RADIO)
+    nearest = cell(1030, 2190, "Nearest station", "rust", w=650)
+    margin = cell(1990, 2190, "Switch at\n2 dB margin", "note", w=650)
+    exitcolor = cell(3150, 2190, "Show nearest\nstation color", w=710)
+    idle = cell(2770, 1990, "Idle", "note", w=280, h=120)
+    crowd = cell(2770, 2200, "Crowd", "note", w=280, h=120)
+    lowvis = cell(2770, 2390, "Low\nvisibility", "note", w=280, h=120)
+    H(station, nearest, "compares signal")
+    H(nearest, margin, "changes only")
+    R(margin, "b", exitcolor, "b", [S.P(2315, 2560), S.P(3505, 2560)],
+      "keeps color stable", seg=1)
+    D(idle, "r", .5, exitcolor, "t", .25, "")
+    H(crowd, exitcolor)
+    D(lowvis, "r", .5, exitcolor, "b", .25, "")
     return S.end_frame()
 
 
 
-def views(y0):
-    """Compact audience map; the separate inventory accounts for all 75 views."""
-    S.begin_frame("23 · Live views", 0, y0, 3440, 2230)
-
-    module = SV(60, 800, STDB, "band1t module\nprivate tables\npublic venue state", kind="stdb", w=660, h=440)
-    bus_x = 1040
-    bus_top, bus_bottom = 250, 1990
-    S.base("line", S.ox + bus_x, S.oy + bus_top, 0, bus_bottom - bus_top,
-           points=[[0, 0], [0, bus_bottom - bus_top]],
-           strokeColor="#364fc7", strokeWidth=2, roughness=0,
-           lastCommittedPoint=None, startBinding=None, endBinding=None,
-           startArrowhead=None, endArrowhead=None)
-    S.arrow(module, None, [module.side("r"), S.P(bus_x, L(module.cy))],
-            label="committed rows", fs=AFS)
-
-    def audience(y, names, filter_label, person, purpose, art, kind="web", public=False):
-        row = B(1390, y, names, "stdb" if not public else "web", w=900, h=220)
-        client = B(2750, y, person + "\n" + purpose, kind, w=600, h=220,
-                   icons={0: art})
-        S.arrow(None, row, [S.P(bus_x, y + 110), row.side("l")],
-                label=filter_label, fs=AFS,
-                color="#495057" if public else "#364fc7", dashed=public)
-        H(row, client, "live rows" if not public else "row changes")
-        return row, client
-
-    audience(140, "my_band\nmy_medical_card\nmy_wallet",
-             "identity match", "attendee", "band + health + balance", PHONE)
-    audience(430, "medic_medical_cards",
-             "granted reader", "medic", "tapped medical cards", HEART)
-    audience(720, "claims_board (ops / medic)\nclaim_clauses(claim_id) (ops)\nowner access",
-             "role checks", "organizer", "board + claim detail", MONITOR)
-    audience(1010, "social_attendees\nsocial_visits",
-             "service roles", "API + indexer", "profiles + visits", RUST, "rust")
-    audience(1300, "worker_jobs",
-             "worker / owner", "workers", "queued + leased jobs", RUST, "rust")
-    audience(1590, "event_graph\nclaimed_people",
-             "anonymous", "venue + tap pages", "graph + profiles", GRAPH3D, public=True)
-    audience(1880, "public tables\ncommand: pending = true\nband · zone · venue",
-             "client query", "bridge + venue screens", "commands + floor", RADIO,
-             public=True)
-    return S.end_frame()
 
 
-FRAMES = (overview, architecture, spacetimedb, queues, vision, pipeline, evidence, insurance, claude_jobs, social, interests, merch,
-          nessie, vultr, hardware)
-MEDIC = LOGOS.parent / "medic-routing" / "medic-routing.excalidraw"  # medic routing, walk, light circle, exits
-only = sys.argv[2:]  # frame function names, for a board of just those frames
-y = n = 0
+
+
+FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
+          nessie, jobs, prepare_event, find_people, photo_memories,
+          settle_claim, policy_amounts, approve_rule, respond_incident,
+          routes_space, hardware, band_wiring, exit_markers_gateway,
+          band_firmware, vision, venue_reconstruction)
+
+ALIASES = {
+    "overview": ("architecture",), "vultr": ("architecture",),
+    "queues": ("jobs",), "pipeline": ("prepare_event",),
+    "evidence": ("elastic_evidence",), "claude_jobs": ("elastic_execution",),
+    "social": ("find_people", "photo_memories"),
+    "insurance": ("settle_claim", "policy_amounts", "approve_rule"),
+    "medic": ("respond_incident", "routes_space"),
+    "views": ("spacetimedb",),
+}
+requested = sys.argv[2:]
+only = {name for item in requested for name in ALIASES.get(item, (item,))}
+known = {draw.__name__ for draw in FRAMES}
+unknown = only - known
+if unknown:
+    raise SystemExit("Unknown frame: " + ", ".join(sorted(unknown)))
+y = 0
 for draw in FRAMES:
-    if not only or draw.__name__ in only:
-        y += draw(y) + GAP
-        n += 1
-        frame = next(e for e in reversed(S.elements) if e["type"] == "frame")
-        frame["name"] = f"{n} · {frame['name'].split(' · ')[-1]}"  # numbered in board order
-if not only or "medic" in only:
-    y += stack(MEDIC, y, n + 1) + GAP
-for draw in (band_wiring, exit_markers_gateway, band_firmware, views):
     if not only or draw.__name__ in only:
         y += draw(y) + GAP
 S.dump(sys.argv[1] if len(sys.argv) > 1 else "bandit-system-design.excalidraw")

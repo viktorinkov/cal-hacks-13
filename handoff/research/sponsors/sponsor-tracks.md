@@ -595,3 +595,32 @@ The pinned post (Charlie Huang, 2026-10-23 22:16 PT) is about the venue Wi-Fi ru
 - An Elastic criteria text on Hive, Devpost or in the hacker guide. All three still say "Coming soon!" or give only the prize. Elastic's own criteria are only in its workshop deck.
 - Visa and Capital One have no criteria text on Devpost. Hive has them.
 - I did not open these files: the Figma deck "Cal Hacks 13.0 Workshop: Move fast and don't break things" (SpacetimeDB), "Building with Multi-Agent Teams - Anthropic.pdf", "Beyond Agentic Harnesses · Hyphenate CalHacks Workshop.pdf" and the Hyphenate Fathom recording.
+
+
+## Microsoft
+
+Source preservation, 2026-10-25. The citation and prompt below were copied unchanged from `devpost.md` (SHA-256 `eaa6c210028856abf73cd87cec0f3e0f7aa04ad4dd4e49452196c5a6608579af`). Track: Grand Prize: Built for the Real World.
+
+**Prompt** ([Cal Hacks prizes page](https://hive.hackberkeley.org/prizes)):
+
+> Track Challenge: Build a production-minded AI agent that solves a meaningful problem in finance, productivity, healthcare, or another high-impact domain
+>
+> Judging Criteria:
+>
+> - Customer understanding
+> - Measurable usefulness
+> - Path from prototype to production
+> - responsible design
+> - end to end functionality
+
+Microsoft judges its second track, the Microsoft Customer Impact Award, on the same criteria.
+
+## Vultr
+
+Source preservation, 2026-10-25. The citation and prompt below were copied unchanged from the same `devpost.md` revision. Track: MLH Best Use of Vultr.
+
+**Prompt** ([Cal Hacks prizes page](https://hive.hackberkeley.org/prizes)):
+
+> Vultr empowers hackers to bring their high-performance projects to life instantly; providing everything from the speed of one-click deployment and scalable cloud compute, to specialized Vultr Cloud GPUs that can power AI-driven applications. We want you to push the limits of what can be built when infrastructure is no longer the bottleneck!
+>
+> Sign up for a Vultr account today and claim your free cloud credits! Take your next hack to the cloud with Vultr for a chance to win some awesome prizes for you and your team!
