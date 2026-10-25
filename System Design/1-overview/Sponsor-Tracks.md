@@ -104,7 +104,9 @@ They answer to the organizer, the venue's risk manager. Checking each claim agai
 
 BandIt enters its payment resolution. The insurance Decision Engine decides who is paid and how much, and the ledger, the wallet payouts and the insurer reconciliation move the money ([Insurance](../6-features/Insurance.md)).
 
-The organizer reads the same books as the event's controller on the Costs tab: the costs so far by cost center, who pays what, every cost line and the journal with its trial balance ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
+The organizer reads the same books as the event's controller on the Costs tab: the net cost, the costs so far by cost center, who pays what, the merch sold, what the event owes each sponsor booth, every cost line and the journal with its trial balance ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
+
+The booth settlement resolves who pays what for merch. An Elastic mug sold from the recap for $18 pays the print shop $5, keeps the event's 10% fee of $1.80 and owes the Elastic booth $11.20 ([Merch](../6-features/Merch.md#merch-on-the-costs-tab)).
 
 | The track asks | BandIt answers with | See it |
 |---|---|---|

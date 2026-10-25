@@ -16,6 +16,8 @@ const TERMS: [RegExp, string, string?][] = [
   [/\baccounts_payable\b/, 'Liability account: vendor bills the venue has approved and not paid yet.'],
   [/\baccrued_liabilities\b/, 'Liability account: work done for the event that no bill covers yet.'],
   [/\bmerch_revenue\b/, 'Revenue account: what merch sales brought in.'],
+  [/\battendee_receivable\b/, 'Asset account: what the people responsible were charged and have not paid yet.'],
+  [/\binsurer_payable\b/, 'Liability account: the insurer\'s share of a charge, which repays what it paid on the claim.'],
   [/^cash$|(?<=[DC]r )cash\b/, 'Asset account: the venue\'s money, paid out to claimants and received from the insurer.'],
 
   // The claims' journals.
@@ -24,6 +26,10 @@ const TERMS: [RegExp, string, string?][] = [
   [/\bJ2(?: receivable)?\b/, 'Journal entry that books the insurer\'s share as owed to the venue.'],
   [/\bJ3(?: claimant payment)?\b/, 'Journal entry for the payment run: the payout leaves the venue\'s cash.'],
   [/\bJ4(?: reconciliation)?\b/, 'Journal entry for cash application: the insurer\'s payment is matched to what it owed.'],
+  [/\bJ5r(?: charge waived)?\b/, 'Journal entry that cancels a charge the organizer waived or the attendee disputed.'],
+  [/\bJ5(?: charge)?\b/, 'Journal entry that books an approved charge as owed by the person responsible: the insurer\'s share and the deductible.'],
+  [/\bJ6(?: charge payment)?\b/, 'Journal entry for cash application: the person responsible paid their charge from their wallet.'],
+  [/\bJ7(?: deductible returned)?\b/, 'Journal entry that gives the owner their deductible back into their wallet from a paid charge.'],
 
   // Bookkeeping.
   [/\btrial balance\b/i, 'Every account\'s total debits and credits; the two totals must match.'],
@@ -69,6 +75,18 @@ const TERMS: [RegExp, string, string?][] = [
   [/^excluded\b/i, 'Not paid: the policy does not cover this service.'],
   [/\bnot covered\b/i, 'The part of the bill the policy does not pay, left to the attendee or their health plan.'],
   [/^cost$/i, 'What the incident cost before any cover: the bill or the repair cost.'],
+
+  // Merch and the booths.
+  [/\bnet cost\b/i, 'What the claims cost the venue, less its part of the charges and the merch margin.'],
+  [/\bprint cost\b/i, 'What the print shop bills to make the products: the cost of goods sold.'],
+  [/\b(?:merch )?margin\b/i, 'What the event keeps from merch after the print cost and what it owes the booths.'],
+  [/^sales$/i, 'What attendees paid for the products from their wallets.', 'th'],
+  [/^fee$/i, 'The event\'s 10% of the booth\'s sales, for running the shop.', 'th'],
+  [/\bowed to booth\b/i, 'What the event pays the booth: its sales less the print cost and the event\'s fee.'],
+  [/^booths$/i, 'What the event owes the sponsor booths for the products that name them.', 'th'],
+  [/^loss$/i, 'What the incidents at the booth\'s table cost before anyone paid.', 'th'],
+  [/^charged$/i, 'What the people responsible were charged: it repays the insurer\'s share, and the deductible goes to the venue or back to the owner.', 'th'],
+  [/^recovered$/i, 'The venue\'s part of the charges: the deductible it carried on its own equipment.', 'th'],
 
   // Insurance.
   [/\bdeductibles?\b/i, 'The part of each covered loss the venue pays itself before the insurer pays.'],

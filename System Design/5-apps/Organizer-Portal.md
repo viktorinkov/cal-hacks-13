@@ -280,20 +280,29 @@ sequenceDiagram
 
 ### Costs tab (Insurance.md)
 
-The Costs tab shows the event's costs so far, from the incidents the event has covered. It answers one question for the organizer, who acts as the event's controller: who pays what.
+The Costs tab shows the event's costs so far, from the incidents the event has covered and the merch it sold. It answers one question for the organizer, who acts as the event's controller: who pays what.
 
-It sums the double-entry `ledger_entry` journals that the claims post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every number agrees with the Settlements tab, and the tab keeps no totals of its own.
+It sums the double-entry `ledger_entry` journals that the claims and charges post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every claim number agrees with the Settlements tab, and the tab keeps no totals of its own. Merch comes from the paid orders in `board_merch_orders`, the merch subledger, with each product's kind and booths from `merch_template` ([Merch](../6-features/Merch.md#merch-on-the-costs-tab)).
 
-Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), and property cover goes to Venue (the venue's own equipment). A claim counts once, in one cost center.
+Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), property cover goes to Venue (the venue's own equipment), and personal property cover goes to Belongings (an attendee's stolen or broken belonging, paid from their own policy). A claim counts once, in one cost center.
 
-The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application.
+The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible: the insurer's share goes to `insurer_payable` and the deductible to `recoveries`. J6 charge payment is its cash application, and J7 returns an owner's deductible to their wallet.
+
+"Net cost" is one row, the bottom line:
+
+| Column | From |
+|---|---|
+| Claims | what the claims cost the venue, the Venue column of "Who pays" |
+| Recovered | the venue's part of the charges: the `recoveries` balance on Venue claims, the deductible it carried; the insurer's share sits in `insurer_payable`, and a Belongings deductible goes back to the owner |
+| Merch margin | the Margin total of "Merch" |
+| Net cost | Claims less Recovered less Merch margin |
 
 "Cost centers" has one row per cost center and a total row:
 
 | Column | From |
 |---|---|
 | Claims | the claims in the cost center |
-| Billed | the hospital report's billed total, or the repair cost the organizer logged |
+| Billed | the hospital report's billed total, or the repair cost or item value the staff logged |
 | Accrued | J1 reserves not yet paid: the `claims_reserve` balance |
 | Paid | J3 payments: the `cash` credits |
 | Insurer owes | J2 receivables not yet paid back: the `insurer_receivable` balance |
@@ -301,17 +310,21 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 | Venue | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
 | Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
 
-"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical did not cover; and what is unpaid.
+"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical and Belongings did not cover; the people responsible, for what they were charged (the `attendee_receivable` debits of J5 less J5r); and what is unpaid.
 
-"Claims" has one row per claim with its cost center, claimant, amounts and status. The claim number opens the claim on the Settlements tab.
+"Merch" has one row per product that sold and a total row: its orders, sales, print cost, what it owes the booths and the event's margin.
+
+"Booths" has one row per sponsor booth with sales or incidents and a total row: its sales, print cost and event fee, what the event owes it, and the incidents at its table with their loss and what the people responsible were charged.
+
+"Claims" has one row per claim with its cost center, claimant, amounts, charge and status. The claim number opens the claim on the Settlements tab.
 
 "Trial balance" has one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. "Journal" lists every journal entry, newest first, with its claim, its lines on one row and when it was posted.
 
-With no claims the tab reads "No claims yet."
+With no claims and no paid orders the tab reads "No claims yet." With paid orders and no claims it shows "Merch" and "Booths" only.
 
-The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
+The tab has no controls.
 
-Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, each account and the journals J1 to J4. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
+Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, print cost, margin, event fee, what is owed to a booth, net cost, each account and the journals J1 to J6. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
 
 ### Event graph (Social.md)
 
