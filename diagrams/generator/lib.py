@@ -25,6 +25,7 @@ KINDS = {
     "note": ("#fff3bf", "#e67700"),
     "bad": ("#ffe3e3", "#c92a2a"),
     "good": ("#d3f9d8", "#2b8a3e"),
+    "claude": ("#fdf0ea", "#d97757"),
 }
 ZONES = {
     "device": ("#fff4e6", "#d9480f"),

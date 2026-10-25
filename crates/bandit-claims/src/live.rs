@@ -3,8 +3,8 @@
 //! resolves the incident; the person who fell files their claim (staff file it for them) and the hospital
 //! report follows on its own; the camera confirms broken equipment and the organizer logs the repair cost.
 //! A claim left waiting for the organizer is decided after `--approve-after` seconds so the run keeps
-//! moving: approved with a learned rule, or refused when the claims agent found the injury happened away
-//! from the event. While the run is paused, the floor staff wait too.
+//! moving: approved with a learned rule, or refused when Claude recommended refusing it. While the run is
+//! paused, the floor staff wait too.
 //!
 //! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
 //! band, is treated as a sprain at first aid.
@@ -15,6 +15,7 @@ use anyhow::Result;
 use bandit_bindings::*;
 use spacetimedb_sdk::Table;
 use std::collections::HashSet;
+use std::process::{Command, Stdio};
 
 /// What the owner connection mirrors for the run: everything the flow commands read, but not the crowd's bands.
 const LIVE_TABLES: &[&str] = &[
@@ -75,6 +76,7 @@ const COST_SECS: i64 = 16;
 pub fn run(app: &App, approve_after: u64) -> Result<()> {
     let db = app.db_with(LIVE_TABLES)?;
     say!(app, "live       watching the run on {} at {}", app.database, app.uri);
+    file_left_records(app, &db)?;
     // Steps already taken this process, so a step that failed once is not retried every half second.
     let mut done: HashSet<(u64, &'static str)> = HashSet::new();
     let mut phase = None;
@@ -116,6 +118,32 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
         }
         sleep_ms(500);
     }
+}
+
+/// Injury claims from earlier runs left waiting for a record PDF that nobody files: the medic's record goes
+/// on each, one at a time in the background so the run is not held up.
+fn file_left_records(app: &App, db: &DbConnection) -> Result<()> {
+    let left: Vec<(u64, String)> = db
+        .db
+        .claim()
+        .iter()
+        .filter(|c| c.status == ClaimStatus::AwaitingRecord && c.status_note == "waiting for the medical record")
+        .filter_map(|c| db.db.live_plan().incident_id().find(&c.incident_id).filter(|p| !p.record.is_empty()).map(|p| (c.id, p.record)))
+        .collect();
+    if left.is_empty() {
+        return Ok(());
+    }
+    say!(app, "live       filing the medic's record on {} claims left waiting for one", left.len());
+    let exe = std::env::current_exe()?;
+    std::thread::spawn(move || {
+        for (claim, template) in left {
+            let _ = Command::new(&exe)
+                .args(["attach-record", "--claim", &claim.to_string(), "--template", &template, "--for-claimant"])
+                .stdin(Stdio::null())
+                .status();
+        }
+    });
+    Ok(())
 }
 
 /// The next step on one incident, when its time has come.
@@ -191,11 +219,13 @@ fn property(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: 
     Ok(())
 }
 
-/// The organizer's decision on a claim nobody decided in time.
+/// The organizer's decision on a claim nobody decided in time: refused when
+/// Claude recommended refusing it or there is nothing to pay, else approved.
 fn decide_claim(app: &App, c: &Claim) -> Result<()> {
-    if c.status_note.contains("causation") {
-        let reason = "the clinic record says the injury happened away from the event";
-        decide::refuse(app, c.id, None, reason, false)?;
+    if c.review_verdict == "refuse" {
+        decide::refuse(app, c.id, None, "the organizer agrees with Claude's refusal", false)?;
+    } else if c.payout_cents == 0 {
+        decide::refuse(app, c.id, None, "nothing to pay: no hospital report covers it", false)?;
     } else {
         decide::approve(app, c.id, None, None, true, false, false)?;
     }

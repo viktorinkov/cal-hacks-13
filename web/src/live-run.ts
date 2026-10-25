@@ -8,6 +8,7 @@ import { act, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
+import { matches, searchWords, searchable } from './table-search';
 import { venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { IncidentMarker, LiveRun } from './module_bindings/types';
@@ -248,19 +249,22 @@ function placeBands() {
 }
 
 function history() {
-  const rows = [...conn.db.decision.iter()].sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
+  const all = [...conn.db.decision.iter()];
+  const words = searchWords('decisions');
+  const hits = words.length ? all.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : all;
+  const rows = hits.sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
   return h('section', {},
     h('h4', {}, 'Decision history'),
-    rows.length === 0
+    all.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
-      : h('table', {},
+      : searchable('decisions', h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Incident'), h('th', {}, 'Who'), h('th', {}, 'Decided'), h('th', {}, 'Why')),
         rows.map(d => h('tr', {},
           h('td', {}, time(d.at)),
           h('td', {}, d.incidentId ? String(d.incidentId) : ''),
           h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
           h('td', {}, d.what),
-          h('td', {}, d.why)))));
+          h('td', {}, d.why)))), rows.length < all.length));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -278,7 +282,7 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
     h('h4', {}, `Incidents (${list.length})`),
     list.length === 0
       ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
-      : h('table', {},
+      : searchable('incidents', h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
         list.map(m => {
           const c = claims.get(m.claimId);
@@ -293,7 +297,7 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
               waiting && [' ', h('button', {
                 onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
               }, 'Approve and teach a rule')]));
-        })));
+        }))));
 }
 
 /** The Live tab's run section: the 3D view, our bands, the incidents and the decision history. */
