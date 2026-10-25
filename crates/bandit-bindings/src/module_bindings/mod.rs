@@ -224,6 +224,7 @@ pub mod job_reaper_timer_type;
 pub mod job_status_type;
 pub mod job_table;
 pub mod job_type;
+pub mod join_organizer_reducer;
 pub mod leave_early_reducer;
 pub mod leave_event_reducer;
 pub mod ledger_entry_table;
@@ -703,6 +704,7 @@ pub use job_reaper_timer_type::JobReaperTimer;
 pub use job_status_type::JobStatus;
 pub use job_table::*;
 pub use job_type::Job;
+pub use join_organizer_reducer::join_organizer;
 pub use leave_early_reducer::leave_early;
 pub use leave_event_reducer::leave_event;
 pub use ledger_entry_table::*;
@@ -1186,6 +1188,7 @@ pub enum Reducer {
     JobReaper {
         timer: JobReaperTimer,
     },
+    JoinOrganizer,
     LeaveEarly {
         node_id: u64,
     },
@@ -1600,6 +1603,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::IngestHeard { .. } => "ingest_heard",
             Reducer::IngestStation { .. } => "ingest_station",
             Reducer::JobReaper { .. } => "job_reaper",
+            Reducer::JoinOrganizer => "join_organizer",
             Reducer::LeaveEarly { .. } => "leave_early",
             Reducer::LeaveEvent => "leave_event",
             Reducer::LiveTick { .. } => "live_tick",
@@ -2065,6 +2069,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&job_reaper_reducer::JobReaperArgs {
                     timer: timer.clone(),
                 })
+            }
+            Reducer::JoinOrganizer => {
+                __sats::bsatn::to_vec(&join_organizer_reducer::JoinOrganizerArgs {})
             }
             Reducer::LeaveEarly { node_id } => {
                 __sats::bsatn::to_vec(&leave_early_reducer::LeaveEarlyArgs {

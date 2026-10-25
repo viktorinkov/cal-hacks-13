@@ -84,6 +84,7 @@ import ImportEventReducer from "./import_event_reducer";
 import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
+import JoinOrganizerReducer from "./join_organizer_reducer";
 import LeaveEarlyReducer from "./leave_early_reducer";
 import LeaveEventReducer from "./leave_event_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
@@ -1359,6 +1360,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_band", IngestBandReducer),
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
+  __reducerSchema("join_organizer", JoinOrganizerReducer),
   __reducerSchema("leave_early", LeaveEarlyReducer),
   __reducerSchema("leave_event", LeaveEventReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),

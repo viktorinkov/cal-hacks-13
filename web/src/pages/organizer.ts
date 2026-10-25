@@ -176,6 +176,7 @@ function header() {
     h('p', {},
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
+    signedInEmail() && can('medic') && !can('ops') && h('p', {}, organizerAccessLink()),
     roles().has('medic') && h('p', {}, 'Tap a band with this phone to open the wearer\'s medical card.'),
     ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap.'),
     can(...STAFF_ROLES) && runBar(conn, can('ops')),
@@ -183,23 +184,27 @@ function header() {
   ];
 }
 
-/** A signed-in person with no staff role sees the email the organizer adds them by. */
+/** Signed-in people can choose organizer access without an email invitation. */
 function noRole() {
-  const email = signedInEmail();
-  if (roles().has('photographer')) return h('section', {}, h('h3', {}, 'Photographer'), h('p', {}, h('a', { href: '/photo' }, 'Add event photos')));
   return h('section', {},
-    h('h3', {}, 'This account has no staff role'),
-    email
-      ? h('p', {}, `The organizer portal is for the event's staff. Ask the organizer to add ${email} on the Staff tab; this page opens as soon as they do.`)
-      : [h('p', {}, 'The organizer portal is for the event\'s staff. To get access, send this code to the organizer:'), h('p', {}, h('code', {}, conn.identity!.toHexString()))],
-    h('p', {}, 'Once you are a medic, tapping a band with this phone opens the wearer\'s medical card.'));
+    h('h3', {}, 'Organizer access'),
+    signedInEmail()
+      ? h('p', {}, 'You can run the event with this account.')
+      : h('p', {}, 'Sign in with email to run the event.'),
+    h('p', {}, organizerAccessLink()),
+    roles().has('photographer') && h('p', {}, h('a', { href: '/photo' }, 'Add event photos')));
+}
+
+function organizerAccessLink() {
+  const next = location.pathname === '/portal' ? '/portal' : '/organizer';
+  return h('a', { href: `/organizer-access?next=${encodeURIComponent(next)}` }, 'Continue as organizer');
 }
 
 /** The first screen: staff sign in before they see anything. */
 function signInScreen() {
   return [
     h('h2', {}, 'BandIt organizer portal'),
-    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, who pays for each claim and the end of the event.'),
+    h('p', {}, 'Sign in with your email to run the event: live zones and alerts, attendees, who pays for each claim and the end of the event.'),
     h('button', { onclick: signIn }, 'Sign in with email'),
   ];
 }

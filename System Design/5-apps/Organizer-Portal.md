@@ -18,7 +18,7 @@ Responsibilities:
 - Give the organizer (`ops`) the attendee list with band status and "Take the band back" (`release_band`), and the "Event ended" button (`end_event`). Once the event has ended, the button becomes "Reopen the event" (`reopen_event`).
 - Insurance.md: give the organizer "Waiting for your decision", the claims no payment rule settled, to decide after the event.
 - Insurance.md: give the organizer the rules Claude proposes from their precedents, to approve or reject, on the Proposed rules tab, with every payment rule and every precedent beside them.
-- Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
+- Let anyone choose organizer access after email sign-in. This grants `ops` to their own account; it does not grant owner authority.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
 - Bright-Data.md: start a server import for the configured event, set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab; Insurance.md: upload the venue's insurance policy there, or name its forms and have them found online, and confirm its terms.
 - Elastic.md: explain Elastic's jobs and link to their Elastic Kibana views from the Kibana tab.
@@ -74,7 +74,7 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 - Insurance.md: after the event the organizer decides every claim no payment rule settled, in "Waiting for your decision" on the Claims tab. They approve or reject each rule Claude proposes on the Proposed rules tab.
 - Social.md: the Event graph and Photos tabs are for every staff member, like the other tabs. The `photographer` role has no screen here and uses the photographer route `/photo`, served with the tap page.
 
-The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This account has no staff role", then "The organizer portal is for the event's organizer and medics. To get access, send this code to the organizer:", and their full identity code.
+The no-role screen offers "Continue as organizer". It opens `/organizer-access`, which uses the existing email sign-in and calls `join_organizer`. The main desk returns to `/organizer`; the plain portal returns to `/portal`. A photographer keeps the link to add photos. A medic can choose organizer access from the plain portal header.
 
 The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, "Zones" with the low-visibility button and the zone table, and "People", the list of everyone), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
 
@@ -87,9 +87,9 @@ The tabs are the same on every device, in this order: Live ("Alerts", "Venue" wi
 - Elastic.md: the Kibana tab, after Merch and Venue setup (see Kibana tab below).
 - Test-Bands.md: the Bands tab, last, shown in test mode only (see Bands tab below).
 
-Staff onboarding happens at setup, before doors open. Every staff member signs in with the SpacetimeDB SpacetimeAuth magic link, the same sign-in attendees use, and sees the no-role screen with their identity code. A Rust service prints its identity on first start.
+Anyone can sign in with email and deliberately choose organizer access. `join_organizer` accepts only the trusted sign-in issuer and an email claim, then grants `ops` to the caller. Attendee sign-in alone grants no staff role. Repeated enrollment does nothing; existing roles and owners remain unchanged.
 
-The owner grants each role with `grant_role` from the SpacetimeDB command line, with a label such as the person's name, and the tabs appear as soon as the grant lands. Only the owner may call `grant_role`, `revoke_role` and `add_owner`; the page has no grant button. Nobody types codes in front of judges.
+The owner still manages medic, photographer and service roles with `add_staff` by email and `grant_role` by identity. Only the owner can grant arbitrary roles, revoke them and add owners. Claim approvals, rule approvals and payment actions keep their existing role checks.
 
 ### Attendee list and Event ended
 
@@ -541,9 +541,9 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | Zones are rectangles in plan metres | the event's zones are taped squares and booth spaces, and a rectangle draws them |
 | Booths stand where the import put them; the organizer moves a misplaced one with `place_booth` from the command line | the map stays a view, and a hand fix is marked `manual`, so a re-import keeps it |
 | `release_band` ("Take the band back") is for `ops` only, after a confirm tap, until the event ends; the attendee keeps their profile and memories | the organizer can fix a band claimed by mistake mid-event; the confirm tap stops an accidental release |
-| Staff roles are granted by the owner with `grant_role` from the command line at setup, before doors open; the page has no grant button | nobody types identity codes in front of judges, and no staff screen can widen its own access |
+| Anyone who signs in with email can deliberately enroll as organizer through `join_organizer`; the owner still manages other staff and service roles | organizer access needs no email whitelist; enrollment grants only the caller's `ops` role |
 | One page for all staff: every tab for anyone with `ops` or `medic`, with the buttons a role cannot use hidden | two roles need no separate layouts; the module checks every role again, so the page cannot grant more than the role |
-| A signed-in person with no staff role sees their identity code and nothing else | the owner reads the code off their screen to grant the role, and no venue data shows to a stranger |
+| A signed-in person with no staff role sees "Continue as organizer" | attendee registration stays separate from choosing to run the event |
 | Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works in the venue during the event, and one person decides every claim no payment rule settled |
 | Insurance.md: the rules Claude proposes wait on their own tab, Proposed rules, beside every payment rule and every precedent; Approve and Reject are for `ops` | a rule traces back to the decisions behind it, so the organizer approves it with those decisions in view, and Claude never approves its own proposal |
 | Insurance.md: the approve form on the Settlements tab and the Live tab's "Approve" only decide the claim | one approval keeps a precedent and makes no rule; a rule comes only from a proposal the organizer approves |
