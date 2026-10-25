@@ -76,7 +76,7 @@ impl Kibana {
         }
     }
 
-    async fn ensure_asset(&self, collection: &str, mut body: Value) -> Result<()> {
+    pub(crate) async fn ensure_asset(&self, collection: &str, mut body: Value) -> Result<()> {
         let id = body["id"].as_str().context("asset without an id")?.to_string();
         let path = format!("{collection}/{id}");
         if self.exists(&path).await? {
@@ -90,7 +90,7 @@ impl Kibana {
         Ok(())
     }
 
-    async fn ensure_workflow(&self, id: &str, yaml: &str) -> Result<()> {
+    pub(crate) async fn ensure_workflow(&self, id: &str, yaml: &str) -> Result<()> {
         let path = format!("api/workflows/workflow/{id}");
         let out = if self.exists(&path).await? {
             self.call(Method::PUT, &path, Some(json!({ "yaml": yaml }))).await?

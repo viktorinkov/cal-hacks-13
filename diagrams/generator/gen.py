@@ -522,8 +522,8 @@ def insurance(y0):
                 mark_h=90, cy=r4, **mk)
     prec = B(1240, 0, "precedents\none per decision\ncomplicated: no proposal", "stdb", w=680, h=260, wordmark=STDB,
              mark_h=50, cy=r4 + 40, **mk)
-    propose = B(300, 0, "Claude\nproposes payment rule\nfrom 3 alike precedents\nceiling under policy limit", "claude",
-                w=680, h=340, wordmark=CLAUDE, mark_h=110, cy=r4 + 40, **mk)
+    propose = B(300, 0, "Agent Builder\n(bandit-rule-proposer)\nES|QL counts approvals\nproposes payment rule", "ext",
+                w=680, h=340, wordmark=ELASTIC, mark_h=MARK_H[ELASTIC], cy=r4 + 40, **mk)
     rules = B(300, 0, "payment rule vN\nshape, ceiling\nprecedents, approver", "stdb", w=680, h=260, wordmark=STDB,
               mark_h=50, cy=r3, **mk)
     history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",
@@ -562,13 +562,12 @@ CLAUDE_JOBS = [  # job kind, result reducer, what Claude does
     ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
     ("claim_draft", "attach_claim_letters", "drafts letters"),
     ("recovery_letter", "attach_recovery_letter", "drafts letter"),
-    ("rule_proposal", "submit_rule_proposal", "proposes rule"),
     ("merch_picks", "submit_merch_picks", "picks merch"),
     ("photo_features", "submit_photo_features", "counts people"),
 ]
 JOB_KINDS = [  # every job kind in the code, by the outside service its worker calls
     ("Anthropic Claude API", "ext", CLAUDE, "asks", [k for k, _, _ in CLAUDE_JOBS]),
-    ("(Evidence Engine)", "ext", ELASTIC, "reads, checks", ["claim_verify", "document_read"]),
+    ("(Evidence Engine)", "ext", ELASTIC, "reads, checks, counts", ["claim_verify", "document_read", "rule_proposal"]),
     ("Web MCP (scraper)", "ext", BRIGHT, "scrapes", ["venue_setup", "plan_lookup", "venue_policy_lookup"]),
     ("Nessie (wallet)", "ext", CAPONE, "pays", ["wallet_open", "merch_purchase", "charge_payment", "claim_payout"]),
 ]

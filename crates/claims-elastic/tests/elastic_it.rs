@@ -190,3 +190,101 @@ async fn claims_round_trip() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+/// Copies a rule proposal offers: three approved wrist sprains, one of them not yet recorded, and a refused one.
+const PRECEDENT_IDS: [&str; 5] = ["claim-900011-v1", "claim-900011-v2", "claim-900012-v2", "claim-900013-v2", "claim-900014-v2"];
+
+fn precedent(claim_id: i64, pack_version: i32, payout_cents: i64) -> ClaimDoc {
+    ClaimDoc { doc_id: ClaimDoc::live_id(claim_id, pack_version), claim_id, pack_version, payout_cents, ..wrist_sprain_fall() }
+}
+
+#[tokio::test]
+async fn rule_precedents_are_counted_and_proposed() -> anyhow::Result<()> {
+    if std::env::var("CLAIMS_ELASTIC_IT").as_deref() != Ok("1") {
+        eprintln!("skipped: set CLAIMS_ELASTIC_IT=1 to run against Elastic");
+        return Ok(());
+    }
+    let es = ClaimsIndex::from_env()?;
+    es.ensure_setup().await?;
+    for id in PRECEDENT_IDS {
+        es.delete_doc(id).await?;
+    }
+    // Claim 900011's second pack is its newest copy, so it is the one counted.
+    es.index_claim(&precedent(900011, 1, 0)).await?;
+    es.index_claim(&precedent(900011, 2, 18_000)).await?;
+    es.index_claim(&precedent(900012, 2, 15_000)).await?;
+    es.index_claim(&precedent(900013, 2, 18_000)).await?;
+    es.index_claim(&ClaimDoc { diagnosis_codes: vec!["S93.401A".into()], ..precedent(900014, 2, 9_500) }).await?;
+    for (id, outcome, payout) in [(900011, "approved", 18_000), (900012, "approved", 15_000), (900014, "refused", 0)] {
+        es.set_outcome(id, 2, outcome, payout).await?;
+    }
+    let newest = es.newest_copy(900011).await?.expect("claim 900011 has copies");
+    assert_eq!((newest.doc_id.as_str(), newest.outcome.as_str()), ("claim-900011-v2", "approved"));
+    assert!(es.newest_copy(900099).await?.is_none());
+    // The approval the letters have not recorded yet, as the job records it.
+    let late = es.newest_copy(900013).await?.unwrap();
+    assert_eq!(late.outcome, "");
+    es.set_outcome(late.claim_id, late.pack_version, "approved", 18_000).await?;
+
+    let doc_ids: Vec<String> = ["claim-900011-v2", "claim-900012-v2", "claim-900013-v2", "claim-900014-v2"].map(String::from).to_vec();
+    let out = es.claim_precedents(&doc_ids).await?;
+    eprintln!("{out:#}");
+    let col = |name: &str| out["columns"].as_array().unwrap().iter().position(|c| c["name"] == name).unwrap();
+    let rows = out["values"].as_array().unwrap();
+    let approved = rows.iter().find(|r| r[col("outcome")] == "approved" && r[col("diagnosis_codes")] == "S63.501A").expect("an approved wrist sprain row");
+    assert_eq!(approved[col("claims")], 3);
+    assert_eq!(approved[col("highest_payout_cents")], 18_000);
+    assert_eq!(approved[col("lowest_payout_cents")], 15_000);
+    let mut ids: Vec<i64> = approved[col("claim_ids")].as_array().unwrap().iter().map(|v| v.as_i64().unwrap()).collect();
+    ids.sort();
+    assert_eq!(ids, [900011, 900012, 900013]);
+    assert!(rows.iter().any(|r| r[col("outcome")] == "refused" && r[col("diagnosis_codes")] == "S93.401A" && r[col("claims")] == 1));
+    assert!(!rows.iter().any(|r| r[col("claim_ids")].to_string().contains("900099")));
+
+    // The agent counts the same copies with its tool and proposes the rule; the worker's checks are in bandit-workers.
+    match (std::env::var("KIBANA_URL"), std::env::var("KIBANA_API_KEY")) {
+        (Ok(url), Ok(key)) if !url.trim().is_empty() => {
+            let kibana = claims_elastic::Kibana::new(&url, &key)?;
+            kibana.ensure_proposer().await?;
+            es.ensure_proposals_index().await?;
+            let key = "proposal-900000-1";
+            es.delete_rule_answer(key).await?;
+            let task = "Venue: Test venue, policy GL-TEST.\nShape: fall claims under medical_payments cover.\n\
+                        The cover's per-claim limit: 500000 cents ($5,000.00). Minimum payout: 0 cents ($0.00).\nRule in force: none.\n\n\
+                        Approved precedents, which you may cite:\n\
+                        - claim 900011: Maya Chen, Stage B, payout 18000 cents ($180.00); diagnoses S63.501A right wrist sprain; corroborated; approved by Ops desk.\n\
+                        - claim 900012: Sam Patel, Stage B, payout 15000 cents ($150.00); diagnoses S63.501A right wrist sprain; corroborated; approved by Ops desk.\n\
+                        - claim 900013: Lee Park, Stage B, payout 18000 cents ($180.00); diagnoses S63.501A right wrist sprain; corroborated; approved by Ops desk.\n\n\
+                        Refused precedents, never cited:\n\
+                        - claim 900014: Jordan Alvarez, Stage B, payout 9500 cents ($95.00); refused because the ankle was hurt at home";
+            let schema = serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "propose": {"type": "boolean"}, "precedent_claim_ids": {"type": "array", "items": {"type": "integer"}},
+                    "ceiling_cents": {"type": "integer"}, "rule": {"type": "string"}, "summary": {"type": "string"}
+                },
+                "required": ["propose", "precedent_claim_ids", "ceiling_cents", "rule", "summary"]
+            });
+            let inputs = serde_json::json!({
+                "proposal_key": key, "claims_index": es.index(), "doc_ids": doc_ids.join(","), "task": task,
+                "schema": schema.to_string(), "proposals_index": es.proposals_index(),
+            });
+            let execution = kibana.run_workflow(claims_elastic::proposer::WORKFLOW, inputs).await?;
+            let done = kibana.wait_for(&execution, std::time::Duration::from_secs(5), std::time::Duration::from_secs(600)).await?;
+            assert_eq!(done["status"], "completed", "{}", claims_elastic::reader::failure(&done));
+            let saved = es.rule_answer(key).await?;
+            eprintln!("{saved:#}");
+            let answer = &saved["answer"];
+            let mut cited: Vec<i64> = answer["precedent_claim_ids"].as_array().unwrap().iter().map(|v| v.as_i64().unwrap()).collect();
+            cited.sort();
+            assert_eq!((answer["propose"].as_bool(), cited, answer["ceiling_cents"].as_i64()), (Some(true), vec![900011, 900012, 900013], Some(18_000)));
+            es.delete_rule_answer(key).await?;
+        }
+        _ => eprintln!("the agent is not run: set KIBANA_URL and KIBANA_API_KEY"),
+    }
+
+    for id in PRECEDENT_IDS {
+        es.delete_doc(id).await?;
+    }
+    Ok(())
+}

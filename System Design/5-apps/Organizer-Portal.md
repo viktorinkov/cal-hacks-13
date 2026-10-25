@@ -293,7 +293,7 @@ sequenceDiagram
 
 ### Proposed rules tab (Insurance.md)
 
-The Proposed rules tab (hash `#rules`) is where the organizer turns their own precedents into payment rules ([Insurance](../6-features/Insurance.md#proposed-rules)). Every decision on a claim is kept as a precedent, and once three approved claims of one shape agree, Claude proposes a rule that cites them. Nothing is paid under a proposed rule until the organizer approves it.
+The Proposed rules tab (hash `#rules`) is where the organizer turns their own precedents into payment rules ([Insurance](../6-features/Insurance.md#proposed-rules)). Every decision on a claim is kept as a precedent, and once three approved claims of one shape agree, the Evidence Engine's agent counts them and proposes a rule that cites them. Nothing is paid under a proposed rule until the organizer approves it.
 
 The tab is plain tables and buttons, in four sections, read from `board_rule_proposals`, `board_organizer_precedents` and `board_rules`, with `claims_board` for the claims they cite.
 
@@ -444,6 +444,7 @@ Elastic.md: the Kibana tab explains what Elastic, the Evidence Engine, does, one
 - During the event, the bands' radio log and the photos: the "Band radio and photos" dashboard.
 - After the event, ordering the recap's suggestions: the "Recap suggestions" dashboard.
 - Insurance.md: claims, checking the evidence: the "Claims evidence" dashboard.
+- Insurance.md: claims, proposing payment rules from the organizer's approvals: the `bandit-propose-rule` workflow runs and the `bandit-rule-proposer` agent, with each count its tool made.
 
 Nothing on the tab reads Elastic or starts a run.
 

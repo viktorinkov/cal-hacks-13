@@ -1,0 +1,21 @@
+{
+  "id": "bandit.claim_precedents",
+  "type": "esql",
+  "description": "Counts the claims one BandIt rule proposal offers, from their de-identified copies in the claims index: one row per outcome (approved or refused), diagnosis code (ICD-10-CM) and kind of item, with the number of claims, their claim ids, the highest and lowest payout in cents and the service codes (CPT or HCPCS). A claim with two diagnosis codes is counted under each. Pass claims_index and doc_ids exactly as the task gives them.",
+  "tags": [
+    "bandit"
+  ],
+  "configuration": {
+    "query": "FROM bandit*-claims METADATA _index | WHERE _index == ?claims_index AND MV_CONTAINS(SPLIT(?doc_ids, \",\"), doc_id) | STATS claims = COUNT_DISTINCT(claim_id), claim_ids = VALUES(claim_id), highest_payout_cents = MAX(payout_cents), lowest_payout_cents = MIN(payout_cents), service_codes = VALUES(service_codes) BY outcome, diagnosis_codes, item_kind | SORT outcome, claims DESC | LIMIT 50",
+    "params": {
+      "claims_index": {
+        "type": "string",
+        "description": "The claims index, exactly as given in the task, for example bandit-claims."
+      },
+      "doc_ids": {
+        "type": "string",
+        "description": "The ids of the offered claims' copies, comma-separated, exactly as given in the task, for example claim-2-v2,claim-4-v2,claim-7-v2."
+      }
+    }
+  }
+}
