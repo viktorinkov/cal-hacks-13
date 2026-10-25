@@ -48,7 +48,7 @@ Every interface is a reducer call in or a subscription out, over the SpacetimeDB
 | Out | Elastic.md: `bandit-indexer` | venue content and the views Elastic.md lists, one way | `zone`, `booth`, `schedule_slot`; Bright-Data.md: `organization`; Social.md: `social_attendees`, `social_visits` | subscription |
 | In | Vision.md: the `vision` role | a security camera per zone; property events and a camera sighting per incident, judged with the Anthropic Claude API | `upsert_camera`, `report_property_event`, `submit_vision_assessment` ([Vision](../4-devices/Vision.md)) | Rust SDK |
 | In | Vision.md (TBD -- LEO): `bandit-vision` | a people count per security camera's zone; person-down alerts | `report_zone_count`, `report_ground_alert` ([Vision](../4-devices/Vision.md)) | Rust SDK |
-| Internal | scheduler | timers | `sweep`, `watch_bands`, `social_tick`, `job_reaper`; Test-Bands.md: `crowd_tick` | schedule tables |
+| Internal | scheduler | timers | `sweep`, `watch_bands`, `social_tick`, `job_reaper`, `live_tick`; Test-Bands.md: `crowd_tick` | schedule tables |
 
 ## Design
 
@@ -60,7 +60,7 @@ The safety loop has several writers (`band1t-bridge`, test bands, organizers, sc
 |---|---|---|
 | Reducers are transactions | every write in a reducer commits together or not at all; a failed role check rolls the call back | `watch_bands` opens an SOS incident, freezes its snapshot and adds the subject band in one commit |
 | Subscriptions | each client gets the current rows, then every change as it commits | an SOS flag in a `band` row reaches the Live tab and the medic's incident desk with no polling layer; `band1t-bridge` receives `command` rows the same way |
-| Scheduled reducers | the module runs its own timers, as repeating intervals, each run a transaction | `sweep` every 1 s, `watch_bands` every 500 ms, `social_tick` every 1 s, `job_reaper` every 10 s; Test-Bands.md: `crowd_tick` every 2 s |
+| Scheduled reducers | the module runs its own timers, as repeating intervals, each run a transaction | `sweep` every 1 s, `watch_bands` every 500 ms, `social_tick` every 1 s, `job_reaper` every 10 s, `live_tick` every 1 s; Test-Bands.md: `crowd_tick` every 2 s |
 | Views | read-only functions in the module that see the caller's identity and may read private tables | "only staff see open incidents" and "an attendee sees only their own band" are enforced by the module, not by an app. Social.md: `event_graph` does not depend on the caller, so it is computed once and shared by every screen that shows it |
 | Identity | every connection has a stable `Identity` | every person signs in with SpacetimeDB SpacetimeAuth, SpacetimeDB's own OpenID Connect provider (in beta), with the magic-link email sign-in only; SpacetimeDB derives the identity from the ID token's issuer and subject, so a person is the same identity on every device. Services keep a saved token. Staff and services are identities with rows in `staff_role`; `band1t-bridge` is the one identity in `bridge` |
 
@@ -339,7 +339,7 @@ Public. Not copied.
 
 #### Control and log group (appended)
 
-`command`: one row per one-shot command for the radio. Written by the Commands and Settings reducers, `resolve_incident`, `claim_band` and the claim completion in `social_tick`. Marked by `command_sent`; rows are never deleted.
+`command`: one row per one-shot command for the radio, the command queue ([Architecture: Queues](../1-overview/Architecture.md#queues)). Written by the Commands and Settings reducers, `resolve_incident`, `claim_band` and the claim completion in `social_tick`. Marked by `command_sent`; rows are never deleted.
 
 Public. Not copied. `band1t-bridge` sends each pending row once as the gateway line `cmd <target> <name> [arg] [arg2]` ([Gateway-Bridge](../3-services/Gateway-Bridge.md)).
 
@@ -433,7 +433,7 @@ Public, and not copied. Read by `social_tick`; not used for safety. Fields `key`
 
 #### Work and files group
 
-`job`: one unit of slow or external work. Queued by feature reducers through the module's internal enqueue function, never by a client; changed by the job reducers (role `worker`) and `job_reaper`.
+`job`: one unit of slow or external work, the job queue. Queued by feature reducers through the module's internal enqueue function, never by a client; changed by the job reducers (role `worker`) and `job_reaper`. [Architecture: Queues](../1-overview/Architecture.md#queues) lists all 18 job kinds, the reducer that queues each one and the reducer that takes its result.
 
 Private; read through `worker_jobs` (workers). Not copied.
 
@@ -479,7 +479,7 @@ The app makes a random token, sends its hash here and the token to `bandit-api`;
 
 #### Schedule tables
 
-Each scheduled reducer has its own schedule table, each a repeating interval: `sweep_timer` (1 s, inserted by `init`), `incident_watch_timer` (500 ms, by `start_safety_watch`), `job_reaper_timer` (10 s, by `start_job_reaper`) and `social_tick_timer` (1 s, by the first `claim_band`). Test-Bands.md: `crowd_timer` (2 s, by `start_crowd`; `start_crowd` also starts `social_tick`, and `stop_crowd` deletes the crowd timer). All are private, and each scheduled reducer refuses any caller but the module itself.
+Each scheduled reducer has its own schedule table, each a repeating interval: `sweep_timer` (1 s, inserted by `init`), `incident_watch_timer` (500 ms, by `start_safety_watch`), `job_reaper_timer` (10 s, by `start_job_reaper`) `social_tick_timer` (1 s, by the first `claim_band`) and `live_run_timer` (1 s, by `start_live_run`; deleted when the run ends). Test-Bands.md: `crowd_timer` (2 s, by `start_crowd`; `start_crowd` also starts `social_tick`, and `stop_crowd` deletes the crowd timer). All are private, and each scheduled reducer refuses any caller but the module itself.
 
 ### Entity diagrams
 
@@ -752,6 +752,7 @@ Role `ops`. Each stores its values in `settings` and writes one command to targe
 | `watch_bands` | every 500 ms, from `start_safety_watch` | opens `sos` and `fall` incidents from band flags and records light-circle witnesses (above) | `incident`, `incident_snapshot`, `incident_band` |
 | `social_tick` | every 1 s, from the first `claim_band`; never stopped | completes a band claim when a `Press` event of that band lands inside its 8 s window (and writes `state 0 1` for a radio band), and deletes expired claims. Social.md: then turns stays and encounters into visits, social encounters, shared visits and graph links | `band_owner`, `band_claim`, `command`; Social.md: `visit`, `social_encounter`, `shared_visit`, `people_link` |
 | `job_reaper` | every 10 s, from `start_job_reaper` | returns expired leases to the queue after a back-off, or marks the job `Dead` once `attempts` reaches `max_attempts` | `job` |
+| `live_tick` | every 1 s, from `start_live_run` | the live run's clock: opens the next scripted incident when it is due, closes the doors at the end time, and ends the event once the crowd is out | `live_run`, `incident`, `incident_marker`, `decision`, `event_state` |
 | Test-Bands.md: `crowd_tick` | every 2 s, from `start_crowd` | moves the crowd, recounts each crowd band's neighbours within 1.5 m, sets its state 0 to 2 against `settings.yellow` and `red`, and writes the crowd's stays and encounters ([Test-Bands](../3-services/Test-Bands.md)) | `band`, `zone_visit`, `encounter` |
 
 Why these cadences: 500 ms for `watch_bands` puts an incident on screen within half a second of the band's flag reaching the module; 1 s for `sweep`, with a 5 s silence rule, matches `band1t-bridge`'s once-a-second refresh of every band it hears; 10 s for the reaper is faster than any lease and costs nothing.
