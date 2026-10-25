@@ -15,24 +15,23 @@ export const CLASS_NONE = 0
 export const CLASS_LANE = 1
 export const CLASS_NEAR = 2
 
-const TRAIL_PPM = 10
+/** Pixels per metre on the trail sheet. The sheet has to stay under the GPU texture limit (the floor is ~228 m). */
+const TRAIL_PPM = 12
 const TRAIL_PAD = 3
 /** Slower than this, m/s, and a person is standing: they leave no trail. */
 const TRAIL_MIN_SPEED = 0.3
-/**
- * Scale of the 32 px puff on the trail sheet. About half a metre of soft light, feathered to nothing
- * at the edge, so a walker leaves a wisp and not a stripe.
- */
-const TRAIL_STAMP = 0.16
-/** White ink per stamp. The puff is already feathered; this is only the bright end of the tail. */
-const TRAIL_INK = 0.28
-const TRAIL_INK_MARKED = 0.4
-/** Fraction of the previous frame's sheet kept. At 60fps a tail is gone in about a second. */
-const TRAIL_KEEP = 0.86
-/** Metres to set the puff back along the step, so the bright end sits behind the feet. */
-const TRAIL_BACK = 0.16
-/** The sheet itself. Ink is the faint part; this only keeps the fade from disappearing into the floor. */
-const TRAIL_ALPHA = 0.7
+/** Length and width of one comet, in metres on the floor. The bright head leads. */
+const TRAIL_LEN = 2.1
+const TRAIL_WIDE = 0.46
+/** White ink per stamp. The texture carries the taper from head to tail. */
+const TRAIL_INK = 0.9
+const TRAIL_INK_MARKED = 1
+/** Fraction of the previous frame kept. A short ghost, then nothing — no path left on the floor. */
+const TRAIL_KEEP = 0.36
+/** Metres to set the bright head back from the feet. */
+const TRAIL_BACK = 0.05
+/** The sheet itself. */
+const TRAIL_ALPHA = 1
 /** Structures lower than this, in metres, never hide a trail: tables, booths, the stage lip. */
 const COVER_MIN_HEIGHT = 2
 
@@ -120,7 +119,13 @@ export class CrowdLayer {
 
   private ensure(pool: Particle[], container: ParticleContainer, n: number, texture: Texture): void {
     while (pool.length < n) {
-      const p = new Particle({ texture, anchorX: 0.5, anchorY: texture === this.personTex ? 1 : 0.5 })
+      const person = texture === this.personTex
+      const p = new Particle({
+        texture,
+        // The comet's bright head sits at 86% across the texture, so that point stays on the feet.
+        anchorX: person ? 0.5 : texture === this.trailTex ? 0.86 : 0.5,
+        anchorY: person ? 1 : 0.5,
+      })
       p.alpha = 0
       pool.push(p)
       container.addParticle(p)
@@ -296,13 +301,13 @@ export class CrowdLayer {
           q.color = 0
           continue
         }
-        // a short dash behind the feet: longer along the step, narrow across it
+        // Comet behind the feet: long along the step, narrow across it, bright end toward the person.
         const len = step || 1
         q.x = (x - (vx / len) * TRAIL_BACK + TRAIL_PAD) * TRAIL_PPM
         q.y = (y - (vy / len) * TRAIL_BACK + TRAIL_PAD) * TRAIL_PPM
         q.rotation = Math.atan2(vy, vx)
-        q.scaleX = TRAIL_STAMP * 1.35
-        q.scaleY = TRAIL_STAMP * 0.55
+        q.scaleX = (TRAIL_LEN * TRAIL_PPM) / this.trailTex.width
+        q.scaleY = (TRAIL_WIDE * TRAIL_PPM) / this.trailTex.height
         const cls = classes[i]
         q.color = particleColor(0xffffff, cls ? TRAIL_INK_MARKED : TRAIL_INK)
       }
