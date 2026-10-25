@@ -865,8 +865,8 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
     views: [
       ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
       ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
-      ['bandit-organize runs, step by step', '/app/workflows'],
-      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+      ['bandit-organize runs, step by step', '/app/workflows/bandit-organize'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder/agents/bandit-organizer'],
     ],
   },
   {

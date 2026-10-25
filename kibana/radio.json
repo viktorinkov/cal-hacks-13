@@ -15,7 +15,7 @@
       },
       "type": "markdown",
       "config": {
-        "content": "## Band radio and photos\n\nThe recorders on the venue laptop write every line the gateway hears, with an id from its content, so a second upload adds nothing.\n\n- `bandit-raw-radio`: each beacon from a band or a station marker, with its zone and its SOS, fall and button flags\n- `bandit-raw-heard`: each band's list of the bands and station markers it heard, with their signal strength\n- `bandit-raw-gateway`: the gateway's own lines: boot, info, acks and errors\n- `bandit-raw-photos`: each photo's camera, time and place, never the image\n\nKept for after the event. The live screen reads SpacetimeDB, never these."
+        "content": "## Band radio and photos\n\nThe recorders on the venue laptop write every line the gateway hears.\n\n- `bandit-raw-radio`: each beacon from a band or a station marker, with its zone and its SOS, fall and button flags\n- `bandit-raw-heard`: each band's list of the bands and station markers it heard, with their signal strength\n- `bandit-raw-gateway`: the gateway's own lines: boot, info, acks and errors\n- `bandit-raw-photos`: each photo's camera, time and place, never the image\n\nKept for after the event; the live screen reads SpacetimeDB."
       }
     },
     {
@@ -120,13 +120,13 @@
       "type": "vis",
       "config": {
         "type": "xy",
-        "title": "Beacons every 10 seconds (UTC), from bands and station markers",
+        "title": "Beacons every 10 seconds, from bands and station markers",
         "layers": [
           {
             "type": "bar_stacked",
             "data_source": {
               "type": "esql",
-              "query": "FROM bandit-raw-radio | EVAL time = DATE_FORMAT(\"yyyy-MM-dd HH:mm:ss\", DATE_TRUNC(10 seconds, @timestamp)) | STATS beacons = COUNT() BY time, kind | SORT time"
+              "query": "FROM bandit-raw-radio | EVAL t = DATE_TRUNC(10 seconds, @timestamp) | STATS beacons = COUNT() BY t, kind | SORT t | EVAL time = DATE_FORMAT(\"HH:mm:ss\", t)"
             },
             "x": {
               "column": "time"
