@@ -6,8 +6,11 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+pub mod account_email_table;
+pub mod account_email_type;
 pub mod add_incident_note_reducer;
 pub mod add_owner_reducer;
+pub mod add_staff_reducer;
 pub mod api_session_table;
 pub mod api_session_type;
 pub mod api_sessions_table;
@@ -52,6 +55,7 @@ pub mod board_precedents_table;
 pub mod board_records_table;
 pub mod board_reviews_table;
 pub mod board_rules_table;
+pub mod board_staff_table;
 pub mod booth_in_type;
 pub mod booth_table;
 pub mod booth_type;
@@ -253,6 +257,7 @@ pub mod register_bridge_reducer;
 pub mod register_photo_reducer;
 pub mod release_band_reducer;
 pub mod remove_social_handle_reducer;
+pub mod remove_staff_reducer;
 pub mod reopen_event_reducer;
 pub mod report_property_event_reducer;
 pub mod report_test_band_reducer;
@@ -299,6 +304,8 @@ pub mod social_tick_reducer;
 pub mod social_tick_timer_table;
 pub mod social_tick_timer_type;
 pub mod social_visits_table;
+pub mod staff_member_table;
+pub mod staff_member_type;
 pub mod staff_role_table;
 pub mod staff_role_type;
 pub mod start_crowd_reducer;
@@ -347,8 +354,11 @@ pub mod zone_type;
 pub mod zone_visit_table;
 pub mod zone_visit_type;
 
+pub use account_email_table::*;
+pub use account_email_type::AccountEmail;
 pub use add_incident_note_reducer::add_incident_note;
 pub use add_owner_reducer::add_owner;
+pub use add_staff_reducer::add_staff;
 pub use api_session_table::*;
 pub use api_session_type::ApiSession;
 pub use api_sessions_table::*;
@@ -393,6 +403,7 @@ pub use board_precedents_table::*;
 pub use board_records_table::*;
 pub use board_reviews_table::*;
 pub use board_rules_table::*;
+pub use board_staff_table::*;
 pub use booth_in_type::BoothIn;
 pub use booth_table::*;
 pub use booth_type::Booth;
@@ -594,6 +605,7 @@ pub use register_bridge_reducer::register_bridge;
 pub use register_photo_reducer::register_photo;
 pub use release_band_reducer::release_band;
 pub use remove_social_handle_reducer::remove_social_handle;
+pub use remove_staff_reducer::remove_staff;
 pub use reopen_event_reducer::reopen_event;
 pub use report_property_event_reducer::report_property_event;
 pub use report_test_band_reducer::report_test_band;
@@ -640,6 +652,8 @@ pub use social_tick_reducer::social_tick;
 pub use social_tick_timer_table::*;
 pub use social_tick_timer_type::SocialTickTimer;
 pub use social_visits_table::*;
+pub use staff_member_table::*;
+pub use staff_member_type::StaffMember;
 pub use staff_role_table::*;
 pub use staff_role_type::StaffRole;
 pub use start_crowd_reducer::start_crowd;
@@ -703,6 +717,11 @@ pub enum Reducer {
     },
     AddOwner {
         identity: __sdk::Identity,
+    },
+    AddStaff {
+        email: String,
+        role: String,
+        name: String,
     },
     ApplyMedicalExtract {
         job_id: u64,
@@ -885,6 +904,9 @@ pub enum Reducer {
     },
     RemoveSocialHandle {
         platform: String,
+    },
+    RemoveStaff {
+        id: u64,
     },
     ReopenEvent,
     ReportPropertyEvent {
@@ -1086,6 +1108,7 @@ impl __sdk::Reducer for Reducer {
         match self {
             Reducer::AddIncidentNote { .. } => "add_incident_note",
             Reducer::AddOwner { .. } => "add_owner",
+            Reducer::AddStaff { .. } => "add_staff",
             Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
             Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveClaim { .. } => "approve_claim",
@@ -1133,6 +1156,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RegisterPhoto { .. } => "register_photo",
             Reducer::ReleaseBand { .. } => "release_band",
             Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
+            Reducer::RemoveStaff { .. } => "remove_staff",
             Reducer::ReopenEvent => "reopen_event",
             Reducer::ReportPropertyEvent { .. } => "report_property_event",
             Reducer::ReportTestBand { .. } => "report_test_band",
@@ -1194,6 +1218,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddOwner { identity } => {
                 __sats::bsatn::to_vec(&add_owner_reducer::AddOwnerArgs {
                     identity: identity.clone(),
+                })
+            }
+            Reducer::AddStaff { email, role, name } => {
+                __sats::bsatn::to_vec(&add_staff_reducer::AddStaffArgs {
+                    email: email.clone(),
+                    role: role.clone(),
+                    name: name.clone(),
                 })
             }
             Reducer::ApplyMedicalExtract {
@@ -1514,6 +1545,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&remove_social_handle_reducer::RemoveSocialHandleArgs {
                     platform: platform.clone(),
                 })
+            }
+            Reducer::RemoveStaff { id } => {
+                __sats::bsatn::to_vec(&remove_staff_reducer::RemoveStaffArgs { id: id.clone() })
             }
             Reducer::ReopenEvent => {
                 __sats::bsatn::to_vec(&reopen_event_reducer::ReopenEventArgs {})
@@ -1866,6 +1900,7 @@ impl __sdk::Reducer for Reducer {
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct DbUpdate {
+    account_email: __sdk::TableUpdate<AccountEmail>,
     api_session: __sdk::TableUpdate<ApiSession>,
     api_sessions: __sdk::TableUpdate<ApiSession>,
     approval: __sdk::TableUpdate<Approval>,
@@ -1891,6 +1926,7 @@ pub struct DbUpdate {
     board_records: __sdk::TableUpdate<MedicalRecord>,
     board_reviews: __sdk::TableUpdate<ClaimReview>,
     board_rules: __sdk::TableUpdate<SettlementRuleRow>,
+    board_staff: __sdk::TableUpdate<StaffMember>,
     booth: __sdk::TableUpdate<Booth>,
     bridge: __sdk::TableUpdate<Bridge>,
     camera: __sdk::TableUpdate<Camera>,
@@ -1984,6 +2020,7 @@ pub struct DbUpdate {
     social_shared_visits: __sdk::TableUpdate<SharedVisit>,
     social_tick_timer: __sdk::TableUpdate<SocialTickTimer>,
     social_visits: __sdk::TableUpdate<Visit>,
+    staff_member: __sdk::TableUpdate<StaffMember>,
     staff_role: __sdk::TableUpdate<StaffRole>,
     station: __sdk::TableUpdate<Station>,
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
@@ -2005,6 +2042,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_update in __sdk::transaction_update_iter_table_updates(raw) {
             match &table_update.table_name[..] {
+                "account_email" => db_update
+                    .account_email
+                    .append(account_email_table::parse_table_update(table_update)?),
                 "api_session" => db_update
                     .api_session
                     .append(api_session_table::parse_table_update(table_update)?),
@@ -2080,6 +2120,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_rules" => db_update
                     .board_rules
                     .append(board_rules_table::parse_table_update(table_update)?),
+                "board_staff" => db_update
+                    .board_staff
+                    .append(board_staff_table::parse_table_update(table_update)?),
                 "booth" => db_update
                     .booth
                     .append(booth_table::parse_table_update(table_update)?),
@@ -2359,6 +2402,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "social_visits" => db_update
                     .social_visits
                     .append(social_visits_table::parse_table_update(table_update)?),
+                "staff_member" => db_update
+                    .staff_member
+                    .append(staff_member_table::parse_table_update(table_update)?),
                 "staff_role" => db_update
                     .staff_role
                     .append(staff_role_table::parse_table_update(table_update)?),
@@ -2424,6 +2470,9 @@ impl __sdk::DbUpdate for DbUpdate {
     ) -> AppliedDiff<'_> {
         let mut diff = AppliedDiff::default();
 
+        diff.account_email = cache
+            .apply_diff_to_table::<AccountEmail>("account_email", &self.account_email)
+            .with_updates_by_pk(|row| &row.identity);
         diff.api_session = cache
             .apply_diff_to_table::<ApiSession>("api_session", &self.api_session)
             .with_updates_by_pk(|row| &row.token_hash);
@@ -2625,6 +2674,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.social_tick_timer = cache
             .apply_diff_to_table::<SocialTickTimer>("social_tick_timer", &self.social_tick_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
+        diff.staff_member = cache
+            .apply_diff_to_table::<StaffMember>("staff_member", &self.staff_member)
+            .with_updates_by_pk(|row| &row.id);
         diff.staff_role = cache
             .apply_diff_to_table::<StaffRole>("staff_role", &self.staff_role)
             .with_updates_by_pk(|row| &row.id);
@@ -2694,6 +2746,9 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<ClaimReview>("board_reviews", &self.board_reviews);
         diff.board_rules = cache
             .apply_diff_to_table::<SettlementRuleRow>("board_rules", &self.board_rules)
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_staff = cache
+            .apply_diff_to_table::<StaffMember>("board_staff", &self.board_staff)
             .with_updates_by_pk(|row| &row.id);
         diff.claim_checks =
             cache.apply_diff_to_table::<ClaimCheck>("claim_checks", &self.claim_checks);
@@ -2767,6 +2822,9 @@ impl __sdk::DbUpdate for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_rows in raw.tables {
             match &table_rows.table[..] {
+                "account_email" => db_update
+                    .account_email
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "api_session" => db_update
                     .api_session
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -2841,6 +2899,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_rules" => db_update
                     .board_rules
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_staff" => db_update
+                    .board_staff
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "booth" => db_update
                     .booth
@@ -3120,6 +3181,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "social_visits" => db_update
                     .social_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "staff_member" => db_update
+                    .staff_member
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "staff_role" => db_update
                     .staff_role
@@ -3173,6 +3237,9 @@ impl __sdk::DbUpdate for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_rows in raw.tables {
             match &table_rows.table[..] {
+                "account_email" => db_update
+                    .account_email
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "api_session" => db_update
                     .api_session
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3247,6 +3314,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_rules" => db_update
                     .board_rules
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_staff" => db_update
+                    .board_staff
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "booth" => db_update
                     .booth
@@ -3526,6 +3596,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "social_visits" => db_update
                     .social_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "staff_member" => db_update
+                    .staff_member
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "staff_role" => db_update
                     .staff_role
@@ -3581,6 +3654,7 @@ impl __sdk::DbUpdate for DbUpdate {
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
+    account_email: __sdk::TableAppliedDiff<'r, AccountEmail>,
     api_session: __sdk::TableAppliedDiff<'r, ApiSession>,
     api_sessions: __sdk::TableAppliedDiff<'r, ApiSession>,
     approval: __sdk::TableAppliedDiff<'r, Approval>,
@@ -3606,6 +3680,7 @@ pub struct AppliedDiff<'r> {
     board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
     board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
+    board_staff: __sdk::TableAppliedDiff<'r, StaffMember>,
     booth: __sdk::TableAppliedDiff<'r, Booth>,
     bridge: __sdk::TableAppliedDiff<'r, Bridge>,
     camera: __sdk::TableAppliedDiff<'r, Camera>,
@@ -3699,6 +3774,7 @@ pub struct AppliedDiff<'r> {
     social_shared_visits: __sdk::TableAppliedDiff<'r, SharedVisit>,
     social_tick_timer: __sdk::TableAppliedDiff<'r, SocialTickTimer>,
     social_visits: __sdk::TableAppliedDiff<'r, Visit>,
+    staff_member: __sdk::TableAppliedDiff<'r, StaffMember>,
     staff_role: __sdk::TableAppliedDiff<'r, StaffRole>,
     station: __sdk::TableAppliedDiff<'r, Station>,
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
@@ -3725,6 +3801,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         event: &EventContext,
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
+        callbacks.invoke_table_row_callbacks::<AccountEmail>(
+            "account_email",
+            &self.account_email,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<ApiSession>("api_session", &self.api_session, event);
         callbacks.invoke_table_row_callbacks::<ApiSession>(
             "api_sessions",
@@ -3816,6 +3897,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<SettlementRuleRow>(
             "board_rules",
             &self.board_rules,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<StaffMember>(
+            "board_staff",
+            &self.board_staff,
             event,
         );
         callbacks.invoke_table_row_callbacks::<Booth>("booth", &self.booth, event);
@@ -4115,6 +4201,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Visit>("social_visits", &self.social_visits, event);
+        callbacks.invoke_table_row_callbacks::<StaffMember>(
+            "staff_member",
+            &self.staff_member,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<StaffRole>("staff_role", &self.staff_role, event);
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
         callbacks.invoke_table_row_callbacks::<SweepTimer>("sweep_timer", &self.sweep_timer, event);
@@ -4800,6 +4891,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     type QueryBuilder = __sdk::QueryBuilder;
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
+        account_email_table::register_table(client_cache);
         api_session_table::register_table(client_cache);
         api_sessions_table::register_table(client_cache);
         approval_table::register_table(client_cache);
@@ -4825,6 +4917,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_records_table::register_table(client_cache);
         board_reviews_table::register_table(client_cache);
         board_rules_table::register_table(client_cache);
+        board_staff_table::register_table(client_cache);
         booth_table::register_table(client_cache);
         bridge_table::register_table(client_cache);
         camera_table::register_table(client_cache);
@@ -4918,6 +5011,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         social_shared_visits_table::register_table(client_cache);
         social_tick_timer_table::register_table(client_cache);
         social_visits_table::register_table(client_cache);
+        staff_member_table::register_table(client_cache);
         staff_role_table::register_table(client_cache);
         station_table::register_table(client_cache);
         sweep_timer_table::register_table(client_cache);
@@ -4933,6 +5027,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         zone_visit_table::register_table(client_cache);
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
+        "account_email",
         "api_session",
         "api_sessions",
         "approval",
@@ -4958,6 +5053,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_records",
         "board_reviews",
         "board_rules",
+        "board_staff",
         "booth",
         "bridge",
         "camera",
@@ -5045,6 +5141,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "social_shared_visits",
         "social_tick_timer",
         "social_visits",
+        "staff_member",
         "staff_role",
         "station",
         "sweep_timer",

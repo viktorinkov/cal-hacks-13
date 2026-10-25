@@ -10,6 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AccountEmail = __t.object("AccountEmail", {
+  identity: __t.identity(),
+  email: __t.string(),
+  seenAt: __t.timestamp(),
+});
+export type AccountEmail = __Infer<typeof AccountEmail>;
+
 export const ApiSession = __t.object("ApiSession", {
   tokenHash: __t.string(),
   identity: __t.identity(),
