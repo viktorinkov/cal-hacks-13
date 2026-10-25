@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Upload, Waves } from 'lucide-react'
+import { Check, CheckCheck, CreditCard, FileText, LoaderCircle, ShieldCheck, Sparkles, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { BandMark, CoverSlip } from '@/components/cover/CoverSlip'
+import { CoverSlip } from '@/components/cover/CoverSlip'
 import { MOCK_BANDS, type MockBand } from '@/mock/bands'
-import { fieldClass } from '@/cover/fields'
 import { blankRegistration, getSavedRegistration, saveRegistration, type Registration } from '@/cover/registry'
 import { useRoute } from '@/cover/route'
 import { useWallClock } from '@/hooks/useWallClock'
 import { useSession, type MedicalCardView } from '@/stdb/session'
 import { validateMedicalFile, type MedicalDocumentKind } from '@/stdb/uploads'
 
+import { ConcertLights } from './ConcertLights'
+import './RegisterPage.css'
+
+const fieldClass = 'signup-input'
 const BRANDS = ['Visa', 'Mastercard', 'Amex']
 
 function bandFromLocation(search: string) {
@@ -17,12 +20,15 @@ function bandFromLocation(search: string) {
   return MOCK_BANDS.find((band) => band.deviceId === id) ?? null
 }
 
-function NightHeader() {
+function NightHeader({ lights, onToggleLights }: { lights: boolean; onToggleLights: () => void }) {
   const { go } = useRoute()
   return (
-    <header className="flex flex-wrap items-baseline justify-between gap-4">
+    <header className="signup-header">
       <button type="button" onClick={() => go('/join')} className="font-display text-[30px] leading-none text-ink">BandIt</button>
-      <nav aria-label="Night" className="flex items-baseline gap-5 text-[14px]">
+      <nav aria-label="Night" className="signup-nav">
+        <button type="button" className="signup-light-toggle" aria-pressed={lights} aria-label="Concert lights" onClick={onToggleLights}>
+          <Sparkles size={15} aria-hidden="true" /><span>Lights</span>
+        </button>
         <button type="button" onClick={() => go('/')} className="text-ink-dim hover:text-ink">Map</button>
         <button type="button" onClick={() => go('/claims')} className="text-ink-dim hover:text-ink">Claims</button>
       </nav>
@@ -57,17 +63,14 @@ function Field({ id, label, value, onChange, error, type = 'text', autoComplete,
   )
 }
 
-function Step({ number, title, note, children }: { number: string; title: string; note: string; children: ReactNode }) {
+function Step({ sectionId, title, note, children }: { sectionId: string; title: string; note: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`step-${number}`} className="border-t border-line pt-7">
-      <div className="mb-6 flex items-start gap-4">
-        <span aria-hidden="true" className="pt-1 font-mono text-[11px] text-champagne">{number}</span>
-        <div>
-          <h2 id={`step-${number}`} className="font-display text-[30px] leading-none">{title}</h2>
-          <p className="mt-2 text-[14px] leading-6 text-ink-dim">{note}</p>
-        </div>
+    <section aria-labelledby={sectionId} className="signup-section">
+      <div className="signup-section-heading">
+        <h2 id={sectionId}>{title}</h2>
+        <p>{note}</p>
       </div>
-      {children}
+      <div className="signup-panel">{children}</div>
     </section>
   )
 }
@@ -90,17 +93,16 @@ function UploadArea({ kind, title, note, disabled, onFiles, error }: {
   const [dragging, setDragging] = useState(false)
   return (
     <div>
-      <label htmlFor={`upload-${kind}`} className={`relative flex flex-col items-start gap-3 rounded border border-dashed p-5 transition-colors ${disabled ? 'border-line opacity-60' : dragging ? 'border-champagne bg-champagne/5' : 'border-line-strong bg-raised/40 hover:border-champagne/60'}`}
+      <label htmlFor={`upload-${kind}`} className={`signup-upload ${dragging ? 'is-dragging' : ''}`}
         onDragOver={(event) => { event.preventDefault(); if (!disabled) setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => { event.preventDefault(); setDragging(false); if (!disabled) onFiles(Array.from(event.dataTransfer.files)) }}>
-        <Upload size={20} strokeWidth={1.5} className="text-champagne" aria-hidden="true" />
-        <span className="text-[15px] font-medium">{title}</span>
-        <span id={`upload-${kind}-help`} className="text-[13px] leading-5 text-ink-dim">{note} PDF for now · up to 10 MB per file.</span>
+        <span className="signup-upload-copy"><span className="block text-[14px] font-medium">{title}</span>
+        <span id={`upload-${kind}-help`} className="text-[13px] leading-5 text-ink-dim">{note} PDF · up to 10 MB.</span></span>
         <input id={`upload-${kind}`} type="file" accept="image/*,application/pdf" multiple disabled={disabled}
           aria-describedby={`upload-${kind}-help${error ? ` upload-${kind}-error` : ''}`} aria-invalid={error ? true : undefined}
           onChange={(event) => { onFiles(Array.from(event.target.files ?? [])); event.target.value = '' }}
-          className="block w-full min-w-0 text-[12px] text-ink-dim file:mr-3 file:cursor-pointer file:rounded file:border file:border-line-strong file:bg-raised file:px-3 file:py-2 file:text-[13px] file:text-ink disabled:file:cursor-default" />
+          className="signup-file" />
       </label>
       {error && <p role="alert" id={`upload-${kind}-error`} className="mt-2 text-[13px] leading-5 text-signal">{error}</p>}
     </div>
@@ -114,15 +116,15 @@ function MedicalReview({ card, confirming, blocked, onConfirm }: { card: Medical
     ['Group number', card.groupNumber], ['Insurer phone', card.insurerPhone],
   ]
   return (
-    <div className="rounded border border-line bg-raised/40 p-5">
-      <dl className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-4 gap-y-3 text-[14px] leading-6">
-        {facts.map(([label, value]) => <div key={label} className="contents"><dt className="text-ink-dim">{label}</dt><dd className="break-words">{value || 'Not found in documents'}</dd></div>)}
+    <div className="signup-medical">
+      <dl className="signup-facts">
+        {facts.map(([label, value]) => <div key={label}><dt className="text-ink-dim">{label}</dt><dd className="break-words">{value || 'Not found in documents'}</dd></div>)}
       </dl>
       {card.status === 'confirmed' && !blocked ? (
         <p role="status" className="mt-6 flex items-center gap-2 text-[14px] text-teal"><CheckCheck size={17} aria-hidden="true" /> You confirmed this card.</p>
       ) : (
-        <Button type="button" className="mt-6 h-11" disabled={confirming || blocked} onClick={onConfirm}>
-          {confirming ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+        <Button type="button" className="signup-primary mt-6" disabled={confirming || blocked} onClick={onConfirm}>
+          {confirming ? <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
           {confirming ? 'Confirming…' : 'This is right'}
         </Button>
       )}
@@ -153,6 +155,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
   const [uploads, setUploads] = useState<LocalUpload[]>([])
   const [uploadErrors, setUploadErrors] = useState<Partial<Record<MedicalDocumentKind, string>>>({})
   const [retrying, setRetrying] = useState<string[]>([])
+  const savedHeading = useRef<HTMLHeadingElement>(null)
   const uploadId = useRef(0)
   const attemptedClaim = useRef(false)
   const mine = myBand?.bandId === Number(band.label) ? myBand : null
@@ -189,6 +192,12 @@ function RegistrationForm({ band }: { band: MockBand }) {
       .catch((error: unknown) => setErrors((current) => ({ ...current, form: reason(error) })))
       .finally(() => setClaiming(false))
   }, [connected, myBandReady, claimBand, band.label, owned, waitingForPress])
+
+  useEffect(() => {
+    if (!saved) return
+    savedHeading.current?.closest('[data-page]')?.scrollTo({ top: 0 })
+    savedHeading.current?.focus({ preventScroll: true })
+  }, [saved])
 
   const set = (key: keyof Registration) => (value: string) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -258,15 +267,15 @@ function RegistrationForm({ band }: { band: MockBand }) {
   }
 
   if (saved) return (
-    <div className="mt-14 grid items-start gap-12 pb-16 md:mt-20 md:grid-cols-2">
+    <div className="signup-complete">
       <div>
         <p className="mb-5 flex items-center gap-2 text-[13px] text-teal"><ShieldCheck size={18} aria-hidden="true" /> Ready for the night</p>
-        <h1 className="font-display text-[clamp(36px,4vw,56px)] leading-[0.98] tracking-[-0.02em]">Saved on band {band.label}.</h1>
+        <h1 ref={savedHeading} tabIndex={-1} className="signup-title">Saved on band {band.label}.</h1>
         <p className="mt-5 max-w-[40ch] text-[16px] leading-7 text-ink-dim">Your band is linked and your details are saved. Your medical card is ready for review at the aid station when it’s needed.</p>
         <WalletStatus />
         <div className="mt-8 flex flex-wrap items-center gap-5">
-          <Button type="button" className="h-11 px-4" onClick={() => setSaved(null)}>Edit this band</Button>
-          <button type="button" onClick={() => go('/claims')} className="text-[14px]">Claims desk</button>
+          <Button type="button" className="signup-primary" onClick={() => setSaved(null)}>Edit this band</Button>
+          <button type="button" onClick={() => go('/claims')} className="min-h-11 text-[14px]">Claims desk</button>
         </div>
       </div>
       <CoverSlip registration={withMedicalCard(saved, session.medicalCardReady ? medicalCard : null)} bandLabel={band.label} />
@@ -274,30 +283,34 @@ function RegistrationForm({ band }: { band: MockBand }) {
   )
 
   return (
-    <div className="mt-14 grid items-start gap-12 pb-20 md:mt-20 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:gap-20">
-      <aside className="min-w-0 md:sticky md:top-8">
-        <p className="mb-5 text-[12px] uppercase tracking-[0.16em] text-champagne">One band. Your night.</p>
-        <h1 className="max-w-[9ch] font-display text-[clamp(42px,5vw,64px)] leading-[0.98] tracking-[-0.02em]">{owned ? 'Make it yours.' : 'Register this band.'}</h1>
-        <p className="mt-5 max-w-[32ch] text-[16px] leading-7 text-ink-dim">A few details now. A little peace of mind for the rest of the night.</p>
-        <div className="mt-8 rounded border border-line bg-raised/50 p-5">
-          <div className="flex items-center justify-between gap-3"><BandMark /><span aria-hidden="true" className="font-mono text-[30px] text-champagne">{band.label}</span></div>
-          <h2 className="mt-5 text-[16px]">You’re on band {band.label}</h2>
-          <div role="status" className="mt-2 text-[13px] leading-6 text-ink-dim">
-            {owned ? <span className="flex items-center gap-2 text-teal"><Check size={15} aria-hidden="true" /> Claimed · edit your details below.</span>
+    <main className="signup-main">
+      <div className="signup-intro">
+        <h1 className="signup-title">Register your band.</h1>
+        <p>Add your details, then check what your documents say.</p>
+      </div>
+      <div className="signup-band">
+        <div className="signup-strap" aria-hidden="true"><span>{band.label}</span><i /></div>
+        <div className="signup-band-status">
+          <h2>You’re on band {band.label}</h2>
+          <div role="status" className="signup-status">
+            {owned ? <span className="flex items-center gap-2"><Check size={15} className="text-teal" aria-hidden="true" /> Claimed · ready for your details</span>
               : waitingForPress ? <span className="text-champagne">Press the button on your band to make it yours.{mine?.expiresAt != null && ` ${Math.max(0, Math.ceil((mine.expiresAt - now) / 1000))} seconds left.`}</span>
               : expired ? 'The button window expired. Try claiming your band again.'
               : claiming ? 'Claiming your band…'
               : !connected ? 'Connecting to your band…'
               : !session.myBandReady ? 'Checking your band…' : 'Your band has not been confirmed yet.'}
           </div>
-          {connected && session.myBandReady && !owned && !waitingForPress && !claiming && <Button type="button" variant="outline" className="mt-4 h-10" onClick={() => void claim()}>Try claiming again</Button>}
+          {connected && session.myBandReady && !owned && !waitingForPress && !claiming && <Button type="button" className="signup-primary mt-3" onClick={() => void claim()}>Try claiming again</Button>}
         </div>
-        <p className="mt-5 flex items-start gap-2 text-[12px] leading-5 text-ink-muted"><ShieldCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> Documents are read for your medical card. File contents stay out of this browser’s saved registration.</p>
-      </aside>
+        <div className="signup-preview" role="group" aria-label="Band details preview">
+          <p>{draft.name.trim() || 'Your name goes here'}</p>
+          <span><CreditCard size={15} aria-hidden="true" />{ /^\d{4}$/.test(draft.last4) ? `${draft.cardBrand} ···· ${draft.last4} · Demo` : 'No demo card added'}</span>
+        </div>
+      </div>
 
-      <form onSubmit={(event) => void save(event)} noValidate className="min-w-0 space-y-10" aria-label={`Register band ${band.label}`}>
+      <form onSubmit={(event) => void save(event)} noValidate className="signup-form" aria-label={`Register band ${band.label}`}>
         {(errors.form || session.signupError || session.error) && <p role="alert" className="rounded border border-signal/30 bg-signal/5 p-4 text-[14px] leading-6 text-signal">{errors.form || session.signupError || session.error}</p>}
-        <Step number="01" title="The person wearing it" note="Who you are, and who we should call.">
+        <Step sectionId="your-details" title="Your details" note="The person wearing the band, and someone to call.">
           <div className="grid gap-5 sm:grid-cols-2">
             <Field id="name" label="Name" value={draft.name} onChange={set('name')} error={errors.name} autoComplete="name" />
             <Field id="email" label="Email" type="email" value={draft.email} onChange={set('email')} error={errors.email} autoComplete="email" inputMode="email" />
@@ -305,9 +318,9 @@ function RegistrationForm({ band }: { band: MockBand }) {
             <Field id="emergency-phone" label="Emergency phone" type="tel" value={draft.emergencyPhone} onChange={set('emergencyPhone')} error={errors.emergencyPhone} autoComplete="section-emergency tel" inputMode="tel" />
           </div>
         </Step>
-        <Step number="02" title="Your documents" note="We’ll read the details, then you check them.">
-          {!owned && <p className="mb-4 text-[13px] leading-6 text-champagne">Confirm your band with its button to unlock uploads.</p>}
-          <p className="mb-5 text-[13px] leading-6 text-ink-dim">For now, use one PDF for each section. Include both sides of your insurance card in the same PDF. Photo reading and combining separate files are not available yet.</p>
+        <Step sectionId="your-documents" title="Documents" note="We’ll read the details, then you check them.">
+          {!owned && <p className="mb-4 text-[13px] leading-6 text-champagne">Confirm your band with its button to add documents.</p>}
+          <p className="mb-5 text-[13px] leading-6 text-ink-dim">One PDF per section. Include both sides of your insurance card in one file. Photos and separate files aren’t supported yet.</p>
           <div className="grid gap-4">
             <UploadArea kind="insurance" title="Insurance card" note="Front and back, together." disabled={!owned || !connected || uploadingKind('insurance')} onFiles={(files) => addFiles('insurance', files)} error={uploadErrors.insurance} />
             <UploadArea kind="history" title="Medical history" note="Your medical records." disabled={!owned || !connected || uploadingKind('history')} onFiles={(files) => addFiles('history', files)} error={uploadErrors.history} />
@@ -331,14 +344,13 @@ function RegistrationForm({ band }: { band: MockBand }) {
             })}
           </ul>
         </Step>
-        <Step number="03" title="A second look" note="Check what your documents told us.">
+        <Step sectionId="review-card" title="Review your card" note="Check what your documents told us.">
           {!session.medicalCardReady || !session.medicalDocumentsReady || outstanding ? <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-dim"><LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Still reading your documents.</p> : !medicalCard ? <p className="text-[14px] leading-6 text-ink-dim">Your medical and insurance details will appear here after you upload your documents.</p> : null}
           {session.medicalCardReady && medicalCard && <MedicalReview card={medicalCard} confirming={confirming} blocked={reviewBlocked} onConfirm={() => void confirm()} />}
         </Step>
-        <Step number="04" title="A card for the night" note="Mock payment details for this demo.">
-          <div className="mb-5 flex items-center gap-2 text-[12px] uppercase tracking-wider text-champagne"><CreditCard size={16} aria-hidden="true" /> Demo payment</div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+        <Step sectionId="payment" title="Payment" note="Mock payment details for this demo.">
+          <div className="signup-payment-fields">
+            <div>
               <label htmlFor="brand" className="mb-2 block text-[14px] font-medium">Card</label>
               <select id="brand" value={draft.cardBrand} onChange={(event) => set('cardBrand')(event.target.value)} className={fieldClass} aria-invalid={errors.cardBrand ? true : undefined} aria-describedby={errors.cardBrand ? 'brand-error' : undefined}>
                 {BRANDS.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
@@ -350,11 +362,12 @@ function RegistrationForm({ band }: { band: MockBand }) {
           </div>
           <p className="mt-3 text-[13px] leading-5 text-ink-dim">Last four only. The full number never lands here.</p>
           <WalletStatus />
-          <Button type="submit" className="mt-6 h-12 w-full sm:w-auto sm:px-6" disabled={saving || !owned || !confirmed || !connected}>{saving ? 'Saving…' : 'Save this band'}</Button>
-          {!confirmed && <p className="mt-3 text-[12px] leading-5 text-ink-muted">Confirm your band and review your medical card to finish.</p>}
+          <Button type="submit" className="signup-primary signup-save mt-6" disabled={saving || !owned || !confirmed || !connected}>{saving ? 'Saving…' : 'Save this band'}</Button>
+          {!confirmed && <p className="mt-3 text-[13px] leading-5 text-ink-dim">Confirm your band and review your medical card to finish.</p>}
         </Step>
       </form>
-    </div>
+      <p className="signup-privacy"><ShieldCheck size={16} aria-hidden="true" /> Documents are read for your medical card. File contents stay out of this browser’s saved registration.</p>
+    </main>
   )
 }
 
@@ -365,16 +378,18 @@ function WalletStatus() {
 }
 
 export function RegisterPage() {
+  const [lights, setLights] = useState(true)
   const { search } = useRoute()
   const band = bandFromLocation(search)
   return (
-    <div data-page className="h-full overflow-y-auto bg-ground text-ink">
-      <div className="mx-auto w-full max-w-[1200px] px-5 py-6 md:px-10 md:py-8">
-        <NightHeader />
+    <div data-page data-lights={lights ? 'on' : 'off'} className="signup-page h-full overflow-y-auto bg-ground text-ink">
+      <ConcertLights enabled={lights} />
+      <div className="signup-shell">
+        <NightHeader lights={lights} onToggleLights={() => setLights((current) => !current)} />
         {band ? <RegistrationForm key={band.deviceId} band={band} /> : (
-          <div className="mx-auto mt-24 max-w-md pb-20 text-center md:mt-32">
+          <div className="signup-tap">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-raised"><Waves size={30} strokeWidth={1.25} className="text-champagne" aria-hidden="true" /></div>
-            <h1 className="mt-8 font-display text-[clamp(38px,5vw,56px)] leading-none tracking-[-0.02em]">Tap your band to start.</h1>
+            <h1 className="signup-title mt-8">Tap your band to start.</h1>
             <p className="mt-5 text-[16px] leading-7 text-ink-dim">Hold your phone near your band’s NFC tag and open the link. We’ll take you straight to your band.</p>
           </div>
         )}

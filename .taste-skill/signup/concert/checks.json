@@ -1,0 +1,19 @@
+{
+  "result": "pass",
+  "colors": [
+    "#b7d9f5",
+    "#bfe6d5",
+    "#d5c5f5"
+  ],
+  "checks": [
+    "pointer sweep changes pastel",
+    "click triggers next color and pulse",
+    "form data retained",
+    "lights toggle stops listeners",
+    "keyboard toggle",
+    "reduced motion has no pointer tracking or animation",
+    "touch tap responds",
+    "320px no horizontal overflow"
+  ],
+  "consoleErrors": []
+}

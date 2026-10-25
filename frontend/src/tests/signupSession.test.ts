@@ -66,7 +66,10 @@ function apply(view: string) {
 async function started() {
   const session = await import('@/stdb/session')
   session.startSession()
-  await vi.waitFor(() => expect(harness.subscriptions).toHaveLength(5))
+  // Other features can add subscriptions without changing attendee isolation.
+  await vi.waitFor(() => expect(harness.subscriptions.map(({ query }) => query)).toEqual(expect.arrayContaining([
+    'SELECT * FROM my_band', 'SELECT * FROM my_medical_documents', 'SELECT * FROM my_medical_card', 'SELECT * FROM my_wallet',
+  ])))
   return session.useSession
 }
 

@@ -30,4 +30,5 @@ if (typeof window !== 'undefined') {
   Element.prototype.hasPointerCapture ??= () => false
   Element.prototype.releasePointerCapture ??= () => {}
   Element.prototype.scrollIntoView ??= () => {}
+  Element.prototype.scrollTo ??= () => {}
 }

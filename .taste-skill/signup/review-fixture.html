@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BandIt signup design review</title></head><body><div id="root"></div><script type="module">
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { RegisterPage } from '/src/components/join/RegisterPage.tsx'
+import { RouteProvider } from '/src/cover/route.tsx'
+import { useSession } from '/src/stdb/session.ts'
+import '/src/index.css'
+// Expose the component's inner scroll to the inspector's window scroll capture.
+const style = document.createElement('style')
+style.textContent = 'html, body, #root, [data-page] { height: auto !important; overflow: visible !important; }'
+document.head.append(style)
+window.__signupReviewSession = useSession
+const review = new URLSearchParams(location.search).get('review') || 'empty'
+history.replaceState(null, '', review === 'tap' ? '/register' : '/register?band=band-05')
+localStorage.removeItem('bandit.cover')
+const card = { bandId: 5, name: '', bloodType: 'O+', allergies: 'Peanuts', conditions: '', medications: '', emergencyContact: 'Sam Rivera, 415-555-0123', insurer: 'Northline', plan: 'Event coverage', memberId: 'NL-44005', groupNumber: 'NL-MAIN', insurerPhone: '415-555-0190', status: 'extracted' }
+useSession.setState({ phase: 'live', error: null, signupError: null, walletError: null,
+ myBand: { bandId: 5, status: review === 'waiting' ? 'waiting_for_press' : 'claimed', expiresAt: review === 'waiting' ? Date.now() + 8000 : null }, myBandReady: true,
+ medicalDocuments: review === 'review' ? [{ id: '1', kind: 'insurance', fileHash: 'test-insurance', pageCount: 2, status: 'read', jobId: '1', dropped: [], uploadedAt: 100 }, { id: '2', kind: 'history', fileHash: 'test-history', pageCount: 2, status: 'read', jobId: '2', dropped: [], uploadedAt: 101 }] : [],
+ medicalDocumentsReady: true, medicalCard: review === 'review' ? card : null, medicalCardReady: true,
+ claimBand: async () => {}, registerBand: async () => {},
+ confirmMedicalCard: async () => useSession.setState({ medicalCard: { ...useSession.getState().medicalCard, status: 'confirmed' } }),
+ submitMedicalDocument: async () => ({ hash: 'visual-test' }), retryMedicalDocument: async () => {},
+})
+createRoot(document.getElementById('root')).render(React.createElement(RouteProvider, null, React.createElement(RegisterPage)))
+</script></body></html>
