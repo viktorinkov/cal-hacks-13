@@ -4,7 +4,7 @@ Insurance resolves the money after an incident: who is paid, how much, from whic
 
 - **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own policy, their health insurance card and the hospital report. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
-- **The organizer** decides each claim that Claude or the guard sends them. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Approving any other claim can teach a rule, and the next claim of that shape is then paid with nobody involved. A complicated claim teaches no rule: the decision is kept as a precedent that the next such claim shows.
+- **The organizer** decides each claim that Claude or the guard sends them, and every decision is kept as a precedent. A complicated claim, one with a gap or mismatch in the policies, always goes to them and is decided one by one. Once three approved claims of one shape agree, Claude proposes a payment rule that cites them, and after the organizer approves it, the next claim of that shape is paid with nobody involved.
 
 Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first. The attendee's own policy pays when their belongings are stolen or broken, because the venue's policy never does.
 
@@ -38,7 +38,9 @@ flowchart TB
   Paid["Paid"]:::stdb
   Ref["Refused, every check listed"]:::stdb
   Org["Organizer decides<br/>approve_claim or refuse_claim"]:::web
-  Rule["Learned rule vN"]:::stdb
+  Prec["Organizer precedents<br/>one per decision"]:::stdb
+  Prop["Anthropic Claude API proposes a rule<br/>from 3 approved precedents, code checks it"]:::ext
+  Rule["Payment rule vN"]:::stdb
   Pay["Capital One Nessie API<br/>deposit into the wallet"]:::ext
 
   Org0 -->|"policy PDF, submit_policy_document"| VP
@@ -58,7 +60,9 @@ flowchart TB
   Guard -->|"pay holds"| Paid
   Guard -->|"refuse on a failed check"| Ref
   Guard -->|"a complication, ask, or a decision it will not let through"| Org
-  Org -->|"approve_claim, learn on"| Rule
+  Org -->|"every decision, organizer_precedent"| Prec
+  Prec -->|"3 alike, job rule_proposal"| Prop
+  Prop -->|"the organizer approves, approve_rule_proposal"| Rule
   Rule -.->|"ceiling for the next pay"| Guard
   Org -->|"approved"| Paid
   Paid -->|"job claim_payout"| Pay
@@ -82,8 +86,9 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | Pay, refuse or ask the organizer? | the Anthropic Claude API, investigating with tools (`claim_review`) | proposes the decision, with the facts it rests on |
 | Is the claim complicated: a gap or mismatch in the policies? | code, the guard, from the cover and the amounts | sends it to the organizer whatever Claude decided, with every complication listed |
 | Does the decision go through? | code, the guard | lets a pay or a refusal through only inside the terms and the checks; otherwise sends it to the organizer |
-| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses; teaches a rule only from a claim that is not complicated, and keeps a precedent from one that is |
-| What the next similar claim does | the organizer's approval, as a `settlement_rule` version | the ceiling under which a pay goes through |
+| A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses; every decision is kept as an `organizer_precedent` |
+| Do the organizer's approvals share a pattern? | the Anthropic Claude API, from 3 or more approved simple precedents of one shape (`rule_proposal`); code checks the claims it cites and its ceiling | proposes a rule; nothing is paid under it until the organizer approves it |
+| What the next similar claim does | the organizer, approving Claude's proposal (`approve_rule_proposal`), never the identity that proposed it; it becomes a `settlement_rule` version | the ceiling under which a pay goes through |
 | The wording of the letters | the Anthropic Claude API, `claim_draft` and `recovery_letter`; code checks every figure | words only |
 | Who broke or took something? (next to build) | security names the band (`name_responsible`); code accepts only a band at the spot; the organizer approves or drops the charge | a charge collected from that person's wallet |
 
@@ -106,7 +111,7 @@ A claim is decided in four steps. Code refuses what no one could pay. Claude inv
 
 ### Complicated claims: gaps and mismatches in the policies
 
-A claim is complicated when the policies leave a serious gap or contradict each other. No rule fits such a claim, so the organizer decides each one, one by one, whatever Claude decided. Every other claim settles or is refused under the guard, and once an organizer has approved a claim of its shape, it settles with nobody involved.
+A claim is complicated when the policies leave a serious gap or contradict each other. No rule fits such a claim, so the organizer decides each one, one by one, whatever Claude decided. Every other claim settles or is refused under the guard, and once the organizer has approved a rule for its shape, it settles with nobody involved.
 
 Code finds each complication from stored rows and lists every one the claim has, not only the first.
 
@@ -121,7 +126,7 @@ A billed service the fee schedule does not list is not a complication: the sched
 
 A complicated claim goes to the organizer as `Complication: {each complication}. {Claude's decision}`, for example `Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00`.
 
-Approving a complicated claim never teaches a rule, because the policies give it none: `approve_claim` ignores `learn` for one, and the organizer screens offer no "teach a rule" or rule ceiling on it. Hyphenate's track still asks that "what happened in March should change what the system does in June", so the organizer's decision is kept as a precedent instead, a `decision` row for each kind of gap:
+A complicated claim never feeds a proposed rule, because a gap leaves no policy term to set a ceiling from. Its `organizer_precedent` row lists the complications, and no proposal reads it. Hyphenate's track still asks that "what happened in March should change what the system does in June", so the decision also writes a `decision` row for each kind of gap:
 
 | The organizer | Precedent row (`what`, then `why`) |
 |---|---|
@@ -156,7 +161,7 @@ The investigation is the `claim_review` job, run by `crates/bandit-workers/src/i
 | `search_policy {query, policy}` (next to build) | the clauses of the venue's policy (`venue`) or the attendee's own policy (`attendee`) closest in meaning to Claude's own query, for example "injury that began before the event" or "services more than 30 days after the incident"; a query with a claimant's name is refused | The Evidence Engine: semantic search on `bandit-policy-clauses`, field `text`, filtered to the two policies on this claim |
 | `read_clause {clause_id}` (next to build) | one clause in full, with its section and page | The Evidence Engine: `bandit-policy-clauses` |
 
-The first build of the two Evidence Engine tools searched decided past claims (`search_past_claims`, `past_claim_stats`). The design drops them: a claim is covered or excluded by what its policies say, and what earlier approvals taught already lives in the organizer's learned rules.
+The first build of the two Evidence Engine tools searched decided past claims (`search_past_claims`, `past_claim_stats`). The design drops them: a claim is covered or excluded by what its policies say, and what earlier decisions settled already lives in the organizer's precedents and the payment rules approved from them.
 
 Each step Claude takes is written live into the decision history with `report_claim_step(job_id, actor, what, why)`, so the organizer and the 3D venue page watch the investigation as it happens.
 
@@ -223,13 +228,13 @@ First, a complicated claim goes to the organizer, whatever Claude decided. Other
 
 | Claude decides | Goes through only when | Otherwise |
 |---|---|---|
-| `pay` | every check of the pack passed, the payout is above $0 and above the policy's minimum, the evidence is `corroborated`, there is no mass occurrence, and the payout is at or under the ceiling of a learned rule for this kind of claim | sent to the organizer with Claude's recommendation |
+| `pay` | every check of the pack passed, the payout is above $0 and above the policy's minimum, the evidence is `corroborated`, there is no mass occurrence, and the payout is at or under the ceiling of an approved payment rule for this kind of claim | sent to the organizer with Claude's recommendation |
 | `refuse` | at least one check failed, and the refusal cites it in `refusal_checks` | sent to the organizer with Claude's recommendation |
 | `ask_organizer` | always: it goes to the organizer with Claude's question | |
 
 A cited exclusion clause does not refuse a claim on its own. The refusal also needs the failed check that tests that exclusion, for example `record_date_window` for a visit before the event, so the refusal rests on the contract and on a check anyone can re-run (next to build).
 
-A decision that goes through is stored with `decided_by` = `claude`. Claude never sets an amount, and it can never pay outside a rule an organizer taught or refuse without a check anyone can re-run.
+A decision that goes through is stored with `decided_by` = `claude`. Claude never sets an amount, and it can never pay outside a rule the organizer approved or refuse without a check anyone can re-run.
 
 ### What a pay needs
 
@@ -241,7 +246,7 @@ A claim is paid with nobody involved only when all of these hold:
 4. No check of the current pack version failed, from code or from The Evidence Engine.
 5. Claude decided `pay`, and its answer passed `validate_decision`.
 6. The evidence is `corroborated`.
-7. An active learned rule matches: same incident kind and cover kind, any zone.
+7. An active payment rule, approved from a proposal, matches: same incident kind and cover kind, any zone.
 8. The payout is at or under that rule's ceiling.
 9. Fewer than 3 injury incidents happened in the same zone within 5 minutes.
 
@@ -261,23 +266,102 @@ Today the limits are seeded and `FEE_SCHEDULE` is compiled into the code. The de
 | which insurance pays first | `other_insurance`: `primary` or `excess` | `primary` |
 | whether the incident is covered at all | `period_start`, `period_end` | not checked |
 
-### Step 4: the organizer, and what an approval teaches
+### Step 4: the organizer, and the precedent each decision keeps
 
 The organizer sees "Waiting for your decision" on the organizer portal's Claims tab. Each claim shows why it is there (for a complicated claim, every complication first), Claude's decision and summary, its findings per source, the checks, the hospital report as read, the billed lines, and each policy clause Claude cited with its page (next to build).
 
-`approve_claim` carries the amount and the pack SHA-256 the organizer saw. It fails closed, writing nothing, when either is out of date:
+`approve_claim(claim_id, amount_seen_cents, pack_hash_seen)` carries the amount and the pack SHA-256 the organizer saw. It fails closed, writing nothing, when either is out of date:
 
 - `stale: the evidence pack is now {sha}` when the pack hash differs from `claim.pack_hash`;
 - `stale: the payout is now {amount}` when the payout, recomputed from the current cover, record or cost notes and aggregate used, differs from the claim's or from the amount seen.
 
-With "Learn a rule from this approval" ticked (the default), the approval writes a `settlement_rule` version:
-
-- its shape is (incident kind, cover kind, any zone);
-- its ceiling is the ceiling the organizer typed, else this claim's payout;
-- its version is one more than the highest of that shape, and the older active versions become `superseded`;
-- no new version is written when an active rule of the shape already covers this payout.
-
 `refuse_claim` needs a reason and stores `refused by {name}: {reason}`. A refusal never changes a rule.
+
+Every decision, an approval or a refusal, writes one `organizer_precedent` row. It holds the claim and its approval, the claim's shape (incident kind and cover kind), the decision, the payout, the claimant, the zone, the complications (empty for a simple claim), a refusal's reason, who decided and when. Its `proposal_id` stays 0 until a proposal cites it.
+
+An approval makes no rule by itself: `approve_claim` takes no learn flag and no rule ceiling. A rule comes only from a proposal that cites several precedents, approved by the organizer (see Proposed rules below).
+
+### Proposed rules
+
+Hyphenate's workshop puts it as "every correction becomes precedent": the agent finds several precedents alike, proposes one general policy that cites them, and only a human controller approves it. BandIt does the same with the organizer's precedents. After three similar approvals Claude proposes the rule, the organizer approves it, and the fourth claim pays itself.
+
+**When Claude proposes a rule.** After an approval of a simple claim, the module looks at that shape's approved simple precedents that no proposal cites yet. It opens a proposal when all of these hold:
+
+1. there are at least 3 of them (`RULE_PRECEDENTS = 3`);
+2. the highest payout among them is above the ceiling of the shape's active rule, or the shape has no rule;
+3. no proposal of the shape is open (`proposing` or `proposed`).
+
+The module then writes a `rule_proposal` row in `proposing`, marks those precedents as cited by it, and queues the `rule_proposal` job. The payload holds the shape, the venue's policy number, the cover's per-claim limit and minimum payout, and the active rule's version and ceiling when there is one. It also holds every approved precedent offered (claim id, claimant, zone, payout, billed and covered amounts, diagnoses, service codes, approver, when) and the shape's refused simple precedents with their reasons, which give context and cannot be cited.
+
+**What Claude returns.** The `rule_proposal` job in `bandit-workers` asks Claude for structured output:
+
+| Field | Values |
+|---|---|
+| `propose` | whether the precedents share a pattern worth a rule |
+| `precedent_claim_ids` | the claims the rule rests on |
+| `ceiling_cents` | the rule's ceiling |
+| `rule` | the rule in one sentence, for example "Pay falls under medical payments cover up to $180.00 when the evidence is corroborated and every check passes" |
+| `summary` | why, citing the claims |
+
+Code checks the answer in the worker, which asks once more with the problems listed, and again in the module's `submit_rule_proposal`:
+
+- at least 3 cited claim ids, all from the approved precedents offered, with no repeats;
+- the ceiling equals the highest payout among the cited claims, so a rule never pays more than the organizer already approved for that shape;
+- the ceiling is at most the cover's per-claim limit in the policy.
+
+| Outcome | The proposal | Its precedents |
+|---|---|---|
+| a valid proposal | `proposed`, waiting for the organizer | the cited ones stay cited; offered ones it does not cite are released for a later proposal |
+| `propose: false`: the precedents share no pattern | `declined`, with Claude's summary | stay cited, so the same ones do not come back |
+| the job dies | `failed` | released |
+
+**The organizer decides.** `approve_rule_proposal(proposal_id, ceiling_seen_cents)` is for `ops` or the module owner. It is refused, writing nothing, when:
+
+- the caller is the identity that proposed it: separation of duties, so Claude's worker can never approve its own proposal;
+- the proposal is not `proposed`;
+- the ceiling seen is not the proposal's, from a stale screen;
+- the ceiling is now above the policy's per-claim limit.
+
+An approval writes `settlement_rule` version n+1 for (incident kind, cover kind, any zone), with `requires_corroborated`, the proposal's ceiling, the organizer as approver and `proposal_id`, which links the cited precedents as the rule's evidence. The shape's earlier active version becomes `superseded`. The proposal becomes `approved`, with the rule's id and version.
+
+The module then decides again every claim of that shape already waiting for the organizer whose Claude decision was `pay`, with no complication and no mass occurrence. One the new rule covers, with every check passed, the evidence corroborated and the payout at or under the ceiling, is paid on Claude's decision inside the rule, with no one involved.
+
+`reject_rule_proposal(proposal_id, reason)` is for `ops` or the owner, and the reason is required. The proposal becomes `rejected`, and its precedents stay cited, so the next three approvals of the shape can start a new proposal.
+
+A fresh live run (`start_live_run` with `fresh`) deletes the decision history and the organizer precedents, retires the active rules, and retires any open proposal.
+
+**In the decision history.** Each step writes one `decision` row:
+
+| When | `actor` | `what` | `why` |
+|---|---|---|---|
+| the organizer approves a simple claim | `organizer` | `Approved {name}'s claim` | `precedent 2 of 3 for falls under medical payments`, or `kept as a precedent` past 3 |
+| a proposal opens | `Decision Engine` | `Proposing a rule from claims 2, 4 and 7` | `three approved falls under medical payments` |
+| Claude proposes | `Claude` | `Proposed rule: {rule}` | `{summary} Waits for the organizer.` |
+| Claude proposes no rule | `Claude` | `Proposed no rule` | the summary |
+| the organizer approves it | `organizer` | `Approved rule v1: falls under medical payments up to $180.00` | `from claims 2, 4 and 7, proposed by Claude` |
+| the organizer rejects it | `organizer` | `Rejected the proposed rule` | the reason |
+
+The question this diagram answers: how three approvals become a payment rule that pays the fourth claim.
+
+```mermaid
+sequenceDiagram
+  participant O as Organizer (organizer portal)
+  participant M as band1t module
+  participant W as bandit-workers
+  participant C as Anthropic Claude API
+  O->>M: approve_claim, three simple falls under medical payments
+  M->>M: three organizer_precedent rows, none cited yet
+  M->>M: rule_proposal in proposing, the precedents cited
+  M->>W: job rule_proposal: the shape, the policy, the precedents
+  W->>C: the precedents and the cover's limit
+  C-->>W: propose, precedent_claim_ids, ceiling_cents, rule, summary
+  W->>M: submit_rule_proposal, checked again: proposed
+  M-->>O: Proposed rules: waits for the organizer
+  O->>M: approve_rule_proposal (ceiling seen)
+  M->>M: settlement_rule vN, proposal approved
+  M->>M: waiting pay claims of the shape decided again
+  Note over M: the fourth fall pays on Claude's decision inside the rule
+```
 
 ### Mass occurrence
 
@@ -291,21 +375,21 @@ These are the scripted claims run's claims (`bandit-claims story`).
 
 | Claim | What happened | What Claude can decide, and what the guard does | Result |
 |---|---|---|---|
-| Maya Chen, band 91 | Slipped near the stage; 2 witnesses; first-aid report, $180 | Claude pays; every check passed, the evidence is corroborated and $180 is under rule v1's $895 ceiling | paid in seconds, `decided_by` `claude` under rule v1 |
-| Jordan Alvarez, band 90 | Fell in the Main stage pit; 3 witnesses; urgent care billed $1,308, covered $895; the Tdap shot (`90715`) is not on the fee schedule | `record_lines` failed, so no pay goes through | waits for the organizer, who approves with learn on and teaches rule v1 |
+| Maya Chen, band 91 | Slipped near the stage; 2 witnesses; first-aid report, $180 | Claude pays; every check passed and the evidence is corroborated, but one approval proposes no rule, so no rule for falls exists yet | waits for the organizer with Claude's pay on top |
+| Jordan Alvarez, band 90 | Fell in the Main stage pit; 3 witnesses; urgent care billed $1,308, covered $895; the Tdap shot (`90715`) is not on the fee schedule | `record_lines` failed, so no pay goes through | waits for the organizer, who approves; the approval is kept as precedent 1 of 3 for falls under medical payments |
 | Sam Patel, band 92 | Went down on the Hacking floor; the report's history says he hurt the ankle playing basketball at home the evening before | Claude finds the report contradicts the incident and recommends a refusal; no check failed, so the refusal cannot go through alone | waits for the organizer with Claude's finding on top |
 | Lee Park, band 93 | The band reports a fall at Main stage, but the light circle forms on Sponsor row | disputed, so Claude decides at once; it refuses on the failed `witness_zone` check, and the guard lets the refusal through | refused, with every check listed |
 | The speaker | Knocked off its stand at Main stage; the camera confirms it; repair $2,400 | no property rule exists yet, so a pay cannot go through | waits for the organizer, who approves; J3 pays the repair vendor on the ledger |
 
-Maya runs after Jordan in the script, so Jordan's approval is what lets her claim be paid on its own. That is the learning the track asks to see.
+Maya runs after Jordan in the script, and one approval proposes no rule, so her claim waits for the organizer as his did. The live run shows the whole path the track asks to see: three approvals, Claude's proposed rule, the organizer's approval, and a fourth claim paid on its own.
 
 ### Every decision is a row: the decision history
 
 Each time someone or something decides about an incident or its claim, the module writes one `decision` row: who acted, their name, what they decided and why. The `actor` is one of `band`, `camera`, `medic`, `organizer`, `Claude`, `Evidence Engine`, `Decision Engine`, `wallet` or `venue`.
 
-The rows come from the claim itself and from each step of Claude's investigation: a status change on every save, the report read ("Read the clinic record: $1,308.00 billed, $895.00 covered"), the checks ("Flagged: record lines"), each source Claude read, each clause it found (next to build), its decision, and the approval ("learned rule v1: the next similar claim up to $895.00 settles on its own").
+The rows come from the claim itself and from each step of Claude's investigation: a status change on every save, the report read ("Read the clinic record: $1,308.00 billed, $895.00 covered"), the checks ("Flagged: record lines"), each source Claude read, each clause it found (next to build), its decision, and the approval ("precedent 2 of 3 for falls under medical payments"). Each step of a proposed rule writes its own row (see Proposed rules).
 
-The 3D venue page (`/live`, the organizer portal's Live tab) lists them live in its "Decision history" panel, coloured by actor. A claim waiting for the organizer there gets the approve button for staff.
+The 3D venue page (`/live`, the organizer portal's Live tab) lists them live in its "Decision history" panel, coloured by actor. A claim waiting for the organizer there gets the "Approve" button for staff, and a proposed rule waiting for the organizer shows above the decision history with "Approve" and "Reject".
 
 ## Reading the insurance documents (next to build)
 
@@ -360,7 +444,8 @@ Responsibilities:
 - Have the Anthropic Claude API investigate each claim with tools and decide pay, refuse or ask the organizer (`claim_review`); check its answer in code and hold it to the policy terms and the checks with the guard.
 - Compute coverage and amounts in integer cents.
 - Refuse in code what no one could pay. Write each decision, and each step of Claude's investigation, to `decision`.
-- Turn an approval into a versioned `settlement_rule`.
+- Keep every organizer decision as an `organizer_precedent`.
+- Have the Anthropic Claude API propose a rule once 3 approved simple precedents of one shape agree (`rule_proposal`), check it in code, and turn the organizer's approval of it into a versioned `settlement_rule`.
 - Post balanced `ledger_entry` journals for every money movement.
 - Pay the claimant into their wallet through the `claim_payout` job ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)).
 - Draft the first notice of loss, the claim summary, the determination letter and recovery letters through `bandit-workers` jobs.
@@ -373,7 +458,7 @@ Non-responsibilities:
 - Raw radio logs: they are never evidence. The pack reads the `incident_snapshot` written in the same transaction that opened the incident.
 - Prompts, model choice and call recording: [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md).
 - The indices, the pipelines and the policy clauses: [Elastic](../7-integrations/Elastic.md).
-- Screens: the Claims tab of the [organizer portal](../5-apps/Organizer-Portal.md) (/organizer) and the 3D venue page.
+- Screens: the Claims and Proposed rules tabs of the [organizer portal](../5-apps/Organizer-Portal.md) (/organizer) and the 3D venue page.
 
 ## Interfaces
 
@@ -391,16 +476,19 @@ Non-responsibilities:
 | `report_claim_step` | in | `worker` | job id, actor, what, why: one step of Claude's investigation | reducer; writes a `decision` row live |
 | `submit_claim_review` | in | `worker` | job id, Claude's decision JSON, the `model_call` | reducer; validates again, then the guard decides whether it goes through |
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | in | the organizer (`ops`) at event setup; `worker` | the policy PDF's hash; the terms The Evidence Engine read; the organizer's confirmation of the terms they saw | reducers; `policy_document`, `policy_term`, then the event's policy rows |
-| `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen, rule ceiling, learn flag | reducer |
-| `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer |
+| `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen | reducer; keeps an `organizer_precedent`, and may open a `rule_proposal` |
+| `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer; keeps an `organizer_precedent` |
+| `submit_rule_proposal` | in | `worker` | job id, Claude's proposal JSON, the `model_call` | reducer; checks it again, then `proposed` or `declined` |
+| `approve_rule_proposal` | in | `ops` or the module owner, never the identity that proposed it | proposal id, ceiling seen | reducer; writes the `settlement_rule` version, decides the waiting claims of the shape again |
+| `reject_rule_proposal` | in | `ops` or the module owner | proposal id, reason | reducer; `rejected` |
 | `close_claim_without_injury` | in | `ops`, `medic`; the live run's floor staff | claim id, reason; the claim must be `AwaitingRecord`, for an incident where the medic treated no injury | reducer; `Refused` with the reason |
 | `record_claim_payout` | in | `worker` | job id, the wallet's customer and account, the deposit id | reducer; J3, `Settled` |
 | `retry_claim_payout` | in | `ops` | claim id of a claim stuck in `Paying` | reducer; queues the deposit again |
 | `record_insurer_payment` | in | `ops` | claim id, amount received, insurer reference | reducer; J4, `Reconciled` |
 | `request_recovery_letter` | in | `ops` | a settled property claim, the counterparty's name and contact | reducer; enqueues `recovery_letter` |
 | `attach_claim_letters`, `attach_recovery_letter` | in | `worker` | the letters' blob hashes | reducer |
-| Jobs `clinic_report`, `claim_record_extract`, `claim_verify`, `claim_review`, `claim_payout`, `claim_draft`, `recovery_letter`; `document_read` (next to build) | out | `bandit-workers` | the payloads in `crates/bandit-insurance/src/payloads.rs` | `job` table |
-| Staff views `claims_board`, `board_facts`, `board_checks`, `board_lines`, `board_reviews`, `board_precedents`, `board_records`, `board_clinic_reports`, `board_approvals`, `board_ledger`, `board_rules`, `board_policies`, `unclaimed_injuries` | out | organizer portal | everything the Claims tab shows, with "How the evidence was gathered" (`web/src/evidence-trail.ts`) | SpacetimeDB subscription |
+| Jobs `clinic_report`, `claim_record_extract`, `claim_verify`, `claim_review`, `rule_proposal`, `claim_payout`, `claim_draft`, `recovery_letter`; `document_read` (next to build) | out | `bandit-workers` | the payloads in `crates/bandit-insurance/src/payloads.rs` | `job` table |
+| Staff views `claims_board`, `board_facts`, `board_checks`, `board_lines`, `board_reviews`, `board_precedents`, `board_records`, `board_clinic_reports`, `board_approvals`, `board_ledger`, `board_rules`, `board_rule_proposals`, `board_organizer_precedents`, `board_policies`, `unclaimed_injuries` | out | organizer portal | everything the Claims and Proposed rules tabs show, with "How the evidence was gathered" (`web/src/evidence-trail.ts`) | SpacetimeDB subscription |
 | Attendee views `my_incidents`, `my_claims` | out | tap page | the attendee's own resolved injuries and their claim's status | SpacetimeDB subscription |
 | `decision` | out | the 3D venue page | the decision history | SpacetimeDB subscription |
 
@@ -557,6 +645,7 @@ stateDiagram-v2
   Reviewing --> Routed: a complication, ask, or the guard holds the decision
   Reviewing --> Paying: Claude pays and the guard lets it through
   Routed --> Paying: approve_claim
+  Routed --> Paying: a rule approved from a proposal covers it
   Routed --> Refused: refuse_claim
   Paying --> Settled: record_claim_payout
   Settled --> Reconciled: record_insurer_payment
@@ -631,8 +720,8 @@ sequenceDiagram
   C-->>W: pay, refuse or ask_organizer, with cited facts
   W->>M: submit_claim_review, then the guard
   M-->>O: sent: Waiting for your decision
-  O->>M: approve_claim (amount and SHA seen, learn on)
-  M->>M: approval, J2, rule version
+  O->>M: approve_claim (amount and SHA seen)
+  M->>M: approval, J2, organizer_precedent
   W->>N: claim_payout: deposit
   W->>M: record_claim_payout, J3, Settled
   W->>C: claim_draft: notice, summary, letter
@@ -644,9 +733,13 @@ The live run plays the whole event on the venue's 3D floor (`/live`). A crowd wa
 
 Who falls, where and when comes from a random number generator seeded with `live_run.seed`, so a run can be played again exactly. The Anthropic Claude API never picks an outcome.
 
-The first beats of `live/script.rs` show every path a claim can take: a fall that teaches a rule, one the rule then settles on its own, a camera-confirmed speaker, an SOS with no claim, a bill above the learned ceiling, and an injury from home. Injuries move between zones so no zone has three within five minutes.
+The first beats of `live/script.rs` show every path a claim can take. Three first-aid wrist falls, at the tables, the sponsor tables and the food line, each wait for the organizer and become precedents. After the third approval, Claude proposes the rule.
 
-`bandit-claims live` plays the floor staff: the medic, the clinic filing its hospital report, the camera and the organizer's cost notes. It decides a claim left waiting for the organizer after `--approve-after` seconds (30): approved with a learned rule, or refused when Claude found the injury happened away from the event.
+Then come the speaker knocked over at the stage and the SOS in the food line. A fourth first-aid wrist fall is paid by the approved rule on its own. The urgent-care wrist, a bill above the rule's ceiling, goes to the organizer, and the last beat is the ankle hurt at home.
+
+The injuries are spread so no zone has three, which would hand the whole occurrence to the organizer.
+
+`bandit-claims live` plays the floor staff: the medic, the clinic filing its hospital report, the camera and the organizer's cost notes. It decides a claim left waiting for the organizer after `--approve-after` seconds (30): approved, or refused when Claude found the injury happened away from the event. It approves a proposed rule left waiting for the organizer as long.
 
 ### The scripted claims run
 
@@ -656,8 +749,8 @@ The first beats of `live/script.rs` show every path a claim can take: a fall tha
 
    The Anthropic Claude API reads it, and code covers $895 of the $1,308 billed. Six lines are cut to their caps and the Tdap shot (`90715`) is excluded, so `record_lines` fails and the claim waits for the organizer.
 
-   The first approval carries an amount from a screen a minute old, so `approve_claim` fails as stale and nothing moves. The second carries $895 and the current SHA-256 with learn on: J2 posts, $895 lands in Jordan's wallet, J3 posts, and rule v1 for (`fall`, `medical_payments`, any zone) is created with ceiling $895.
-2. **Maya falls the same way.** Band 91 slips near the stage, and bands 97 and 98 light the circle. Her first-aid report is $180, every check passes, Claude pays, and the guard lets it through under rule v1 in seconds.
+   The first approval carries an amount from a screen a minute old, so `approve_claim` fails as stale and nothing moves. The second carries $895 and the current SHA-256: J2 posts, $895 lands in Jordan's wallet and J3 posts. The approval is kept as precedent 1 of 3 for (`fall`, `medical_payments`).
+2. **Maya falls the same way.** Band 91 slips near the stage, and bands 97 and 98 light the circle. Her first-aid report is $180, every check passes and Claude pays. No rule for falls exists yet, so the guard sends it to the organizer with Claude's pay on top.
 3. **Sam's injury from home.** Band 92 goes down on the Hacking floor, with bands 94 and 99 around it. His record ($565) looks routine, but its history says he hurt the ankle playing basketball at home the evening before. Claude recommends refusing it, but no check failed, so it waits for the organizer with that finding on top.
 4. **Lee's fake fall.** Band 93 reports a fall at Main stage, but its circle (bands 95, 96 and 97) forms on Sponsor row. The evidence is disputed, so Claude decides at once, without waiting for a hospital report. It refuses on the failed `witness_zone` check, the guard lets that through, and the claim lists every check.
 5. **The broken speaker.** A speaker falls off its stand at Main stage, and the camera confirms it. The $2,400 repair waits for the organizer, who approves it; J3 pays the repair vendor on the ledger, and `request_recovery_letter` drafts a letter to "Stagecraft AV" worded as a query.
@@ -675,11 +768,11 @@ The first beats of `live/script.rs` show every path a claim can take: a fall tha
 | Same bill twice | code: `record_duplicate` fails, and Claude refuses on it |
 | Injured staff | code: `claimant_not_staff`, refused before Claude |
 
-The tool plays the organizer: it approves every genuine claim with learn on and refuses every fake that reached a person. It prints the scorecard:
+The tool plays the organizer: it approves every genuine claim and every rule Claude proposes, and refuses every fake that reached a person. It prints the scorecard:
 
 | Measure | Target |
 |---|---|
-| Straight-through rate per round: genuine claims settled with nobody | rises each round as rules are learned |
+| Straight-through rate per round: genuine claims settled with nobody | rises each round once the organizer approves the rules Claude proposes |
 | Dollars wrongly paid on fakes | $0.00 |
 | Precision and recall of settling on its own, and the weakest fake type | precision 1.0 |
 | Billed versus paid on genuine claims | reported |
@@ -706,7 +799,9 @@ erDiagram
   claim ||--o{ approval : "decided by"
   claim ||--o{ ledger_entry : "posts"
   claim ||--o{ decision : "history"
-  approval ||--o| settlement_rule : "creates version"
+  approval ||--|| organizer_precedent : "kept as"
+  rule_proposal ||--o{ organizer_precedent : "cites"
+  rule_proposal ||--o| settlement_rule : "approved as version"
   settlement_rule ||--o{ claim : "settles"
 ```
 
@@ -725,8 +820,10 @@ erDiagram
 | `claim_precedent` | one similar past claim for one pack version, which `claim_clause` replaces | `reference`, `outcome`, `payout_cents`, `narrative`, `score` |
 | `claim_clause` (next to build) | one policy clause that bears on one pack version | `clause_id`, `policy` (`venue`, `attendee`), `section`, `page`, `text`, `score` |
 | `claim_review` | Claude's answer for one pack version | `verdict`, `causation`, `summary`, `concerns`, `innocent_explanations`, `missing_evidence`, `cited_fact_ids`, `rejected`, `model_call_id` |
-| `settlement_rule` | one version of a learned rule | `incident_kind`, `cover_kind`, `zone_id` (0: any zone), `ceiling_cents`, `approver_name`, `approval_id`, `version`, `status` (`active`, `superseded`) |
-| `approval` | one person's decision | `decision` (`approve`, `refuse`), `amount_seen_cents`, `pack_hash_seen`, `learn`, `requested_ceiling_cents`, `reason` |
+| `settlement_rule` | one version of a payment rule, approved from a proposal | `incident_kind`, `cover_kind`, `zone_id` (0: any zone), `requires_corroborated`, `ceiling_cents`, `approver_name`, `proposal_id` (its precedents are the rule's evidence), `version`, `status` (`active`, `superseded`, `retired`) |
+| `approval` | one person's decision | `decision` (`approve`, `refuse`), `amount_seen_cents`, `pack_hash_seen`, `reason` |
+| `organizer_precedent` | one organizer decision on a claim, kept as a precedent | `claim_id`, `approval_id`, `incident_kind`, `cover_kind`, `decision` (`approve`, `refuse`), `payout_cents`, `claimant_name`, `zone_name`, `complications` (empty for a simple claim), `reason`, `decided_by_name`, `proposal_id` (0 until a proposal cites it), `decided_at` |
+| `rule_proposal` | one rule Claude proposes from the precedents of one shape | `incident_kind`, `cover_kind`, `status` (`proposing`, `proposed`, `approved`, `rejected`, `declined`, `failed`, `retired`), `ceiling_cents`, `limit_cents` (the cover's per-claim limit), `claim_ids` (the claims it cites), `rule`, `summary`, `job_id`, `model_call_id`, `proposed_by`, `decided_by_name`, `reason`, `settlement_rule_id` and `rule_version` |
 | `ledger_entry` | one line of one journal | `journal_id`, `journal`, `account`, `debit_cents`, `credit_cents`, `memo`, `posted_by` |
 | `claimant_account` | an attendee's Capital One Nessie customer and account: their wallet | `identity`, `customer_id`, `account_id` |
 | `decision` | one decision about an incident or its claim | `incident_id`, `claim_id`, `actor`, `who`, `what`, `why` |
@@ -736,7 +833,7 @@ erDiagram
 | `attendee_policy` (next to build) | one attendee's own policy, read from their policy PDF | insurer, policy number, the personal property cover's per-claim limit, yearly limit and deductible |
 | `charge` (next to build) | what the person responsible owes for one claim | the incident and claim, the band named and how security knew, the amount, the organizer's decision, the collection's reference |
 
-`authority_limit` stays in the schema for the live database; nothing reads or writes it.
+`authority_limit` stays in the schema for the live database; nothing reads or writes it. The same holds for `approval.learn` and `approval.requested_ceiling_cents`: the columns stay, and no reducer sets them.
 
 ### Reducers
 
@@ -753,8 +850,11 @@ erDiagram
 | `submit_claim_review` | `worker` | validates Claude's decision, then the guard lets it through or sends it to the organizer |
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | `ops`; `worker`; `ops` | the venue's policy PDF, the terms read from it, the organizer's confirmation |
 | `name_responsible` (next to build) | security staff | names the band responsible for an incident, and how they know |
-| `approve_claim` | `ops` or the module owner | stale checks, `approval`, J2, rule version, payout |
-| `refuse_claim` | `ops` or the module owner | `approval`, J1r, `Refused` |
+| `approve_claim` | `ops` or the module owner | stale checks, `approval`, `organizer_precedent`, J2, payout; opens a `rule_proposal` and enqueues its job when the shape's uncited approved simple precedents reach 3 (see Proposed rules) |
+| `refuse_claim` | `ops` or the module owner | `approval`, `organizer_precedent`, J1r, `Refused` |
+| `submit_rule_proposal` | `worker` | checks Claude's proposal again; `proposed`, or `declined` with its summary; releases the precedents it does not cite |
+| `approve_rule_proposal` | `ops` or the module owner, never the identity that proposed it | separation of duties and stale checks, `settlement_rule` version n+1, the older version `superseded`, then decides the waiting claims of the shape again |
+| `reject_rule_proposal` | `ops` or the module owner | `rejected` with the reason; its precedents stay cited |
 | `record_claim_payout` | `worker` | the wallet's `payout` entry, J3, `Settled`, enqueues `claim_draft` |
 | `retry_claim_payout` | `ops` | queues the deposit again for a claim in `Paying` |
 | `record_insurer_payment` | `ops` | J4, `Reconciled` |
@@ -773,7 +873,10 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | The Evidence Engine is unavailable | no validation, no policy clauses | an `info` check `elastic`; Claude investigates without them, its policy tools answer empty, and a decision that would rest on a clause goes to the organizer |
 | Claude's answer fails `validate_decision` twice, or the job dies | no usable decision | the answer is set aside and code decides alone; nothing is paid on it |
 | A policy term cannot be read, or code rejects it (next to build) | that term is unknown | it keeps its default and is flagged for the organizer before they confirm |
-| The organizer's screen is out of date | the amount or SHA-256 seen is stale | `approve_claim` fails closed and writes nothing |
+| The organizer's screen is out of date | the amount or SHA-256 seen is stale, or the ceiling seen on a proposal | `approve_claim` and `approve_rule_proposal` fail closed and write nothing |
+| Claude's proposal cites a claim it was not offered, sets a ceiling other than the highest payout it cites, or one above the policy's limit | a rule would pay more than the organizer approved | the worker asks once more with the problems listed, and `submit_rule_proposal` checks again |
+| The `rule_proposal` job dies | no proposal | the proposal is `failed`, and its precedents are released for a later proposal |
+| Claude's worker calls `approve_rule_proposal` on its own proposal | the proposer would approve its own rule | refused: the caller is the identity that proposed it (separation of duties) |
 | Someone without `ops` tries to decide | the wrong person would move money | `claim N is waiting for Organizer (ops)`; the portal hides the buttons anyway |
 | A letter quotes a figure not in the amounts, or the call fails | no usable letter | one retry, then the code template; settlement never waits for letters |
 | `claim_payout` dies | the claimant is unpaid | the claim stays `Paying` with the error until `retry_claim_payout` |
@@ -785,7 +888,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): `job`, `blob_ref`, `staff_role`, `attendee`, roles and the hook inside `resolve_incident`.
 - [Safety](Safety.md): `incident`, `incident_snapshot`, `incident_band`, `incident_note` with `cost_cents`, `resolve_incident`.
-- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, `model_call`, the prompts and schemas of `claim_record_extract`, `claim_review`, `claim_draft` and `recovery_letter`.
+- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, `model_call`, the prompts and schemas of `claim_record_extract`, `claim_review`, `rule_proposal`, `claim_draft` and `recovery_letter`.
 - [Elastic](../7-integrations/Elastic.md): `bandit-claims` and `bandit-claims-validate`; `bandit-documents`, `bandit-documents-extract`, `bandit-policy-clauses`, the workflow `bandit-read-document` and the agent `bandit-document-reader` (next to build).
 - [Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md): the `claim_payout` deposit and the wallet.
 - [Vision](../4-devices/Vision.md) (TBD -- LEO): `vision_assessment` and camera frames.
@@ -794,7 +897,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 
 **Used by**
 
-- [Organizer-Portal](../5-apps/Organizer-Portal.md): the Claims tab.
+- [Organizer-Portal](../5-apps/Organizer-Portal.md): the Claims and Proposed rules tabs.
 - [Architecture](../1-overview/Architecture.md) and [Sponsor-Tracks](../1-overview/Sponsor-Tracks.md): the Hyphenate, Anthropic and Capital One rows.
 - The 3D venue page: the `decision` history and the incident markers.
 
@@ -805,7 +908,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | The Evidence Engine reads every insurance PDF: the venue's policy, the attendee's insurance card and the hospital report (next to build) | reading documents into searchable, quoted terms is search work; Claude's turn is the judgment that follows |
 | Every term read from the venue's policy quotes its clause and page, code checks the quote word for word, and the organizer confirms the terms before they set any money (next to build) | the limits that move money must trace to the venue's own contract, never to a model's summary of it |
 | Both the venue and the attendee are insured, and the venue's policy says which pays first (`primary` or `excess`) (next to build) | that is how a venue's medical payments cover meets an attendee's own health plan |
-| The Evidence Engine matches a claim against the clauses of both policies, not against past claims (next to build) | a claim is covered or excluded by its contract's wording; how other claims ended says nothing about this one, and the organizer's learned rules already carry what earlier approvals taught |
+| The Evidence Engine matches a claim against the clauses of both policies, not against past claims (next to build) | a claim is covered or excluded by its contract's wording; how other claims ended says nothing about this one, and the organizer's precedents and the rules approved from them already carry what earlier decisions settled |
 | Claude cites a clause for the decision, for each billed line and for which policy pays; code checks each clause belongs to a policy on this claim (next to build) | every call traces back to the contract, the way a finance reviewer checks it |
 | A charge needs a person security named at the spot and the organizer's decision; no rule and no model charges a person (next to build) | a wrong charge hurts an attendee as much as a wrong refusal |
 | Each of the five incident types has its own claimant and paying policy, and the venue's policy never pays for an attendee's own belongings (next to build) | a general liability policy excludes guests' property, so a stolen laptop is a claim on the attendee's own policy |
@@ -813,15 +916,19 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | The attendee files their own injury claim, in their own words; resolving the incident no longer opens it | the claim is the attendee's, and their account of what happened is evidence Claude compares with the report |
 | The hospital report's case comes from the module's seeded generator; the Anthropic Claude API only writes the report for it | BandIt has no hospital connection, a run can be played again exactly, and a model never picks an outcome |
 | Claude investigates with tools and decides pay, refuse or ask the organizer | the judgment of whether a story hangs together belongs to the part that can read every source and weigh them |
-| The guard lets a pay through only inside a learned rule's ceiling with every check passed and the evidence corroborated, and a refusal only on a failed check | Claude decides, but it never pays outside what an organizer approved, and never refuses on something no one can re-run |
+| The guard lets a pay through only inside an approved rule's ceiling with every check passed and the evidence corroborated, and a refusal only on a failed check | Claude decides, but it never pays outside what an organizer approved, and never refuses on something no one can re-run |
 | Code computes every amount; Claude never sets a figure | a model must never decide a payable |
 | Code refuses a staff claimant and a claim with nothing to pay before Claude | those need no judgment |
 | A complicated claim, one with a gap or mismatch in the policies, always goes to the organizer, one by one | no rule can settle what the contract does not answer; the organizer sees every gap at once |
-| A complicated claim teaches no rule; the organizer's decision is kept as a precedent the next claim with the same gap shows, never applied | the system remembers what a person decided without turning one exception into a policy |
+| A complicated claim feeds no proposed rule; the organizer's decision is kept as a precedent the next claim with the same gap shows, never applied | a gap leaves no policy term to set a ceiling from, and the system remembers what a person decided without turning one exception into a policy |
 | Disputed evidence goes to Claude at once, without waiting for a hospital report | the sources already contradict each other, so there is nothing to wait for |
-| Every routed claim goes to the organizer (`ops`), with no approval ladder | one person decides money after the event, and anyone with `ops` can act for them; the stale check and the learned rule guard the money |
+| Every routed claim goes to the organizer (`ops`), with no approval ladder | one person decides money after the event, and anyone with `ops` can act for them; the stale check and the approved rules guard the money |
 | `approve_claim` fails closed on a stale amount or pack | the guardrail finance reviewers ask about first |
-| A learned rule's shape is (incident kind, cover kind, any zone), with the ceiling the organizer approved | the next claim of the same shape at or under that amount needs nobody |
+| Every organizer decision is kept as an `organizer_precedent`, and one approval makes no rule | Hyphenate's workshop: "every correction becomes precedent"; one exception is not yet a pattern |
+| Claude proposes a rule from 3 or more approved simple precedents of one shape, citing the claims it rests on; code checks the cited claims, the ceiling and the policy's limit | every rule traces back to the decisions behind it, and code, not the model, holds the ceiling to what the organizer approved |
+| A payment rule's shape is (incident kind, cover kind, any zone), and its ceiling is the highest payout among the precedents it cites | the next claim of the same shape at or under that amount needs nobody, and a rule never pays more than the organizer already approved |
+| Only `ops` or the owner approves a proposal, never the identity that proposed it | separation of duties, as in Hyphenate's workshop: the agent proposes, a human controller approves |
+| Approving a rule decides again the waiting claims of its shape that Claude would pay | the claims the rule covers need no second look, so the fourth claim pays itself |
 | A refusal never changes a rule | a fake refused for its own reason must not switch off a good rule |
 | Three or more injuries in one zone within 5 minutes turn automation off for the occurrence | one occurrence can use up the aggregate limit, so a person decides with all of it in view |
 | Every decision and every step of Claude's investigation is a `decision` row with who, what and why | judges and the organizer can follow a claim from the band to the payout |

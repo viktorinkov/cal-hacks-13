@@ -16,7 +16,8 @@ Responsibilities:
 - Show where each booth stands.
 - Let staff find anyone in the Live tab's "People" list and act as them: file a claim, buy merch, take the band back and open their medical card; the owner also opens their pages.
 - Give the organizer (`ops`) the attendee list with band status and "Take the band back" (`release_band`), and the "Event ended" button (`end_event`). Once the event has ended, the button becomes "Reopen the event" (`reopen_event`).
-- Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
+- Insurance.md: give the organizer "Waiting for your decision", the claims no payment rule settled, to decide after the event.
+- Insurance.md: give the organizer the rules Claude proposes from their precedents, to approve or reject, on the Proposed rules tab, with every payment rule and every precedent beside them.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
 - Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab.
@@ -43,7 +44,7 @@ Not responsible for:
 | Incident reducers | out | organizer portal to module | `assign_medic` ("Take it"), `add_incident_note` ("Add note"), `resolve_incident` ("Resolve") | SDK reducer call |
 | Attendee list and "Event ended" reducers | out | organizer portal to module | `release_band` ("Take the band back"); `end_event` and `reopen_event` ("Event ended" and "Reopen the event") | SDK reducer call |
 | API session | out | organizer portal to module, then to `bandit-api` | on page load the organizer portal makes a random token, registers its hash with `open_api_session` and sends the token with each `bandit-api` request: Vision.md (TBD -- LEO): the latest frame; Insurance.md: the hospital report upload through `POST /api/blobs` and the letter downloads | SDK reducer call, then HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| Insurance.md | both | organizer portal, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, plus `planted_incident` (Test-Bands.md) for the scorecard and `claim_precedent` (Elastic.md); "Waiting for your decision" with `approve_claim` and `refuse_claim` for `ops`; on a claim waiting for its hospital report, "File the medical record" (`POST /api/blobs` with purpose `medical`, then `submit_medical_record`) | SDK and HTTPS |
+| Insurance.md | both | organizer portal, module and `bandit-api` | claims queue: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`, plus `planted_incident` (Test-Bands.md) for the scorecard and `claim_precedent` (Elastic.md); "Waiting for your decision" with `approve_claim` and `refuse_claim` for `ops`; the Proposed rules tab from the staff views `board_rule_proposals`, `board_organizer_precedents` and `board_rules`, with `approve_rule_proposal` and `reject_rule_proposal` for `ops`; on a claim waiting for its hospital report, "File the medical record" (`POST /api/blobs` with purpose `medical`, then `submit_medical_record`) | SDK and HTTPS |
 | Medical-Card.md | both | organizer portal and module | in the incident desk, "Tap band <band code> for the medical card" calls `request_medical_card` with the incident's band, and the card comes from `medic_medical_cards`; the medical access log from `board_medical_access` (which medic read which band's card, when, for which incident) | SDK |
 | Vision.md (TBD -- LEO) | both | module and organizer portal | camera tile: `camera`, `camera_count`, `ground_alert`, `vision_assessment`; latest frame `blob_ref`; the security camera's count in the zone table | SDK and HTTPS |
 | Social.md | in | module to organizer portal | the Event graph and Photos tabs: the `event_graph` view (every link, with people by display name) and the staff view `board_photos` (every event photo with its zone, time, caption and the node ids of the `findable` people in it); the Photos tab names those people by display name from `board_attendees` | SDK |
@@ -70,7 +71,7 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 | owner | the team member signed in with the identity that published the module | passes every role check, on the page as in the module; grants roles from the command line |
 
 - Medical-Card.md: the medic also opens the medical card with "Tap band <band code> for the medical card" (`request_medical_card`), or by tapping the band with their phone. The phone's medic view links back here with "Notes, cost and resolve on the incident desk". The granted card shows inside the incident from `medic_medical_cards`, labelled "not yet confirmed by the wearer" until the attendee confirms it.
-- Insurance.md: after the event the organizer decides every claim no learned rule settled, in "Waiting for your decision" on the Claims tab.
+- Insurance.md: after the event the organizer decides every claim no payment rule settled, in "Waiting for your decision" on the Claims tab. They approve or reject each rule Claude proposes on the Proposed rules tab.
 - Social.md: the Event graph and Photos tabs are for every staff member, like the other tabs. The `photographer` role has no screen here and uses the photographer route `/photo`, served with the tap page.
 
 The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This account has no staff role", then "The organizer portal is for the event's organizer and medics. To get access, send this code to the organizer:", and their full identity code.
@@ -78,7 +79,8 @@ The no-role screen. A signed-in person with no staff role sees no tabs. The page
 The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, "Zones" with the low-visibility button and the zone table, and "People", the list of everyone), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
 
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
-- Insurance.md: the Costs tab, right after Claims (see Costs tab below).
+- Insurance.md: the Proposed rules tab (hash `#rules`), right after Claims (see Proposed rules tab below).
+- Insurance.md: the Costs tab, right after Proposed rules (see Costs tab below).
 - Social.md: the Event graph tab, then the Photos tab, after Costs (see Event graph and Photos tab below).
 - Merch.md: the Merch tab, after Photos (see Merch tab below).
 - Bright-Data.md: the Venue setup tab, after Merch (see Venue setup tab below).
@@ -109,6 +111,12 @@ The Live tab's 3D view names the floor from the `venue_spot` rows: the areas, ev
 
 Each of our bands on the floor carries a blue tag with the name typed when it was placed (`band_place`) over its band code. The tags climb above each other and are never hidden.
 
+### Decision history on the Live tab (Insurance.md)
+
+Insurance.md: the Live tab's "Decision history" lists every `decision` row, newest first, with its time, who acted and what they decided ([Insurance](../6-features/Insurance.md#every-decision-is-a-row-the-decision-history)). The newest row of each claim waiting for the organizer carries "Approve", which calls `approve_claim` with the payout and pack SHA-256 shown.
+
+A proposed rule waiting for the organizer shows above the decision history with "Approve" (`approve_rule_proposal`, with the ceiling shown) and "Reject" with a reason (`reject_rule_proposal`). Both buttons are for `ops`.
+
 ### People on the Live tab
 
 At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
@@ -138,7 +146,7 @@ When the organizer presses "Event ended", `end_event` sets `event_state.ended`. 
 | Venue map (Live tab, "Venue") | the zones and booths of `venue_plan`, and every band on the map as a dot where the module places it | `venue_plan`, `band` | none |
 | Zones (Live tab) | the low-visibility button, the status line, and the zone table: each zone's people, bands 1 to 99, their average neighbour count, level, capacity, exit colour and station marker | `zone`, `band`, `station`, `gateway`, `settings` | `set_low_vis` |
 | Incident desk (Claims tab, "Open incidents") | every open incident with its kind, zone, band and the attendee who wears it, status, opening time, who opened it, and its notes | `open_incidents`, `board_notes`, `board_attendees`, `zone` | `assign_medic` ("Take it"), `add_incident_note` ("Add note"), `resolve_incident` ("Resolve") |
-| Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), the Anthropic Claude API's causation explanation, the decision form for `ops` ("Learn a rule from this approval, so similar claims settle on their own", ticked by default; "Rule ceiling in dollars (optional)"; "Approve $X"; Refuse with a reason), and the stamp "Settled under rule vN, approved by <name>"; the learned rules; the ledger by account and policy; the accuracy-run scorecard (Test-Bands.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (`ops`) |
+| Insurance.md: Claims queue | claims by status and amount; per claim the bill lines with billed and paid side by side, the evidence pack and its checks (Elastic.md: with the similar past claims), the Anthropic Claude API's causation explanation, the decision form for `ops` ("Approve $X"; Refuse with a reason; on a complicated claim, the line that it is decided one by one), and the stamp "Settled under rule vN, approved by <name>"; the ledger by account and policy; the accuracy-run scorecard (Test-Bands.md), computed in the browser from the rows it reads | `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | `approve_claim`, `refuse_claim`, `open_claim` (Rebuild pack), `enter_claim_lines`, `record_insurer_payment`, `request_recovery_letter`, `retire_settlement_rule` (`ops`) |
 | Insurance.md: "File the medical record" | on a claim waiting for its hospital report, for `medic` and `ops`: "Clinic PDF" and "File it, Claude reads it" | `medical_record` | the upload `POST /api/blobs` with purpose `medical`, then `submit_medical_record` |
 | Medical-Card.md: Medical card | inside an incident in the incident desk: "Medical card: <name>, band <band code>", with " (not yet confirmed by the wearer)" until confirmed; blood type, allergies, conditions, medications, emergency contact, insurance and notes, or "No medical card on file." | `medic_medical_cards` | "Tap band <band code> for the medical card" (`request_medical_card`) |
 | Medical-Card.md: Medical access log | every medic tap: medic, band, incident, time, reason | `board_medical_access` | none |
@@ -275,6 +283,23 @@ sequenceDiagram
     Band->>Band: SOS latch off, back to its density colour
     Mod-->>Org: the incident leaves Open incidents
 ```
+
+### Proposed rules tab (Insurance.md)
+
+The Proposed rules tab (hash `#rules`) is where the organizer turns their own precedents into payment rules ([Insurance](../6-features/Insurance.md#proposed-rules)). Every decision on a claim is kept as a precedent, and once three approved claims of one shape agree, Claude proposes a rule that cites them. Nothing is paid under a proposed rule until the organizer approves it.
+
+The tab is plain tables and buttons, in four sections, read from `board_rule_proposals`, `board_organizer_precedents` and `board_rules`, with `claims_board` for the claims they cite.
+
+| Section | Shows | Controls (reducer) |
+|---|---|---|
+| "Proposed rules" | each open proposal with its shape, its ceiling, the rule in one sentence, the summary of why, and the claims it cites, each with its claimant and payout and a link to the claim on the Settlements tab | for `ops`: "Approve" (`approve_rule_proposal`, with the ceiling shown); "Reject" with a reason (`reject_rule_proposal`) |
+| "Payment rules" | every rule version, with the claims it came from and who approved it | none |
+| "Precedents" | every organizer decision, newest first: the claim, its shape, the decision, the payout, the complications, who decided, and which proposal cites it | none |
+| "Earlier proposals" | every proposal that is approved, rejected, declined, failed or retired | none |
+
+"Payment rules" moved here from the Settlements tab, where it was "Learned payment rules". The Settlements tab's approve form has no "Learn a rule from this approval" checkbox and no rule ceiling input, because an approval decides its claim and keeps a precedent. A complicated claim's form still says it is decided one by one.
+
+The tab carries no explanation text, and it names none of the services behind it.
 
 ### Costs tab (Insurance.md)
 
@@ -429,6 +454,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | `my_roles`, `my_owner` | the caller's own roles and whether they are the owner, for the header, the tabs and the hidden buttons |
 | `event_state` | the "Event ended" button |
 | Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, filing the hospital report, the Costs tab |
+| Insurance.md: the staff views `board_rule_proposals`, `board_organizer_precedents` | the Proposed rules tab, and the proposed rule waiting above the Live tab's decision history |
 | Medical-Card.md: `medic_medical_cards`, `board_medical_access` | the medical card in the incident desk, the medical access log |
 | Vision.md (TBD -- LEO): `camera`, `camera_count`, `ground_alert`, `vision_assessment` | camera tile, the security camera's count in the zone table |
 | Social.md: `event_graph` | event graph |
@@ -470,7 +496,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 
 - The organizer loses the Live tab, the incident desk, the attendee list and "Event ended". Low visibility and taking, noting and resolving incidents would need another client calling the same reducers, such as the SpacetimeDB command line.
 - Remove the organizer portal row from the component table in Architecture.md and the organizer portal's subscriptions from SpacetimeDB.md's "subscriptions per client".
-- Remove the organizer portal bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", filing the hospital report), Medical-Card.md (the medical card in the incident desk, medical access log), Social.md (the Event graph and Photos tabs), Merch.md (the Merch tab and `board_merch_orders`), Vision.md (camera tile, the security camera's count in the zone table), Elastic.md (the Kibana tab), Test-Bands.md (the test bands and the crowd on the map, the Bands tab) and Bright-Data.md (the booths on the map, the Venue setup tab).
+- Remove the organizer portal bullets in Insurance.md (claims queue with its scorecard, "Waiting for your decision", filing the hospital report, the Proposed rules tab), Medical-Card.md (the medical card in the incident desk, medical access log), Social.md (the Event graph and Photos tabs), Merch.md (the Merch tab and `board_merch_orders`), Vision.md (camera tile, the security camera's count in the zone table), Elastic.md (the Kibana tab), Test-Bands.md (the test bands and the crowd on the map, the Bands tab) and Bright-Data.md (the booths on the map, the Venue setup tab).
 
 ## Decisions
 
@@ -487,7 +513,9 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | Staff roles are granted by the owner with `grant_role` from the command line at setup, before doors open; the page has no grant button | nobody types identity codes in front of judges, and no staff screen can widen its own access |
 | One page for all staff: every tab for anyone with `ops` or `medic`, with the buttons a role cannot use hidden | two roles need no separate layouts; the module checks every role again, so the page cannot grant more than the role |
 | A signed-in person with no staff role sees their identity code and nothing else | the owner reads the code off their screen to grant the role, and no venue data shows to a stranger |
-| Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works in the venue during the event, and one person decides every claim no learned rule settled |
+| Insurance.md: "Waiting for your decision" is for `ops`, oldest first; the organizer decides after the event | the medic works in the venue during the event, and one person decides every claim no payment rule settled |
+| Insurance.md: the rules Claude proposes wait on their own tab, Proposed rules, beside every payment rule and every precedent; Approve and Reject are for `ops` | a rule traces back to the decisions behind it, so the organizer approves it with those decisions in view, and Claude never approves its own proposal |
+| Insurance.md: the approve form on the Settlements tab and the Live tab's "Approve" only decide the claim | one approval keeps a precedent and makes no rule; a rule comes only from a proposal the organizer approves |
 | Insurance.md: the scorecard is computed in the browser from the claim rows; nothing is stored | it is a view of the accuracy run, not a decision, and anyone can recompute it from the same rows |
 | Insurance.md: the hospital report is filed on the claim that waits for it, by `medic` or `ops` | the claim says what it is waiting for, and the incident desk stays for the person in front of the medic |
 | A medic takes an incident with "Take it" (`assign_medic`); the organizer does not assign medics; medics wear no bands | the medic knows whether they are free, and the desk shows who took it |

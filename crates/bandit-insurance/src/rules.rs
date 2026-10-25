@@ -1,6 +1,6 @@
-//! Learned settlement rules. A rule is only ever created by a human approval,
-//! inherits that approver's ceiling, and never overwrites: a new decision on
-//! the same shape writes version n+1.
+//! Payment rules. Claude proposes one from approved precedents of one shape;
+//! only the organizer's approval of the proposal creates it, and it never
+//! overwrites: a new rule for the same shape writes version n+1.
 
 use crate::{Cents, CoverKind, IncidentKind};
 use serde::{Deserialize, Serialize};
@@ -32,6 +32,59 @@ pub fn matching_rule(
         .filter(|r| r.active && r.incident_kind == incident_kind && r.cover_kind == cover_kind)
         .filter(|r| r.zone_id == 0 || r.zone_id == zone_id)
         .max_by_key(|r| (r.zone_id != 0, r.version))
+}
+
+/// Approved simple precedents of one shape it takes before Claude proposes a rule.
+pub const RULE_PRECEDENTS: usize = 3;
+
+/// Claude's answer to `rule_proposal`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProposedRule {
+    /// false when the precedents share no pattern worth a rule.
+    pub propose: bool,
+    pub precedent_claim_ids: Vec<u64>,
+    pub ceiling_cents: Cents,
+    /// The rule in one sentence.
+    pub rule: String,
+    /// Why, citing the claims.
+    pub summary: String,
+}
+
+/// What is wrong with a proposal: it cites at least `RULE_PRECEDENTS` of the offered approved claims
+/// (`(claim_id, payout_cents)`), each once, and its ceiling is the highest payout among them, so a rule
+/// never pays more than an organizer already approved, and never above the policy's per-claim limit.
+pub fn check_proposal(p: &ProposedRule, offered: &[(u64, Cents)], limit_cents: Cents) -> Result<(), Vec<String>> {
+    let mut problems = Vec::new();
+    if p.summary.trim().is_empty() {
+        problems.push("the summary must say why".to_string());
+    }
+    if !p.propose {
+        return if problems.is_empty() { Ok(()) } else { Err(problems) };
+    }
+    if p.rule.trim().is_empty() {
+        problems.push("the rule must be one sentence".to_string());
+    }
+    let mut seen = Vec::new();
+    for id in &p.precedent_claim_ids {
+        if !offered.iter().any(|(c, _)| c == id) {
+            problems.push(format!("claim {id} is not one of the approved precedents"));
+        } else if seen.contains(id) {
+            problems.push(format!("claim {id} is cited twice"));
+        } else {
+            seen.push(*id);
+        }
+    }
+    if seen.len() < RULE_PRECEDENTS {
+        problems.push(format!("a rule cites at least {RULE_PRECEDENTS} approved precedents, not {}", seen.len()));
+    }
+    let highest = offered.iter().filter(|(c, _)| seen.contains(c)).map(|(_, p)| *p).max().unwrap_or(0);
+    if !seen.is_empty() && p.ceiling_cents != highest {
+        problems.push(format!("the ceiling must be {highest} cents, the highest payout among the cited claims, not {}", p.ceiling_cents));
+    }
+    if p.ceiling_cents > limit_cents {
+        problems.push(format!("the ceiling must be at most the policy's per-claim limit of {limit_cents} cents"));
+    }
+    if problems.is_empty() { Ok(()) } else { Err(problems) }
 }
 
 /// The ceiling a new rule gets: the requested ceiling (default: the approved
@@ -107,6 +160,26 @@ mod tests {
         assert_eq!(learned_ceiling(None, 900000, None), 900000);
         assert_eq!(learned_ceiling(Some(2000000), 900000, None), 2000000);
         assert_eq!(learned_ceiling(None, 60000, Some(50000)), 50000);
+    }
+
+    fn proposed(ids: &[u64], ceiling: Cents) -> ProposedRule {
+        ProposedRule { propose: true, precedent_claim_ids: ids.to_vec(), ceiling_cents: ceiling, rule: "Pay falls up to $180.00".into(), summary: "Three alike.".into() }
+    }
+
+    #[test]
+    fn a_proposal_stays_inside_its_precedents_and_the_policy() {
+        let offered = [(2, 18000), (4, 18000), (7, 15000), (9, 89500)];
+        assert_eq!(check_proposal(&proposed(&[2, 4, 7], 18000), &offered, 500000), Ok(()));
+        let e = check_proposal(&proposed(&[2, 4], 18000), &offered, 500000).unwrap_err();
+        assert!(e[0].contains("at least 3"), "{e:?}");
+        let e = check_proposal(&proposed(&[2, 4, 7], 25000), &offered, 500000).unwrap_err();
+        assert!(e[0].contains("must be 18000 cents"), "{e:?}");
+        let e = check_proposal(&proposed(&[2, 4, 4, 5], 18000), &offered, 500000).unwrap_err();
+        assert!(e.iter().any(|p| p.contains("cited twice")) && e.iter().any(|p| p.contains("claim 5 is not")), "{e:?}");
+        let e = check_proposal(&proposed(&[2, 4, 9], 89500), &offered, 50000).unwrap_err();
+        assert!(e[0].contains("per-claim limit"), "{e:?}");
+        let none = ProposedRule { propose: false, precedent_claim_ids: vec![], ceiling_cents: 0, rule: String::new(), summary: "No pattern.".into() };
+        assert_eq!(check_proposal(&none, &offered, 500000), Ok(()));
     }
 
     #[test]

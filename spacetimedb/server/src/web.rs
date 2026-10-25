@@ -151,10 +151,22 @@ pub fn board_notes(ctx: &ViewContext) -> Vec<IncidentNote> {
     ctx.db.incident_note().incident_id().filter(0u64..).collect()
 }
 
-/// The learned settlement rules, every version.
+/// The payment rules, every version.
 #[spacetimedb::view(accessor = board_rules, public)]
 pub fn board_rules(ctx: &ViewContext) -> RawQuery<SettlementRuleRow> {
     staff_query(ctx, "settlement_rule")
+}
+
+/// Claude's rule proposals, open and decided.
+#[spacetimedb::view(accessor = board_rule_proposals, public)]
+pub fn board_rule_proposals(ctx: &ViewContext) -> RawQuery<RuleProposal> {
+    staff_query(ctx, "rule_proposal")
+}
+
+/// Every organizer decision on a claim, kept as a precedent.
+#[spacetimedb::view(accessor = board_organizer_precedents, public)]
+pub fn board_organizer_precedents(ctx: &ViewContext) -> RawQuery<OrganizerPrecedent> {
+    staff_query(ctx, "organizer_precedent")
 }
 
 #[spacetimedb::view(accessor = board_policies, public)]

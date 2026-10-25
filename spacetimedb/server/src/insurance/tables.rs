@@ -359,7 +359,7 @@ pub struct ClaimantAccount {
     pub created_at: Timestamp,
 }
 
-/// One version of a learned rule. Only an approval creates one.
+/// One version of a payment rule. Only the organizer's approval of Claude's proposal creates one.
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = settlement_rule)]
 pub struct SettlementRuleRow {
@@ -375,11 +375,79 @@ pub struct SettlementRuleRow {
     pub approver: Identity,
     pub approver_name: String,
     pub approver_role: String,
+    /// 0 for a rule from a proposal.
     pub approval_id: u64,
     pub version: u32,
-    /// `active` or `superseded`.
+    /// `active`, `superseded` or `retired`.
     pub status: String,
     pub created_at: Timestamp,
+    /// The approved proposal whose precedents are the rule's evidence.
+    #[default(0)]
+    pub proposal_id: u64,
+}
+
+/// One organizer decision on a claim, kept as a precedent. Approved simple claims of the same shape
+/// (incident kind and cover) that no proposal cites yet are what Claude proposes a rule from.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = organizer_precedent)]
+pub struct OrganizerPrecedent {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub claim_id: u64,
+    pub approval_id: u64,
+    pub incident_kind: String,
+    pub cover_kind: String,
+    /// `approve` or `refuse`.
+    pub decision: String,
+    pub payout_cents: u64,
+    pub claimant_name: String,
+    pub zone_name: String,
+    /// The gaps that made the claim complicated, joined with "; "; empty for a simple claim.
+    pub complications: String,
+    pub reason: String,
+    pub decided_by_name: String,
+    /// The proposal that cites it; 0 while none does.
+    #[index(btree)]
+    pub proposal_id: u64,
+    pub decided_at: Timestamp,
+}
+
+/// A payment rule Claude proposes from three or more approved precedents of one shape, for the organizer.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = rule_proposal)]
+pub struct RuleProposal {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub incident_kind: String,
+    pub cover_kind: String,
+    /// `proposing` (Claude is reading the precedents), `proposed` (waits for the organizer), `approved`,
+    /// `rejected`, `declined` (Claude proposed no rule), `failed` or `retired`.
+    pub status: String,
+    pub ceiling_cents: u64,
+    /// The cover's per-claim limit in the policy when the proposal opened.
+    pub limit_cents: u64,
+    /// The claims of the precedents it cites.
+    pub claim_ids: Vec<u64>,
+    /// The rule in one sentence.
+    pub rule: String,
+    /// Why, citing the claims.
+    pub summary: String,
+    pub job_id: u64,
+    pub model_call_id: u64,
+    /// The worker that answered; it may never approve the proposal.
+    pub proposed_by: Identity,
+    pub decided_by: Identity,
+    pub decided_by_name: String,
+    /// A rejection's reason.
+    pub reason: String,
+    pub settlement_rule_id: u64,
+    pub rule_version: u32,
+    pub created_at: Timestamp,
+    pub proposed_at: Option<Timestamp>,
+    pub decided_at: Option<Timestamp>,
 }
 
 /// One human decision on a claim, with what the person was shown.
@@ -398,7 +466,9 @@ pub struct Approval {
     pub decision: String,
     pub amount_seen_cents: u64,
     pub pack_hash_seen: String,
+    /// No longer set: rules come from proposals.
     pub learn: bool,
+    /// No longer set: rules come from proposals.
     pub requested_ceiling_cents: Option<u64>,
     pub reason: String,
     pub decided_at: Timestamp,

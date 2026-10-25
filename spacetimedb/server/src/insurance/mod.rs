@@ -4,14 +4,17 @@
 //! report arrives as drawn by the seeded generator, or Claude reads a filed
 //! record; Elastic validates the evidence and finds similar claims, the claims
 //! agent reviews the pack, and code decides coverage, amounts and the route:
-//! settle under a learned rule, send to the organizer, or refuse and show every
-//! check. Money moves on a double-entry ledger.
+//! settle under an approved rule, send to the organizer, or refuse and show every
+//! check. Every organizer decision is kept as a precedent, and Claude proposes
+//! payment rules from them for the organizer to approve. Money moves on a
+//! double-entry ledger.
 
 pub mod documents;
 pub mod evidence;
 pub mod filing;
 pub mod flow;
 pub mod people;
+pub mod proposals;
 pub mod setup;
 pub mod tables;
 pub mod views;
