@@ -399,7 +399,7 @@ pub struct SettlementRuleRow {
     /// 0 for a rule from a proposal.
     pub approval_id: u64,
     pub version: u32,
-    /// `active`, `superseded` or `retired`.
+    /// `active`, `review_required`, `superseded` or `retired`.
     pub status: String,
     pub created_at: Timestamp,
     /// The approved proposal whose precedents are the rule's evidence.
@@ -445,14 +445,14 @@ pub struct RuleProposal {
     pub incident_kind: String,
     pub cover_kind: String,
     /// `proposing` (Claude is reading the precedents), `proposed` (waits for the organizer), `approved`,
-    /// `rejected`, `declined` (Claude proposed no rule), `failed` or `retired`.
+    /// `rejected`, `declined` (the agent proposed no rule), `scope_review`, `scope_proposed`, `scope_approved`, `failed` or `retired`.
     pub status: String,
     pub ceiling_cents: u64,
     /// The cover's per-claim limit in the policy when the proposal opened.
     pub limit_cents: u64,
     /// The claims of the precedents it cites.
     pub claim_ids: Vec<u64>,
-    /// The rule in one sentence.
+    /// The code-enforced approval scope; older rows preserve their original wording.
     pub rule: String,
     /// Why, citing the claims.
     pub summary: String,

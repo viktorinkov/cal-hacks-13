@@ -310,8 +310,14 @@ The agent answers with structured output:
 | `propose` | whether the precedents share a pattern worth a rule |
 | `precedent_claim_ids` | the claims the rule rests on |
 | `ceiling_cents` | the rule's ceiling |
-| `rule` | the rule in one sentence, for example "Pay falls under medical payments cover up to $180.00 when the evidence is corroborated and every check passes" |
-| `summary` | why, citing the claims |
+| `rule` | an empty string from the agent; code generates the exact approval scope from incident kind, cover, all zones, required corroboration and ceiling |
+| `summary` | rationale only, citing the claims; diagnosis and treatment do not restrict the executable rule |
+
+The approval always names the fields the code enforces. For example: “Automatic payment scope: fall claims under medical payments cover; all zones; up to $180.00, corroborated evidence required.” Policy, amount and evidence checks still apply, and complications and mass occurrences still need an individual decision. Clinical similarities explain why the agent proposes a ceiling; they are not diagnosis or treatment predicates. If those precedents justify only a clinical subset, the agent must decline the broader rule. The organizer sees the complete scope beside the approval button, separate from the rationale.
+
+**Earlier approvals.** A rule can authorize future automatic decisions only when it links back to its approved proposal, the proposal links to that rule version, and its stored approval sentence exactly matches the executable fields. Old free-text rules and orphan rule rows fail this check immediately. `review_rule_scopes`, called by `scripts/e2e-publish` after the module publishes, marks them `review_required` and preserves the old text. An old pending proposal becomes `scope_review`, so an old browser cannot approve it. Where at least three valid simple approved precedents still support the ceiling within the current policy, review creates a new `scope_proposed` proposal with a fresh id, fresh timestamp and the explicit scope. The normal approval action and scripted staff runner cannot approve it. The organizer must use `approve_rule_scope_review` with the exact scope displayed; this records `scope_approved`. Only this explicit review activates it. Earlier review replacements approved through the ordinary action also lose authority and receive a fresh review, without changing their recorded history. Zone-specific legacy rules and orphan rules stay withheld; review never silently broadens them. Repeating the review does not create duplicate proposals.
+
+This check covers the normal decision, the fallback decision and claims waiting when a new rule is approved. It does not undo settlements or cancel deposits already queued before publication. Before shipping this change, inspect `Paying` claims and their `claim_payout` jobs; an in-flight deposit needs reconciliation, not an automatic cancellation or a duplicate payment.
 
 Code checks the answer in the worker, which runs the workflow once more with the problems listed, and again in the module's `submit_rule_proposal`. The worker records the agent's run as the proposal's `model_call`: the agent, the model it ran on, the time it took and its answer.
 
@@ -511,8 +517,9 @@ Non-responsibilities:
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` | in | the organizer (`ops`) at event setup; `worker` | the policy PDF's hash; the terms The Evidence Engine read; the organizer's confirmation of the terms they saw | reducers; `policy_document`, `policy_term`, then the event's policy rows |
 | `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen | reducer; keeps an `organizer_precedent`, and may open a `rule_proposal` |
 | `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer; keeps an `organizer_precedent` |
-| `submit_rule_proposal` | in | `worker` | job id, the agent's proposal JSON, the `model_call` | reducer; checks it again, then `proposed` or `declined` |
+| `submit_rule_proposal` | in | `worker` | job id, the agent's proposal JSON, the `model_call` | reducer; checks it again, then `proposed`, `scope_proposed` if earlier authority needs review, or `declined` |
 | `approve_rule_proposal` | in | `ops` or the module owner, never the identity that proposed it | proposal id, ceiling seen | reducer; writes the `settlement_rule` version, decides the waiting claims of the shape again |
+| `approve_rule_scope_review` | in | `ops` or the module owner, never the identity that proposed it | proposal id, ceiling seen, exact scope seen | reducer; explicitly approves a `scope_proposed` rule after checking the displayed scope; normal scripted approval cannot perform this action |
 | `reject_rule_proposal` | in | `ops` or the module owner | proposal id, reason | reducer; `rejected` |
 | `close_claim_without_injury` | in | `ops`, `medic`; the live run's floor staff | claim id, reason; the claim must be `AwaitingRecord`, for an incident where the medic treated no injury | reducer; `Refused` with the reason |
 | `record_claim_payout` | in | `worker` | job id, the wallet's customer and account, the deposit id | reducer; J3, `Settled` |
@@ -862,10 +869,10 @@ erDiagram
 | `claim_precedent` | one similar past claim for one pack version, which `claim_clause` replaces | `reference`, `outcome`, `payout_cents`, `narrative`, `score` |
 | `claim_clause` | one policy clause that bears on one pack version | `clause_id`, `policy` (`venue`, `attendee`), `section`, `page`, `text`, `score` |
 | `claim_review` | the Decision Engine's answer for one pack version | `verdict`, `causation`, `summary`, `concerns`, `innocent_explanations`, `missing_evidence`, `cited_fact_ids`, `rejected`, `model_call_id` |
-| `settlement_rule` | one version of a payment rule, approved from a proposal | `incident_kind`, `cover_kind`, `zone_id` (0: any zone), `requires_corroborated`, `ceiling_cents`, `approver_name`, `proposal_id` (its precedents are the rule's evidence), `version`, `status` (`active`, `superseded`, `retired`) |
+| `settlement_rule` | one version of a payment rule, approved from a proposal | `incident_kind`, `cover_kind`, `zone_id` (0: any zone), `requires_corroborated`, `ceiling_cents`, `approver_name`, `proposal_id` (its precedents are the rule's evidence), `version`, `status` (`active`, `review_required`, `superseded`, `retired`) |
 | `approval` | one person's decision | `decision` (`approve`, `refuse`), `amount_seen_cents`, `pack_hash_seen`, `reason` |
 | `organizer_precedent` | one organizer decision on a claim, kept as a precedent | `claim_id`, `approval_id`, `incident_kind`, `cover_kind`, `decision` (`approve`, `refuse`), `payout_cents`, `claimant_name`, `zone_name`, `complications` (empty for a simple claim), `reason`, `decided_by_name`, `proposal_id` (0 until a proposal cites it), `decided_at` |
-| `rule_proposal` | one rule Decision Engine proposes from the precedents of one shape | `incident_kind`, `cover_kind`, `status` (`proposing`, `proposed`, `approved`, `rejected`, `declined`, `failed`, `retired`), `ceiling_cents`, `limit_cents` (the cover's per-claim limit), `claim_ids` (the claims it cites), `rule`, `summary`, `job_id`, `model_call_id`, `proposed_by`, `decided_by_name`, `reason`, `settlement_rule_id` and `rule_version` |
+| `rule_proposal` | one rule Decision Engine proposes from the precedents of one shape | `incident_kind`, `cover_kind`, `status` (`proposing`, `proposed`, `approved`, `rejected`, `declined`, `scope_review`, `scope_proposed`, `scope_approved`, `failed`, `retired`), `ceiling_cents`, `limit_cents` (the cover's per-claim limit), `claim_ids` (the claims it cites), `rule`, `summary`, `job_id`, `model_call_id`, `proposed_by`, `decided_by_name`, `reason`, `settlement_rule_id` and `rule_version` |
 | `ledger_entry` | one line of one journal | `journal_id`, `journal`, `account`, `debit_cents`, `credit_cents`, `memo`, `posted_by` |
 | `claimant_account` | an attendee's Capital One Nessie customer and account: their wallet | `identity`, `customer_id`, `account_id` |
 | `decision` | one decision about an incident or its claim | `incident_id`, `claim_id`, `actor`, `who`, `what`, `why` |
@@ -893,9 +900,11 @@ erDiagram
 | `name_responsible_band` | `ops`, `medic` | names the band responsible for an incident, and how they know |
 | `approve_claim` | `ops` or the module owner | stale checks, `approval`, `organizer_precedent`, J2, payout; opens a `rule_proposal` and enqueues its job when the shape's uncited approved simple precedents reach 3 (see Proposed rules) |
 | `refuse_claim` | `ops` or the module owner | `approval`, `organizer_precedent`, J1r, `Refused` |
-| `submit_rule_proposal` | `worker` | checks the agent's proposal again; `proposed`, or `declined` with its summary; releases the precedents it does not cite |
+| `submit_rule_proposal` | `worker` | checks the agent's proposal again; `proposed`, `scope_proposed` if earlier authority needs review, or `declined` with its summary; releases the precedents it does not cite |
 | `approve_rule_proposal` | `ops` or the module owner, never the identity that proposed it | separation of duties and stale checks, `settlement_rule` version n+1, the older version `superseded`, then decides the waiting claims of the shape again |
+| `approve_rule_scope_review` | `ops` or the module owner, never the identity that proposed it | explicit acknowledgement of a `scope_proposed` rule and the exact displayed scope; normal scripted approval cannot perform this action |
 | `reject_rule_proposal` | `ops` or the module owner | `rejected` with the reason; its precedents stay cited |
+| `review_rule_scopes` | `ops`, `worker` or the module owner | flags legacy authority, preserves original wording and offers a fresh scope for human approval when the stored precedents and current policy support it; never pays a claim |
 | `record_claim_payout` | `worker` | the wallet's `payout` entry, J3, `Settled`, enqueues `claim_draft` |
 | `retry_claim_payout` | `ops` | queues the deposit again for a claim in `Paying` |
 | `record_insurer_payment` | `ops` | J4, `Reconciled` |

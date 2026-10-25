@@ -8,9 +8,12 @@ import { BandsPage } from '@/components/desk/BandsPage'
 import { CostsPage } from '@/components/desk/CostsPage'
 import { GraphPage } from '@/components/desk/GraphPage'
 import { MerchPage } from '@/components/desk/MerchPage'
+import { PaymentsPage } from '@/components/desk/PaymentsPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
+import { VenuePage } from '@/components/desk/VenuePage'
 import { JoinPage } from '@/components/join/JoinPage'
 import { RegisterPage } from '@/components/join/RegisterPage'
+import { WalletPage } from '@/components/wallet/WalletPage'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -63,6 +66,8 @@ function Pages() {
   const { path } = useRoute()
   if (path === '/join') return <JoinPage />
   if (path === '/register') return <RegisterPage />
+  if (path === '/wallet') return <WalletPage />
+  if (path === '/payments') return <PaymentsPage />
   if (path === '/claims') return <ClaimsDesk />
   if (path === '/attendees') return <AttendeesPage />
   if (path === '/bands') return <BandsPage />
@@ -70,13 +75,14 @@ function Pages() {
   if (path === '/merch') return <MerchPage />
   if (path === '/graph') return <GraphPage />
   if (path === '/costs') return <CostsPage />
+  if (path === '/venue') return <VenuePage />
   return <Boot />
 }
 
 function Shell() {
   const { path } = useRoute()
   if (path === '/callback') return <SignInCallback />
-  const attendeePage = path === '/join' || path === '/register'
+  const attendeePage = path === '/join' || path === '/register' || path === '/wallet'
   return (
     <Connected>
       {path === '/organizer' || (window.location.hostname === 'band1t.vip' && !attendeePage) ? (

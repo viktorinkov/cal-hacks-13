@@ -15,20 +15,30 @@ export function shapeWords(incidentKind: string, coverKind: string): string {
   return `${KIND_WORDS[incidentKind] ?? incidentKind} under ${COVER_WORDS[coverKind] ?? coverKind} cover`;
 }
 
+function awaitsApproval(p: RuleProposal): boolean {
+  return p.status === 'proposed' || p.status === 'scope_proposed';
+}
+
 /** The proposals waiting for the organizer, oldest first. */
 export function waitingProposals(conn: DbConnection): RuleProposal[] {
-  return [...conn.db.boardRuleProposals.iter()].filter(p => p.status === 'proposed').sort((a, b) => Number(a.id - b.id));
+  return [...conn.db.boardRuleProposals.iter()].filter(awaitsApproval).sort((a, b) => Number(a.id - b.id));
 }
 
 /** Approve, with the ceiling on screen, and Reject with a reason. */
 export function decideProposal(conn: DbConnection, p: RuleProposal) {
+  const scopeReview = p.status === 'scope_proposed';
+  const approve = () => scopeReview
+    ? conn.reducers.approveRuleScopeReview({ proposalId: p.id, ceilingSeenCents: p.ceilingCents, scopeSeen: p.rule })
+    : conn.reducers.approveRuleProposal({ proposalId: p.id, ceilingSeenCents: p.ceilingCents });
   const reject = (e: Event) => {
     e.preventDefault();
     act(() => conn.reducers.rejectRuleProposal({ proposalId: p.id, reason: field(e.target as HTMLFormElement, 'reason') }));
   };
   return h('div', {},
-    h('button', { onclick: (e: Event) => { e.stopPropagation(); act(() => conn.reducers.approveRuleProposal({ proposalId: p.id, ceilingSeenCents: p.ceilingCents })); } },
-      `Approve: pays up to ${money(p.ceilingCents)}`),
+    h('p', {}, h('strong', {}, 'Scope to approve: '), p.rule),
+    h('p', { class: 'muted' }, 'Diagnosis and treatment in the rationale do not narrow this scope.'),
+    h('button', { onclick: (e: Event) => { e.stopPropagation(); act(approve); } },
+      `${scopeReview ? 'Review and approve scope' : 'Approve this scope'}: up to ${money(p.ceilingCents)}`),
     h('form', { onsubmit: reject },
       h('input', { name: 'reason', placeholder: 'Reason for rejecting', required: true }),
       h('button', {}, 'Reject')));
@@ -44,19 +54,19 @@ function claimLinks(conn: DbConnection, ids: bigint[], open: (id: bigint) => voi
 }
 
 function proposed(conn: DbConnection, canDecide: boolean, open: (id: bigint) => void) {
-  const rows = [...conn.db.boardRuleProposals.iter()].filter(p => p.status === 'proposed' || p.status === 'proposing').sort((a, b) => Number(a.id - b.id));
-  return h('section', { class: rows.some(p => p.status === 'proposed') ? 'alert' : '' },
+  const rows = [...conn.db.boardRuleProposals.iter()].filter(p => awaitsApproval(p) || p.status === 'proposing').sort((a, b) => Number(a.id - b.id));
+  return h('section', { class: rows.some(awaitsApproval) ? 'alert' : '' },
     h('h3', {}, `Proposed rules (${rows.length})`),
     !rows.length && h('p', { class: 'muted' }, 'None right now.'),
     rows.length > 0 && h('table', {},
-      h('tr', {}, h('th', {}, 'Proposal'), h('th', {}, 'Precedents'), h('th', {}, 'Rule'), h('th', {}, 'Ceiling'), h('th', {}, 'Why'), h('th', {}, '')),
+      h('tr', {}, h('th', {}, 'Proposal'), h('th', {}, 'Precedents'), h('th', {}, 'Rule'), h('th', {}, 'Ceiling'), h('th', {}, 'Rationale only'), h('th', {}, '')),
       rows.map(p => h('tr', {},
         h('td', {}, `#${p.id} ${shapeWords(p.incidentKind, p.coverKind)}`, h('div', { class: 'muted' }, date(p.createdAt))),
         h('td', {}, claimLinks(conn, p.claimIds, open)),
         h('td', {}, p.status === 'proposing' ? h('span', { class: 'muted' }, 'Being written') : p.rule),
-        h('td', {}, p.status === 'proposed' ? money(p.ceilingCents) : '', h('div', { class: 'muted' }, `policy limit ${money(p.limitCents)}`)),
+        h('td', {}, awaitsApproval(p) ? money(p.ceilingCents) : '', h('div', { class: 'muted' }, `policy limit ${money(p.limitCents)}`)),
         h('td', {}, p.summary),
-        h('td', {}, p.status === 'proposed' && canDecide && decideProposal(conn, p))))));
+        h('td', {}, awaitsApproval(p) && canDecide && decideProposal(conn, p))))));
 }
 
 function rules(conn: DbConnection, open: (id: bigint) => void) {
@@ -74,7 +84,7 @@ function rules(conn: DbConnection, open: (id: bigint) => void) {
           h('td', {}, `v${r.version}`), h('td', {}, shapeWords(r.incidentKind, r.coverKind)),
           h('td', {}, `${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
           h('td', {}, p ? claimLinks(conn, p.claimIds, open) : ''),
-          h('td', {}, `${r.approverName} (${r.approverRole}), ${date(r.createdAt)}`), h('td', {}, r.status));
+          h('td', {}, `${r.approverName} (${r.approverRole}), ${date(r.createdAt)}`), h('td', {}, r.status === 'review_required' ? 'Needs scope review; automatic payments withheld' : r.status));
       })),
     policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
 }
@@ -98,7 +108,7 @@ function precedents(conn: DbConnection, open: (id: bigint) => void) {
 }
 
 function earlier(conn: DbConnection, open: (id: bigint) => void) {
-  const rows = [...conn.db.boardRuleProposals.iter()].filter(p => p.status !== 'proposed' && p.status !== 'proposing').sort((a, b) => Number(b.id - a.id));
+  const rows = [...conn.db.boardRuleProposals.iter()].filter(p => !awaitsApproval(p) && p.status !== 'proposing').sort((a, b) => Number(b.id - a.id));
   return rows.length > 0 && h('section', {},
     h('h3', {}, 'Earlier proposals'),
     h('table', {},
@@ -108,7 +118,7 @@ function earlier(conn: DbConnection, open: (id: bigint) => void) {
         h('td', {}, claimLinks(conn, p.claimIds, open)),
         h('td', {}, p.rule, p.summary && h('div', { class: 'muted' }, p.summary)),
         h('td', {}, p.ceilingCents ? money(p.ceilingCents) : ''),
-        h('td', {}, p.status === 'approved' ? `approved by ${p.decidedByName} as rule v${p.ruleVersion}` : p.status === 'rejected' ? `rejected by ${p.decidedByName}: ${p.reason}` : p.status === 'declined' ? 'no rule proposed' : p.status)))));
+        h('td', {}, p.status === 'scope_approved' ? `scope reviewed and approved by ${p.decidedByName} as rule v${p.ruleVersion}` : p.status === 'approved' ? `approved by ${p.decidedByName} as rule v${p.ruleVersion}` : p.status === 'rejected' ? `rejected by ${p.decidedByName}: ${p.reason}` : p.status === 'declined' ? 'no rule proposed' : p.status === 'scope_review' ? 'Needs scope review; replacement approval required' : p.status)))));
 }
 
 /** The Proposed rules tab. `open` shows a claim on the Settlements tab. */

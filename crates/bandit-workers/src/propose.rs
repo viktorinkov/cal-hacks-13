@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 use anyhow::bail;
 use bandit_insurance::money::format_cents;
 use bandit_insurance::payloads::{KIND_RULE_PROPOSAL, RuleProposalPayload};
-use bandit_insurance::rules::{ProposedRule, check_proposal};
+use bandit_insurance::rules::{ProposedRule, approval_scope, check_proposal};
+use bandit_insurance::{CoverKind, IncidentKind};
 use claims_elastic::{ClaimsIndex, Kibana, proposer, reader};
 use serde_json::{Value, json};
 
@@ -38,6 +39,7 @@ fn task(p: &RuleProposalPayload, missing: &[u64]) -> String {
             Some(r) => format!("Rule in force: version {}, pays up to {}.", r.version, money(r.ceiling_cents)),
             None => "Rule in force: none.".into(),
         },
+        "Approval scope is the whole incident kind and cover, all zones, corroborated evidence and the proposed ceiling. Diagnosis and treatment are rationale only, never rule conditions. Code writes the approval text; leave rule empty.".into(),
         String::new(),
         "Approved precedents, which you may cite:".into(),
     ];
@@ -84,8 +86,8 @@ fn schema() -> Value {
             "propose": {"type": "boolean", "description": "false when the approved claims share no pattern worth a rule"},
             "precedent_claim_ids": {"type": "array", "items": {"type": "integer"}, "description": "the approved claims the rule rests on"},
             "ceiling_cents": {"type": "integer", "description": "the highest payout among the cited claims"},
-            "rule": {"type": "string", "description": "the rule in one sentence"},
-            "summary": {"type": "string", "description": "why, in at most two sentences"}
+            "rule": {"type": "string", "enum": [""], "description": "leave empty; code generates the enforced approval scope"},
+            "summary": {"type": "string", "description": "rationale only, in at most two sentences; clinical details are not rule conditions"}
         },
         "required": ["propose", "precedent_claim_ids", "ceiling_cents", "rule", "summary"]
     })
@@ -93,9 +95,15 @@ fn schema() -> Value {
 
 /// The proposal, or what is wrong with it.
 fn check(v: &Value, p: &RuleProposalPayload) -> Result<ProposedRule, Vec<String>> {
-    let proposed: ProposedRule = serde_json::from_value(v.clone()).map_err(|e| vec![format!("not a proposal: {e}")])?;
+    let mut proposed: ProposedRule = serde_json::from_value(v.clone()).map_err(|e| vec![format!("not a proposal: {e}")])?;
     let offered: Vec<(u64, u64)> = p.approved.iter().map(|a| (a.claim_id, a.payout_cents)).collect();
-    check_proposal(&proposed, &offered, p.limit_cents).map(|_| proposed)
+    check_proposal(&proposed, &offered, p.limit_cents)?;
+    if proposed.propose {
+        let kind = IncidentKind::parse(&p.incident_kind).ok_or_else(|| vec!["unknown incident kind".into()])?;
+        let cover = CoverKind::parse(&p.cover_kind).ok_or_else(|| vec!["unknown cover kind".into()])?;
+        proposed.rule = approval_scope(kind, cover, 0, true, proposed.ceiling_cents);
+    }
+    Ok(proposed)
 }
 
 /// Asks once; when code rejects the answer, asks once more with the answer and the problems. `ask` gets the
@@ -275,6 +283,18 @@ mod tests {
     async fn a_good_answer_is_asked_once() {
         let (tries, seen) = propose_with(vec![answer(&[2, 4, 7], 18_000)]).await;
         assert_eq!((tries.ok().unwrap().calls.len(), seen.len()), (1, 1));
+    }
+
+    #[test]
+    fn clinical_model_wording_cannot_become_approval_scope() {
+        let proposed = check(&answer(&[2, 4, 7], 18_000), &payload()).unwrap();
+        assert_eq!(proposed.rule, approval_scope(IncidentKind::Fall, CoverKind::MedicalPayments, 0, true, 18_000));
+        assert!(!proposed.rule.contains("sprains"));
+        assert!(proposed.summary.contains("sprains"), "clinical details remain rationale");
+        assert_eq!(schema()["properties"]["rule"]["enum"], json!([""]));
+        let mut empty = answer(&[2, 4, 7], 18_000);
+        empty["rule"] = json!("");
+        assert!(check(&empty, &payload()).is_ok());
     }
 
     #[test]

@@ -5,6 +5,8 @@ import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
 import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
+import { schedulePayments } from '@/payments/store'
+import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -36,6 +38,11 @@ const STAFF_QUERIES = [
   'SELECT * FROM board_lines',
   'SELECT * FROM my_claims',
   'SELECT * FROM open_incidents',
+  'SELECT * FROM board_charges',
+  'SELECT * FROM board_merch_orders',
+  'SELECT * FROM board_wallets',
+  'SELECT * FROM board_fee_schedule',
+  'SELECT * FROM board_merch_picks',
 ]
 
 /** Tables the desk can read without a staff role. Requested one at a time, after the floor. */
@@ -113,10 +120,19 @@ interface SessionState {
   signupError: string | null
   wallet: WalletView | null
   walletError: string | null
+  walletEntriesReady: boolean
+  chargesReady: boolean
+  suggestionsReady: boolean
+  merchOrdersReady: boolean
+  /** Refusals of the attendee's payment views, by view name. */
+  walletViewErrors: Record<string, string>
   actors: Actor[]
   /** Whether the staff-only views subscribed. Empty tables still count as open. */
   staffViews: 'pending' | 'open' | 'refused'
   staffError: string | null
+  /** Whether this sign-in asked for the staff views at all, and how each one answered. */
+  staffRequested: boolean
+  staffQueries: Record<string, 'open' | 'refused'>
   approve: (id: string) => Promise<void>
   refuse: (id: string, reason: string) => Promise<void>
   requestCard: (bandId: number) => Promise<void>
@@ -126,6 +142,12 @@ interface SessionState {
   retryMedicalDocument: (id: string) => Promise<void>
   confirmMedicalCard: () => Promise<void>
   connectWallet: () => Promise<void>
+  approveCharge: (chargeId: string, amountSeenCents: number, packHashSeen: string) => Promise<void>
+  waiveCharge: (chargeId: string, reason: string) => Promise<void>
+  buyMerchAs: (nodeId: string, templateId: string, photoId: string, size: string) => Promise<void>
+  disputeCharge: (chargeId: string, text: string) => Promise<void>
+  buyMerch: (templateId: string, photoId: string, size: string) => Promise<void>
+  rerunShoppingAgent: () => Promise<void>
 }
 
 type Reducers = {
@@ -145,6 +167,12 @@ type Reducers = {
   openApiSession(args: { tokenHash: string }): Promise<unknown>
   submitMedicalDocument(args: { kind: string; fileHash: string; pageCount: number }): Promise<unknown>
   confirmMedicalCard(args: Record<string, never>): Promise<unknown>
+  approveCharge(args: { chargeId: bigint; amountSeenCents: bigint; packHashSeen: string }): Promise<unknown>
+  waiveCharge(args: { chargeId: bigint; reason: string }): Promise<unknown>
+  buyMerchAs(args: { nodeId: bigint; templateId: bigint; photoId: bigint; size: string }): Promise<unknown>
+  disputeCharge(args: { chargeId: bigint; text: string }): Promise<unknown>
+  buyMerch(args: { templateId: bigint; photoId: bigint; size: string }): Promise<unknown>
+  rerunShoppingAgent(args: Record<string, never>): Promise<unknown>
 }
 
 let conn: DbConnection | null = null
@@ -346,6 +374,7 @@ function publish() {
   })
   syncFloor(db)
   scheduleCatalog(db)
+  schedulePayments(db)
 }
 
 async function call<T>(work: () => Promise<T>): Promise<T> {
@@ -491,7 +520,12 @@ function subscribeAttendeeViews(next: DbConnection) {
     ['my_medical_documents', 'medicalDocumentsReady'],
     ['my_medical_card', 'medicalCardReady'],
     ['my_wallet', null],
+    ['my_wallet_entries', 'walletEntriesReady'],
+    ['my_charges', 'chargesReady'],
+    ['my_merch_suggestions', 'suggestionsReady'],
+    ['my_merch_orders', 'merchOrdersReady'],
   ] as const
+  const paymentViews: readonly string[] = ['my_wallet_entries', 'my_charges', 'my_merch_suggestions', 'my_merch_orders']
   for (const [view, readiness] of views) {
     next.subscriptionBuilder()
       .onApplied(() => {
@@ -503,6 +537,7 @@ function subscribeAttendeeViews(next: DbConnection) {
         if (conn !== next) return
         const reason = messageOf(args[1] ?? args[0])
         if (view === 'my_wallet') useSession.setState({ walletError: reason })
+        else if (paymentViews.includes(view)) useSession.setState((state) => ({ walletViewErrors: { ...state.walletViewErrors, [view]: reason } }))
         else useSession.setState({ signupError: reason })
       })
       .subscribe(`SELECT * FROM ${view}`)
@@ -527,11 +562,14 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
           medicalDocuments: [], medicalDocumentsReady: false,
           medicalCard: null, medicalCardReady: false,
           signupError: null, wallet: null, walletError: null,
+          walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false,
+          walletViewErrors: {}, staffRequested: Boolean(token), staffQueries: {},
         })
         console.info('[stdb] connected', identity.toHexString())
         if (!played && newToken) window.localStorage.setItem(key, newToken)
         wireTables(next.db)
         subscribeAttendeeViews(next)
+        subscribeVenueSetup(next)
         next
           .subscriptionBuilder()
           .onApplied(() => {
@@ -554,7 +592,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
                 .subscriptionBuilder()
                 .onApplied(() => {
                   window.clearTimeout(timer)
-                  if (token) useSession.setState({ staffViews: 'open', staffError: null })
+                  if (token) useSession.setState((state) => ({ staffViews: 'open', staffError: null, staffQueries: { ...state.staffQueries, [query]: 'open' } }))
                   safePublish()
                   go()
                 })
@@ -562,7 +600,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
                   window.clearTimeout(timer)
                   const reason = messageOf(args[1] ?? args[0])
                   console.warn('[stdb] query refused', query, reason)
-                  if (token) useSession.setState({ staffError: reason || 'A staff view was refused.' })
+                  if (token) useSession.setState((state) => ({ staffError: reason || 'A staff view was refused.', staffQueries: { ...state.staffQueries, [query]: 'refused' } }))
                   go()
                 })
                 .subscribe(query)
@@ -582,6 +620,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .onDisconnect((_ctx, error) => {
         conn = null
         apiSession = null
+        dropVenueSetup()
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
         noteDisconnect('Connection lost.')
       })
@@ -645,9 +684,16 @@ export const useSession = create<SessionState>((set, get) => ({
   signupError: null,
   wallet: null,
   walletError: null,
+  walletEntriesReady: false,
+  chargesReady: false,
+  suggestionsReady: false,
+  merchOrdersReady: false,
+  walletViewErrors: {},
   actors: [],
   staffViews: 'pending',
   staffError: null,
+  staffRequested: false,
+  staffQueries: {},
   approve: async (id) => {
     const claim = get().claims.find((item) => item.id === id)
     if (!claim) return
@@ -741,18 +787,44 @@ export const useSession = create<SessionState>((set, get) => ({
   connectWallet: async () => {
     await call(() => reducers().connectWallet({}))
   },
+  // The backend compares the amount and pack hash with its own row, so a figure that moved is refused.
+  approveCharge: async (chargeId, amountSeenCents, packHashSeen) => {
+    await call(() => reducers().approveCharge({ chargeId: BigInt(chargeId), amountSeenCents: BigInt(amountSeenCents), packHashSeen }))
+  },
+  waiveCharge: async (chargeId, reason) => {
+    const trimmed = reason.trim()
+    if (!trimmed) throw new Error('Write why the charge is waived.')
+    await call(() => reducers().waiveCharge({ chargeId: BigInt(chargeId), reason: trimmed }))
+  },
+  buyMerchAs: async (nodeId, templateId, photoId, size) => {
+    await call(() => reducers().buyMerchAs({ nodeId: BigInt(nodeId), templateId: BigInt(templateId), photoId: BigInt(photoId), size }))
+  },
+  disputeCharge: async (chargeId, text) => {
+    const trimmed = text.trim()
+    if (!trimmed) throw new Error('Say what isn’t right.')
+    await call(() => reducers().disputeCharge({ chargeId: BigInt(chargeId), text: trimmed }))
+  },
+  buyMerch: async (templateId, photoId, size) => {
+    await call(() => reducers().buyMerch({ templateId: BigInt(templateId), photoId: BigInt(photoId), size }))
+  },
+  rerunShoppingAgent: async () => {
+    await call(() => reducers().rerunShoppingAgent({}))
+  },
 }))
 
 noteDisconnect = (message) => useSession.setState({
   phase: 'error', error: message,
   myBandReady: false, medicalDocumentsReady: false, medicalCardReady: false,
+  walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false,
 })
 
 /** What the desk tests render. No database connection. */
 export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionState,
   'staff' | 'owner' | 'insurer' | 'cards' | 'wallet' | 'phase' | 'me' | 'roles' |
   'myBand' | 'myBandReady' | 'medicalDocuments' | 'medicalDocumentsReady' |
-  'medicalCard' | 'medicalCardReady' | 'signupError' | 'walletError'
+  'medicalCard' | 'medicalCardReady' | 'signupError' | 'walletError' |
+  'walletEntriesReady' | 'chargesReady' | 'suggestionsReady' | 'merchOrdersReady' | 'walletViewErrors' |
+  'staffViews' | 'staffError' | 'staffRequested' | 'staffQueries'
 >>) {
   useSession.setState({
     phase: 'live',
@@ -772,6 +844,15 @@ export function seedSession(claims: BoardClaim[], extras?: Partial<Pick<SessionS
     medicalCardReady: false,
     signupError: null,
     walletError: null,
+    walletEntriesReady: false,
+    chargesReady: false,
+    suggestionsReady: false,
+    merchOrdersReady: false,
+    walletViewErrors: {},
+    staffViews: 'pending',
+    staffError: null,
+    staffRequested: false,
+    staffQueries: {},
     ...extras,
   })
 }

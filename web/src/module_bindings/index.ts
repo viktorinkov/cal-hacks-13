@@ -43,6 +43,7 @@ import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApproveChargeReducer from "./approve_charge_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
 import ApproveRuleProposalReducer from "./approve_rule_proposal_reducer";
+import ApproveRuleScopeReviewReducer from "./approve_rule_scope_review_reducer";
 import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
@@ -1316,6 +1317,7 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_charge", ApproveChargeReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
   __reducerSchema("approve_rule_proposal", ApproveRuleProposalReducer),
+  __reducerSchema("approve_rule_scope_review", ApproveRuleScopeReviewReducer),
   __reducerSchema("assign_medic", AssignMedicReducer),
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),

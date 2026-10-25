@@ -107,6 +107,13 @@ describe('band signup', () => {
     expect(claimBand).not.toHaveBeenCalled()
   })
 
+  it('opens the wallet from the header', async () => {
+    renderRegistration()
+
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Night' })).getByRole('button', { name: 'Wallet' }))
+    expect(window.location.pathname).toBe('/wallet')
+  })
+
   it('prefills typed details from an actual save for this band', () => {
     saveRegistration({ ...blankRegistration('band-05'), name: 'Returning guest', email: 'returning@example.test' })
     renderRegistration()

@@ -82,7 +82,7 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 		try_files {path} /index.html
 		file_server
 	}
-	@desk path /organizer /organizer/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/ /t/*
+	@desk path /organizer /organizer/ /payments /payments/ /venue /venue/ /attendees /attendees/ /bands /bands/ /photos /photos/ /merch /merch/ /graph /graph/ /claims /claims/ /costs /costs/ /join /join/ /register /register/ /wallet /wallet/ /t/*
 	handle @desk {
 		root * /srv/bandit-desk
 		try_files {path} /index.html
