@@ -2,7 +2,7 @@
 
 This file is for the coding agent that takes over Band1t (the repo still says BandIt in many places) when the Claude setup stops. It holds only what the repository does not already say: Viktor's standing rules from outside the repo, his decisions from the chats, the work that was unfinished at handoff, the steps that only work on Viktor's Mac, where the credentials live, and the research. For how the system works, read the files under "Read first". Do not copy their content into this file.
 
-Snapshot: 2026-10-25 06:52 UTC, vik-e2e at `b1d5464`, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
+Snapshot: 2026-10-25 07:10 UTC, vik-e2e at `60ac3f5`, deployed on band1t.vip. Refresh it right before the handoff with the steps in the last section.
 
 ## Read first
 
@@ -116,6 +116,21 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - The live run's movement must look real: people stay inside the venue and walk at a believable speed, and the sponsor names sit where the sponsors are on the venue layout.
 - He keeps his plain pages on dev.band1t.vip to test with, even though Eddie's desk is the main site.
 - Dropped on 2026-10-25 as new work: alerts on the medics' phones, and a logged opening of medical cards in View as. Cancelled as Leo's work: camera sightings for falls and SOS, exit colors per zone, low visibility guiding every band, and SOS above the other ring states. No firmware changes.
+- The happy path is Cal Hacks, but the product must work for any venue.
+- No Instagram sign-in. The recap shows who is in each photo.
+- Cut from the recap as never requested: the Claude-written "story of the night", an "Is this you?" step on photos, "N min together" and minutes per booth, match scores on cards, and a "min at the sponsor booths" line on merch picks. Who counts as having met someone is Leo's (vision).
+- "Also there with you" is a list of suggestions from the attendee's side, not a search: people they spent time with but didn't swap details with, and booths the same way. Never people they didn't meet.
+- The people graph shows memories (photos) together with people and companies, built on an existing graph library.
+- Tapping a band in a browser signed in as a medic opens that person's medical info. Everyone else gets the sign-in screen.
+- Sponsor merch belongs to the Cal Hacks booths and is assumed to exist before the event. Each sponsor gets merch, smaller sponsors one type only. The images were made with Gemini through computer use, not by an API in the product.
+- The shopping agent suggests merch for that one person and never buys by itself. The organizer does not rerun it.
+- A person who leaves early can buy merch right after leaving: the event has ended for them.
+- The organizer has a Merch tab with the templates and every order. Staff, photographers included, are added by email.
+- Venue setup: the organizer names the event and Bright Data scrapes the rest, with Cal Hacks as the default in a dropdown. Judges don't need a live scrape. Bright Data also finds the insurance policies on the web, the attendee's plan and the venue's policy, instead of agents fetching them by hand.
+- Kibana syncs by itself, so no import buttons for it in the UI.
+- The crowd is 1,000 test bands, generated in code, not by a model.
+- The Live tab on Viktor's pages: a big venue map with side panels, plain style, many tables and buttons, tables that scroll and search, and the legend as a table. Run controls (pause, end the event) sit at the top of every screen, and the run writes to SpacetimeDB like the real system. Every attendee is in a search bar: pick one to act as them or open their portal, or click them on the map. A real band dragged onto a person shows as that attendee. Exit stations and sponsor names are marked on the map.
+- Evacuation (fire, evacuate everyone) is for the scripted run on Viktor's dev pages only.
 
 ### Insurance (Hyphenate's track, a main focus)
 
@@ -125,6 +140,13 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - The attendee's plan lookup is for their insurance plan only, with no belongings.
 - When several people have the same plan, the PDF's storage, its Elastic pages, its reading and its clauses are done once per file (by SHA-256). The fetch, the pick and the search still run per person, and Viktor approved skipping the web search when someone types a plan another attendee already found.
 - Check the earlier research before starting new research (see "Research").
+- For Hyphenate, talk less about insurance and more about settling the payments between the parties.
+- Incidents cover injuries, damage to the venue's property, and theft from the venue (not attendees' stolen belongings). Each person sees their charges in their portal.
+- The organizer can file a claim as any attendee and pick whether its outcome is real, fake or random. The claim's evidence trail is shown visually.
+- The Costs tab covers this event's operational costs so far, merch and booth reconciliation included, and nothing out of scope. Finance terms are defined on hover.
+- A rule proposal's ceiling is the highest payout among past approved claims, and the organizer still approves it. Viktor accepted this at 06:12.
+- Policy PDFs become chunks searchable by meaning in Elastic, to show what Elastic does that SpacetimeDB doesn't.
+- The scorer script (it plants real and fake claims and scores which ones got paid) stays as the proof for Hyphenate's and Anthropic's tracks. The scorecard page was dropped.
 
 ### Sponsors
 
@@ -132,11 +154,19 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - Kibana dashboards stay, because they are visual for judges.
 - Use a sponsor's API only where it truly fits. The merch images were made by hand with an image model, since no sponsor fit.
 - The app's name is Band1t.
+- Vultr hosts Band1t, for the MLH Vultr prize. Microsoft's track is entered anyway because it doesn't need Azure. See `artifacts/hosting-sponsor-research.md`.
+- Hyphenate was dropped at 00:03 after Viktor's talk with them and brought back at 00:08. Make the social side stronger anyway.
 
 ### The Devpost
 
 - The Devpost may describe things that are not built yet, as long as the rest of the rules hold.
 - Lean heavily on Meta for connecting people. The social part and the interests need detailed diagrams and their own detailed section.
+- Each sponsor has its own section, the four big ones above all, quoting the sponsor's prompt word for word (never paraphrased, and not the prizes).
+- Elastic is called the Evidence Engine.
+- The best fit is Meta, Visa and a Cal Hacks track. The Devpost order follows from that.
+- One Excalidraw board holds every diagram. Diagrams show the intended behavior, and come before the code.
+- Build what the Devpost describes and the code lacks, asking Viktor first when it goes beyond the README. Don't delete Devpost text unless it clearly repeats itself for a weaker sponsor, and avoid deleting features unless they conflict or would cost points.
+- The SOS-to-portal timing is a TODO for later. Don't measure it now.
 
 ### Working style
 
@@ -144,6 +174,8 @@ Taken from the project chat and the threads. Dates are 2026-10-24 and 2026-10-25
 - Don't ask him things you can check yourself, for example with git. Don't say "most likely" when you can verify.
 - Ask him only about removals and new features, one at a time.
 - Breaking things is fine: this is a hackathon project with no data worth keeping.
+- Tell him each time band1t.vip deploys. Keep vik-e2e ready for PR #22 at least every 30 minutes.
+- Show him things in his Chrome instead of giving him links.
 
 ## Team and ownership
 
@@ -174,7 +206,7 @@ Names and locations only. Never copy a value into the repo, a commit or a messag
 | VM: `/var/lib/bandit/identities/` | the services' identities on the VM | copied by `scripts/deploy-vm` |
 | Claude project files: `/mnt/project-files/bandit-cloud.env` | the cloud threads' keys (lost at handoff) | `BANDIT_ENV_B64`, `BANDIT_SPACETIME_TOKEN`, `BANDIT_DEPLOY_KEY_B64`, `BANDIT_IDENTITIES_B64`: base64 copies of the Mac's `.env`, owner token and identities, plus a separate deploy key for root@band1t.vip. `deploy/cloud-setup.sh` shows how they were unpacked |
 
-Accounts behind the keys: GitHub `viktorinkov`, SpacetimeDB Maincloud (signed in with GitHub), Elastic Cloud (Kibana link in `LINKS.md`), Bright Data, Capital One Nessie, the Anthropic Console (prepaid credits with auto-reload off), Vultr (server `bandit`) and Porkbun (the band1t.vip DNS). The SpacetimeAuth client id is public and is in `LINKS.md`. The Anthropic API key pays for the app's Claude calls. It is separate from Claude Code usage, so the app keeps working after the Claude setup stops, as long as the API credits last.
+Accounts behind the keys: GitHub `viktorinkov`, SpacetimeDB Maincloud (signed in with GitHub), Elastic Cloud (Kibana link in `LINKS.md`), Bright Data, Capital One Nessie, the Anthropic Console (prepaid credits with auto-reload off), Vultr (server `bandit`), Porkbun (the band1t.vip DNS, account `leopoz`) and Excalidraw (Viktor's UCSB email). The SpacetimeAuth client id is public and is in `LINKS.md`. The Anthropic API key pays for the app's Claude calls. It is separate from Claude Code usage, so the app keeps working after the Claude setup stops, as long as the API credits last.
 
 ## Mac-only steps and blocked paths
 
@@ -196,7 +228,7 @@ Refresh this table with `handoff/branches.sh`.
 
 | Branch | Commits not in vik-e2e | Last commit (UTC) | Author | What it is |
 | --- | --- | --- | --- | --- |
-| `vik-plan-reuse` | 2 | 10-25 06:36 | Viktor | in progress: a plan lookup reuses a plan another attendee already found, with no web search. Viktor approved it. Waits for the PDF indexing work below |
+| `vik-evacuate` | 1 | 10-25 06:56 | Viktor | in progress: an Evacuate button on the Live tab sends the live run's crowd to the exits (new reducer `evacuate_live_run`, table `live_evacuation`). Viktor asked for it at 06:45 for his dev pages only, as part of the scripted run. Publish the module before merging it |
 | `vik-medic-alerts` | 1 | 10-25 05:54 | Viktor | design only, dropped by Viktor: alerts on the medics' phones. Don't merge |
 | `vik-medical-view-as` | 1 | 10-25 05:55 | Viktor | design only, dropped by Viktor as new work: View as opens a medical card only through a logged opening. Don't merge |
 | `vik-security-sightings` | 1 | 10-25 05:55 | Viktor | design only, cancelled: Leo does the camera side. Don't merge |
@@ -205,19 +237,20 @@ Refresh this table with `handoff/branches.sh`.
 | `firmware` | 11 | 10-23 21:12 | Leo | the band, gateway and station firmware. Leo's |
 | `security-vision` | 4 | 10-24 14:19 | Leo | security view and splat work. Leo's |
 | `venue-photos-1080p` | 1 | 10-24 22:15 | Leo | 1080p venue photos. Leo's |
-| `venue-splat` | 1 | 10-24 21:57 | Eddie | Gaussian splat of the hall. Eddie's |
+| `venue-splat` | 2 | 10-24 23:38 | Eddie | Gaussian splat of the hall, now the final 30k-step version. Eddie's |
 
 Open PRs: #22 (vik-e2e into main, the team's PR), #41 (`vik-cloud-config` into main: cloud-thread push and Maincloud rules, waiting for Eddie's or Leo's review because main is protected) and #2 (above).
 
 ### Work in progress or left over
 
-- **Attendee's plan to cut venue costs**: the claim decision shows which policy pays first. Code was done and tests were running at 06:29. Not on origin yet. Left: the Maincloud publish, the push and merge into vik-e2e, and its Devpost paragraph. Viktor approved it ("Okay, yes go ahead", 06:20).
-- **Index fetched PDFs for search by meaning**: index each fetched plan and venue PDF into the clause index (`bandit-policy-clauses`) at fetch time, and make the plan and venue checks cite the matched chunk. It must also fix a bug: when a second person's lookup fetches the same PDF and it does not match what they typed, the pass-over step deletes that PDF's pages and reading from Elastic, which wipes the first person's kept plan. Remove a fetched PDF only when no lookup kept it. The bulk indexing commit `b428148` is on vik-e2e; the rest was not on origin at 06:35.
-- **Reuse a plan**: the `vik-plan-reuse` branch above.
+- **Attendee's plan to cut venue costs**: shipped (`54e3924`, merge `2787ead`). The attendee's plan pays first and the venue's excess cover pays only the copay the plan leaves. Left: check that devpost.md has its paragraph.
+- **Index fetched PDFs for search by meaning**: shipped (`443bb8f`, `7525163`). Fetched plan and venue PDFs are chunked into `bandit-policy-clauses` and each check cites the chunk it matched. A PDF that any lookup kept now stays in Elastic when another lookup passes it over.
+- **Reuse a plan**: shipped (merge `c2f0aae`) and published: Maincloud has `plan_lookup.reused_from`.
+- **Evacuate the live run**: the `vik-evacuate` branch above.
 - **Hospital report**: merged (`0de153d`) and published. Maincloud has `apply_hospital_report` and no longer `apply_medical_record`. Left: check that no claim is stuck in `ReadingRecord`, and apply its 12 Devpost edits.
 - **Queues**: once the hospital report is live (it is), move `claim_record_extract` to `document_read` under Elastic in the System Design docs, the Excalidraw board and the Devpost.
 - **Complicated claims**: shipped. Two complications are designed but not built: policies that disagree on who pays first, and two clauses that conflict. The venue-costs work above covers part of the first.
-- **"Make vik-e2e the default branch?"**: Viktor never answered. The default branch is still `main`. With Codex on the Mac this matters less: work from vik-e2e.
+- **Default branch**: Viktor decided at 06:57 that it stays `main`. Work from vik-e2e.
 - **Claim evidence timeline** and **file claims as any attendee**: both threads stalled at about 00:48 after the code they waited for landed (`web/src/evidence-trail.ts`, `file_claim_for_wearer`). Nobody checked them against Viktor's asks. Filing for an attendee who has no incident yet was named as a gap.
 
 ## Devpost
