@@ -10,6 +10,7 @@
 //! limits a person set (see `decision`).
 
 pub mod clinic;
+pub mod complications;
 pub mod config;
 pub mod corroboration;
 pub mod coverage;

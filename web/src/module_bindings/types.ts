@@ -484,6 +484,15 @@ export const CrowdTimer = __t.object("CrowdTimer", {
 });
 export type CrowdTimer = __Infer<typeof CrowdTimer>;
 
+export const CrowdWalk = __t.object("CrowdWalk", {
+  bandId: __t.u32(),
+  path: __t.array(__t.f32()),
+  startedAt: __t.timestamp(),
+  arrivesAt: __t.timestamp(),
+  speedMps: __t.f32(),
+});
+export type CrowdWalk = __Infer<typeof CrowdWalk>;
+
 export const Decision = __t.object("Decision", {
   id: __t.u64(),
   at: __t.timestamp(),
@@ -864,6 +873,13 @@ export const Link = __t.object("Link", {
   updated: __t.timestamp(),
 });
 export type Link = __Infer<typeof Link>;
+
+export const LivePause = __t.object("LivePause", {
+  id: __t.u8(),
+  pausedAt: __t.timestamp(),
+  pausedBy: __t.identity(),
+});
+export type LivePause = __Infer<typeof LivePause>;
 
 // The tagged union or sum type for the algebraic type `LivePhase`.
 export const LivePhase = __t.enum("LivePhase", {
@@ -1615,6 +1631,28 @@ export const Venue = __t.object("Venue", {
 });
 export type Venue = __Infer<typeof Venue>;
 
+export const VenueFloor = __t.object("VenueFloor", {
+  id: __t.u8(),
+  x0M: __t.f32(),
+  y0M: __t.f32(),
+  cellM: __t.f32(),
+  cols: __t.u32(),
+  rows: __t.u32(),
+  open: __t.byteArray(),
+  loadedAt: __t.timestamp(),
+});
+export type VenueFloor = __Infer<typeof VenueFloor>;
+
+export const VenueFloorIn = __t.object("VenueFloorIn", {
+  x0: __t.f32(),
+  z0: __t.f32(),
+  cell: __t.f32(),
+  cols: __t.u32(),
+  rows: __t.u32(),
+  runs: __t.array(__t.u32()),
+});
+export type VenueFloorIn = __Infer<typeof VenueFloorIn>;
+
 export const VenueIn = __t.object("VenueIn", {
   sourceKey: __t.string(),
   name: __t.string(),
@@ -1717,6 +1755,23 @@ export const VenueSpotIn = __t.object("VenueSpotIn", {
   angle: __t.f32(),
 });
 export type VenueSpotIn = __Infer<typeof VenueSpotIn>;
+
+export const ViewablePerson = __t.object("ViewablePerson", {
+  identity: __t.identity(),
+  name: __t.string(),
+  role: __t.string(),
+  bandId: __t.u32(),
+  crowd: __t.bool(),
+});
+export type ViewablePerson = __Infer<typeof ViewablePerson>;
+
+export const ViewingAs = __t.object("ViewingAs", {
+  viewer: __t.identity(),
+  target: __t.identity(),
+  by: __t.identity(),
+  at: __t.timestamp(),
+});
+export type ViewingAs = __Infer<typeof ViewingAs>;
 
 export const VisionAssessment = __t.object("VisionAssessment", {
   id: __t.u64(),

@@ -14,6 +14,7 @@ Responsibilities:
 - Hold the one band control on the page: the low-visibility button (`set_low_vis`).
 - Run incidents in the incident desk: a medic takes one ("Take it"), staff add notes with a cost, and staff resolve it.
 - Show where each booth stands.
+- Let staff find anyone in the Live tab's "People" list and act as them: file a claim, buy merch, take the band back and open their medical card; the owner also opens their pages.
 - Give the organizer (`ops`) the attendee list with band status and "Take the band back" (`release_band`), and the "Event ended" button (`end_event`). Once the event has ended, the button becomes "Reopen the event" (`reopen_event`).
 - Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
@@ -74,10 +75,11 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 
 The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This account has no staff role", then "The organizer portal is for the event's organizer and medics. To get access, send this code to the organizer:", and their full identity code.
 
-The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, and "Zones" with the low-visibility button and the zone table), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
+The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, "Zones" with the low-visibility button and the zone table, and "People", the list of everyone), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
 
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
-- Social.md: the Event graph tab, then the Photos tab, after Claims (see Event graph and Photos tab below).
+- Insurance.md: the Costs tab, right after Claims (see Costs tab below).
+- Social.md: the Event graph tab, then the Photos tab, after Costs (see Event graph and Photos tab below).
 - Merch.md: the Merch tab, after Photos (see Merch tab below).
 - Bright-Data.md: the Venue setup tab, after Merch (see Venue setup tab below).
 - Elastic.md: the Kibana tab, after Merch and Venue setup (see Kibana tab below).
@@ -100,6 +102,26 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
 Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
+
+### People on the Live tab
+
+At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
+
+The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
+
+"Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
+
+Every other place that picks a person uses the same search bar: the View as tab, the Merch tab's "Buy as an attendee" (over the attendees with a wallet, each with its balance) and the Settlements tab's "File a claim as someone" (over the attendees with a band). The bar lists its first 12 matches under it, each with what the person is and their band code. A click, or Enter for the first match, picks one.
+
+| Action | For | Calls |
+|---|---|---|
+| "Their pages": "Their band page now", "Medical card" and "Recap and merch" for an attendee with a band, the portal for an organizer or medic, the photo page for a photographer; the page shows in the View as frame under the person, read-only, until "Hide their page" | the owner | `view_as` |
+| "File a claim as <name>": "What happened" picks a short story in their words, "Hospital report" picks "Matches", "Doesn't match" or "Random" | `ops` and `medic`, for an attendee with a band | for their injury that has no claim yet, `file_claim_for_wearer`; otherwise `open_incident` for a fall or SOS on their band where it is now, `resolve_incident` with "treated on site", then `file_claim_for_wearer` |
+| "Their claims": each claim with its status and payout, opening it on the Settlements tab | staff | none |
+| "Buy merch as <name>": the shop of the Merch tab's "Buy as an attendee", or "No wallet, so no merch." | `ops` | `buy_merch_as` |
+| "Take band <band code> back", with the attendee list's confirm | bands 1 to 99, until the event ends | `release_band` |
+| "Tap band <band code> for <name>'s medical card", then the card | `medic`, bands 1 to 99 | `request_medical_card` |
+| Test-Bands.md: "Walk to" each zone, "Press" and "Fall here" | test bands 90 to 99, in test mode | the Bands tab's `/api/dev` calls |
 
 When the organizer presses "Event ended", `end_event` sets `event_state.ended`. Every open tap page turns into the recap live, and from then on bands cannot be released ([Tap-Page](Tap-Page.md)). "Reopen the event" runs `reopen_event`, which clears it, to run the event flow again.
 
@@ -248,6 +270,41 @@ sequenceDiagram
     Mod-->>Org: the incident leaves Open incidents
 ```
 
+### Costs tab (Insurance.md)
+
+The Costs tab shows the event's costs so far, from the incidents the event has covered. It answers one question for the organizer, who acts as the event's controller: who pays what.
+
+It sums the double-entry `ledger_entry` journals that the claims post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every number agrees with the Settlements tab, and the tab keeps no totals of its own.
+
+Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), and property cover goes to Venue (the venue's own equipment). A claim counts once, in one cost center.
+
+The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application.
+
+"Cost centers" has one row per cost center and a total row:
+
+| Column | From |
+|---|---|
+| Claims | the claims in the cost center |
+| Billed | the hospital report's billed total, or the repair cost the organizer logged |
+| Accrued | J1 reserves not yet paid: the `claims_reserve` balance |
+| Paid | J3 payments: the `cash` credits |
+| Insurer owes | J2 receivables not yet paid back: the `insurer_receivable` balance |
+| Insurer paid | J4 receipts: the `cash` debits |
+| Venue | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
+| Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
+
+"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical did not cover; and what is unpaid.
+
+"Claims" has one row per claim with its cost center, claimant, amounts and status. The claim number opens the claim on the Settlements tab.
+
+"Trial balance" has one row per account with its debits, credits and balance, marked "Balanced" when total debits equal total credits. "Journal" lists every journal entry, newest first, with its claim, its lines on one row and when it was posted.
+
+With no claims the tab reads "No claims yet."
+
+The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
+
+Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, each account and the journals J1 to J4. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
+
 ### Event graph (Social.md)
 
 The event graph is a big-screen view for the event: the whole event as one live 3D graph of people, booths, companies and the event photos. Judges watch it grow as people meet, visit booths and turn up in photos.
@@ -365,7 +422,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | `board_attendees` | the attendee list on the Attendees tab, and the name of the attendee who wears the band on an "Alerts" line or an incident |
 | `my_roles`, `my_owner` | the caller's own roles and whether they are the owner, for the header, the tabs and the hidden buttons |
 | `event_state` | the "Event ended" button |
-| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, filing the hospital report |
+| Insurance.md: `claim`, `injured_party`, `medical_record`, `claim_line`, `evidence_fact`, `evidence_pack`, `approval`, `settlement_rule`, `ledger_entry`; Test-Bands.md: `planted_incident`; Elastic.md: `claim_precedent` | Waiting for your decision, claims queue, ledger, rules, scorecard, filing the hospital report, the Costs tab |
 | Medical-Card.md: `medic_medical_cards`, `board_medical_access` | the medical card in the incident desk, the medical access log |
 | Vision.md (TBD -- LEO): `camera`, `camera_count`, `ground_alert`, `vision_assessment` | camera tile, the security camera's count in the zone table |
 | Social.md: `event_graph` | event graph |

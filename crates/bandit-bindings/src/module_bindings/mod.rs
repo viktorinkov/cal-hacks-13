@@ -124,6 +124,8 @@ pub mod crowd_member_type;
 pub mod crowd_tick_reducer;
 pub mod crowd_timer_table;
 pub mod crowd_timer_type;
+pub mod crowd_walk_table;
+pub mod crowd_walk_type;
 pub mod decision_table;
 pub mod decision_type;
 pub mod encounter_table;
@@ -195,6 +197,8 @@ pub mod ledger_entry_table;
 pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
+pub mod live_pause_table;
+pub mod live_pause_type;
 pub mod live_phase_type;
 pub mod live_plan_table;
 pub mod live_plan_type;
@@ -204,6 +208,7 @@ pub mod live_run_timer_type;
 pub mod live_run_type;
 pub mod live_tick_reducer;
 pub mod load_merch_templates_reducer;
+pub mod load_venue_floor_reducer;
 pub mod load_venue_spots_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
@@ -265,6 +270,7 @@ pub mod organization_table;
 pub mod organization_type;
 pub mod owner_table;
 pub mod owner_type;
+pub mod pause_live_run_reducer;
 pub mod people_link_table;
 pub mod people_link_type;
 pub mod person_card_type;
@@ -308,6 +314,7 @@ pub mod request_recovery_letter_reducer;
 pub mod rerun_shopping_agent_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
+pub mod resume_live_run_reducer;
 pub mod retry_claim_payout_reducer;
 pub mod revoke_role_reducer;
 pub mod schedule_slot_in_type;
@@ -377,6 +384,9 @@ pub mod update_profile_reducer;
 pub mod upsert_camera_reducer;
 pub mod upsert_coverage_rule_reducer;
 pub mod upsert_insurance_policy_reducer;
+pub mod venue_floor_in_type;
+pub mod venue_floor_table;
+pub mod venue_floor_type;
 pub mod venue_in_type;
 pub mod venue_plan_table;
 pub mod venue_setup_result_type;
@@ -389,6 +399,11 @@ pub mod venue_spot_table;
 pub mod venue_spot_type;
 pub mod venue_table;
 pub mod venue_type;
+pub mod view_as_people_table;
+pub mod view_as_reducer;
+pub mod viewable_person_type;
+pub mod viewing_as_table;
+pub mod viewing_as_type;
 pub mod vision_assessment_table;
 pub mod vision_assessment_type;
 pub mod visit_table;
@@ -521,6 +536,8 @@ pub use crowd_member_type::CrowdMember;
 pub use crowd_tick_reducer::crowd_tick;
 pub use crowd_timer_table::*;
 pub use crowd_timer_type::CrowdTimer;
+pub use crowd_walk_table::*;
+pub use crowd_walk_type::CrowdWalk;
 pub use decision_table::*;
 pub use decision_type::Decision;
 pub use encounter_table::*;
@@ -592,6 +609,8 @@ pub use ledger_entry_table::*;
 pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
+pub use live_pause_table::*;
+pub use live_pause_type::LivePause;
 pub use live_phase_type::LivePhase;
 pub use live_plan_table::*;
 pub use live_plan_type::LivePlan;
@@ -601,6 +620,7 @@ pub use live_run_timer_type::LiveRunTimer;
 pub use live_run_type::LiveRun;
 pub use live_tick_reducer::live_tick;
 pub use load_merch_templates_reducer::load_merch_templates;
+pub use load_venue_floor_reducer::load_venue_floor;
 pub use load_venue_spots_reducer::load_venue_spots;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
@@ -662,6 +682,7 @@ pub use organization_table::*;
 pub use organization_type::Organization;
 pub use owner_table::*;
 pub use owner_type::Owner;
+pub use pause_live_run_reducer::pause_live_run;
 pub use people_link_table::*;
 pub use people_link_type::PeopleLink;
 pub use person_card_type::PersonCard;
@@ -705,6 +726,7 @@ pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use rerun_shopping_agent_reducer::rerun_shopping_agent;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
+pub use resume_live_run_reducer::resume_live_run;
 pub use retry_claim_payout_reducer::retry_claim_payout;
 pub use revoke_role_reducer::revoke_role;
 pub use schedule_slot_in_type::ScheduleSlotIn;
@@ -774,6 +796,9 @@ pub use update_profile_reducer::update_profile;
 pub use upsert_camera_reducer::upsert_camera;
 pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
 pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
+pub use venue_floor_in_type::VenueFloorIn;
+pub use venue_floor_table::*;
+pub use venue_floor_type::VenueFloor;
 pub use venue_in_type::VenueIn;
 pub use venue_plan_table::*;
 pub use venue_setup_result_type::VenueSetupResult;
@@ -786,6 +811,11 @@ pub use venue_spot_table::*;
 pub use venue_spot_type::VenueSpot;
 pub use venue_table::*;
 pub use venue_type::Venue;
+pub use view_as_people_table::*;
+pub use view_as_reducer::view_as;
+pub use viewable_person_type::ViewablePerson;
+pub use viewing_as_table::*;
+pub use viewing_as_type::ViewingAs;
 pub use vision_assessment_table::*;
 pub use vision_assessment_type::VisionAssessment;
 pub use visit_table::*;
@@ -973,6 +1003,9 @@ pub enum Reducer {
     LoadMerchTemplates {
         templates: Vec<MerchTemplateIn>,
     },
+    LoadVenueFloor {
+        floor: VenueFloorIn,
+    },
     LoadVenueSpots {
         spots: Vec<VenueSpotIn>,
     },
@@ -988,6 +1021,7 @@ pub enum Reducer {
         band_id: u32,
         note: String,
     },
+    PauseLiveRun,
     PlaceBand {
         band_id: u32,
         x_m: f32,
@@ -1091,6 +1125,7 @@ pub enum Reducer {
         incident_id: u64,
         resolution: String,
     },
+    ResumeLiveRun,
     RetryClaimPayout {
         claim_id: u64,
     },
@@ -1254,6 +1289,10 @@ pub enum Reducer {
         period_start: __sdk::Timestamp,
         period_end: __sdk::Timestamp,
     },
+    ViewAs {
+        viewer: __sdk::Identity,
+        target: __sdk::Identity,
+    },
     WatchBands {
         timer: IncidentWatchTimer,
     },
@@ -1310,10 +1349,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::JobReaper { .. } => "job_reaper",
             Reducer::LiveTick { .. } => "live_tick",
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
+            Reducer::LoadVenueFloor { .. } => "load_venue_floor",
             Reducer::LoadVenueSpots { .. } => "load_venue_spots",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
             Reducer::OpenIncident { .. } => "open_incident",
+            Reducer::PauseLiveRun => "pause_live_run",
             Reducer::PlaceBand { .. } => "place_band",
             Reducer::PlaceBooth { .. } => "place_booth",
             Reducer::RecordClaimPayout { .. } => "record_claim_payout",
@@ -1337,6 +1378,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RerunShoppingAgent => "rerun_shopping_agent",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
+            Reducer::ResumeLiveRun => "resume_live_run",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
@@ -1373,6 +1415,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertCamera { .. } => "upsert_camera",
             Reducer::UpsertCoverageRule { .. } => "upsert_coverage_rule",
             Reducer::UpsertInsurancePolicy { .. } => "upsert_insurance_policy",
+            Reducer::ViewAs { .. } => "view_as",
             Reducer::WatchBands { .. } => "watch_bands",
             _ => unreachable!(),
         }
@@ -1664,6 +1707,11 @@ impl __sdk::Reducer for Reducer {
                     templates: templates.clone(),
                 })
             }
+            Reducer::LoadVenueFloor { floor } => {
+                __sats::bsatn::to_vec(&load_venue_floor_reducer::LoadVenueFloorArgs {
+                    floor: floor.clone(),
+                })
+            }
             Reducer::LoadVenueSpots { spots } => {
                 __sats::bsatn::to_vec(&load_venue_spots_reducer::LoadVenueSpotsArgs {
                     spots: spots.clone(),
@@ -1690,6 +1738,9 @@ impl __sdk::Reducer for Reducer {
                 band_id: band_id.clone(),
                 note: note.clone(),
             }),
+            Reducer::PauseLiveRun => {
+                __sats::bsatn::to_vec(&pause_live_run_reducer::PauseLiveRunArgs {})
+            }
             Reducer::PlaceBand {
                 band_id,
                 x_m,
@@ -1883,6 +1934,9 @@ impl __sdk::Reducer for Reducer {
                 incident_id: incident_id.clone(),
                 resolution: resolution.clone(),
             }),
+            Reducer::ResumeLiveRun => {
+                __sats::bsatn::to_vec(&resume_live_run_reducer::ResumeLiveRunArgs {})
+            }
             Reducer::RetryClaimPayout { claim_id } => {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),
@@ -2170,6 +2224,12 @@ impl __sdk::Reducer for Reducer {
                     period_end: period_end.clone(),
                 },
             ),
+            Reducer::ViewAs { viewer, target } => {
+                __sats::bsatn::to_vec(&view_as_reducer::ViewAsArgs {
+                    viewer: viewer.clone(),
+                    target: target.clone(),
+                })
+            }
             Reducer::WatchBands { timer } => {
                 __sats::bsatn::to_vec(&watch_bands_reducer::WatchBandsArgs {
                     timer: timer.clone(),
@@ -2241,6 +2301,7 @@ pub struct DbUpdate {
     crowd_group: __sdk::TableUpdate<CrowdGroup>,
     crowd_member: __sdk::TableUpdate<CrowdMember>,
     crowd_timer: __sdk::TableUpdate<CrowdTimer>,
+    crowd_walk: __sdk::TableUpdate<CrowdWalk>,
     decision: __sdk::TableUpdate<Decision>,
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
@@ -2264,6 +2325,7 @@ pub struct DbUpdate {
     job_reaper_timer: __sdk::TableUpdate<JobReaperTimer>,
     ledger_entry: __sdk::TableUpdate<LedgerEntry>,
     link: __sdk::TableUpdate<Link>,
+    live_pause: __sdk::TableUpdate<LivePause>,
     live_plan: __sdk::TableUpdate<LivePlan>,
     live_run: __sdk::TableUpdate<LiveRun>,
     live_run_timer: __sdk::TableUpdate<LiveRunTimer>,
@@ -2327,10 +2389,13 @@ pub struct DbUpdate {
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     unclaimed_injuries: __sdk::TableUpdate<UnclaimedInjury>,
     venue: __sdk::TableUpdate<Venue>,
+    venue_floor: __sdk::TableUpdate<VenueFloor>,
     venue_plan: __sdk::TableUpdate<PlanArea>,
     venue_setup: __sdk::TableUpdate<VenueSetup>,
     venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
     venue_spot: __sdk::TableUpdate<VenueSpot>,
+    view_as_people: __sdk::TableUpdate<ViewablePerson>,
+    viewing_as: __sdk::TableUpdate<ViewingAs>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
     wallet_entry: __sdk::TableUpdate<WalletEntry>,
@@ -2516,6 +2581,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(crowd_timer_table::parse_table_update(table_update)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(crowd_walk_table::parse_table_update(table_update)?),
                 "decision" => db_update
                     .decision
                     .append(decision_table::parse_table_update(table_update)?),
@@ -2585,6 +2653,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "link" => db_update
                     .link
                     .append(link_table::parse_table_update(table_update)?),
+                "live_pause" => db_update
+                    .live_pause
+                    .append(live_pause_table::parse_table_update(table_update)?),
                 "live_plan" => db_update
                     .live_plan
                     .append(live_plan_table::parse_table_update(table_update)?),
@@ -2774,6 +2845,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(venue_table::parse_table_update(table_update)?),
+                "venue_floor" => db_update
+                    .venue_floor
+                    .append(venue_floor_table::parse_table_update(table_update)?),
                 "venue_plan" => db_update
                     .venue_plan
                     .append(venue_plan_table::parse_table_update(table_update)?),
@@ -2786,6 +2860,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue_spot" => db_update
                     .venue_spot
                     .append(venue_spot_table::parse_table_update(table_update)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(view_as_people_table::parse_table_update(table_update)?),
+                "viewing_as" => db_update
+                    .viewing_as
+                    .append(viewing_as_table::parse_table_update(table_update)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(vision_assessment_table::parse_table_update(table_update)?),
@@ -2908,6 +2988,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.crowd_timer = cache
             .apply_diff_to_table::<CrowdTimer>("crowd_timer", &self.crowd_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
+        diff.crowd_walk = cache
+            .apply_diff_to_table::<CrowdWalk>("crowd_walk", &self.crowd_walk)
+            .with_updates_by_pk(|row| &row.band_id);
         diff.decision = cache
             .apply_diff_to_table::<Decision>("decision", &self.decision)
             .with_updates_by_pk(|row| &row.id);
@@ -2977,6 +3060,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.link = cache
             .apply_diff_to_table::<Link>("link", &self.link)
             .with_updates_by_pk(|row| &row.key);
+        diff.live_pause = cache
+            .apply_diff_to_table::<LivePause>("live_pause", &self.live_pause)
+            .with_updates_by_pk(|row| &row.id);
         diff.live_plan = cache
             .apply_diff_to_table::<LivePlan>("live_plan", &self.live_plan)
             .with_updates_by_pk(|row| &row.incident_id);
@@ -3079,6 +3165,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.venue = cache
             .apply_diff_to_table::<Venue>("venue", &self.venue)
             .with_updates_by_pk(|row| &row.id);
+        diff.venue_floor = cache
+            .apply_diff_to_table::<VenueFloor>("venue_floor", &self.venue_floor)
+            .with_updates_by_pk(|row| &row.id);
         diff.venue_setup = cache
             .apply_diff_to_table::<VenueSetup>("venue_setup", &self.venue_setup)
             .with_updates_by_pk(|row| &row.id);
@@ -3088,6 +3177,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.venue_spot = cache
             .apply_diff_to_table::<VenueSpot>("venue_spot", &self.venue_spot)
             .with_updates_by_pk(|row| &row.id);
+        diff.viewing_as = cache
+            .apply_diff_to_table::<ViewingAs>("viewing_as", &self.viewing_as)
+            .with_updates_by_pk(|row| &row.viewer);
         diff.vision_assessment = cache
             .apply_diff_to_table::<VisionAssessment>("vision_assessment", &self.vision_assessment)
             .with_updates_by_pk(|row| &row.id);
@@ -3232,6 +3324,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.unclaimed_injuries = cache
             .apply_diff_to_table::<UnclaimedInjury>("unclaimed_injuries", &self.unclaimed_injuries);
         diff.venue_plan = cache.apply_diff_to_table::<PlanArea>("venue_plan", &self.venue_plan);
+        diff.view_as_people =
+            cache.apply_diff_to_table::<ViewablePerson>("view_as_people", &self.view_as_people);
         diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
@@ -3411,6 +3505,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3479,6 +3576,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "link" => db_update
                     .link
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "live_pause" => db_update
+                    .live_pause
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "live_plan" => db_update
                     .live_plan
@@ -3669,6 +3769,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_floor" => db_update
+                    .venue_floor
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3680,6 +3783,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_spot" => db_update
                     .venue_spot
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -3883,6 +3992,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3951,6 +4063,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "link" => db_update
                     .link
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "live_pause" => db_update
+                    .live_pause
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "live_plan" => db_update
                     .live_plan
@@ -4141,6 +4256,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_floor" => db_update
+                    .venue_floor
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4152,6 +4270,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue_spot" => db_update
                     .venue_spot
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -4243,6 +4367,7 @@ pub struct AppliedDiff<'r> {
     crowd_group: __sdk::TableAppliedDiff<'r, CrowdGroup>,
     crowd_member: __sdk::TableAppliedDiff<'r, CrowdMember>,
     crowd_timer: __sdk::TableAppliedDiff<'r, CrowdTimer>,
+    crowd_walk: __sdk::TableAppliedDiff<'r, CrowdWalk>,
     decision: __sdk::TableAppliedDiff<'r, Decision>,
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
@@ -4266,6 +4391,7 @@ pub struct AppliedDiff<'r> {
     job_reaper_timer: __sdk::TableAppliedDiff<'r, JobReaperTimer>,
     ledger_entry: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     link: __sdk::TableAppliedDiff<'r, Link>,
+    live_pause: __sdk::TableAppliedDiff<'r, LivePause>,
     live_plan: __sdk::TableAppliedDiff<'r, LivePlan>,
     live_run: __sdk::TableAppliedDiff<'r, LiveRun>,
     live_run_timer: __sdk::TableAppliedDiff<'r, LiveRunTimer>,
@@ -4329,10 +4455,13 @@ pub struct AppliedDiff<'r> {
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     unclaimed_injuries: __sdk::TableAppliedDiff<'r, UnclaimedInjury>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
+    venue_floor: __sdk::TableAppliedDiff<'r, VenueFloor>,
     venue_plan: __sdk::TableAppliedDiff<'r, PlanArea>,
     venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
     venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
     venue_spot: __sdk::TableAppliedDiff<'r, VenueSpot>,
+    view_as_people: __sdk::TableAppliedDiff<'r, ViewablePerson>,
+    viewing_as: __sdk::TableAppliedDiff<'r, ViewingAs>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
     wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
@@ -4557,6 +4686,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<CrowdTimer>("crowd_timer", &self.crowd_timer, event);
+        callbacks.invoke_table_row_callbacks::<CrowdWalk>("crowd_walk", &self.crowd_walk, event);
         callbacks.invoke_table_row_callbacks::<Decision>("decision", &self.decision, event);
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
@@ -4632,6 +4762,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Link>("link", &self.link, event);
+        callbacks.invoke_table_row_callbacks::<LivePause>("live_pause", &self.live_pause, event);
         callbacks.invoke_table_row_callbacks::<LivePlan>("live_plan", &self.live_plan, event);
         callbacks.invoke_table_row_callbacks::<LiveRun>("live_run", &self.live_run, event);
         callbacks.invoke_table_row_callbacks::<LiveRunTimer>(
@@ -4831,6 +4962,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
+        callbacks.invoke_table_row_callbacks::<VenueFloor>("venue_floor", &self.venue_floor, event);
         callbacks.invoke_table_row_callbacks::<PlanArea>("venue_plan", &self.venue_plan, event);
         callbacks.invoke_table_row_callbacks::<VenueSetup>("venue_setup", &self.venue_setup, event);
         callbacks.invoke_table_row_callbacks::<VenueSetupStep>(
@@ -4839,6 +4971,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<VenueSpot>("venue_spot", &self.venue_spot, event);
+        callbacks.invoke_table_row_callbacks::<ViewablePerson>(
+            "view_as_people",
+            &self.view_as_people,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ViewingAs>("viewing_as", &self.viewing_as, event);
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
             "vision_assessment",
             &self.vision_assessment,
@@ -5570,6 +5708,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         crowd_group_table::register_table(client_cache);
         crowd_member_table::register_table(client_cache);
         crowd_timer_table::register_table(client_cache);
+        crowd_walk_table::register_table(client_cache);
         decision_table::register_table(client_cache);
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
@@ -5593,6 +5732,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         job_reaper_timer_table::register_table(client_cache);
         ledger_entry_table::register_table(client_cache);
         link_table::register_table(client_cache);
+        live_pause_table::register_table(client_cache);
         live_plan_table::register_table(client_cache);
         live_run_table::register_table(client_cache);
         live_run_timer_table::register_table(client_cache);
@@ -5656,10 +5796,13 @@ impl __sdk::SpacetimeModule for RemoteModule {
         sweep_timer_table::register_table(client_cache);
         unclaimed_injuries_table::register_table(client_cache);
         venue_table::register_table(client_cache);
+        venue_floor_table::register_table(client_cache);
         venue_plan_table::register_table(client_cache);
         venue_setup_table::register_table(client_cache);
         venue_setup_step_table::register_table(client_cache);
         venue_spot_table::register_table(client_cache);
+        view_as_people_table::register_table(client_cache);
+        viewing_as_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
         wallet_entry_table::register_table(client_cache);
@@ -5720,6 +5863,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "crowd_group",
         "crowd_member",
         "crowd_timer",
+        "crowd_walk",
         "decision",
         "encounter",
         "event",
@@ -5742,6 +5886,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "job_reaper_timer",
         "ledger_entry",
         "link",
+        "live_pause",
         "live_plan",
         "live_run",
         "live_run_timer",
@@ -5805,10 +5950,13 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "sweep_timer",
         "unclaimed_injuries",
         "venue",
+        "venue_floor",
         "venue_plan",
         "venue_setup",
         "venue_setup_step",
         "venue_spot",
+        "view_as_people",
+        "viewing_as",
         "vision_assessment",
         "visit",
         "wallet_entry",

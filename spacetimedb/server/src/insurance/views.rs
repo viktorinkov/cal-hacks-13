@@ -4,17 +4,18 @@
 use super::*;
 use crate::roles::*;
 use crate::tables::*;
+use crate::view_as::viewed;
 use spacetimedb::ViewContext;
 
 fn is_claims_staff(ctx: &ViewContext) -> bool {
-    ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| CLAIM_ROLES.contains(&r.role.as_str()))
+    ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| CLAIM_ROLES.contains(&r.role.as_str()))
 }
 
 /// Claims waiting for the caller: the named approver's queue.
 #[spacetimedb::view(accessor = my_claim_queue, public)]
 pub fn my_claim_queue(ctx: &ViewContext) -> Vec<Claim> {
-    ctx.db.claim().routed_to().filter(ctx.sender()).collect()
+    ctx.db.claim().routed_to().filter(viewed(ctx)).collect()
 }
 
 #[spacetimedb::view(accessor = claim_facts, public)]

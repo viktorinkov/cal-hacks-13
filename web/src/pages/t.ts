@@ -9,7 +9,7 @@
 
 import {
   act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
-  signIn, signOut, signedInEmail, testAs, time, type Actor, PLATFORMS,
+  signIn, signOut, signedInEmail, testAs, time, viewing, type Actor, PLATFORMS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
 import { recap } from '../recap';
@@ -374,6 +374,18 @@ function medicView() {
   return [title, h('p', { class: 'error' }, tap), again];
 }
 
+// --- View as -------------------------------------------------------------------------------
+
+/** The screen the organizer's View as frame picked by its hash: the medical card or the recap. */
+function viewedScreen() {
+  const screen = location.hash.slice(1);
+  if (screen === 'card') {
+    const me = conn.db.myAttendee.iter().next().value;
+    return medicalCard({ incidentId: 0n, bandId, name: me?.displayName ?? '', card: conn.db.myMedicalCard.iter().next().value });
+  }
+  return screen === 'recap' ? recap(conn, render) : null;
+}
+
 function render() {
   // While someone types what happened, the page holds still so the phone keeps its keyboard up.
   if (!conn || document.activeElement instanceof HTMLTextAreaElement) return;
@@ -381,9 +393,13 @@ function render() {
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   const signed = signedInEmail();
   const top = h('p', { class: 'muted top' }, signed ? `Signed in as ${signed} · ` : '', signed && h('button', { class: 'link', onclick: signOut }, 'Sign out'),
-    testMode && people.length > 0 && testAs(people));
+    testMode && !viewing() && people.length > 0 && testAs(people));
   if (isMedic()) return mount('app', top, medicView());
-  if (mb && mb.bandId === bandId && mb.status === 'claimed') {
+  // The View as frame also shows a crowd attendee, who wears a band without tapping it.
+  const wears = mb && mb.bandId === bandId && mb.status === 'claimed';
+  if (wears || (viewing() && conn.db.myAttendee.count() > 0)) {
+    const screen = viewing() && viewedScreen();
+    if (screen) return mount('app', top, claims(), screen);
     if (ended) {
       return mount('app', top, claims(), recap(conn, render));
     }
@@ -402,13 +418,19 @@ async function main() {
   testMode = cfg.test_mode;
   if (!bandId) return mount('app', h('h2', {}, 'Unknown band'), h('p', {}, 'This tag is not a BandIt band.'));
   const guest = sessionStorage.getItem('bandit-guest') === '1';
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest) {
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !guest && !viewing()) {
     return mount('app', h('h2', {}, `Band ${code}`), h('p', {}, 'Sign in with your email to make this band yours.'),
       h('button', { onclick: signIn }, 'Sign in with email'),
       testMode && h('button', { class: 'test', onclick: () => { sessionStorage.setItem('bandit-guest', '1'); location.reload(); } }, 'Continue without an account'));
   }
   if (testMode) people = await actors();
   conn = await connect([...QUERIES, `SELECT * FROM band WHERE id = ${bandId}`], render);
+  // The View as frame only reads: it never taps, claims or opens a card, and its hash picks the screen.
+  if (viewing()) {
+    step = resumeStep();
+    window.addEventListener('hashchange', render);
+    return render();
+  }
   // A medic's tap opens the medical card; it never claims the band.
   if (isMedic()) return tapAsMedic();
   const mb = conn.db.myBand.iter().next().value;
