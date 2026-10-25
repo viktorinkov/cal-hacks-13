@@ -4,7 +4,7 @@
 // the live run, close the doors, approve the claims that wait for the organizer and place our own bands on
 // the floor by clicking it.
 
-import { act, config, connect, h, idToken, mount, signIn, signOut, signedInEmail, type Config } from '../lib';
+import { act, complicated, config, connect, h, idToken, mount, signIn, signOut, signedInEmail, type Config } from '../lib';
 import { bandCode } from '../band-code';
 import { present } from '../venue-map';
 import type { DbConnection } from '../module_bindings';
@@ -190,7 +190,7 @@ function drawPanel() {
     focus,
     approves,
     onFocus: id => (id === undefined ? showAll() : focusOn(id)),
-    onApprove: c => act(() => conn!.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: true })),
+    onApprove: c => act(() => conn!.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: !complicated(c) })),
   });
   dirty.history = false;
   layout();

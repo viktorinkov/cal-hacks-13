@@ -237,6 +237,11 @@ export function money(cents: bigint | number): string {
   return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** A claim with a gap or mismatch in the policies: the organizer decides it one by one, and approving it teaches no rule. */
+export function complicated(c: { statusNote: string }): boolean {
+  return c.statusNote.startsWith('Complication');
+}
+
 export function time(t: Timestamp | undefined): string {
   return t ? t.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 }

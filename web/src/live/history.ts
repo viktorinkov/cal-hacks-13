@@ -1,7 +1,7 @@
 // The "Decision history" panel: every row of `decision`, newest first, with who decided what and why. A row
 // of an incident focuses it on the floor; a claim waiting for the organizer gets the approve button for staff.
 
-import { h, money } from '../lib';
+import { complicated, h, money } from '../lib';
 import { incidentState, incidentTitle } from './incidents';
 import type { Claim, Decision, IncidentMarker } from './rows';
 
@@ -64,11 +64,14 @@ export function drawHistory(head: HTMLElement, list: HTMLElement, v: HistoryView
     let approve: HTMLElement | false = false;
     if (d.claimId && !waiting.has(d.claimId) && marker?.claimStatus === 'waiting for the organizer' && claim?.status.tag === 'Routed' && v.approves(claim)) {
       waiting.add(d.claimId);
+      const gap = complicated(claim);
       approve = h('button', {
         class: 'approve',
-        title: `Approves ${money(claim.payoutCents)} for ${claim.claimantName || 'the claimant'} and teaches the Decision Engine a rule for similar claims`,
+        title: gap
+          ? `Approves ${money(claim.payoutCents)} for ${claim.claimantName || 'the claimant'}. A gap in the policy teaches no rule: the decision is shown on the next such claim`
+          : `Approves ${money(claim.payoutCents)} for ${claim.claimantName || 'the claimant'} and teaches the Decision Engine a rule for similar claims`,
         onclick: (e: Event) => { e.stopPropagation(); v.onApprove(claim); },
-      }, `Approve ${money(claim.payoutCents)} and teach a rule`);
+      }, gap ? `Approve ${money(claim.payoutCents)}` : `Approve ${money(claim.payoutCents)} and teach a rule`);
     }
     const mine = v.focus !== undefined && d.incidentId === v.focus;
     const cls = ['row', d.incidentId ? 'linked' : '', mine ? 'on' : '', v.focus !== undefined && !mine ? 'dim' : '', fresh && d.id > seen ? 'new' : ''];
