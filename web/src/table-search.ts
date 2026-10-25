@@ -56,7 +56,7 @@ export function searchable(name: string, el: HTMLElement, partial = false): HTML
     }
   };
   return [
-    h('p', {}, h('input', { name: `search-${name}`, type: 'search', placeholder: 'Search', value: queries.get(name) ?? '', oninput: typed }), count),
+    h('p', {}, h('input', { name: `search-${name}`, type: 'search', class: 'search', placeholder: 'Search', value: queries.get(name) ?? '', oninput: typed }), count),
     el,
   ];
 }
