@@ -377,17 +377,21 @@ export function movements(conn: DbConnection) {
     h('td', { class: e.amountCents < 0n ? '' : 'pass' }, `${e.amountCents < 0n ? 'out' : 'in'} ${money(e.amountCents < 0n ? -e.amountCents : e.amountCents)}`))))];
 }
 
-function merch(conn: DbConnection) {
+/** The same shop during the event and in the recap, with its wallet shown once. */
+export function merch(conn: DbConnection) {
   const picks = [...conn.db.myMerchSuggestions.iter()].sort((a, b) => a.rank - b.rank);
   const orders = [...conn.db.myMerchOrders.iter()].sort((a, b) => Number(b.id - a.id));
+  const shipping = new Map([...conn.db.myMerchShipping.iter()].map(s => [s.orderId, s.shippingAddress]));
   const titles = new Map([...conn.db.merchTemplate.iter()].map(t => [t.id, t.title]));
   const hasWallet = !!conn.db.myWallet.iter().next().value;
+  const shopper = conn.db.myAttendee.iter().next().value?.nodeId ?? 0n;
   const buy = async (e: Event, t: MerchSuggestion) => {
     e.preventDefault();
     const size = t.kind === 'tee' ? field(e.target as HTMLElement, `size-${t.templateId}`) : '';
-    await act(() => conn.reducers.buyMerch({ templateId: t.templateId, photoId: t.photoId, size }));
+    const shippingAddress = field(e.target as HTMLElement, `shipping-${shopper}-${t.templateId}`);
+    await act(() => conn.reducers.buyMerchWithShipping({ templateId: t.templateId, photoId: t.photoId, size, shippingAddress }));
   };
-  return [
+  return h('section', {}, h('h3', {}, 'Make it merch'),
     balance(conn),
     !picks.length && h('p', { class: 'muted' }, 'Merch appears once a photographer takes a photo of you.'),
     h('div', { class: 'merch' }, picks.map(t => {
@@ -402,12 +406,15 @@ function merch(conn: DbConnection) {
           h('form', { onsubmit: (e: Event) => buy(e, t) },
             t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `size-${t.templateId}` },
               ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
+            h('label', {}, 'Shipping address (recipient and full mailing address)',
+              h('textarea', { name: `shipping-${shopper}-${t.templateId}`, rows: 4, required: true, maxlength: 1000, autocomplete: 'shipping street-address', placeholder: 'Recipient name\nStreet address and apartment\nCity, state, postal code\nCountry' })),
             h('button', { disabled: !hasWallet || undefined }, `Buy ${money(t.priceCents)}`))));
     })),
     orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
-      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}${o.line ? ` "${o.line}"` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · receipt ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
+      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}${o.line ? ` "${o.line}"` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · receipt ${o.nessiePurchaseId.slice(0, 8)}` : ''}`,
+      h('div', { style: 'white-space: pre-line' }, shipping.has(o.id) ? `Ship to: ${shipping.get(o.id)}` : 'Shipping address not recorded.'))))],
     movements(conn),
-  ];
+  );
 }
 
 /** The whole recap. `rerender` redraws the page once bandit-api answers. */
@@ -424,6 +431,6 @@ export function recap(conn: DbConnection, rerender: () => void) {
     h('section', {}, h('h3', {}, 'Also there with you'), alsoThere()),
     h('section', {}, h('h3', {}, 'Booths you spent time at'), booths()),
     h('section', {}, h('h3', {}, 'Your photos'), photos(conn, event)),
-    h('section', {}, h('h3', {}, 'Make it merch'), merch(conn)),
+    merch(conn),
   ];
 }

@@ -20,6 +20,8 @@ import AttachClaimLettersReducer from "../attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "../attach_recovery_letter_reducer";
 import BuyMerchReducer from "../buy_merch_reducer";
 import BuyMerchAsReducer from "../buy_merch_as_reducer";
+import BuyMerchAsWithShippingReducer from "../buy_merch_as_with_shipping_reducer";
+import BuyMerchWithShippingReducer from "../buy_merch_with_shipping_reducer";
 import ChooseVenueReducer from "../choose_venue_reducer";
 import ClaimBandReducer from "../claim_band_reducer";
 import ClaimJobReducer from "../claim_job_reducer";
@@ -143,6 +145,8 @@ export type AttachClaimLettersParams = __Infer<typeof AttachClaimLettersReducer>
 export type AttachRecoveryLetterParams = __Infer<typeof AttachRecoveryLetterReducer>;
 export type BuyMerchParams = __Infer<typeof BuyMerchReducer>;
 export type BuyMerchAsParams = __Infer<typeof BuyMerchAsReducer>;
+export type BuyMerchAsWithShippingParams = __Infer<typeof BuyMerchAsWithShippingReducer>;
+export type BuyMerchWithShippingParams = __Infer<typeof BuyMerchWithShippingReducer>;
 export type ChooseVenueParams = __Infer<typeof ChooseVenueReducer>;
 export type ClaimBandParams = __Infer<typeof ClaimBandReducer>;
 export type ClaimJobParams = __Infer<typeof ClaimJobReducer>;

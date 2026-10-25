@@ -14,7 +14,7 @@ import {
   signIn, signOut, signedInEmail, testAs, time, viewing, type Actor, PLATFORMS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
-import { movements, recap } from '../recap';
+import { merch, movements, recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
 import type { MyCharge } from '../module_bindings/types';
 
@@ -30,6 +30,7 @@ const QUERIES = [
   'SELECT * FROM my_photos',
   'SELECT * FROM merch_template',
   'SELECT * FROM my_merch_orders',
+  'SELECT * FROM my_merch_shipping',
   'SELECT * FROM my_merch_suggestions',
   'SELECT * FROM my_wallet_entries',
   'SELECT * FROM my_wallet',
@@ -274,14 +275,14 @@ function cardStep() {
 
 let walletAsked = false;
 
-/** The Capital One wallet: claim payouts land in it, and merch after the event is paid from it. */
+/** The Capital One wallet: claim payouts land in it, and merch is paid from it. */
 function walletStep() {
   const w = conn.db.myWallet.iter().next().value;
   if (w) {
     return [
       h('h2', {}, 'Your wallet is connected'),
       h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`),
-      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue pays your treatment into it, and after the event you can buy merch with your photos from it.`),
+      h('p', { class: 'muted' }, `Capital One account ${w.accountId.slice(0, 8)}. If you get hurt here, the venue pays your treatment into it. You can buy merch with your photos during and after the event.`),
       h('button', { onclick: () => go('done') }, 'Continue'),
     ];
   }
@@ -290,7 +291,7 @@ function walletStep() {
   }
   return [
     h('h2', {}, 'Connect your Capital One wallet'),
-    h('p', {}, "If you get hurt here, the venue pays your treatment into this wallet, and after the event you can buy merch made from your photos with it. It starts with $200."),
+    h('p', {}, "If you get hurt here, the venue pays your treatment into this wallet. You can buy merch made from your photos during and after the event. It starts with $200."),
     h('button', { onclick: () => act(() => conn.reducers.connectWallet({})).then(ok => { if (ok) { walletAsked = true; render(); } }) }, 'Connect'),
     h('button', { class: 'link', onclick: () => go('done') }, 'Skip'),
   ];
@@ -501,9 +502,9 @@ function render() {
     if (ended) {
       return mount('app', top, claims(), charges(), recap(conn, render), wallet(ended));
     }
-    // The setup first: it can move on a step, and the wallet's balance shows once, on the wallet step or below.
+    // Setup first, then shopping. The shop includes the wallet balance and activity.
     const steps = setup();
-    return mount('app', top, claims(), charges(), steps, wallet(ended));
+    return mount('app', top, claims(), charges(), steps, step === 'done' ? merch(conn) : wallet(ended));
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));

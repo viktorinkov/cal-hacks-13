@@ -35,3 +35,19 @@ Pages, on http://127.0.0.1:8097:
 8. `/organizer?as=ops`: "Event ended". Every open tap link switches to the recap: where you were and when, the people and booths you spent time with (ranked by Elastic), photos with who is in them and Share, merch with your photo, Buy from the wallet.
 
 `scripts/e2e-sql "<query>"` runs SQL as the database owner. Logs are in `.dev/e2e-<target>/logs`.
+
+## Populate the finance dashboard
+
+After the event's test attendees have visited Sponsor row and their wallets have opened, run:
+
+```sh
+scripts/finance-setup
+```
+
+This reuses the Sponsor row crew illustration, tags it from the recorded band visits, buys four products for $76 through the normal wallet workers, and records one settled property claim's insurer receipt. Each order has the public venue address marked “test order, do not ship.” It preserves the event's state and existing claims. Rerunning reuses the same photo, orders and receipt. The default target is Maincloud and the upload host is `https://dev.band1t.vip`.
+
+To prepare the photo before publishing a module change, run:
+
+```sh
+scripts/finance-setup --prepare-only
+```

@@ -48,6 +48,8 @@ import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
 import BuyMerchReducer from "./buy_merch_reducer";
 import BuyMerchAsReducer from "./buy_merch_as_reducer";
+import BuyMerchAsWithShippingReducer from "./buy_merch_as_with_shipping_reducer";
+import BuyMerchWithShippingReducer from "./buy_merch_with_shipping_reducer";
 import ChooseVenueReducer from "./choose_venue_reducer";
 import ClaimBandReducer from "./claim_band_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
@@ -176,6 +178,7 @@ import BoardLinesRow from "./board_lines_table";
 import BoardMedicalAccessRow from "./board_medical_access_table";
 import BoardMerchOrdersRow from "./board_merch_orders_table";
 import BoardMerchPicksRow from "./board_merch_picks_table";
+import BoardMerchShippingRow from "./board_merch_shipping_table";
 import BoardNotesRow from "./board_notes_table";
 import BoardOrganizerPrecedentsRow from "./board_organizer_precedents_table";
 import BoardPhotosRow from "./board_photos_table";
@@ -233,6 +236,7 @@ import MyIncidentsRow from "./my_incidents_table";
 import MyMedicalCardRow from "./my_medical_card_table";
 import MyMedicalDocumentsRow from "./my_medical_documents_table";
 import MyMerchOrdersRow from "./my_merch_orders_table";
+import MyMerchShippingRow from "./my_merch_shipping_table";
 import MyMerchSuggestionsRow from "./my_merch_suggestions_table";
 import MyOwnerRow from "./my_owner_table";
 import MyPhotosRow from "./my_photos_table";
@@ -839,6 +843,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, BoardMerchPicksRow),
+  boardMerchShipping: __table({
+    name: 'board_merch_shipping',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, BoardMerchShippingRow),
   boardNotes: __table({
     name: 'board_notes',
     indexes: [
@@ -1105,6 +1116,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyMerchOrdersRow),
+  myMerchShipping: __table({
+    name: 'my_merch_shipping',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyMerchShippingRow),
   myMerchSuggestions: __table({
     name: 'my_merch_suggestions',
     indexes: [
@@ -1270,6 +1288,8 @@ const reducersSchema = __reducers(
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
   __reducerSchema("buy_merch", BuyMerchReducer),
   __reducerSchema("buy_merch_as", BuyMerchAsReducer),
+  __reducerSchema("buy_merch_as_with_shipping", BuyMerchAsWithShippingReducer),
+  __reducerSchema("buy_merch_with_shipping", BuyMerchWithShippingReducer),
   __reducerSchema("choose_venue", ChooseVenueReducer),
   __reducerSchema("claim_band", ClaimBandReducer),
   __reducerSchema("claim_job", ClaimJobReducer),
@@ -1446,6 +1466,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "board_merch_orders": Omit<typeof tablesSchema.schemaType.tables["boardMerchOrders"], "accessorName"> & { readonly accessorName: "board_merch_orders" };
     /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
     readonly "board_merch_picks": Omit<typeof tablesSchema.schemaType.tables["boardMerchPicks"], "accessorName"> & { readonly accessorName: "board_merch_picks" };
+    /** @deprecated Use `boardMerchShipping` instead. This alias will be removed in the next major version. */
+    readonly "board_merch_shipping": Omit<typeof tablesSchema.schemaType.tables["boardMerchShipping"], "accessorName"> & { readonly accessorName: "board_merch_shipping" };
     /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
     readonly "board_notes": Omit<typeof tablesSchema.schemaType.tables["boardNotes"], "accessorName"> & { readonly accessorName: "board_notes" };
     /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
@@ -1522,6 +1544,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "my_medical_documents": Omit<typeof tablesSchema.schemaType.tables["myMedicalDocuments"], "accessorName"> & { readonly accessorName: "my_medical_documents" };
     /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
     readonly "my_merch_orders": Omit<typeof tablesSchema.schemaType.tables["myMerchOrders"], "accessorName"> & { readonly accessorName: "my_merch_orders" };
+    /** @deprecated Use `myMerchShipping` instead. This alias will be removed in the next major version. */
+    readonly "my_merch_shipping": Omit<typeof tablesSchema.schemaType.tables["myMerchShipping"], "accessorName"> & { readonly accessorName: "my_merch_shipping" };
     /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
     readonly "my_merch_suggestions": Omit<typeof tablesSchema.schemaType.tables["myMerchSuggestions"], "accessorName"> & { readonly accessorName: "my_merch_suggestions" };
     /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
@@ -1613,6 +1637,7 @@ const tableAccessorAliases = {
   "board_medical_access": "boardMedicalAccess",
   "board_merch_orders": "boardMerchOrders",
   "board_merch_picks": "boardMerchPicks",
+  "board_merch_shipping": "boardMerchShipping",
   "board_notes": "boardNotes",
   "board_organizer_precedents": "boardOrganizerPrecedents",
   "board_photos": "boardPhotos",
@@ -1651,6 +1676,7 @@ const tableAccessorAliases = {
   "my_medical_card": "myMedicalCard",
   "my_medical_documents": "myMedicalDocuments",
   "my_merch_orders": "myMerchOrders",
+  "my_merch_shipping": "myMerchShipping",
   "my_merch_suggestions": "myMerchSuggestions",
   "my_owner": "myOwner",
   "my_photos": "myPhotos",
@@ -1752,6 +1778,8 @@ export type DbView = __DbViewBase & {
   readonly "board_merch_orders": __DbViewBase["boardMerchOrders"];
   /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
   readonly "board_merch_picks": __DbViewBase["boardMerchPicks"];
+  /** @deprecated Use `boardMerchShipping` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_shipping": __DbViewBase["boardMerchShipping"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __DbViewBase["boardNotes"];
   /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
@@ -1828,6 +1856,8 @@ export type DbView = __DbViewBase & {
   readonly "my_medical_documents": __DbViewBase["myMedicalDocuments"];
   /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "my_merch_orders": __DbViewBase["myMerchOrders"];
+  /** @deprecated Use `myMerchShipping` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_shipping": __DbViewBase["myMerchShipping"];
   /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
   readonly "my_merch_suggestions": __DbViewBase["myMerchSuggestions"];
   /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
@@ -1934,6 +1964,8 @@ export type Tables = __TablesBase & {
   readonly "board_merch_orders": __TablesBase["boardMerchOrders"];
   /** @deprecated Use `boardMerchPicks` instead. This alias will be removed in the next major version. */
   readonly "board_merch_picks": __TablesBase["boardMerchPicks"];
+  /** @deprecated Use `boardMerchShipping` instead. This alias will be removed in the next major version. */
+  readonly "board_merch_shipping": __TablesBase["boardMerchShipping"];
   /** @deprecated Use `boardNotes` instead. This alias will be removed in the next major version. */
   readonly "board_notes": __TablesBase["boardNotes"];
   /** @deprecated Use `boardOrganizerPrecedents` instead. This alias will be removed in the next major version. */
@@ -2010,6 +2042,8 @@ export type Tables = __TablesBase & {
   readonly "my_medical_documents": __TablesBase["myMedicalDocuments"];
   /** @deprecated Use `myMerchOrders` instead. This alias will be removed in the next major version. */
   readonly "my_merch_orders": __TablesBase["myMerchOrders"];
+  /** @deprecated Use `myMerchShipping` instead. This alias will be removed in the next major version. */
+  readonly "my_merch_shipping": __TablesBase["myMerchShipping"];
   /** @deprecated Use `myMerchSuggestions` instead. This alias will be removed in the next major version. */
   readonly "my_merch_suggestions": __TablesBase["myMerchSuggestions"];
   /** @deprecated Use `myOwner` instead. This alias will be removed in the next major version. */
