@@ -6,7 +6,9 @@ BandIt uses three Bright Data products, each for the job it does best:
 - the Bright Data Web Unlocker API, for the raw HTML of the pages a venue setup reads, for a linked model file, and for the PDF of an attendee's plan or of the venue's policy forms;
 - the Bright Data Browser API, for exporting a venue's 3D model from inside its own web page.
 
-`bandit-ingest` is a Rust command-line tool the team runs before the event. It reads the event's public pages and three Bright Data datasets through the Bright Data Web MCP, and saves every answer as a snapshot file kept with the project. The Evidence Engine in Elastic then organizes the records, and `bandit-ingest` loads the checked bundle into SpacetimeDB in one `import_event` transaction.
+The organizer starts “Import event data” from the plain portal's Venue setup tab. `start_event_import` queues an `event_import` job, and `bandit-workers` runs the reusable `bandit-ingest` library on the Vultr server. It reads current public pages and three Bright Data datasets through the Bright Data Web MCP and saves the source snapshots. The Evidence Engine in Elastic organizes the records; Rust validates the bundle; `finish_event_import` applies the shared `import_event` transaction and completes the job together. The command-line tool remains available for maintenance.
+
+The app currently accepts the configured Cal Hacks 13.0 source set. Its inputs are `event.json`, `sources.json`, `zones.json` and `booths.json`; an event name alone does not supply a full sponsor, people, schedule and booth import. Venue discovery and 3D map capture from an event name remain a separate `venue_setup` job.
 
 Everything downstream reads ordinary SpacetimeDB rows: the sponsors on the organizer portal (/organizer), the booths of the recap, "Are you one of these?" at onboarding, the people graph's `works_at` and `exhibits` links, and the sponsor merch. Without the import those screens have no sponsors, booths or speakers.
 
@@ -23,13 +25,13 @@ Responsibilities:
 - Fetch the event's public pages and its company and place datasets through the Bright Data Web MCP, from the list in the event's `sources.json`, and keep a snapshot of every answer.
 - Turn the snapshots into records in Rust, hand them to the Elastic Workflow `bandit-organize`, check what comes back, and assemble one event bundle.
 - Give every sponsor a booth: its spot from the hand-written `booths.json`, its zone the one whose centre is nearest.
-- Load the bundle with `import_event` over the SpacetimeDB HTTP API, keyed by stable source keys so a rerun updates rows instead of adding them.
+- Apply the bundle through the leased worker's `finish_event_import` callback, using the same transaction and stable source keys as `import_event`, so a rerun updates existing rows.
 - Build unclaimed `person` profiles from event pages only (the event site's speakers), and let an attendee who has claimed their band claim their profile at onboarding with one tap.
 - Export the Cal Hacks venue map's 3D model through the Bright Data Browser API (`pipeline/venue_model.py`), kept as `web/venue/venue.glb`.
 - Set up any event's venue from its name, started from the organizer portal: search, let the Evidence Engine pick the event site, the venue and its public 3D map, and save the venue's model.
 - Find an attendee's plan from its name, started from the tap page: search, let the Evidence Engine pick the plan's own document, fetch its PDF and hand it to the Evidence Engine's reading.
 - Find the venue's policy forms from their form numbers, started from the organizer portal's Venue setup tab: search, let the Evidence Engine pick each form's document, fetch both PDFs, join them into one policy PDF and hand it to the Evidence Engine's reading.
-- Own the tables `organization`, `person`, `person_claim`, `venue_setup`, `venue_setup_step`, `chosen_venue`, `plan_lookup` and `venue_policy_lookup`, the reducers `claim_person`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup`, `choose_venue`, `look_up_plan`, `finish_plan_lookup`, `look_up_venue_policy` and `finish_venue_policy_lookup`, the views `claimed_people`, `my_plan_lookups` and `board_venue_policy_lookups`, and the job kinds `venue_setup`, `attendee_policy_lookup` and `venue_policy_lookup`.
+- Own the tables `organization`, `person`, `person_claim`, `event_import`, `event_import_step`, `venue_setup`, `venue_setup_step`, `chosen_venue`, `plan_lookup` and `venue_policy_lookup`, the reducers `claim_person`, `start_event_import`, `report_event_import_step`, `finish_event_import`, `start_venue_setup`, `report_venue_setup_step`, `finish_venue_setup`, `choose_venue`, `look_up_plan`, `finish_plan_lookup`, `look_up_venue_policy` and `finish_venue_policy_lookup`, the views `claimed_people`, `my_plan_lookups` and `board_venue_policy_lookups`, and the job kinds `event_import`, `venue_setup`, `attendee_policy_lookup` and `venue_policy_lookup`.
 
 Non-responsibilities:
 
@@ -37,7 +39,7 @@ Non-responsibilities:
 - Does not merge facts across sources. The Elastic Workflow `bandit-organize` does that ([Elastic](Elastic.md)).
 - Does not define zones. Each zone, with its station id and exit colour, is written by hand in the event's `zones.json`, which goes into the bundle unchanged ([SpacetimeDB](../2-data/SpacetimeDB.md)).
 - Does not scrape merch. [Merch](../6-features/Merch.md) loads its hand-made templates from `assets/merch/templates.json`.
-- Runs no Bright Data call on the safety path. The only Bright Data runs the organizer portal starts are a venue setup and a venue policy lookup, and the only one the tap page starts is a plan lookup.
+- Runs no Bright Data call on the safety path. The organizer portal starts the event import, venue setup and venue policy lookup; the tap page starts a plan lookup.
 - Does not read the plan's PDF or the venue's policy forms. The Evidence Engine reads it into terms and clauses exactly like an uploaded PDF ([Elastic](Elastic.md)), and [Insurance](../6-features/Insurance.md) decides what those terms may set.
 - Does not own `venue`, `zone`, `booth` or `schedule_slot` ([SpacetimeDB](../2-data/SpacetimeDB.md)); `import_event` fills them from the bundle.
 
@@ -53,11 +55,13 @@ The job name is `attendee_policy_lookup`; workers continue to accept already que
 
 | Interface | Direction | Who | What flows | Transport |
 |---|---|---|---|---|
-| Bright Data Web MCP, import | out | `bandit-ingest fetch` | `scrape_as_markdown` for each page in `sources.json`; `run_scraper`, `get_scraper_progress` and `get_scraper_results` for each dataset | MCP `tools/call` over HTTPS to `mcp.brightdata.com/mcp`, tool groups `advanced_scraping`, `browser` and `scrapers`, with `BRIGHTDATA_API_TOKEN` |
+| Event import action | in | plain organizer portal, role `ops` | `start_event_import("calhacks-13")`; status and steps from `event_import` and `event_import_step` | SpacetimeDB reducer call and subscriptions |
+| Bright Data Web MCP, import | out | `bandit-workers`, job `event_import`, through the `bandit-ingest` library | `scrape_as_markdown` for each page in `sources.json`; `run_scraper`, `get_scraper_progress` and `get_scraper_results` for each dataset | MCP `tools/call` over HTTPS to `mcp.brightdata.com/mcp`, tool groups `advanced_scraping`, `browser` and `scrapers`, with `BRIGHTDATA_API_TOKEN` |
 | Event folder | in | every `bandit-ingest` stage | `event.json` (name, website, time zone), `sources.json` (pages and datasets), `zones.json` (the station marker plan), `booths.json` (booth spots) | hand-written files in `crates/bandit-ingest/events/<slug>/` |
-| Snapshots, records and bundles | out and in | each stage writes what the next reads | `snapshots/`, `records/records.jsonl`, `records/plan.jsonl`, `bundles/<run id>.organized.json`, `bundles/<run id>.json` | files in the event folder, kept with the project |
-| Elastic raw indices and `bandit-organize` | out and in | `bandit-ingest organize` | records out to `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; one Elastic Workflows run; back comes one document from `bandit-bundles`; decisions to `bandit-organizer-decisions`; stage timings to `bandit-pipeline-events` | Elasticsearch Bulk, ES\|QL and search APIs with `ELASTICSEARCH_API_KEY`; the Elastic Kibana Workflows API with `KIBANA_API_KEY` ([Elastic](Elastic.md)) |
-| `import_event` | out | `bandit-ingest load`, role `ingest` | the bundle; then the `import_run` row with the counts per section | SpacetimeDB HTTP API: `POST /v1/database/<database>/call/import_event`, then `POST /v1/database/<database>/sql` |
+| Snapshots, records and bundles | out and in | each stage writes what the next reads | `snapshots/`, `records/records.jsonl`, `records/plan.jsonl`, `bundles/<run id>.organized.json`, `bundles/<run id>.json` | server jobs: `BANDIT_DATA_DIR/event-import/<import_id>/<attempt>/`; maintenance CLI: the event folder |
+| Elastic raw indices and `bandit-organize` | out and in | the importer library in `bandit-workers`; maintenance command `bandit-ingest organize` | records out to `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; one Elastic Workflows run; back comes one document from `bandit-bundles`; decisions to `bandit-organizer-decisions`; stage timings to `bandit-pipeline-events` | Elasticsearch Bulk, ES\|QL and search APIs with `ELASTICSEARCH_API_KEY`; the Elastic Kibana Workflows API with `KIBANA_API_KEY` ([Elastic](Elastic.md)) |
+| Event import steps and result | out | `bandit-workers`, role `worker`, holding the event-import job lease | `report_event_import_step`; `finish_event_import(job_id, bundle)` applies the checked rows, stores counts and completes the job atomically | SpacetimeDB reducer calls |
+| `import_event`, maintenance | out | `bandit-ingest load`, role `ingest` | the bundle; then the `import_run` row with the counts per section | SpacetimeDB HTTP API: `POST /v1/database/<database>/call/import_event`, then `POST /v1/database/<database>/sql` |
 | `claim_person` | in | tap page (/t/code), signed in as the attendee | the `person` id the attendee says is them; refused unless the caller already owns a band | SpacetimeDB reducer call |
 | Bright Data Browser API | out | `pipeline/venue_model.py`, run by hand before the event, and by `bandit-workers` for a venue setup | opens a venue map in Bright Data's remote browser and exports its 3D scene in the page as binary glTF; back come the file in 3 MB parts and a screenshot | CDP over a secure WebSocket to `brd.superproxy.io:9222`, through Playwright, with `BRIGHTDATA_CUSTOMER_ID`, `BRIGHTDATA_BROWSER_ZONE` and `BRIGHTDATA_BROWSER_PASSWORD` |
 | Venue model file | out | `pipeline/venue_model.py` to the project | `web/venue/venue.glb` (metres, y up, no lights), copied only when under 20 MB | file |
@@ -123,9 +127,17 @@ Cal Hacks 13.0, at the Palace of Fine Arts, is the first event it runs at. Its f
 
 The saved Cal Hacks 13.0 run, `calhacks-13-20261024t0828z`, turned these into 245 records. The Elastic Workflow `bandit-organize` made 62 organisations of them: 53 by an exact domain join and 9 merged by the Elastic Agent Builder agent `bandit-organizer`. The bundle holds 62 organisations, 51 booths, 3 people and 2 schedule slots.
 
-### Pipeline
+### Organizer-started import
 
-Eight stages, one of them in Elastic. Each stage reads the files the previous one wrote, so any stage can run alone. `bandit-ingest run --event <slug>` runs them all under a fresh run id, the event's slug plus the UTC time, such as `calhacks-13-20261024t0828z`.
+“Import event data” calls `start_event_import` for the selected configured event. The module checks `ops`, rejects an unsupported slug and a second running import for the same event, creates the `event_import` row, and queues its job. The run id is `calhacks-13-import-<import_id>`.
+
+The worker copies only the four input files into `BANDIT_DATA_DIR/event-import/<import_id>/<attempt>/`. It ensures the Elastic assets exist, fetches fresh evidence there, and runs the existing parse, map, organize and assemble stages. Exact ES|QL joins handle matching domains; the `bandit-organizer` agent resolves the remaining records with reasons. The worker records each stage through `report_event_import_step`, saves the source and matching dashboards, and submits a typed bundle through `finish_event_import`.
+
+The result reducer checks the worker role, current lease, job kind, event key and run id. It applies the shared import transaction, writes the added and updated counts, marks the import `ready`, and finishes the job in that same transaction. A broken reference rolls everything back. Queue retries keep the import running; exhausted attempts mark it `failed`. The organizer can leave the page while this runs and return to its steps and result.
+
+### Pipeline and maintenance commands
+
+The server uses the same stages as the maintenance CLI. Each stage reads the files the previous one wrote, so a maintainer can also run a stage alone. `bandit-ingest run --event <slug>` runs the CLI stages under a fresh run id, the event's slug plus the UTC time, such as `calhacks-13-20261024t0828z`. The CLI's direct load and verification use its own identity; the app uses the worker's leased result callback above.
 
 | Stage | Command | Reads | Writes |
 |---|---|---|---|
@@ -138,7 +150,7 @@ Eight stages, one of them in Elastic. Each stage reads the files the previous on
 | verify | `bandit-ingest verify <bundle>` | the bundle | row counts per table in SpacetimeDB against the bundle |
 | dashboards | `bandit-ingest dashboards` | the run id | the Elastic Kibana dashboards "scrape pipeline" and "sponsors and prizes" for the run |
 
-`bandit-ingest elastic-setup` creates the raw indices, the Elastic Agent Builder tools `bandit.records` and `bandit.candidates`, the agent `bandit-organizer` and the workflow, before the first run.
+The server import ensures the raw indices, Elastic Agent Builder tools `bandit.records` and `bandit.candidates`, agent `bandit-organizer` and workflow exist before fetching. A maintainer can run the same setup through `bandit-ingest elastic-setup`.
 
 The organize stage checks the workflow's document before it saves anything. Every key it names must be a record of the run or an organisation it defined, and every organisation candidate, prize, person and schedule item must have a decision; otherwise the stage stops.
 
@@ -151,7 +163,7 @@ flowchart TB
   SRC["Public pages and datasets: calhacks.io, Devpost, LinkedIn, Crunchbase, Google Maps"] -->|"HTTPS"| BD["Bright Data Web MCP"]
   BD -->|"markdown, scrape_as_markdown"| F["fetch stage"]
   BD -->|"dataset rows, run_scraper"| F
-  F -->|"people fields dropped, one file per URL"| SNAP["Snapshots in the event folder"]
+  F -->|"people fields dropped, one file per URL"| SNAP["Source snapshots in this server attempt"]
   SNAP -->|"markdown and rows"| P["parse stage"]
   SEED["zones.json, booths.json"] -->|"zones and spots"| M["map stage"]
   P -->|"records.jsonl"| O["organize stage"]
@@ -160,8 +172,8 @@ flowchart TB
   ES -->|"bundle document, bandit-bundles"| O
   O -->|"organized decisions"| A["assemble stage"]
   SEED -->|"zones, booth spots"| A
-  A -->|"bundle file"| L["load stage"]
-  L -->|"HTTP API, import_event"| STDB["band1t module"]
+  A -->|"checked bundle"| L["worker result callback"]
+  L -->|"finish_event_import, shared import transaction"| STDB["band1t module"]
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
@@ -527,13 +539,15 @@ The question this diagram answers: for one sponsor, what does a run do from the 
 
 ```mermaid
 sequenceDiagram
-  participant OP as Team member
-  participant ING as bandit-ingest
+  participant OP as Organizer portal
+  participant ING as bandit-workers / importer library
   participant BD as Bright Data Web MCP
   participant ES as Elastic
   participant STDB as band1t module
   participant IDX as bandit-indexer
-  OP->>ING: bandit-ingest run --event calhacks-13
+  OP->>STDB: start_event_import(calhacks-13)
+  STDB-->>ING: event_import job by subscription
+  ING->>STDB: claim_job, then report_event_import_step
   ING->>BD: scrape_as_markdown (Devpost page)
   BD-->>ING: markdown with the sponsor's link, logo and tier
   ING->>BD: run_scraper (LinkedIn company dataset, company page URLs)
@@ -545,8 +559,9 @@ sequenceDiagram
   Note over ES: ES|QL LOOKUP JOIN on domain, then the bandit-organizer agent for the rest
   ES-->>ING: bundle document in bandit-bundles
   ING->>ING: check the decisions, assemble org:visa.com and booth:visa.com
-  ING->>STDB: import_event over the HTTP API (one transaction)
-  STDB-->>ING: import_run counts per section
+  ING->>STDB: finish_event_import(job_id, bundle)
+  Note over STDB: check lease and run, apply rows and complete job atomically
+  STDB-->>OP: event_import ready, counts and steps by subscription
   STDB-->>IDX: organization and booth rows by subscription
 ```
 
@@ -556,9 +571,9 @@ sequenceDiagram
 
 | Failure | Effect | Design answer |
 |---|---|---|
-| A page or dataset call fails during a fetch | The fetch stage stops | The snapshots already in the event folder stay, so parse, organize, assemble and load run again from them without Bright Data; nothing at the event depends on a fetch |
-| A dataset collection is slow | The fetch waits | The stage polls `get_scraper_progress` every 30 s, and each MCP call waits at most 10 minutes |
-| The `bandit-organize` run fails, or its document names an unknown key or leaves a record without a decision | No organized file for that run | The organize stage stops; the last bundle file in `bundles/` stays, and `scripts/e2e-setup` loads the newest one |
+| A page or dataset call fails during a fetch | The fetch stage stops; existing event rows stay unchanged | The job retries with a fresh attempt folder and fresh source fetch; after its last attempt the import shows `failed`. The maintenance CLI can rerun later stages from its saved snapshots |
+| A dataset collection is slow | The fetch waits | The stage polls `get_scraper_progress` every 30 s, checks a 30-minute collection deadline between polls, and limits each MCP call to 10 minutes |
+| The `bandit-organize` run fails, or its document names an unknown key or leaves a record without a decision | No organized file for that run | The organize stage stops and the job retries; it never substitutes a checked-in bundle. Previously imported rows stay unchanged |
 | A category is off the list, a link points at an undefined organisation, or there is no Google Maps record | No bundle for that run | The assemble stage stops before it writes a file |
 | A reference inside the bundle does not resolve | `import_event` would create dangling rows | `import_event` refuses and the whole call rolls back; the previous load stays as it was |
 | A booth has no spot in `booths.json` | The booth stands at the default spot | It loads with `placement` `zone` in its nearest zone; `load_venue_spots` gives it a sponsor table, and `place_booth` moves it by hand |
@@ -581,7 +596,7 @@ sequenceDiagram
 **Depends on**
 
 - [SpacetimeDB](../2-data/SpacetimeDB.md): tables `venue`, `zone` (with `plan_x_m`, `plan_y_m`), `booth` (with `organization_id`, `plan_x_m`, `plan_y_m`, `placement`, `source_url`, `fetched_at`), `schedule_slot`, `import_run`, `venue_spot`, `band_owner`, `attendee`, `blob_ref`; reducers `import_event`, `grant_role`, `place_booth`, `load_venue_spots`; the `ingest`, `ops` and `worker` roles.
-- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that serves `/venue`; `bandit-workers`, which runs the job `venue_setup` and, for it, `pipeline/venue_model.py` with Python and Playwright on the Vultr VM.
+- [Rust-Backend](../3-services/Rust-Backend.md): the `bandit-api` process that serves `/venue`; `bandit-workers`, which runs `event_import` through the importer library and runs `venue_setup` through `pipeline/venue_model.py` using Python and Playwright on the Vultr VM.
 - [Elastic](Elastic.md): the raw indices and the Elastic Workflow `bandit-organize` for the organize stage. Without it, no bundle is assembled.
 - [Elastic](Elastic.md): `bandit-run-task` for `venue_find`, `venue_map`, `plan_find` and `venue_policy_find`; `bandit-read-document` for cited policy extraction; `model_call` keeps the execution record.
 - [Elastic](Elastic.md): the Elastic Workflow `bandit-read-document`, which reads what each PDF a lookup fetches prints about itself, and the job `document_read`, which reads a plan lookup's PDF and a venue policy lookup's joined PDF into terms and clauses; [Insurance](../6-features/Insurance.md): `queue_document_read`, `apply_document_terms` and `confirm_policy_terms`.
@@ -618,9 +633,10 @@ sequenceDiagram
 | Every dataset row loses its people fields (`PEOPLE_FIELDS`) before its snapshot is saved | every fact about a person in the system is one the event published or the person entered |
 | The venue setup reads pages through the Bright Data Web Unlocker API as raw HTML | a 3D map hides in `iframe`, `embed`, `object` and `model-viewer` tags and model file links, which markdown drops |
 | The venue model goes through the Bright Data Browser API | the export puts a script in the map's page before it loads and runs the page's own exporter inside it, so it needs a remote browser session it drives itself over CDP |
-| Every Bright Data answer is a snapshot file kept with the project, rewritten by the next fetch of the same URL | parse, organize, assemble and load rerun without Bright Data, and the event never waits on a live scrape |
+| Server imports save fresh source snapshots in a separate folder for each attempt; the maintenance CLI keeps its snapshots in the event folder | each server result has its fetched evidence, while maintainers can inspect and rerun individual stages |
 | Pages are parsed in Rust, one parser per page kind; Elastic receives JSON records, never page bodies | the page kinds are few and known, and a parser's output is the same for the same snapshot |
-| `bandit-ingest` calls `import_event` through the SpacetimeDB HTTP API with its own saved identity | a one-shot loader needs no subscription, and its first load prints the one `grant_role` command that gives it `ingest` |
+| The organizer starts a server `event_import` job; its leased result calls the same import transaction as the maintenance CLI | one app action runs the whole import without a laptop script, and rows and completion commit together |
+| The maintenance `bandit-ingest load` command retains its saved `ingest` identity and direct HTTP call | maintainers can still inspect and load a checked bundle independently |
 | A booth's spot comes from the hand-written `booths.json`, its zone from the nearest zone centre, and its sponsor table on the 3D floor from `load_venue_spots` by name | the event publishes no booth positions; the team writes the few that matter, and every other booth still has a zone and a table |
 | An organizer moves a booth with `place_booth`, and a re-import keeps a `manual` booth | a wrong spot is fixed in seconds by hand, and the fix survives the next run |
 | No exhibitor contact export and no email; `claim_person` accepts a claim only from an attendee who already owns a band | the band claim's press already proved who holds the band one step earlier, so the profile claim needs no second press and no email round trip |
@@ -642,4 +658,4 @@ sequenceDiagram
 | Each step of a venue setup is a `venue_setup_step` row, and the organizer picks the shown venue (`chosen_venue`) | the tab shows the run live by subscription, and a new setup never replaces the venue on screen by itself |
 | The Elastic Workflow `bandit-organize` is the one place facts are merged across sources, and `bandit-ingest` checks its answer twice, once after the workflow and once while assembling | one owner per step, and a wrong key never reaches SpacetimeDB |
 | The scrape never changes a zone; zones, their station ids and their exit colours are hand-written in `zones.json` | the safety features stay the same whatever the scrape finds |
-| The import works for any event: its input is the event folder, and Cal Hacks 13.0 is the first event it runs at | the product must work at any venue; only the folder changes from one event to the next |
+| The app accepts the configured Cal Hacks source set; a new event needs its own source and plan configuration plus parser support | full event ingestion has explicit inputs; the separate name-based venue setup discovers a venue and its 3D map |

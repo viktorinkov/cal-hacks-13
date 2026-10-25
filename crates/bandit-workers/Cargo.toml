@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 bandit-bindings = { path = "../bandit-bindings" }
+bandit-ingest = { path = "../bandit-ingest" }
 bandit-common = { path = "../bandit-common" }
 claims-elastic = { path = "../claims-elastic" }
 claude-client = { path = "../claude-client" }

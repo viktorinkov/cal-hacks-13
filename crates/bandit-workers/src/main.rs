@@ -16,6 +16,7 @@ mod clinic;
 mod document;
 mod elastic;
 mod elastic_image;
+mod event_import;
 mod investigate;
 mod jobs;
 mod letters;

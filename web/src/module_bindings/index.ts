@@ -70,6 +70,7 @@ import FailJobReducer from "./fail_job_reducer";
 import FileClaimReducer from "./file_claim_reducer";
 import FileClaimForWearerReducer from "./file_claim_for_wearer_reducer";
 import FileClinicReportReducer from "./file_clinic_report_reducer";
+import FinishEventImportReducer from "./finish_event_import_reducer";
 import FinishPlanLookupReducer from "./finish_plan_lookup_reducer";
 import FinishVenuePolicyLookupReducer from "./finish_venue_policy_lookup_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
@@ -112,6 +113,7 @@ import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportClaimStepReducer from "./report_claim_step_reducer";
+import ReportEventImportStepReducer from "./report_event_import_step_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
 import ReportVenueSetupStepReducer from "./report_venue_setup_step_reducer";
@@ -135,6 +137,7 @@ import SetZoneStationReducer from "./set_zone_station_reducer";
 import SettleMerchOrderReducer from "./settle_merch_order_reducer";
 import SleepBandsReducer from "./sleep_bands_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
+import StartEventImportReducer from "./start_event_import_reducer";
 import StartFindReducer from "./start_find_reducer";
 import StartJobReaperReducer from "./start_job_reaper_reducer";
 import StartLiveRunReducer from "./start_live_run_reducer";
@@ -211,6 +214,8 @@ import DepartureRow from "./departure_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
 import EventGraphRow from "./event_graph_table";
+import EventImportRow from "./event_import_table";
+import EventImportStepRow from "./event_import_step_table";
 import EventStateRow from "./event_state_table";
 import GatewayRow from "./gateway_table";
 import ImportRunRow from "./import_run_table";
@@ -433,6 +438,34 @@ const tablesSchema = __schema({
       { name: 'event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EventRow),
+  eventImport: __table({
+    name: 'event_import',
+    indexes: [
+      { accessor: 'id', name: 'event_import_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'status', name: 'event_import_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'event_import_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, EventImportRow),
+  eventImportStep: __table({
+    name: 'event_import_step',
+    indexes: [
+      { accessor: 'id', name: 'event_import_step_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'import_id', name: 'event_import_step_import_id_idx_btree', algorithm: 'btree', columns: [
+        'importId',
+      ] },
+    ],
+    constraints: [
+      { name: 'event_import_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, EventImportStepRow),
   eventState: __table({
     name: 'event_state',
     indexes: [
@@ -1310,6 +1343,7 @@ const reducersSchema = __reducers(
   __reducerSchema("file_claim", FileClaimReducer),
   __reducerSchema("file_claim_for_wearer", FileClaimForWearerReducer),
   __reducerSchema("file_clinic_report", FileClinicReportReducer),
+  __reducerSchema("finish_event_import", FinishEventImportReducer),
   __reducerSchema("finish_plan_lookup", FinishPlanLookupReducer),
   __reducerSchema("finish_venue_policy_lookup", FinishVenuePolicyLookupReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
@@ -1352,6 +1386,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_claim_step", ReportClaimStepReducer),
+  __reducerSchema("report_event_import_step", ReportEventImportStepReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
   __reducerSchema("report_venue_setup_step", ReportVenueSetupStepReducer),
@@ -1375,6 +1410,7 @@ const reducersSchema = __reducers(
   __reducerSchema("settle_merch_order", SettleMerchOrderReducer),
   __reducerSchema("sleep_bands", SleepBandsReducer),
   __reducerSchema("start_crowd", StartCrowdReducer),
+  __reducerSchema("start_event_import", StartEventImportReducer),
   __reducerSchema("start_find", StartFindReducer),
   __reducerSchema("start_job_reaper", StartJobReaperReducer),
   __reducerSchema("start_live_run", StartLiveRunReducer),
@@ -1412,6 +1448,10 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "chosen_venue": Omit<typeof tablesSchema.schemaType.tables["chosenVenue"], "accessorName"> & { readonly accessorName: "chosen_venue" };
     /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
     readonly "crowd_walk": Omit<typeof tablesSchema.schemaType.tables["crowdWalk"], "accessorName"> & { readonly accessorName: "crowd_walk" };
+    /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+    readonly "event_import": Omit<typeof tablesSchema.schemaType.tables["eventImport"], "accessorName"> & { readonly accessorName: "event_import" };
+    /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+    readonly "event_import_step": Omit<typeof tablesSchema.schemaType.tables["eventImportStep"], "accessorName"> & { readonly accessorName: "event_import_step" };
     /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1610,6 +1650,8 @@ const tableAccessorAliases = {
   "band_place": "bandPlace",
   "chosen_venue": "chosenVenue",
   "crowd_walk": "crowdWalk",
+  "event_import": "eventImport",
+  "event_import_step": "eventImportStep",
   "event_state": "eventState",
   "import_run": "importRun",
   "incident_marker": "incidentMarker",
@@ -1724,6 +1766,10 @@ export type DbView = __DbViewBase & {
   readonly "chosen_venue": __DbViewBase["chosenVenue"];
   /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
   readonly "crowd_walk": __DbViewBase["crowdWalk"];
+  /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+  readonly "event_import": __DbViewBase["eventImport"];
+  /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+  readonly "event_import_step": __DbViewBase["eventImportStep"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1910,6 +1956,10 @@ export type Tables = __TablesBase & {
   readonly "chosen_venue": __TablesBase["chosenVenue"];
   /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
   readonly "crowd_walk": __TablesBase["crowdWalk"];
+  /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+  readonly "event_import": __TablesBase["eventImport"];
+  /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+  readonly "event_import_step": __TablesBase["eventImportStep"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */

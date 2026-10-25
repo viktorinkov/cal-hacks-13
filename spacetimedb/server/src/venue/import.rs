@@ -48,6 +48,11 @@ fn named(source_key: &str, name: &str, what: &str) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn import_event(ctx: &ReducerContext, bundle: EventBundle) -> Result<(), String> {
     require_role(ctx, &["ingest", "ops"])?;
+    apply_event(ctx, bundle).map(|_| ())
+}
+
+/// Applies a checked bundle in the caller's transaction. Callers enforce their own role and lease.
+pub(super) fn apply_event(ctx: &ReducerContext, bundle: EventBundle) -> Result<ImportRun, String> {
     let v = bundle.venue;
     named(&v.source_key, &v.name, "venue")?;
 
@@ -247,7 +252,7 @@ pub fn import_event(ctx: &ReducerContext, bundle: EventBundle) -> Result<(), Str
         );
     }
 
-    ctx.db.import_run().insert(ImportRun {
+    Ok(ctx.db.import_run().insert(ImportRun {
         id: 0,
         run_id: bundle.run_id,
         venue_id,
@@ -256,8 +261,7 @@ pub fn import_event(ctx: &ReducerContext, bundle: EventBundle) -> Result<(), Str
         imported_by: ctx.sender(),
         imported_at: ctx.timestamp,
         counts: vec![venue_count, zone_count, org_count, person_count, booth_count, slot_count],
-    });
-    Ok(())
+    }))
 }
 
 #[spacetimedb::reducer]

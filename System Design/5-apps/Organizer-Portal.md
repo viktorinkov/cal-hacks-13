@@ -20,7 +20,7 @@ Responsibilities:
 - Insurance.md: give the organizer the rules Claude proposes from their precedents, to approve or reject, on the Proposed rules tab, with every payment rule and every precedent beside them.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
-- Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab; Insurance.md: upload the venue's insurance policy there, or name its forms and have them found online, and confirm its terms.
+- Bright-Data.md: start a server import for the configured event, set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab; Insurance.md: upload the venue's insurance policy there, or name its forms and have them found online, and confirm its terms.
 - Elastic.md: explain Elastic's jobs and link to their Elastic Kibana views from the Kibana tab.
 - Social.md: draw the event graph in 3D for the big screen, with the event photos among the people in them, and list every event photo on the Photos tab.
 
@@ -52,7 +52,7 @@ Not responsible for:
 | Merch.md | in | module to organizer portal | the Merch tab: the public `merch_template` table and, for `ops`, the view `board_merch_orders` | SDK |
 | Test-Bands.md | both | module and `bandit-api` to organizer portal | the band id (test bands are 90 to 99, the crowd's bands from 100) for the map and the counts; the crowd attendees in `board_attendees`; the Bands tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Bright-Data.md | in | module to organizer portal | the booths and organisations the import loaded: the booths on the venue map, the organisations in the attendee list's Company column | SDK |
-| Bright-Data.md | both | organizer portal, module and `bandit-api` | the Venue setup tab: `venue_setup`, `venue_setup_step` and `chosen_venue` in; `start_venue_setup` and `choose_venue` out, for `ops`; the model from `/venue/venue.glb` or the setup's blob; for the insurance policy, `board_venue_policy_lookups`, `board_policy_documents` and `board_policy_terms` in, `look_up_venue_policy`, `submit_policy_document` and `confirm_policy_terms` out | SDK and HTTPS |
+| Bright-Data.md | both | organizer portal, module and `bandit-api` | the Venue setup tab: `event_import`, `event_import_step`, `venue_setup`, `venue_setup_step` and `chosen_venue` in; `start_event_import`, `start_venue_setup` and `choose_venue` out, for `ops`; the model from `/venue/venue.glb` or the setup's blob; for the insurance policy, `board_venue_policy_lookups`, `board_policy_documents` and `board_policy_terms` in, `look_up_venue_policy`, `submit_policy_document` and `confirm_policy_terms` out | SDK and HTTPS |
 
 ## Design
 
@@ -433,7 +433,9 @@ The tab has no controls: orders are placed and paid from the attendee's recap.
 
 ### Venue setup tab (Bright-Data.md)
 
-Bright-Data.md: the Venue setup tab sets up a venue from the event's name and picks the venue the portal shows ([Bright-Data](../7-integrations/Bright-Data.md)).
+Bright-Data.md: the plain portal's Venue setup tab imports a configured event's data, sets up a venue from the event's name and picks the venue the portal shows ([Bright-Data](../7-integrations/Bright-Data.md)).
+
+- "Import event data": `ops` selects the configured event, currently Cal Hacks 13.0, and calls `start_event_import`. The server refreshes sponsors, people, schedules and booths from its configured public sources. The button is disabled while this event is importing. Every staff member sees the live steps, errors and result; completed runs show each section's added and updated counts. Closing the page does not stop the server job.
 
 - "Venue": the "Shown venue" list holds "Cal Hacks 13.0 at the Palace of Fine Arts", the default, and every ready setup as "<event> at <venue>", newest first. Choosing one calls `choose_venue`, and only `ops` can change it. Below the list come the venue's name and address, its meshes, triangles, named parts and size in metres, the page the model came from, and the model in 3D ("Drag to turn, scroll to zoom.").
 - "Set up a venue": for `ops`, a field for the event's name and "Find the venue" (`start_venue_setup`). Everyone else reads "The organizer sets up the venue."
@@ -454,7 +456,7 @@ Elastic.md: the Kibana tab explains what Elastic, the Evidence Engine, does, one
 
 Nothing on the tab reads Elastic or starts a run.
 
-Bright-Data.md: the event import is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event. The Bright Data runs the portal starts are a venue setup and a venue policy lookup ([Bright-Data](../7-integrations/Bright-Data.md)).
+Bright-Data.md: the Venue setup tab starts the event import, venue setup and venue policy lookup. The Kibana tab only links to their evidence and matching history ([Bright-Data](../7-integrations/Bright-Data.md)).
 
 ### Bands tab (Test-Bands.md)
 
@@ -488,7 +490,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | Social.md: `event_graph` | event graph |
 | Social.md: `board_photos` | the Photos tab and the photos in the event graph |
 | Merch.md: `merch_template`, `board_merch_orders` | the Merch tab |
-| Bright-Data.md: `venue_setup`, `venue_setup_step`, `chosen_venue` | the Venue setup tab |
+| Bright-Data.md: `event_import`, `event_import_step`, `venue_setup`, `venue_setup_step`, `chosen_venue` | the Venue setup tab: import progress and results, venue setup and selection |
 | Bright-Data.md: `board_venue_policy_lookups`; Insurance.md: `board_policy_documents`, `board_policy_terms`, `board_policies`, `board_covers`, `board_fee_schedule` | the Venue setup tab's insurance policy section |
 
 The page redraws at most every 500 ms, however many rows change, and at least once a second; the venue map moves its dots between redraws. Test-Bands.md: the crowd adds up to 2,000 `band` rows that change every 2 s ([Test-Bands](../3-services/Test-Bands.md)).

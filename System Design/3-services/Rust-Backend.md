@@ -27,7 +27,7 @@ Every process, where it runs, what it may do in the module, and what it talks to
 | `band1t` module | `band1t` | SpacetimeDB Maincloud | runs inside SpacetimeDB | nothing outside SpacetimeDB | none |
 | `band1t-bridge` | `band1t-bridge` | venue laptop | none: it is the one identity in the module's `bridge` row, set by `register_bridge` | the gateway over USB serial | its SpacetimeDB token |
 | Test-Bands.md: the `bandit-claims` command-line tool | `bandit-claims` | venue laptop | `tester` (its `tester` identity, for the test bands); Insurance.md: the test identities it plays, among them the medic (`medic`) and the organizer (`ops`) | nothing outside; Insurance.md: `bandit-api` over HTTPS to upload the planted claims' bills | its SpacetimeDB tokens |
-| `bandit-ingest` | `bandit-ingest` | venue laptop, before the event | `ingest` | the `band1t` module through the SpacetimeDB HTTP API (`import_event`); Bright-Data.md: the Bright Data Web MCP; Elastic.md: Elastic Serverless (the raw indices, the dashboards) and Elastic Kibana (the `bandit-organize` workflow) | its SpacetimeDB token in `crates/bandit-ingest/.secrets`; Bright-Data.md: `BRIGHTDATA_API_TOKEN`; Elastic.md: `ELASTICSEARCH_API_KEY`, `KIBANA_API_KEY` |
+| Maintenance `bandit-ingest` CLI | `bandit-ingest` | maintainer's chosen host; app imports run inside the VM worker | `ingest` for direct maintenance loads | the `band1t` module through the SpacetimeDB HTTP API (`import_event`); Bright-Data.md: the Bright Data Web MCP; Elastic.md: Elastic Serverless (the raw indices, the dashboards) and Elastic Kibana (the `bandit-organize` workflow) | its SpacetimeDB token in `crates/bandit-ingest/.secrets`; Bright-Data.md: `BRIGHTDATA_API_TOKEN`; Elastic.md: `ELASTICSEARCH_API_KEY`, `KIBANA_API_KEY` |
 | Elastic.md: `bandit-indexer` | `bandit-indexer` | Vultr VM | `indexer` | Elastic Serverless: the one-way copy into `bandit-booths` and `bandit-people`, where each findable attendee's interests come from the booths, or the whole zones, where they spent the most minutes | SpacetimeDB token, Elastic key |
 | `bandit-api` | `bandit-api` | Vultr VM | `api` | browsers over HTTPS through Caddy, the blob store in `/var/lib/bandit`; Elastic.md: Elastic Serverless (ranking over `bandit-people` and `bandit-booths`, the log in `bandit-recap-rankings`) | SpacetimeDB token; Elastic.md: Elastic key; Test-Bands.md: the `tester` token for the dev routes |
 | `bandit-workers` | `bandit-workers` | Vultr VM | `worker` | the blob store in `/var/lib/bandit`; Capital-One-Nessie.md: the Capital One Nessie API; Elastic.md, Insurance.md: Elastic Serverless and Kibana Workflows/Agent Builder (documents, clauses, claim copies and model execution); Bright-Data.md: the Bright Data Web MCP, the Bright Data Web Unlocker API and, through `pipeline/venue_model.py`, the Bright Data Browser API | SpacetimeDB token; Capital-One-Nessie.md: Capital One Nessie API base URL and key; Elastic.md, Insurance.md: Elastic and Kibana keys; Bright-Data.md: the Bright Data API token, the Web Unlocker zone and the Browser API zone |
@@ -43,7 +43,7 @@ So every side effect outside SpacetimeDB happens in a separate Rust process that
 
 ### Workspace layout
 
-Which crate depends on which. Every workspace service except `bandit-ingest` also uses `bandit-bindings` and `bandit-common`; `band1t-bridge` has its own bindings, generated from the same module. `bandit-ingest` shares no crate with the others: it reaches the module only through the SpacetimeDB HTTP API.
+Which crate depends on which. The service binaries use `bandit-bindings` and `bandit-common`; `band1t-bridge` has its own bindings, generated from the same module. `bandit-ingest` exposes the event pipeline as a library linked by `bandit-workers`. Its maintenance CLI retains the direct SpacetimeDB HTTP loader; the worker uses generated bindings and a leased result reducer.
 
 The question this diagram answers: which crates does each Rust binary build on?
 
@@ -58,7 +58,7 @@ flowchart LR
     Vision["bandit-vision (TBD -- LEO)"]
     Workers["bandit-workers"]
   end
-  Ingest["bandit-ingest, no shared crates"]
+  Ingest["bandit-ingest: importer library and maintenance CLI"]
   Shared["bandit-bindings and bandit-common: generated table types, connect, config, logs, identity tokens, blob store"]
   Rules["bandit-insurance: claim rules, no I/O"]
   ClaimsES["claims-elastic: indices, Agent Builder and Workflows"]
@@ -73,7 +73,8 @@ flowchart LR
   Workers -->|"clauses, validation, workflows and agents"| ClaimsES
   Workers -->|"shared request and schema types"| ClaudeC
   Vision -.->|"frames, judgments"| ClaudeC
-  Ingest -.->|"import_event, HTTP API"| Module
+  Workers -->|"event import pipeline"| Ingest
+  Ingest -.->|"maintenance CLI only: import_event, HTTP API"| Module
 
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
@@ -92,7 +93,8 @@ flowchart LR
 | `claude-client` | library | the only way any process calls the Anthropic Claude API; also records every call | [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md) |
 | `bandit-insurance` | library | the claim rules: the evidence pack hash, the corroboration checks, the coverage arithmetic, the route and the ledger postings, with no I/O, no clock and no randomness; the module, `bandit-workers` and `bandit-claims` use it | [Insurance](../6-features/Insurance.md) |
 | `claims-elastic` | library | claim-copy validation, policy pages and clauses, hybrid search, and installation/execution of bounded workflows and Agent Builder agents; `bandit-workers` uses it | [Elastic](../7-integrations/Elastic.md) |
-| `bandit-claims`, `bandit-ingest`, `bandit-indexer`, `bandit-api`, `bandit-workers` | binaries | the processes in the Interfaces table | their docs |
+| `bandit-ingest` | library and maintenance binary | event source fetch, parsing, Elastic matching and bundle validation; linked by `bandit-workers` for `event_import` jobs | [Bright-Data](../7-integrations/Bright-Data.md) |
+| `bandit-claims`, `bandit-indexer`, `bandit-api`, `bandit-workers` | binaries | the processes in the Interfaces table | their docs |
 | Vision.md (TBD -- LEO): `bandit-vision` | binary | the security view's connection to the module; it calls the Anthropic Claude API through `claude-client`; this Leo-owned path is separate from worker workflows | [Vision](../4-devices/Vision.md) |
 
 The two browser apps use TypeScript bindings generated from the same module, so the web and Rust sides cannot drift apart either.
@@ -109,7 +111,7 @@ Each process reaches the module the same way, as a client of SpacetimeDB Mainclo
 - Bright-Data.md: `deploy/setup.sh` also makes a Python virtual environment in `var/venv` with Playwright, which `bandit-workers` uses to run `pipeline/venue_model.py` for a venue setup.
 - The VM runs with test mode on (`BANDIT_TEST_MODE=1` in the service file), so the test tools that features add are live at the event.
 - `bandit-api` serves the organizer portal (/organizer) and the tap page (/t/code) as static files from band1t.vip. The NFC tags hold that host, so judges open the tap page on their own phones, and the apps' uploads and API calls go to the same origin with no cross-origin setup.
-- The venue laptop runs `band1t-bridge`, because it needs the gateway's USB cable, and runs `bandit-ingest` once before the event.
+- The venue laptop runs `band1t-bridge`, because it needs the gateway's USB cable. The organizer starts event ingestion from the app; `bandit-workers` runs the importer on the VM and stores each attempt under `/var/lib/bandit/event-import/<import_id>/<attempt>/`.
 - Test-Bands.md: the `bandit-claims` command-line tool runs on the venue laptop. The VM builds it too, because `bandit-api`'s dev routes start its `fall`, `property` and `attach-record` commands, and test mode turns on those routes and the organizer portal's Bands tab.
 - Test-Bands.md: the VM also runs `bandit-claims live` as the systemd service `bandit-live`: the floor staff for a live run (the medic, the clinic, the camera and the organizer's cost notes). It is idle until a live run starts.
 - Vision.md (TBD -- LEO): `bandit-vision` runs on the venue laptop.
@@ -142,7 +144,7 @@ sequenceDiagram
 ### Configuration and secrets
 
 - Each workspace service reads the nearest `.env` file plus the real environment variables, which win (`bandit-common`'s `Config`). It holds `SPACETIMEDB_URL` (SpacetimeDB Maincloud by default), `SPACETIMEDB_DATABASE` (`bandit-calhacks13-sp82j`), `BANDIT_DATA_DIR` and the feature keys.
-- `bandit-ingest` reads the repo's `.env` itself, and `band1t-bridge` takes `--port`, `--server` and `--db` on its command line. The job kinds a worker runs are fixed in code (`jobs::handles`). Anthropic-Claude-API.md: every process that calls the Anthropic Claude API reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)).
+- The maintenance `bandit-ingest` CLI reads the repo's `.env` itself. The importer library uses the worker's existing server environment and identity; `band1t-bridge` takes `--port`, `--server` and `--db` on its command line. The job kinds a worker runs are fixed in code (`jobs::handles`). Anthropic-Claude-API.md: every process that calls the Anthropic Claude API reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)).
 - Secrets are the SpacetimeDB tokens plus the feature keys in the Interfaces table. On the VM they sit in its `.env` file, which `scripts/deploy-vm` copies over SSH and the services read at start; on the laptop they sit in a local environment file outside the repo. They are never written to SpacetimeDB rows, never sent to browsers and never committed.
 
 ### `bandit-api`: the HTTP edge
@@ -245,6 +247,7 @@ stateDiagram-v2
 | Social.md: `photo_features` | run `bandit-read-image` with one temporary image attachment; validate its people count and caption, delete the upload, then `submit_photo_features`; identity still comes from bands | [Social](../6-features/Social.md), [Elastic](../7-integrations/Elastic.md) |
 | Bright-Data.md: `attendee_policy_lookup` | Bright Data searches and fetches; bounded `plan_find` selects supplied URLs in `bandit-run-task`; the document reader checks the insurer, plan and year; `finish_plan_lookup` saves the found plan and queues its terms read | [Bright-Data](../7-integrations/Bright-Data.md) |
 | Bright-Data.md: `venue_policy_lookup` | Bright Data searches and fetches; bounded `venue_policy_find` selects supplied URLs in `bandit-run-task`; the document reader checks form numbers and pages; `finish_venue_policy_lookup` files the joined PDF | [Bright-Data](../7-integrations/Bright-Data.md) |
+| Bright-Data.md: `event_import` | run the importer library on a blocking server thread while the runner renews its lease: fetch configured public sources, parse and map them, run `bandit-organize`, validate the bundle, report progress, then `finish_event_import` | [Bright-Data](../7-integrations/Bright-Data.md) |
 | Bright-Data.md: `venue_setup` | Bright Data searches and reads pages; bounded `venue_find` and `venue_map` select supplied results in `bandit-run-task`; code exports with `pipeline/venue_model.py`, reports steps and calls `finish_venue_setup` | [Bright-Data](../7-integrations/Bright-Data.md) |
 
 The fixed text executor accepts only system text, user text and a JSON schema. It rejects binary inputs, tool definitions and conversation history rather than dropping them. Claim investigation has its own Agent Builder workflow and scoped Rust tool bridge; images have their own upload/read/delete workflow.

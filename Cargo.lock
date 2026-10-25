@@ -301,6 +301,7 @@ dependencies = [
  "anyhow",
  "bandit-bindings",
  "bandit-common",
+ "bandit-ingest",
  "bandit-insurance",
  "claims-elastic",
  "claude-client",

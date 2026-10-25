@@ -37,10 +37,10 @@ Every connection in the system. Names match the component docs.
 | Elastic.md, Anthropic-Claude-API.md, Capital-One-Nessie.md: `bandit-workers` | Elastic Workflows and Agent Builder, Capital One Nessie API | model execution and bank calls | HTTPS |
 | Elastic.md: `bandit-indexer` | `band1t` module, Elastic Serverless | subscription in, bulk index writes out | SDK in, HTTPS out |
 | Elastic.md: `bandit-api` | Elastic Serverless | `GET /api/recap`: hybrid searches with a reranker that order the recap's people and booths, over candidates SpacetimeDB listed | HTTPS |
-| Bright-Data.md: `bandit-ingest` | Bright Data Web MCP, `band1t` module | page fetches (`scrape_as_markdown`) and company datasets (`run_scraper`); `import_event` | HTTPS; SpacetimeDB HTTP API |
+| Bright-Data.md: `bandit-workers`, job `event_import`, using the importer library | Bright Data Web MCP, `band1t` module | configured public pages (`scrape_as_markdown`) and company datasets (`run_scraper`); progress and checked bundle through `report_event_import_step` and `finish_event_import` | HTTPS; SpacetimeDB SDK |
 | Bright-Data.md: `pipeline/venue_model.py`, run by hand before the event | Bright Data Browser API | the Cal Hacks venue map opened in a remote browser; its 3D scene back as the file `web/venue/venue.glb` | CDP over WebSocket, through Playwright |
 | Bright-Data.md: `bandit-workers`, job `venue_setup` | Bright Data Web MCP, Web Unlocker and Browser API; Elastic Workflows | fetch pages, select the venue and map with bounded `venue_find` and `venue_map` tasks, then export with `pipeline/venue_model.py` | HTTPS; CDP over WebSocket through Playwright |
-| Elastic.md: `bandit-ingest` | Elastic Serverless | parsed JSON records in; the bundle back from `bandit-organize` in Elastic Workflows | HTTPS |
+| Elastic.md: the importer library in `bandit-workers` | Elastic Serverless | parsed JSON records in; the bundle back from `bandit-organize` in Elastic Workflows | HTTPS |
 | Elastic.md, Insurance.md: `bandit-workers` | Elastic Serverless, `band1t` module | every insurance PDF, read into terms and clauses by `bandit-read-document`; a de-identified copy of each claim into `bandit-claims` through the pipeline `bandit-claims-validate`, with the clauses of both policies that bear on it back, written through `submit_claim_checks` | HTTPS; SDK |
 | Vision.md (TBD -- LEO): `bandit-vision` | `band1t` module, `bandit-api`, Anthropic Claude API | zone counts, ground alerts, camera sightings, property events, photo features; frames stored as blobs; frames to the Anthropic Claude API | reducer calls; HTTPS |
 
@@ -78,7 +78,6 @@ flowchart LR
     subgraph Laptop["Venue laptop"]
       Bridge["band1t-bridge"]
       SecView["Security view (TBD -- LEO)"]
-      Ingest["bandit-ingest, before the event"]
     end
   end
   subgraph Cloud["SpacetimeDB Maincloud"]
@@ -110,14 +109,14 @@ flowchart LR
   STDB -->|"pending commands, subscription"| Bridge
   Cameras -.->|"live video, 30 fps"| SecView
   SecView -.->|"camera assessment, submit_vision_assessment"| STDB
-  Ingest -->|"page fetches, scrape_as_markdown"| Bright
-  Ingest -->|"raw records, bundle back, bandit-organize"| Elastic
-  Ingest -->|"event bundle, import_event"| STDB
+  Workers -->|"event sources, event_import"| Bright
+  Workers -->|"raw records, bundle back, bandit-organize"| Elastic
+  Workers -->|"checked event bundle, finish_event_import"| STDB
   Portal -->|"magic-link sign-in"| Auth
   Tap -->|"magic-link sign-in"| Auth
   Auth -->|"ID token, checked on connect"| STDB
   STDB -->|"live rows, subscription"| Portal
-  Portal -->|"staff actions, resolve_incident"| STDB
+  Portal -->|"staff actions, start_event_import, resolve_incident"| STDB
   STDB -->|"own rows, my_band"| Tap
   Tap -->|"attendee actions, update_profile"| STDB
   Portal -->|"policy + hospital report PDFs, POST /api/blobs"| API
@@ -141,7 +140,7 @@ flowchart LR
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
   classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
   class Bands,Markers,Gateway device
-  class Bridge,Ingest,API,Workers,Indexer rust
+  class Bridge,API,Workers,Indexer rust
   class STDB stdb
   class Portal,Tap web
   class Auth,Claude,Elastic,Nessie,Bright ext
@@ -165,9 +164,9 @@ One row per arrow above, in the same order. Call names are spelled as the code s
 | the module | `band1t-bridge` | new `command` rows | subscription `SELECT * FROM command WHERE pending = true` | the same WebSocket | a command reaches the radio the moment it commits |
 | Vision.md (TBD -- LEO): security cameras | security view | live video at 30 fps | none | read directly by the venue laptop | the security view works without the internet |
 | Vision.md (TBD -- LEO): security view | the module | a camera assessment of an incident; property events | `submit_vision_assessment`, `report_property_event` | SpacetimeDB client SDK, role `vision` | the module, not the camera, decides what happens next |
-| Bright-Data.md: `bandit-ingest` | Bright Data Web MCP | the event's pages and company datasets | `scrape_as_markdown`, `run_scraper` | MCP over HTTPS | Bright Data does every step that touches the web |
-| Elastic.md: `bandit-ingest` | Elastic | raw records into `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; the organized bundle back from `bandit-bundles` | the Elastic Workflows workflow `bandit-organize` | HTTPS | messy text is resolved before anything reaches the module |
-| Bright-Data.md: `bandit-ingest` | the module | the checked event bundle | `import_event` | SpacetimeDB HTTP API | the whole event loads in one transaction or not at all |
+| Bright-Data.md: the importer library in `bandit-workers` | Bright Data Web MCP | the event's pages and company datasets | `scrape_as_markdown`, `run_scraper` | MCP over HTTPS | Bright Data does every step that touches the web |
+| Elastic.md: the importer library in `bandit-workers` | Elastic | raw records into `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; the organized bundle back from `bandit-bundles` | the Elastic Workflows workflow `bandit-organize` | HTTPS | messy text is resolved before anything reaches the module |
+| Bright-Data.md: `bandit-workers` | the module | the checked event bundle for its leased import | `finish_event_import` | SpacetimeDB SDK | the event rows and job completion commit together |
 | Organizer portal | SpacetimeDB SpacetimeAuth | the magic-link email sign-in | OpenID Connect at `auth.spacetimedb.com/oidc` | HTTPS | BandIt keeps no password and sends no email |
 | Tap page | SpacetimeDB SpacetimeAuth | the magic-link email sign-in | OpenID Connect at `auth.spacetimedb.com/oidc` | HTTPS | a judge signs in on their own phone |
 | SpacetimeDB SpacetimeAuth | the module | the ID token, which each page passes when it connects | none | OpenID Connect | one identity per person, the same on every device |
@@ -207,7 +206,7 @@ Each kind of decision has one maker, with a guardrail in code around it. Elastic
 | Elastic.md: the order of recap suggestions | Elastic (`bandit-people`, `bandit-booths`) | the people and booths SpacetimeDB listed for the attendee, and the attendee's interests | Elastic only orders the ids it is given; without it the lists go by minutes |
 | Elastic.md, Insurance.md: which policy clauses bear on a claim | Elastic (`bandit-policy-clauses`) | the de-identified copy's narrative, built by code, and the Decision Engine's own queries | only the venue's policy and this attendee's health-plan wording are searched; a clause matters only when the Decision Engine cites it and code checks it |
 | Insurance.md: who falls, where and when in the live run | code in the module: a generator seeded with `live_run.seed` (`live/script.rs`) | the script's beats: the incident kind, the zone kind, the medic's note and the hospital report that follows | never the Anthropic Claude API; a run can be played again exactly, and no zone gets three injuries within five minutes |
-| Bright-Data.md, Elastic.md: the event setup bundle | Elastic: the Elastic Agent Builder agent `bandit-organizer`, run by `bandit-organize` in Elastic Workflows | the raw records Bright Data fetched | Elastic ES\|QL `LOOKUP JOIN` makes the exact joins first, and the agent gives a reason for each decision; `bandit-ingest` checks the bundle and `import_event` loads it in one transaction |
+| Bright-Data.md, Elastic.md: the event setup bundle | Elastic: the Elastic Agent Builder agent `bandit-organizer`, run by `bandit-organize` in Elastic Workflows | the raw records Bright Data fetched | Elastic ES\|QL `LOOKUP JOIN` makes the exact joins first, and the agent gives a reason for each decision; the importer library checks the bundle and `finish_event_import` applies its shared import transaction |
 | Merch.md: a merch order | a person: the attendee, from the recap (`buy_merch`) | a template and a photo the attendee is tagged in | code checks that the event has ended and the wallet covers the price; a failed purchase frees the money |
 
 Insurance.md: the insurance Decision Engine is Elastic Agent Builder plus the Rust code that validates and applies each claim decision, and The Evidence Engine reads every document it needs. It runs in this order, and steps 0, 2, 3, 5 and 6 leave the module as jobs:
@@ -344,7 +343,7 @@ flowchart LR
 
 #### The job queue
 
-A feature's slow or outside work is a `job` row: reading a PDF, deciding a claim, finding a venue, paying. Three services call outside services directly instead: `bandit-ingest` (Bright Data, Elastic), `bandit-indexer` (Elastic) and `bandit-api` (Elastic, for the recap). One process, `bandit-workers`, takes jobs off the queue. It subscribes to `worker_jobs`, which shows every `Queued` and `Leased` job to the `worker` role.
+A feature's slow or outside work is a `job` row: importing event data, reading a PDF, deciding a claim, finding a venue, paying. `bandit-indexer` calls Elastic directly for indexing, and `bandit-api` calls it for the recap. The maintenance `bandit-ingest` CLI can still run individual import stages directly. The app's import is an `event_import` job handled by the one queue consumer, `bandit-workers`. It subscribes to `worker_jobs`, which shows every `Queued` and `Leased` job to the `worker` role.
 
 - **Lease.** `claim_job` gives a job to one worker for 60 s. The worker calls `extend_job_lease` every 30 s while the job runs.
 - **Result.** The worker hands the result to the feature's result reducer. That reducer checks that the caller still holds the lease, applies the result and marks the job `Done` in one transaction.
@@ -352,7 +351,7 @@ A feature's slow or outside work is a `job` row: reading a PDF, deciding a claim
 - **Dead.** After 3 attempts the job is `Dead`, and the feature's fallback runs.
 - **Load.** One worker runs at most 4 jobs at once.
 
-These are the 17 job kinds in the code (`KIND` constants in `spacetimedb/server/src` and `crates/bandit-insurance`, handlers in `crates/bandit-workers`):
+These are the 18 job kinds in the code (`KIND` constants in `spacetimedb/server/src` and `crates/bandit-insurance`, handlers in `crates/bandit-workers`):
 
 | Job kind | Queued by | What the worker does | Outside service | Result reducer |
 |---|---|---|---|---|
@@ -370,6 +369,7 @@ These are the 17 job kinds in the code (`KIND` constants in `spacetimedb/server/
 | `merch_purchase` | `buy_merch` and `buy_merch_as` | records the order as a purchase from the wallet | Capital One Nessie | `settle_merch_order` |
 | `merch_picks` | attendee departure, event end, `rerun_shopping_agent` | choose three products and photos from the supplied eligible lists; validate every id and length | Elastic Workflows, `bandit-run-task` | `submit_merch_picks` |
 | `photo_features` | `register_photo` | count people and caption one temporarily uploaded image; validate and delete the upload | Elastic Agent Builder, `bandit-read-image` | `submit_photo_features` |
+| `event_import` | `start_event_import` | fetch the configured event's public sources, run exact joins and evidence matching, validate the bundle and apply it atomically | Bright Data Web MCP; Elastic ES\|QL, Workflows and Agent Builder | `report_event_import_step`, `finish_event_import` |
 | `venue_setup` | `start_venue_setup` | Bright Data fetches; bounded `venue_find` and `venue_map` select supplied results; code exports the model | Bright Data and Elastic Workflows | `report_venue_setup_step`, `finish_venue_setup` |
 | `attendee_policy_lookup` | `look_up_plan`, unless the same plan was already found | Bright Data fetches candidates; bounded `plan_find` selects supplied URLs; `bandit-read-document` checks the health-plan wording | Bright Data and Elastic Workflows | `finish_plan_lookup` |
 | `venue_policy_lookup` | `look_up_venue_policy` | Bright Data fetches; bounded `venue_policy_find` selects supplied URLs; `bandit-read-document` checks the printed forms | Bright Data and Elastic Workflows | `finish_venue_policy_lookup` |
@@ -414,7 +414,7 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 
 | Data | Source of truth | Written by | Copies |
 |---|---|---|---|
-| Venue layout: zones (each with its station marker and exit colour), booths, schedule | `band1t` module | `import_event` from the event bundle; organizers with `set_zone_station` and `place_booth`; Bright-Data.md: `bandit-ingest` builds the bundle | none; Elastic.md: `bandit-booths` |
+| Venue layout: zones (each with its station marker and exit colour), booths, schedule | `band1t` module | `finish_event_import` from the worker's checked bundle, using the shared `import_event` transaction; organizers with `set_zone_station` and `place_booth` | none; Elastic.md: `bandit-booths` |
 | Bands, attendees, consent, staff roles | `band1t` module | tap page, organizers, the owner (role grants) | none |
 | Band rows, station markers, the gateway, heard lists, events, commands, settings | `band1t` module | `band1t-bridge` through the ingest reducers, `sweep`, the `ops` reducers; Test-Bands.md: `report_test_band` from the `bandit-claims` tool and `bandit-api`, and `crowd_tick` for the crowd | none |
 | Incidents, snapshots, witnesses, notes | `band1t` module | `watch_bands`, organizers, medics | none |
@@ -423,9 +423,9 @@ Where each kind of data lives, and where copies go. "Source of truth" means the 
 | Medical-Card.md, Insurance.md: medical card and insurance wording | `band1t` module | attendee, organizer and checked worker results | private medical-history and card text goes to a bounded workflow without a shared search index; policy wording and hospital reports use the document indices |
 | Capital-One-Nessie.md, Insurance.md: wallets, claims, ledger | `band1t` module | reducers; workers record the Capital One Nessie ids | Capital One Nessie holds the bank records but never moves a balance, so the wallet balance is the module's own sum; Elastic.md: a de-identified copy of each claim in `bandit-claims` (codes, amounts, zones, times and a narrative built by code), used to validate the claim and as the query for its policy clauses |
 | Files: photos, PDFs, letters | the blob store, a folder in `/var/lib/bandit` on the Vultr VM | `bandit-api` and `bandit-workers`, each through `register_blob` | `blob_ref` row in the module (hash, size, owner, access class) |
-| Bright-Data.md: raw fetch snapshots | versioned files kept with the project | `bandit-ingest` | loaded into the module through `import_event` |
+| Bright-Data.md: raw fetch snapshots | per-attempt files under `/var/lib/bandit/event-import`; maintenance runs keep their event-folder snapshots | the importer library in `bandit-workers` | validated bundle rows reach the module through `finish_event_import`; raw snapshots stay on the server |
 | Anthropic-Claude-API.md: model calls | `model_call` rows, with each response | `bandit-workers`; Vision.md (TBD -- LEO): `bandit-vision` | used for audit |
-| Elastic.md: raw scraped records and the organized bundle | Elastic raw indices and `bandit-bundles` | `bandit-ingest`, `bandit-organize` in Elastic Workflows | working data before the import; rebuilt from the snapshots at every run, never read at the event |
+| Elastic.md: raw scraped records and the organized bundle | Elastic raw indices and `bandit-bundles` | the importer library in `bandit-workers`, `bandit-organize` in Elastic Workflows | working data before the import; rebuilt from the snapshots at every run, never read at the event |
 
 ### What each database does best
 
@@ -461,7 +461,7 @@ The diagram shows where the two meet and which way data flows at each meeting po
 ```mermaid
 flowchart TB
   BD["Bright Data records"] -->|"raw JSON"| ES["Elastic: organize, order by meaning, analyze in Elastic Kibana"]
-  ES -->|"1. import: one checked bundle, loaded by import_event"| STDB["SpacetimeDB: live state, every write"]
+  ES -->|"1. import: checked by worker, committed by finish_event_import"| STDB["SpacetimeDB: live state, every write"]
   STDB -->|"2. copy: findable rows, one way, by bandit-indexer"| ES
   ES -->|"3. order: ranked ids for the recap, through bandit-api, over candidates SpacetimeDB listed"| APP["Tap page"]
   STDB <-->|"4. Insurance.md: insurance PDFs and the claim copy in, checked terms and matching clauses back through reducers"| ES
@@ -499,7 +499,7 @@ The line is drawn by the question: exact, live or transactional questions go to 
 
 ### Deployment
 
-Where each process runs, and how it reaches the module. There is one deployment. External services are left out of the picture: the services on the VM and `bandit-ingest` call them over HTTPS.
+Where each process runs, and how it reaches the module. There is one deployment. External services are left out of the picture: the services on the VM call them over HTTPS, including the event importer inside `bandit-workers`.
 
 ```mermaid
 flowchart TB
@@ -512,12 +512,11 @@ flowchart TB
   subgraph Laptop["Venue laptop, online through a team phone's hotspot"]
     Bridge["band1t-bridge"]
     Sim["bandit-claims (Test-Bands.md)"]
-    Ingest["bandit-ingest, before the event"]
     OpsUI["Organizer portal in a browser"]
   end
   subgraph VM["Vultr VM, always on: band1t.vip"]
-    Svc["Caddy, then bandit-api, bandit-workers, bandit-indexer as systemd services"]
-    Vol[("/var/lib/bandit: identities, blobs, records")]
+    Svc["Caddy, then bandit-api, bandit-workers with event importer, bandit-indexer as systemd services"]
+    Vol[("/var/lib/bandit: identities, blobs, records, import attempts")]
   end
   STDBCloud[("SpacetimeDB Maincloud: band1t")]
 
@@ -526,8 +525,7 @@ flowchart TB
   Gateway -->|"USB serial"| Bridge
   Bridge -->|"WebSocket"| STDBCloud
   Sim -->|"WebSocket"| STDBCloud
-  Ingest -->|"seed, import_event"| STDBCloud
-  OpsUI -->|"WebSocket"| STDBCloud
+  OpsUI -->|"WebSocket: actions including start_event_import"| STDBCloud
   OpsUI -->|"app files"| Svc
   Phones -->|"NFC URL, app files, uploads, recap order"| Svc
   Phones -->|"WebSocket"| STDBCloud
@@ -539,7 +537,7 @@ flowchart TB
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
   class Bands,StationMarkers,Gateway device
-  class Bridge,Sim,Ingest,Svc,Vol rust
+  class Bridge,Sim,Svc,Vol rust
   class STDBCloud stdb
   class Phones,OpsUI web
 ```
@@ -547,7 +545,7 @@ flowchart TB
 - The `band1t` module runs on SpacetimeDB Maincloud only, as the database `bandit-calhacks13-sp82j`. There is no standalone copy and no second host, so there is never a second source of truth.
 - `bandit-api`, `bandit-workers` and `bandit-indexer` run on one always-on Debian VM on Vultr, as systemd services that restart on failure. Caddy on the VM serves HTTPS for band1t.vip and passes each request to `bandit-api`.
 - `bandit-api` serves both web apps as static files from band1t.vip, which is the host written into the NFC tags, so judges use their own phones. The three services share the data folder `/var/lib/bandit`: the service identities, the blob store and the rendered records ([Rust-Backend](../3-services/Rust-Backend.md)).
-- The venue laptop runs only what needs the venue: `band1t-bridge` on the gateway's USB cable, the organizer portal in a browser, and the SpacetimeDB command line for the band commands that have no control on a page. `bandit-ingest` runs on it once before the event.
+- The venue laptop runs only what needs the venue: `band1t-bridge` on the gateway's USB cable, the organizer portal in a browser, and the SpacetimeDB command line for the band commands that have no control on a page. The organizer starts event imports in the app; the VM worker runs them even after that browser closes.
 - Test-Bands.md: the `bandit-claims` command-line tool runs on the venue laptop.
 - Vision.md (TBD -- LEO): `bandit-vision` runs on the venue laptop.
 - The venue laptop gets internet from a team phone's hotspot, so venue Wi-Fi is not on the critical path.
@@ -609,9 +607,9 @@ The failures that can happen during the event, and the one answer to each. The f
 | Decision | Why |
 |---|---|
 | The `band1t` module runs on SpacetimeDB Maincloud only, and the venue laptop gets internet from a team phone's hotspot | one deployment means one source of truth, one set of identities and no switch-over during the event; venue Wi-Fi is off the critical path |
-| Bright-Data.md: the import works for any event, from the start URLs in its seed; Cal Hacks 13.0 is the first event it runs at | the product must work at any venue, and the judges are at Cal Hacks 13.0, so the booths, schedule and organisations on screen are ones they can check against the venue |
+| Bright-Data.md: the app imports the configured Cal Hacks 13.0 source set through a server job; name-based venue discovery stays separate | source and plan configuration plus parser support define a full event import; a venue name alone does not provide them |
 | Judges use their own phones; `bandit-api` serves both web apps from its public HTTPS host, which the NFC tags hold | one host in the tags, and the app files, uploads and API calls share one origin |
-| `bandit-api`, `bandit-workers` and `bandit-indexer` run on one Vultr VM; the venue laptop runs only `band1t-bridge`, the `bandit-claims` tool, `bandit-ingest` and the organizer portal | the venue laptop holds what needs the gateway's cable or the team's hands; the services keep running when the venue laptop sleeps |
+| `bandit-api`, `bandit-workers` with the event importer, and `bandit-indexer` run on one Vultr VM; the venue laptop runs `band1t-bridge`, the `bandit-claims` tool and the organizer portal | the organizer starts imports through the app; server jobs keep running when the venue laptop sleeps |
 | Social.md: people and the links between them live in SpacetimeDB tables; no graph database, separate Postgres or Elastic Kibana Graph | every link is an exact fact from a visit, an encounter row or the import, written in the same transaction as its visit or encounter, pushed live and filtered per caller by views; a graph of hundreds of nodes needs only one or two hops of indexed lookups; Elastic Kibana Graph is unavailable on Serverless and discovers implicit links, which the visit and encounter rows already record. Elastic.md: Elastic only orders the recap's suggestions |
 | Capital-One-Nessie.md: nobody pays at the venue; the Capital One Nessie API settles only the merch bought in the app after the event and the claim payouts | the band press stays for claiming a band, and the money moments judges see at the event are the merch checkout and the insurance payout |
 | A band in GUIDE chases its exit colour; under low visibility it chases faster as it nears the exit marker glowing that colour, and a full band pulses every 2 s | the ring has no compass, so colour, speed and vibration are how a band points its attendee to the door |
