@@ -457,7 +457,7 @@ fn clause_words(ctx: &ViewContext, c: &Charge) -> String {
     let found = ctx.db.claim_clause().claim_id().filter(c.claim_id).find(|k| &k.clause_id == id);
     match found {
         Some(k) => {
-            let whose = if k.policy == "attendee" { "your own policy" } else { "the venue's policy" };
+            let whose = if k.policy == "attendee" { "your health plan" } else { "the venue's policy" };
             format!("{whose}, {}, page {}", k.section.replace('_', " "), k.page)
         }
         None => String::new(),

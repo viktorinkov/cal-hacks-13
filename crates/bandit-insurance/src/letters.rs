@@ -151,18 +151,20 @@ fn kind_text(kind: &str) -> &str {
     match kind {
         "fall" => "a fall",
         "sos" => "an SOS alert",
-        "property" => "property damage",
+        "property" | "breakage" => "property damage",
+        "theft" => "a theft from the venue",
         other => other,
     }
 }
 
-/// First notice of loss to the insurer, in the section order of the ACORD 3
-/// liability notice of occurrence: carrier, policy, insured, occurrence,
+/// First notice of loss to the insurer: the ACORD 1 property loss notice for
+/// the venue's broken or stolen property, else the ACORD 3 liability notice of
+/// occurrence, in its section order: carrier, policy, insured, occurrence,
 /// injured or damaged, witnesses, other injured, remarks, then the facts.
 pub fn fnol_template(d: &LetterData) -> String {
     let d = &plain(d);
     let a = d.amounts;
-    let (form, line) = if d.incident_kind == "property" {
+    let (form, line) = if matches!(d.incident_kind.as_str(), "property" | "theft" | "breakage") {
         ("PROPERTY LOSS NOTICE (ACORD 1 layout)", "commercial property, the property part of the package policy")
     } else {
         ("LIABILITY NOTICE OF OCCURRENCE / CLAIM (ACORD 3 layout)", "general liability, medical payments cover")
@@ -244,15 +246,16 @@ pub fn summary_template(d: &LetterData) -> String {
 pub fn determination_template(d: &LetterData) -> String {
     let d = &plain(d);
     let a = d.amounts;
-    let basis = if d.incident_kind == "property" {
+    let basis = if d.incident_kind == "theft" {
+        "Covered costs are the value of what was taken, as venue staff logged it for the incident."
+    } else if matches!(d.incident_kind.as_str(), "property" | "breakage") {
         "Covered costs are the repair costs venue staff logged for the incident."
     } else {
         "Medical charges are paid up to the venue's fee schedule for each service, for treatment on or after the incident date."
     };
     let limit = if a.payout_cents < a.cost_cents { " The payment is limited by the policy's per-claim or aggregate limit." } else { "" };
     let which = match d.incident_kind.as_str() {
-        "property" => "the venue's property policy",
-        "theft" | "breakage" => "your own policy",
+        "property" | "theft" | "breakage" => "the venue's property policy",
         _ => "the venue's general liability policy",
     };
     format!(

@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use spacetimedb_sdk::Identity;
 use std::collections::{BTreeMap, HashMap};
 
-/// A person's interests come from the booths, or the whole zones, where they spent the most minutes.
+/// A person's interests come from the booths they stood at, or the zones they stayed in, with the most minutes.
 pub const TOP_SPOTS: usize = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -159,7 +159,7 @@ impl<'a> Venue<'a> {
     }
 
     /// No names and no socials: an attendee id, a graph node id, a company and what they spent time on.
-    /// A stay at one booth adds that booth; a stay somewhere in a zone adds every booth of the zone.
+    /// A stay at one booth adds its zone and that booth; a stay known only by its zone adds just the zone.
     fn person_doc(&self, a: &Attendee, visits: &[&Visit]) -> Value {
         let mut lines: Vec<String> = Vec::new();
         for (zone_id, booth_id) in top_spots(visits) {
@@ -167,7 +167,7 @@ impl<'a> Venue<'a> {
             if !lines.contains(&zone) {
                 lines.push(zone);
             }
-            let booths = self.booths_in(zone_id).iter().filter(|b| booth_id == 0 || b.id == booth_id);
+            let booths = self.booths_in(zone_id).iter().filter(|b| b.id == booth_id);
             lines.extend(booths.map(|b| Self::booth_line(b)).filter(|l| !lines.contains(l)).collect::<Vec<_>>());
         }
         json!({
@@ -347,7 +347,7 @@ mod tests {
                 attendee(3, "Cy", false, 0),
             ],
             visits: vec![
-                visit(100, 1, 1, 12.34),
+                Visit { booth_id: 10, ..visit(100, 1, 1, 12.34) },
                 visit(101, 1, 2, 30.0),
                 visit(102, 3, 1, 5.0),
                 Visit { booth_id: 12, ..visit(103, 2, 2, 4.0) },
@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(d["organization"], "Elastic");
         assert_eq!(
             d["interests"],
-            "Expo\nElastic booth: Elastic booth showcases. (search, ai)\nRobot arms: Robot arms showcases. (robotics)\nStage\nDrone show: Drone show showcases. (drones)"
+            "Expo\nElastic booth: Elastic booth showcases. (search, ai)\nStage"
         );
         assert!(d.get("display_name").is_none());
         assert_eq!(doc(&docs, Index::People, &hex(who(2)))["interests"], "Stage\nDrone show: Drone show showcases. (drones)");

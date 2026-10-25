@@ -10,8 +10,8 @@ Elastic judges the track on four criteria, which follow one line: Search → Rea
 
 | Elastic's criterion | Step | Where BandIt meets it |
 |---|---|---|
-| 01 Elasticsearch: "Creative, meaningful use of search" | Search | Elastic ES\|QL `LOOKUP JOIN` steps make the exact joins of an import run, a `FORK` + `FUSE` hybrid search gives the agent its candidates, semantic queries order each recap and find the clauses of the venue's and the attendee's policies that bear on each claim (next to build), and ingest pipelines check every claim copy and pull the text out of every insurance PDF (next to build) |
-| 02 Jina embeddings: "Search by meaning, in any language" | Search | every `semantic_text` field (`text`, `description`, `interests`, `narrative`) names `.jina-embeddings-v5-text-small`, which embeds each document on write and each query at search time; no BandIt process computes a vector |
+| 01 Elasticsearch: "Creative, meaningful use of search" | Search | Elastic ES\|QL `LOOKUP JOIN` steps make the exact joins of an import run, a `FORK` + `FUSE` hybrid search gives the agent its candidates, hybrid searches with a reranker order each recap and find the clauses of the venue's and the attendee's policies that bear on each claim, and ingest pipelines check every claim copy and pull the text out of every insurance PDF (next to build) |
+| 02 Jina embeddings: "Search by meaning, in any language" | Search | every `semantic_text` field (`text`, `description`, `interests`, `narrative`) names `.jina-embeddings-v5-text-small`, which embeds each document on write and each query at search time; no BandIt process computes a vector. The reranker `.jina-reranker-v3` reorders the top hits of the clause search and of the recap ranking |
 | 03 Agent Builder + Workflows: "Agents that answer and act" | Reason, Act | the Elastic Workflow `bandit-organize` calls the Elastic Agent Builder agent `bandit-organizer` in two schema-checked `ai.agent` steps, and its `save_bundle` step writes the bundle that `bandit-ingest` checks and loads with `import_event`; the workflow `bandit-read-document` runs the agent `bandit-document-reader` in one schema-checked `ai.agent` step per insurance PDF, quoting the clause and page behind every term (next to build); the workflow `bandit-propose-rule` runs the agent `bandit-rule-proposer`, whose one Elastic ES\|QL tool counts the organizer's approvals in `bandit-claims`, to propose a payment rule that code checks and the organizer approves |
 | 04 Cloud Serverless: "Zero ops, free for the weekend" | all three | one Elastic Cloud Serverless project with no cluster to size; the Elastic Inference Service serves the embedding model and the agent's LLM, and every index, tool, agent and workflow is created from files in the repo (`bandit-ingest elastic-setup`) or by the process that writes it, when it starts |
 
@@ -52,7 +52,7 @@ Non-responsibilities:
 
   Insurance.md: the one exception for insurance data is the de-identified claim copy in `bandit-claims`: incident kind, zone, time, witness count, corroboration, diagnosis and service codes, amounts, the hospital report's SHA-256 and a narrative built by code. It holds no names, no attendee or band ids, and no staff notes, visit reasons or history.
 
-  Insurance.md: the insurance documents are the other exception (next to build). An attendee's insurance card and hospital report are indexed in `bandit-documents` and `bandit-policy-clauses` under their file's SHA-256 with no name in the document id, readable only with the workers' own API key, shown on no dashboard, and deleted once the claim is decided. The venue's policy is the venue's own contract and stays for the event.
+  Insurance.md: the insurance documents are the other exception. An attendee's insurance card and hospital report are indexed in `bandit-documents`, and the card's clauses in `bandit-policy-clauses`, under their file's SHA-256 with no name in the document id, readable only with the workers' own API key, shown on no dashboard, and deleted once the claim is decided (next to build). The venue's policy is the venue's own contract and stays for the event.
 - Does not fetch pages. Bright Data owns every step that touches the web ([Bright-Data](Bright-Data.md)). Elastic receives JSON records that `bandit-ingest` parsed in Rust, never HTML or Markdown, and makes no web call.
 
 ## Interfaces
@@ -73,14 +73,14 @@ Non-responsibilities:
 | Elastic Bulk API, copy indices | out | `bandit-indexer` | index and delete operations on `bandit-booths` and `bandit-people`, keyed by booth id and attendee id | HTTPS, `ELASTICSEARCH_API_KEY` |
 | `GET /api/recap` | in | the recap on the tap page (/t/code) ([Tap-Page](../5-apps/Tap-Page.md)) | the session token in the `x-bandit-session` header; returns the caller's recap, with `suggested_people`, `also_there` and `suggested_booths` in order, each with its score, and `suggestions_ranked` | HTTPS JSON on `bandit-api` |
 | `api_sessions` and Social views | in | `bandit-api` (role `api`) | the session token, hashed with SHA-256 and matched in `api_sessions` to get the caller's identity; `social_attendees`, `social_visits`, `social_encounters` and the other rows the recap shows | SpacetimeDB subscription ([SpacetimeDB](../2-data/SpacetimeDB.md), [Social](../6-features/Social.md)) |
-| Elasticsearch search | out | `bandit-api` | for `GET /api/recap`: an `ids` query for the caller's `bandit-people` document, then one semantic query on `bandit-people` (the people met and the people also there together) and one on `bandit-booths`; each call times out after 10 s | HTTPS, `ELASTICSEARCH_API_KEY` |
+| Elasticsearch search | out | `bandit-api` | for `GET /api/recap`: an `ids` query for the caller's `bandit-people` document, then one hybrid search on `bandit-people` (the people met and the people also there together) and one on `bandit-booths`, each a keyword and a semantic query fused with RRF and reranked by `.jina-reranker-v3`; each call times out after 10 s | HTTPS, `ELASTICSEARCH_API_KEY` |
 | `bandit-recap-rankings` | in | `bandit-api` | after each ranked recap, one document per attendee (id: attendee id): the places their interests text names, the order Elastic chose with the first booth's and person's scores, the first person also there with their score, and the booth that minutes alone put first | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Vision.md: Elastic Bulk API, raw radio and photos | in | Leo's `feed.py` and `photos.py` on the venue laptop ([Vision](../4-devices/Vision.md)) | one document per gateway line and per photo, with a document id from its content, so a second upload adds nothing | HTTPS, from the laptop's `.env` keys |
 | Insurance.md: `bandit-claims`, through the pipeline `bandit-claims-validate` | in | `bandit-workers`: job `claim_verify`, the seed when it first creates the index, and job `claim_draft` | one de-identified document per pack version (`claim-<id>-v<n>`); the 30 seeded past claims (`history-01` to `history-30`); the outcome and payout once a claim is paid | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: `bandit-documents`, through the pipeline `bandit-documents-extract` (next to build) | in | `bandit-workers`: job `document_read` | one document per page of an insurance PDF (`<sha256>-p<n>`), with the page's bytes for the `attachment` processor | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: Elastic Workflows API, `bandit-read-document` (next to build) | in | `bandit-workers`: job `document_read` | start one execution per document with its SHA-256 and kind (`venue_policy`, `insurance_card`, `hospital_report`); poll it every 5 s; read back the terms and clauses from `bandit-document-terms` | HTTPS to Elastic Kibana, `KIBANA_API_KEY` |
 | Insurance.md: `bandit-policy-clauses` (next to build) | in | `bandit-workers`: job `document_read`; Bright-Data.md: the plan lookup and the venue policy lookup | one document per clause of the venue's policy or an attendee's card, once code found its text word for word on its page; and one document per chunk of each page of a PDF a lookup fetched, the moment it arrives | HTTPS, `ELASTICSEARCH_API_KEY` |
-| Insurance.md: policy clause search (next to build) | out | `bandit-workers`: job `claim_verify`, and Claude's tools `search_policy` and `read_clause` in job `claim_review` | a `semantic` query on `bandit-policy-clauses` `text`, filtered to the venue's policy and this attendee's card; each clause's id, policy, section, page, text and score, written through `submit_claim_checks` or handed to Claude | HTTPS, `ELASTICSEARCH_API_KEY` |
+| Insurance.md: policy clause search | out | `bandit-workers`: job `claim_verify`, and Claude's tools `search_policy` and `read_clause` in job `claim_review` | a hybrid search on `bandit-policy-clauses`: a keyword `match` on `text.words` and a `semantic` query on `text`, fused with RRF and reranked by `.jina-reranker-v3`, filtered to the venue's policy and this attendee's card; each clause's id, policy, section, page, text and score, written through `submit_claim_checks` or handed to Claude | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: precedent search (today; the clause search replaces it) | out | `bandit-workers` | one semantic query on `narrative` per claim copy; the top 3 decided past claims, written through `submit_claim_checks` | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Elastic Kibana | in | the team, signed in to the Elastic Cloud project | the Elastic Workflows execution view, Elastic Agent Builder, and the five dashboards: scrape pipeline, sponsors and prizes, band radio and photos, recap suggestions and (Insurance.md) claims evidence; read only on every BandIt index | HTTPS in a browser; Elastic Cloud logins, never attendees |
 
@@ -115,10 +115,11 @@ flowchart LR
     BUN["bandit-bundles"]
     LOGS["bandit-organizer-decisions, bandit-pipeline-events"]
     VRAW["bandit-raw-radio, -heard, -gateway, -photos"]
-    QR["recap ranking (semantic, filtered to candidates -> bandit-people, bandit-booths)"]
-    QC["policy clause search (semantic on text, filtered to the claim's two policies -> bandit-policy-clauses)"]
+    QR["recap ranking (keyword + semantic, RRF, rerank, filtered to candidates -> bandit-people, bandit-booths)"]
+    QC["policy clause search (keyword + semantic on text, RRF, rerank, filtered to the claim's two policies -> bandit-policy-clauses)"]
     RANK["bandit-recap-rankings"]
     INF[".jina-embeddings-v5-text-small (inference endpoint: embeds every semantic_text field on write, and each semantic query)"]
+    RR[".jina-reranker-v3 (inference endpoint: reads the query with each fused hit and reorders them)"]
   end
   subgraph OUT["Outputs"]
     RCP["recap on the tap page, via bandit-api"]
@@ -156,6 +157,8 @@ flowchart LR
   CLM -->|"the copy's narrative as the query"| QC
   INF -->|"query embedding, semantic"| QR
   INF -->|"query embedding, semantic"| QC
+  RR -->|"reorders the top hits"| QR
+  RR -->|"reorders the top hits"| QC
   IDX ~~~ INF
   QR -->|"ranked ids + scores, GET /api/recap"| RCP
   QC -->|"matching clauses + scores"| SCC
@@ -181,7 +184,7 @@ flowchart LR
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
   class IDX,WRK,WRB,ING,DOCW,WRP rust
   class LAP device
-  class COPY,PIPE,CLM,RD,CLS,RP,RAW,VRAW,INF,WF,TOOLS,AG,BUN,LOGS,QR,QC,RANK,KIBR,KIBC,KIBE,KIBV ext
+  class COPY,PIPE,CLM,RD,CLS,RP,RAW,VRAW,INF,WF,TOOLS,AG,BUN,LOGS,QR,QC,RR,RANK,KIBR,KIBC,KIBE,KIBV ext
   class SCC,IMP,TERMS,PROP stdb
   class RCP web
 ```
@@ -200,17 +203,21 @@ One row per index. "Names" means names of people; company and booth names are pu
 | `bandit-bundles` | the organized result of one import run, id = run id | the workflow's last step, `save_bundle` (`elasticsearch.index`) | `bandit-ingest`, `_search` with a `term` on `run_id` | speakers only as source keys |
 | `bandit-organizer-decisions` | one decision with its reason: `organization`, `prize_link`, `person_link`, `schedule_link` or `gap` | `bandit-ingest`, `_bulk`, after it checks the bundle | both event dashboards (Elastic ES\|QL) | speakers' names on `person_link` decisions |
 | `bandit-pipeline-events` | one step of one run, with its time and counts | `bandit-ingest`, `POST _doc` from `log_event` | the scrape pipeline dashboard (Elastic ES\|QL) | none |
-| `bandit-booths` | one booth, with its organisation's facts, its tags and its schedule titles in `description` | `bandit-indexer`, `_bulk` index and delete, id = booth id | `bandit-api` for `GET /api/recap`: `semantic` on `description`, filtered to the candidate booth ids; the recap suggestions dashboard (Elastic ES\|QL) | none |
-| `bandit-people` | one findable attendee: attendee id, graph node id, company name and `interests` | `bandit-indexer`, `_bulk` index and delete, id = attendee id | `bandit-api`: an `ids` query for the caller's own `interests`, then `semantic` on `interests`, filtered to the candidate node ids; the recap suggestions dashboard | none: ids and a company name |
+| `bandit-booths` | one booth, with its organisation's facts, its tags and its schedule titles in `description` | `bandit-indexer`, `_bulk` index and delete, id = booth id | `bandit-api` for `GET /api/recap`: a hybrid search (keyword on `description.words`, `semantic` on `description`, RRF, reranked), filtered to the candidate booth ids; the recap suggestions dashboard (Elastic ES\|QL) | none |
+| `bandit-people` | one findable attendee: attendee id, graph node id, company name and `interests` | `bandit-indexer`, `_bulk` index and delete, id = attendee id | `bandit-api`: an `ids` query for the caller's own `interests`, then a hybrid search (keyword on `interests.words`, `semantic` on `interests`, RRF, reranked), filtered to the candidate node ids; the recap suggestions dashboard | none: ids and a company name |
 | `bandit-recap-rankings` | one attendee's latest recap ranking, id = attendee id: the places their interests name, the people, the people also there and the booths in Elastic's order, the first person's, person also there's and booth's scores, and the booth that minutes alone put first | `bandit-api`, `PUT _doc` from `log_ranking`, after each ranked recap | only the recap suggestions dashboard (Elastic ES\|QL) | the attendee and the people on their recap, by display name |
 | `bandit-claims` | one de-identified claim pack version (`claim-<id>-v<n>`), or one of 30 seeded past claims (`history-01` to `history-30`) | `bandit-workers`: job `claim_verify` (`PUT _doc` through `bandit-claims-validate`), the seed when it first creates the index (`_bulk`), job `claim_draft` (`_update` with the outcome), job `rule_proposal` (`_update` with the organizer's approval, when the letters have not recorded it yet) | `bandit-workers`: the `narrative` is the query text of the policy clause search (next to build), and today the text it ranks past claims by (`semantic`); the agent's tool `bandit.claim_precedents` (Elastic ES\|QL), counting the copies a rule proposal offers; the claims evidence dashboard (Elastic ES\|QL) | none |
 | `bandit-documents` (next to build) | one page of one insurance PDF, id `<sha256>-p<n>`: `document_hash`, `kind` (`venue_policy`, `insurance_card`, `hospital_report`), `page`, `text` | `bandit-workers`: job `document_read`, `PUT _doc` through `bandit-documents-extract` | the agent's tool `bandit.document_pages` (Elastic ES\|QL); `bandit-workers`, to check each quote word for word; never a dashboard | an attendee's, on their card and hospital report; deleted once the claim is decided |
 | `bandit-document-terms` (next to build) | what `bandit-read-document` read from one document, id = its SHA-256: its kind, the reader's version (a hash of the agent's instructions, the workflow, the tool and the kind's schema), the terms with their quotes and pages, the clauses, and what it prints about itself | the workflow's last step, `save_terms` (`elasticsearch.index`) | `bandit-workers`, `_doc` by id | as `bandit-documents`, and deleted with it |
 | `bandit-rule-proposals` | what `bandit-propose-rule` proposed for one try of one proposal, id `proposal-<id>-<try>`: `proposal_key`, `model` (the connector), `answer` (the structured output) and `usage` | the workflow's last step, `save_proposal` (`elasticsearch.index`) | `bandit-workers`, `_doc` by id | none: claim ids, codes and amounts |
-| `bandit-policy-clauses` (next to build) | one passage of a policy PDF, of one of two kinds: a clause of the venue's policy or an attendee's insurance card (`kind` `clause`, id `<sha256>-c<n>`), or a chunk of one page of a PDF a lookup fetched (`kind` `chunk`, id `<sha256>-p<page>-k<n>`). Each has `clause_id`, `kind`, `policy` (`venue`, `attendee`), `document_hash`, `section` (empty for a chunk), `page`, `text` | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page; Bright-Data.md: the plan lookup and the venue policy lookup, `_bulk`, each fetched PDF's chunks before anything reads it, and the joined PDF's chunks when the venue policy lookup files it | `bandit-workers`: `semantic` on `text` over clauses only, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause`; the lookups' chunk search, `semantic` on `text` over one PDF's chunks, for the chunk each check cites | none in the venue's; an attendee's clauses are deleted with the claim |
+| `bandit-policy-clauses` | one passage of a policy PDF, of one of two kinds: a clause of the venue's policy or an attendee's insurance card (`kind` `clause`, id `<sha256>-c<n>`), or a chunk of one page of a PDF a lookup fetched (`kind` `chunk`, id `<sha256>-p<page>-k<n>`). Each has `clause_id`, `kind`, `policy` (`venue`, `attendee`), `document_hash`, `section` (empty for a chunk), `page`, `text` (with its keyword subfield `text.words`) | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page; Bright-Data.md: the plan lookup and the venue policy lookup, `_bulk`, each fetched PDF's chunks before anything reads it, and the joined PDF's chunks when the venue policy lookup files it | `bandit-workers`: a hybrid search (keyword on `text.words`, `semantic` on `text`, RRF, reranked) over clauses only, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause`; the lookups' chunk search, the same hybrid search over one PDF's chunks, for the chunk each check cites | none in the venue's; an attendee's clauses are deleted with the claim |
 | `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway`, `bandit-raw-photos` | one gateway line, heard list or photo record | `feed.py` and `photos.py` on the venue laptop, `_bulk` | only the band radio and photos dashboard (Elastic ES\|QL), after the event | none |
 
-Every `semantic_text` field names the inference endpoint `.jina-embeddings-v5-text-small` on the Elastic Inference Service: `text` in the three import raw indices, `description`, `interests` and `narrative`, and `text` in `bandit-documents` and `bandit-policy-clauses` (next to build). Elastic embeds a document's text when it is written and the query text when it is searched, so no BandIt process computes a vector.
+Every `semantic_text` field names the inference endpoint `.jina-embeddings-v5-text-small` on the Elastic Inference Service: `text` in the three import raw indices, `description`, `interests` and `narrative`, and `text` in `bandit-documents` and `bandit-policy-clauses`. Elastic embeds a document's text when it is written and the query text when it is searched, so no BandIt process computes a vector.
+
+The three fields that a hybrid search reads, `text` in `bandit-policy-clauses`, `interests` and `description`, each have a `words` subfield: a plain `text` field with the `english` analyzer, for the keyword half. The keyword half finds a policy's exact words, such as "employee" or "pre-existing", that a meaning search can rank low. The semantic half finds the same idea in other words.
+
+The `rrf` retriever fuses the two lists by rank. The `text_similarity_reranker` retriever then has `.jina-reranker-v3` read the query next to each fused hit and reorder them. If the reranker call fails, the same search runs again without it and keeps the fused order.
 
 `bandit-indexer`, `bandit-api` and `bandit-workers` put `ELASTIC_INDEX_PREFIX` (`bandit` on the VM) in front of their index names. A local run writes `bandit-e2e-*` and never mixes into the live indices.
 
@@ -240,24 +247,26 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 **Trigger.** After the organizer ends the event, the recap on the tap page calls `GET /api/recap` on `bandit-api` with its session token.
 
-**Input.** The caller's candidates, which `bandit-api` builds from SpacetimeDB rows: the findable people they hung out with, the findable people they shared a zone with for at least 5 minutes but never met ("Also there with you"), and every booth in the zones they visited. `bandit-indexer` keeps the copy they are ranked against.
+**Input.** The caller's candidates, which `bandit-api` builds from SpacetimeDB rows: the findable people they hung out with, the findable people they shared a zone with for at least 5 minutes but never met ("Also there with you"), and the booths their band stood at. `bandit-indexer` keeps the copy they are ranked against.
 
 **In Elastic.**
 
 1. An `ids` query gets the caller's `bandit-people` document and its `interests` text.
-2. Two `semantic` queries run at once with that text: one on `bandit-people` `interests`, filtered with `terms` on the `node_id` of both lists of people, and one on `bandit-booths` `description`, filtered on the candidates' `booth_id`.
-3. Elastic embeds the query with the same inference endpoint and returns the candidates best match first, with scores.
-4. Social.md: for the people who share no booth with the caller, a third `semantic` query in the same round, on `bandit-booths` `description` with the same text and filtered to those people's booths, puts each person's booths in order of how close they are to the caller's interests. Then, for each person's closest booth, one `semantic` query with that booth's text, filtered to the caller's own booths, finds the caller's closest booth. Each answer brings back the booths' `tags`.
+2. Two hybrid searches run at once with that text: one on `bandit-people` `interests`, filtered with `terms` on the `node_id` of both lists of people, and one on `bandit-booths` `description`, filtered on the candidates' `booth_id`. Each runs a keyword `match` on the `words` subfield and a `semantic` query on the field, fuses the two lists with RRF, and has `.jina-reranker-v3` reorder the fused candidates against the interests text.
+3. Elastic returns the candidates best match first, with the reranker's scores.
+4. Social.md: for the people who share no booth with the caller, a third hybrid search in the same round, on `bandit-booths` `description` with the same text and filtered to those people's booths, puts each person's booths in order of how close they are to the caller's interests. Then, for each person's closest booth, one hybrid search with that booth's text, filtered to the caller's own booths, finds the caller's closest booth. Each answer brings back the booths' `tags`.
 
 **Output.** `bandit-api` puts `suggested_people`, `also_there` and `suggested_booths` in that order and sets `suggestions_ranked`. One people query serves both lists of people, so the same score orders each. Social.md: each person who shares no booth with the caller gets `similar`: their closest booth, the caller's closest booth and a tag both carry, for the card's "why" line. It then writes the caller's latest ranking to `bandit-recap-rankings` (`log_ranking`) for the recap suggestions dashboard; a failed write is only logged.
 
 **Can change** the order of the three lists, and which pair of booths a card's "why" line names when two people share none. **Cannot** add a person or a booth (every query is filtered to the candidates), decide who is findable, or hold up the recap: after 10 s, or on any error, the lists stay in minutes order. Detail: [Part two](#part-two-the-one-way-copy-downstream-of-spacetimedb) and [Part three](#part-three-ordering-the-recaps-suggestions).
 
-#### Read every insurance document (next to build)
+#### Read every insurance document
+
+The `venue_policy`, `health_plan` and `hospital_report` kinds are built. The `insurance_card` kind is next to build.
 
 **Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`. A plan lookup and a venue policy lookup run the same steps on each PDF they fetch before they keep it, to read what it prints about itself, and put the PDF's chunks in `bandit-policy-clauses` first, so it is searchable by meaning the moment it arrives ([Fetched PDFs](#fetched-pdfs-searchable-by-meaning-the-moment-they-arrive), [Bright-Data](Bright-Data.md)).
 
-**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address.
+**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address. A hospital report's job names its `medical_record` row and its page count.
 
 **In Elastic.**
 
@@ -266,9 +275,9 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 3. A `data.parseJson` step picks the JSON schema of that kind, and one `ai.agent` step calls the Elastic Agent Builder agent `bandit-document-reader` with it. The agent's only tool is the Elastic ES|QL tool `bandit.document_pages`, limited to this document's pages. Every term it returns quotes its clause and page, and a policy's answer also lists its clauses.
 4. `save_terms` (`elasticsearch.index`) writes the answer, with the kind and the reader's version, as one document to `bandit-document-terms`.
 
-**Output.** `bandit-workers` reads the answer back and checks it in Rust: every quote and every clause must appear word for word on its page. It writes each clause of a policy to `bandit-policy-clauses`. The venue's terms go to the module through `apply_document_terms`, which runs `validate_policy_terms`, and the organizer confirms them with `confirm_policy_terms`. The card's insurer, member id and copays go on the attendee's `medical_card`. The hospital report's record goes through `validate_record` and is priced by code, as today.
+**Output.** `bandit-workers` reads the answer back and checks it in Rust: every quote and every clause must appear word for word on its page. It writes each clause of a policy to `bandit-policy-clauses`. The venue's terms go to the module through `apply_document_terms`, which runs `validate_policy_terms`, and the organizer confirms them with `confirm_policy_terms`. The card's insurer, member id and copays go on the attendee's `medical_card`. The hospital report's answer and its page texts go to the module through `apply_hospital_report`, which runs `check_report_read` again, then `validate_record`, and code prices every line against the policy's fee schedule, as today. A hospital report is not a policy: it gets no `policy_document` row, and none of its text goes to `bandit-policy-clauses`.
 
-**Can change** every limit, deductible, minimum payout, service window, fee schedule cap and exclusion that the insurance Decision Engine is held to, once the organizer confirms them, and which clauses Claude can cite. **Cannot** set a term that code rejects (a quote that is not on its page, a deductible above its limit), move money, or decide a claim. Detail: [Part five](#part-five-reading-every-insurance-document-next-to-build).
+**Can change** every limit, deductible, minimum payout, service window, fee schedule cap and exclusion that the insurance Decision Engine is held to, once the organizer confirms them, which clauses Claude can cite, and the billed lines a claim is priced from. **Cannot** set a term that code rejects (a quote that is not on its page, a deductible above its limit), move money, or decide a claim. Detail: [Part five](#part-five-reading-every-insurance-document).
 
 #### Validate the claim copy and find the policy clauses that bear on it
 
@@ -280,7 +289,7 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 1. `PUT bandit-claims/_doc/claim-<id>-v<n>?pipeline=bandit-claims-validate`: the ingest pipeline's Painless `script` processor checks the copy and writes `validation.valid` and `validation.errors`. It never rejects a document.
 2. `semantic_text` embeds the `narrative`.
-3. One `semantic` query on `bandit-policy-clauses` `text`, with the copy's narrative as the query, filtered to the venue's confirmed policy and this attendee's card, returns the closest clauses. The worker keeps the top 5 (next to build). Today's code runs `similar_claims` instead: one `semantic` query on `bandit-claims` `narrative` over decided claims from earlier events, top 3.
+3. One hybrid search on `bandit-policy-clauses`, with the copy's narrative as the query, filtered to the venue's confirmed policy, this attendee's card and the sections that can decide the claim's kind (`sections_for_kind`): a keyword `match` on `text.words` and a `semantic` query on `text`, fused with RRF and reranked by `.jina-reranker-v3`. The worker keeps the top 5.
 
 **Output.** One `elastic_validation` check and the matching clauses (clause id, policy, section, page, text, score) as `claim_clause` rows, written through `submit_claim_checks`. Claude then searches the same clauses with its own queries.
 
@@ -362,7 +371,7 @@ sequenceDiagram
   Note over M,E: Each claim: validate the copy, find the clauses
   M->>W: job claim_verify with its VerifyPayload
   W->>E: PUT the de-identified copy through bandit-claims-validate
-  W->>E: semantic search on bandit-policy-clauses, both policies
+  W->>E: hybrid search on bandit-policy-clauses, both policies, reranked
   E-->>W: validation, the closest clauses with scores
   W->>M: submit_claim_checks: the elastic_validation check and claim_clause rows
   Note over M,C: Decide: the insurance Decision Engine
@@ -419,8 +428,8 @@ SpacetimeDB decides who and what is on the list (exact, private, live); Elastic 
 | "Which booths and companies tie the crowd together?" | SpacetimeDB, the people graph | `visited`, `works_at` and `exhibits` links to shared booth and company nodes, pushed live to the big screen through `event_graph` |
 | "Of the people I hung out with, who is most into the same things as me?" | Elastic, `GET /api/recap` | Two people who visited different booths can still care about the same things; only embeddings of the booth texts can tell. The answer is an order, never a new name on the list |
 | "Of the people I was near but never met, who should I have talked to?" | Elastic, `GET /api/recap` | The same match over "Also there with you": a shared zone puts them on the list, and shared interests put the right one first |
-| "Of the booths in the zones I visited, which fit me best?" | Elastic, `GET /api/recap` | My interests matched to booth descriptions by meaning |
-| Insurance.md: "What do this venue's policy and this attendee's policy say about a fall at the Main stage?" | Elastic, `bandit-policy-clauses` (next to build) | Meaning over the policy's own wording, which rarely uses the claim's words; the answer is a clause Claude can cite, never an amount |
+| "Of the booths I stood at, which fit me best?" | Elastic, `GET /api/recap` | My interests matched to booth descriptions by meaning |
+| Insurance.md: "What do this venue's policy and this attendee's policy say about a fall at the Main stage?" | Elastic, `bandit-policy-clauses` | Meaning over the policy's own wording, which rarely uses the claim's words, and its exact terms, such as "employee"; a reranker reads each clause against the question; the answer is a clause Claude can cite, never an amount |
 
 Presence is zone-level only ([SpacetimeDB](../2-data/SpacetimeDB.md)), and the copy indices hold no positions at all: a booth carries its zone's id and name, and an attendee's interests name zones and booths.
 
@@ -548,7 +557,7 @@ flowchart LR
   STDB["band1t module"] -->|"zone, organization, booth, schedule_slot, subscription"| IDX["bandit-indexer"]
   STDB -->|"Social.md views: social_attendees, social_visits"| IDX
   IDX -->|"changed documents, _bulk at most once a second"| ES["Elastic Serverless: bandit-booths, bandit-people"]
-  ES -->|"ranked ids + scores, semantic queries"| API["bandit-api: GET /api/recap"]
+  ES -->|"ranked ids + scores, hybrid search + rerank"| API["bandit-api: GET /api/recap"]
   ES -->|"booth and people charts, ES|QL"| KIB["Elastic Kibana: recap suggestions dashboard"]
   classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
@@ -577,11 +586,11 @@ The findable switch is `attendee.findable`, given meaning by [Social](../6-featu
 
 **`bandit-booths`** (one document per `booth` row, id = booth id): `booth_id`, `name`, `booth_number`, `kind`, `tags` (the booth's tags, then its organisation's), `zone_id`, `zone_name`, `organization_id`, `org_name`, `org_kind`, `sponsor_tier`, and `description` (semantic_text): the booth's description, its organisation's description, the tags and its schedule titles, one per line, so one meaning search covers all of them.
 
-**`bandit-people`** (one document per findable attendee, id = attendee id as hex): `attendee_id`, `node_id` (the attendee's node in the people graph, which the recap ranks by), `organization` (their company's name), and `interests` (semantic_text). `interests` is built from the attendee's top 5 spots by visit minutes: for each, the zone's name and description, then the name, description and tags of the booth the visit names, or of every booth in the zone when it names none. The spots go in zone and booth order, so the document changes only when the set of spots changes, not as minutes add up.
+**`bandit-people`** (one document per findable attendee, id = attendee id as hex): `attendee_id`, `node_id` (the attendee's node in the people graph, which the recap ranks by), `organization` (their company's name), and `interests` (semantic_text). `interests` is built from the attendee's top 5 spots by visit minutes: for each, the zone's name and description, then the name, description and tags of the booth the visit names; a visit that names no booth adds only its zone. The spots go in zone and booth order, so the document changes only when the set of spots changes, not as minutes add up.
 
 ### Part three: ordering the recap's suggestions
 
-The recap ([Tap-Page](../5-apps/Tap-Page.md)) asks `bandit-api` for `GET /api/recap` once the organizer ends the event. `bandit-api` builds the whole recap from its subscription cache, including three lists of suggestions: `suggested_people`, everyone the attendee hung out with who is findable; `also_there`, the findable people they shared a zone with for at least 5 minutes but never met, one per person with the places, the minutes and their interests; and `suggested_booths`, every booth in a zone they visited, with the minutes spent there ([Social](../6-features/Social.md)).
+The recap ([Tap-Page](../5-apps/Tap-Page.md)) asks `bandit-api` for `GET /api/recap` once the organizer ends the event. `bandit-api` builds the whole recap from its subscription cache, including three lists of suggestions: `suggested_people`, everyone the attendee hung out with who is findable; `also_there`, the findable people they shared a zone with for at least 5 minutes but never met, one per person with the places, the minutes and their interests; and `suggested_booths`, the booths their band stood at, with their minutes at each ([Social](../6-features/Social.md)).
 
 SpacetimeDB rows decide who and what is on each list. Elastic only decides the order of these three, so the people and booths closest to what the attendee was into come first; there is no query box, and the attendee's own `interests` text is the query.
 
@@ -605,11 +614,12 @@ sequenceDiagram
   API->>API: build the recap from the cache, suggestions by minutes
   API->>ES: ids query for the caller's bandit-people document
   ES-->>API: interests text
-  API->>ES: semantic query on bandit-people interests, terms on the node_id of the people met and also there
-  API->>ES: semantic query on bandit-booths description, terms on candidate booth_id
-  API->>ES: semantic query on bandit-booths description, terms on the booths of people who share none with the caller
+  API->>ES: hybrid search on bandit-people interests, terms on the node_id of the people met and also there
+  API->>ES: hybrid search on bandit-booths description, terms on candidate booth_id
+  API->>ES: hybrid search on bandit-booths description, terms on the booths of people who share none with the caller
+  ES->>ES: each search: keyword and semantic lists, fused with RRF, reranked by .jina-reranker-v3
   ES-->>API: ranked ids and scores
-  API->>ES: per picked booth, semantic query with its text, terms on the caller's booths
+  API->>ES: per picked booth, hybrid search with its text, terms on the caller's booths
   ES-->>API: the caller's closest booth, with tags
   API->>ES: PUT bandit-recap-rankings, log_ranking
   API-->>APP: the recap with suggestions in order and suggestions_ranked
@@ -657,7 +667,7 @@ The 30 past claims are synthetic, written by the team in `crates/claims-elastic/
 
 An empty narrative is dropped so the embedding cannot fail the write, and a processor error marks the document invalid with `pipeline_error`. The worker turns the result into the `elastic_validation` check: an invalid copy fails it, which routes the claim to the organizer with the errors listed, and Elastic never refuses a claim.
 
-**The search today.** After the write, `similar_claims` runs one `semantic` query on `narrative`, with the copy's own narrative as the query text. It keeps decided claims only, skips this claim and every live claim from the last 24 h, so precedents are always from earlier events, then collapses on `claim_id` and takes the top 3. The design replaces it with the policy clause search of [Part five](#part-five-reading-every-insurance-document-next-to-build).
+**The search today.** After the write, `similar_claims` runs one `semantic` query on `narrative`, with the copy's own narrative as the query text. It keeps decided claims only, skips this claim and every live claim from the last 24 h, so precedents are always from earlier events, then collapses on `claim_id` and takes the top 3. The design replaces it with the policy clause search of [Part five](#part-five-reading-every-insurance-document).
 
 ### Part four: Elastic Kibana, what the team shows
 
@@ -718,9 +728,11 @@ The radio and photos, recap suggestions and (Insurance.md) claims evidence dashb
 
 Elastic Kibana Graph is not used: it is unavailable on Serverless.
 
-### Part five: reading every insurance document (next to build)
+### Part five: reading every insurance document
 
-[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's insurance card, and each hospital report. Elastic reads them into terms and clauses. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
+[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's insurance card, and each hospital report. Elastic reads them into terms and clauses, and a hospital report into its record. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
+
+The `venue_policy`, `health_plan` and `hospital_report` kinds are built. The `insurance_card` kind is next to build.
 
 The question this diagram answers: how one insurance PDF becomes checked terms and searchable clauses.
 
@@ -730,7 +742,7 @@ flowchart TB
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
 
-  PDF["PDF in blob storage<br/>venue_policy, insurance_card, health_plan or hospital_report;<br/>uploaded, or fetched by a plan lookup"]:::stdb
+  PDF["PDF in blob storage<br/>venue_policy, insurance_card, health_plan or hospital_report;<br/>uploaded, fetched by a plan lookup, or rendered by the scripted claims run"]:::stdb
   DR["bandit-workers, job document_read<br/>splits the pages; a scan is transcribed word for word"]:::rust
   EX["bandit-documents-extract<br/>attachment, then semantic_text"]:::ext
   DOCS["bandit-documents<br/>one page each"]:::ext
@@ -742,7 +754,7 @@ flowchart TB
   CL["bandit-policy-clauses<br/>one clause each"]:::ext
   PT["policy_term rows<br/>validate_policy_terms, then confirm_policy_terms"]:::stdb
   MC["the attendee's medical_card<br/>insurer, member id, copays"]:::stdb
-  MR["medical_record and claim_line<br/>validate_record, priced by code"]:::stdb
+  MR["medical_record and claim_line<br/>apply_hospital_report: check_report_read, validate_record, priced by code"]:::stdb
 
   PDF -->|"bytes + SHA-256"| DR
   DR -->|"one page each, PUT _doc"| EX
@@ -757,7 +769,7 @@ flowchart TB
   CHK -->|"policy clauses, _bulk"| CL
   CHK -->|"venue terms, apply_document_terms"| PT
   CHK -->|"card fields"| MC
-  CHK -->|"hospital report record"| MR
+  CHK -->|"hospital report record + page texts, apply_hospital_report"| MR
 ```
 
 **`bandit-documents-extract`** is the default pipeline of `bandit-documents`:
@@ -783,9 +795,9 @@ What each kind's schema asks for:
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
 | `health_plan` | a plan's Summary of Benefits and Coverage: insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services. What it prints about itself, each copied exactly with its page: the kind of document (`sbc` or `other`), the insurer, the plan and the plan year; a plan lookup keeps the PDF only when these match what the attendee typed | every row of its benefits table and its excluded services |
 | `coverage_form` | one coverage form a venue policy lookup fetched, maybe inside a longer PDF such as a specimen policy; read only to check it, never filed: which form it is (`liability_form`, `property_form` or `other`), its form number with its edition and its title, each copied exactly with its page, and the pages where the form starts and ends | none |
-| `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
+| `hospital_report` | the record, with a quote and page behind every fact: document kind (`first_aid_record`, `urgent_care_record`, `emergency_record`, `other`); patient (name, date of birth); provider (name, address); encounter (date of service, time, reason for visit, history of present illness); each diagnosis (ICD-10-CM code, description); each service line (CPT or HCPCS code, description, date, units, charge as printed); invoice number; total billed as printed. The patient, the provider, the encounter, each diagnosis, each service line, the invoice number and the total each carry `quote`, the printed line or row copied word for word, and `page`. Code's checks (`check_report_read`, in the worker and again in the module): every quote is on its page word for word; the patient's name, the encounter date, each diagnosis code, each service's code, date and printed charge, the invoice number and the total are inside their quotes; the reason for visit and the history are printed word for word in the report; code parses every amount (`$385.00` to 38500 cents). A diagnosis or service line that fails is dropped with a reason, a patient or encounter that fails rejects the read, and any other field that fails is left empty, with a line in `dropped`. Then `validate_record` runs, and code prices every line | none |
 
-**The clause search.** `claim_verify` and Claude's `search_policy` run one `semantic` query on `bandit-policy-clauses` `text`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card, and take the top 5: clause id, policy, section, page, text and score. They read clauses only: a document of `kind` `chunk` never comes back, so a claim is decided on clauses code checked. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.
+**The clause search.** `claim_verify` and Claude's `search_policy` run one hybrid search on `bandit-policy-clauses`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card: a keyword `match` on `text.words` and a `semantic` query on `text`, fused with RRF and reranked by `.jina-reranker-v3`. They take the top 5: clause id, policy, section, page, text and score. They read clauses only: a document of `kind` `chunk` never comes back, so a claim is decided on clauses code checked. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.
 
 #### Fetched PDFs, searchable by meaning the moment they arrive
 
@@ -794,7 +806,7 @@ A plan lookup and a venue policy lookup fetch PDFs from the web through Bright D
 1. **Pages.** `bandit-workers` writes each page through `bandit-documents-extract`, as for any PDF, and the `attachment` processor takes its text.
 2. **Chunks.** Code cuts each page's text into chunks at line breaks, at most 60 words each, and writes them to `bandit-policy-clauses` with `_bulk`: `kind` `chunk`, id `<sha256>-p<page>-k<n>`, the policy they belong to (`attendee` for a plan, `venue` for a coverage form), the page and the text. `semantic_text` embeds each chunk with `.jina-embeddings-v5-text-small`. A chunk is the page's own words, so it needs no check.
 3. **Read.** `bandit-read-document` reads the PDF, and code checks what it prints about itself, as before.
-4. **Cite.** For a PDF that passes, one `semantic` query on `bandit-policy-clauses` `text`, filtered to `kind` `chunk` and this PDF's `document_hash`, with what was typed as the query text. For a plan that is the insurer and the plan, with "summary of benefits and coverage". For a coverage form it is the form number and the form's title, and the query is also filtered to the form's own pages. Of the top 5 hits, code keeps the first that holds the printed plan name or form number, else the first hit. The lookup records it: chunk id, page, text and score.
+4. **Cite.** For a PDF that passes, the clause search's hybrid search with rerank runs on `bandit-policy-clauses`, filtered to `kind` `chunk` and this PDF's `document_hash`, with what was typed as the query text: the keyword half finds the exact plan name or form number, and the semantic half finds the same words broken across lines or spelled out. For a plan that is the insurer and the plan, with "summary of benefits and coverage". For a coverage form it is the form number and the form's title, and the query is also filtered to the form's own pages. Of the top 5 hits, code keeps the first that holds the printed plan name or form number, else the first hit. The lookup records it: chunk id, page, text and score.
 5. **Keep or drop.** A PDF that is passed over leaves Elastic: its pages, its answer and its chunks. A PDF the blob store holds stays, because a lookup kept it: when two attendees have the same plan, its PDF has the same SHA-256, so it is stored, read and chunked once, and the second lookup's check reuses all three. The plan's PDF keeps its chunks. The venue policy lookup writes the chunks of the joined PDF it files, with the joined page numbers, moves each citation onto them, and deletes the fetched PDFs' chunks when the job ends.
 
 The question this diagram answers: what does Elastic do with a PDF a lookup fetched, from its arrival to the chunk the check cites?
@@ -812,13 +824,13 @@ sequenceDiagram
   W->>R: read the PDF (health_plan or coverage_form)
   R-->>W: what it prints about itself, with pages
   W->>W: code checks the printed names against what was typed
-  W->>C: semantic query with what was typed, this PDF's chunks only
-  C-->>W: top 5 chunks by meaning, with scores
+  W->>C: hybrid search with what was typed, this PDF's chunks only
+  C-->>W: top 5 chunks, keyword and semantic fused, reranked, with scores
   W->>W: keep the first chunk that holds the printed name
   W-->>W: the found plan or form, with the chunk it cites
 ```
 
-**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses`, chunks and clauses, once the claim is decided.
+**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses`, chunks and clauses, once the claim is decided (next to build).
 
 ### Vision.md: the raw radio log and photos
 

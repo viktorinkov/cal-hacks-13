@@ -1005,7 +1005,7 @@ function waiting(c: Claim, hospital: boolean): string {
     case 'AwaitingRecord':
       if (!INJURIES.includes(c.incidentKind)) return 'Waiting for the evidence to be gathered.';
       return hospital ? 'Waiting for the hospital report.' : 'Waiting for the medical record: upload the clinic\'s report below.';
-    case 'ReadingRecord': return `Waiting for Claude to read the ${hospital ? 'hospital report' : 'medical record'}.`;
+    case 'ReadingRecord': return 'Waiting for the Evidence Engine to read the hospital report.';
     case 'Verifying': return 'Waiting for the Elastic checks.';
     case 'Reviewing': return 'Waiting for the claims agent\'s review.';
     case 'Routed': return decides(c) ? `Waiting for your sign-off to pay ${money(c.payoutCents)} to ${payee(c)}.` : `Waiting for the ${c.routedToName.toLowerCase()} to sign off the payment.`;
@@ -1099,7 +1099,7 @@ function claimDetail(id: bigint) {
       h('h4', {}, 'Upload the clinic\'s report'),
       h('label', {}, 'Clinic report PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.test_mode && h('label', {}, 'or a test report, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
-      h('button', {}, 'Upload it, Claude reads it')),
+      h('button', {}, 'Upload it, the Evidence Engine reads it')),
     review && [h('h4', {}, `Claude's decision: ${verdict(review.verdict)}`),
       h('p', {}, review.summary), review.causation && h('p', {}, `Causation: ${review.causation}`),
       review.concerns.length > 0 && h('ul', {}, review.concerns.map(x => h('li', {}, x))),
@@ -1112,10 +1112,10 @@ function claimDetail(id: bigint) {
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
-    record && record.status !== 'extracted' && [h('h4', {}, hospital ? 'Hospital report' : 'Medical record'),
-      h('p', {}, record.status === 'reading' ? `Claude is reading the ${hospital ? 'report' : 'PDF'}.` : `Claude could not read it: ${record.dropped.join('; ')}`, ' ',
+    record && record.status !== 'extracted' && [h('h4', {}, 'Hospital report'),
+      h('p', {}, record.status === 'reading' ? 'The Evidence Engine is reading the report.' : `The report could not be read: ${record.dropped.join('; ')}`, ' ',
         h('a', { href: `/blobs/${record.fileHash}`, target: '_blank' }, open))],
-    record && record.status === 'extracted' && [h('h4', {}, `${hospital ? 'Hospital report' : 'Medical record'}, read by Claude`),
+    record && record.status === 'extracted' && [h('h4', {}, 'Hospital report, read by the Evidence Engine'),
       h('p', {}, `${record.documentKind} for ${record.patientName} from ${record.providerName} on ${record.dateOfService}, invoice ${record.invoiceNumber}. Billed ${money(record.billedCents)}, covered ${money(record.coveredCents)}.`),
       record.reasonForVisit && h('p', {}, `Reason: ${record.reasonForVisit}. ${record.history}`),
       h('p', {}, `Diagnoses: ${record.diagnoses.join('; ')}`),

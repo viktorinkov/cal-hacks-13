@@ -40,9 +40,15 @@ impl ClaimsIndex {
         format!("{}-policy-clauses", self.prefix)
     }
 
-    /// Creates the clause index if it is missing.
+    /// Creates the clause index if it is missing. An existing index gets the
+    /// current mapping, and its clauses written before `text.words` was mapped
+    /// are written again so the keyword search finds them too.
     pub async fn ensure_clauses_index(&self) -> Result<()> {
-        self.ensure_index(&self.clauses_index(), json!({ "mappings": clause_mappings() })).await?;
+        if !self.ensure_index(&self.clauses_index(), json!({ "mappings": clause_mappings() })).await? {
+            let body = json!({ "query": { "bool": { "must_not": { "exists": { "field": "text.words" } } } } });
+            let path = format!("{}/_update_by_query?conflicts=proceed&refresh=true", self.clauses_index());
+            self.call(Method::POST, &path, Some(body)).await?;
+        }
         Ok(())
     }
 
@@ -82,7 +88,8 @@ fn clause_mappings() -> Value {
         "properties": {
             "clause_id": kw, "kind": kw, "policy": kw, "document_hash": kw, "section": kw,
             "page": { "type": "integer" },
-            "text": { "type": "semantic_text", "inference_id": INFERENCE_ID }
+            // `words` is the same text for the keyword half of the hybrid clause search.
+            "text": { "type": "semantic_text", "inference_id": INFERENCE_ID, "fields": { "words": { "type": "text", "analyzer": "english" } } }
         }
     })
 }
@@ -108,6 +115,7 @@ mod tests {
             assert!(mapped["properties"].get(key).is_some(), "{key} is not mapped");
         }
         assert_eq!(mapped["properties"]["text"]["inference_id"], INFERENCE_ID);
+        assert_eq!(mapped["properties"]["text"]["fields"]["words"]["type"], "text");
         assert_eq!(serde_json::from_value::<PolicyClause>(v).unwrap(), c);
     }
 }

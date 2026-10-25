@@ -10,14 +10,8 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  ModelCallIn,
-} from "./types";
-
 export default {
   jobId: __t.u64(),
-  recordJson: __t.string(),
-  get call() {
-    return ModelCallIn;
-  },
+  readJson: __t.string(),
+  pages: __t.array(__t.string()),
 };

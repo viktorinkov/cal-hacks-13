@@ -9,7 +9,7 @@ use bandit_bindings::*;
 use spacetimedb_sdk::Table;
 use std::io::BufRead;
 
-/// Long enough for Claude to read a record and review the pack.
+/// Long enough for the Evidence Engine to read a record and Claude to review the pack.
 const FLOW_SECS: u64 = 360;
 
 pub fn run(app: &App, pause: bool) -> Result<()> {

@@ -1,3 +1,4 @@
+use crate::live::band_place;
 use crate::tables::*;
 use crate::{log_event, require_bridge};
 use spacetimedb::{ReducerContext, Table};
@@ -6,8 +7,9 @@ const ENCOUNTER_GAP_MICROS: i64 = 5_000_000;
 const ENCOUNTER_STEP_CAP_MICROS: i64 = 2_000_000;
 const ZONE_BLIP_MICROS: i64 = 5_000_000;
 
+/// A beacon's band row; where it stands is set by `stand` once its stays are up to date.
 fn band_row(b: &BandBeacon, ctx: &ReducerContext) -> Band {
-    let (x_m, y_m, zone) = crate::live::radio_band_spot(ctx, b.id.into(), b.zone);
+    let zone = crate::live::radio_band_zone(ctx, b.id.into(), b.zone);
     Band {
         id: b.id.into(),
         state: b.state,
@@ -26,10 +28,16 @@ fn band_row(b: &BandBeacon, ctx: &ReducerContext) -> Band {
         has_motor: b.flags & F_MOTOR != 0,
         online: true,
         last_seen: ctx.timestamp,
-        x_m,
-        y_m,
+        x_m: 0.0,
+        y_m: 0.0,
         booth_id: 0,
     }
+}
+
+/// The band at its spot and booth, from its open stay.
+fn stand(ctx: &ReducerContext, row: Band) -> Band {
+    let (x_m, y_m, booth_id) = crate::live::band_spot(ctx, row.id, row.zone);
+    Band { x_m, y_m, booth_id, ..row }
 }
 
 fn touch_gateway(ctx: &ReducerContext) {
@@ -62,9 +70,9 @@ pub fn ingest_band(ctx: &ReducerContext, beacon: BandBeacon) -> Result<(), Strin
     let id = beacon.id;
     let Some(prev) = ctx.db.band().id().find(row.id) else {
         if row.zone != 0 {
-            open_stay(ctx, row.id, row.zone, 0);
+            open_band_stay(ctx, row.id, row.zone);
         }
-        ctx.db.band().insert(row);
+        ctx.db.band().insert(stand(ctx, row));
         log_event(ctx, id, EventKind::Online, "");
         return Ok(());
     };
@@ -99,7 +107,7 @@ pub fn ingest_band(ctx: &ReducerContext, beacon: BandBeacon) -> Result<(), Strin
     if row.zone != prev.zone {
         change_zone(ctx, row.id, row.zone);
     }
-    ctx.db.band().id().update(row);
+    ctx.db.band().id().update(stand(ctx, row));
     Ok(())
 }
 
@@ -175,6 +183,22 @@ pub(crate) fn open_stay(ctx: &ReducerContext, band_id: u32, zone: u8, booth_id: 
     ctx.db.zone_visit().insert(ZoneVisit { id: 0, band_id, zone, entered: ctx.timestamp, left: None, booth_id, open: true });
 }
 
+/// A radio or test band starts a stay in a zone, at the booth it stands at for the stay.
+pub(crate) fn open_band_stay(ctx: &ReducerContext, band_id: u32, zone: u8) {
+    open_stay(ctx, band_id, zone, stay_booth(ctx, band_id, zone));
+}
+
+/// The booth a new stay of a radio or test band names. A placed band stands at the sponsor table nearest its spot
+/// when that spot is in the zone. A band the radio places only by zone stands at one of the zone's booths for the
+/// whole stay, so its interests come from the booths of every zone it stays in.
+fn stay_booth(ctx: &ReducerContext, band_id: u32, zone: u8) -> u64 {
+    match ctx.db.band_place().band_id().find(band_id) {
+        Some(p) if p.station_id == zone => crate::venue::nearest_booth(ctx, p.x_m, p.y_m),
+        Some(_) => 0,
+        None => crate::venue::zone_booth(ctx, band_id, zone, ctx.timestamp),
+    }
+}
+
 pub(crate) fn close_stay(ctx: &ReducerContext, v: ZoneVisit) {
     ctx.db.zone_visit().id().update(ZoneVisit { left: Some(ctx.timestamp), open: false, ..v });
 }
@@ -200,7 +224,7 @@ fn change_zone(ctx: &ReducerContext, band_id: u32, zone: u8) {
         Some(v) => {
             ctx.db.zone_visit().id().update(ZoneVisit { left: None, open: true, ..v.clone() });
         }
-        None => open_stay(ctx, band_id, zone, 0),
+        None => open_band_stay(ctx, band_id, zone),
     }
 }
 

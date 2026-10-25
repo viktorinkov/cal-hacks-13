@@ -1,7 +1,9 @@
 //! `clinic_report`: Claude writes the hospital's report for the case the module
-//! drew, code checks it against the case, and the rendered text is stored for staff.
+//! drew, code checks it against the case, and the hospital prints it as a PDF:
+//! the clinical note on page 1, the itemized bill on page 2. The module then has
+//! the Evidence Engine read that PDF like any hospital report.
 
-use bandit_insurance::clinic::{REPORT_PAGES, Scenario, check_report, render_text};
+use bandit_insurance::clinic::{REPORT_PAGES, Scenario, check_report, printed_pages};
 use bandit_insurance::medical::{ExtractedRecord, validate_record};
 use bandit_insurance::payloads::ClinicPayload;
 use bandit_insurance::schemas::medical_record_schema;
@@ -19,9 +21,9 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: ClinicPayload) -> Result<(), JobErro
         Ok(r) => r,
         Err(problems) => return Err(JobError { error: format!("hospital report still off its case: {}", problems.join("; ")), calls }),
     };
-    let text = render_text(&record);
-    let blob = ctx.blobs.put(text.as_bytes()).map_err(|e| JobError::msg(format!("storing the hospital report: {e}")))?;
-    ctx.sink.register_text(&blob, "hospital_report").await?;
+    let pdf = crate::print::text_pdf(&printed_pages(&record)).map_err(|e| JobError { error: format!("printing the hospital report: {e:#}"), calls: calls.clone() })?;
+    let blob = ctx.blobs.put(&pdf).map_err(|e| JobError { error: format!("storing the hospital report: {e}"), calls: calls.clone() })?;
+    ctx.sink.register_staff(&blob, "hospital_report", "application/pdf").await?;
     tracing::info!(job_id = job.id, claim_id = p.claim_id, scenario = %p.scenario, provider = %record.provider.name, "hospital report written");
     let record_json = serde_json::to_string(&record).map_err(|e| JobError::msg(format!("encoding the hospital report: {e}")))?;
     ctx.sink.finish(job.id, Finish::ClinicReport { record_json, file_hash: blob.sha256 }, calls).await?;
@@ -71,6 +73,9 @@ mod tests {
         assert!(first.contains(&p.statement) && first.contains(&p.medic_notes[0]), "{first}");
         let retry = model.text_of(1);
         assert!(retry.contains("the visit date must be 2026-10-24, not 2026-10-23"), "{retry}");
-        assert!(render_text(&record).contains("Patient: Jordan Alvarez"));
+        let pdf = crate::print::text_pdf(&printed_pages(&record)).unwrap();
+        assert_eq!(crate::document::page_count(&pdf), REPORT_PAGES);
+        let note = lopdf::Document::load_mem(&pdf).unwrap().extract_text(&[1]).unwrap();
+        assert!(note.contains("Patient: Jordan Alvarez"), "{note}");
     }
 }

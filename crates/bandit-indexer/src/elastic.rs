@@ -53,6 +53,8 @@ impl Elastic {
     }
 
     /// Creates the first generation with its mapping and the alias pointing at it, when the alias is missing.
+    /// An existing generation gets the current mapping, which only adds fields; the first flush writes
+    /// every document again, which fills them.
     pub async fn ensure_index(&self, index: Index) -> Result<()> {
         let alias = self.alias(index);
         let found = self
@@ -60,6 +62,14 @@ impl Elastic {
             .send()
             .await?;
         if found.status() == StatusCode::OK {
+            let put = self
+                .request(Method::PUT, &format!("{alias}/_mapping"))
+                .json(&mapping(index))
+                .send()
+                .await?;
+            ok_json(put)
+                .await
+                .with_context(|| format!("updating the mapping of {alias}"))?;
             return Ok(());
         }
         let body = json!({ "mappings": mapping(index), "aliases": { alias.clone(): {} } });
@@ -159,7 +169,12 @@ pub fn mapping(index: Index) -> Value {
     let keyword = json!({ "type": "keyword" });
     let long = json!({ "type": "long" });
     let text = json!({ "type": "text", "fields": { "keyword": { "type": "keyword" } } });
-    let semantic = json!({ "type": "semantic_text", "inference_id": INFERENCE_ID });
+    // `words` is the same text for the keyword half of bandit-api's hybrid search.
+    let semantic = json!({
+        "type": "semantic_text",
+        "inference_id": INFERENCE_ID,
+        "fields": { "words": { "type": "text", "analyzer": "english" } },
+    });
     match index {
         Index::Booths => json!({ "properties": {
             "booth_id": long,

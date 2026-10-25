@@ -3,14 +3,14 @@
 //! breaks into passages of at most [`MAX_CHUNK_WORDS`] words. A lookup writes
 //! them the moment the PDF arrives, so Elastic can search its wording by
 //! meaning before anything reads it, and its check cites the chunk that best
-//! matches what was typed ([`cite`]). The claim searches never read chunks.
+//! matches what was typed ([`cite`]), found by the same hybrid search with
+//! rerank as the clauses. The claim searches never read chunks.
 
 use anyhow::{Context, Result};
 use reqwest::{Method, StatusCode};
 use serde_json::{Value, json};
 
-use crate::clause_search::{SOURCE, clause_of};
-use crate::{ClaimsIndex, ClauseHit, PolicyClause, hits};
+use crate::{ClaimsIndex, ClauseHit, PolicyClause};
 
 /// `kind` of a chunk; a checked clause is [`crate::CLAUSE`].
 pub const CHUNK: &str = "chunk";
@@ -148,30 +148,18 @@ impl ClaimsIndex {
         Ok(v["deleted"].as_u64().unwrap_or(0))
     }
 
-    /// The chunks of one PDF closest in meaning to `query`, best first, at most
-    /// `k`, from pages `first` to `last` when given. A blank query, a missing
-    /// index or no hits is an empty list.
+    /// The chunks of one PDF that best match `query`, best first, at most `k`,
+    /// from pages `first` to `last` when given: the clause search's hybrid
+    /// search with rerank, filtered to the PDF's chunks. A blank query, a
+    /// missing index or no hits is an empty list.
     pub async fn search_chunks(&self, query: &str, document_hash: &str, pages: Option<(u32, u32)>, k: usize) -> Result<Vec<ClauseHit>> {
-        let query = query.trim();
-        if query.is_empty() || k == 0 {
-            return Ok(Vec::new());
-        }
-        let Some(v) = self.clause_query(chunk_search_body(query, document_hash, pages, k)).await? else {
-            return Ok(Vec::new());
-        };
-        hits(&v).take(k).map(clause_of).collect()
+        self.run_clause_search(query, vec![chunks_of(document_hash, pages)], &[], k).await
     }
 }
 
-fn chunk_search_body(query: &str, document_hash: &str, pages: Option<(u32, u32)>, k: usize) -> Value {
-    json!({
-        "size": k,
-        "query": { "bool": {
-            "must": { "semantic": { "field": "text", "query": query } },
-            "filter": chunk_filter(document_hash, pages)
-        }},
-        "_source": SOURCE
-    })
+/// The search's one "policy": this PDF's chunks.
+fn chunks_of(document_hash: &str, pages: Option<(u32, u32)>) -> Value {
+    json!({ "bool": { "filter": chunk_filter(document_hash, pages) } })
 }
 
 #[cfg(test)]
@@ -231,14 +219,11 @@ Important Questions Answers Why This Matters\nWhat is the overall deductible? $2
 
     #[test]
     fn the_chunk_search_reads_one_pdfs_chunks() {
-        let body = chunk_search_body("Kaiser Permanente Bronze 60 HMO summary of benefits and coverage", "ab12", Some((4, 19)), 5);
-        assert_eq!(body["size"], 5);
-        assert_eq!(body["query"]["bool"]["must"]["semantic"]["field"], "text");
-        let filter = &body["query"]["bool"]["filter"];
+        let filter = &chunks_of("ab12", Some((4, 19)))["bool"]["filter"];
         assert_eq!(filter[0], json!({ "term": { "kind": "chunk" } }));
         assert_eq!(filter[1], json!({ "term": { "document_hash": "ab12" } }));
         assert_eq!(filter[2], json!({ "range": { "page": { "gte": 4, "lte": 19 } } }));
-        assert_eq!(chunk_search_body("q", "ab12", None, 5)["query"]["bool"]["filter"].as_array().unwrap().len(), 2);
+        assert_eq!(chunks_of("ab12", None)["bool"]["filter"].as_array().unwrap().len(), 2);
     }
 
     #[tokio::test]

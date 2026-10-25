@@ -4,61 +4,59 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::model_call_in_type::ModelCallIn;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub(super) struct ApplyMedicalRecordArgs {
+pub(super) struct ApplyHospitalReportArgs {
     pub job_id: u64,
-    pub record_json: String,
-    pub call: ModelCallIn,
+    pub read_json: String,
+    pub pages: Vec<String>,
 }
 
-impl From<ApplyMedicalRecordArgs> for super::Reducer {
-    fn from(args: ApplyMedicalRecordArgs) -> Self {
-        Self::ApplyMedicalRecord {
+impl From<ApplyHospitalReportArgs> for super::Reducer {
+    fn from(args: ApplyHospitalReportArgs) -> Self {
+        Self::ApplyHospitalReport {
             job_id: args.job_id,
-            record_json: args.record_json,
-            call: args.call,
+            read_json: args.read_json,
+            pages: args.pages,
         }
     }
 }
 
-impl __sdk::InModule for ApplyMedicalRecordArgs {
+impl __sdk::InModule for ApplyHospitalReportArgs {
     type Module = super::RemoteModule;
 }
 
 #[allow(non_camel_case_types)]
-/// Extension trait for access to the reducer `apply_medical_record`.
+/// Extension trait for access to the reducer `apply_hospital_report`.
 ///
 /// Implemented for [`super::RemoteReducers`].
-pub trait apply_medical_record {
-    /// Request that the remote module invoke the reducer `apply_medical_record` to run as soon as possible.
+pub trait apply_hospital_report {
+    /// Request that the remote module invoke the reducer `apply_hospital_report` to run as soon as possible.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
-    /// /// Use [`apply_medical_record:apply_medical_record_then`] to run a callback after the reducer completes.
-    fn apply_medical_record(
+    /// /// Use [`apply_hospital_report:apply_hospital_report_then`] to run a callback after the reducer completes.
+    fn apply_hospital_report(
         &self,
         job_id: u64,
-        record_json: String,
-        call: ModelCallIn,
+        read_json: String,
+        pages: Vec<String>,
     ) -> __sdk::Result<()> {
-        self.apply_medical_record_then(job_id, record_json, call, |_, _| {})
+        self.apply_hospital_report_then(job_id, read_json, pages, |_, _| {})
     }
 
-    /// Request that the remote module invoke the reducer `apply_medical_record` to run as soon as possible,
+    /// Request that the remote module invoke the reducer `apply_hospital_report` to run as soon as possible,
     /// registering `callback` to run when we are notified that the reducer completed.
     ///
     /// This method returns immediately, and errors only if we are unable to send the request.
     /// The reducer will run asynchronously in the future,
     ///  and its status can be observed with the `callback`.
-    fn apply_medical_record_then(
+    fn apply_hospital_report_then(
         &self,
         job_id: u64,
-        record_json: String,
-        call: ModelCallIn,
+        read_json: String,
+        pages: Vec<String>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -66,22 +64,22 @@ pub trait apply_medical_record {
     ) -> __sdk::Result<()>;
 }
 
-impl apply_medical_record for super::RemoteReducers {
-    fn apply_medical_record_then(
+impl apply_hospital_report for super::RemoteReducers {
+    fn apply_hospital_report_then(
         &self,
         job_id: u64,
-        record_json: String,
-        call: ModelCallIn,
+        read_json: String,
+        pages: Vec<String>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
             + 'static,
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
-            ApplyMedicalRecordArgs {
+            ApplyHospitalReportArgs {
                 job_id,
-                record_json,
-                call,
+                read_json,
+                pages,
             },
             callback,
         )

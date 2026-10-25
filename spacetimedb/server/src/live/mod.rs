@@ -455,7 +455,12 @@ fn report_placed_test_bands(ctx: &ReducerContext) {
         if ctx.db.event_state().id().find(0).is_some_and(|e| e.ended) || crate::departure::band_left(ctx, p.band_id) {
             continue;
         }
-        ctx.db.band().id().update(Band { online: true, last_seen: ctx.timestamp, x_m: p.x_m, y_m: p.y_m, zone: p.station_id, ..b });
+        // Back online after a gap, it starts a new stay at its spot.
+        if !ctx.db.zone_visit().band_id().filter(p.band_id).any(|v| v.open) {
+            crate::ingest::open_band_stay(ctx, p.band_id, p.station_id);
+        }
+        let (x_m, y_m, booth_id) = band_spot(ctx, p.band_id, p.station_id);
+        ctx.db.band().id().update(Band { online: true, last_seen: ctx.timestamp, x_m, y_m, zone: p.station_id, booth_id, ..b });
     }
 }
 
@@ -576,16 +581,23 @@ pub fn unplace_band(ctx: &ReducerContext, band_id: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// Where a radio band stands: its placed spot, else its zone's spot. The zone stays the radio's, unless the
-/// radio hears no station.
-pub fn radio_band_spot(ctx: &ReducerContext, band_id: u32, zone: u8) -> (f32, f32, u8) {
+/// The zone a radio band is in: the one its radio hears, else the station of the spot it was placed at.
+pub fn radio_band_zone(ctx: &ReducerContext, band_id: u32, zone: u8) -> u8 {
     match ctx.db.band_place().band_id().find(band_id) {
-        Some(p) => (p.x_m, p.y_m, if zone == 0 { p.station_id } else { zone }),
-        None => {
-            let (x, y) = crate::venue::station_spot(ctx, zone);
-            (x, y, zone)
-        }
+        Some(p) if zone == 0 => p.station_id,
+        _ => zone,
     }
+}
+
+/// Where a radio or test band stands and the booth it stands at, which is always its open stay's: its placed
+/// spot, else in front of its stay's booth, else its zone's spot.
+pub fn band_spot(ctx: &ReducerContext, band_id: u32, zone: u8) -> (f32, f32, u64) {
+    let booth_id = ctx.db.zone_visit().band_id().filter(band_id).find(|v| v.open && v.zone == zone).map(|v| v.booth_id).unwrap_or(0);
+    let (x, y) = match ctx.db.band_place().band_id().find(band_id) {
+        Some(p) => (p.x_m, p.y_m),
+        None => crate::venue::booth_spot(ctx, booth_id).unwrap_or_else(|| crate::venue::station_spot(ctx, zone)),
+    };
+    (x, y, booth_id)
 }
 
 /// Puts a new incident on the floor. Called by the safety system for every incident it opens.

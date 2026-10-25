@@ -5,7 +5,7 @@
 
 use super::flow::*;
 use super::*;
-use crate::jobs::{self, ModelCallIn};
+use crate::jobs::{self, ModelCallIn, blob_ref};
 use crate::roles::*;
 use crate::safety::*;
 use bandit_insurance::clinic::{REPORT_PAGES, Scenario, check_report};
@@ -112,8 +112,9 @@ fn request_report(ctx: &ReducerContext, claim: &Claim, incident: &Incident, choi
     Ok(())
 }
 
-/// The worker's hospital report: the record it wrote and the report's text in
-/// the blob store. Code checks it follows its case, then applies it as the
+/// The worker's hospital report: the record it wrote and the report's PDF in
+/// the blob store. Code checks the report follows its case, then the Evidence
+/// Engine reads the PDF like any hospital report, and what it reads is the
 /// claim's medical record.
 #[spacetimedb::reducer]
 pub fn file_clinic_report(ctx: &ReducerContext, job_id: u64, record_json: String, file_hash: String, call: ModelCallIn) -> Result<(), String> {
@@ -128,6 +129,9 @@ pub fn file_clinic_report(ctx: &ReducerContext, job_id: u64, record_json: String
         return Ok(());
     }
     let file_hash = file_hash.to_lowercase();
+    if ctx.db.blob_ref().hash().find(&file_hash).is_none() {
+        return Err(format!("no stored file {file_hash}"));
+    }
     let checked = serde_json::from_str::<ExtractedRecord>(&record_json)
         .map_err(|e| vec![format!("not a record: {e}")])
         .and_then(|record| check_report(&p, &record).map(|_| record))
@@ -149,8 +153,7 @@ pub fn file_clinic_report(ctx: &ReducerContext, job_id: u64, record_json: String
         received_at: Some(ctx.timestamp),
         ..report
     });
-    let record = insert_record(ctx, claim.id, file_hash, REPORT_PAGES);
-    let record = ctx.db.medical_record().id().update(MedicalRecord { job_id, ..record });
     jobs::finish(ctx, job, "report received");
-    apply_record(ctx, claim, record, &valid, call_id)
+    read_report(ctx, claim, file_hash, REPORT_PAGES);
+    Ok(())
 }

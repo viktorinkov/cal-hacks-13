@@ -40,6 +40,8 @@ pub const PIPELINE: &str = "bandit-claims-validate";
 /// Inference endpoint behind `narrative`: the project's default for
 /// `semantic_text`, pinned so a change of default cannot re-map the field.
 pub const INFERENCE_ID: &str = ".jina-embeddings-v5-text-small";
+/// Rerank endpoint that reorders the clause search's fused hits.
+pub const RERANK_ID: &str = ".jina-reranker-v3";
 /// Outcomes a decided claim can carry. Open claims have an empty outcome.
 pub const OUTCOMES: [&str; 3] = ["auto_settled", "approved", "refused"];
 /// Every incident kind, and the cover that answers it: an injury from the
