@@ -6,13 +6,14 @@ use super::tables::*;
 use crate::roles::*;
 use crate::tables::*;
 use crate::venue::*;
+use crate::view_as::viewed;
 use spacetimedb::{AnonymousViewContext, Identity, SpacetimeType, Timestamp, ViewContext};
 
 /// Services that copy or serve social rows.
 const SERVICES: &[&str] = &["indexer", "worker", "api"];
 
 fn allowed(ctx: &ViewContext, roles: &[&str]) -> bool {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     ctx.db.owner().identity().find(me).is_some()
         || ctx.db.staff_role().identity().filter(me).any(|r| roles.contains(&r.role.as_str()))
 }
@@ -113,12 +114,12 @@ pub struct ClaimedPerson {
 
 #[spacetimedb::view(accessor = my_attendee, public)]
 pub fn my_attendee(ctx: &ViewContext) -> Option<Attendee> {
-    ctx.db.attendee().identity().find(ctx.sender())
+    ctx.db.attendee().identity().find(viewed(ctx))
 }
 
 #[spacetimedb::view(accessor = my_band, public)]
 pub fn my_band(ctx: &ViewContext) -> Option<MyBand> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     if let Some(o) = ctx.db.band_owner().owner().find(me) {
         return Some(MyBand { band_id: o.band_id, status: "claimed".into(), expires_at: None });
     }
@@ -131,7 +132,7 @@ pub fn my_band(ctx: &ViewContext) -> Option<MyBand> {
 
 #[spacetimedb::view(accessor = my_handles, public)]
 pub fn my_handles(ctx: &ViewContext) -> Vec<SocialHandle> {
-    ctx.db.social_handle().owner().filter(ctx.sender()).collect()
+    ctx.db.social_handle().owner().filter(viewed(ctx)).collect()
 }
 
 #[spacetimedb::view(accessor = my_visits, public)]
@@ -139,7 +140,7 @@ pub fn my_visits(ctx: &ViewContext) -> Vec<MyVisit> {
     ctx.db
         .visit()
         .attendee()
-        .filter(ctx.sender())
+        .filter(viewed(ctx))
         .map(|v| MyVisit {
             zone_visit_id: v.zone_visit_id,
             zone_id: v.zone_id,
@@ -159,7 +160,7 @@ pub fn my_visits(ctx: &ViewContext) -> Vec<MyVisit> {
 /// The people you hung out with, with their socials.
 #[spacetimedb::view(accessor = my_encounters, public)]
 pub fn my_encounters(ctx: &ViewContext) -> Vec<MyEncounter> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     let rows = ctx.db.social_encounter().attendee_a().filter(me).chain(ctx.db.social_encounter().attendee_b().filter(me));
     rows.filter(|e| e.met)
         .filter_map(|e| {
@@ -179,7 +180,7 @@ pub fn my_encounters(ctx: &ViewContext) -> Vec<MyEncounter> {
 
 #[spacetimedb::view(accessor = my_shared_visits, public)]
 pub fn my_shared_visits(ctx: &ViewContext) -> Vec<MySharedVisit> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     let rows = ctx.db.shared_visit().attendee_a().filter(me).chain(ctx.db.shared_visit().attendee_b().filter(me));
     rows.filter_map(|s| {
         let other = if s.attendee_a == me { s.attendee_b } else { s.attendee_a };
@@ -289,7 +290,7 @@ fn links_at(ctx: &ViewContext, kind: &str, id: u64) -> Vec<PeopleLink> {
 /// your company, and the other findable people at those booths and that company, all by name.
 #[spacetimedb::view(accessor = my_graph, public)]
 pub fn my_graph(ctx: &ViewContext) -> Vec<GraphLink> {
-    let Some(me) = ctx.db.attendee().identity().find(ctx.sender()).filter(|a| a.findable) else {
+    let Some(me) = ctx.db.attendee().identity().find(viewed(ctx)).filter(|a| a.findable) else {
         return Vec::new();
     };
     let mine = links_at(ctx, "person", me.node_id);
@@ -361,7 +362,7 @@ pub struct MyPhoto {
 /// tag them all when you share it.
 #[spacetimedb::view(accessor = my_photos, public)]
 pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {
-    let me = ctx.sender();
+    let me = viewed(ctx);
     ctx.db
         .photo_tag()
         .attendee()

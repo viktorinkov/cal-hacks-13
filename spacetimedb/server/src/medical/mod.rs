@@ -8,6 +8,7 @@ use crate::roles::*;
 use crate::safety::*;
 use crate::tables::*;
 use crate::social::tables::*;
+use crate::view_as::viewed;
 use serde::{Deserialize, Serialize};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
@@ -244,12 +245,12 @@ pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), Str
 
 #[spacetimedb::view(accessor = my_medical_card, public)]
 pub fn my_medical_card(ctx: &ViewContext) -> Option<MedicalCard> {
-    ctx.db.medical_card().attendee().find(ctx.sender())
+    ctx.db.medical_card().attendee().find(viewed(ctx))
 }
 
 #[spacetimedb::view(accessor = my_medical_documents, public)]
 pub fn my_medical_documents(ctx: &ViewContext) -> Vec<MedicalDocument> {
-    ctx.db.medical_document().attendee().filter(ctx.sender()).collect()
+    ctx.db.medical_document().attendee().filter(viewed(ctx)).collect()
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -264,7 +265,7 @@ pub struct MedicCard {
 /// The card of each band this medic tapped, from the latest tap.
 #[spacetimedb::view(accessor = medic_medical_cards, public)]
 pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {
-    let mut taps: Vec<MedicalAccessLog> = ctx.db.medical_access_log().reader().filter(ctx.sender()).filter(|l| l.granted).collect();
+    let mut taps: Vec<MedicalAccessLog> = ctx.db.medical_access_log().reader().filter(viewed(ctx)).filter(|l| l.granted).collect();
     taps.sort_by_key(|l| std::cmp::Reverse(l.id));
     let mut out: Vec<MedicCard> = Vec::new();
     for log in taps {
@@ -281,7 +282,7 @@ pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {
 /// Every tap, granted or not, for the host portal.
 #[spacetimedb::view(accessor = board_medical_access, public)]
 pub fn board_medical_access(ctx: &ViewContext) -> Vec<MedicalAccessLog> {
-    let staff = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| ["ops", "medic"].contains(&r.role.as_str()));
+    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| ["ops", "medic"].contains(&r.role.as_str()));
     if staff { ctx.db.medical_access_log().reader().filter(Identity::ZERO..).collect() } else { Vec::new() }
 }

@@ -54,7 +54,7 @@ export function idToken(): string | undefined {
 }
 
 export function signedInEmail(): string {
-  const token = idToken();
+  const token = viewing() ? undefined : idToken();
   return token ? jwtClaims(token).email ?? '' : '';
 }
 
@@ -129,27 +129,49 @@ export async function playedToken(): Promise<string | undefined> {
   return (await actors()).find(a => a.name === as)?.token;
 }
 
+// --- View as -------------------------------------------------------------------------------
+
+/** The person the owner's View as tab shows this page for (`?view=<identity>`), else ''. */
+export function viewing(): string {
+  return new URLSearchParams(location.search).get('view') ?? '';
+}
+
+/**
+ * Points this page's viewer, a fresh identity kept for the browser tab, at the person through the
+ * owner's portal around it: the module then answers every view for them.
+ */
+async function pointViewer(viewer: string, person: string): Promise<void> {
+  const viewAs = (window.top as any)?.banditViewAs;
+  if (!viewAs) throw new Error("Open this page from the organizer portal's View as tab.");
+  await viewAs(viewer, person);
+}
+
 // --- Connection -----------------------------------------------------------------------------
 
 /**
  * Connects as the played person, else the signed-in person, else the identity kept in this
  * browser, and resolves once `queries` have arrived. `onChange` runs after every change to them.
+ * In the View as frame it connects as the tab's viewer instead, read-only.
  */
 export async function connect(queries: string[], onChange: () => void): Promise<DbConnection> {
   const cfg = await config();
   const played = await playedToken();
+  const view = viewing();
   // One kept identity per database, so a local test run never clashes with Maincloud.
   const storeKey = `bandit-token:${cfg.database}`;
+  const viewerKey = `bandit-viewer:${cfg.database}`;
   const stored = localStorage.getItem(storeKey) ?? localStorage.getItem('bandit-token') ?? undefined;
-  const token = played ?? idToken() ?? stored;
+  const token = view ? sessionStorage.getItem(viewerKey) ?? undefined : played ?? idToken() ?? stored;
+  if (view) document.body.classList.add('viewing');
   const open = (token: string | undefined) => new Promise<DbConnection>((resolve, reject) => {
     DbConnection.builder()
       .withUri(cfg.spacetimedb_url)
       .withDatabaseName(cfg.database)
       .withToken(token)
-      .onConnect((c, _identity, newToken) => {
-        if (!played && !idToken()) localStorage.setItem(storeKey, newToken);
-        c.subscriptionBuilder()
+      .onConnect((c, identity, newToken) => {
+        if (view) sessionStorage.setItem(viewerKey, newToken);
+        else if (!played && !idToken()) localStorage.setItem(storeKey, newToken);
+        const subscribe = () => c.subscriptionBuilder()
           .onApplied(() => {
             watch(c, onChange);
             (window as any).bandit = c;
@@ -158,6 +180,8 @@ export async function connect(queries: string[], onChange: () => void): Promise<
           })
           .onError(ctx => reject((ctx as any).event ?? new Error('subscription failed')))
           .subscribe(queries);
+        if (view) pointViewer(identity.toHexString(), view).then(subscribe, reject);
+        else subscribe();
       })
       .onConnectError((_ctx, e) => reject(e))
       .build();
@@ -303,6 +327,10 @@ export function mount(id: string, ...children: Child[]) {
 /** Runs a reducer call or request and shows its error under the page title instead of throwing. */
 export async function act(what: () => Promise<unknown>): Promise<boolean> {
   const bar = document.getElementById('error');
+  if (viewing()) {
+    if (bar) bar.textContent = 'This is a read-only view: nothing changes for this person.';
+    return false;
+  }
   try {
     if (bar) bar.textContent = '';
     await what();

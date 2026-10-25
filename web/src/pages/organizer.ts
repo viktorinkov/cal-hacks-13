@@ -1,13 +1,15 @@
 // The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
 // attendee's filing (or staff filing for them) to the named approver's decision, the event graph with its photos,
 // the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
+// The owner also views the portal and the attendee pages as any person sees them, read-only.
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
 
+import { Identity } from 'spacetimedb';
 import {
   act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
-  signOut, signedInEmail, time, type Config, EXIT_COLOURS,
+  signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
 import { evidenceTrail } from '../evidence-trail';
@@ -16,7 +18,7 @@ import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
-import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate } from '../module_bindings/types';
+import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_roles',
@@ -57,6 +59,7 @@ const QUERIES = [
   'SELECT * FROM venue_setup_step',
   'SELECT * FROM chosen_venue',
   'SELECT * FROM board_staff',
+  'SELECT * FROM view_as_people',
 ];
 
 /** The synthetic clinic records in fixtures/medical-records, rendered for the incident's date and time. */
@@ -97,7 +100,7 @@ function can(...wanted: string[]): boolean {
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
   const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
-  const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff']] : all;
+  const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff'], ['viewas', 'View as']] : all;
   return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
 
@@ -272,6 +275,73 @@ function staffTab() {
         h('td', {}, m.name), h('td', {}, m.email), h('td', {}, roleName(m.role)),
         h('td', { class: m.account ? 'pass' : 'muted' }, m.account ? 'yes' : 'not yet'),
         h('td', {}, h('button', { class: 'link', onclick: () => remove(m.id, m.name, m.role) }, 'Remove'))))));
+}
+
+// --- View as --------------------------------------------------------------------------------
+
+/** The person the owner views as, by `<role> <identity>`, and which of their screens. */
+let viewKey = '';
+let viewScreen = '';
+
+const VIEW_GROUPS: [string, string][] = [['ops', 'Organizers'], ['medic', 'Medics'], ['photographer', 'Photographers'], ['attendee', 'Attendees'], ['crowd', 'Crowd']];
+
+function keyOf(p: ViewablePerson) {
+  return `${p.role} ${p.identity.toHexString()}`;
+}
+
+function viewed(): ViewablePerson | undefined {
+  return [...conn.db.viewAsPeople.iter()].find(p => keyOf(p) === viewKey);
+}
+
+/** The screens a person sees, by the hash their page opens at: attendees their band page, staff this portal. */
+function screens(p: ViewablePerson): [string, string][] {
+  if (p.role === 'attendee') return [['now', 'Their band page now'], ['card', 'Medical card'], ['recap', 'Recap and merch']];
+  if (p.role === 'photographer') return [['now', 'Photo page']];
+  return [['claims', 'Organizer portal']];
+}
+
+function viewUrl(p: ViewablePerson, screen: string): string {
+  const view = `?view=${p.identity.toHexString()}#${screen}`;
+  if (p.role === 'attendee') return `/t/${bandCode(p.bandId)}${view}`;
+  return p.role === 'photographer' ? `/photo${view}` : `/organizer${view}`;
+}
+
+/** The owner picks a person; their page shows below, live with their data. Nothing on it can be pressed. */
+function viewAsTab() {
+  const people = [...conn.db.viewAsPeople.iter()].sort((a, b) => (a.name || '~').localeCompare(b.name || '~'));
+  const p = viewed();
+  const pick = (e: Event) => {
+    viewKey = (e.target as HTMLSelectElement).value;
+    const chosen = viewed();
+    viewScreen = chosen ? screens(chosen)[0][0] : '';
+    (e.target as HTMLSelectElement).blur();
+    render();
+  };
+  const band = (x: ViewablePerson) => x.bandId ? `, band ${bandCode(x.bandId)}` : '';
+  return h('section', {},
+    h('h3', {}, 'View as'),
+    h('p', { class: 'muted' }, 'See the pages a person sees, live with their data. It is read-only: nothing on their page can be pressed or changed.'),
+    h('label', {}, 'Person',
+      h('select', { onchange: pick },
+        h('option', { value: '' }, 'Choose a person'),
+        VIEW_GROUPS.map(([group, label]) => {
+          const rows = people.filter(x => (x.crowd ? 'crowd' : x.role) === group);
+          return rows.length > 0 && h('optgroup', { label }, rows.map(x =>
+            h('option', { value: keyOf(x), selected: keyOf(x) === viewKey || undefined }, `${x.name || '(no name yet)'}${band(x)}`)));
+        }))),
+    p && h('p', {}, screens(p).map(([screen, label]) =>
+      h('button', { class: screen === viewScreen ? 'on' : '', onclick: () => { viewScreen = screen; render(); } }, label))),
+    p && p.role === 'attendee' && !p.bandId && h('p', {}, `${p.name || 'They'} wear no band right now, so there is no band page to show.`));
+}
+
+/** The View as frame sits outside the redrawn parts, so the person's page never reloads on a redraw. */
+function showViewAs(on: boolean) {
+  const box = document.getElementById('viewas')!;
+  const p = on ? viewed() : undefined;
+  box.hidden = !p || (p.role === 'attendee' && !p.bandId);
+  const frame = box.querySelector('iframe')!;
+  const want = p ? viewUrl(p, viewScreen) : '';
+  if (want && frame.getAttribute('src') !== want) frame.setAttribute('src', want);
 }
 
 // --- Claims ---------------------------------------------------------------------------------
@@ -909,12 +979,15 @@ function render() {
   mount('head', header());
   if (!open.length) {
     showLive3d(false);
+    showViewAs(false);
     return mount('app', noRole());
   }
   // A tab the caller's roles do not open falls back to their first one.
   if (!open.some(([key]) => key === tab)) tab = open[0][0];
-  showLive3d(tab === 'live');
-  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : live();
+  // The 3D venue is the same for everyone, so a View as frame leaves it out.
+  showLive3d(tab === 'live' && !viewing());
+  showViewAs(tab === 'viewas');
+  const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : live();
   mount('app', body);
   if (scrollToClaim) {
     scrollToClaim = false;
@@ -937,6 +1010,9 @@ async function main() {
   if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
+  // A View as frame points its viewer at the chosen person through this owner's connection.
+  (window as any).banditViewAs = (viewer: string, person: string) =>
+    conn.reducers.viewAs({ viewer: Identity.fromString(viewer), target: Identity.fromString(person) });
   window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLSelectElement)) render(); }, 1000);
 }

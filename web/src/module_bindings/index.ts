@@ -130,6 +130,7 @@ import UpdateProfileReducer from "./update_profile_reducer";
 import UpsertCameraReducer from "./upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "./upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "./upsert_insurance_policy_reducer";
+import ViewAsReducer from "./view_as_reducer";
 
 // Import all procedure arg schemas
 
@@ -219,6 +220,7 @@ import VenuePlanRow from "./venue_plan_table";
 import VenueSetupRow from "./venue_setup_table";
 import VenueSetupStepRow from "./venue_setup_step_table";
 import VenueSpotRow from "./venue_spot_table";
+import ViewAsPeopleRow from "./view_as_people_table";
 import WorkerJobsRow from "./worker_jobs_table";
 import ZoneRow from "./zone_table";
 import ZoneVisitRow from "./zone_visit_table";
@@ -1064,6 +1066,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, VenuePlanRow),
+  viewAsPeople: __table({
+    name: 'view_as_people',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, ViewAsPeopleRow),
   workerJobs: __table({
     name: 'worker_jobs',
     indexes: [
@@ -1171,6 +1180,7 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_camera", UpsertCameraReducer),
   __reducerSchema("upsert_coverage_rule", UpsertCoverageRuleReducer),
   __reducerSchema("upsert_insurance_policy", UpsertInsurancePolicyReducer),
+  __reducerSchema("view_as", ViewAsReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
@@ -1323,6 +1333,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "unclaimed_injuries": Omit<typeof tablesSchema.schemaType.tables["unclaimedInjuries"], "accessorName"> & { readonly accessorName: "unclaimed_injuries" };
     /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
     readonly "venue_plan": Omit<typeof tablesSchema.schemaType.tables["venuePlan"], "accessorName"> & { readonly accessorName: "venue_plan" };
+    /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+    readonly "view_as_people": Omit<typeof tablesSchema.schemaType.tables["viewAsPeople"], "accessorName"> & { readonly accessorName: "view_as_people" };
     /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
     readonly "worker_jobs": Omit<typeof tablesSchema.schemaType.tables["workerJobs"], "accessorName"> & { readonly accessorName: "worker_jobs" };
   };
@@ -1416,6 +1428,7 @@ const tableAccessorAliases = {
   "social_visits": "socialVisits",
   "unclaimed_injuries": "unclaimedInjuries",
   "venue_plan": "venuePlan",
+  "view_as_people": "viewAsPeople",
   "worker_jobs": "workerJobs",
 } as const;
 
@@ -1581,6 +1594,8 @@ export type DbView = __DbViewBase & {
   readonly "unclaimed_injuries": __DbViewBase["unclaimedInjuries"];
   /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
   readonly "venue_plan": __DbViewBase["venuePlan"];
+  /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+  readonly "view_as_people": __DbViewBase["viewAsPeople"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __DbViewBase["workerJobs"];
 };
@@ -1731,6 +1746,8 @@ export type Tables = __TablesBase & {
   readonly "unclaimed_injuries": __TablesBase["unclaimedInjuries"];
   /** @deprecated Use `venuePlan` instead. This alias will be removed in the next major version. */
   readonly "venue_plan": __TablesBase["venuePlan"];
+  /** @deprecated Use `viewAsPeople` instead. This alias will be removed in the next major version. */
+  readonly "view_as_people": __TablesBase["viewAsPeople"];
   /** @deprecated Use `workerJobs` instead. This alias will be removed in the next major version. */
   readonly "worker_jobs": __TablesBase["workerJobs"];
 };

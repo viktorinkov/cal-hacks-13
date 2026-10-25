@@ -102,6 +102,7 @@ import UpdateProfileReducer from "../update_profile_reducer";
 import UpsertCameraReducer from "../upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "../upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "../upsert_insurance_policy_reducer";
+import ViewAsReducer from "../view_as_reducer";
 
 export type AddIncidentNoteParams = __Infer<typeof AddIncidentNoteReducer>;
 export type AddOwnerParams = __Infer<typeof AddOwnerReducer>;
@@ -199,4 +200,5 @@ export type UpdateProfileParams = __Infer<typeof UpdateProfileReducer>;
 export type UpsertCameraParams = __Infer<typeof UpsertCameraReducer>;
 export type UpsertCoverageRuleParams = __Infer<typeof UpsertCoverageRuleReducer>;
 export type UpsertInsurancePolicyParams = __Infer<typeof UpsertInsurancePolicyReducer>;
+export type ViewAsParams = __Infer<typeof ViewAsReducer>;
 

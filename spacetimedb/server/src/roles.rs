@@ -1,4 +1,5 @@
 use crate::tables::*;
+use crate::view_as::viewed;
 use spacetimedb::{Identity, RawQuery, ReducerContext, Table, Timestamp, ViewContext};
 
 #[spacetimedb::table(accessor = staff_role)]
@@ -65,7 +66,7 @@ pub fn revoke_role(ctx: &ReducerContext, identity: Identity, role: String) -> Re
 
 #[spacetimedb::view(accessor = my_roles, public)]
 pub fn my_roles(ctx: &ViewContext) -> Vec<StaffRole> {
-    ctx.db.staff_role().identity().filter(ctx.sender()).collect()
+    ctx.db.staff_role().identity().filter(viewed(ctx)).collect()
 }
 
 /// The owner makes another identity an owner too, for example their own browser sign-in on the

@@ -156,7 +156,7 @@ pub fn open_api_session(ctx: &ReducerContext, token_hash: String) -> Result<(), 
     }
     ctx.db.api_session().insert(ApiSession {
         token_hash,
-        identity: ctx.sender(),
+        identity: crate::view_as::acting_for(ctx),
         created_at: ctx.timestamp,
         expires_at: ctx.timestamp + seconds(API_SESSION_HOURS * 3600),
     });
