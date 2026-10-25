@@ -103,6 +103,7 @@ pub mod client_connected_reducer;
 pub mod client_disconnected_reducer;
 pub mod clinic_report_table;
 pub mod clinic_report_type;
+pub mod close_claim_without_injury_reducer;
 pub mod command_sent_reducer;
 pub mod command_table;
 pub mod command_type;
@@ -496,6 +497,7 @@ pub use client_connected_reducer::client_connected;
 pub use client_disconnected_reducer::client_disconnected;
 pub use clinic_report_table::*;
 pub use clinic_report_type::ClinicReport;
+pub use close_claim_without_injury_reducer::close_claim_without_injury;
 pub use command_sent_reducer::command_sent;
 pub use command_table::*;
 pub use command_type::Command;
@@ -873,6 +875,10 @@ pub enum Reducer {
     },
     ClientConnected,
     ClientDisconnected,
+    CloseClaimWithoutInjury {
+        claim_id: u64,
+        reason: String,
+    },
     CommandSent {
         id: u64,
         error: Option<String>,
@@ -1270,6 +1276,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::Clear { .. } => "clear",
             Reducer::ClientConnected => "client_connected",
             Reducer::ClientDisconnected => "client_disconnected",
+            Reducer::CloseClaimWithoutInjury { .. } => "close_claim_without_injury",
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
             Reducer::ConfirmMedicalCard => "confirm_medical_card",
@@ -1493,6 +1500,12 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::ClientDisconnected => {
                 __sats::bsatn::to_vec(&client_disconnected_reducer::ClientDisconnectedArgs {})
+            }
+            Reducer::CloseClaimWithoutInjury { claim_id, reason } => {
+                __sats::bsatn::to_vec(&close_claim_without_injury_reducer::CloseClaimWithoutInjuryArgs {
+                    claim_id: claim_id.clone(),
+                    reason: reason.clone(),
+                })
             }
             Reducer::CommandSent { id, error } => {
                 __sats::bsatn::to_vec(&command_sent_reducer::CommandSentArgs {

@@ -383,6 +383,7 @@ Non-responsibilities:
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | in | the organizer (`ops`) at event setup; `worker` | the policy PDF's hash; the terms The Evidence Engine read; the organizer's confirmation of the terms they saw | reducers; `policy_document`, `policy_term`, then the event's policy rows |
 | `approve_claim` | in | `ops` or the module owner | claim id, amount seen, pack SHA-256 seen, rule ceiling, learn flag | reducer |
 | `refuse_claim` | in | `ops` or the module owner | claim id, pack SHA-256 seen, reason | reducer |
+| `close_claim_without_injury` | in | `ops`, `medic`; the live run's floor staff | claim id, reason; the claim must be `AwaitingRecord`, for an incident where the medic treated no injury | reducer; `Refused` with the reason |
 | `record_claim_payout` | in | `worker` | job id, the wallet's customer and account, the deposit id | reducer; J3, `Settled` |
 | `retry_claim_payout` | in | `ops` | claim id of a claim stuck in `Paying` | reducer; queues the deposit again |
 | `record_insurer_payment` | in | `ops` | claim id, amount received, insurer reference | reducer; J4, `Reconciled` |
@@ -534,6 +535,7 @@ stateDiagram-v2
   [*] --> AwaitingRecord: file_claim or file_claim_for_wearer
   [*] --> Verifying: property claim opens on resolve
   AwaitingRecord --> Refused: staff claimant
+  AwaitingRecord --> Refused: close_claim_without_injury
   AwaitingRecord --> Verifying: disputed, Claude decides at once
   AwaitingRecord --> Verifying: file_clinic_report
   AwaitingRecord --> Routed: report off its case or never arrived
