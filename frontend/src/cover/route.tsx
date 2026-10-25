@@ -33,6 +33,7 @@ const TITLES: Record<string, string> = {
   '/bands': 'Bands · BandIt',
   '/payments': 'Payments · BandIt',
   '/wallet': 'Wallet · BandIt',
+  '/venue': 'Venue · BandIt',
   '/photos': 'Photos · BandIt',
   '/merch': 'Merch · BandIt',
   '/graph': 'Event graph · BandIt',
