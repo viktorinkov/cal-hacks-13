@@ -15,7 +15,7 @@
 | Kibana: Band radio and photos | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-radio |
 | Kibana: Recap suggestions | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-recap |
 | Kibana: Claims evidence | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-claims |
-| System design board (Excalidraw) | https://excalidraw.com/#json=NmD-kHCDrfbXVhSS1k8f2,ZrT2CzUX-h2adlqGVNretg |
+| System design board (Excalidraw) | https://excalidraw.com/#json=ak3nAqw0vpBv1-5os2r7h,1NKjUwPPxt8P2d88OkwE5w |
 | Code | https://github.com/viktorinkov/cal-hacks-13 |
 | Hackathon | https://cal-hacks-13-0.devpost.com |
 
