@@ -2,11 +2,13 @@
 //! through the `<prefix>-documents-extract` pipeline (a scan is first written out
 //! word for word by the Claude API), the `bandit-read-document` workflow reads
 //! the terms and clauses, and code checks every quote against its page before
-//! the clauses are indexed and the module gets the answer.
+//! the clauses are indexed and the module gets the answer. The plan and venue
+//! policy lookups read each PDF they fetch the same way (`read_pdf`), to check
+//! what it prints about itself before they keep it.
 
 use std::time::Duration;
 
-use anyhow::{Context, bail};
+use anyhow::{Context, anyhow, bail};
 use bandit_bindings::ModelCallIn;
 use bandit_insurance::policy::{CheckedPolicy, DocumentReadPayload, PolicyRead, VENUE_POLICY, check_policy, document_schema};
 use claims_elastic::{PolicyClause, StoredPage, reader};
@@ -19,6 +21,8 @@ use crate::sink::Finish;
 
 const POLL_EVERY: Duration = Duration::from_secs(5);
 const WORKFLOW_LIMIT: Duration = Duration::from_secs(10 * 60);
+/// Most pages of a PDF a lookup fetched that the Evidence Engine reads to check it.
+pub const MAX_CHECK_PAGES: usize = claims_elastic::MAX_DOCUMENT_PAGES;
 
 const TRANSCRIBE_SYSTEM: &str = "You transcribe one scanned page of an insurance document. \
 Write out every word printed on the page exactly as printed, in reading order, one printed line per line, \
@@ -31,36 +35,10 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
     if pages.len() != p.page_count as usize {
         return Err(JobError::msg(format!("the PDF has {} pages, not {}", pages.len(), p.page_count)));
     }
-    let (es, kibana) = ctx.reader().await?;
-    for (i, page) in pages.iter().enumerate() {
-        es.put_page(&p.file_hash, &p.kind, i as u32 + 1, page, None).await?;
-    }
-
     let mut calls = Vec::new();
-    let scans: Vec<u32> = es.document_pages(&p.file_hash).await?.iter().filter(|s| s.needs_transcription).map(|s| s.page).collect();
-    for n in scans {
-        let page = pages.get(n as usize - 1).ok_or_else(|| JobError::msg(format!("page {n} is not in the PDF")))?;
-        let text = transcribe(&ctx.claude, page, &mut calls).await?;
-        es.put_page(&p.file_hash, &p.kind, n, page, Some(&text)).await.map_err(keep(&mut calls))?;
-        tracing::info!(job_id = job.id, page = n, chars = text.len(), "scanned page transcribed");
-    }
-    let texts = page_texts(&es.document_pages(&p.file_hash).await.map_err(keep(&mut calls))?, p.page_count).map_err(keep(&mut calls))?;
-
-    let inputs = json!({
-        "document_hash": p.file_hash,
-        "kind": p.kind,
-        "page_count": p.page_count,
-        "schema": document_schema(&p.kind).to_string(),
-        "terms_index": es.terms_index(),
-    });
-    let execution = kibana.run_workflow(reader::WORKFLOW, inputs).await.map_err(keep(&mut calls))?;
-    tracing::info!(job_id = job.id, execution = %execution, "{} started", reader::WORKFLOW);
-    let done = kibana.wait_for(&execution, POLL_EVERY, WORKFLOW_LIMIT).await.map_err(keep(&mut calls))?;
-    if done["status"] != "completed" {
-        return Err(JobError { error: format!("{} execution {execution} {}", reader::WORKFLOW, reader::failure(&done)), calls });
-    }
-    let answer = es.document_terms(&p.file_hash).await.map_err(keep(&mut calls))?;
+    let Read { answer, texts } = read_pdf(ctx, job, &p.file_hash, &p.kind, &pages, &mut calls).await.map_err(keep(&mut calls))?;
     let read = policy_read(&answer).map_err(keep(&mut calls))?;
+    let (es, _) = ctx.reader().await.map_err(|e| JobError { calls: std::mem::take(&mut calls), ..e })?;
 
     let checked = check_policy(&read, &texts);
     let clauses = clause_docs(&p, &checked);
@@ -83,6 +61,76 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: DocumentReadPayload) -> Result<(), J
 /// An error that carries the Claude calls made before it, so they are recorded.
 fn keep(calls: &mut Vec<ModelCallIn>) -> impl FnOnce(anyhow::Error) -> JobError + '_ {
     move |e| JobError { error: format!("{e:#}"), calls: std::mem::take(calls) }
+}
+
+/// What the Evidence Engine read from one PDF: the answer as the workflow's
+/// `save_terms` step stored it, and the text of each page, which code checks
+/// every quote against.
+pub struct Read {
+    pub answer: Value,
+    pub texts: Vec<String>,
+}
+
+/// Reads one PDF, given as its pages, in the Evidence Engine as `kind`. Each page
+/// goes through the extract pipeline unless all are stored already (a scan is
+/// first written out word for word by the Claude API), then the
+/// `bandit-read-document` workflow reads it. An answer the same reader saved for
+/// this PDF and kind is used as it is, so a PDF a plan lookup checked is not read
+/// again when the module files it. The Claude calls made go into `calls`.
+pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[Vec<u8>], calls: &mut Vec<ModelCallIn>) -> anyhow::Result<Read> {
+    let (es, kibana) = ctx.reader().await.map_err(|e| anyhow!(e.error))?;
+    let page_count = pages.len() as u32;
+    let stored = es.document_pages(hash).await?;
+    if stored.len() != pages.len() || stored.iter().any(|s| s.needs_transcription) {
+        for (i, page) in pages.iter().enumerate() {
+            es.put_page(hash, kind, i as u32 + 1, page, None).await?;
+        }
+        let scans: Vec<u32> = es.document_pages(hash).await?.iter().filter(|s| s.needs_transcription).map(|s| s.page).collect();
+        for n in scans {
+            let page = pages.get(n as usize - 1).with_context(|| format!("page {n} is not in the PDF"))?;
+            let text = transcribe(&ctx.claude, page, calls).await?;
+            es.put_page(hash, kind, n, page, Some(&text)).await?;
+            tracing::info!(job_id = job.id, page = n, chars = text.len(), "scanned page transcribed");
+        }
+    }
+    let texts = page_texts(&es.document_pages(hash).await?, page_count)?;
+
+    let schema = document_schema(kind).to_string();
+    let version = reader::version(&schema);
+    if let Some(saved) = es.saved_terms(hash).await?
+        && same_reading(&saved, kind, &version)
+    {
+        tracing::info!(job_id = job.id, kind, document = hash, "the same reader read this PDF already");
+        return Ok(Read { answer: saved, texts });
+    }
+    let inputs = json!({
+        "document_hash": hash,
+        "kind": kind,
+        "page_count": page_count,
+        "schema": schema,
+        "terms_index": es.terms_index(),
+        "reader": version,
+    });
+    let execution = kibana.run_workflow(reader::WORKFLOW, inputs).await?;
+    tracing::info!(job_id = job.id, kind, execution = %execution, "{} started", reader::WORKFLOW);
+    let done = kibana.wait_for(&execution, POLL_EVERY, WORKFLOW_LIMIT).await?;
+    if done["status"] != "completed" {
+        bail!("{} execution {execution} {}", reader::WORKFLOW, reader::failure(&done));
+    }
+    Ok(Read { answer: es.document_terms(hash).await?, texts })
+}
+
+/// A saved answer read this PDF as `kind` with the reader of `version`.
+fn same_reading(saved: &Value, kind: &str, version: &str) -> bool {
+    saved["kind"] == kind && saved["reader"] == version && saved["read"].is_object()
+}
+
+/// Deletes a PDF a lookup only checked from Elastic: its pages and its answer.
+pub async fn forget(ctx: &Ctx, hash: &str) {
+    let Some(es) = &ctx.elastic else { return };
+    if let Err(e) = es.delete_document(hash).await {
+        tracing::warn!(document = hash, error = %format!("{e:#}"), "could not delete a checked PDF from Elastic");
+    }
 }
 
 /// Each page of `pdf` as a PDF of its own, in page order.
@@ -213,8 +261,8 @@ pub fn clause_docs(p: &DocumentReadPayload, checked: &CheckedPolicy) -> Vec<Poli
         .collect()
 }
 
-/// The Claude API writes out one scanned page word for word.
-async fn transcribe<M: Model>(model: &M, page: &[u8], calls: &mut Vec<ModelCallIn>) -> Result<String, JobError> {
+/// The Claude API writes out one scanned page word for word. Every call, failed or not, goes into `calls`.
+async fn transcribe<M: Model>(model: &M, page: &[u8], calls: &mut Vec<ModelCallIn>) -> anyhow::Result<String> {
     let schema = json!({
         "type": "object",
         "properties": {"text": {"type": "string", "description": "every word on the page, as printed"}},
@@ -222,7 +270,13 @@ async fn transcribe<M: Model>(model: &M, page: &[u8], calls: &mut Vec<ModelCallI
         "additionalProperties": false
     });
     let request = MessageRequest::new().system(TRANSCRIBE_SYSTEM).pdf(page).text("Write out this page.").json_schema(schema);
-    let answer = model.ask("document_transcribe", Effort::Low, request).await.map_err(|f| JobError::from_call(f, calls))?;
+    let answer = match model.ask("document_transcribe", Effort::Low, request).await {
+        Ok(a) => a,
+        Err(f) => {
+            calls.push(f.call);
+            bail!("transcribing a scanned page: {}", f.error);
+        }
+    };
     calls.push(answer.call);
     Ok(answer.json["text"].as_str().unwrap_or_default().trim().to_string())
 }
@@ -358,6 +412,15 @@ mod tests {
     }
 
     #[test]
+    fn a_saved_answer_is_used_only_from_the_same_reader_and_kind() {
+        let saved = json!({"document_hash": "ab12", "kind": "health_plan", "reader": "v1", "read": {"clauses": []}});
+        assert!(same_reading(&saved, "health_plan", "v1"));
+        assert!(!same_reading(&saved, "health_plan", "v2"), "the reader changed");
+        assert!(!same_reading(&saved, "coverage_form", "v1"), "read as another kind");
+        assert!(!same_reading(&json!({"kind": "health_plan", "reader": "v1", "read": null}), "health_plan", "v1"));
+    }
+
+    #[test]
     fn every_page_must_be_indexed() {
         let stored = vec![StoredPage { page: 1, text: "one".into(), needs_transcription: false }, StoredPage { page: 2, text: "two".into(), ..Default::default() }];
         assert_eq!(page_texts(&stored, 2).unwrap(), ["one", "two"]);
@@ -368,7 +431,7 @@ mod tests {
     async fn a_scan_is_written_out_by_the_model() {
         let model = FakeModel::new(vec![Ok(json!({"text": "  EXCLUSIONS\nThis insurance does not apply.  "}))]);
         let mut calls = Vec::new();
-        let text = transcribe(&model, b"%PDF-1.5", &mut calls).await.ok().unwrap();
+        let text = transcribe(&model, b"%PDF-1.5", &mut calls).await.unwrap();
         assert_eq!(text, "EXCLUSIONS\nThis insurance does not apply.");
         assert_eq!((calls.len(), calls[0].kind.as_str()), (1, "document_transcribe"));
         let body = model.body(0);

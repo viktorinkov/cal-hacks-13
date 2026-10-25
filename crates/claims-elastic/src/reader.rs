@@ -132,6 +132,20 @@ impl Kibana {
     }
 }
 
+/// The reader's version for a kind's `schema`: a hash of the tool, the agent,
+/// its instructions, the workflow and the schema. An answer saved with the same
+/// version came from the same reader, so the same PDF need not be read again.
+pub fn version(schema: &str) -> String {
+    // FNV-1a over 64 bits: the same on every build, unlike std's hasher.
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for part in [TOOL_JSON, AGENT_JSON, AGENT_INSTRUCTIONS, WORKFLOW_YAML, schema] {
+        for b in part.bytes().chain([0]) {
+            h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    format!("{h:016x}")
+}
+
 /// The agent with its instructions.
 fn agent() -> Result<Value> {
     let mut body: Value = serde_json::from_str(AGENT_JSON)?;
@@ -164,6 +178,14 @@ mod tests {
         assert_eq!(a["configuration"]["enable_elastic_capabilities"], false);
         assert!(a["configuration"]["instructions"].as_str().unwrap().contains("never infer"));
         assert!(WORKFLOW_YAML.contains(&format!("name: {WORKFLOW}")) && WORKFLOW_YAML.contains(&format!("agent-id: {AGENT}")));
+        assert!(WORKFLOW_YAML.contains("reader: \"{{ inputs.reader }}\""), "save_terms keeps the reader's version");
+    }
+
+    #[test]
+    fn the_version_follows_the_schema() {
+        let v = version("{\"required\":[\"clauses\"]}");
+        assert_eq!((v.len(), v.clone()), (16, version("{\"required\":[\"clauses\"]}")));
+        assert_ne!(v, version("{\"required\":[\"printed\",\"clauses\"]}"));
     }
 
     #[test]

@@ -23,7 +23,7 @@ mod documents;
 pub mod reader;
 pub use clause_search::{CLAUSE_SECTIONS, ClauseHit, sections_for_kind};
 pub use clauses::PolicyClause;
-pub use documents::StoredPage;
+pub use documents::{MAX_DOCUMENT_PAGES, StoredPage};
 pub use reader::Kibana;
 
 /// Index prefix used when `ELASTIC_INDEX_PREFIX` is not set (Maincloud).

@@ -25,6 +25,7 @@ pub mod outcome;
 pub mod pack;
 pub mod payloads;
 pub mod policy;
+pub mod printed;
 pub mod rules;
 pub mod schemas;
 pub mod time;
