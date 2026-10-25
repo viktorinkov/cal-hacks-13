@@ -74,7 +74,16 @@ A call replaces the whole crowd: it first deletes every crowd attendee with thei
   From a booth it tries another booth 35 percent of the time and otherwise goes back to its table, where it stays 6 to 15 minutes. Booth staff stay at their booth 15 to 40 minutes at a time, with a 4 to 8 minute food break 30 percent of the time.
 
   At the start a third of the teams are away from their table, and the first moves are spread over the first 10 minutes, so the venue is busy at once. All of these are starting values.
-- **Spots and neighbours.** A team stands at a spot in metres on the venue plan, the same plan the organizer portal's venue map draws from `venue_plan` ([SpacetimeDB](../2-data/SpacetimeDB.md)): a booth's spot for the attendees who visit it, its staff spot for the booth's staff, or a random spot in a zone. Each member stands at the team's spot plus their own offset.
+
+  Where a team goes and how long it stays come from a random generator seeded with the live run's seed and the tick, so the same seed sends the crowd the same way.
+- **Walking.** A team walks to its next spot; nobody jumps. The way follows the venue floor's walkable grid, `venue_floor`: the 3D model seen from above in 25 cm cells, loaded from `web/venue/floor.json` with `load_venue_floor` (role `ops`). Walls, tables, the stage and the food line close a cell; chairs do not, so people walk the gaps between the rows of hacker tables to their table. `pipeline/venue_floor.py` makes the grid from `web/venue/venue.glb`.
+
+  The module finds the shortest way on the grid and keeps only its corners, so people walk straight down an aisle and turn at its end, around the hall's curve instead of through its walls. The members set off one behind the other, 0.6 s apart, each from where they stand to their own place at the new spot, at the team's steady speed of 1.1 to 1.5 m/s. A live run at a faster pace plays the walks at most 1.5 times faster, so they stay brisk walks and never runs.
+
+  Each member's walk is a `crowd_walk` row: its corners, when it starts, when it arrives and its speed. On every tick `crowd_tick` puts the band at its place along the walk, and the organizer portal's 3D view follows the same walk smoothly between ticks. The team's stay at the new spot counts from when its last member arrives.
+- **In and out of the doors.** When a live run opens the doors, every team comes in through a door over the first 25 s, seven in ten by the door nearest their first spot, and walks there; a band is off until its wearer walks in. When the doors close every team walks to its nearest door, and each band goes off as its wearer walks out. The event ends once nobody is still walking, 10 s to 2 minutes after the doors close, and the medic is done.
+- **Someone down.** A team stays with a member who fell or pressed SOS. Once the medic resolves it, that member walks from where they fell back to the team, and the team moves on. While a live run is paused nobody walks, and every walk and next move carry on by the time it was paused.
+- **Spots and neighbours.** A team stands at a spot in metres on the venue plan, the same plan the organizer portal's venue map draws from `venue_plan` ([SpacetimeDB](../2-data/SpacetimeDB.md)): a booth's spot for the attendees who visit it, its staff spot for the booth's staff, or a random spot in a zone. Each member stands at the team's spot plus their own offset, at the nearest point where someone can stand, so beside a table and never on it. A member on their way counts in the zone and booth they left until they are halfway, then in the ones they walk to.
 
   Every tick, `crowd_tick` counts each crowd band's neighbours, the bands within 1.5 m, real and test bands included. It turns that count into the band's state, IDLE, YELLOW or GUIDE (calm, busy or very busy on the map), against `settings.yellow` and `settings.red`, with the firmware's one-step hysteresis. It writes the `band` row (zone, booth, spot, `neigh`, state, online) only for the bands that changed, all in one transaction.
 - **Stays.** When a crowd band's zone or booth changes, `crowd_tick` closes its open stay in `zone_visit` and opens a new one with the new zone and booth. The crowd needs no space-time mapping, because the module places each crowd band itself.
@@ -96,7 +105,7 @@ What one crowd tick does.
 ```mermaid
 flowchart TB
     SC["start_crowd: up to 2,000 crowd bands from 100, teams and booth staff"] --> CT["crowd_tick every 2 s"]
-    CT -->|"a team's time is up"| MV["the team moves: a booth, food, the stage, another table, the entrance, or home"]
+    CT -->|"a team's time is up"| MV["the team walks the aisles to a booth, food, the stage, another table, the entrance, or home"]
     MV -->|"zone or booth changed"| ST["zone_visit: old stay closed, new stay opened"]
     CT -->|"bands that changed"| BR["band: zone, booth, spot, neigh, state"]
     CT -->|"teammates always, strangers who talk"| CL["encounter: close time, 6 times faster"]

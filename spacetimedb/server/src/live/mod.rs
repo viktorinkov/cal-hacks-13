@@ -22,7 +22,6 @@ use crate::roles::require_role;
 use crate::insurance::settlement_rule;
 use crate::safety::{self, IncidentKind, IncidentStatus, incident};
 use crate::social::crowd::{self, MAX_CROWD};
-use crate::social::tables::*;
 use crate::tables::*;
 use crate::venue::{nearest_station, place_name, venue_spot, zone_for_station};
 use crate::web::event_state;
@@ -35,8 +34,9 @@ const TICK_MILLIS: u64 = 1_000;
 /// would have its circle in another zone); the next ones this far apart, in seconds.
 const FIRST_INCIDENT_SECS: i64 = 60;
 const INCIDENT_GAP_SECS: (i64, i64) = (70, 95);
-/// The crowd takes this long to walk out once the doors close, before the bands go quiet.
-const WALK_OUT_SECS: i64 = 25;
+/// Once the doors close the bands go quiet when the crowd has walked out of the doors, at the earliest this
+/// long after and at the latest this long.
+const WALK_OUT_SECS: (i64, i64) = (10, 120);
 /// The doors stay closed at most this long waiting for the medic to resolve the last incidents.
 const CLOSE_WAIT_SECS: i64 = 120;
 /// A test band that stops reporting goes offline after 5 s; the run reports placed test bands every tick.
@@ -252,9 +252,6 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
     }
     ctx.db.live_pause().id().delete(0);
     crate::web::set_ended_by(ctx, false)?;
-    crowd::start(ctx, crowd_size, pace.max(1) as f32)?;
-    walk_in(ctx);
-    safety::ensure_watch(ctx);
     let row = LiveRun {
         id: 0,
         phase: LivePhase::Running,
@@ -273,6 +270,10 @@ pub fn start_live_run(ctx: &ReducerContext, crowd_size: u16, minutes: u16, pace:
         Some(_) => ctx.db.live_run().id().update(row),
         None => ctx.db.live_run().insert(row),
     };
+    // The run's row first: the crowd walks in at its pace, and its seed sends everyone their way.
+    crowd::start(ctx, crowd_size, pace.max(1) as f32)?;
+    crowd::walk_in(ctx);
+    safety::ensure_watch(ctx);
     for t in ctx.db.live_run_timer().iter().collect::<Vec<_>>() {
         ctx.db.live_run_timer().scheduled_id().delete(t.scheduled_id);
     }
@@ -337,51 +338,9 @@ pub fn resume_live_run(ctx: &ReducerContext) -> Result<(), String> {
             ..r
         });
     }
-    for g in ctx.db.crowd_group().iter().collect::<Vec<_>>() {
-        ctx.db.crowd_group().id().update(CrowdGroup { next_move_at: g.next_move_at + gap, ..g });
-    }
+    crowd::resume(ctx, gap);
     record(ctx, 0, 0, "venue", &safety::caller_name(ctx), "Resumed".into(), format!("paused for {} s", gap.to_micros() / 1_000_000));
     Ok(())
-}
-
-/// Every person of the crowd starts at a door, so the first tick walks them to their tables.
-fn walk_in(ctx: &ReducerContext) {
-    let doors: Vec<(f32, f32, u8)> =
-        ctx.db.venue_spot().kind().filter("entrance").map(|s| (s.x_m, s.y_m, s.station_id)).collect();
-    if doors.is_empty() {
-        return;
-    }
-    let mut rng = ctx.rng();
-    for m in ctx.db.crowd_member().iter() {
-        let (x, y, station) = doors[rng.gen_range(0..doors.len())];
-        let row = Band {
-            id: m.band_id,
-            state: 0,
-            flags: F_MPU | F_MOTOR,
-            neigh: 0,
-            zone: station,
-            bat: 255,
-            find: 0,
-            rssi: -60,
-            seq: 1,
-            sos: false,
-            fall: false,
-            pressed: false,
-            low_battery: false,
-            has_mpu: true,
-            has_motor: true,
-            online: true,
-            last_seen: ctx.timestamp,
-            x_m: x + rng.gen_range(-1.5..1.5),
-            y_m: y + rng.gen_range(-1.5..1.5),
-            booth_id: 0,
-        };
-        if ctx.db.band().id().find(m.band_id).is_some() {
-            ctx.db.band().id().update(row);
-        } else {
-            ctx.db.band().insert(row);
-        }
-    }
 }
 
 fn close_doors(ctx: &ReducerContext, r: LiveRun) {
@@ -421,7 +380,8 @@ pub fn live_tick(ctx: &ReducerContext, _timer: LiveRunTimer) -> Result<(), Strin
         LivePhase::Closing => {
             let since = r.closing_at.map(|t| safety::micros_between(t, ctx.timestamp) / 1_000_000).unwrap_or(0);
             let open = ctx.db.incident_marker().iter().any(|m| m.status != "resolved");
-            if since >= WALK_OUT_SECS && (!open || since >= CLOSE_WAIT_SECS) {
+            let out = since >= WALK_OUT_SECS.1 || (since >= WALK_OUT_SECS.0 && !crowd::walking(ctx));
+            if out && (!open || since >= CLOSE_WAIT_SECS) {
                 finish(ctx, r);
             }
         }

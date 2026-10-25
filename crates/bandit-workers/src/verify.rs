@@ -19,7 +19,7 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: VerifyPayload) -> Result<(), JobErro
     let attendee = attendee_hash(&p);
     // The clause search never fails the job: without clauses Claude decides with its own searches, or none.
     let found = es
-        .search_clauses(&doc.narrative, None, attendee, sections_for_kind(&p.incident_kind), CLAUSES)
+        .search_clauses(&doc.narrative, Some(p.venue_policy_hash.as_str()).filter(|h| !h.is_empty()), attendee, sections_for_kind(&p.incident_kind), CLAUSES)
         .await
         .map_err(|e| format!("{e:#}"));
     if let Err(e) = &found {

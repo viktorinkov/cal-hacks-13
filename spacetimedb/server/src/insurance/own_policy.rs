@@ -135,6 +135,7 @@ pub fn cover_rule(p: &AttendeePolicy) -> super::CoverageRuleRow {
         per_claim_limit_cents: p.per_claim_limit_cents,
         aggregate_limit_cents: p.aggregate_limit_cents,
         deductible_cents: p.deductible_cents,
+        minimum_payout_cents: 0,
         service_window_days: 0,
         active: true,
         updated_at: p.updated_at,

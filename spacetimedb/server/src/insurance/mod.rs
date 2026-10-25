@@ -10,6 +10,7 @@
 //! ledger.
 
 pub mod charges;
+pub mod documents;
 pub mod evidence;
 pub mod filing;
 pub mod flow;
@@ -25,6 +26,7 @@ mod tests;
 pub use flow::{on_incident_resolved, on_job_dead};
 pub use charges::*;
 pub use own_policy::*;
+pub use documents::{FeeScheduleLine, PolicyDocument, PolicyTerm, fee_schedule_line, policy_document, policy_term};
 pub use tables::*;
 
 use spacetimedb::{ReducerContext, Table, Timestamp};

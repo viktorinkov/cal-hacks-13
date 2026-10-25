@@ -71,6 +71,9 @@ pub struct VerifyPayload {
     /// The attendee's own policy document (`attendee_policy.document_hash`), empty when none is on file.
     #[serde(default)]
     pub attendee_policy_hash: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
 }
 
 /// A policy clause the Evidence Engine found for a claim, as the module stored it (`claim_clause`).
@@ -134,6 +137,9 @@ pub struct ReviewPayload {
     /// The attendee's own policy document, empty when none is on file: Claude's policy search covers it too.
     #[serde(default)]
     pub attendee_policy_hash: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

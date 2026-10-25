@@ -14,6 +14,7 @@ pub mod add_staff_reducer;
 pub mod api_session_table;
 pub mod api_session_type;
 pub mod api_sessions_table;
+pub mod apply_document_terms_reducer;
 pub mod apply_medical_extract_reducer;
 pub mod apply_medical_record_reducer;
 pub mod approval_table;
@@ -47,7 +48,9 @@ pub mod board_attendees_table;
 pub mod board_charges_table;
 pub mod board_checks_table;
 pub mod board_clinic_reports_table;
+pub mod board_covers_table;
 pub mod board_facts_table;
+pub mod board_fee_schedule_table;
 pub mod board_ledger_table;
 pub mod board_lines_table;
 pub mod board_medical_access_table;
@@ -59,6 +62,8 @@ pub mod board_notes_table;
 pub mod board_photo_type;
 pub mod board_photos_table;
 pub mod board_policies_table;
+pub mod board_policy_documents_table;
+pub mod board_policy_terms_table;
 pub mod board_precedents_table;
 pub mod board_records_table;
 pub mod board_reviews_table;
@@ -114,11 +119,13 @@ pub mod client_connected_reducer;
 pub mod client_disconnected_reducer;
 pub mod clinic_report_table;
 pub mod clinic_report_type;
+pub mod close_claim_without_injury_reducer;
 pub mod command_sent_reducer;
 pub mod command_table;
 pub mod command_type;
 pub mod complete_job_reducer;
 pub mod confirm_medical_card_reducer;
+pub mod confirm_policy_terms_reducer;
 pub mod connect_wallet_reducer;
 pub mod coverage_rule_row_type;
 pub mod coverage_rule_table;
@@ -129,6 +136,8 @@ pub mod crowd_member_type;
 pub mod crowd_tick_reducer;
 pub mod crowd_timer_table;
 pub mod crowd_timer_type;
+pub mod crowd_walk_table;
+pub mod crowd_walk_type;
 pub mod decision_table;
 pub mod decision_type;
 pub mod dispute_charge_reducer;
@@ -151,6 +160,8 @@ pub mod evidence_pack_type;
 pub mod extend_job_lease_reducer;
 pub mod fact_type;
 pub mod fail_job_reducer;
+pub mod fee_schedule_line_table;
+pub mod fee_schedule_line_type;
 pub mod file_claim_for_wearer_reducer;
 pub mod file_claim_reducer;
 pub mod file_clinic_report_reducer;
@@ -210,6 +221,7 @@ pub mod live_run_timer_type;
 pub mod live_run_type;
 pub mod live_tick_reducer;
 pub mod load_merch_templates_reducer;
+pub mod load_venue_floor_reducer;
 pub mod load_venue_spots_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
@@ -292,6 +304,10 @@ pub mod photo_type;
 pub mod place_band_reducer;
 pub mod place_booth_reducer;
 pub mod plan_area_type;
+pub mod policy_document_table;
+pub mod policy_document_type;
+pub mod policy_term_table;
+pub mod policy_term_type;
 pub mod property_event_table;
 pub mod property_event_type;
 pub mod record_charge_payment_reducer;
@@ -374,6 +390,7 @@ pub mod submit_medical_document_reducer;
 pub mod submit_medical_record_reducer;
 pub mod submit_merch_picks_reducer;
 pub mod submit_photo_features_reducer;
+pub mod submit_policy_document_reducer;
 pub mod submit_vision_assessment_reducer;
 pub mod sweep_reducer;
 pub mod sweep_timer_table;
@@ -386,6 +403,9 @@ pub mod upsert_attendee_policy_reducer;
 pub mod upsert_camera_reducer;
 pub mod upsert_coverage_rule_reducer;
 pub mod upsert_insurance_policy_reducer;
+pub mod venue_floor_in_type;
+pub mod venue_floor_table;
+pub mod venue_floor_type;
 pub mod venue_in_type;
 pub mod venue_plan_table;
 pub mod venue_setup_result_type;
@@ -426,6 +446,7 @@ pub use add_staff_reducer::add_staff;
 pub use api_session_table::*;
 pub use api_session_type::ApiSession;
 pub use api_sessions_table::*;
+pub use apply_document_terms_reducer::apply_document_terms;
 pub use apply_medical_extract_reducer::apply_medical_extract;
 pub use apply_medical_record_reducer::apply_medical_record;
 pub use approval_table::*;
@@ -459,7 +480,9 @@ pub use board_attendees_table::*;
 pub use board_charges_table::*;
 pub use board_checks_table::*;
 pub use board_clinic_reports_table::*;
+pub use board_covers_table::*;
 pub use board_facts_table::*;
+pub use board_fee_schedule_table::*;
 pub use board_ledger_table::*;
 pub use board_lines_table::*;
 pub use board_medical_access_table::*;
@@ -471,6 +494,8 @@ pub use board_notes_table::*;
 pub use board_photo_type::BoardPhoto;
 pub use board_photos_table::*;
 pub use board_policies_table::*;
+pub use board_policy_documents_table::*;
+pub use board_policy_terms_table::*;
 pub use board_precedents_table::*;
 pub use board_records_table::*;
 pub use board_reviews_table::*;
@@ -526,11 +551,13 @@ pub use client_connected_reducer::client_connected;
 pub use client_disconnected_reducer::client_disconnected;
 pub use clinic_report_table::*;
 pub use clinic_report_type::ClinicReport;
+pub use close_claim_without_injury_reducer::close_claim_without_injury;
 pub use command_sent_reducer::command_sent;
 pub use command_table::*;
 pub use command_type::Command;
 pub use complete_job_reducer::complete_job;
 pub use confirm_medical_card_reducer::confirm_medical_card;
+pub use confirm_policy_terms_reducer::confirm_policy_terms;
 pub use connect_wallet_reducer::connect_wallet;
 pub use coverage_rule_row_type::CoverageRuleRow;
 pub use coverage_rule_table::*;
@@ -541,6 +568,8 @@ pub use crowd_member_type::CrowdMember;
 pub use crowd_tick_reducer::crowd_tick;
 pub use crowd_timer_table::*;
 pub use crowd_timer_type::CrowdTimer;
+pub use crowd_walk_table::*;
+pub use crowd_walk_type::CrowdWalk;
 pub use decision_table::*;
 pub use decision_type::Decision;
 pub use dispute_charge_reducer::dispute_charge;
@@ -563,6 +592,8 @@ pub use evidence_pack_type::EvidencePack;
 pub use extend_job_lease_reducer::extend_job_lease;
 pub use fact_type::Fact;
 pub use fail_job_reducer::fail_job;
+pub use fee_schedule_line_table::*;
+pub use fee_schedule_line_type::FeeScheduleLine;
 pub use file_claim_for_wearer_reducer::file_claim_for_wearer;
 pub use file_claim_reducer::file_claim;
 pub use file_clinic_report_reducer::file_clinic_report;
@@ -622,6 +653,7 @@ pub use live_run_timer_type::LiveRunTimer;
 pub use live_run_type::LiveRun;
 pub use live_tick_reducer::live_tick;
 pub use load_merch_templates_reducer::load_merch_templates;
+pub use load_venue_floor_reducer::load_venue_floor;
 pub use load_venue_spots_reducer::load_venue_spots;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
@@ -704,6 +736,10 @@ pub use photo_type::Photo;
 pub use place_band_reducer::place_band;
 pub use place_booth_reducer::place_booth;
 pub use plan_area_type::PlanArea;
+pub use policy_document_table::*;
+pub use policy_document_type::PolicyDocument;
+pub use policy_term_table::*;
+pub use policy_term_type::PolicyTerm;
 pub use property_event_table::*;
 pub use property_event_type::PropertyEvent;
 pub use record_charge_payment_reducer::record_charge_payment;
@@ -786,6 +822,7 @@ pub use submit_medical_document_reducer::submit_medical_document;
 pub use submit_medical_record_reducer::submit_medical_record;
 pub use submit_merch_picks_reducer::submit_merch_picks;
 pub use submit_photo_features_reducer::submit_photo_features;
+pub use submit_policy_document_reducer::submit_policy_document;
 pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use sweep_reducer::sweep;
 pub use sweep_timer_table::*;
@@ -798,6 +835,9 @@ pub use upsert_attendee_policy_reducer::upsert_attendee_policy;
 pub use upsert_camera_reducer::upsert_camera;
 pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
 pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
+pub use venue_floor_in_type::VenueFloorIn;
+pub use venue_floor_table::*;
+pub use venue_floor_type::VenueFloor;
 pub use venue_in_type::VenueIn;
 pub use venue_plan_table::*;
 pub use venue_setup_result_type::VenueSetupResult;
@@ -850,6 +890,11 @@ pub enum Reducer {
         email: String,
         role: String,
         name: String,
+    },
+    ApplyDocumentTerms {
+        job_id: u64,
+        read_json: String,
+        pages: Vec<String>,
     },
     ApplyMedicalExtract {
         job_id: u64,
@@ -916,6 +961,10 @@ pub enum Reducer {
     },
     ClientConnected,
     ClientDisconnected,
+    CloseClaimWithoutInjury {
+        claim_id: u64,
+        reason: String,
+    },
     CommandSent {
         id: u64,
         error: Option<String>,
@@ -925,6 +974,9 @@ pub enum Reducer {
         result: String,
     },
     ConfirmMedicalCard,
+    ConfirmPolicyTerms {
+        document_id: u64,
+    },
     ConnectWallet,
     CrowdTick {
         timer: CrowdTimer,
@@ -1003,6 +1055,9 @@ pub enum Reducer {
     },
     LoadMerchTemplates {
         templates: Vec<MerchTemplateIn>,
+    },
+    LoadVenueFloor {
+        floor: VenueFloorIn,
     },
     LoadVenueSpots {
         spots: Vec<VenueSpotIn>,
@@ -1252,6 +1307,10 @@ pub enum Reducer {
         caption: String,
         call: ModelCallIn,
     },
+    SubmitPolicyDocument {
+        file_hash: String,
+        page_count: u32,
+    },
     SubmitVisionAssessment {
         incident_id: u64,
         trigger: String,
@@ -1330,6 +1389,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddIncidentNote { .. } => "add_incident_note",
             Reducer::AddOwner { .. } => "add_owner",
             Reducer::AddStaff { .. } => "add_staff",
+            Reducer::ApplyDocumentTerms { .. } => "apply_document_terms",
             Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
             Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveCharge { .. } => "approve_charge",
@@ -1346,9 +1406,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::Clear { .. } => "clear",
             Reducer::ClientConnected => "client_connected",
             Reducer::ClientDisconnected => "client_disconnected",
+            Reducer::CloseClaimWithoutInjury { .. } => "close_claim_without_injury",
             Reducer::CommandSent { .. } => "command_sent",
             Reducer::CompleteJob { .. } => "complete_job",
             Reducer::ConfirmMedicalCard => "confirm_medical_card",
+            Reducer::ConfirmPolicyTerms { .. } => "confirm_policy_terms",
             Reducer::ConnectWallet => "connect_wallet",
             Reducer::CrowdTick { .. } => "crowd_tick",
             Reducer::DisputeCharge { .. } => "dispute_charge",
@@ -1371,6 +1433,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::JobReaper { .. } => "job_reaper",
             Reducer::LiveTick { .. } => "live_tick",
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
+            Reducer::LoadVenueFloor { .. } => "load_venue_floor",
             Reducer::LoadVenueSpots { .. } => "load_venue_spots",
             Reducer::NameResponsibleBand { .. } => "name_responsible_band",
             Reducer::OpenApiSession { .. } => "open_api_session",
@@ -1431,6 +1494,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::SubmitMedicalRecord { .. } => "submit_medical_record",
             Reducer::SubmitMerchPicks { .. } => "submit_merch_picks",
             Reducer::SubmitPhotoFeatures { .. } => "submit_photo_features",
+            Reducer::SubmitPolicyDocument { .. } => "submit_policy_document",
             Reducer::SubmitVisionAssessment { .. } => "submit_vision_assessment",
             Reducer::Sweep { .. } => "sweep",
             Reducer::UnplaceBand { .. } => "unplace_band",
@@ -1469,6 +1533,15 @@ impl __sdk::Reducer for Reducer {
                     name: name.clone(),
                 })
             }
+            Reducer::ApplyDocumentTerms {
+                job_id,
+                read_json,
+                pages,
+            } => __sats::bsatn::to_vec(&apply_document_terms_reducer::ApplyDocumentTermsArgs {
+                job_id: job_id.clone(),
+                read_json: read_json.clone(),
+                pages: pages.clone(),
+            }),
             Reducer::ApplyMedicalExtract {
                 job_id,
                 card_json,
@@ -1585,6 +1658,12 @@ impl __sdk::Reducer for Reducer {
             Reducer::ClientDisconnected => {
                 __sats::bsatn::to_vec(&client_disconnected_reducer::ClientDisconnectedArgs {})
             }
+            Reducer::CloseClaimWithoutInjury { claim_id, reason } => __sats::bsatn::to_vec(
+                &close_claim_without_injury_reducer::CloseClaimWithoutInjuryArgs {
+                    claim_id: claim_id.clone(),
+                    reason: reason.clone(),
+                },
+            ),
             Reducer::CommandSent { id, error } => {
                 __sats::bsatn::to_vec(&command_sent_reducer::CommandSentArgs {
                     id: id.clone(),
@@ -1599,6 +1678,11 @@ impl __sdk::Reducer for Reducer {
             }
             Reducer::ConfirmMedicalCard => {
                 __sats::bsatn::to_vec(&confirm_medical_card_reducer::ConfirmMedicalCardArgs {})
+            }
+            Reducer::ConfirmPolicyTerms { document_id } => {
+                __sats::bsatn::to_vec(&confirm_policy_terms_reducer::ConfirmPolicyTermsArgs {
+                    document_id: document_id.clone(),
+                })
             }
             Reducer::ConnectWallet => {
                 __sats::bsatn::to_vec(&connect_wallet_reducer::ConnectWalletArgs {})
@@ -1731,6 +1815,11 @@ impl __sdk::Reducer for Reducer {
             Reducer::LoadMerchTemplates { templates } => {
                 __sats::bsatn::to_vec(&load_merch_templates_reducer::LoadMerchTemplatesArgs {
                     templates: templates.clone(),
+                })
+            }
+            Reducer::LoadVenueFloor { floor } => {
+                __sats::bsatn::to_vec(&load_venue_floor_reducer::LoadVenueFloorArgs {
+                    floor: floor.clone(),
                 })
             }
             Reducer::LoadVenueSpots { spots } => {
@@ -2178,6 +2267,13 @@ impl __sdk::Reducer for Reducer {
                 caption: caption.clone(),
                 call: call.clone(),
             }),
+            Reducer::SubmitPolicyDocument {
+                file_hash,
+                page_count,
+            } => __sats::bsatn::to_vec(&submit_policy_document_reducer::SubmitPolicyDocumentArgs {
+                file_hash: file_hash.clone(),
+                page_count: page_count.clone(),
+            }),
             Reducer::SubmitVisionAssessment {
                 incident_id,
                 trigger,
@@ -2326,7 +2422,9 @@ pub struct DbUpdate {
     board_charges: __sdk::TableUpdate<Charge>,
     board_checks: __sdk::TableUpdate<ClaimCheck>,
     board_clinic_reports: __sdk::TableUpdate<ClinicReport>,
+    board_covers: __sdk::TableUpdate<CoverageRuleRow>,
     board_facts: __sdk::TableUpdate<EvidenceFact>,
+    board_fee_schedule: __sdk::TableUpdate<FeeScheduleLine>,
     board_ledger: __sdk::TableUpdate<LedgerEntry>,
     board_lines: __sdk::TableUpdate<ClaimLine>,
     board_medical_access: __sdk::TableUpdate<MedicalAccessLog>,
@@ -2335,6 +2433,8 @@ pub struct DbUpdate {
     board_notes: __sdk::TableUpdate<IncidentNote>,
     board_photos: __sdk::TableUpdate<BoardPhoto>,
     board_policies: __sdk::TableUpdate<InsurancePolicy>,
+    board_policy_documents: __sdk::TableUpdate<PolicyDocument>,
+    board_policy_terms: __sdk::TableUpdate<PolicyTerm>,
     board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
     board_records: __sdk::TableUpdate<MedicalRecord>,
     board_reviews: __sdk::TableUpdate<ClaimReview>,
@@ -2367,6 +2467,7 @@ pub struct DbUpdate {
     crowd_group: __sdk::TableUpdate<CrowdGroup>,
     crowd_member: __sdk::TableUpdate<CrowdMember>,
     crowd_timer: __sdk::TableUpdate<CrowdTimer>,
+    crowd_walk: __sdk::TableUpdate<CrowdWalk>,
     decision: __sdk::TableUpdate<Decision>,
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
@@ -2374,6 +2475,7 @@ pub struct DbUpdate {
     event_state: __sdk::TableUpdate<EventState>,
     evidence_fact: __sdk::TableUpdate<EvidenceFact>,
     evidence_pack: __sdk::TableUpdate<EvidencePack>,
+    fee_schedule_line: __sdk::TableUpdate<FeeScheduleLine>,
     gateway: __sdk::TableUpdate<Gateway>,
     import_run: __sdk::TableUpdate<ImportRun>,
     incident: __sdk::TableUpdate<Incident>,
@@ -2432,6 +2534,8 @@ pub struct DbUpdate {
     person_claim: __sdk::TableUpdate<PersonClaim>,
     photo: __sdk::TableUpdate<Photo>,
     photo_tag: __sdk::TableUpdate<PhotoTag>,
+    policy_document: __sdk::TableUpdate<PolicyDocument>,
+    policy_term: __sdk::TableUpdate<PolicyTerm>,
     property_event: __sdk::TableUpdate<PropertyEvent>,
     schedule_slot: __sdk::TableUpdate<ScheduleSlot>,
     settings: __sdk::TableUpdate<Settings>,
@@ -2453,6 +2557,7 @@ pub struct DbUpdate {
     sweep_timer: __sdk::TableUpdate<SweepTimer>,
     unclaimed_injuries: __sdk::TableUpdate<UnclaimedInjury>,
     venue: __sdk::TableUpdate<Venue>,
+    venue_floor: __sdk::TableUpdate<VenueFloor>,
     venue_plan: __sdk::TableUpdate<PlanArea>,
     venue_setup: __sdk::TableUpdate<VenueSetup>,
     venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
@@ -2527,9 +2632,15 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_clinic_reports" => db_update.board_clinic_reports.append(
                     board_clinic_reports_table::parse_table_update(table_update)?,
                 ),
+                "board_covers" => db_update
+                    .board_covers
+                    .append(board_covers_table::parse_table_update(table_update)?),
                 "board_facts" => db_update
                     .board_facts
                     .append(board_facts_table::parse_table_update(table_update)?),
+                "board_fee_schedule" => db_update
+                    .board_fee_schedule
+                    .append(board_fee_schedule_table::parse_table_update(table_update)?),
                 "board_ledger" => db_update
                     .board_ledger
                     .append(board_ledger_table::parse_table_update(table_update)?),
@@ -2554,6 +2665,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "board_policies" => db_update
                     .board_policies
                     .append(board_policies_table::parse_table_update(table_update)?),
+                "board_policy_documents" => db_update.board_policy_documents.append(
+                    board_policy_documents_table::parse_table_update(table_update)?,
+                ),
+                "board_policy_terms" => db_update
+                    .board_policy_terms
+                    .append(board_policy_terms_table::parse_table_update(table_update)?),
                 "board_precedents" => db_update
                     .board_precedents
                     .append(board_precedents_table::parse_table_update(table_update)?),
@@ -2650,6 +2767,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(crowd_timer_table::parse_table_update(table_update)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(crowd_walk_table::parse_table_update(table_update)?),
                 "decision" => db_update
                     .decision
                     .append(decision_table::parse_table_update(table_update)?),
@@ -2671,6 +2791,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "evidence_pack" => db_update
                     .evidence_pack
                     .append(evidence_pack_table::parse_table_update(table_update)?),
+                "fee_schedule_line" => db_update
+                    .fee_schedule_line
+                    .append(fee_schedule_line_table::parse_table_update(table_update)?),
                 "gateway" => db_update
                     .gateway
                     .append(gateway_table::parse_table_update(table_update)?),
@@ -2845,6 +2968,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "photo_tag" => db_update
                     .photo_tag
                     .append(photo_tag_table::parse_table_update(table_update)?),
+                "policy_document" => db_update
+                    .policy_document
+                    .append(policy_document_table::parse_table_update(table_update)?),
+                "policy_term" => db_update
+                    .policy_term
+                    .append(policy_term_table::parse_table_update(table_update)?),
                 "property_event" => db_update
                     .property_event
                     .append(property_event_table::parse_table_update(table_update)?),
@@ -2908,6 +3037,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue" => db_update
                     .venue
                     .append(venue_table::parse_table_update(table_update)?),
+                "venue_floor" => db_update
+                    .venue_floor
+                    .append(venue_floor_table::parse_table_update(table_update)?),
                 "venue_plan" => db_update
                     .venue_plan
                     .append(venue_plan_table::parse_table_update(table_update)?),
@@ -3057,6 +3189,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.crowd_timer = cache
             .apply_diff_to_table::<CrowdTimer>("crowd_timer", &self.crowd_timer)
             .with_updates_by_pk(|row| &row.scheduled_id);
+        diff.crowd_walk = cache
+            .apply_diff_to_table::<CrowdWalk>("crowd_walk", &self.crowd_walk)
+            .with_updates_by_pk(|row| &row.band_id);
         diff.decision = cache
             .apply_diff_to_table::<Decision>("decision", &self.decision)
             .with_updates_by_pk(|row| &row.id);
@@ -3074,6 +3209,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.id);
         diff.evidence_pack = cache
             .apply_diff_to_table::<EvidencePack>("evidence_pack", &self.evidence_pack)
+            .with_updates_by_pk(|row| &row.id);
+        diff.fee_schedule_line = cache
+            .apply_diff_to_table::<FeeScheduleLine>("fee_schedule_line", &self.fee_schedule_line)
             .with_updates_by_pk(|row| &row.id);
         diff.gateway = cache
             .apply_diff_to_table::<Gateway>("gateway", &self.gateway)
@@ -3183,6 +3321,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.photo_tag = cache
             .apply_diff_to_table::<PhotoTag>("photo_tag", &self.photo_tag)
             .with_updates_by_pk(|row| &row.id);
+        diff.policy_document = cache
+            .apply_diff_to_table::<PolicyDocument>("policy_document", &self.policy_document)
+            .with_updates_by_pk(|row| &row.id);
+        diff.policy_term = cache
+            .apply_diff_to_table::<PolicyTerm>("policy_term", &self.policy_term)
+            .with_updates_by_pk(|row| &row.id);
         diff.property_event = cache
             .apply_diff_to_table::<PropertyEvent>("property_event", &self.property_event)
             .with_updates_by_pk(|row| &row.id);
@@ -3221,6 +3365,9 @@ impl __sdk::DbUpdate for DbUpdate {
             .with_updates_by_pk(|row| &row.scheduled_id);
         diff.venue = cache
             .apply_diff_to_table::<Venue>("venue", &self.venue)
+            .with_updates_by_pk(|row| &row.id);
+        diff.venue_floor = cache
+            .apply_diff_to_table::<VenueFloor>("venue_floor", &self.venue_floor)
             .with_updates_by_pk(|row| &row.id);
         diff.venue_setup = cache
             .apply_diff_to_table::<VenueSetup>("venue_setup", &self.venue_setup)
@@ -3269,8 +3416,14 @@ impl __sdk::DbUpdate for DbUpdate {
             "board_clinic_reports",
             &self.board_clinic_reports,
         );
+        diff.board_covers = cache
+            .apply_diff_to_table::<CoverageRuleRow>("board_covers", &self.board_covers)
+            .with_updates_by_pk(|row| &row.id);
         diff.board_facts =
             cache.apply_diff_to_table::<EvidenceFact>("board_facts", &self.board_facts);
+        diff.board_fee_schedule = cache
+            .apply_diff_to_table::<FeeScheduleLine>("board_fee_schedule", &self.board_fee_schedule)
+            .with_updates_by_pk(|row| &row.id);
         diff.board_ledger =
             cache.apply_diff_to_table::<LedgerEntry>("board_ledger", &self.board_ledger);
         diff.board_lines = cache.apply_diff_to_table::<ClaimLine>("board_lines", &self.board_lines);
@@ -3288,6 +3441,15 @@ impl __sdk::DbUpdate for DbUpdate {
             cache.apply_diff_to_table::<BoardPhoto>("board_photos", &self.board_photos);
         diff.board_policies = cache
             .apply_diff_to_table::<InsurancePolicy>("board_policies", &self.board_policies)
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_policy_documents = cache
+            .apply_diff_to_table::<PolicyDocument>(
+                "board_policy_documents",
+                &self.board_policy_documents,
+            )
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_policy_terms = cache
+            .apply_diff_to_table::<PolicyTerm>("board_policy_terms", &self.board_policy_terms)
             .with_updates_by_pk(|row| &row.id);
         diff.board_precedents =
             cache.apply_diff_to_table::<ClaimPrecedent>("board_precedents", &self.board_precedents);
@@ -3440,8 +3602,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_clinic_reports" => db_update
                     .board_clinic_reports
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_covers" => db_update
+                    .board_covers
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_facts" => db_update
                     .board_facts
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_fee_schedule" => db_update
+                    .board_fee_schedule
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_ledger" => db_update
                     .board_ledger
@@ -3466,6 +3634,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_policies" => db_update
                     .board_policies
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_policy_documents" => db_update
+                    .board_policy_documents
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_policy_terms" => db_update
+                    .board_policy_terms
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "board_precedents" => db_update
                     .board_precedents
@@ -3563,6 +3737,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3583,6 +3760,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "evidence_pack" => db_update
                     .evidence_pack
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "fee_schedule_line" => db_update
+                    .fee_schedule_line
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "gateway" => db_update
                     .gateway
@@ -3758,6 +3938,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "photo_tag" => db_update
                     .photo_tag
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "policy_document" => db_update
+                    .policy_document
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "policy_term" => db_update
+                    .policy_term
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3820,6 +4006,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue" => db_update
                     .venue
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue_floor" => db_update
+                    .venue_floor
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
@@ -3924,8 +4113,14 @@ impl __sdk::DbUpdate for DbUpdate {
                 "board_clinic_reports" => db_update
                     .board_clinic_reports
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_covers" => db_update
+                    .board_covers
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_facts" => db_update
                     .board_facts
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_fee_schedule" => db_update
+                    .board_fee_schedule
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_ledger" => db_update
                     .board_ledger
@@ -3950,6 +4145,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_policies" => db_update
                     .board_policies
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_policy_documents" => db_update
+                    .board_policy_documents
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_policy_terms" => db_update
+                    .board_policy_terms
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "board_precedents" => db_update
                     .board_precedents
@@ -4047,6 +4248,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "crowd_timer" => db_update
                     .crowd_timer
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "crowd_walk" => db_update
+                    .crowd_walk
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "decision" => db_update
                     .decision
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4067,6 +4271,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "evidence_pack" => db_update
                     .evidence_pack
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "fee_schedule_line" => db_update
+                    .fee_schedule_line
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "gateway" => db_update
                     .gateway
@@ -4242,6 +4449,12 @@ impl __sdk::DbUpdate for DbUpdate {
                 "photo_tag" => db_update
                     .photo_tag
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "policy_document" => db_update
+                    .policy_document
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "policy_term" => db_update
+                    .policy_term
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4304,6 +4517,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue" => db_update
                     .venue
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue_floor" => db_update
+                    .venue_floor
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue_plan" => db_update
                     .venue_plan
@@ -4374,7 +4590,9 @@ pub struct AppliedDiff<'r> {
     board_charges: __sdk::TableAppliedDiff<'r, Charge>,
     board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
     board_clinic_reports: __sdk::TableAppliedDiff<'r, ClinicReport>,
+    board_covers: __sdk::TableAppliedDiff<'r, CoverageRuleRow>,
     board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
+    board_fee_schedule: __sdk::TableAppliedDiff<'r, FeeScheduleLine>,
     board_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     board_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
     board_medical_access: __sdk::TableAppliedDiff<'r, MedicalAccessLog>,
@@ -4383,6 +4601,8 @@ pub struct AppliedDiff<'r> {
     board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
     board_photos: __sdk::TableAppliedDiff<'r, BoardPhoto>,
     board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
+    board_policy_documents: __sdk::TableAppliedDiff<'r, PolicyDocument>,
+    board_policy_terms: __sdk::TableAppliedDiff<'r, PolicyTerm>,
     board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
     board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
     board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
@@ -4415,6 +4635,7 @@ pub struct AppliedDiff<'r> {
     crowd_group: __sdk::TableAppliedDiff<'r, CrowdGroup>,
     crowd_member: __sdk::TableAppliedDiff<'r, CrowdMember>,
     crowd_timer: __sdk::TableAppliedDiff<'r, CrowdTimer>,
+    crowd_walk: __sdk::TableAppliedDiff<'r, CrowdWalk>,
     decision: __sdk::TableAppliedDiff<'r, Decision>,
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
@@ -4422,6 +4643,7 @@ pub struct AppliedDiff<'r> {
     event_state: __sdk::TableAppliedDiff<'r, EventState>,
     evidence_fact: __sdk::TableAppliedDiff<'r, EvidenceFact>,
     evidence_pack: __sdk::TableAppliedDiff<'r, EvidencePack>,
+    fee_schedule_line: __sdk::TableAppliedDiff<'r, FeeScheduleLine>,
     gateway: __sdk::TableAppliedDiff<'r, Gateway>,
     import_run: __sdk::TableAppliedDiff<'r, ImportRun>,
     incident: __sdk::TableAppliedDiff<'r, Incident>,
@@ -4480,6 +4702,8 @@ pub struct AppliedDiff<'r> {
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
     photo: __sdk::TableAppliedDiff<'r, Photo>,
     photo_tag: __sdk::TableAppliedDiff<'r, PhotoTag>,
+    policy_document: __sdk::TableAppliedDiff<'r, PolicyDocument>,
+    policy_term: __sdk::TableAppliedDiff<'r, PolicyTerm>,
     property_event: __sdk::TableAppliedDiff<'r, PropertyEvent>,
     schedule_slot: __sdk::TableAppliedDiff<'r, ScheduleSlot>,
     settings: __sdk::TableAppliedDiff<'r, Settings>,
@@ -4501,6 +4725,7 @@ pub struct AppliedDiff<'r> {
     sweep_timer: __sdk::TableAppliedDiff<'r, SweepTimer>,
     unclaimed_injuries: __sdk::TableAppliedDiff<'r, UnclaimedInjury>,
     venue: __sdk::TableAppliedDiff<'r, Venue>,
+    venue_floor: __sdk::TableAppliedDiff<'r, VenueFloor>,
     venue_plan: __sdk::TableAppliedDiff<'r, PlanArea>,
     venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
     venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
@@ -4580,9 +4805,19 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             &self.board_clinic_reports,
             event,
         );
+        callbacks.invoke_table_row_callbacks::<CoverageRuleRow>(
+            "board_covers",
+            &self.board_covers,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<EvidenceFact>(
             "board_facts",
             &self.board_facts,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<FeeScheduleLine>(
+            "board_fee_schedule",
+            &self.board_fee_schedule,
             event,
         );
         callbacks.invoke_table_row_callbacks::<LedgerEntry>(
@@ -4619,6 +4854,16 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<InsurancePolicy>(
             "board_policies",
             &self.board_policies,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<PolicyDocument>(
+            "board_policy_documents",
+            &self.board_policy_documents,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<PolicyTerm>(
+            "board_policy_terms",
+            &self.board_policy_terms,
             event,
         );
         callbacks.invoke_table_row_callbacks::<ClaimPrecedent>(
@@ -4733,6 +4978,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<CrowdTimer>("crowd_timer", &self.crowd_timer, event);
+        callbacks.invoke_table_row_callbacks::<CrowdWalk>("crowd_walk", &self.crowd_walk, event);
         callbacks.invoke_table_row_callbacks::<Decision>("decision", &self.decision, event);
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
@@ -4746,6 +4992,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks.invoke_table_row_callbacks::<EvidencePack>(
             "evidence_pack",
             &self.evidence_pack,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<FeeScheduleLine>(
+            "fee_schedule_line",
+            &self.fee_schedule_line,
             event,
         );
         callbacks.invoke_table_row_callbacks::<Gateway>("gateway", &self.gateway, event);
@@ -4926,6 +5177,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Photo>("photo", &self.photo, event);
         callbacks.invoke_table_row_callbacks::<PhotoTag>("photo_tag", &self.photo_tag, event);
+        callbacks.invoke_table_row_callbacks::<PolicyDocument>(
+            "policy_document",
+            &self.policy_document,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<PolicyTerm>("policy_term", &self.policy_term, event);
         callbacks.invoke_table_row_callbacks::<PropertyEvent>(
             "property_event",
             &self.property_event,
@@ -5003,6 +5260,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
+        callbacks.invoke_table_row_callbacks::<VenueFloor>("venue_floor", &self.venue_floor, event);
         callbacks.invoke_table_row_callbacks::<PlanArea>("venue_plan", &self.venue_plan, event);
         callbacks.invoke_table_row_callbacks::<VenueSetup>("venue_setup", &self.venue_setup, event);
         callbacks.invoke_table_row_callbacks::<VenueSetupStep>(
@@ -5709,7 +5967,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_charges_table::register_table(client_cache);
         board_checks_table::register_table(client_cache);
         board_clinic_reports_table::register_table(client_cache);
+        board_covers_table::register_table(client_cache);
         board_facts_table::register_table(client_cache);
+        board_fee_schedule_table::register_table(client_cache);
         board_ledger_table::register_table(client_cache);
         board_lines_table::register_table(client_cache);
         board_medical_access_table::register_table(client_cache);
@@ -5718,6 +5978,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         board_notes_table::register_table(client_cache);
         board_photos_table::register_table(client_cache);
         board_policies_table::register_table(client_cache);
+        board_policy_documents_table::register_table(client_cache);
+        board_policy_terms_table::register_table(client_cache);
         board_precedents_table::register_table(client_cache);
         board_records_table::register_table(client_cache);
         board_reviews_table::register_table(client_cache);
@@ -5750,6 +6012,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         crowd_group_table::register_table(client_cache);
         crowd_member_table::register_table(client_cache);
         crowd_timer_table::register_table(client_cache);
+        crowd_walk_table::register_table(client_cache);
         decision_table::register_table(client_cache);
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
@@ -5757,6 +6020,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         event_state_table::register_table(client_cache);
         evidence_fact_table::register_table(client_cache);
         evidence_pack_table::register_table(client_cache);
+        fee_schedule_line_table::register_table(client_cache);
         gateway_table::register_table(client_cache);
         import_run_table::register_table(client_cache);
         incident_table::register_table(client_cache);
@@ -5815,6 +6079,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         person_claim_table::register_table(client_cache);
         photo_table::register_table(client_cache);
         photo_tag_table::register_table(client_cache);
+        policy_document_table::register_table(client_cache);
+        policy_term_table::register_table(client_cache);
         property_event_table::register_table(client_cache);
         schedule_slot_table::register_table(client_cache);
         settings_table::register_table(client_cache);
@@ -5836,6 +6102,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         sweep_timer_table::register_table(client_cache);
         unclaimed_injuries_table::register_table(client_cache);
         venue_table::register_table(client_cache);
+        venue_floor_table::register_table(client_cache);
         venue_plan_table::register_table(client_cache);
         venue_setup_table::register_table(client_cache);
         venue_setup_step_table::register_table(client_cache);
@@ -5868,7 +6135,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_charges",
         "board_checks",
         "board_clinic_reports",
+        "board_covers",
         "board_facts",
+        "board_fee_schedule",
         "board_ledger",
         "board_lines",
         "board_medical_access",
@@ -5877,6 +6146,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "board_notes",
         "board_photos",
         "board_policies",
+        "board_policy_documents",
+        "board_policy_terms",
         "board_precedents",
         "board_records",
         "board_reviews",
@@ -5903,6 +6174,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "crowd_group",
         "crowd_member",
         "crowd_timer",
+        "crowd_walk",
         "decision",
         "encounter",
         "event",
@@ -5910,6 +6182,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "event_state",
         "evidence_fact",
         "evidence_pack",
+        "fee_schedule_line",
         "gateway",
         "import_run",
         "incident",
@@ -5967,6 +6240,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "person_claim",
         "photo",
         "photo_tag",
+        "policy_document",
+        "policy_term",
         "property_event",
         "schedule_slot",
         "settings",
@@ -5988,6 +6263,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "sweep_timer",
         "unclaimed_injuries",
         "venue",
+        "venue_floor",
         "venue_plan",
         "venue_setup",
         "venue_setup_step",

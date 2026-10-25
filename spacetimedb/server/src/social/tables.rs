@@ -275,6 +275,21 @@ pub struct CrowdMember {
     pub chat: u32,
 }
 
+/// The last walk of one attendee of the crowd: the corners of the way they walk, from where they stood to where
+/// they stand now or soon, at a steady speed. The band stands at the path's end once it arrives, so the 3D view
+/// draws everyone from these rows and the bands' own spots.
+#[spacetimedb::table(accessor = crowd_walk, public)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CrowdWalk {
+    #[primary_key]
+    pub band_id: u32,
+    /// x and y of each corner in turn, in metres.
+    pub path: Vec<f32>,
+    pub started_at: Timestamp,
+    pub arrives_at: Timestamp,
+    pub speed_mps: f32,
+}
+
 #[spacetimedb::table(accessor = crowd_timer, scheduled(crate::social::crowd::crowd_tick))]
 pub struct CrowdTimer {
     #[primary_key]

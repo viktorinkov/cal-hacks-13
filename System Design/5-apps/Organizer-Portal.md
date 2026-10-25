@@ -103,6 +103,12 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 
 Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
 
+### Names in the 3D venue
+
+The Live tab's 3D view names the floor from the `venue_spot` rows: the areas, every sponsor over its tables, the named places and the doors. A name that would cover another hides until the camera comes closer, and close up a sponsor's name climbs a line or two so neighbouring tables all show theirs.
+
+Each of our bands on the floor carries a blue tag with the name typed when it was placed (`band_place`) over its band code. The tags climb above each other and are never hidden.
+
 ### People on the Live tab
 
 At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
@@ -110,6 +116,8 @@ At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee fro
 The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
 
 "Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
+
+Every other place that picks a person uses the same search bar: the View as tab, the Merch tab's "Buy as an attendee" (over the attendees with a wallet, each with its balance) and the Settlements tab's "File a claim as someone" (over the attendees with a band). The bar lists its first 12 matches under it, each with what the person is and their band code. A click, or Enter for the first match, picks one.
 
 | Action | For | Calls |
 |---|---|---|
@@ -300,6 +308,8 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 With no claims the tab reads "No claims yet."
 
 The tab has no controls. Charges to an attendee (next to build) post J5 and join the tab as their own line under "Who pays what".
+
+Every finance term on the Claims and Costs tabs shows its definition on hover: accrual, cost center, deductible, reserve, recovery, short payment, trial balance, debits and credits, each account and the journals J1 to J4. Each term is a plain `abbr` whose title is one short sentence in the words Hyphenate's track uses. Words with an everyday meaning, such as balance or recovery, are defined only where they are a label, so an attendee's own words stay plain. Resting on a term holds the page's redraws for up to 10 seconds, so the definition stays up.
 
 ### Event graph (Social.md)
 

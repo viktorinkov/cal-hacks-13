@@ -190,19 +190,20 @@ fn name_parts(p: &ReviewPayload) -> Vec<String> {
     parts
 }
 
-/// The claim's own policy document for `policy`: none for the venue's (any of
-/// the venue's clauses is on the claim), the attendee's document when on file.
+/// The claim's own policy document for `policy`: the venue's confirmed policy
+/// PDF (none for the seeded policy, whose clauses are all the venue's), the
+/// attendee's document when on file.
 fn document_of<'a>(p: &'a ReviewPayload, policy: &str) -> Option<&'a str> {
     match policy {
         "attendee" => Some(p.attendee_policy_hash.trim()).filter(|h| !h.is_empty()),
-        _ => None,
+        _ => Some(p.venue_policy_hash.trim()).filter(|h| !h.is_empty()),
     }
 }
 
 /// True when a clause belongs to a policy on this claim: the venue's, or this attendee's own document.
 fn on_this_claim(c: &ClauseHit, p: &ReviewPayload) -> bool {
     match c.policy.as_str() {
-        "venue" => true,
+        "venue" => document_of(p, "venue").is_none_or(|h| c.document_hash == h),
         "attendee" => document_of(p, "attendee").is_some_and(|h| c.document_hash == h),
         _ => false,
     }
