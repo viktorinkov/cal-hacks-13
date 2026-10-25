@@ -2,7 +2,7 @@
 
 > (TBD -- LEO) Leo owns the security view: the security cameras, the models, where they run and how the Anthropic Claude API is used. Two parts are built.
 >
-> Leo's security view in `pipeline/` finds a band that calls for help on a security camera and shows the organizer where the person is. The module's camera tables take a camera sighting, judged by the Anthropic Claude API, and property events per incident; today the scripted claims run plays the security view's side of them.
+> Leo's security view in `pipeline/` finds a band that calls for help on a security camera, shows the organizer where the person is, and sends a camera sighting of each call it locates to the module through `report_camera_sighting`. The module's camera tables also take property events per incident; today the scripted claims run plays the security view's side of those.
 >
 > The rest of the module interface (the pit head count, person-down alerts and photo features) is not built. This file fixes what it sends in and gets back, with Leo's defaults, which Leo may change.
 
@@ -25,7 +25,9 @@ Responsibilities, built (Leo's Python code in `pipeline/`, on the venue laptop):
 
 Responsibilities toward the module:
 
-- On an `sos`, `fall` or `property` incident in a security camera's zone, write a camera sighting, the Anthropic Claude API's judgment of the frames, through `submit_vision_assessment`. Built in the module; Test-Bands.md: the `bandit-claims` tool plays this side in the scripted claims run ([Test-Bands](../3-services/Test-Bands.md)).
+- Register the security camera with the zone it covers through `upsert_camera` (`security.py watch --zone`). Built.
+- For each SOS call it locates, upload the marked view as a frame and write a camera sighting on the band's open incident through `report_camera_sighting` (`security.py watch`). Built.
+- On a `property` incident in a security camera's zone, write a camera sighting through `submit_vision_assessment`. Built in the module; Test-Bands.md: the `bandit-claims` tool plays this side in the scripted claims run ([Test-Bands](../3-services/Test-Bands.md)).
 - Report property events through `report_property_event`, attached to a `property` incident or opening one; [Insurance](../6-features/Insurance.md) reads them as evidence. Built in the module, played the same way.
 - (TBD -- LEO) Write a fresh people count for the pit through `report_zone_count`.
 - (TBD -- LEO) Raise and refresh a person-down alert through `report_ground_alert`.
@@ -55,7 +57,8 @@ Not responsible for:
 | Venue plan | in | the repo | `pipeline/venues/palace-of-fine-arts.json`: the ground-floor plan image of the Palace of Fine Arts, its sections (halls, breakout rooms, entrances) and notes on orientation | file |
 | Security window | out | `security.py watch` to the organizer | the live feed, the lit snapshot, the plan and a zoomed plan, all marked; the alarm; `a` acknowledges, `q` quits | a window on the laptop |
 | Security page | out | `security.py watch --serve 8770` to a browser | `/scene.json` (venue, plan, anchors, model, camera pose), `/state` (bands, open SOS calls, flashes, status lines), `/live.mjpg` (the marked feed), `POST /ack` | HTTP on the laptop; on the venue's network with `--host 0.0.0.0` |
-| SOS record | out | `security.py watch` | one `events.jsonl` line per event (`sos`, `radio_position`, `located`, `flash_without_sos`, `acknowledged`, `cleared`, `dropped`), and per located SOS a folder with `view.jpg` and `last_3s.mp4` | files under `pipeline/data/security/` |
+| SOS record | out | `security.py watch` | one `events.jsonl` line per event (`sos`, `radio_position`, `located`, `flash_without_sos`, `acknowledged`, `cleared`, `dropped`, `reported`, `report_failed`), and per located SOS a folder with `view.jpg` and `last_3s.mp4` | files under `pipeline/data/security/` |
+| Camera sighting | out | `security.py watch` to `bandit-api` and the module | per located SOS: `view.jpg` uploaded as a frame, then `report_camera_sighting` with the band, the camera's name, the time it was located, how sure it is and what it shows; at start, with `--zone`, `upsert_camera` for the camera | HTTPS: `POST /api/blobs?purpose=frame` to the public host, the SpacetimeDB HTTP API with the `vision` identity |
 | 3D venue model | out | `splat.py` to the security page | `venue.splat` and `scene.json` (model to venue transform) under `pipeline/data/venue/splat/`; the camera's pose and lens in `pipeline/data/security/cameras/<name>.json` | files |
 | Elastic.md: raw radio and photos | out | `feed.py --upload`, `feed.py upload`, `photos.py --upload` | the indices `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway` and `bandit-raw-photos` ([Elastic](../7-integrations/Elastic.md)) | Elastic Bulk API |
 
@@ -64,6 +67,7 @@ Not responsible for:
 | Interface | Direction | Between | What flows | Transport |
 |---|---|---|---|---|
 | `upsert_camera` | out | security view to module | one `camera` row per security camera: name, the zone it covers, mount (`overhead` or `side`); marks it live | SDK reducer, roles `vision` and `ops` |
+| `report_camera_sighting` | out | security view to module | the camera sighting of an SOS call: band id, camera name, the time the flash was located, confidence, description; the module finds the band's open `sos` or `fall` incident, writes a confirmed `vision_assessment` with the frame and sets `incident.vision_status` | HTTP reducer call, role `vision` |
 | `submit_vision_assessment` | out | security view to module | the camera sighting: incident id, trigger, confirmed yes or no, confidence, description for staff, recommended action, insurance-ready incident description, camera id, frame hashes with their capture times, `model_call` id; sets `incident.vision_status` | SDK reducer, role `vision` |
 | `report_property_event` | out | security view to module | incident id, camera id, kind, description, confidence, frame hashes; with incident id 0 the module opens a `property` incident in the camera's zone with `opened_by` `vision`, otherwise the event attaches to that `property` incident | SDK reducer, role `vision` |
 | Frame upload | out | security view to `bandit-api` | JPEG frames; `bandit-api` stores them and calls `register_blob` with access class `staff` and purpose `frame` | HTTPS to the public host ([Rust-Backend](../3-services/Rust-Backend.md)) |
@@ -93,6 +97,9 @@ flowchart LR
     SEC -->|"/scene.json, /state, /live.mjpg"| PAGE["Security page in a browser"]
     PAGE -->|"POST /ack"| SEC
     SEC -->|"events.jsonl, view.jpg, last_3s.mp4"| LOG[("pipeline/data/security")]
+    SEC -->|"view.jpg as a frame"| API["bandit-api"]
+    API -->|"register_blob"| MOD
+    SEC -->|"upsert_camera, report_camera_sighting"| MOD
     REC -->|"--upload"| ES[("Elastic raw indices")]
     classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
     classDef leo fill:#FFF8E1,stroke:#F57F17,color:#1A1A1A
@@ -102,7 +109,7 @@ flowchart LR
     class RNG tbd
     class REC,SEC,SPL,CAL,PAGE,LOG leo
     class MOD stdb
-    class BR rust
+    class BR,API rust
     class ES ext
 ```
 
@@ -130,6 +137,16 @@ The call stays on screen until a fresh beacon from the band no longer carries th
 
 When a call is first located, the security view saves the marked view and the last 3 s of video in a folder for that call, and logs how long locating took and how far the camera and the radio positions disagreed.
 
+**Sending the sighting to the module.** The same moment, a background thread uploads `view.jpg` to `bandit-api` as a frame (`POST /api/blobs?purpose=frame`, stored as a `staff` blob) and calls `report_camera_sighting` as the `vision` identity. The camera loop never waits for it, so the window, the page and the alarm work without the internet.
+
+The sighting carries the band, the camera's name, the time the flash was located, how sure the security view is and one line on what it saw. It is 0.95 sure when the flash is within the radio gate of the band's radio position, 0.85 with no radio position, and 0.6 when the flash is the only one left but outside the gate.
+
+The module finds the band's open `sos` or `fall` incident and records a confirmed camera sighting on it. When the module has no open incident for the band yet, or the internet is down, the thread tries again every 5 s for 2 minutes, then logs `report_failed`.
+
+At start, `--zone` names the station (101 to 105) of the zone the camera covers. The security view looks up that zone and registers the camera under its `--name` with `upsert_camera`, so a claim can check the camera's zone against the incident's. Without `--zone`, the camera must already be registered under that name. `--no-report` keeps everything on the laptop.
+
+The `vision` identity's token comes from `BANDIT_VISION_TOKEN`, or the `vision` file in the identities folder of the data directory (`BANDIT_DATA_DIR`, `.dev/e2e-maincloud` when unset). The database is the one in `.env`, and the public host is `BANDIT_API_URL` (`https://band1t.vip` when unset).
+
 The sequence answers: what the security view does when a band calls for help.
 
 ```mermaid
@@ -139,6 +156,8 @@ sequenceDiagram
     participant R as feed.py record
     participant S as security.py watch
     participant O as Organizer
+    participant A as bandit-api
+    participant M as band1t module
     B->>B: button hold or fall, ring flashes red at 4 Hz
     B->>G: beacons with the SOS flag (ESP-NOW)
     G->>R: one line per beacon (USB serial)
@@ -148,6 +167,10 @@ sequenceDiagram
     S->>S: 4 Hz red spot nearest band 4's radio position
     S->>O: flash marked on the feed, lit snapshot, plan and 3D
     S->>S: save view.jpg and last_3s.mp4, log located
+    S->>A: upload view.jpg (purpose frame)
+    A->>M: register_blob, class staff
+    S->>M: report_camera_sighting(band 4, camera, time, confidence)
+    M->>M: confirmed camera sighting on band 4's open incident
     O->>S: acknowledge (a, or the page button)
     B->>G: beacons without the flag
     S->>S: log cleared, the call leaves the screen
@@ -177,11 +200,13 @@ Elastic.md: the four raw indices hold, per session, band beacons and station mar
 
 ### The module side
 
-The module defines three tables for the security view: `camera`, `vision_assessment` (the camera sightings) and `property_event`, with the reducers `upsert_camera`, `submit_vision_assessment` and `report_property_event`.
+The module defines three tables for the security view: `camera`, `vision_assessment` (the camera sightings) and `property_event`, with the reducers `upsert_camera`, `report_camera_sighting`, `submit_vision_assessment` and `report_property_event`.
+
+`report_camera_sighting` takes the band id, the camera's name, the time the flash was located, a confidence from 0 to 1, a description and the frame's SHA-256. It refuses an unknown camera, a frame not registered in `blob_ref`, a confidence outside 0 to 1, and a band with no open `sos` or `fall` incident. It writes a `vision_assessment` with trigger `band_sos` or `band_fall`, confirmed yes, the one frame and its time, and an insurance-ready paragraph naming the camera and its zone. Like `submit_vision_assessment`, it sets `incident.vision_status` to `confirmed` and the camera's `last_frame_at`.
 
 Test-Bands.md: `bandit-claims setup` registers the camera "overhead pit" on the main stage zone, and `bandit-claims property --camera` plays the security view's side for the property incident in the scripted claims run: a frame in the blob store, a `fallen_object` event and a confirmed camera sighting ([Test-Bands](../3-services/Test-Bands.md)).
 
-Nothing in `pipeline/` calls these reducers yet; the service that will is `bandit-vision` (TBD -- LEO), under the identity of that name.
+`security.py watch` calls `upsert_camera` and `report_camera_sighting` as the `vision` identity. The rest (the property events, the pit count, person-down alerts and photo features) is for `bandit-vision` (TBD -- LEO), under the identity of that name.
 
 `camera`: one row per security camera.
 
@@ -249,6 +274,9 @@ flowchart LR
         BL["blob_ref"]
     end
     Api -->|"register_blob, class staff"| BL
+    Sec["security.py watch"] -->|"view.jpg as a frame (HTTPS)"| Api
+    Sec -->|"upsert_camera"| CAMT
+    Sec -->|"report_camera_sighting"| VA
     Vis -->|"upsert_camera"| CAMT
     Vis -->|"submit_vision_assessment"| VA
     Vis -->|"report_property_event"| PE
@@ -265,7 +293,9 @@ flowchart LR
     classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
     classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
+    classDef leo fill:#FFF8E1,stroke:#F57F17,color:#1A1A1A
     class Vis,CC,GA,PF tbd
+    class Sec leo
     class Claude ext
     class Api,Ins,Soc rust
     class CAMT,VA,PE,BL,Inc stdb
@@ -274,7 +304,7 @@ flowchart LR
 
 ### Role `vision`
 
-`bandit-vision` connects as its own identity, and the owner grants it `vision` with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)). `submit_vision_assessment` and `report_property_event` accept only this role; `upsert_camera` also accepts `ops`. `record_model_call` and `register_blob` accept it too, for the Anthropic Claude API record and the frames.
+`bandit-vision` connects as its own identity, and the owner grants it `vision` with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)); `security.py watch` uses the same `vision` identity. `report_camera_sighting`, `submit_vision_assessment` and `report_property_event` accept only this role; `upsert_camera` also accepts `ops`. `record_model_call` and `register_blob` accept it too, for the Anthropic Claude API record and the frames.
 
 (TBD -- LEO) For photo features, the job reducers would accept `vision` as well, so the service can take `photo_features` jobs without the broader `worker` role.
 

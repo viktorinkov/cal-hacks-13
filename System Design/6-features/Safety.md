@@ -117,7 +117,7 @@ The Live tab lists every present band with SOS or fall under "Alerts", as "SOS o
 
 Test-Bands.md: `bandit-claims property` calls it, and the Bands tab's "Speaker breaks in <zone>" runs that command.
 
-Vision.md: `report_property_event` with no incident opens one in the camera's zone with `opened_by` `vision`, and `submit_vision_assessment` sets the incident's `vision_status` to `confirmed` or `not_confirmed`.
+Vision.md: `report_property_event` with no incident opens one in the camera's zone with `opened_by` `vision`. `report_camera_sighting` (the security view's sighting of a band's SOS flash) and `submit_vision_assessment` set the incident's `vision_status` to `confirmed` or `not_confirmed`.
 
 This diagram answers: what happens, in order, from a fall to the medic resolving it.
 

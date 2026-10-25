@@ -77,7 +77,7 @@ flowchart LR
     Cameras["Security cameras (TBD -- LEO)"]
     subgraph Laptop["Venue laptop"]
       Bridge["band1t-bridge"]
-      SecView["Security view (TBD -- LEO)"]
+      SecView["Security view"]
       Ingest["bandit-ingest, before the event"]
     end
   end
@@ -109,7 +109,7 @@ flowchart LR
   Bridge -->|"band reports, ingest_band"| STDB
   STDB -->|"pending commands, subscription"| Bridge
   Cameras -.->|"live video, 30 fps"| SecView
-  SecView -.->|"camera assessment, submit_vision_assessment"| STDB
+  SecView -->|"camera sighting, report_camera_sighting"| STDB
   Ingest -->|"page fetches, scrape_as_markdown"| Bright
   Ingest -->|"raw records, bundle back, bandit-organize"| Elastic
   Ingest -->|"event bundle, import_event"| STDB
@@ -140,11 +140,11 @@ flowchart LR
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
   classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
   class Bands,Markers,Gateway device
-  class Bridge,Ingest,API,Workers,Indexer rust
+  class Bridge,Ingest,API,Workers,Indexer,SecView rust
   class STDB stdb
   class Portal,Tap web
   class Auth,Claude,Elastic,Nessie,Bright ext
-  class Cameras,SecView tbd
+  class Cameras tbd
 ```
 
 Dashed boxes and arrows are Leo's security view (TBD -- LEO). Arrows point from the caller; "back" marks what the call returns.
@@ -163,7 +163,7 @@ One row per arrow above, in the same order. Call names are spelled as the code s
 | `band1t-bridge` | the module | a band's report at once on a change, else once a second; station and heard reports; acks | `ingest_band`, `ingest_station`, `ingest_heard`, `gateway_up`, `command_sent` | SpacetimeDB Rust client SDK (WebSocket) | each report is one transaction every screen sees |
 | the module | `band1t-bridge` | new `command` rows | subscription `SELECT * FROM command WHERE pending = true` | the same WebSocket | a command reaches the radio the moment it commits |
 | Vision.md (TBD -- LEO): security cameras | security view | live video at 30 fps | none | read directly by the venue laptop | the security view works without the internet |
-| Vision.md (TBD -- LEO): security view | the module | a camera assessment of an incident; property events | `submit_vision_assessment`, `report_property_event` | SpacetimeDB client SDK, role `vision` | the module, not the camera, decides what happens next |
+| Vision.md: security view | the module | a camera sighting of each SOS call it locates, with the frame; (TBD -- LEO) property events | `report_camera_sighting`, `upsert_camera`; `report_property_event` | SpacetimeDB HTTP API, role `vision`; the frame through `bandit-api` | the module, not the camera, decides what happens next |
 | Bright-Data.md: `bandit-ingest` | Bright Data Web MCP | the event's pages and company datasets | `scrape_as_markdown`, `run_scraper` | MCP over HTTPS | Bright Data does every step that touches the web |
 | Elastic.md: `bandit-ingest` | Elastic | raw records into `bandit-raw-pages`, `bandit-raw-orgs` and `bandit-raw-plan`; the organized bundle back from `bandit-bundles` | the Elastic Workflows workflow `bandit-organize` | HTTPS | messy text is resolved before anything reaches the module |
 | Bright-Data.md: `bandit-ingest` | the module | the checked event bundle | `import_event` | SpacetimeDB HTTP API | the whole event loads in one transaction or not at all |
