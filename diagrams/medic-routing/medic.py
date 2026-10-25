@@ -242,7 +242,7 @@ def light_circle(y0):
         d0, d1 = 26 / max(1, math.dist(p0, p1)), 30 / max(1, math.dist(p0, p1))
         q0 = (S.ox + p0[0] + (p1[0] - p0[0]) * d0, S.oy + p0[1] + (p1[1] - p0[1]) * d0)
         q1 = (S.ox + p1[0] - (p1[0] - p0[0]) * d1, S.oy + p1[1] - (p1[1] - p0[1]) * d1)
-        S.arrow(None, None, [q0, q1], color="#1864ab")
+        S.arrow(None, None, [q0, q1], label="steps back", color="#1864ab", fs=AFS)
     for k in range(10):
         a = math.radians(k * 36 + 5)
         r = (5.4 + 0.5 * (k % 3)) * M
@@ -252,11 +252,11 @@ def light_circle(y0):
     down = B(60, 170, "person down\nSOS or fall", "bad", w=420)
     within = B(60, 1220, "within 3 m\nlights blue", "stdb", w=420)
     back = B(900, 1220, "steps back\nto 4.2 m", "stdb", w=420)
-    D(down, "b", 0.6, person, "t", 0.3)
-    D(within, "t", 0.7, inner, "l", 0.85)
-    D(back, "t", 0.5, outer, "b", 0.62)
-    far = B(1000, 170, "farther\nstays green", "good", w=360)
-    D(far, "l", 0.5, S.last_far, "r", 0.5)
+    D(down, "b", 0.6, person, "t", 0.3, "signals SOS")
+    D(within, "t", 0.7, inner, "l", 0.85, "lights bands")
+    D(back, "t", 0.5, outer, "b", 0.62, "clears space")
+    far = B(1180, 170, "farther\nstays green", "good", w=360)
+    D(far, "l", 0.5, S.last_far, "r", 0.5, "stays green")
     # how the circle forms, on the bands and in the module
     c1, c2 = 1580, 2260
     r1, r2, r3, r4 = 220, 480, 760, 980
