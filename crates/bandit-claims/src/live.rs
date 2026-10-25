@@ -22,8 +22,8 @@
 //! staff wait too.
 //!
 //! Each incident's plan comes from `live_plan`. An injury with no plan, such as a fall on a presenter's own
-//! band, is treated as a sprain at first aid; broken or taken things with no plan are looked into and resolved
-//! with no cost and nobody named.
+//! band, is the left wrist sprain `urgent-care-wrist` records: wrapped at first aid and referred to urgent care.
+//! Broken or taken things with no plan are looked into and resolved with no cost and nobody named.
 
 use crate::app::*;
 use crate::{decide, flow};
@@ -57,14 +57,14 @@ const LIVE_TABLES: &[&str] = &[
     "incident_marker",
 ];
 
-/// The plan for an incident nobody scripted: a sprain treated at first aid, or broken or taken things looked
-/// into with no record, no cost and nobody named.
+/// The plan for an incident nobody scripted: the left wrist sprain `urgent-care-wrist` records, or broken or taken
+/// things looked into with no record, no cost and nobody named.
 fn default_plan(m: &IncidentMarker, kind: IncidentKind) -> LivePlan {
     let place = if m.place.is_empty() { "the floor".to_string() } else { m.place.clone() };
     let (record, note, resolution) = if is_injury(kind) {
         (
-            "first-aid-wrist".to_string(),
-            format!("on scene at {place}: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
+            "urgent-care-wrist".to_string(),
+            format!("on scene at {place}: fell when the crowd surged, left wrist pain and swelling; ice and a wrap, referring to urgent care"),
             "treated on site".to_string(),
         )
     } else {
