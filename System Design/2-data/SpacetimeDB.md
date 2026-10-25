@@ -294,8 +294,8 @@ Public. Not copied.
 | `seq` | number | the band's beacon counter |
 | `online` | bool | set on every report; `sweep` clears it after 5 s of silence |
 | `last_seen` | timestamp | the module's time of the last report |
-| `x_m`, `y_m` | metres | where the band stands on the venue plan, for the Live tab's map: a radio band at its zone's centre, because the radio gives only the zone. Test-Bands.md: a test band at a slot 1.5 m apart around that centre, and a crowd band at its own spot |
-| `booth_id` | booth id, 0 for none | the booth the band stands at; 0 for every radio band. Test-Bands.md: set for a crowd band at a booth |
+| `x_m`, `y_m` | metres | where the band stands on the venue plan, for the Live tab's map: a placed band at its spot, a radio band in front of its stay's booth, else at its zone's centre, because the radio gives only the zone. Test-Bands.md: a test band at a slot around the same spot (0.4 m apart at a booth, 1.5 m at a zone's centre), and a crowd band at its own spot |
+| `booth_id` | booth id, 0 for none | the booth the band stands at, always its open stay's booth: for a radio or test band, the booth picked for its stay in a zone with sponsor tables (Social.md). Test-Bands.md: for a crowd band, the booth it visits |
 
 `station`: one station marker, keyed by its station id. Written by `ingest_station` (`band1t-bridge`) and `sweep`. Public, and not copied.
 
@@ -370,7 +370,7 @@ Public. Not copied: Social.md's views carry the findable visits to Elastic.md. R
 | `band_id` | band id, indexed | which band |
 | `zone` | station id | the station id of the stay |
 | `entered`, `left` | timestamp, the end optional | the stay |
-| `booth_id` | booth id, 0 for none | the booth, when known (Test-Bands.md: the crowd) |
+| `booth_id` | booth id, 0 for none | the booth the band stands at for the stay: a placed band's sponsor table, a radio or test band's booth picked for the stay by a generator seeded with the band and the stay's start, and Test-Bands.md: a crowd band's booth; 0 in a zone without booths |
 | `open` | bool, indexed | true until `left` is set, so `social_tick` reads only the stays still running |
 
 `encounter`: two bands close together. Written by `ingest_heard`, only from the lower id's heard list, for band ids 1 to 99 at or above `settings.neigh_rssi`, where gaps under 5 s add up to 2 s each; Test-Bands.md: and by `crowd_tick` for the crowd's pairs.

@@ -93,7 +93,9 @@ A stay becomes a visit once it has lasted 2 minutes (`VISIT_MIN_SECONDS`, starti
 
 A crowd band's stay names the booth it stands at. So does the stay of a band a presenter places on the 3D floor (`place_band`): when the floor spot nearest the click is a sponsor table, the stay names that table's booth, and moving the band to another table starts a new stay.
 
-A stay that only the radio gives, by zone, names no booth, and its `visited` link goes to every booth in the zone.
+A radio or test band that only reports its zone stands at one of the zone's booths for the whole stay, so every band adds interests. When its stay opens in a zone with sponsor tables, the module picks one of them with a generator seeded by the band and the stay's start (`zone_booth`), and the band stands in front of that table on the 3D floor. Its next stay in the zone picks again.
+
+A stay in a zone without booths names no booth and adds no `visited` link.
 
 | `visit` field | Meaning |
 |---|---|
@@ -167,7 +169,7 @@ flowchart LR
 | `people_link.kind` | From, to | Written when | Weight |
 |---|---|---|---|
 | `met` | attendee, attendee | an encounter is met (3 minutes close; starting value, calibrate at the venue) | the encounter's minutes |
-| `visited` | attendee, booth | a visit at a booth is written (2 minutes; starting value, calibrate at the venue) | minutes over all of the attendee's visits to that booth; it never shrinks |
+| `visited` | attendee, booth | a visit that names a booth is written (2 minutes; starting value, calibrate at the venue); only the booth the band stood at, never the rest of its zone | minutes over all of the attendee's visits to that booth; it never shrinks |
 | `works_at` | attendee, organization | Bright-Data.md: the attendee claims a `person` profile whose imported row names an organisation; Test-Bands.md: or a crowd attendee staffs that organisation's booth | 1 |
 | `exhibits` | booth, organization | Bright-Data.md: with the first `visited` link to a booth whose imported row names its organisation | 1 |
 
@@ -317,7 +319,7 @@ Three service views give the findable rows to `bandit-indexer` and `bandit-api` 
 
 A booth both of you stood at, at any time of the night, is a shared interest. Shared interests come first, highlighted, with your minutes next to theirs; the person's other booths follow, most minutes first. That is the reason the two of you connect, read straight off the venue.
 
-A visit that names only a zone adds no interest, because one zone such as the sponsor row holds many booths. `GET /api/recap` builds the interests in `bandit-api` from the `social_visits` view, so they come from findable attendees only. Elastic.md: the order of the list comes from the same visits, through the `interests` text of `bandit-people`.
+A visit that names only a zone adds no interest, because one zone such as the sponsor row holds many booths. Every band's stays in a booth zone name a booth, the radio and test bands' included, so every attendee has interests. `GET /api/recap` builds the interests in `bandit-api` from the `social_visits` view, so they come from findable attendees only. Elastic.md: the order of the list comes from the same visits, through the `interests` text of `bandit-people`.
 
 | Interest field | Meaning |
 |---|---|
@@ -394,7 +396,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | Decision | Why |
 |---|---|
 | The photographer route `/photo` is served with the tap page, gated by the `photographer` role | One app on the one public host; the role check is in the module, as for every other route |
-| A visit names a booth when the band stood at a sponsor table: a crowd band at its booth, a placed band at the sponsor table nearest its spot; a visit the radio gives by zone names none | The sponsor row is one zone with many booths, so only the band's spot on the 3D floor says which booth it stood at |
+| A visit names a booth when the band stood at a sponsor table: a crowd band at its booth, a placed band at the sponsor table nearest its spot, and a band the radio places only by zone at one of the zone's booths for the stay, picked by a seeded generator | The sponsor row is one zone with many booths, so the band's spot on the 3D floor says which booth it stood at; a band that reports only its zone still needs a spot, so it gets one booth per stay, and the same stay always names the same booth |
 | Socials are Meta only (Instagram, Facebook, Threads), typed by the attendee at onboarding; no provider sign-in and no `verified` state | Meta is the sponsor track; typing needs no provider approval, and a handle is shown only to people who hung out with its owner |
 | Onboarding has no company field; `works_at` comes only from the import and a claimed profile | Every company link then comes from the event's own pages, and onboarding stays short |
 | No Bandshake and no connection requests: an encounter between two `findable` attendees is the connection, and each sees the other's name and socials | The project description: find who you hung out with and their Insta, afterwards |

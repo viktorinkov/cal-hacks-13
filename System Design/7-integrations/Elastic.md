@@ -230,7 +230,7 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 **Trigger.** After the organizer ends the event, the recap on the tap page calls `GET /api/recap` on `bandit-api` with its session token.
 
-**Input.** The caller's candidates, which `bandit-api` builds from SpacetimeDB rows: the findable people they hung out with, and every booth in the zones they visited. `bandit-indexer` keeps the copy they are ranked against.
+**Input.** The caller's candidates, which `bandit-api` builds from SpacetimeDB rows: the findable people they hung out with, and the booths their band stood at. `bandit-indexer` keeps the copy they are ranked against.
 
 **In Elastic.**
 
@@ -377,7 +377,7 @@ SpacetimeDB decides who and what is on the list (exact, private, live); Elastic 
 | "Who did I hang out with tonight?" | SpacetimeDB, `my_encounters` | Exact encounter rows the bands measured; `findable` is checked in the view |
 | "Which booths and companies tie the crowd together?" | SpacetimeDB, the people graph | `visited`, `works_at` and `exhibits` links to shared booth and company nodes, pushed live to the big screen through `event_graph` |
 | "Of the people I hung out with, who is most into the same things as me?" | Elastic, `GET /api/recap` | Two people who visited different booths can still care about the same things; only embeddings of the booth texts can tell. The answer is an order, never a new name on the list |
-| "Of the booths in the zones I visited, which fit me best?" | Elastic, `GET /api/recap` | My interests matched to booth descriptions by meaning |
+| "Of the booths I stood at, which fit me best?" | Elastic, `GET /api/recap` | My interests matched to booth descriptions by meaning |
 | Insurance.md: "What do this venue's policy and this attendee's policy say about a fall at the Main stage?" | Elastic, `bandit-policy-clauses` (next to build) | Meaning over the policy's own wording, which rarely uses the claim's words; the answer is a clause Claude can cite, never an amount |
 
 Presence is zone-level only ([SpacetimeDB](../2-data/SpacetimeDB.md)), and the copy indices hold no positions at all: a booth carries its zone's id and name, and an attendee's interests name zones and booths.
@@ -535,11 +535,11 @@ The findable switch is `attendee.findable`, given meaning by [Social](../6-featu
 
 **`bandit-booths`** (one document per `booth` row, id = booth id): `booth_id`, `name`, `booth_number`, `kind`, `tags` (the booth's tags, then its organisation's), `zone_id`, `zone_name`, `organization_id`, `org_name`, `org_kind`, `sponsor_tier`, and `description` (semantic_text): the booth's description, its organisation's description, the tags and its schedule titles, one per line, so one meaning search covers all of them.
 
-**`bandit-people`** (one document per findable attendee, id = attendee id as hex): `attendee_id`, `node_id` (the attendee's node in the people graph, which the recap ranks by), `organization` (their company's name), and `interests` (semantic_text). `interests` is built from the attendee's top 5 spots by visit minutes: for each, the zone's name and description, then the name, description and tags of the booth the visit names, or of every booth in the zone when it names none. The spots go in zone and booth order, so the document changes only when the set of spots changes, not as minutes add up.
+**`bandit-people`** (one document per findable attendee, id = attendee id as hex): `attendee_id`, `node_id` (the attendee's node in the people graph, which the recap ranks by), `organization` (their company's name), and `interests` (semantic_text). `interests` is built from the attendee's top 5 spots by visit minutes: for each, the zone's name and description, then the name, description and tags of the booth the visit names; a visit that names no booth adds only its zone. The spots go in zone and booth order, so the document changes only when the set of spots changes, not as minutes add up.
 
 ### Part three: ordering the recap's suggestions
 
-The recap ([Tap-Page](../5-apps/Tap-Page.md)) asks `bandit-api` for `GET /api/recap` once the organizer ends the event. `bandit-api` builds the whole recap from its subscription cache, including two lists of suggestions: `suggested_people`, everyone the attendee hung out with who is findable, and `suggested_booths`, every booth in a zone they visited, with the minutes spent there ([Social](../6-features/Social.md)).
+The recap ([Tap-Page](../5-apps/Tap-Page.md)) asks `bandit-api` for `GET /api/recap` once the organizer ends the event. `bandit-api` builds the whole recap from its subscription cache, including two lists of suggestions: `suggested_people`, everyone the attendee hung out with who is findable, and `suggested_booths`, the booths their band stood at, with their minutes at each ([Social](../6-features/Social.md)).
 
 SpacetimeDB rows decide who and what is on each list. Elastic only decides the order of these two, so the people and booths closest to what the attendee was into come first; there is no query box, and the attendee's own `interests` text is the query.
 

@@ -366,3 +366,32 @@ fn a_band_placed_at_a_sponsor_table_stands_at_its_booth() {
     assert_eq!(open(), vec![(table.station_id, 0)], "a hacker table names no booth");
     assert_eq!(w.t.db.band().id().find(95).unwrap().booth_id, 0);
 }
+
+#[test]
+fn a_band_that_reports_only_its_zone_stands_at_one_booth_for_the_stay() {
+    let w = World::new();
+    w.t.db.staff_role().insert(StaffRole { id: 0, identity: id("tester"), role: "tester".into(), label: "tester".into(), granted_by: id("owner"), granted_at: w.t.clock.now() });
+    let sponsor = w.t.db.venue_spot().iter().find(|s| s.kind == "sponsor_table" && s.booth_id != 0).unwrap().station_id;
+    let floor = w.t.db.venue_spot().iter().find(|s| s.kind == "table").unwrap().station_id;
+    let report = |station: u8| w.as_("tester", |ctx| crate::safety::report_test_band(ctx, 94, station, 0, 0, false, false, false));
+    let open = || w.t.db.zone_visit().band_id().filter(94u32).filter(|v| v.open).map(|v| (v.zone, v.booth_id)).collect::<Vec<_>>();
+
+    report(sponsor);
+    let booth = open()[0].1;
+    assert_eq!(open(), vec![(sponsor, booth)]);
+    assert_ne!(booth, 0, "the stay names one of the zone's booths");
+    let band = w.t.db.band().id().find(94).unwrap();
+    assert_eq!(band.booth_id, booth);
+    let (x, y) = w.as_("ops", |ctx| Ok(booth_spot(ctx, booth).unwrap()));
+    assert!((band.x_m - x).hypot(band.y_m - y) < 1.0, "it stands at that booth's table");
+
+    for _ in 0..5 {
+        w.t.clock.advance(TimeDuration::from_micros(1_000_000));
+        report(sponsor);
+    }
+    assert_eq!(open(), vec![(sponsor, booth)], "it keeps that booth for the whole stay");
+
+    report(floor);
+    assert_eq!(open(), vec![(floor, 0)], "a zone without booths names none");
+    assert_eq!(w.t.db.band().id().find(94).unwrap().booth_id, 0);
+}

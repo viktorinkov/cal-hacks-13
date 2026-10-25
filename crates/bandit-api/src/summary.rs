@@ -44,7 +44,7 @@ pub struct Summary {
     pub photos: Vec<PhotoOut>,
     /// The people you hung out with, best match for your interests first.
     pub suggested_people: Vec<SuggestedPerson>,
-    /// The booths in the zones you visited, best match for your interests first.
+    /// The booths your band stood at, best match for your interests first.
     pub suggested_booths: Vec<SuggestedBooth>,
     /// False when Elastic could not rank the suggestions: they are then ordered by minutes.
     pub suggestions_ranked: bool,
@@ -85,7 +85,7 @@ pub struct SuggestedBooth {
     pub booth_id: u64,
     pub name: String,
     pub zone_name: String,
-    /// Minutes spent in the booth's zone.
+    /// Your minutes at the booth.
     pub minutes: f32,
     pub score: Option<f64>,
 }
@@ -191,7 +191,7 @@ pub fn summary(rows: &Rows, who: Identity) -> Option<Summary> {
     for v in &visits {
         *minutes.entry(v.zone_id).or_default() += v.minutes;
     }
-    let suggested_booths = suggested_booths(rows, &minutes, &zone_name);
+    let suggested_booths = suggested_booths(rows, &booth_minutes(rows, who), &zone_name);
     let mut top_zones: Vec<ZoneMinutes> = minutes
         .into_iter()
         .map(|(zone_id, m)| ZoneMinutes {
@@ -382,10 +382,10 @@ fn photos_together(rows: &Rows, who: Identity, other: Identity) -> u32 {
     tagged(who).intersection(&tagged(other)).count() as u32
 }
 
-/// Every booth in a zone you visited, with the minutes you spent in that zone, most minutes first.
+/// The booths you stood at, with your minutes at each, most minutes first.
 fn suggested_booths(
     rows: &Rows,
-    zone_minutes: &BTreeMap<u64, f32>,
+    booth_minutes: &BTreeMap<u64, f32>,
     zone_name: &dyn Fn(u64) -> String,
 ) -> Vec<SuggestedBooth> {
     let mut out: Vec<SuggestedBooth> = rows
@@ -396,7 +396,7 @@ fn suggested_booths(
                 booth_id: b.id,
                 name: b.name.clone(),
                 zone_name: zone_name(b.zone_id),
-                minutes: round(*zone_minutes.get(&b.zone_id)?),
+                minutes: round(*booth_minutes.get(&b.id)?),
                 score: None,
             })
         })
@@ -410,7 +410,8 @@ fn suggested_booths(
 }
 
 /// What the attendee spent time on, as the indexer writes a person's interests: each visited zone,
-/// most minutes first, then its booths. Ranks the suggestions of someone with no people document.
+/// most minutes first, then the booths they stood at in it, most minutes first. Ranks the suggestions
+/// of someone with no people document.
 pub fn visited_text(rows: &Rows, who: Identity) -> String {
     let mut minutes: BTreeMap<u64, f32> = BTreeMap::new();
     for v in rows.visits.iter().filter(|v| v.attendee == who) {
@@ -418,6 +419,7 @@ pub fn visited_text(rows: &Rows, who: Identity) -> String {
     }
     let mut zones: Vec<(u64, f32)> = minutes.into_iter().collect();
     zones.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    let stood = booth_minutes(rows, who);
     let mut lines = Vec::new();
     for (zone_id, _) in zones {
         if let Some(z) = rows.zones.iter().find(|z| z.id == zone_id) {
@@ -427,16 +429,17 @@ pub fn visited_text(rows: &Rows, who: Identity) -> String {
                 format!("{}: {}", z.name, z.description)
             });
         }
-        let mut booths: Vec<&Booth> = rows
+        let mut booths: Vec<(&Booth, f32)> = rows
             .booths
             .iter()
             .filter(|b| b.zone_id == zone_id)
+            .filter_map(|b| Some((b, *stood.get(&b.id)?)))
             .collect();
-        booths.sort_by_key(|b| b.id);
+        booths.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.id.cmp(&b.0.id)));
         lines.extend(
             booths
                 .iter()
-                .map(|b| format!("{}: {} ({})", b.name, b.description, b.tags.join(", "))),
+                .map(|(b, _)| format!("{}: {} ({})", b.name, b.description, b.tags.join(", "))),
         );
     }
     lines.join("\n")
@@ -521,9 +524,9 @@ fn person(rows: &Rows, id: Identity) -> Option<Person> {
     })
 }
 
-/// The booths of a visit: its booth, or every booth in its zone when only the zone is known.
+/// The booth of a visit, the one the band stood at; a visit known only by its zone has none.
 fn in_visit(b: &Booth, v: &Visit) -> bool {
-    b.zone_id == v.zone_id && (v.booth_id == 0 || b.id == v.booth_id)
+    b.id == v.booth_id
 }
 
 fn other_of(a: Identity, b: Identity, who: Identity) -> Option<Identity> {
@@ -739,16 +742,32 @@ mod tests {
         }
     }
 
+    /// The rows with Ada at the Elastic booth for her first expo stay and at the drone show on the
+    /// stage; her second expo stay names only the zone.
+    fn rows_at_booths() -> Rows {
+        let mut rows = rows();
+        for v in &mut rows.visits {
+            v.booth_id = match v.zone_visit_id {
+                20 => 10,
+                21 => 12,
+                _ => v.booth_id,
+            };
+        }
+        rows
+    }
+
     #[test]
     fn visits_in_time_order_with_their_booths() {
-        let s = summary(&rows(), who(1)).unwrap();
+        let s = summary(&rows_at_booths(), who(1)).unwrap();
         assert_eq!(s.display_name, "Ada");
         let ids: Vec<u64> = s.visits.iter().map(|v| v.zone_visit_id).collect();
         assert_eq!(ids, vec![20, 21, 22]);
         let booths: Vec<&str> = s.visits[0].booths.iter().map(|b| b.name.as_str()).collect();
-        assert_eq!(booths, vec!["Elastic booth", "Robot arms"]);
+        assert_eq!(booths, vec!["Elastic booth"]);
         assert_eq!(s.visits[0].zone_name, "Expo");
         assert_eq!(s.visits[0].minutes, 12.3);
+        // A stay known only by its zone names none of the zone's booths.
+        assert!(s.visits[2].booths.is_empty());
     }
 
     #[test]
@@ -792,7 +811,7 @@ mod tests {
 
     #[test]
     fn suggestions_start_in_minutes_order() {
-        let s = summary(&rows(), who(1)).unwrap();
+        let s = summary(&rows_at_booths(), who(1)).unwrap();
         assert!(!s.suggestions_ranked);
         let people: Vec<(u64, f32)> = s
             .suggested_people
@@ -812,8 +831,9 @@ mod tests {
             .iter()
             .map(|b| (b.booth_id, b.minutes))
             .collect();
-        assert_eq!(booths, vec![(10, 22.3), (11, 22.3), (12, 20.0)]);
-        assert_eq!(s.suggested_booths[2].zone_name, "Stage");
+        // Only the booths Ada stood at, with her minutes at each, not every booth of the expo.
+        assert_eq!(booths, vec![(12, 20.0), (10, 12.3)]);
+        assert_eq!(s.suggested_booths[0].zone_name, "Stage");
     }
 
     #[test]
@@ -884,8 +904,8 @@ mod tests {
 
     #[test]
     fn ranking_follows_elastic_then_minutes() {
-        let mut s = summary(&rows(), who(1)).unwrap();
-        apply_ranking(&mut s, &[(2, 0.9)], &[(12, 0.8), (10, 0.5)]);
+        let mut s = summary(&rows_at_booths(), who(1)).unwrap();
+        apply_ranking(&mut s, &[(2, 0.9)], &[(10, 0.5)]);
         assert!(s.suggestions_ranked);
         let people: Vec<(u64, Option<f64>)> = s
             .suggested_people
@@ -898,12 +918,12 @@ mod tests {
             .iter()
             .map(|b| (b.booth_id, b.score))
             .collect();
-        assert_eq!(booths, vec![(12, Some(0.8)), (10, Some(0.5)), (11, None)]);
+        assert_eq!(booths, vec![(10, Some(0.5)), (12, None)]);
     }
 
     #[test]
     fn ranking_doc_shows_the_order_next_to_minutes() {
-        let mut s = summary(&rows(), who(1)).unwrap();
+        let mut s = summary(&rows_at_booths(), who(1)).unwrap();
         let by_minutes = s.suggested_booths[0].name.clone();
         apply_ranking(&mut s, &[(2, 0.9)], &[(12, 0.8), (10, 0.5)]);
         let doc = ranking_doc(&s, "Stage\nDrone show: Drone show showcases. (drones)", Some(&by_minutes), 7);
@@ -912,15 +932,17 @@ mod tests {
         assert_eq!(doc["first_booth_score"], 0.8);
         assert_eq!(doc["first_booth_by_minutes"], by_minutes.as_str());
         assert_eq!(doc["reordered"], s.suggested_booths[0].name != by_minutes);
-        assert_eq!(doc["booths"].as_array().unwrap().len(), 3);
+        assert_eq!(doc["booths"].as_array().unwrap().len(), 2);
     }
 
     #[test]
     fn visited_text_reads_like_interests() {
         assert_eq!(
-            visited_text(&rows(), who(1)),
-            "Expo\nElastic booth: Elastic booth showcases. (showcase)\nRobot arms: Robot arms showcases. (showcase)\nStage\nDrone show: Drone show showcases. (showcase)"
+            visited_text(&rows_at_booths(), who(1)),
+            "Expo\nElastic booth: Elastic booth showcases. (showcase)\nStage\nDrone show: Drone show showcases. (showcase)"
         );
+        // Zone-only stays name the zones and no booths.
+        assert_eq!(visited_text(&rows(), who(1)), "Expo\nStage");
         assert_eq!(visited_text(&rows(), who(42)), "");
     }
 

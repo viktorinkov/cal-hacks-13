@@ -5,7 +5,9 @@
 
 use super::tables::*;
 use crate::roles::require_role;
-use spacetimedb::{ReducerContext, SpacetimeType, Table};
+use spacetimedb::rand::rngs::StdRng;
+use spacetimedb::rand::{Rng, SeedableRng};
+use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
 #[derive(Clone, Debug, PartialEq)]
 #[spacetimedb::table(accessor = venue_spot, public)]
@@ -153,6 +155,37 @@ pub fn nearest_station(ctx: &ReducerContext, x: f32, y: f32) -> u8 {
 /// The booth at a point: the booth of its sponsor table when the zone spot nearest to it is one, else 0.
 pub fn nearest_booth(ctx: &ReducerContext, x: f32, y: f32) -> u64 {
     nearest_zone_spot(ctx, x, y).filter(|s| s.kind == "sponsor_table").map(|s| s.booth_id).unwrap_or(0)
+}
+
+/// The booth a band the radio places only by zone stands at for one stay: one of the zone's sponsor tables, picked
+/// by a generator seeded with the band and the stay's start, so one stay always names one booth. 0 when the zone has
+/// no sponsor table with a booth.
+pub fn zone_booth(ctx: &ReducerContext, band_id: u32, station_id: u8, entered: Timestamp) -> u64 {
+    let mut booths: Vec<u64> = ctx
+        .db
+        .venue_spot()
+        .station_id()
+        .filter(station_id)
+        .filter(|s| s.kind == "sponsor_table" && s.booth_id != 0)
+        .map(|s| s.booth_id)
+        .collect();
+    booths.sort_unstable();
+    booths.dedup();
+    if booths.is_empty() {
+        return 0;
+    }
+    let seed = (band_id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ entered.to_micros_since_unix_epoch() as u64;
+    booths[StdRng::seed_from_u64(seed).gen_range(0..booths.len())]
+}
+
+/// Where a visitor stands at a booth: in front of its sponsor table, where the crowd's visitors stand.
+pub fn booth_spot(ctx: &ReducerContext, booth_id: u64) -> Option<(f32, f32)> {
+    if booth_id == 0 {
+        return None;
+    }
+    let t = ctx.db.venue_spot().kind().filter("sponsor_table").filter(|s| s.booth_id == booth_id).min_by_key(|s| s.id)?;
+    let (nx, ny) = (-t.angle.sin(), t.angle.cos());
+    Some((t.x_m + nx * 1.4, t.y_m + ny * 1.4))
 }
 
 /// The labelled spot nearest to a point, for saying where something happened: "table 112", "the Anthropic

@@ -359,13 +359,20 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
     let flags = sos as u8 * F_SOS | fall as u8 * F_FALL | press as u8 * F_PRESS | F_MPU | F_MOTOR;
     let id = u32::from(band_id);
     let prev = ctx.db.band().id().find(id);
-    // Test bands stand a step apart around their zone's centre, so each shows on the venue map.
-    let (cx, cy) = crate::venue::station_spot(ctx, station_id);
-    let slot = (band_id - TEST_BANDS.start()) as f32;
-    // A band a presenter placed on the 3D floor stays where they put it.
-    let (x_m, y_m) = match ctx.db.band_place().band_id().find(id) {
-        Some(p) => (p.x_m, p.y_m),
-        None => (cx + (slot % 5.0 - 2.0) * 1.5, cy + (slot / 5.0).floor() * 1.5 - 0.75),
+    if prev.as_ref().is_none_or(|b| b.zone != station_id || !b.online) {
+        crate::ingest::leave_zone(ctx, id);
+        if station_id != 0 {
+            crate::ingest::open_band_stay(ctx, id, station_id);
+        }
+    }
+    // A band a presenter placed on the 3D floor stays where they put it. The others stand a step apart around
+    // their stay's booth, else their zone's centre, so each shows on the venue map.
+    let (x_m, y_m, booth_id) = crate::live::band_spot(ctx, id, station_id);
+    let (x_m, y_m) = if ctx.db.band_place().band_id().find(id).is_some() {
+        (x_m, y_m)
+    } else {
+        let (slot, step) = ((band_id - TEST_BANDS.start()) as f32, if booth_id != 0 { 0.4 } else { 1.5 });
+        (x_m + (slot % 5.0 - 2.0) * step, y_m + (slot / 5.0).floor() * step - step / 2.0)
     };
     let row = Band {
         id,
@@ -387,7 +394,7 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
         last_seen: ctx.timestamp,
         x_m,
         y_m,
-        booth_id: 0,
+        booth_id,
     };
     let was = |f: fn(&Band) -> bool| prev.as_ref().is_some_and(f);
     if sos && !was(|b| b.sos) {
@@ -398,12 +405,6 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
     }
     if press && !was(|b| b.pressed) {
         crate::log_event(ctx, band_id, EventKind::Press, "test band");
-    }
-    if prev.as_ref().is_none_or(|b| b.zone != station_id || !b.online) {
-        crate::ingest::leave_zone(ctx, id);
-        if station_id != 0 {
-            crate::ingest::open_stay(ctx, id, station_id, 0);
-        }
     }
     if prev.is_some() {
         ctx.db.band().id().update(row);
