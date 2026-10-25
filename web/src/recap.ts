@@ -279,7 +279,7 @@ function balance(conn: DbConnection) {
   return h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w.accountId.slice(0, 8)}`));
 }
 
-const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid in for your claim', charge: 'Charge paid' };
+const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid in for your claim', charge: 'Charge paid', refund: 'Your deductible back' };
 
 /** The wallet's movements, newest first: payouts in, charges and merch out. */
 export function movements(conn: DbConnection) {
