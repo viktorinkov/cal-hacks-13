@@ -66,6 +66,7 @@ export const AttendeeOut = __t.object("AttendeeOut", {
     return __t.array(HandleOut);
   },
   createdAt: __t.timestamp(),
+  role: __t.string(),
 });
 export type AttendeeOut = __Infer<typeof AttendeeOut>;
 
@@ -533,6 +534,7 @@ export const CrowdGroup = __t.object("CrowdGroup", {
   xM: __t.f32(),
   yM: __t.f32(),
   nextMoveAt: __t.timestamp(),
+  role: __t.string(),
 });
 export type CrowdGroup = __Infer<typeof CrowdGroup>;
 

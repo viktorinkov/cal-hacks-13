@@ -1,9 +1,11 @@
 //! The crowd on the real Cal Hacks floor in an in-memory module: it walks in through the doors, walks the aisles
 //! from spot to spot at walking speed and never through a table or a wall, stays with someone who is down,
-//! walks out of the doors when they close, and lets someone who leaves early walk out alone.
+//! walks out of the doors when they close, and lets someone who leaves early walk out alone. Everyone working the
+//! event wears a band too, except the medics.
 
 use super::tables::*;
 use crate::departure::departure;
+use crate::safety::incident;
 use crate::live::*;
 use crate::roles::*;
 use crate::tables::*;
@@ -295,4 +297,49 @@ fn someone_who_leaves_early_walks_alone_to_the_nearest_door_and_is_out() {
     assert!(w.t.db.decision().iter().any(|e| e.what.contains("left early by the")), "the run's history says so");
     let err = w.t.with_reducer_tx(auth("ops"), |ctx| crate::departure::leave_early(ctx, node)).unwrap_err();
     assert!(err.contains("already left"), "{err}");
+}
+
+#[test]
+fn everyone_at_the_event_wears_a_band_but_the_medics() {
+    let w = World::new();
+    let org = w.t.db.organization().iter().next().unwrap();
+    w.t.db.person().insert(Person {
+        id: 0,
+        source_key: "person:eno".into(),
+        venue_id: 1,
+        display_name: "Eno Reyes".into(),
+        kind: "speaker".into(),
+        role: "opening speaker".into(),
+        title: "Founder".into(),
+        organization_id: org.id,
+        bio: String::new(),
+        headshot_url: String::new(),
+        links: vec![],
+        source_url: String::new(),
+        fetched_at: w.t.clock.now(),
+        updated_at: w.t.clock.now(),
+    });
+    w.as_("ops", |ctx| start_live_run(ctx, 300, 12, 8, false, 42));
+    let mut roles: HashMap<String, usize> = HashMap::new();
+    for m in w.t.db.crowd_member().iter() {
+        *roles.entry(role_of(&w.t.db.crowd_group().id().find(m.group_id).unwrap()).to_string()).or_default() += 1;
+    }
+    let count = |r: &str| roles.get(r).copied().unwrap_or(0);
+    assert_eq!((count(BOOTH_STAFF), count(ORGANIZER), count(PHOTOGRAPHER), count(SPEAKER)), (30, 3, 2, 1));
+    assert_eq!(count(HACKER), 300 - 36);
+
+    let people = crate::web::board_attendees(&w.t.view_context(auth("ops")));
+    assert_eq!(people.len(), 300, "every one of them has a band and a role");
+    let speaker = people.iter().find(|a| a.role == SPEAKER).unwrap();
+    assert_eq!((speaker.display_name.as_str(), speaker.organization.as_str()), ("Eno Reyes", org.name.as_str()));
+    assert!(speaker.band_id >= FIRST_CROWD_BAND && speaker.handles.is_empty(), "the speaker wears a band, with no made-up socials");
+    assert_eq!(people.iter().filter(|a| a.role == ORGANIZER).count(), 3);
+
+    // Only hackers are the ones who fall, press SOS or go home early.
+    let mut walked = HashMap::new();
+    w.walk_for(240, &mut walked);
+    for i in w.t.db.incident().iter().filter(|i| i.subject_band >= FIRST_CROWD_BAND) {
+        let m = w.t.db.crowd_member().band_id().find(i.subject_band).unwrap();
+        assert_eq!(role_of(&w.t.db.crowd_group().id().find(m.group_id).unwrap()), HACKER, "incident {} happened to a hacker", i.id);
+    }
 }

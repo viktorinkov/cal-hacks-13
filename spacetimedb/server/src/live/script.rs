@@ -13,7 +13,7 @@
 use super::*;
 use crate::insurance::people::wearer;
 use crate::departure::departure;
-use crate::social::tables::{crowd_group, crowd_member};
+use crate::social::tables::{crowd_group, crowd_member, role_of, HACKER};
 use crate::venue::zone;
 use spacetimedb::rand::rngs::StdRng;
 
@@ -123,7 +123,7 @@ fn hackers(ctx: &ReducerContext, station: Option<u8>) -> Vec<Band> {
         .crowd_member()
         .iter()
         .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
-        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| g.staff_booth == 0))
+        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| role_of(&g) == HACKER))
         .filter_map(|m| ctx.db.band().id().find(m.band_id))
         .filter(|b| b.online && station.is_none_or(|s| b.zone == s))
         .collect()
@@ -217,7 +217,7 @@ pub fn send_someone_home(ctx: &ReducerContext, rng: &mut StdRng) {
         .crowd_member()
         .iter()
         .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
-        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| g.staff_booth == 0))
+        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| role_of(&g) == HACKER))
         .filter(|m| ctx.db.band().id().find(m.band_id).is_some_and(|b| b.online))
         .map(|m| (m.band_id, m.identity))
         .collect();

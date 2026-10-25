@@ -235,7 +235,8 @@ pub struct SocialTickTimer {
 }
 
 /// Friends who move through the venue together: a team of hackers with a home table on the hacking
-/// floor, or one sponsor's staff member whose home is their booth.
+/// floor, one sponsor's staff member whose home is their booth, or an organizer, photographer or speaker
+/// on their own rounds.
 #[spacetimedb::table(accessor = crowd_group)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct CrowdGroup {
@@ -252,6 +253,24 @@ pub struct CrowdGroup {
     pub x_m: f32,
     pub y_m: f32,
     pub next_move_at: Timestamp,
+    /// What the group does at the event: `hacker`, `booth_staff`, `organizer`, `photographer` or `speaker`.
+    #[default("")]
+    pub role: String,
+}
+
+pub const HACKER: &str = "hacker";
+pub const BOOTH_STAFF: &str = "booth_staff";
+pub const ORGANIZER: &str = "organizer";
+pub const PHOTOGRAPHER: &str = "photographer";
+pub const SPEAKER: &str = "speaker";
+
+/// A group's role. A crowd started before roles were kept has hackers and booth staff only.
+pub fn role_of(g: &CrowdGroup) -> &str {
+    match g.role.as_str() {
+        "" if g.staff_booth != 0 => BOOTH_STAFF,
+        "" => HACKER,
+        r => r,
+    }
 }
 
 /// One attendee of the crowd: their band, their group, where they stand within it and what they care about.

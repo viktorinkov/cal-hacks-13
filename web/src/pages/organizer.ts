@@ -8,8 +8,8 @@
 // decides the claims afterwards.
 
 import {
-  act, bandById, capital, complicated, config, connect, date, field, h, idToken, isLoss, kindWords, medicalCard, money, mount, risk, signIn,
-  signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
+  act, bandById, capital, complicated, config, connect, date, field, h, idToken, isLoss, kindWords, medicalCard, money, mount, risk, roleWords,
+  signIn, signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
 import { costsTab } from '../costs';
@@ -280,19 +280,23 @@ function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.crowd) - Number(b.crowd) || a.displayName.localeCompare(b.displayName));
   const kind = (a: (typeof all)[number]) => a.crowd || a.bandId >= 100 ? 'crowd' : a.bandId >= 90 ? 'test' : a.bandId > 0 ? 'hardware' : 'none';
   const count = (k: string) => all.filter(a => kind(a) === k).length;
+  const roles = new Map<string, number>();
+  for (const a of all) roles.set(a.role, (roles.get(a.role) ?? 0) + 1);
   const words = searchWords('attendees');
-  const hits = words.length ? all.filter(a => matches([a.displayName, a.crowd ? 'crowd' : '', a.bandId ? bandCode(a.bandId) : '', bandStatus(a.bandId), a.organization,
+  const hits = words.length ? all.filter(a => matches([a.displayName, roleWords(a.role), a.crowd ? 'crowd' : '', a.bandId ? bandCode(a.bandId) : '', bandStatus(a.bandId), a.organization,
     a.findable ? 'yes' : 'no', ...a.handles.map(x => `${x.platform} ${x.handle}`), time(a.createdAt)].join(' '), words)) : all;
   const shown = hits.slice(0, hits.filter(a => !a.crowd).length + CROWD_ROWS);
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   return h('section', {},
     h('h3', {}, `${all.length} attendees`),
     h('p', { class: 'muted' }, `${count('crowd')} in the crowd, ${count('test')} wearing test bands, ${count('hardware')} wearing hardware bands${count('none') ? `, ${count('none')} without a band` : ''}.`),
+    h('p', { class: 'muted' }, `${ROLES.filter(([r]) => roles.has(r)).map(([r, many]) => `${roles.get(r)} ${roles.get(r) === 1 ? roleWords(r) : many}`).join(', ')}.`),
     hits.length > shown.length && h('p', { class: 'muted' }, `Showing the first ${CROWD_ROWS} crowd attendees, by name.`),
     searchable('attendees', h('table', {},
-      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
+      h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Role'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
       shown.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.crowd && h('span', { class: 'muted' }, ' crowd')),
+        h('td', {}, roleWords(a.role)),
         h('td', {}, a.bandId ? h('a', { href: `/t/${bandCode(a.bandId)}` }, bandCode(a.bandId)) : ''),
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
           a.bandId > 0 && a.bandId < 100 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
@@ -302,8 +306,15 @@ function attendees() {
 
 // --- People (Live tab) ----------------------------------------------------------------------
 
-/** One person on the Live tab's list: an attendee from the host's list, or a staff member the owner can view as. */
-type Person = { key: string; name: string; kind: string; crowd: boolean; bandId: number; att?: AttendeeOut; view?: ViewablePerson };
+/** One person on the Live tab's list: an attendee from the host's list, or a staff member the owner can view as,
+ *  with what they do at the event and the kind of band they wear. */
+type Person = { key: string; name: string; role: string; kind: string; crowd: boolean; bandId: number; att?: AttendeeOut; view?: ViewablePerson };
+
+/** Every role that wears a band, in the order the counts list them, with its plural. */
+const ROLES: [string, string][] = [
+  ['hacker', 'hackers'], ['booth_staff', 'booth staff'], ['organizer', 'organizers'], ['photographer', 'photographers'], ['speaker', 'speakers'],
+  ['attendee', 'attendees who tapped a band'],
+];
 
 /** What the Live tab's search holds, and the person opened from the list, by key. */
 let peopleSearch = '';
@@ -320,19 +331,19 @@ function code(bandId: number): string {
 }
 
 function kindOf(bandId: number, crowd: boolean): string {
-  return crowd || bandId >= 100 ? 'crowd' : bandId >= 90 ? 'test band' : bandId > 0 ? 'hardware band' : 'no band';
+  return crowd || bandId >= 100 ? 'crowd band' : bandId >= 90 ? 'test band' : bandId > 0 ? 'hardware band' : 'no band';
 }
 
 /** Everyone: the attendees who tapped a band, then the staff, then the crowd, by name. For the owner each
  *  attendee also carries their row of `view_as_people`, which opens their pages. */
 function everyone(): Person[] {
   const out: Person[] = [...conn.db.boardAttendees.iter()].map(a =>
-    ({ key: `a${a.nodeId}`, name: a.displayName, kind: kindOf(a.bandId, a.crowd), crowd: a.crowd, bandId: a.bandId, att: a }));
+    ({ key: `a${a.nodeId}`, name: a.displayName, role: roleWords(a.role), kind: kindOf(a.bandId, a.crowd), crowd: a.crowd, bandId: a.bandId, att: a }));
   const byBand = new Map(out.filter(p => p.bandId).map(p => [p.bandId, p]));
   const byName = new Map(out.filter(p => !p.bandId).map(p => [p.name, p]));
   for (const v of conn.db.viewAsPeople.iter()) {
     if (v.role !== 'attendee') {
-      out.push({ key: keyOf(v), name: v.name, kind: roleName(v.role).toLowerCase(), crowd: false, bandId: v.bandId, view: v });
+      out.push({ key: keyOf(v), name: v.name, role: roleName(v.role).toLowerCase(), kind: kindOf(v.bandId, false), crowd: false, bandId: v.bandId, view: v });
       continue;
     }
     const p = v.bandId ? byBand.get(v.bandId) : byName.get(v.name);
@@ -342,9 +353,9 @@ function everyone(): Person[] {
   return out.sort((a, b) => rank(a) - rank(b) || (a.name || '~').localeCompare(b.name || '~'));
 }
 
-/** Every word of the search appears in the person's name, kind, band code, company or handles. */
+/** Every word of the search appears in the person's name, role, kind of band, band code, company or handles. */
 function found(p: Person, words: string[]): boolean {
-  return matches([p.name, p.kind, p.bandId ? code(p.bandId) : '', p.att?.organization ?? '', ...(p.att?.handles.map(x => x.handle) ?? [])]
+  return matches([p.name, p.role, p.kind, p.bandId ? code(p.bandId) : '', p.att?.organization ?? '', ...(p.att?.handles.map(x => x.handle) ?? [])]
     .join(' '), words);
 }
 
@@ -353,19 +364,19 @@ const searches = new Map<string, string>();
 /** How many matches a search bar lists under it. */
 const SEARCH_ROWS = 12;
 
-/** A search bar over people: each word typed must appear in the person's name, kind, band code, company or
+/** A search bar over people: each word typed must appear in the person's name, role, band, company or
  *  handles. Its first matches list under it; a click, or Enter for the first one, picks a person. */
 function personSearch(name: string, people: Person[], chosen: (p: Person) => boolean, pick: (p: Person) => void, more: (p: Person) => string = () => '') {
   const words = (searches.get(name) ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = people.filter(p => found(p, words));
   const choose = (p: Person) => { pick(p); render(); };
   return h('div', {},
-    h('input', { name, type: 'search', class: 'search', placeholder: 'Search by name, band, company or handle', value: searches.get(name) ?? '',
+    h('input', { name, type: 'search', class: 'search', placeholder: 'Search by name, role, band, company or handle', value: searches.get(name) ?? '',
       oninput: (e: Event) => { searches.set(name, (e.target as HTMLInputElement).value); render(); },
       onkeydown: (e: KeyboardEvent) => { if (e.key === 'Enter' && matches[0]) { e.preventDefault(); choose(matches[0]); } } }),
     h('ul', { class: 'results' }, matches.slice(0, SEARCH_ROWS).map(p => h('li', {},
       h('button', { type: 'button', class: chosen(p) ? 'on' : '', onclick: () => choose(p) },
-        p.name || '(no name yet)', h('span', { class: 'muted' }, ` ${p.kind}${p.bandId ? `, band ${code(p.bandId)}` : ''}${more(p)}`))))),
+        p.name || '(no name yet)', h('span', { class: 'muted' }, ` ${p.role || p.kind}${p.bandId ? `, band ${code(p.bandId)}` : ''}${more(p)}`))))),
     matches.length > SEARCH_ROWS && h('p', { class: 'muted' }, `${matches.length - SEARCH_ROWS} more found: keep typing to narrow it down.`),
     !matches.length && h('p', { class: 'muted' }, 'Nobody found.'));
 }
@@ -401,7 +412,7 @@ function openBand(bandId: number) {
 /** A band nobody on the list wears, opened from the 3D venue. */
 function bandOnly(key: string): Person | undefined {
   const id = Number(/^b(\d+)$/.exec(key)?.[1] ?? 0);
-  return id ? { key, name: '', kind: kindOf(id, false), crowd: id >= 100, bandId: id } : undefined;
+  return id ? { key, name: '', role: '', kind: kindOf(id, false), crowd: id >= 100, bandId: id } : undefined;
 }
 
 /** The list's rows by person, kept with what they show: a crowd of a thousand would otherwise rebuild every redraw. */
@@ -428,15 +439,16 @@ function peopleList(all: Person[]) {
   const rows = shown.map(p => {
     const b = p.bandId ? bandById(conn, p.bandId) : undefined;
     const gone = left.get(p.att?.nodeId ?? -1n);
-    const cells = [p.name || '(no name yet)', p.kind, p.bandId ? code(p.bandId) : '', b && present(b) ? stations.get(b.zone) ?? 'no zone' : '',
+    const cells = [p.name || '(no name yet)', p.role, p.kind, p.bandId ? code(p.bandId) : '', b && present(b) ? stations.get(b.zone) ?? 'no zone' : '',
       gone ? (gone.leftAt ? 'left' : 'walking out') : bandStatus(p.bandId), p.att?.organization ?? '', String(filed(p) || '')];
     const shows = [...cells, p.key === opened].join('|');
     let kept = personRows.get(p.key);
     if (kept?.shows !== shows) {
-      const [name, kind, band, zone, status, company, count] = cells;
+      const [name, role, kind, band, zone, status, company, count] = cells;
       kept = { shows, row: h('tr', {},
-        h('td', {}, h('button', { class: 'link', onclick: () => openPerson(p) }, name), h('span', { class: 'muted' }, ` ${kind}`)),
-        h('td', {}, band), h('td', {}, zone),
+        h('td', {}, h('button', { class: 'link', onclick: () => openPerson(p) }, name)),
+        h('td', {}, role),
+        h('td', {}, band, band && h('span', { class: 'muted' }, ` ${kind}`)), h('td', {}, zone),
         h('td', { class: status === 'online' ? 'pass' : 'muted' }, status),
         h('td', {}, company), h('td', {}, count),
         h('td', {}, h('button', { class: p.key === opened ? 'on' : '', onclick: () => openPerson(p) }, 'Open'))) };
@@ -455,11 +467,11 @@ function peopleList(all: Person[]) {
   }
   listTop = top;
   listTable = h('table', {},
-    h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Zone now'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Claims'), h('th', {})),
+    h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Role'), h('th', {}, 'Band'), h('th', {}, 'Zone now'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Claims'), h('th', {})),
     rows.map(r => r.row));
   return h('section', {},
     h('h3', {}, `People (${all.length})`),
-    h('input', { name: 'people-search', type: 'search', placeholder: 'Search by name, band, company or handle', value: peopleSearch,
+    h('input', { name: 'people-search', type: 'search', placeholder: 'Search by name, role, band, company or handle', value: peopleSearch,
       oninput: (e: Event) => { peopleSearch = (e.target as HTMLInputElement).value; render(); } }),
     words.length > 0 && h('p', { class: 'muted' }, `${shown.length} found`),
     listTable);
@@ -475,6 +487,7 @@ function personPanel(all: Person[]) {
   const gone = departureOf(a?.nodeId);
   const name = p.name || 'them';
   const facts = [
+    p.role,
     p.kind,
     gone && leftWords(gone),
     b && present(b) ? `${bandStatus(p.bandId)} in ${[...conn.db.zone.iter()].find(z => z.stationId === b.zone)?.name ?? 'no zone'}` : p.bandId ? bandStatus(p.bandId) : '',

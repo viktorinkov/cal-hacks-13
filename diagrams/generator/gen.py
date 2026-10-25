@@ -30,7 +30,7 @@ USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK, G
         "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
         "footprints", "graph-3d"))
 SHIELD = logo("icon-shield-check.svg")
-HEART, HAMMER, LOCK = (logo(f"icon-{n}.svg") for n in ("heart-pulse", "hammer", "lock-open"))
+HEART, HAMMER, LOCK, BROKEN = (logo(f"icon-{n}.svg") for n in ("heart-pulse", "hammer", "lock-open", "package-x"))
 SOCIALS = [logo(n + ".svg") for n in ("instagram", "facebook", "threads")]
 
 
@@ -375,47 +375,55 @@ def badge(box, n):
 def insurance(y0):
     S.begin_frame("7 · Claim Settlement", 0, y0, 1000, 600)
     S.text(40, 28, "Claim Settlement", fs=64)
-    A, Bx, C1, C2, D_, E, F = 60, 760, 1440, 2160, 2960, 3840, 4580
-    p = [330, 640, 950]  # documents rows
+    A, Bx, C1, C2, D_, E, F = 150, 820, 1440, 2160, 2960, 3840, 4580
+    p = [330, 640, 950, 1260]  # documents rows
     mk = dict(fill=WHITE)
 
-    def person(x, cy, label, w=380):
+    def person(x, cy, label, w=400):
         return B(x, 0, label, "web", w=w, h=240, wordmark=USER, mark_h=120, cy=cy, **mk)
 
     # 1. documents: three PDFs, each its own card
     organizer = person(A, p[0], "organizer")
     attendee = person(A, p[1], "attendee")
     venue_pdf = B(Bx, 0, "venue policy\nPDF", "note", w=440, h=260, wordmark=FILE, mark_h=120, cy=p[0])
-    att_pdf = B(Bx, 0, "attendee policy\nPDF", "note", w=440, h=260, wordmark=FILE, mark_h=120, cy=p[1])
     report = B(Bx, 0, "hospital report\nmedical records, bill\nPDF", "note", w=440, h=260, wordmark=FILE,
-               mark_h=100, cy=p[2])
+               mark_h=100, cy=p[1])
+    att_pdf = B(Bx, 0, "attendee policy\nhealth plan, belongings\nPDF", "note", w=460, h=260, wordmark=FILE,
+                mark_h=100, cy=p[3])
+    lookup = B(A, 0, "plan lookup\nfinds policy PDFs", "ext", w=400, h=220, wordmark=BRIGHT, mark_h=56, cy=p[2], **mk)
+    pick = B(A, 0, "Claude\npicks, checks plan", "claude", w=400, h=240, wordmark=CLAUDE, mark_h=90, cy=p[3], **mk)
     H(organizer, venue_pdf, "uploads at setup")
-    H(attendee, att_pdf, "uploads at sign-up")
-    D(attendee, "b", 0.5, report, "l", 0.5, "uploads with claim")
+    H(attendee, report, "uploads with claim")
+    V(attendee, lookup, "names plan", x=attendee.cx)
+    V(lookup, pick, "policy PDFs", x=lookup.cx)
+    H(pick, att_pdf, "checked plan", y=att_pdf.cy)
 
     # 2. the Evidence Engine reads every PDF
-    top, bot = p[0] - 130, p[2] + 130
-    Z(C1 - 40, top - 70, C2 + 560 - C1 + 80, 1270 - top + 70, "Evidence Engine", "ext", logo_=ELASTIC)
+    top, bot = p[0] - 130, p[3] + 130
+    Z(C1 - 40, top - 70, C2 + 560 - C1 + 80, bot + 40 - top + 70, "Evidence Engine", "ext", logo_=ELASTIC)
     ingest = B(C1, top, "ingest pipeline\nPDF text, pages", "ext", w=520, h=bot - top, wordmark=ELASTIC,
                mark_h=70, **mk)
     reader = B(C2, top, "Agent Builder\nWorkflows\nreads PDFs", "ext", w=520, h=p[1] + 130 - top, wordmark=ELASTIC,
                mark_h=70, **mk)
-    clauses = B(C2, 860, "policy clauses\ninjury, damage, theft", "ext", w=520, h=370, wordmark=HAMMER, mark_h=100,
-                **mk)
-    mark = S.elements[-1]  # the incident types as a row of pictures: injury, damage, theft
-    for i, icon in ((-1, HEART), (1, LOCK)):
-        S.image(mark["x"] + i * 150 + (mark["width"] - 100 * aspect(icon)) / 2, mark["y"], icon, 100)
+    clauses = B(C2, 860, "policy clauses\nfall, SOS, property\ntheft, breakage", "ext", w=520, h=370, wordmark=HEART,
+                mark_h=90, **mk)
+    mark = S.elements[-1]  # the incident types as a row of pictures: injury, property, theft, breakage
+    mid = mark["x"] + mark["width"] / 2
+    mark["x"] = mid - 1.5 * 120 - mark["width"] / 2
+    for i, icon in ((-0.5, HAMMER), (0.5, LOCK), (1.5, BROKEN)):
+        S.image(mid + i * 120 - 90 * aspect(icon) / 2, mark["y"], icon, 90)
     for pdf in (venue_pdf, att_pdf, report):
         H(pdf, ingest, "PDF", y=pdf.cy)
     H(ingest, reader, "PDF pages", y=S.oy + (top + p[1] + 130) / 2)
     V(reader, clauses, "each clause", x=clauses.cx)
 
     # 3. the terms that drive the decision, from both policies
-    venue_terms = B(D_, 0, "venue terms\nmedical payments cover\nproperty cover, theft clause\n"
-                    "staff excluded, subrogation\n$5,000 per claim, $25,000 per event\nminimum payout, deductible\n"
-                    "fee schedule", "stdb", w=700, h=400, wordmark=STDB, mark_h=50,
+    venue_terms = B(D_, 0, "venue terms\nmedical payments cover\nproperty cover, deductible\n"
+                    "excludes attendee belongings\nstaff excluded\n$5,000 per claim, $25,000 per event\n"
+                    "fee schedule", "stdb", w=700, h=370, wordmark=STDB, mark_h=50,
                     cy=p[0] - 20, **mk)
-    att_terms = B(D_, 0, "attendee terms\nhealth plan, insurer\ncoverage, deductible", "stdb", w=700, h=230,
+    att_terms = B(D_, 0, "attendee terms\ninsurer, policy number\npersonal property cover\nper-claim, yearly limits\ndeductible", "stdb",
+                  w=700, h=270,
                   wordmark=STDB, mark_h=50, cy=p[1] + 20, **mk)
     bill = B(D_, 0, "bill lines\npage cites\ninjury codes", "stdb", w=700, h=230, wordmark=STDB, mark_h=50,
              cy=p[2] + 10, **mk)
@@ -424,9 +432,8 @@ def insurance(y0):
     D(reader, "r", 0.93, bill, "l", 0.5, "bill lines")
     checks = B(E, 0, "checks bill\ntotals, patient\ndate, injury code\nno duplicate", "rust", w=560, h=300,
                wordmark=RUST, mark_h=70, cy=bill.cy - S.oy)
-    split = B(F, venue_terms.y - S.oy, "Who pays what\nvenue medical: injury\nhealth plan: the rest\n"
-              "venue property: damage\nabove deductible\ntheft clause: theft\nresponsible attendee: charge\n"
-              "own things: organizer", "rust", w=600, h=checks.bottom - venue_terms.y,
+    split = B(F, venue_terms.y - S.oy, "Who pays what\nfall, SOS: venue medical\nproperty: venue property\n"
+              "theft, breakage: attendee\npersonal property cover\nresponsible attendee: charge", "rust", w=600, h=checks.bottom - venue_terms.y,
               wordmark=RUST, mark_h=90)
     H(bill, checks, "bill lines")
     H(venue_terms, split, "venue terms", y=venue_terms.cy)
@@ -434,23 +441,25 @@ def insurance(y0):
     H(checks, split, "valid lines", y=checks.cy)
 
     # 4. the claim and its evidence, every source its own card
-    e = [1660, 1980, 2280, 2560, 2840, 3120]
-    claim = B(A, 0, "tap page (/t/code)\nHurt at the event?\nFile a claim", "web", w=500, h=290, wordmark=PHONE,
+    e = [1860, 2180, 2480, 2760, 3040, 3320, 3600]
+    claim = B(A, 0, "tap page (/t/code)\nHurt at the event?\nSomething stolen or broken?", "web", w=560, h=290, wordmark=PHONE,
               mark_h=110, cy=e[0], **mk)
-    venue_claim = B(A, 0, "organizer portal\n(/organizer, Claims)\ndamage, theft", "web", w=500, h=270,
+    venue_claim = B(A, 0, "organizer portal\n(/organizer, Claims)\nrepair cost, responsible", "web", w=560, h=270,
                     wordmark=MONITOR, mark_h=100, cy=e[1], **mk)
-    srcs = [B(A, 0, label, "device", w=500, h=240, wordmark=icon, mark_h=110, cy=y, **mk)
+    srcs = [B(A, 0, label, "device", w=520, h=240, wordmark=icon, mark_h=110, cy=y, **mk)
             for (label, icon), y in zip((("band", WATCH), ("light circle", RADIO), ("security camera", CAMERA),
-                                         ("medic", USER)), e[2:])]
-    facts = [B(820, 0, "file_claim\nown words, injury", "stdb", w=560, h=200, cy=e[0]),
-             B(820, 0, "responsible band\nzone visit, camera sighting", "rust", w=560, h=200, cy=e[1]),
-             B(820, 0, "incident\nSOS, fall, damage", "stdb", w=560, h=200, cy=e[2]),
-             B(820, 0, "witnesses\n2+ bands, same zone", "rust", w=560, h=200, cy=e[3]),
-             B(820, 0, "camera sighting\nsame zone, 2 min", "rust", w=560, h=200, cy=e[4]),
-             B(820, 0, "medic note\nwithin 30 min", "rust", w=560, h=200, cy=e[5])]
-    V(attendee, claim, "files claim", x=attendee.cx)
+                                         ("medic", USER), ("live run\n(/organizer#live)", THREE)), e[2:])]
+    facts = [B(880, 0, "file_claim\nown words, item, value", "stdb", w=560, h=200, cy=e[0]),
+             B(880, 0, "name_responsible\nband at spot, 10 m", "rust", w=560, h=200, cy=e[1]),
+             B(880, 0, "incident\nSOS or fall", "stdb", w=560, h=200, cy=e[2]),
+             B(880, 0, "witnesses\n2+ bands, same zone", "rust", w=560, h=200, cy=e[3]),
+             B(880, 0, "camera sighting\nsame zone, 2 min", "rust", w=560, h=200, cy=e[4]),
+             B(880, 0, "medic note\nwithin 30 min", "rust", w=560, h=200, cy=e[5]),
+             B(880, 0, "seeded crowd\nincidents, losses, notes", "stdb", w=560, h=200, cy=e[6])]
+    R(attendee, "l", claim, "l", [(S.ox + 95, attendee.cy), (S.ox + 95, S.oy + 1450), (S.ox + 95, claim.cy)],
+      label="files claim", seg=2)
     for src, fact, label in zip([claim, venue_claim] + srcs, facts, ("own words", "names band", "SOS or fall",
-                                                                     "witness bands", "flash", "note")):
+                                                                     "witness bands", "flash", "note", "writes")):
         H(src, fact, label, y=fact.cy)
     pack = B(1620, claim.y - S.oy, "evidence pack\nnumbered facts", "stdb", w=520, h=facts[-1].bottom - claim.y,
              wordmark=STDB, mark_h=50, **mk)
@@ -482,11 +491,11 @@ def insurance(y0):
     guard = B(2360, 0, "guard\namounts from code\nrefuse alone: failed check\npay alone: rule ceiling\npolicy gap: organizer", "rust",
               w=760, h=330, wordmark=RUST, mark_h=70, cy=r3)
     refused = B(1300, 0, "refused\nreason shown", "bad", w=640, h=200, cy=r3)
-    payout = B(3720, 0, "settles\npays attendee, repair vendor\ncharges responsible attendee\nup to $5,000 per claim\n"
-               "within $25,000 per event\ndouble-entry journals", "rust", w=640, h=380, wordmark=RUST, mark_h=60, cy=r3)
+    payout = B(3720, 0, "settles\npays attendee, venue\ncollects from insurers\nup to policy limits\n"
+               "approved charges\ndouble-entry journals", "rust", w=640, h=380, wordmark=RUST, mark_h=60, cy=r3)
     nessie = B(4600, 0, "deposit, charge\n(wallet)", "ext", w=500, h=240, wordmark=CAPONE, mark_h=60, cy=r3 - 100,
                **mk)
-    charges = B(4600, 0, "tap page (/t/code)\nYour charges\npay, dispute", "web", w=500, h=280, wordmark=PHONE, mark_h=110,
+    charges = B(4600, 0, "tap page (/t/code)\nYour claims\nYour charges", "web", w=500, h=280, wordmark=PHONE, mark_h=110,
                 cy=r3 + 300, **mk)
     V(nessie, charges, "shows, pays", x=nessie.cx, both=True)
     V(claude, guard, "pay, refuse\nor ask", x=claude.cx)
@@ -504,34 +513,43 @@ def insurance(y0):
         B(1240 + gap + (i % 2) * (cw + gap), ct + 70 + (i // 2) * (chh + gap), label, "note", w=cw, h=chh,
           wordmark=icon, mark_h=70, **mk)
 
-    # 8. the organizer decides complicated claims one by one, and whatever else the guard holds
+    # 8. the organizer decides what code and Claude hand over, and every decision keeps a precedent
     r4 = L(cz.bottom) + 130 + 300
-    org = B(2200, 0, "Organizer decides\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
+    org = B(2200, 0, "Organizer decides\nclaims, charges, rules\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
             wordmark=USER, mark_h=260, cy=r4)
     stale = B(3720, 0, "amount and evidence\nunchanged", "rust", w=640, h=240, wordmark=RUST, mark_h=60, cy=r4)
-    insurer = B(4600, 0, "health plan claim\nnotice of loss", "claude", w=500, h=240, wordmark=CLAUDE,
+    insurer = B(4600, 0, "notice of loss\nvenue insurer\nattendee insurer\npays organizer", "claude", w=500, h=290, wordmark=CLAUDE,
                 mark_h=90, cy=r4, **mk)
-    rules = B(1240, 0, "learned rules\nversion, approver", "stdb", w=640, h=220, wordmark=STDB, mark_h=50,
-              cy=L(org.y) + org.h * 0.72, **mk)
-    history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls, precedents", "stdb",
-                w=3860, h=200, wordmark=STDB, mark_h=50, **mk)
+    prec = B(1240, 0, "precedents\none per decision\ncomplicated: no proposal", "stdb", w=680, h=260, wordmark=STDB,
+             mark_h=50, cy=r4 + 40, **mk)
+    propose = B(300, 0, "Claude\nproposes payment rule\nfrom 3 alike precedents\nceiling under policy limit", "claude",
+                w=680, h=340, wordmark=CLAUDE, mark_h=110, cy=r4 + 40, **mk)
+    rules = B(300, 0, "payment rule vN\nshape, ceiling\nprecedents, approver", "stdb", w=680, h=260, wordmark=STDB,
+              mark_h=50, cy=r3, **mk)
+    history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",
+                w=3060, h=200, wordmark=STDB, mark_h=50, **mk)
+    costs = B(4600, 0, "organizer portal\n(/organizer, Costs)\nwho pays what\njournals, trial balance", "web", w=560,
+              h=330, wordmark=MONITOR, mark_h=100, cy=L(history.cy) - 60, **mk)
     gx = (guard.x + cz.right) / 2
     V(guard, cz, "policy gap", x=gx)
     V(cz, org, "one by one", x=gx)
     V(guard, org, "asks organizer", x=guard.right - 60)
     H(org, stale, "approves", y=org.cy)
     V(stale, payout, "unchanged", x=stale.cx)
-    R(payout, "r", insurer, "l", [(payout.right + 110, payout.y + payout.h * 0.85), (payout.right + 110, insurer.cy)],
-      label="health plan share", seg=1, fa=0.85)
+    R(payout, "r", insurer, "l", [(payout.right + 140, payout.y + payout.h * 0.85), (payout.right + 140, insurer.cy)],
+      label="collects", seg=1, fa=0.85)
     R(org, "l", refused, "l", [(1150, org.y + 80), (1150, refused.cy)], label="refuses", seg=1, fa=80 / org.h)
-    teach = H(org, rules, "teaches a rule\nnever from a gap", dashed=True, color="#2b8a3e", y=rules.cy)
-    teach["strokeWidth"] = 4
-    top = guard.y - 65  # the rule ceiling runs above the refused card and into the guard from the left
-    R(rules, "l", guard, "l", [(1080, rules.cy), (1080, top), (2300, top), (2300, guard.y + 90)],
-      label="rule ceiling", seg=2, fb=90 / guard.h, dashed=True, color="#2b8a3e")
-    V(history, org, "shows last precedent\nnever applied", x=org.cx)
+    H(org, prec, "every decision", y=prec.cy)
+    H(prec, propose, "3 alike", y=prec.cy)
+    learn = V(propose, rules, "organizer approves", x=propose.cx, color="#2b8a3e")
+    learn["strokeWidth"] = 4
+    R(rules, "t", guard, "t", [(rules.cx, pack.bottom + 80), (guard.x + 90, pack.bottom + 80)],
+      label="rule ceiling", seg=1, fb=90 / guard.w, dashed=True, color="#2b8a3e")
+    R(payout, "r", costs, "l", [(payout.right + 50, payout.y + payout.h * 0.95), (payout.right + 50, costs.cy)],
+      label="journals", seg=2, fa=0.95)
+    V(history, org, "shows", x=org.cx)
     for box, n in ((venue_pdf, 1), (ingest, 2), (reader, 3), (claim, 4), (pack, 5), (split, 6), (claude, 7),
-                   (guard, 8), (cz, 9), (org, 10), (payout, 11)):
+                   (guard, 8), (cz, 9), (org, 10), (payout, 11), (propose, 12)):
         badge(box, n)
     return S.end_frame()
 

@@ -20,7 +20,7 @@ Responsibilities:
 - Insurance.md: give the organizer the rules Claude proposes from their precedents, to approve or reject, on the Proposed rules tab, with every payment rule and every precedent beside them.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
-- Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab.
+- Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab; Insurance.md: upload the venue's insurance policy there, or name its forms and have them found online, and confirm its terms.
 - Elastic.md: explain Elastic's jobs and link to their Elastic Kibana views from the Kibana tab.
 - Social.md: draw the event graph in 3D for the big screen, with the event photos among the people in them, and list every event photo on the Photos tab.
 
@@ -52,7 +52,7 @@ Not responsible for:
 | Merch.md | in | module to organizer portal | the Merch tab: the public `merch_template` table and, for `ops`, the view `board_merch_orders` | SDK |
 | Test-Bands.md | both | module and `bandit-api` to organizer portal | the band id (test bands are 90 to 99, the crowd's bands from 100) for the map and the counts; the crowd attendees in `board_attendees`; the Bands tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Bright-Data.md | in | module to organizer portal | the booths and organisations the import loaded: the booths on the venue map, the organisations in the attendee list's Company column | SDK |
-| Bright-Data.md | both | organizer portal, module and `bandit-api` | the Venue setup tab: `venue_setup`, `venue_setup_step` and `chosen_venue` in; `start_venue_setup` and `choose_venue` out, for `ops`; the model from `/venue/venue.glb` or the setup's blob | SDK and HTTPS |
+| Bright-Data.md | both | organizer portal, module and `bandit-api` | the Venue setup tab: `venue_setup`, `venue_setup_step` and `chosen_venue` in; `start_venue_setup` and `choose_venue` out, for `ops`; the model from `/venue/venue.glb` or the setup's blob; for the insurance policy, `board_venue_policy_lookups`, `board_policy_documents` and `board_policy_terms` in, `look_up_venue_policy`, `submit_policy_document` and `confirm_policy_terms` out | SDK and HTTPS |
 
 ## Design
 
@@ -103,13 +103,15 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note; a belongings claim on a policy the attendee named shows "Policy found online from its name", the limit and deductible the attendee typed, and "Open the policy wording" | the Claims queue's tables; Insurance.md: `attendee_policy`; Bright-Data.md: `plan_lookup` | `approve_claim`, `refuse_claim` |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
-Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
+Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A second line counts the roles: "<n> hackers, <n> booth staff, <n> organizers, <n> photographers, <n> speakers, <n> attendees who tapped a band." Every row shows the person's role in a Role column: hacker, booth staff, organizer, photographer or speaker for the crowd, attendee for someone who tapped a band, and organizer or photographer for staff who tapped one. A crowd attendee's row is also marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
 
 ### Names in the 3D venue
 
 The Live tab's 3D view names the floor from the `venue_spot` rows: the areas, the exit doors, every sponsor over its tables and the named places. A name that would cover another hides until the camera comes closer, and close up a sponsor's name climbs a line or two so neighbouring tables all show theirs.
 
 Each exit door shows its exit marker ([Hardware](../4-devices/Hardware.md)): a post and a ring on the floor glowing its exit colour, and under the door's name "exit marker <station id>, <colour>". The colour is the one the station marker reports in `station`, else its zone's `exit_colour`, else blue.
+
+Resting the pointer on a person in the 3D view shows their name, role, band code, company and their band's light.
 
 Each of our bands on the floor carries a blue tag with the name typed when it was placed (`band_place`) over its band code. The tags climb above each other and are never hidden.
 
@@ -123,9 +125,9 @@ A proposed rule waiting for the organizer shows above the decision history with 
 
 At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
 
-The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
+Everyone wears a band except the medics. The search box above the list matches every word typed against the name, the role (hacker, booth staff, organizer, photographer, speaker, attendee or medic), the kind of band (crowd band, test band or hardware band), the band code, the company and the socials. Each row shows the role, the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
 
-"Open" shows the person above the list, with their band code, status, zone, company, socials and join time, and "walking to <door>" or "left at <time> by <door>" once they leave early. Staff act as them from there.
+"Open" shows the person above the list, with their band code, role, kind of band, status, zone, company, socials and join time, and "walking to <door>" or "left at <time> by <door>" once they leave early. Staff act as them from there.
 
 Under the zone table, "Left early (<n>)" lists everyone with a `departure` row while the event runs: the name, the door, when they set off, when they walked out (or "walking") and who sent them, with "Open" for the person.
 
@@ -429,6 +431,7 @@ Bright-Data.md: the Venue setup tab sets up a venue from the event's name and pi
 
 - "Venue": the "Shown venue" list holds "Cal Hacks 13.0 at the Palace of Fine Arts", the default, and every ready setup as "<event> at <venue>", newest first. Choosing one calls `choose_venue`, and only `ops` can change it. Below the list come the venue's name and address, its meshes, triangles, named parts and size in metres, the page the model came from, and the model in 3D ("Drag to turn, scroll to zoom.").
 - "Set up a venue": for `ops`, a field for the event's name and "Find the venue" (`start_venue_setup`). Everyone else reads "The organizer sets up the venue."
+- "Insurance policy": for `ops` only. "Upload and read" takes the venue's policy PDF (`POST /api/blobs` purpose `policy`, then `submit_policy_document`). "Find the policy online" takes the insurer, the state, the liability and property form numbers from the declarations' forms schedule, and the declarations: policy number, period, claims contact, medical expense limit, general aggregate, property limit and property deductible (`look_up_venue_policy`). "Looked up (n)" lists each lookup, newest first, with its status ("Searching", "Found", "Not found", "Wrong form" or "Failed"), each found form as a link with its printed form number, title and pages, and its note; a lookup that found nothing reads "We couldn't find the policy's forms online. Upload the policy instead." Below come the policy PDFs, uploaded or found, with their status, and the terms of the newest read one: each term with its value in effect, what the policy printed, its quote, page and status (`read`, `flagged`, `default` or `typed`), and "Use these terms for the event" (`confirm_policy_terms`). "In effect now" shows the policy, its covers and its schedule of benefits.
 - "Setups (n)": one block per run, newest first. Each shows the event's name and its status ("Working", "Ready", "No 3D model found" or "Failed"), the venue and its address, the event site, the 3D map and the floor plans as links, "Pages used (n)", any error, and every step with its time.
 
 The default model loads from `/venue/venue.glb`, which `bandit-api` serves; a setup's model loads from its blob at `/blobs/<sha256>`. The Live tab's venue map does not change: it draws zones and bands from `venue_plan`.
@@ -444,7 +447,7 @@ Elastic.md: the Kibana tab explains what Elastic, the Evidence Engine, does, one
 
 Nothing on the tab reads Elastic or starts a run.
 
-Bright-Data.md: the event import is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event. The one Bright Data run the portal starts is a venue setup ([Bright-Data](../7-integrations/Bright-Data.md)).
+Bright-Data.md: the event import is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event. The Bright Data runs the portal starts are a venue setup and a venue policy lookup ([Bright-Data](../7-integrations/Bright-Data.md)).
 
 ### Bands tab (Test-Bands.md)
 
@@ -479,6 +482,7 @@ Every device subscribes to the same tables and views. Private tables arrive thro
 | Social.md: `board_photos` | the Photos tab and the photos in the event graph |
 | Merch.md: `merch_template`, `board_merch_orders` | the Merch tab |
 | Bright-Data.md: `venue_setup`, `venue_setup_step`, `chosen_venue` | the Venue setup tab |
+| Bright-Data.md: `board_venue_policy_lookups`; Insurance.md: `board_policy_documents`, `board_policy_terms`, `board_policies`, `board_covers`, `board_fee_schedule` | the Venue setup tab's insurance policy section |
 
 The page redraws at most every 500 ms, however many rows change, and at least once a second; the venue map moves its dots between redraws. Test-Bands.md: the crowd adds up to 2,000 `band` rows that change every 2 s ([Test-Bands](../3-services/Test-Bands.md)).
 
