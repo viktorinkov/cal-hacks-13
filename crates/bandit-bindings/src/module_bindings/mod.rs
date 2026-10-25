@@ -1127,6 +1127,9 @@ pub enum Reducer {
         customer_id: String,
         account_id: String,
         purchase_id: String,
+        refund_customer_id: String,
+        refund_account_id: String,
+        refund_deposit_id: String,
     },
     RecordClaimPayout {
         job_id: u64,
@@ -1944,11 +1947,17 @@ impl __sdk::Reducer for Reducer {
                 customer_id,
                 account_id,
                 purchase_id,
+                refund_customer_id,
+                refund_account_id,
+                refund_deposit_id,
             } => __sats::bsatn::to_vec(&record_charge_payment_reducer::RecordChargePaymentArgs {
                 job_id: job_id.clone(),
                 customer_id: customer_id.clone(),
                 account_id: account_id.clone(),
                 purchase_id: purchase_id.clone(),
+                refund_customer_id: refund_customer_id.clone(),
+                refund_account_id: refund_account_id.clone(),
+                refund_deposit_id: refund_deposit_id.clone(),
             }),
             Reducer::RecordClaimPayout {
                 job_id,

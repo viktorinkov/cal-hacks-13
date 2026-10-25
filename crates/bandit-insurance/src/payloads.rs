@@ -187,6 +187,20 @@ pub struct ChargePaymentPayload {
     /// The merchant the purchase is made at: the venue.
     pub merchant_name: String,
     pub memo: String,
+    /// The owner whose deductible the charge returns, hex; empty when none goes back.
+    #[serde(default)]
+    pub refund_to: String,
+    #[serde(default)]
+    pub refund_name: String,
+    /// The owner's Nessie customer and account; empty when they have no wallet yet.
+    #[serde(default)]
+    pub refund_customer_id: String,
+    #[serde(default)]
+    pub refund_account_id: String,
+    #[serde(default)]
+    pub refund_cents: Cents,
+    #[serde(default)]
+    pub refund_memo: String,
 }
 
 /// Input of `clinic_report`: everything the hospital's report is written from.

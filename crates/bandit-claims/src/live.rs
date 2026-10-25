@@ -144,6 +144,12 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
                 .charge()
                 .iter()
                 .filter(|c| c.status == "proposed" && !c.recommendation.is_empty() && c.created_at >= r.started_at && since(c.updated_at) >= approve_after as i64)
+                // A charge is decided once its claim is: paid, or refused.
+                .filter(|c| {
+                    db.db.claim().id().find(&c.claim_id).is_some_and(|k| {
+                        matches!(k.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled | ClaimStatus::Refused)
+                    })
+                })
                 .collect();
             for c in charges {
                 if done.insert((c.id, "charge")) {

@@ -24,7 +24,7 @@ pub struct WalletEntry {
     pub id: u64,
     #[index(btree)]
     pub identity: Identity,
-    /// `opening`, `purchase`, `payout` or `charge`.
+    /// `opening`, `purchase`, `payout`, `charge` or `refund`.
     pub kind: String,
     /// Money in is positive, money out negative.
     pub amount_cents: i64,
