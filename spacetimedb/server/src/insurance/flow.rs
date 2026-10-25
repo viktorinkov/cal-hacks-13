@@ -522,9 +522,9 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
 }
 
 /// Claude's investigation and decision. Code validates the decision again,
-/// then holds it to its limits (`decision::guard`): Claude pays inside the
-/// authority a learned rule gives and refuses on failed checks; anything else
-/// goes to the organizer. An invalid decision is set aside and the claim is
+/// then holds it to its limits (`decision::guard`): for a simple claim Claude
+/// pays inside the authority a learned rule gives and refuses on failed
+/// checks; a claim with any complication goes to the organizer. An invalid decision is set aside and the claim is
 /// decided as if Claude were unavailable.
 #[spacetimedb::reducer]
 pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: String, call: ModelCallIn) -> Result<(), String> {
@@ -603,16 +603,11 @@ fn corroboration_of(claim: &Claim) -> bandit_insurance::Corroboration {
     }
 }
 
-/// Why nothing of this claim's occurrence settles on its own, when enough people were hurt in it.
+/// The mass occurrence complication, when enough people were hurt in this claim's occurrence:
+/// nothing of it settles or is refused on its own.
 fn mass_occurrence(ctx: &ReducerContext, claim: &Claim) -> Option<String> {
     let occurrence = occurrence(ctx, claim.incident_id);
-    (occurrence.len() >= MASS_OCCURRENCE).then(|| {
-        format!(
-            "{} people hurt in {} within 5 minutes: auto-settle is off and the organizer decides every claim of the occurrence",
-            occurrence.len(),
-            claim.zone_name
-        )
-    })
+    (occurrence.len() >= MASS_OCCURRENCE).then(|| format!("{} people hurt in {} within 5 minutes", occurrence.len(), claim.zone_name))
 }
 
 /// Claude's valid decision, held to its limits.
@@ -645,11 +640,8 @@ fn decide_claim(ctx: &ReducerContext, claim: Claim, review: ReviewGate) -> Resul
         review,
         review_required: settings(ctx).review_required,
         rule: matching_rule(&rules, kind_of(&claim), cover_of(&claim), claim.zone_id),
+        mass_occurrence: mass_occurrence(ctx, &claim),
     });
-    if let (Some(reason), false) = (mass_occurrence(ctx, &claim), matches!(decision, Decision::Refuse { .. })) {
-        route(ctx, claim, reason);
-        return Ok(());
-    }
     let by = if matches!(decision, Decision::AutoSettle { .. }) { "rule" } else { "code" };
     apply(ctx, claim, decision, by)
 }
@@ -892,6 +884,9 @@ pub fn approve_claim(
     let claim = claim_by_id(ctx, claim_id)?;
     approver_check(ctx, &claim, &pack_hash_seen)?;
     let now = current_amounts(ctx, &claim).ok_or("no cover for this claim")?;
+    if claim.payout_cents == 0 {
+        return Err("there is nothing to pay: the claim has no covered cost, so refuse it or file its hospital report first".into());
+    }
     if now.payout_cents != claim.payout_cents || amount_seen_cents != claim.payout_cents {
         return Err(format!("stale: the payout is now {}", bandit_insurance::money::format_cents(now.payout_cents)));
     }

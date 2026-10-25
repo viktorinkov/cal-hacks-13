@@ -5,10 +5,11 @@
 //! checks the answer and holds the decision to the limits a person set:
 //!
 //! - Claude never sets an amount. The fee schedule and the policy limits did.
-//! - Claude pays only claims whose checks all passed, whose evidence is
-//!   corroborated, and that fall inside the authority an organizer's approval
-//!   gave the Decision Engine (a learned rule and its ceiling). Any other pay
-//!   decision goes to the organizer as Claude's recommendation.
+//! - Claude's decision goes through on its own only for a simple claim. A
+//!   claim with any complication (sources that disagree, missing evidence,
+//!   failed checks, a bill over a limit, a payout above what an organizer
+//!   approved, a mass occurrence) goes to the organizer as Claude's
+//!   recommendation, with every complication listed (`complications`).
 //! - Claude refuses on its own only when the refusal rests on a check that
 //!   failed. A refusal on judgment alone goes to the organizer, because a
 //!   wrong refusal hurts an injured attendee more than a wrong small payment
@@ -16,6 +17,7 @@
 //! - Claude pays only after it has read the band evidence, the light circle
 //!   and, for an injury, the hospital report itself.
 
+use crate::complications::{ClaimState, Complication, complications, reason};
 use crate::coverage::Amounts;
 use crate::letters::unknown_figures;
 use crate::money::format_cents;
@@ -390,66 +392,63 @@ fn concerns_text(d: &AgentDecision) -> String {
     if parts.is_empty() { d.summary.clone() } else { parts.join("; ") }
 }
 
-/// Holds a valid decision to the limits, first match wins:
+/// Holds a valid decision to the limits:
 /// 1. no cover: refuse, whatever Claude decided;
-/// 2. `refuse` resting on failed checks: refused by Claude; any other refusal goes to the organizer;
+/// 2. `refuse` goes through only when it rests on failed checks and no
+///    complication holds a refusal (sources that disagree, a mass occurrence);
 /// 3. `ask_organizer`: to the organizer with Claude's question;
-/// 4. `pay` goes through only with every check passed, a payout above zero,
-///    corroborated evidence, no mass occurrence, a learned rule, and a payout
-///    within its ceiling; otherwise it goes to the organizer (or, at zero with
-///    every check passed, is refused).
+/// 4. `pay` goes through only when the claim has no complication; at zero
+///    with every check passed it is refused instead.
+///
+/// Anything that does not go through goes to the organizer with Claude's
+/// decision and every complication the claim has.
 pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
     let refuse = |reason: String, by: &'static str, guardrail: &str| Guarded { decision: Decision::Refuse { reason }, decided_by: by, guardrail: guardrail.into() };
-    let route = |reason: String, guardrail: String| Guarded { decision: Decision::Route { reason }, decided_by: "code", guardrail };
+    let route = |head: String, list: &[Complication]| Guarded {
+        decision: Decision::Route { reason: reason(&head, list) },
+        decided_by: "code",
+        guardrail: "a claim with a complication goes to the organizer".into(),
+    };
     let payout = format_cents(input.amounts.payout_cents);
 
     if !input.has_cover {
         return refuse("no active cover for this incident kind".into(), "code", "the policy has no active cover for this kind of incident");
     }
+    let found = complications(&ClaimState {
+        corroboration: input.corroboration,
+        amounts: input.amounts,
+        checks: input.checks,
+        rule: input.rule,
+        mass_occurrence: input.mass_occurrence.as_deref(),
+    });
     match d.decision {
-        Choice::Refuse if !d.refusal_checks.is_empty() => refuse(
-            format!("Claude refused: failed {}: {}", d.refusal_checks.join(", "), concerns_text(d)),
-            "claude",
-            "a refusal that rests on failed checks goes through on its own",
-        ),
-        Choice::Refuse => route(
-            format!("Claude recommends refusing: {}. Every check passed, so a person decides", concerns_text(d).trim_end_matches('.')),
-            "every check passed, so a refusal on Claude's judgment alone needs a person".into(),
-        ),
-        Choice::AskOrganizer => route(format!("Claude asks: {}", d.question.trim()), "Claude chose to ask a person".into()),
-        Choice::Pay => {
-            let failed = failed_check_names(input.checks);
-            if !failed.is_empty() {
-                return route(format!("Claude would pay {payout}, but checks failed: {}", failed.join(", ")), "Claude pays only when every check passed".into());
+        Choice::Refuse => {
+            let mut held: Vec<Complication> = found.into_iter().filter(Complication::holds_refusal).collect();
+            if d.refusal_checks.is_empty() {
+                held.insert(0, Complication::NoFailedCheck);
             }
-            if input.amounts.payout_cents == 0 {
+            if held.is_empty() {
+                return refuse(
+                    format!("Claude refused: failed {}: {}", d.refusal_checks.join(", "), concerns_text(d)),
+                    "claude",
+                    "a simple refusal that rests on failed checks goes through on its own",
+                );
+            }
+            let on = if d.refusal_checks.is_empty() { String::new() } else { format!(" on failed {}", d.refusal_checks.join(", ")) };
+            route(format!("Claude recommends refusing{on}: {}", concerns_text(d).trim_end_matches('.')), &held)
+        }
+        Choice::AskOrganizer => route(format!("Claude asks: {}", d.question.trim()), &found),
+        Choice::Pay => {
+            if input.amounts.payout_cents == 0 && failed_check_names(input.checks).is_empty() {
                 return refuse("payout is zero after limits".into(), "code", "nothing is payable after the fee schedule and the limits");
             }
-            if input.corroboration != Corroboration::Corroborated {
-                return route(
-                    format!("Claude would pay {payout}, but the evidence is {}", input.corroboration.as_str()),
-                    "Claude pays only on corroborated evidence".into(),
-                );
-            }
-            if let Some(reason) = &input.mass_occurrence {
-                return route(reason.clone(), "in a mass occurrence the organizer decides every claim".into());
-            }
-            let Some(rule) = input.rule else {
-                return route(
-                    format!("Claude would pay {payout}; no approval has given it authority for this kind of claim yet"),
-                    "Claude pays only inside the authority an organizer's approval gave".into(),
-                );
-            };
-            if input.amounts.payout_cents > rule.ceiling_cents {
-                return route(
-                    format!("Claude would pay {payout}, above the {} authority of rule v{}", format_cents(rule.ceiling_cents), rule.version),
-                    format!("rule v{} lets Claude pay up to {}", rule.version, format_cents(rule.ceiling_cents)),
-                );
-            }
-            Guarded {
-                decision: Decision::AutoSettle { rule_id: rule.rule_id, rule_version: rule.version },
-                decided_by: "claude",
-                guardrail: format!("{payout} is inside the {} authority of rule v{}", format_cents(rule.ceiling_cents), rule.version),
+            match input.rule {
+                Some(rule) if found.is_empty() => Guarded {
+                    decision: Decision::AutoSettle { rule_id: rule.rule_id, rule_version: rule.version },
+                    decided_by: "claude",
+                    guardrail: format!("a simple claim: {payout} is inside the {} authority of rule v{}", format_cents(rule.ceiling_cents), rule.version),
+                },
+                _ => route(format!("Claude would pay {payout}"), &found),
             }
         }
     }
@@ -604,7 +603,7 @@ mod tests {
         let g = guard(&pay(), &input(&checks, Some(&rule)));
         assert_eq!(g.decision, Decision::AutoSettle { rule_id: 7, rule_version: 1 });
         assert_eq!(g.decided_by, "claude");
-        assert_eq!(g.guardrail, "$180.00 is inside the $250.00 authority of rule v1");
+        assert_eq!(g.guardrail, "a simple claim: $180.00 is inside the $250.00 authority of rule v1");
     }
 
     #[test]
@@ -614,15 +613,41 @@ mod tests {
             Decision::Route { reason } => reason,
             other => panic!("{other:?}"),
         };
-        assert_eq!(route(guard(&pay(), &input(&checks, None))), "Claude would pay $180.00; no approval has given it authority for this kind of claim yet");
+        assert_eq!(route(guard(&pay(), &input(&checks, None))), "Claude would pay $180.00. Complications: no approval covers this kind of claim yet");
         let small = SettlementRule { ceiling_cents: 10_000, ..rule.clone() };
-        assert_eq!(route(guard(&pay(), &input(&checks, Some(&small)))), "Claude would pay $180.00, above the $100.00 authority of rule v1");
+        assert_eq!(
+            route(guard(&pay(), &input(&checks, Some(&small)))),
+            "Claude would pay $180.00. Complications: $180.00 is above the $100.00 ceiling of rule v1"
+        );
         let bad = failing();
-        assert_eq!(route(guard(&pay(), &input(&bad, Some(&rule)))), "Claude would pay $180.00, but checks failed: witness_zone");
+        assert_eq!(route(guard(&pay(), &input(&bad, Some(&rule)))), "Claude would pay $180.00. Complications: failed checks: witness_zone");
         let thin = GuardInput { corroboration: Corroboration::Uncorroborated, ..input(&checks, Some(&rule)) };
-        assert_eq!(route(guard(&pay(), &thin)), "Claude would pay $180.00, but the evidence is uncorroborated");
+        assert_eq!(route(guard(&pay(), &thin)), "Claude would pay $180.00. Complications: no second source confirms where and when it happened");
         let mass = GuardInput { mass_occurrence: Some("3 people hurt in Main stage within 5 minutes".into()), ..input(&checks, Some(&rule)) };
-        assert_eq!(route(guard(&pay(), &mass)), "3 people hurt in Main stage within 5 minutes");
+        assert_eq!(route(guard(&pay(), &mass)), "Claude would pay $180.00. Complications: 3 people hurt in Main stage within 5 minutes");
+        let capped = GuardInput { amounts: Amounts { cost_cents: 30_000, ..input(&checks, None).amounts }, ..input(&checks, Some(&rule)) };
+        assert_eq!(
+            route(guard(&pay(), &capped)),
+            "Claude would pay $180.00. Complications: the covered cost $300.00 is over the policy's limit, so the payout is capped at $180.00"
+        );
+    }
+
+    #[test]
+    fn every_complication_is_listed_for_the_organizer() {
+        let bad = failing();
+        let messy = GuardInput {
+            corroboration: Corroboration::Disputed,
+            mass_occurrence: Some("3 people hurt in Main stage within 5 minutes".into()),
+            ..input(&bad, None)
+        };
+        assert_eq!(
+            guard(&pay(), &messy).decision,
+            Decision::Route {
+                reason: "Claude would pay $180.00. Complications: the sources disagree on where or when it happened; failed checks: witness_zone; \
+                         3 people hurt in Main stage within 5 minutes; no approval covers this kind of claim yet"
+                    .into()
+            }
+        );
     }
 
     #[test]
@@ -635,12 +660,45 @@ mod tests {
         assert_eq!(g.decision, Decision::Refuse { reason: "Claude refused: failed witness_zone: location: every witness band was in the sponsor hall".into() });
         assert_eq!(g.decided_by, "claude");
 
+        // missing evidence and no approval do not weaken a refusal on a failed check
+        let thin = GuardInput { corroboration: Corroboration::Uncorroborated, ..input(&bad, None) };
+        assert_eq!(guard(&fake, &thin).decided_by, "claude");
+
         let g = guard(&refuse_at_home(), &input(&good, Some(&rule)));
-        assert_eq!(g.decision, Decision::Route { reason: "Claude recommends refusing: causation: the report says the injury happened at home. Every check passed, so a person decides".into() });
+        assert_eq!(
+            g.decision,
+            Decision::Route { reason: "Claude recommends refusing: causation: the report says the injury happened at home. Complications: every check passed".into() }
+        );
         assert_eq!(g.decided_by, "code");
 
         let ask = AgentDecision { decision: Choice::AskOrganizer, question: " Was the attendee at the event? ".into(), ..pay() };
         assert_eq!(guard(&ask, &input(&good, Some(&rule))).decision, Decision::Route { reason: "Claude asks: Was the attendee at the event?".into() });
+        let ask_thin = GuardInput { corroboration: Corroboration::Uncorroborated, ..input(&good, Some(&rule)) };
+        assert_eq!(
+            guard(&ask, &ask_thin).decision,
+            Decision::Route { reason: "Claude asks: Was the attendee at the event? Complications: no second source confirms where and when it happened".into() }
+        );
+    }
+
+    #[test]
+    fn a_refusal_where_the_sources_disagree_goes_to_the_organizer() {
+        let (bad, rule) = (failing(), rule());
+        let mut fake = refuse_at_home();
+        fake.refusal_checks = vec!["witness_zone".into()];
+        fake.concerns = vec![Concern { kind: "location".into(), detail: "every witness band was in the sponsor hall".into(), fact_ids: vec![2] }];
+        let disputed = GuardInput { corroboration: Corroboration::Disputed, ..input(&bad, Some(&rule)) };
+        let g = guard(&fake, &disputed);
+        assert_eq!(
+            g.decision,
+            Decision::Route {
+                reason: "Claude recommends refusing on failed witness_zone: location: every witness band was in the sponsor hall. \
+                         Complications: the sources disagree on where or when it happened"
+                    .into()
+            }
+        );
+        assert_eq!(g.decided_by, "code");
+        let mass = GuardInput { mass_occurrence: Some("3 people hurt in Main stage within 5 minutes".into()), ..input(&bad, Some(&rule)) };
+        assert!(matches!(guard(&fake, &mass).decision, Decision::Route { .. }));
     }
 
     #[test]

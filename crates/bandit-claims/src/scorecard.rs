@@ -322,8 +322,8 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
 }
 
 /// How far a fake got: 0 refused by code, 1 stopped by a code check or rule
-/// (Claude refuses on its own only on a failed check), 2 stopped only by
-/// Claude's judgment, 3 paid.
+/// (Claude refuses on its own only a simple claim, on a failed check), 2
+/// stopped only by Claude's judgment, 3 paid.
 fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled) {
         return (3, "paid".into());
@@ -335,7 +335,8 @@ fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if c.decided_by == "claude" {
         return (1, format!("refused by Claude on a failed check ({note})"));
     }
-    if note.starts_with("Claude recommends refusing") || note.starts_with("Claude asks") || note.starts_with("claims agent") {
+    let judgment_only = note.starts_with("Claude recommends refusing") && note.contains("every check passed");
+    if judgment_only || note.starts_with("Claude asks") || note.starts_with("Complications: Claude") {
         return (2, "caught only by Claude".into());
     }
     if in_pipeline(c.status) {

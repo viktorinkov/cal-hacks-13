@@ -3,7 +3,7 @@
 //! resolves the incident; the clinic files its record on the claim made out to the person who fell; the
 //! camera confirms broken equipment and the organizer logs the repair cost. A claim left waiting for the
 //! organizer is decided after `--approve-after` seconds so the run keeps moving: approved with a learned rule,
-//! or refused when the claims agent found the injury happened away from the event.
+//! or refused when Claude recommended refusing it.
 //!
 //! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
 //! band, is treated as a sprain at first aid.
@@ -205,11 +205,13 @@ fn property(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: 
     Ok(())
 }
 
-/// The organizer's decision on a claim nobody decided in time.
+/// The organizer's decision on a claim nobody decided in time: refused when
+/// Claude recommended refusing it or there is nothing to pay, else approved.
 fn decide_claim(app: &App, c: &Claim) -> Result<()> {
-    if c.status_note.contains("causation") {
-        let reason = "the clinic record says the injury happened away from the event";
-        decide::refuse(app, c.id, None, reason, false)?;
+    if c.review_verdict == "refuse" {
+        decide::refuse(app, c.id, None, "the organizer agrees with Claude's refusal", false)?;
+    } else if c.payout_cents == 0 {
+        decide::refuse(app, c.id, None, "nothing to pay: no hospital report covers it", false)?;
     } else {
         decide::approve(app, c.id, None, None, true, false, false)?;
     }
