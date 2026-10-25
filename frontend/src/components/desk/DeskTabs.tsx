@@ -4,7 +4,7 @@ import { useRoute } from '@/cover/route'
 import { useSession } from '@/stdb/session'
 
 const ITEMS: { to: string; label: string; on: (path: string) => boolean; ownerOnly?: boolean }[] = [
-  { to: '/', label: 'Live', on: (path: string) => path === '/' || path === '/organizer' },
+  { to: '/', label: 'Map', on: (path: string) => path === '/' || path === '/organizer' },
   { to: '/attendees', label: 'Attendees', on: (path: string) => path === '/attendees' },
   { to: '/claims', label: 'Settlements', on: (path: string) => path === '/claims' },
   { to: '/rules', label: 'Proposed rules', on: (path: string) => path === '/rules' },

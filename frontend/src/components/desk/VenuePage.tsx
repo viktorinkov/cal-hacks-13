@@ -167,14 +167,37 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
               : 'Connecting…'}
           </p>
         )}
-        {latestImport && (
-          <p className="mt-2 text-[13px] text-ink-dim">
-            {latestImport.status === 'running' ? 'Importing' : latestImport.status === 'ready' ? 'Imported' : latestImport.status === 'failed' ? 'Import failed' : latestImport.status}{' '}
-            {latestImport.eventName || 'the event'}
-            {latestStep ? ` · ${latestStep.step}${latestStep.detail ? `: ${latestStep.detail}` : ''}` : ''}
-            {latestImport.error ? ` · ${latestImport.error}` : ''}
-          </p>
-        )}
+        {latestImport &&
+          (latestImport.status === 'ready' && latestImport.counts.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-[13px] text-ink">Imported {latestImport.eventName || 'the event'}</p>
+              <table className="mt-2 w-full max-w-md border-collapse text-[13px]">
+                <thead>
+                  <tr className="text-left text-ink-muted">
+                    <th scope="col" className="pb-1 font-normal">Section</th>
+                    <th scope="col" className="pb-1 text-right font-normal tabular-nums">Added</th>
+                    <th scope="col" className="pb-1 text-right font-normal tabular-nums">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestImport.counts.map((row) => (
+                    <tr key={row.section} className="border-t border-line">
+                      <th scope="row" className="py-1 pr-4 text-left font-normal capitalize text-ink">{row.section}</th>
+                      <td className="py-1 text-right tabular-nums text-ink-dim">{row.inserted}</td>
+                      <td className="py-1 text-right tabular-nums text-ink-dim">{row.updated}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-2 text-[13px] text-ink-dim">
+              {latestImport.status === 'running' ? 'Importing' : latestImport.status === 'failed' ? 'Import failed' : latestImport.status}{' '}
+              {latestImport.eventName || 'the event'}
+              {latestImport.status === 'running' && latestStep ? ` · ${latestStep.step}` : ''}
+              {latestImport.error ? ` · ${latestImport.error}` : ''}
+            </p>
+          ))}
       </form>
       <div className="min-w-0 lg:col-span-5">
         <label htmlFor="venue-run-pick" className="mb-2 block text-[13px] font-medium text-ink">

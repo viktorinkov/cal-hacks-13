@@ -264,6 +264,10 @@ type RunReducers = {
   resumeLiveRun(args: Record<string, never>): Promise<unknown>
   evacuateLiveRun(args: { on: boolean }): Promise<unknown>
   endLiveRun(args: Record<string, never>): Promise<unknown>
+  endEvent(args: Record<string, never>): Promise<unknown>
+  reopenEvent(args: Record<string, never>): Promise<unknown>
+  startCrowd(args: { size: number }): Promise<unknown>
+  stopCrowd(args: Record<string, never>): Promise<unknown>
   approveClaim(args: { claimId: bigint; amountSeenCents: bigint; packHashSeen: string }): Promise<unknown>
   giveBand(args: { bandId: number; nodeId: bigint; name: string }): Promise<unknown>
   placeBand(args: { bandId: number; xM: number; yM: number; label: string }): Promise<unknown>
@@ -576,6 +580,26 @@ export function endRun(): Promise<boolean> {
 
 export function setRunLowVis(on: boolean): Promise<boolean> {
   return call('lowvis', (r) => r.setLowVis({ on }))
+}
+
+/** end_event flips every band's page to the recap, whether or not a run is live. */
+export function endEventRun(): Promise<boolean> {
+  return call('end-event', (r) => r.endEvent({}))
+}
+
+export function reopenEventRun(): Promise<boolean> {
+  return call('reopen', (r) => r.reopenEvent({}))
+}
+
+/** Re-seeds the crowd at `size` and re-arms its backend ticker. */
+export function restartCrowd(size: number): Promise<boolean> {
+  if (!whole(size, RUN_LIMITS.crowd)) return Promise.resolve(refuse('crowd', 'The crowd must be a whole number from 1 to 2,000.'))
+  return call('crowd', (r) => r.startCrowd({ size }))
+}
+
+/** Freezes the crowd where it stands. */
+export function stopCrowdNow(): Promise<boolean> {
+  return call('crowd', (r) => r.stopCrowd({}))
 }
 
 /** Approve a claim routed to the organizer, at the amount and pack shown on screen. */
