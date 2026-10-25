@@ -102,6 +102,24 @@ pub fn split_pages(pdf: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
         .collect()
 }
 
+/// Pages `first` to `last` of `pdf`, 1-based and inclusive, as a PDF of their own.
+pub fn pdf_pages(pdf: &[u8], first: u32, last: u32) -> anyhow::Result<Vec<u8>> {
+    let mut doc = lopdf::Document::load_mem(pdf)?;
+    let numbers: Vec<u32> = doc.get_pages().into_keys().collect();
+    if first < 1 || last < first || last as usize > numbers.len() {
+        bail!("pages {first} to {last} are not in a PDF of {} pages", numbers.len());
+    }
+    doc.delete_pages(&numbers.iter().copied().filter(|&n| n < first || n > last).collect::<Vec<_>>());
+    doc.prune_objects();
+    let mut out = Vec::new();
+    doc.save_to(&mut out).context("writing the pages")?;
+    let kept = lopdf::Document::load_mem(&out)?.get_pages().len() as u32;
+    if kept != last - first + 1 {
+        bail!("the cut PDF has {kept} pages, not {}", last - first + 1);
+    }
+    Ok(out)
+}
+
 /// The pages of `pdf` as `split_pages` will find them; the page objects counted when it does not load.
 pub fn page_count(pdf: &[u8]) -> u32 {
     lopdf::Document::load_mem(pdf).map(|d| d.get_pages().len() as u32).unwrap_or_else(|_| bandit_common::count_pages(pdf)).max(1)
@@ -277,6 +295,17 @@ mod tests {
         assert!(text(2).contains("CP 00 10 10 12"), "{:?}", text(2));
         assert!(join_pdfs(&[&liability, b"not a pdf"]).is_err());
         assert_eq!(page_count(b"%PDF-1.7 <</Type /Page>>"), 1);
+    }
+
+    #[test]
+    fn cuts_a_form_out_of_a_longer_pdf() {
+        let specimen = pdf(&["DECLARATIONS", "COMMERCIAL GENERAL LIABILITY COVERAGE FORM CG 00 01 04 13", "COVERAGE C MEDICAL PAYMENTS", "LIQUOR LIABILITY"]);
+        let form = pdf_pages(&specimen, 2, 3).unwrap();
+        assert_eq!(page_count(&form), 2);
+        let text = Document::load_mem(&form).unwrap().extract_text(&[1, 2]).unwrap();
+        assert!(text.contains("CG 00 01 04 13") && text.contains("COVERAGE C") && !text.contains("LIQUOR"), "{text:?}");
+        assert!(pdf_pages(&specimen, 3, 5).is_err());
+        assert!(pdf_pages(&specimen, 0, 2).is_err());
     }
 
     fn payload(kind: &str) -> DocumentReadPayload {

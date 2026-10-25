@@ -28,6 +28,7 @@
 
 - The SessionStart hook `.claude/hooks/git-identity` sets Viktor's identity when it is unset or `noreply@anthropic.com`.
 - In any clone or worktree the hook does not cover, set `user.name` to `Viktor Minchev` and `user.email` to `vikitominchev@gmail.com` before the first commit. Never commit as Claude.
+- Commit and merge messages never point at Claude: no `claude/` branch names, claude.ai links, `Claude-Session` or `Co-Authored-By` lines. Merge with `git merge -m "merge <what it brings>" <branch>`, never with the default message. `.githooks/commit-msg` rejects these, and the SessionStart hook `.claude/hooks/git-hooks` turns it on.
 
 ## Deleting files
 
