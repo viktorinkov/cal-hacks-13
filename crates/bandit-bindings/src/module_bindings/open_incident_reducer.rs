@@ -9,7 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub(super) struct OpenIncidentArgs {
     pub kind: String,
     pub zone_id: u64,
-    pub band_id: u8,
+    pub band_id: u32,
     pub note: String,
 }
 
@@ -43,7 +43,7 @@ pub trait open_incident {
         &self,
         kind: String,
         zone_id: u64,
-        band_id: u8,
+        band_id: u32,
         note: String,
     ) -> __sdk::Result<()> {
         self.open_incident_then(kind, zone_id, band_id, note, |_, _| {})
@@ -59,7 +59,7 @@ pub trait open_incident {
         &self,
         kind: String,
         zone_id: u64,
-        band_id: u8,
+        band_id: u32,
         note: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
@@ -73,7 +73,7 @@ impl open_incident for super::RemoteReducers {
         &self,
         kind: String,
         zone_id: u64,
-        band_id: u8,
+        band_id: u32,
         note: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)

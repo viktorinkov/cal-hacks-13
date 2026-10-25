@@ -21,7 +21,8 @@ use crate::ingest::{close_stay, open_stay};
 use crate::roles::require_role;
 use crate::tables::*;
 use crate::tables::micros;
-use crate::venue::{booth, organization, zone, Booth, Organization, Zone};
+use crate::safety::{self, incident, incident_band, S_NEAR_SOS};
+use crate::venue::{booth, organization, venue_spot, zone, Booth, Organization, VenueSpot, Zone};
 use spacetimedb::rand::rngs::StdRng;
 use spacetimedb::rand::{Rng, SeedableRng};
 use spacetimedb::{AnonymousViewContext, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
@@ -49,6 +50,11 @@ const KEEP_STAYS_MICROS: i64 = 3_600_000_000;
 const PRUNE_EVERY_TICKS: u64 = 30;
 /// Every attendee of the crowd is generated from this seed and their band id.
 const SEED: u64 = 0xCA1_4AC5_0013;
+/// The crowd within this many metres of someone who is down lights the circle, and steps back to this distance.
+const CIRCLE_M: f32 = 3.0;
+const CLEAR_M: f32 = 4.2;
+/// At most this many of the crowd are recorded as an incident's light-circle witnesses.
+const MAX_WITNESSES: usize = 12;
 
 const FIRST_NAMES: &[&str] = &[
     "Maya", "Ethan", "Priya", "Lucas", "Sofia", "Noah", "Aisha", "Diego", "Hana", "Marcus", "Elena", "Kenji", "Chloe",
@@ -87,9 +93,10 @@ fn rng_for(band_id: u32) -> StdRng {
     StdRng::seed_from_u64(SEED ^ (band_id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
 }
 
-fn later(ctx: &ReducerContext, min_minutes: f32, max_minutes: f32) -> Timestamp {
-    let secs = ctx.rng().gen_range(min_minutes * 60.0..max_minutes * 60.0) as i64;
-    ctx.timestamp + seconds(secs)
+/// A time between `min_minutes` and `max_minutes` from now, divided by the live run's pace.
+fn later(ctx: &ReducerContext, min_minutes: f32, max_minutes: f32, pace: f32) -> Timestamp {
+    let secs = (ctx.rng().gen_range(min_minutes * 60.0..max_minutes * 60.0) / pace.max(1.0)) as i64;
+    ctx.timestamp + seconds(secs.max(1))
 }
 
 // --- The venue as the crowd sees it ------------------------------------------------------------
@@ -155,6 +162,12 @@ struct BoothSpot {
 struct Venue {
     zones: Vec<(Zone, Rect)>,
     booths: Vec<BoothSpot>,
+    /// The spots of each station on the 3D floor, empty when none are loaded.
+    spots: HashMap<u8, Vec<(f32, f32)>>,
+    /// The hacker tables, in table-number order: where teams sit.
+    tables: Vec<(f32, f32)>,
+    /// The doors people leave by, with their station.
+    exits: Vec<(f32, f32, u8)>,
 }
 
 impl Venue {
@@ -163,15 +176,40 @@ impl Venue {
             ctx.db.zone().iter().filter(|z| z.station_id != 0).collect(),
             |zone_id| ctx.db.booth().zone_id().filter(zone_id).collect(),
             |id| ctx.db.organization().id().find(id),
+            ctx.db.venue_spot().iter().collect(),
         )
     }
 
-    /// The zones with a station, their booths and the booths' organisations, as the crowd uses them.
-    fn build(stations: Vec<Zone>, booths_in: impl Fn(u64) -> Vec<Booth>, organization: impl Fn(u64) -> Option<Organization>) -> Venue {
+    /// The zones with a station, their booths and the booths' organisations, as the crowd uses them. With
+    /// spots on the 3D floor, a zone is the box around its spots and a booth stands at its sponsor table.
+    fn build(
+        stations: Vec<Zone>,
+        booths_in: impl Fn(u64) -> Vec<Booth>,
+        organization: impl Fn(u64) -> Option<Organization>,
+        floor: Vec<VenueSpot>,
+    ) -> Venue {
+        let mut spots: HashMap<u8, Vec<(f32, f32)>> = HashMap::new();
+        for s in floor.iter().filter(|s| s.station_id != 0 && s.kind != "exit") {
+            spots.entry(s.station_id).or_default().push((s.x_m, s.y_m));
+        }
+        let mut table_spots: Vec<&VenueSpot> = floor.iter().filter(|s| s.kind == "table").collect();
+        table_spots.sort_by_key(|s| s.number);
+        let tables: Vec<(f32, f32)> = table_spots.iter().map(|s| (s.x_m, s.y_m)).collect();
+        let exits: Vec<(f32, f32, u8)> = floor.iter().filter(|s| s.kind == "exit").map(|s| (s.x_m, s.y_m, s.station_id)).collect();
         let mut stations = stations;
         stations.sort_by(|a, b| b.area_sq_m.total_cmp(&a.area_sq_m).then(a.id.cmp(&b.id)));
         let mut zones: Vec<(Zone, Rect)> = Vec::new();
         for z in stations {
+            if let Some(pts) = spots.get(&z.station_id) {
+                let r = Rect {
+                    x0: pts.iter().map(|p| p.0).fold(f32::MAX, f32::min) - 1.0,
+                    y0: pts.iter().map(|p| p.1).fold(f32::MAX, f32::min) - 1.0,
+                    x1: pts.iter().map(|p| p.0).fold(f32::MIN, f32::max) + 1.0,
+                    y1: pts.iter().map(|p| p.1).fold(f32::MIN, f32::max) + 1.0,
+                };
+                zones.push((z, r));
+                continue;
+            }
             let mut r = Rect::of(&z);
             for (_, other) in &zones {
                 r = r.clear_of(other);
@@ -202,19 +240,56 @@ impl Venue {
                     "Silver" => 1.5,
                     _ => 1.0,
                 };
+                // At its sponsor table: staff behind it, visitors in front.
+                let (staff, visitor) = match floor.iter().find(|s| s.kind == "sponsor_table" && s.booth_id == b.id) {
+                    Some(t) => {
+                        let (nx, ny) = (-t.angle.sin(), t.angle.cos());
+                        ((t.x_m - nx * 0.9, t.y_m - ny * 0.9), (t.x_m + nx * 1.4, t.y_m + ny * 1.4))
+                    }
+                    None => ((x, stand), (x, aisle)),
+                };
                 booths.push(BoothSpot {
                     id: b.id,
                     name: b.name.clone(),
                     organization_id: b.organization_id,
                     station: z.station_id,
-                    visitor: (x, aisle),
-                    staff: (x, stand),
+                    visitor,
+                    staff,
                     tags,
                     pull,
                 });
             }
         }
-        Venue { zones, booths }
+        Venue { zones, booths, spots, tables, exits }
+    }
+
+    /// A random spot of the zone: next to one of its spots on the 3D floor, else anywhere in its rectangle.
+    fn point_in(&self, station: u8, r: &Rect, rng: &mut impl Rng) -> (f32, f32) {
+        match self.spots.get(&station) {
+            Some(pts) if !pts.is_empty() => {
+                let (x, y) = pts[rng.gen_range(0..pts.len())];
+                (x + rng.gen_range(-0.6..0.6), y + rng.gen_range(-0.6..0.6))
+            }
+            _ => r.random_point(rng),
+        }
+    }
+
+    /// Team `n`'s table: the hacker tables in turn, else a spot on the hacking floor.
+    fn home(&self, n: usize, rng: &mut impl Rng) -> (u8, (f32, f32)) {
+        let (floor, rect) = self.floor();
+        if self.tables.is_empty() {
+            return (floor.station_id, rect.random_point(rng));
+        }
+        // Spread teams over the whole floor: every third table first, then the ones between.
+        let len = self.tables.len();
+        let i = (n * 3 + (n * 3 / len) % 3) % len;
+        let (x, y) = self.tables[i];
+        (floor.station_id, (x + rng.gen_range(-0.3..0.3), y + rng.gen_range(-0.3..0.3)))
+    }
+
+    /// The door nearest to a point, with its station.
+    fn nearest_exit(&self, x: f32, y: f32) -> Option<(f32, f32, u8)> {
+        self.exits.iter().copied().min_by(|a, b| ((a.0 - x).powi(2) + (a.1 - y).powi(2)).total_cmp(&((b.0 - x).powi(2) + (b.1 - y).powi(2))))
     }
 
     fn zone_of_kind(&self, kind: &str) -> Option<&(Zone, Rect)> {
@@ -268,7 +343,7 @@ type Spot = (u8, u64, f32, f32, (f32, f32));
 
 fn in_zone(venue: &Venue, kind: &str, minutes: (f32, f32), rng: &mut impl Rng) -> Option<Spot> {
     let (z, r) = venue.zone_of_kind(kind)?;
-    let (x, y) = r.random_point(rng);
+    let (x, y) = venue.point_in(z.station_id, r, rng);
     Some((z.station_id, 0, x, y, minutes))
 }
 
@@ -326,11 +401,12 @@ pub struct PlanArea {
 /// The plan the Live tab draws the bands on: the same zone rectangles and booth spots the crowd moves between.
 #[spacetimedb::view(accessor = venue_plan, public)]
 pub fn venue_plan(ctx: &AnonymousViewContext) -> Vec<PlanArea> {
-    use crate::venue::{booth__view, organization__view, zone__view};
+    use crate::venue::{booth__view, organization__view, venue_spot__view, zone__view};
     let venue = Venue::build(
         ctx.db.zone().station_id().filter(1u8..).collect(),
         |zone_id| ctx.db.booth().zone_id().filter(zone_id).collect(),
         |id| ctx.db.organization().id().find(id),
+        ctx.db.venue_spot().station_id().filter(0u8..).collect(),
     );
     let zones = venue.zones.iter().map(|(z, r)| PlanArea {
         station_id: z.station_id,
@@ -483,6 +559,11 @@ fn add_member(ctx: &ReducerContext, band_id: u32, g: &CrowdGroup, organization_i
 #[spacetimedb::reducer]
 pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
     require_role(ctx, &["ops", "tester"])?;
+    start(ctx, size, 1.0)
+}
+
+/// The crowd of `size`, with its first moves spread over the first minutes divided by `pace`.
+pub fn start(ctx: &ReducerContext, size: u16, pace: f32) -> Result<(), String> {
     if size > MAX_CROWD {
         return Err(format!("the crowd is at most {MAX_CROWD} bands"));
     }
@@ -496,7 +577,6 @@ pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
     }
     let pool = venue.interest_pool();
     let mut rng = StdRng::seed_from_u64(SEED);
-    let (floor, floor_rect) = venue.floor().clone();
 
     // One in ten staffs a booth, two per booth, the biggest sponsors first.
     let mut staffed: Vec<&BoothSpot> = venue.booths.iter().collect();
@@ -511,7 +591,10 @@ pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
         let id = groups.len() as u16 + 1;
         let (home_station, home_booth, (hx, hy)) = match staff {
             Some(b) => (b.station, b.id, b.staff),
-            None => (floor.station_id, 0, floor_rect.random_point(rng)),
+            None => {
+                let (station, at) = venue.home(id as usize, rng);
+                (station, 0, at)
+            }
         };
         let g = CrowdGroup {
             id,
@@ -554,7 +637,7 @@ pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
             let (station, booth_id, x, y, _) = next_spot(g, &interests, &venue, &[], &mut rng);
             (g.station, g.booth_id, g.x_m, g.y_m) = (station, booth_id, x, y);
         }
-        g.next_move_at = ctx.timestamp + seconds(rng.gen_range(20..600));
+        g.next_move_at = ctx.timestamp + seconds(((rng.gen_range(20..600) as f32) / pace.max(1.0)) as i64 + 1);
         ctx.db.crowd_group().insert(g.clone());
     }
     ensure_tick(ctx);
@@ -572,6 +655,28 @@ pub fn start_crowd(ctx: &ReducerContext, size: u16) -> Result<(), String> {
 #[spacetimedb::reducer]
 pub fn stop_crowd(ctx: &ReducerContext) -> Result<(), String> {
     require_role(ctx, &["ops", "tester"])?;
+    stop(ctx);
+    Ok(())
+}
+
+/// Every team walks to its nearest door and stays there until the bands go quiet.
+pub fn head_for_exits(ctx: &ReducerContext) {
+    let venue = Venue::load(ctx);
+    let mut rng = ctx.rng();
+    for g in ctx.db.crowd_group().iter().collect::<Vec<_>>() {
+        let Some((x, y, station)) = venue.nearest_exit(g.x_m, g.y_m) else { continue };
+        ctx.db.crowd_group().id().update(CrowdGroup {
+            station,
+            booth_id: 0,
+            x_m: x + rng.gen_range(-2.0..2.0),
+            y_m: y + rng.gen_range(-2.0..2.0),
+            next_move_at: ctx.timestamp + seconds(86_400),
+            ..g
+        });
+    }
+}
+
+pub fn stop(ctx: &ReducerContext) {
     for t in ctx.db.crowd_timer().iter().collect::<Vec<_>>() {
         ctx.db.crowd_timer().scheduled_id().delete(t.scheduled_id);
     }
@@ -579,7 +684,6 @@ pub fn stop_crowd(ctx: &ReducerContext) -> Result<(), String> {
         crate::ingest::leave_zone(ctx, b.id);
         ctx.db.band().id().update(Band { online: false, last_seen: ctx.timestamp, ..b });
     }
-    Ok(())
 }
 
 // --- The tick ----------------------------------------------------------------------------------
@@ -690,6 +794,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     members.sort_by_key(|m| m.band_id);
     let mut bands: HashMap<u32, Band> = ctx.db.band().iter().filter(|b| b.id >= FIRST_CROWD_BAND).map(|b| (b.id, b)).collect();
     let mut rng = ctx.rng();
+    let pace = crate::live::pace(ctx);
 
     // Teams whose time is up move on together; whoever was talking to one of them stops.
     let mut moved: Vec<u16> = Vec::new();
@@ -699,7 +804,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         }
         let interests: Vec<String> = members.iter().filter(|m| m.group_id == groups[i].id).flat_map(|m| m.interests.clone()).collect();
         let (station, booth_id, x, y, (lo, hi)) = next_spot(&groups[i], &interests, &venue, &groups, &mut rng);
-        let g = CrowdGroup { station, booth_id, x_m: x, y_m: y, next_move_at: later(ctx, lo, hi), ..groups[i].clone() };
+        let g = CrowdGroup { station, booth_id, x_m: x, y_m: y, next_move_at: later(ctx, lo, hi, pace), ..groups[i].clone() };
         groups[i] = ctx.db.crowd_group().id().update(g);
         moved.push(groups[i].id);
     }
@@ -711,26 +816,69 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
     }
 
     // Everyone's spot: their team's spot plus their own offset.
-    let spots: Vec<(u8, u64, f32, f32)> = members
+    let mut spots: Vec<(u8, u64, f32, f32)> = members
         .iter()
         .map(|m| {
             let g = group_of[&m.group_id];
             (g.station, g.booth_id, g.x_m + m.dx_m, g.y_m + m.dy_m)
         })
         .collect();
+    // Whoever is down stays where they fell. Everyone within reach lights the circle and steps back, which
+    // is the band's compass pointing them away.
+    let down = crate::live::down_bands(ctx);
+    let mut circle: Vec<Option<usize>> = vec![None; members.len()];
+    for (i, m) in members.iter().enumerate() {
+        if let Some(d) = down.iter().find(|d| d.band_id == m.band_id) {
+            let prev = bands.get(&m.band_id);
+            spots[i] = (prev.map(|b| b.zone).unwrap_or(spots[i].0), prev.map(|b| b.booth_id).unwrap_or(0), d.x_m, d.y_m);
+            continue;
+        }
+        let (x, y) = (spots[i].2, spots[i].3);
+        let Some((k, d)) = down.iter().enumerate().find(|(_, d)| (d.x_m - x).powi(2) + (d.y_m - y).powi(2) < CIRCLE_M * CIRCLE_M) else {
+            continue;
+        };
+        let (dx, dy) = (x - d.x_m, y - d.y_m);
+        let len = (dx * dx + dy * dy).sqrt();
+        let (ux, uy) = if len < 0.01 {
+            let a = m.band_id as f32 * 2.399_963;
+            (a.cos(), a.sin())
+        } else {
+            (dx / len, dy / len)
+        };
+        spots[i].2 = d.x_m + ux * CLEAR_M;
+        spots[i].3 = d.y_m + uy * CLEAR_M;
+        circle[i] = Some(k);
+    }
     // Radio and test bands stand among them too: they count as neighbours, and a test band meets them.
     let others: Vec<Band> = ctx.db.band().iter().filter(|b| b.id < FIRST_CROWD_BAND).filter(|b| b.online && b.zone != 0).collect();
     let mut points: Vec<(f32, f32)> = spots.iter().map(|s| (s.2, s.3)).collect();
     points.extend(others.iter().map(|b| (b.x_m, b.y_m)));
     let grid = Grid::new(&points);
 
+    let mut witnessed: HashMap<u64, usize> = HashMap::new();
     for (i, m) in members.iter().enumerate() {
         let (station, booth_id, x, y) = spots[i];
         let neigh = (grid.within(&points, (x, y), NEIGH_M).len().saturating_sub(1)).min(255) as u8;
         let prev = bands.get(&m.band_id);
-        let state = density_state(prev.map(|b| b.state).unwrap_or(0), neigh, settings.yellow, settings.red);
+        let downed = down.iter().find(|d| d.band_id == m.band_id);
+        let state = match (downed, circle[i]) {
+            (Some(_), _) => S_SOS,
+            (None, Some(_)) => S_NEAR_SOS,
+            _ => density_state(prev.map(|b| b.state).unwrap_or(0), neigh, settings.yellow, settings.red),
+        };
+        let (fall, sos) = downed.map(|d| (d.fall, !d.fall)).unwrap_or((false, false));
+        if let Some(d) = circle[i].map(|k| &down[k]) {
+            let n = witnessed.entry(d.incident_id).or_insert_with(|| ctx.db.incident_band().incident_id().filter(d.incident_id).count());
+            let known = ctx.db.incident_band().incident_id().filter(d.incident_id).any(|r| r.band_id == m.band_id);
+            if let Some(incident) = (known || *n < MAX_WITNESSES).then(|| ctx.db.incident().id().find(d.incident_id)).flatten() {
+                safety::witness(ctx, &incident, m.band_id, safety::zone_id_for_station(ctx, station), -58);
+                if !known {
+                    *n += 1;
+                }
+            }
+        }
         let same_spot = prev.is_some_and(|b| b.zone == station && b.booth_id == booth_id);
-        if prev.is_some_and(|b| same_spot && b.neigh == neigh && b.state == state && b.x_m == x && b.y_m == y && b.online) {
+        if prev.is_some_and(|b| same_spot && b.neigh == neigh && b.state == state && b.x_m == x && b.y_m == y && b.online && b.fall == fall && b.sos == sos) {
             continue;
         }
         if !same_spot || !prev.is_some_and(|b| b.online) {
@@ -742,15 +890,15 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         let row = Band {
             id: m.band_id,
             state,
-            flags: F_MPU | F_MOTOR,
+            flags: F_MPU | F_MOTOR | if fall { F_FALL } else { 0 } | if sos { F_SOS } else { 0 },
             neigh,
             zone: station,
             bat: 255,
             find: 0,
             rssi: -60,
             seq: prev.map(|b| b.seq.wrapping_add(1)).unwrap_or(1),
-            sos: false,
-            fall: false,
+            sos,
+            fall,
             pressed: false,
             low_battery: false,
             has_mpu: true,

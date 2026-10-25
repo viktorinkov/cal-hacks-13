@@ -55,6 +55,7 @@ pub fn routes(web: &Web) -> axum::Router<Arc<App>> {
         .route_service("/t/{token}", file("t.html"))
         .route_service("/callback", file("t.html"))
         .route_service("/organizer", file("organizer.html"))
+        .route_service("/live", file("live.html"))
         .route_service("/photo", file("photo.html"))
         .route_service("/style.css", file("style.css"))
         .nest_service("/js", ServeDir::new(web.root.join("web/dist")))

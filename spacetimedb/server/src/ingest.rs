@@ -7,13 +7,13 @@ const ENCOUNTER_STEP_CAP_MICROS: i64 = 2_000_000;
 const ZONE_BLIP_MICROS: i64 = 5_000_000;
 
 fn band_row(b: &BandBeacon, ctx: &ReducerContext) -> Band {
-    let (x_m, y_m) = crate::venue::station_spot(ctx, b.zone);
+    let (x_m, y_m, zone) = crate::live::radio_band_spot(ctx, b.id.into(), b.zone);
     Band {
         id: b.id.into(),
         state: b.state,
         flags: b.flags,
         neigh: b.neigh,
-        zone: b.zone,
+        zone,
         bat: b.bat,
         find: b.find,
         rssi: b.rssi,

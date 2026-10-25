@@ -26,7 +26,7 @@ export default __t.row({
   resolved: __t.bool(),
   zoneId: __t.u64().name("zone_id"),
   stationId: __t.u8().name("station_id"),
-  subjectBand: __t.u8().name("subject_band"),
+  subjectBand: __t.u32().name("subject_band"),
   openedBy: __t.string().name("opened_by"),
   openedAt: __t.timestamp().name("opened_at"),
   lastSignalAt: __t.timestamp().name("last_signal_at"),
