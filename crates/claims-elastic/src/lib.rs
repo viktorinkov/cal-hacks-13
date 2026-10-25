@@ -291,7 +291,6 @@ impl ClaimsIndex {
             .collect()
     }
 
-    /// Records the decision on an indexed live claim pack version.
     /// Counts the decided claims of `incident_kind` by outcome with ES|QL, with
     /// the median and largest payout of each, for example 12 approved, median $180.00.
     pub async fn outcome_stats(&self, incident_kind: &str) -> Result<Vec<OutcomeStats>> {
@@ -305,6 +304,7 @@ impl ClaimsIndex {
         outcome_rows(&v)
     }
 
+    /// Records the decision on an indexed live claim pack version.
     pub async fn set_outcome(&self, claim_id: i64, pack_version: i32, outcome: &str, payout_cents: u64) -> Result<()> {
         if !OUTCOMES.contains(&outcome) {
             bail!("outcome {outcome:?} is not one of {OUTCOMES:?}");

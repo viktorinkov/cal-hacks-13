@@ -20,6 +20,7 @@ use crate::coverage::Amounts;
 use crate::letters::unknown_figures;
 use crate::money::format_cents;
 use crate::outcome::{Decision, failed_check_names};
+use crate::payloads::ReviewPayload;
 use crate::rules::SettlementRule;
 use crate::{Causation, Cents, Check, CheckResult, Corroboration};
 use serde::{Deserialize, Serialize};
@@ -176,6 +177,27 @@ pub struct AgentDecision {
     pub cited_fact_ids: Vec<u32>,
 }
 
+impl Finding {
+    /// The decision history's headline, for example "The light circle supports the claim".
+    pub fn headline(&self) -> String {
+        let label = self.source.label();
+        let mut chars = label.chars();
+        let label: String = chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default();
+        let plural = matches!(self.source, EvidenceSource::Camera | EvidenceSource::Medic | EvidenceSource::Checks | EvidenceSource::PastClaims);
+        let says = match (self.stance, plural) {
+            (Stance::Supports, false) => "supports the claim",
+            (Stance::Supports, true) => "support the claim",
+            (Stance::Contradicts, false) => "contradicts the claim",
+            (Stance::Contradicts, true) => "contradict the claim",
+            (Stance::Neutral, false) => "says nothing either way",
+            (Stance::Neutral, true) => "say nothing either way",
+            (Stance::Missing, false) => "is missing",
+            (Stance::Missing, true) => "are missing",
+        };
+        format!("{label} {says}")
+    }
+}
+
 /// One step of an investigation, as the decision history shows it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -202,10 +224,15 @@ pub struct Investigation {
     pub sources_read: Vec<EvidenceSource>,
 }
 
-/// What the claim needs Claude to have read before it may pay.
-pub fn required_reading(injury_with_report: bool) -> Vec<EvidenceSource> {
+/// What Claude must have read before it may pay this claim: for an injury the
+/// band and the light circle, and the hospital report once one is filed; for
+/// property the security cameras.
+pub fn required_reading(p: &ReviewPayload) -> Vec<EvidenceSource> {
+    if p.cover_kind == "property" {
+        return vec![EvidenceSource::Camera];
+    }
     let mut v = vec![EvidenceSource::Band, EvidenceSource::LightCircle];
-    if injury_with_report {
+    if !p.lines.is_empty() {
         v.push(EvidenceSource::HospitalReport);
     }
     v
@@ -352,7 +379,7 @@ pub struct GuardInput<'a> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Guarded {
     pub decision: Decision,
-    /// `rule` (Claude paid inside a learned rule), `claude` (Claude refused on a failed check) or `code`.
+    /// `claude` (Claude paid inside a learned rule, or refused on a failed check) or `code`.
     pub decided_by: &'static str,
     /// The limit that applied, in a sentence.
     pub guardrail: String,
@@ -367,9 +394,10 @@ fn concerns_text(d: &AgentDecision) -> String {
 /// 1. no cover: refuse, whatever Claude decided;
 /// 2. `refuse` resting on failed checks: refused by Claude; any other refusal goes to the organizer;
 /// 3. `ask_organizer`: to the organizer with Claude's question;
-/// 4. `pay` goes through only with a payout above zero, every check passed,
+/// 4. `pay` goes through only with every check passed, a payout above zero,
 ///    corroborated evidence, no mass occurrence, a learned rule, and a payout
-///    within its ceiling; otherwise it goes to the organizer (or, at zero, is refused).
+///    within its ceiling; otherwise it goes to the organizer (or, at zero with
+///    every check passed, is refused).
 pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
     let refuse = |reason: String, by: &'static str, guardrail: &str| Guarded { decision: Decision::Refuse { reason }, decided_by: by, guardrail: guardrail.into() };
     let route = |reason: String, guardrail: String| Guarded { decision: Decision::Route { reason }, decided_by: "code", guardrail };
@@ -385,17 +413,17 @@ pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
             "a refusal that rests on failed checks goes through on its own",
         ),
         Choice::Refuse => route(
-            format!("Claude recommends refusing: {}", concerns_text(d)),
+            format!("Claude recommends refusing: {}. Every check passed, so a person decides", concerns_text(d).trim_end_matches('.')),
             "every check passed, so a refusal on Claude's judgment alone needs a person".into(),
         ),
         Choice::AskOrganizer => route(format!("Claude asks: {}", d.question.trim()), "Claude chose to ask a person".into()),
         Choice::Pay => {
-            if input.amounts.payout_cents == 0 {
-                return refuse("payout is zero after limits".into(), "code", "nothing is payable after the fee schedule and the limits");
-            }
             let failed = failed_check_names(input.checks);
             if !failed.is_empty() {
                 return route(format!("Claude would pay {payout}, but checks failed: {}", failed.join(", ")), "Claude pays only when every check passed".into());
+            }
+            if input.amounts.payout_cents == 0 {
+                return refuse("payout is zero after limits".into(), "code", "nothing is payable after the fee schedule and the limits");
             }
             if input.corroboration != Corroboration::Corroborated {
                 return route(
@@ -420,7 +448,7 @@ pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
             }
             Guarded {
                 decision: Decision::AutoSettle { rule_id: rule.rule_id, rule_version: rule.version },
-                decided_by: "rule",
+                decided_by: "claude",
                 guardrail: format!("{payout} is inside the {} authority of rule v{}", format_cents(rule.ceiling_cents), rule.version),
             }
         }
@@ -440,6 +468,7 @@ mod tests {
     const SEQS: [u32; 6] = [1, 2, 3, 4, 5, 6];
     const AMOUNTS: [Cents; 4] = [18_000, 18_000, 8_000, 10_000];
     const READ: [EvidenceSource; 3] = [EvidenceSource::Band, EvidenceSource::LightCircle, EvidenceSource::HospitalReport];
+    const MUST: [EvidenceSource; 3] = READ;
 
     fn finding(source: EvidenceSource, stance: Stance, ids: &[u32]) -> Finding {
         Finding { source, stance, detail: format!("{} {}", source.label(), stance.as_str()), fact_ids: ids.to_vec() }
@@ -515,12 +544,12 @@ mod tests {
 
     #[test]
     fn a_grounded_pay_is_valid() {
-        assert_eq!(validate_decision(&pay(), &SEQS, &passing(), &AMOUNTS, &READ, &required_reading(true)), Ok(()));
+        assert_eq!(validate_decision(&pay(), &SEQS, &passing(), &AMOUNTS, &READ, &MUST), Ok(()));
     }
 
     #[test]
     fn pay_needs_the_reading_done() {
-        let errors = validate_decision(&pay(), &SEQS, &passing(), &AMOUNTS, &[EvidenceSource::Band], &required_reading(true)).unwrap_err();
+        let errors = validate_decision(&pay(), &SEQS, &passing(), &AMOUNTS, &[EvidenceSource::Band], &MUST).unwrap_err();
         assert_eq!(
             errors,
             [
@@ -574,7 +603,7 @@ mod tests {
         let (checks, rule) = (passing(), rule());
         let g = guard(&pay(), &input(&checks, Some(&rule)));
         assert_eq!(g.decision, Decision::AutoSettle { rule_id: 7, rule_version: 1 });
-        assert_eq!(g.decided_by, "rule");
+        assert_eq!(g.decided_by, "claude");
         assert_eq!(g.guardrail, "$180.00 is inside the $250.00 authority of rule v1");
     }
 
@@ -607,7 +636,7 @@ mod tests {
         assert_eq!(g.decided_by, "claude");
 
         let g = guard(&refuse_at_home(), &input(&good, Some(&rule)));
-        assert_eq!(g.decision, Decision::Route { reason: "Claude recommends refusing: causation: the report says the injury happened at home".into() });
+        assert_eq!(g.decision, Decision::Route { reason: "Claude recommends refusing: causation: the report says the injury happened at home. Every check passed, so a person decides".into() });
         assert_eq!(g.decided_by, "code");
 
         let ask = AgentDecision { decision: Choice::AskOrganizer, question: " Was the attendee at the event? ".into(), ..pay() };

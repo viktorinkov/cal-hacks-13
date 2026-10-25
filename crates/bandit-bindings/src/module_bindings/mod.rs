@@ -1018,10 +1018,8 @@ pub enum Reducer {
     ReportClaimStep {
         job_id: u64,
         actor: String,
-        action: String,
-        summary: String,
-        detail: String,
-        fact_ids: Vec<u32>,
+        what: String,
+        why: String,
     },
     ReportPropertyEvent {
         incident_id: u64,
@@ -1750,17 +1748,13 @@ impl __sdk::Reducer for Reducer {
             Reducer::ReportClaimStep {
                 job_id,
                 actor,
-                action,
-                summary,
-                detail,
-                fact_ids,
+                what,
+                why,
             } => __sats::bsatn::to_vec(&report_claim_step_reducer::ReportClaimStepArgs {
                 job_id: job_id.clone(),
                 actor: actor.clone(),
-                action: action.clone(),
-                summary: summary.clone(),
-                detail: detail.clone(),
-                fact_ids: fact_ids.clone(),
+                what: what.clone(),
+                why: why.clone(),
             }),
             Reducer::ReportPropertyEvent {
                 incident_id,

@@ -223,7 +223,7 @@ mod tests {
         }
     }
 
-    fn decision_sample() -> AgentDecision {
+    fn full_decision() -> AgentDecision {
         AgentDecision {
             decision: Choice::AskOrganizer,
             causation: Causation::Unclear,
@@ -255,7 +255,7 @@ mod tests {
         };
         let cases = [
             ("medical_record", medical_record_schema(), serde_json::to_value(maya_record()).unwrap()),
-            ("agent_decision", agent_decision_schema(), serde_json::to_value(decision_sample()).unwrap()),
+            ("agent_decision", agent_decision_schema(), serde_json::to_value(full_decision()).unwrap()),
             ("claim_letters", claim_letters_schema(), serde_json::to_value(letters).unwrap()),
             ("recovery_letter", recovery_letter_schema(), serde_json::to_value(recovery).unwrap()),
         ];
@@ -291,8 +291,8 @@ mod tests {
 
     #[test]
     fn model_output_parses_into_the_types() {
-        let decision: AgentDecision = serde_json::from_value(serde_json::to_value(decision_sample()).unwrap()).unwrap();
-        assert_eq!(decision, decision_sample());
+        let decision: AgentDecision = serde_json::from_value(serde_json::to_value(full_decision()).unwrap()).unwrap();
+        assert_eq!(decision, full_decision());
         let raw = json!({"stance": "query", "subject": "s", "body": "b?", "cited_fact_ids": []});
         assert_eq!(serde_json::from_value::<RecoveryLetter>(raw).unwrap().stance, "query");
     }

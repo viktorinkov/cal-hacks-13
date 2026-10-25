@@ -321,8 +321,9 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
     Ok(())
 }
 
-/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule,
-/// 2 stopped only by the claims agent, 3 paid.
+/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule
+/// (Claude refuses on its own only on a failed check), 2 stopped only by
+/// Claude's judgment, 3 paid.
 fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled) {
         return (3, "paid".into());
@@ -331,8 +332,11 @@ fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if c.decided_by == "code" {
         return (0, format!("refused by code ({})", note));
     }
-    if note.starts_with("claims agent") {
-        return (2, "caught only by the claims agent".into());
+    if c.decided_by == "claude" {
+        return (1, format!("refused by Claude on a failed check ({note})"));
+    }
+    if note.starts_with("Claude recommends refusing") || note.starts_with("Claude asks") || note.starts_with("claims agent") {
+        return (2, "caught only by Claude".into());
     }
     if in_pipeline(c.status) {
         return (1, format!("still {}", status_name(c.status)));
@@ -344,7 +348,8 @@ fn score(app: &App, planted: &[Planted], label: &str) -> Result<()> {
     let db = app.db()?;
     let rows: Vec<(&Planted, Claim)> = planted.iter().map(|p| app.claim(p.claim).map(|c| (p, c))).collect::<Result<_>>()?;
     let paid = |c: &Claim| matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled);
-    let auto = |c: &Claim| c.decided_by == "rule";
+    // Settled with no person: Claude's payment inside a learned rule, or the code-only rule.
+    let auto = |c: &Claim| paid(c) && matches!(c.decided_by.as_str(), "claude" | "rule");
     let genuine: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind == Kind::Genuine).collect();
     let fakes: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind != Kind::Genuine).collect();
     let tp = genuine.iter().filter(|(_, c)| auto(c)).count();

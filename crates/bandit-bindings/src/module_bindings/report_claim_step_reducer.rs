@@ -9,10 +9,8 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub(super) struct ReportClaimStepArgs {
     pub job_id: u64,
     pub actor: String,
-    pub action: String,
-    pub summary: String,
-    pub detail: String,
-    pub fact_ids: Vec<u32>,
+    pub what: String,
+    pub why: String,
 }
 
 impl From<ReportClaimStepArgs> for super::Reducer {
@@ -20,10 +18,8 @@ impl From<ReportClaimStepArgs> for super::Reducer {
         Self::ReportClaimStep {
             job_id: args.job_id,
             actor: args.actor,
-            action: args.action,
-            summary: args.summary,
-            detail: args.detail,
-            fact_ids: args.fact_ids,
+            what: args.what,
+            why: args.why,
         }
     }
 }
@@ -47,12 +43,10 @@ pub trait report_claim_step {
         &self,
         job_id: u64,
         actor: String,
-        action: String,
-        summary: String,
-        detail: String,
-        fact_ids: Vec<u32>,
+        what: String,
+        why: String,
     ) -> __sdk::Result<()> {
-        self.report_claim_step_then(job_id, actor, action, summary, detail, fact_ids, |_, _| {})
+        self.report_claim_step_then(job_id, actor, what, why, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `report_claim_step` to run as soon as possible,
@@ -65,10 +59,8 @@ pub trait report_claim_step {
         &self,
         job_id: u64,
         actor: String,
-        action: String,
-        summary: String,
-        detail: String,
-        fact_ids: Vec<u32>,
+        what: String,
+        why: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -81,10 +73,8 @@ impl report_claim_step for super::RemoteReducers {
         &self,
         job_id: u64,
         actor: String,
-        action: String,
-        summary: String,
-        detail: String,
-        fact_ids: Vec<u32>,
+        what: String,
+        why: String,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -94,10 +84,8 @@ impl report_claim_step for super::RemoteReducers {
             ReportClaimStepArgs {
                 job_id,
                 actor,
-                action,
-                summary,
-                detail,
-                fact_ids,
+                what,
+                why,
             },
             callback,
         )

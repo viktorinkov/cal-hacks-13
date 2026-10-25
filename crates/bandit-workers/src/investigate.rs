@@ -105,11 +105,6 @@ pub fn allowed_amounts(p: &ReviewPayload) -> Vec<bandit_insurance::Cents> {
     allowed
 }
 
-/// What Claude must read before it may pay this claim.
-fn must_read(p: &ReviewPayload) -> Vec<EvidenceSource> {
-    required_reading(p.cover_kind == "medical_payments" && !p.lines.is_empty())
-}
-
 fn facts_of<'a>(p: &'a ReviewPayload, source: EvidenceSource) -> Vec<&'a Fact> {
     let kinds = READABLE.iter().find(|(s, _)| *s == source).map(|(_, k)| *k).unwrap_or(&[]);
     p.facts.iter().filter(|f| kinds.contains(&f.source)).collect()
@@ -260,7 +255,7 @@ async fn run_tool<E: PastClaims>(t: &ToolUse, p: &ReviewPayload, evidence: &E, t
 pub async fn investigate<M: Model, E: PastClaims>(model: &M, evidence: &E, p: &ReviewPayload, tz: i32, steps: &UnboundedSender<Step>) -> Result<Done, JobError> {
     let seqs: Vec<u32> = p.facts.iter().map(|f| f.seq).collect();
     let allowed = allowed_amounts(p);
-    let must = must_read(p);
+    let must = required_reading(p);
     let sources: Vec<(&str, usize)> = READABLE.iter().map(|(s, _)| (s.as_str(), facts_of(p, *s).len())).collect();
     let mut request = tools(MessageRequest::new())
         .system(prompts::INVESTIGATE_SYSTEM)
@@ -308,6 +303,12 @@ pub async fn investigate<M: Model, E: PastClaims>(model: &M, evidence: &E, p: &R
             continue;
         }
         if let Ok(d) = &checked {
+            for f in &d.findings {
+                emit(step("Claude", "weigh", f.headline(), &f.detail, f.fact_ids.clone()), &mut all_steps);
+            }
+            if !d.trusted_source.trim().is_empty() {
+                emit(step("Claude", "weigh", "Weighed the sources that disagree".into(), d.trusted_source.trim(), vec![]), &mut all_steps);
+            }
             let summary = match d.decision {
                 bandit_insurance::decision::Choice::Pay => format!("Decided to pay {}", format_cents(p.amounts.payout_cents)),
                 bandit_insurance::decision::Choice::Refuse => "Decided to refuse".to_string(),
@@ -392,7 +393,8 @@ mod tests {
         assert!(summaries[1].starts_with("Read the light circle: "), "{summaries:?}");
         assert_eq!(summaries[3], "Searched past claims for \"wrist sprain after a fall at the main stage\": 1 found, 1 refused");
         assert_eq!(summaries[4], "Past fall claims: 12 approved (median $180.00, largest $895.00)");
-        assert_eq!(summaries[5], "Decided to pay $895.00");
+        assert_eq!(summaries[5], "The light circle supports the claim");
+        assert_eq!(summaries[6], "Decided to pay $895.00");
         assert_eq!(live, done.investigation.steps, "every step was reported live");
         assert_eq!(live[3].actor, "Evidence Engine");
 
