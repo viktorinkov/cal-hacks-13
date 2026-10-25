@@ -21,7 +21,7 @@ export default __t.row({
   coverKind: __t.string().name("cover_kind"),
   claimant: __t.option(__t.identity()),
   claimantName: __t.string().name("claimant_name"),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u32().name("band_id"),
   zoneId: __t.u64().name("zone_id"),
   zoneName: __t.string().name("zone_name"),
   policyId: __t.u64().name("policy_id"),

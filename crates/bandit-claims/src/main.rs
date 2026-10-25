@@ -6,6 +6,7 @@ mod app;
 mod decide;
 mod story;
 mod flow;
+mod live;
 mod scorecard;
 mod setup;
 mod show;
@@ -160,6 +161,12 @@ enum Cmd {
         #[arg(long, default_value_t = 3)]
         rounds: u32,
     },
+    /// The floor staff for the live run: the medic, the clinic, the camera and the organizer's cost notes
+    Live {
+        /// Decide a claim left waiting for the organizer this many seconds (0: never)
+        #[arg(long, default_value_t = 30)]
+        approve_after: u64,
+    },
 }
 
 fn main() {
@@ -224,6 +231,7 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::Wait { claim, status, timeout } => show::wait(&app, claim, parse_status(&status)?, timeout).map(|_| ()),
         Cmd::Story { no_pause } => story::run(&app, !no_pause),
         Cmd::Scorecard { rounds } => scorecard::run(&app, rounds),
+        Cmd::Live { approve_after } => live::run(&app, approve_after),
     }
 }
 

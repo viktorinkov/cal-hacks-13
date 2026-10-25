@@ -1,0 +1,16 @@
+# The floor staff for the live run on the 3D floor (bandit-claims live): the medic, the clinic records, the
+# camera and the organizer's cost notes. Idle until a live run starts.
+[Unit]
+Description=BandIt live run floor staff
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/bandit
+ExecStart=/opt/bandit/target/debug/bandit-claims live
+Environment=BANDIT_DATA_DIR=/var/lib/bandit BANDIT_TEST_MODE=1 CHROME=/usr/local/bin/chrome
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

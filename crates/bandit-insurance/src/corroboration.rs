@@ -145,7 +145,7 @@ mod tests {
         micros_at(2026, 10, 24, h, m, s, PDT)
     }
 
-    fn witness(band_id: u8, zone_id: u64) -> Witness {
+    fn witness(band_id: u32, zone_id: u64) -> Witness {
         Witness { band_id, zone_id, rssi: -55, first_seen_at: at(22, 14, 6), last_seen_at: at(22, 20, 0) }
     }
 

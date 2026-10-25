@@ -22,6 +22,11 @@ pub struct EventState {
 
 fn set_ended(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
+    set_ended_by(ctx, ended)
+}
+
+/// Ends or reopens the event as the caller, with no role check: the live run's clock ends it.
+pub fn set_ended_by(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     let row = EventState { id: 0, ended, ended_at: ended.then_some(ctx.timestamp), ended_by: ctx.sender() };
     if ctx.db.event_state().id().find(0).is_some() {
         ctx.db.event_state().id().update(row);

@@ -10,6 +10,7 @@ pub mod venue;
 pub mod social;
 pub mod insurance;
 pub mod jobs;
+pub mod live;
 pub mod safety;
 pub mod vision;
 pub mod web;

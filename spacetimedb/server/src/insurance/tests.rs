@@ -149,7 +149,7 @@ impl World {
             b.fall = false;
             b.state = 0;
         });
-        self.t.db.incident().subject_band().filter(subject).max_by_key(|i| i.id).unwrap().id
+        self.t.db.incident().subject_band().filter(u32::from(subject)).max_by_key(|i| i.id).unwrap().id
     }
 
     fn treat_and_resolve(&self, incident_id: u64) -> Claim {
@@ -507,7 +507,7 @@ fn test_bands_raise_incidents_without_the_bridge() {
     w.watch();
     w.advance(1);
     w.watch();
-    let incident = w.t.db.incident().subject_band().filter(95u8).next().expect("incident from a test band fall");
+    let incident = w.t.db.incident().subject_band().filter(95u32).next().expect("incident from a test band fall");
     assert_eq!(incident.kind, IncidentKind::Fall);
     assert_eq!(w.t.db.incident_band().incident_id().filter(incident.id).filter(|r| r.role == "witness").count(), 2);
     assert!(w.t.db.event().iter().any(|e| e.band_id == 95 && e.kind == EventKind::Fall));
