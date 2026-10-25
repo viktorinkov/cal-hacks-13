@@ -104,6 +104,8 @@ They answer to the organizer, the venue's risk manager. Checking each claim agai
 
 BandIt enters its payment resolution. The insurance Decision Engine decides who is paid and how much, and the ledger, the wallet payouts and the insurer reconciliation move the money ([Insurance](../6-features/Insurance.md)).
 
+The organizer reads the same books as the event's controller on the Costs tab: the costs so far by cost center, who pays what, every cost line and the journal with its trial balance ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
+
 | The track asks | BandIt answers with | See it |
 |---|---|---|
 | "Is it real enough? Realistic data, a messy problem, and proof that it works." | Four parties and their money: the attendee's wallet (a Capital One Nessie API account), the venue's books, the venue's insurer and the repair vendor, on a double-entry ledger that rejects any journal that does not balance. Real documents set the amounts: the venue's policy PDF, the attendee's insurance card and the hospital report PDFs, read by The Evidence Engine into terms that quote their clauses (next to build; today the Anthropic Claude API reads the hospital report), a 21-code fee schedule, per-claim and aggregate limits, and a deductible. The proof is the accuracy run, `bandit-claims scorecard`: rounds of planted claims with an answer key, 2 genuine falls and 4 kinds of fake each, scored on what the automation paid | the organizer portal (/organizer, Claims); the scorecard printed by `bandit-claims` |
