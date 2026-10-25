@@ -1,0 +1,3025 @@
+{
+  "metadata": {
+    "audited_at": "2026-10-25T10:01:57.861420+00:00",
+    "base_ref": "origin/vik-e2e",
+    "base_commit": "5029dca9414c1d4b665c1353992b6be1764dd9f2",
+    "migration_commit": "c2e4e3de77f9893108165960ed63af1e100e71f3",
+    "view_count": 75,
+    "migration_changed_view_bodies": [],
+    "migration_missing_views": [],
+    "scope": "Static audit of view declarations, gates, and production subscription queries. Not runtime delivery proof. Generated bindings/tests do not count as subscribers. Owner CLI mirrors raw tables.",
+    "viewed_identity": "viewed(ctx) returns ctx.sender() unless the owner configured a fresh viewer identity through view_as; write reducers generally still use the real sender.",
+    "staff_roles": [
+      "ops",
+      "medic"
+    ],
+    "claim_roles": [
+      "ops"
+    ],
+    "raw_public_tables": {
+      "departure": {
+        "public": true,
+        "source": "spacetimedb/server/src/departure.rs",
+        "line": 18
+      },
+      "decision": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/log.rs",
+        "line": 13
+      },
+      "live_run": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 63
+      },
+      "live_pause": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 87
+      },
+      "live_evacuation": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 98
+      },
+      "live_plan": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 116
+      },
+      "incident_marker": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 139
+      },
+      "band_place": {
+        "public": true,
+        "source": "spacetimedb/server/src/live/mod.rs",
+        "line": 169
+      },
+      "merch_template": {
+        "public": true,
+        "source": "spacetimedb/server/src/merch/mod.rs",
+        "line": 46
+      },
+      "crowd_walk": {
+        "public": true,
+        "source": "spacetimedb/server/src/social/tables.rs",
+        "line": 300
+      },
+      "band": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 19
+      },
+      "station": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 47
+      },
+      "link": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 57
+      },
+      "event": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 87
+      },
+      "command": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 99
+      },
+      "settings": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 116
+      },
+      "gateway": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 128
+      },
+      "encounter": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 138
+      },
+      "zone_visit": {
+        "public": true,
+        "source": "spacetimedb/server/src/tables.rs",
+        "line": 153
+      },
+      "venue_setup": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/setup.rs",
+        "line": 23
+      },
+      "venue_setup_step": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/setup.rs",
+        "line": 63
+      },
+      "chosen_venue": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/setup.rs",
+        "line": 77
+      },
+      "venue_spot": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/spots.rs",
+        "line": 13
+      },
+      "venue": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 17
+      },
+      "zone": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 41
+      },
+      "organization": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 64
+      },
+      "booth": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 98
+      },
+      "schedule_slot": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 125
+      },
+      "person": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 152
+      },
+      "import_run": {
+        "public": true,
+        "source": "spacetimedb/server/src/venue/tables.rs",
+        "line": 175
+      },
+      "camera": {
+        "public": true,
+        "source": "spacetimedb/server/src/vision/mod.rs",
+        "line": 12
+      },
+      "event_state": {
+        "public": true,
+        "source": "spacetimedb/server/src/web.rs",
+        "line": 15
+      }
+    },
+    "group_counts": {
+      "Attendee": 20,
+      "Ops and medic board": 28,
+      "Assigned approver": 1,
+      "Ops claim detail": 6,
+      "Workers": 1,
+      "Medic grants": 1,
+      "Ops commerce board": 3,
+      "Identity": 1,
+      "Owner controls": 3,
+      "Public projections": 3,
+      "Services": 8
+    },
+    "comparison_branch": "vik-elastic-workflows",
+    "previous_audit_commit": "c2e4e3de77f9893108165960ed63af1e100e71f3",
+    "view_bodies_unchanged_since_previous_audit": true,
+    "subscribed_view_names_unchanged_since_previous_audit": true,
+    "production_subscribed_view_count": 63,
+    "react_ui_change": "Adds /payments, /wallet and /venue routes. Payment screens add five staff view queries and four independent attendee view queries already used by the plain portal. Venue setup subscribes to three raw public tables. Existing 200ms table-change UI batching remains.",
+    "react_added_staff_views": [
+      "board_charges",
+      "board_merch_orders",
+      "board_wallets",
+      "board_fee_schedule",
+      "board_merch_picks"
+    ],
+    "react_added_attendee_views": [
+      "my_wallet_entries",
+      "my_charges",
+      "my_merch_suggestions",
+      "my_merch_orders"
+    ],
+    "react_added_raw_tables": [
+      "venue_setup",
+      "venue_setup_step",
+      "chosen_venue"
+    ]
+  },
+  "views": [
+    {
+      "signature": "pub fn my_claim_queue(ctx: &ViewContext) -> Vec<Claim>",
+      "body": "pub fn my_claim_queue(ctx: &ViewContext) -> Vec<Claim> {\n    ctx.db.claim().routed_to().filter(viewed(ctx)).collect()\n}",
+      "line": 17,
+      "name": "my_claim_queue",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Assigned approver",
+      "access_check": "claim.routed_to == viewed(ctx)",
+      "row_scope": "Claims routed to caller; no separate role predicate",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 107
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "06bda93164afca5a63d31c82878bc908a0a25c869b5548f3921945915da226f5"
+    },
+    {
+      "signature": "pub fn my_attendee(ctx: &ViewContext) -> Option<Attendee>",
+      "body": "pub fn my_attendee(ctx: &ViewContext) -> Option<Attendee> {\n    ctx.db.attendee().identity().find(viewed(ctx))\n}",
+      "line": 116,
+      "name": "my_attendee",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 22,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "6667fdbdae3fdef81dc573fd49297fc00540077135461fae5fab83d85df1c464"
+    },
+    {
+      "signature": "pub fn my_band(ctx: &ViewContext) -> Option<MyBand>",
+      "body": "pub fn my_band(ctx: &ViewContext) -> Option<MyBand> {\n    let me = viewed(ctx);\n    if let Some(o) = ctx.db.band_owner().owner().find(me) {\n        return Some(MyBand { band_id: o.band_id, status: \"claimed\".into(), expires_at: None });\n    }\n    ctx.db.band_claim().claimant().filter(me).next().map(|c| MyBand {\n        band_id: c.band_id,\n        status: \"waiting_for_press\".into(),\n        expires_at: Some(c.expires_at),\n    })\n}",
+      "line": 121,
+      "name": "my_band",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Owned band; otherwise first pending band claim",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 23,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 519,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "band_claim",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 43
+        },
+        {
+          "name": "band_owner",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 32
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "792adab5a03ad2209a8fb8a6441e7c97c4be5fefe518ae029da3fa59e210d54b"
+    },
+    {
+      "signature": "pub fn my_charges(ctx: &ViewContext) -> Vec<MyCharge>",
+      "body": "pub fn my_charges(ctx: &ViewContext) -> Vec<MyCharge> {\n    ctx.db\n        .charge()\n        .attendee()\n        .filter(viewed(ctx))\n        .filter(|c| c.status != PROPOSED)\n        .map(|c| {\n            let incident = ctx.db.incident().id().find(c.incident_id);\n            MyCharge {\n                id: c.id,\n                incident_id: c.incident_id,\n                incident_kind: incident.as_ref().map(|i| i.kind.as_str().to_string()).unwrap_or_default(),\n                zone_name: incident.as_ref().and_then(|i| ctx.db.zone().id().find(i.zone_id)).map(|z| z.name).unwrap_or_default(),\n                happened_at: incident.as_ref().map(|i| i.opened_at).unwrap_or(c.created_at),\n                amount_cents: c.amount_cents,\n                status: c.status.clone(),\n                why: why_words(ctx, &c),\n                clause: clause_words(ctx, &c),\n                dispute_text: c.dispute_text.clone(),\n                paid_at: c.paid_at,\n            }\n        })\n        .collect()\n}",
+      "line": 470,
+      "name": "my_charges",
+      "source": "spacetimedb/server/src/insurance/charges.rs",
+      "audience_group": "Attendee",
+      "access_check": "charge.attendee == viewed(ctx)",
+      "row_scope": "Own charges excluding proposed status, enriched with reason/clause",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 48,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 524,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "charge",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/charges.rs",
+          "line": 32
+        },
+        {
+          "name": "incident",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 80
+        },
+        {
+          "name": "zone",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 41
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "bbbdb8ddddd5be2d05e1e679713941db76f6077732df3a6dd419abe39279386d"
+    },
+    {
+      "signature": "pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim>",
+      "body": "pub fn my_claims(ctx: &ViewContext) -> Vec<MyClaim> {\n    let me = viewed(ctx);\n    ctx.db\n        .claim()\n        .routed_to()\n        .filter(Identity::ZERO..)\n        .filter(|c| c.claimant == Some(me))\n        .map(|c| MyClaim {\n            id: c.id,\n            incident_kind: c.incident_kind,\n            zone_name: c.zone_name,\n            status: c.status,\n            status_note: c.status_note,\n            payout_cents: c.payout_cents,\n            payout_reference: c.payout_reference,\n            opened_at: c.opened_at,\n            settled_at: c.settled_at,\n            incident_id: c.incident_id,\n            statement: c.statement,\n        })\n        .collect()\n}",
+      "line": 226,
+      "name": "my_claims",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Attendee",
+      "access_check": "claim.claimant == viewed(ctx)",
+      "row_scope": "Own claim status/payout/statement projection, without evidence",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 39,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 47,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 107
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "4efa02cea12c77553b85b66fec8a611d540a122094ee54052256ae65bdb7dc75"
+    },
+    {
+      "signature": "pub fn my_departure(ctx: &ViewContext) -> Option<Departure>",
+      "body": "pub fn my_departure(ctx: &ViewContext) -> Option<Departure> {\n    ctx.db.departure().attendee().find(viewed(ctx))\n}",
+      "line": 143,
+      "name": "my_departure",
+      "source": "spacetimedb/server/src/departure.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 38,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "departure",
+          "public": true,
+          "source": "spacetimedb/server/src/departure.rs",
+          "line": 18
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "58b0ee9d7eddb754625cd1842414a56af4e25f6bc0864715370861d8aaf73290"
+    },
+    {
+      "signature": "pub fn my_encounters(ctx: &ViewContext) -> Vec<MyEncounter>",
+      "body": "pub fn my_encounters(ctx: &ViewContext) -> Vec<MyEncounter> {\n    let me = viewed(ctx);\n    let rows = ctx.db.social_encounter().attendee_a().filter(me).chain(ctx.db.social_encounter().attendee_b().filter(me));\n    rows.filter(|e| e.met)\n        .filter_map(|e| {\n            let other = if e.attendee_a == me { e.attendee_b } else { e.attendee_a };\n            Some(MyEncounter {\n                id: e.id,\n                zone_id: e.zone_id,\n                zone_name: zone_name(ctx, e.zone_id),\n                started_at: e.started_at,\n                last_seen_at: e.last_seen_at,\n                minutes: e.seconds_together as f32 / 60.0,\n                person: person_card(ctx, other)?,\n            })\n        })\n        .collect()\n}",
+      "line": 159,
+      "name": "my_encounters",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity; other attendee must be findable",
+      "row_scope": "Own met=true encounters and other attendee profile/social handles",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 29,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "social_encounter",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 116
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "6f0b1e4db5bb17718d68f0a1865db83c8df583ad95ca3ace3edb1f44d85d1907"
+    },
+    {
+      "signature": "pub fn my_graph(ctx: &ViewContext) -> Vec<GraphLink>",
+      "body": "pub fn my_graph(ctx: &ViewContext) -> Vec<GraphLink> {\n    let Some(me) = ctx.db.attendee().identity().find(viewed(ctx)).filter(|a| a.findable) else {\n        return Vec::new();\n    };\n    let mine = links_at(ctx, \"person\", me.node_id);\n    let mut links: Vec<PeopleLink> = Vec::new();\n    for l in &mine {\n        match l.kind.as_str() {\n            \"visited\" => links.extend(links_at(ctx, \"booth\", l.to_id)),\n            \"works_at\" => links.extend(links_at(ctx, \"company\", l.to_id)),\n            _ => {}\n        }\n    }\n    links.extend(mine);\n    links.sort_by_key(|l| l.id);\n    links.dedup_by_key(|l| l.id);\n    let label = |kind: &str, id: u64| -> String {\n        match kind {\n            \"person\" => ctx.db.attendee().node_id().find(id).map(|a| a.display_name).unwrap_or_default(),\n            \"booth\" => ctx.db.booth().id().find(id).map(|b| b.name).unwrap_or_default(),\n            _ => ctx.db.organization().id().find(id).map(|o| o.name).unwrap_or_default(),\n        }\n    };\n    links\n        .into_iter()\n        .map(|l| GraphLink {\n            from_label: label(&l.from_kind, l.from_id),\n            to_label: label(&l.to_kind, l.to_id),\n            id: l.id,\n            kind: l.kind,\n            from_kind: l.from_kind,\n            from_id: l.from_id,\n            to_kind: l.to_kind,\n            to_id: l.to_id,\n            weight: l.weight,\n        })\n        .collect()\n}",
+      "line": 289,
+      "name": "my_graph",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller attendee exists and is findable",
+      "row_scope": "Caller graph neighborhood and related booth/company links",
+      "identity": "viewed(ctx)",
+      "notes": "The function does not independently recheck findable for every returned neighbor.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "booth",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 98
+        },
+        {
+          "name": "organization",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 64
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "d8d41e0d2303a166cb761f4f49d3f3525276074cfb3810787e573a1d1fd963c2"
+    },
+    {
+      "signature": "pub fn my_handles(ctx: &ViewContext) -> Vec<SocialHandle>",
+      "body": "pub fn my_handles(ctx: &ViewContext) -> Vec<SocialHandle> {\n    ctx.db.social_handle().owner().filter(viewed(ctx)).collect()\n}",
+      "line": 134,
+      "name": "my_handles",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 24,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "social_handle",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 67
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "4fe6256b432d5dde2800c62237d7570672af4073c81faa4763a6263c8ae892e0"
+    },
+    {
+      "signature": "pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident>",
+      "body": "pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident> {\n    let Some(own) = ctx.db.band_owner().owner().find(viewed(ctx)) else {\n        return Vec::new();\n    };\n    ctx.db\n        .incident()\n        .subject_band()\n        .filter(u32::from(own.band_id))\n        .filter(|i| i.kind.is_injury() && i.opened_at >= own.claimed_at)\n        .map(|i| MyIncident {\n            incident_id: i.id,\n            kind: kind_name(i.kind),\n            zone_name: zone_name(ctx, i.zone_id),\n            opened_at: i.opened_at,\n            resolved: i.resolved,\n            resolved_at: i.resolved_at,\n            resolution: i.resolution,\n            claim_id: claim_id_for(ctx, i.id),\n        })\n        .collect()\n}",
+      "line": 277,
+      "name": "my_incidents",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller owns band",
+      "row_scope": "Injury incidents for own band since band claimed_at",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 46,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "band_owner",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 32
+        },
+        {
+          "name": "incident",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 80
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "4a13a27c9cdc4b0e53693972db50ead037506b7c0788dfa09e5caf9c57f3ef76"
+    },
+    {
+      "signature": "pub fn my_medical_card(ctx: &ViewContext) -> Option<MedicalCard>",
+      "body": "pub fn my_medical_card(ctx: &ViewContext) -> Option<MedicalCard> {\n    ctx.db.medical_card().attendee().find(viewed(ctx))\n}",
+      "line": 247,
+      "name": "my_medical_card",
+      "source": "spacetimedb/server/src/medical/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 25,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 521,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "medical_card",
+          "public": false,
+          "source": "spacetimedb/server/src/medical/mod.rs",
+          "line": 42
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "f623c715bf57e9287f1d416443766b6ebe9983a1b88a02c230603da3133fc8a8"
+    },
+    {
+      "signature": "pub fn my_medical_documents(ctx: &ViewContext) -> Vec<MedicalDocument>",
+      "body": "pub fn my_medical_documents(ctx: &ViewContext) -> Vec<MedicalDocument> {\n    ctx.db.medical_document().attendee().filter(viewed(ctx)).collect()\n}",
+      "line": 252,
+      "name": "my_medical_documents",
+      "source": "spacetimedb/server/src/medical/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 26,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 520,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "medical_document",
+          "public": false,
+          "source": "spacetimedb/server/src/medical/mod.rs",
+          "line": 21
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "0502a7fd91dac2c3969f2454a1f922f3f973340a3ad711fd26333fc6a332de91"
+    },
+    {
+      "signature": "pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder>",
+      "body": "pub fn my_merch_orders(ctx: &ViewContext) -> Vec<MerchOrder> {\n    ctx.db.merch_order().attendee().filter(viewed(ctx)).collect()\n}",
+      "line": 339,
+      "name": "my_merch_orders",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 36,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 32,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 526,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "merch_order",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 91
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "893a9a016247222de170eca9a83d94519b2654fb77cdb5d2021e96c2b037c271"
+    },
+    {
+      "signature": "pub fn my_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping>",
+      "body": "pub fn my_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping> {\n    ctx.db.merch_order().attendee().filter(viewed(ctx)).filter_map(|o| ctx.db.merch_shipping().order_id().find(o.id)).collect()\n}",
+      "line": 344,
+      "name": "my_merch_shipping",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller owns matching order",
+      "row_scope": "Shipping records for caller orders",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 33,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "merch_order",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 91
+        },
+        {
+          "name": "merch_shipping",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 116
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "39cfc12fe305f85ff5e2c6d38b75bfc254ae9ffe0d53452c196ea8eaff27d21d"
+    },
+    {
+      "signature": "pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion>",
+      "body": "pub fn my_merch_suggestions(ctx: &ViewContext) -> Vec<MerchSuggestion> {\n    let me = viewed(ctx);\n    let photos: Vec<Photo> = ctx\n        .db\n        .photo_tag()\n        .attendee()\n        .filter(me)\n        .filter_map(|t| ctx.db.photo().id().find(t.photo_id))\n        .collect();\n    if photos.is_empty() {\n        return Vec::new();\n    }\n    let met: BTreeSet<Identity> = ctx\n        .db\n        .social_encounter()\n        .attendee_a()\n        .filter(me)\n        .filter(|e| e.met)\n        .map(|e| e.attendee_b)\n        .chain(ctx.db.social_encounter().attendee_b().filter(me).filter(|e| e.met).map(|e| e.attendee_a))\n        .collect();\n    let friends: HashMap<u64, Vec<String>> = photos\n        .iter()\n        .map(|p| {\n            let names = ctx\n                .db\n                .photo_tag()\n                .photo_id()\n                .filter(p.id)\n                .filter(|t| met.contains(&t.attendee))\n                .filter_map(|t| ctx.db.attendee().identity().find(t.attendee).filter(|a| a.findable).map(|a| a.display_name))\n                .collect();\n            (p.id, names)\n        })\n        .collect();\n    let mut zone_minutes: HashMap<u64, f32> = HashMap::new();\n    let mut visited_booths: BTreeSet<u64> = BTreeSet::new();\n    for v in ctx.db.visit().attendee().filter(me) {\n        *zone_minutes.entry(v.zone_id).or_default() += v.minutes;\n        if v.booth_id != 0 {\n            visited_booths.insert(v.booth_id);\n        } else {\n            visited_booths.extend(ctx.db.booth().zone_id().filter(v.zone_id).map(|b| b.id));\n        }\n    }\n    let ticks = |t: &MerchTemplate| -> Vec<String> {\n        let mut names: Vec<String> = t\n            .booth_ids\n            .iter()\n            .filter(|b| visited_booths.contains(b))\n            .filter_map(|b| ctx.db.booth().id().find(*b))\n            .filter_map(|b| ctx.db.organization().id().find(b.organization_id).map(|o| o.name))\n            .collect();\n        names.dedup();\n        names\n    };\n    let suggestion = |rank: u32, t: MerchTemplate, p: &Photo, line: String, reason: String| MerchSuggestion {\n        rank,\n        ticks: ticks(&t),\n        template_id: t.id,\n        title: t.title,\n        kind: t.kind,\n        price_cents: t.price_cents,\n        image_url: t.image_url,\n        width: t.width,\n        height: t.height,\n        photo_x: t.photo_x,\n        photo_y: t.photo_y,\n        photo_w: t.photo_w,\n        photo_h: t.photo_h,\n        photo_id: p.id,\n        photo_url: p.url.clone(),\n        line,\n        reason,\n        friends: friends.get(&p.id).cloned().unwrap_or_default(),\n    };\n\n    let mut picks: Vec<MerchPick> = ctx.db.merch_pick().attendee().filter(me).collect();\n    picks.sort_by_key(|p| p.rank);\n    let picked: Vec<MerchSuggestion> = picks\n        .into_iter()\n        .filter_map(|pick| {\n            let t = ctx.db.merch_template().id().find(pick.template_id)?;\n            let p = photos.iter().find(|p| p.id == pick.photo_id)?;\n            Some(suggestion(pick.rank, t, p, pick.line, pick.reason))\n        })\n        .collect();\n    if !picked.is_empty() {\n        return picked;\n    }\n\n    let mut ranked: Vec<(MerchTemplate, &Photo, f32, bool)> = ctx\n        .db\n        .merch_template()\n        .price_cents()\n        .filter(0u64..)\n        .map(|t| {\n            let zones: BTreeSet<u64> = t.booth_ids.iter().filter_map(|b| ctx.db.booth().id().find(*b)).map(|b| b.zone_id).collect();\n            let minutes = zones.iter().fold(0.0f32, |sum, z| sum + zone_minutes.get(z).copied().unwrap_or_default());\n            let with = |p: &Photo| friends.get(&p.id).map_or(0, |f| f.len());\n            let photo = photos.iter().max_by_key(|p| (zones.contains(&p.zone_id), with(p), p.taken_at, p.id)).expect(\"photos is not empty\");\n            let at_booth = zones.contains(&photo.zone_id);\n            (t, photo, minutes, at_booth)\n        })\n        .collect();\n    ranked.sort_by(|a, b| {\n        b.2.total_cmp(&a.2)\n            .then(b.3.cmp(&a.3))\n            .then(a.0.booth_ids.is_empty().cmp(&b.0.booth_ids.is_empty()).reverse())\n            .then(b.1.taken_at.cmp(&a.1.taken_at))\n            .then(a.0.id.cmp(&b.0.id))\n    });\n    ranked\n        .into_iter()\n        .take(SUGGESTIONS)\n        .enumerate()\n        .map(|(i, (t, p, _, _))| {\n            let line = friends_line(friends.get(&p.id).map(Vec::as_slice).unwrap_or_default());\n            suggestion(i as u32 + 1, t, p, line, String::new())\n        })\n        .collect()\n}",
+      "line": 651,
+      "name": "my_merch_suggestions",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity and own tagged photos",
+      "row_scope": "Own stored picks or deterministic fallback ranking; met+findable friend names",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 34,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 525,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "booth",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 98
+        },
+        {
+          "name": "merch_pick",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 126
+        },
+        {
+          "name": "merch_template",
+          "public": true,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 46
+        },
+        {
+          "name": "organization",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 64
+        },
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        },
+        {
+          "name": "photo_tag",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 214
+        },
+        {
+          "name": "social_encounter",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 116
+        },
+        {
+          "name": "visit",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 93
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9a3eb12417f495eb42561bd4fae0df1d3fa4d6a68c51e266c5c4e308f69c13d2"
+    },
+    {
+      "signature": "pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto>",
+      "body": "pub fn my_photos(ctx: &ViewContext) -> Vec<MyPhoto> {\n    let me = viewed(ctx);\n    ctx.db\n        .photo_tag()\n        .attendee()\n        .filter(me)\n        .filter_map(|t| {\n            let p = ctx.db.photo().id().find(t.photo_id)?;\n            let people = ctx\n                .db\n                .photo_tag()\n                .photo_id()\n                .filter(p.id)\n                .filter(|o| o.attendee != me)\n                .filter_map(|o| person_card(ctx, o.attendee))\n                .collect();\n            Some(MyPhoto {\n                photo_id: p.id,\n                url: p.url,\n                taken_at: p.taken_at,\n                zone_name: zone_name(ctx, p.zone_id),\n                caption: p.caption,\n                people,\n            })\n        })\n        .collect()\n}",
+      "line": 361,
+      "name": "my_photos",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller is tagged; other attendee cards require findable",
+      "row_scope": "Tagged photos with other findable attendee profile/social handles",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 35,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 30,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        },
+        {
+          "name": "photo_tag",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 214
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "1af86eb3b60567ed96c034d4e947f3fdd1cb1d4b4bb4b77fc583d30f66273144"
+    },
+    {
+      "signature": "pub fn my_plan_lookups(ctx: &ViewContext) -> Vec<PlanLookup>",
+      "body": "pub fn my_plan_lookups(ctx: &ViewContext) -> Vec<PlanLookup> {\n    ctx.db.plan_lookup().attendee().filter(viewed(ctx)).collect()\n}",
+      "line": 338,
+      "name": "my_plan_lookups",
+      "source": "spacetimedb/server/src/insurance/plan_lookup.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 27,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "plan_lookup",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/plan_lookup.rs",
+          "line": 65
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9f2c414c4f0f40776bb9390e34f0244c8b4303f9039c670d819618b1af9a13ec"
+    },
+    {
+      "signature": "pub fn my_shared_visits(ctx: &ViewContext) -> Vec<MySharedVisit>",
+      "body": "pub fn my_shared_visits(ctx: &ViewContext) -> Vec<MySharedVisit> {\n    let me = viewed(ctx);\n    let rows = ctx.db.shared_visit().attendee_a().filter(me).chain(ctx.db.shared_visit().attendee_b().filter(me));\n    rows.filter_map(|s| {\n        let other = if s.attendee_a == me { s.attendee_b } else { s.attendee_a };\n        Some(MySharedVisit {\n            id: s.id,\n            zone_id: s.zone_id,\n            zone_name: zone_name(ctx, s.zone_id),\n            booths: booth_names(ctx, s.zone_id),\n            started_at: s.started_at,\n            overlap_minutes: s.overlap_minutes,\n            person: person_card(ctx, other)?,\n        })\n    })\n    .collect()\n}",
+      "line": 179,
+      "name": "my_shared_visits",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity; other attendee must be findable",
+      "row_scope": "Shared visits involving caller, enriched with other attendee profile",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "shared_visit",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 143
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "11d90dc0dd12b7154fb414eebc1fd75ea0840510c2d219a58f555a2fd02345c1"
+    },
+    {
+      "signature": "pub fn my_visits(ctx: &ViewContext) -> Vec<MyVisit>",
+      "body": "pub fn my_visits(ctx: &ViewContext) -> Vec<MyVisit> {\n    ctx.db\n        .visit()\n        .attendee()\n        .filter(viewed(ctx))\n        .map(|v| MyVisit {\n            zone_visit_id: v.zone_visit_id,\n            zone_id: v.zone_id,\n            zone_name: zone_name(ctx, v.zone_id),\n            // Only the booth the band stood at; a stay known only by its zone names none.\n            booths: ctx.db.booth().id().find(v.booth_id).map(|b| b.name).into_iter().collect(),\n            started_at: v.started_at,\n            ended_at: v.ended_at,\n            minutes: v.minutes,\n        })\n        .collect()\n}",
+      "line": 139,
+      "name": "my_visits",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own visits, enriched with zone and booth names",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 28,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "booth",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 98
+        },
+        {
+          "name": "visit",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 93
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "80114f3df8c5b898ed5caa042df64d459d2424160942f5c5ad30178dad1b77ef"
+    },
+    {
+      "signature": "pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet>",
+      "body": "pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet> {\n    let me = viewed(ctx);\n    let account = ctx.db.claimant_account().identity().find(me)?;\n    Some(MyWallet { account_id: account.account_id, balance_cents: balance(ctx, me), opened_at: account.created_at })\n}",
+      "line": 139,
+      "name": "my_wallet",
+      "source": "spacetimedb/server/src/wallet/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller account exists",
+      "row_scope": "Own account and computed wallet balance",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 36,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 522,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claimant_account",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 374
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "df627472fb2549d4ae2caf480d243582b7cf1d57294e1371507ed5443a1b3a18"
+    },
+    {
+      "signature": "pub fn my_wallet_entries(ctx: &ViewContext) -> Vec<WalletEntry>",
+      "body": "pub fn my_wallet_entries(ctx: &ViewContext) -> Vec<WalletEntry> {\n    ctx.db.wallet_entry().identity().filter(viewed(ctx)).collect()\n}",
+      "line": 179,
+      "name": "my_wallet_entries",
+      "source": "spacetimedb/server/src/wallet/mod.rs",
+      "audience_group": "Attendee",
+      "access_check": "Caller identity",
+      "row_scope": "Own attendee/owner/identity rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 35,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 523,
+          "condition": "Independent attendee subscription on every connection; assembled as SELECT * FROM ${view}"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "wallet_entry",
+          "public": false,
+          "source": "spacetimedb/server/src/wallet/mod.rs",
+          "line": 20
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "f6663d295cb151ad3872b7d4997bbbabb9979ed55a6e4a214dfc5c20242973d0"
+    },
+    {
+      "signature": "pub fn my_roles(ctx: &ViewContext) -> Vec<StaffRole>",
+      "body": "pub fn my_roles(ctx: &ViewContext) -> Vec<StaffRole> {\n    ctx.db.staff_role().identity().filter(viewed(ctx)).collect()\n}",
+      "line": 68,
+      "name": "my_roles",
+      "source": "spacetimedb/server/src/roles.rs",
+      "audience_group": "Identity",
+      "access_check": "Caller identity",
+      "row_scope": "Own staff_role rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 43,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 30,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 31,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "web/src/pages/photo.ts",
+          "line": 50,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 43,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "4baa39243ceb3caea01727dc3ce37006788e299302de6ffeab1f2565d4b91391"
+    },
+    {
+      "signature": "pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard>",
+      "body": "pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {\n    let mut taps: Vec<MedicalAccessLog> = ctx.db.medical_access_log().reader().filter(viewed(ctx)).filter(|l| l.granted).collect();\n    taps.sort_by_key(|l| std::cmp::Reverse(l.id));\n    let mut out: Vec<MedicCard> = Vec::new();\n    for log in taps {\n        if out.iter().any(|c| c.band_id == log.band_id) {\n            continue;\n        }\n        let card = ctx.db.medical_card().attendee().find(log.attendee);\n        let name = ctx.db.attendee().identity().find(log.attendee).map(|a| a.display_name).unwrap_or_default();\n        out.push(MedicCard { incident_id: log.incident_id, band_id: log.band_id, name, card });\n    }\n    out\n}",
+      "line": 267,
+      "name": "medic_medical_cards",
+      "source": "spacetimedb/server/src/medical/mod.rs",
+      "audience_group": "Medic grants",
+      "access_check": "Granted medical_access_log where reader == viewed(ctx)",
+      "row_scope": "Latest granted tap per band; current medical card/name",
+      "identity": "viewed(ctx)",
+      "notes": "request_medical_card reducer checks medic/owner and writes grant. View has no current-role or expiry check; open incident is optional.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 66,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 45,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "medical_access_log",
+          "public": false,
+          "source": "spacetimedb/server/src/medical/mod.rs",
+          "line": 64
+        },
+        {
+          "name": "medical_card",
+          "public": false,
+          "source": "spacetimedb/server/src/medical/mod.rs",
+          "line": 42
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "09a57f46c3e3f5668ff236ab84d7cdaec76248d87209694b28fdbc93d200ea41"
+    },
+    {
+      "signature": "pub fn board_approvals(ctx: &ViewContext) -> Vec<Approval>",
+      "body": "pub fn board_approvals(ctx: &ViewContext) -> Vec<Approval> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.approval().claim_id().filter(0u64..).collect()\n}",
+      "line": 133,
+      "name": "board_approvals",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 55,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "approval",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 476
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "762f30cc621bb07ff3f662d7914ff8ceb2f1839e3cee91fc3069726c3866312d"
+    },
+    {
+      "signature": "pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut>",
+      "body": "pub fn board_attendees(ctx: &ViewContext) -> Vec<AttendeeOut> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db\n        .attendee()\n        .person_id()\n        .filter(0u64..)\n        .map(|a| AttendeeOut {\n            node_id: a.node_id,\n            band_id: ctx\n                .db\n                .band_owner()\n                .owner()\n                .find(a.identity)\n                .map(|o| o.band_id.into())\n                .or_else(|| ctx.db.crowd_member().identity().find(a.identity).map(|m| m.band_id))\n                .unwrap_or(0),\n            findable: a.findable,\n            crowd: a.crowd,\n            organization: ctx.db.organization().id().find(a.organization_id).map(|o| o.name).unwrap_or_default(),\n            handles: ctx\n                .db\n                .social_handle()\n                .owner()\n                .filter(a.identity)\n                .map(|h| crate::social::views::HandleOut { platform: h.platform, handle: h.handle })\n                .collect(),\n            role: attendee_role(ctx, &a),\n            display_name: a.display_name,\n            created_at: a.created_at,\n        })\n        .collect()\n}",
+      "line": 378,
+      "name": "board_attendees",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "All attendee profiles with band, handles, organization and role",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 34,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 44,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "band_owner",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 32
+        },
+        {
+          "name": "crowd_member",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 277
+        },
+        {
+          "name": "organization",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 64
+        },
+        {
+          "name": "social_handle",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 67
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "1242c45d1611cdfebd92e0fbeda51c6aa59d84459ab73aafffe9169361889762"
+    },
+    {
+      "signature": "pub fn board_charges(ctx: &ViewContext) -> Vec<Charge>",
+      "body": "pub fn board_charges(ctx: &ViewContext) -> Vec<Charge> {\n    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == \"ops\" || r.role == \"medic\");\n    if !staff {\n        return Vec::new();\n    }\n    ctx.db.charge().attendee().filter(Identity::ZERO..).collect()\n}",
+      "line": 497,
+      "name": "board_charges",
+      "source": "spacetimedb/server/src/insurance/charges.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "All corresponding rows/projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/payments/store.ts",
+          "line": 14,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 41,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 53,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "charge",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/charges.rs",
+          "line": 32
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9d0a049e8da63b746ea7fb2ff3641cd404a2d4f6c4a7b08fd8518816beb71d98"
+    },
+    {
+      "signature": "pub fn board_checks(ctx: &ViewContext) -> Vec<ClaimCheck>",
+      "body": "pub fn board_checks(ctx: &ViewContext) -> Vec<ClaimCheck> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_check().claim_id().filter(0u64..).collect()\n}",
+      "line": 85,
+      "name": "board_checks",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 32,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 49,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim_check",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 234
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "6ced53f07c4c5c6c000635e55eeee31ccd5aa05141dca9b3ea7bcbd744e4be2d"
+    },
+    {
+      "signature": "pub fn board_clinic_reports(ctx: &ViewContext) -> Vec<ClinicReport>",
+      "body": "pub fn board_clinic_reports(ctx: &ViewContext) -> Vec<ClinicReport> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.clinic_report().claim_id().filter(0u64..).collect()\n}",
+      "line": 125,
+      "name": "board_clinic_reports",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 47,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "clinic_report",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 166
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "a90f6feb61d46cb6d4ed31494f4a158783cf6c7935aedbda5833e7cb526ac44e"
+    },
+    {
+      "signature": "pub fn board_covers(ctx: &ViewContext) -> RawQuery<CoverageRuleRow>",
+      "body": "pub fn board_covers(ctx: &ViewContext) -> RawQuery<CoverageRuleRow> {\n    staff_query(ctx, \"coverage_rule\")\n}",
+      "line": 181,
+      "name": "board_covers",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 61,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "coverage_rule",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 55
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "2f5e2a615b2989ebfa1ba92d1169e7f3ae37ea2ae92d2fac85d150d76311ab04"
+    },
+    {
+      "signature": "pub fn board_facts(ctx: &ViewContext) -> Vec<EvidenceFact>",
+      "body": "pub fn board_facts(ctx: &ViewContext) -> Vec<EvidenceFact> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.evidence_fact().claim_id().filter(0u64..).collect()\n}",
+      "line": 77,
+      "name": "board_facts",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 33,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 48,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "evidence_fact",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 194
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "44fd1442aca3141de3d09f8653583583923baaba3fa7d021f31ea28ec251a7ba"
+    },
+    {
+      "signature": "pub fn board_fee_schedule(ctx: &ViewContext) -> RawQuery<FeeScheduleLine>",
+      "body": "pub fn board_fee_schedule(ctx: &ViewContext) -> RawQuery<FeeScheduleLine> {\n    staff_query(ctx, \"fee_schedule_line\")\n}",
+      "line": 205,
+      "name": "board_fee_schedule",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 44,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 65,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "fee_schedule_line",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/documents.rs",
+          "line": 84
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "e19b80773cf720e47079ff91315c8ea4659c09668e2f8dd9752dda32030b40ab"
+    },
+    {
+      "signature": "pub fn board_ledger(ctx: &ViewContext) -> Vec<LedgerEntry>",
+      "body": "pub fn board_ledger(ctx: &ViewContext) -> Vec<LedgerEntry> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.ledger_entry().claim_id().filter(0u64..).collect()\n}",
+      "line": 141,
+      "name": "board_ledger",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 37,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 56,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "ledger_entry",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 500
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "94e5624b9675c6d9eb9a7547ddc0e2b9a9097bf773dffb5ec2f9c7b5d49e8fde"
+    },
+    {
+      "signature": "pub fn board_lines(ctx: &ViewContext) -> Vec<ClaimLine>",
+      "body": "pub fn board_lines(ctx: &ViewContext) -> Vec<ClaimLine> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_line().claim_id().filter(0u64..).collect()\n}",
+      "line": 93,
+      "name": "board_lines",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 38,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 50,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim_line",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 289
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "f801197e0436ef0b3b4e77f28df5c14146972f9fab7acff2e104822f3cda7924"
+    },
+    {
+      "signature": "pub fn board_medical_access(ctx: &ViewContext) -> Vec<MedicalAccessLog>",
+      "body": "pub fn board_medical_access(ctx: &ViewContext) -> Vec<MedicalAccessLog> {\n    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| [\"ops\", \"medic\"].contains(&r.role.as_str()));\n    if staff { ctx.db.medical_access_log().reader().filter(Identity::ZERO..).collect() } else { Vec::new() }\n}",
+      "line": 284,
+      "name": "board_medical_access",
+      "source": "spacetimedb/server/src/medical/mod.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "All corresponding rows/projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "medical_access_log",
+          "public": false,
+          "source": "spacetimedb/server/src/medical/mod.rs",
+          "line": 64
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "56636fa42e12260327e5617ed55ec6cd90a75746e79930c35e6ff5c6202556e6"
+    },
+    {
+      "signature": "pub fn board_merch_picks(ctx: &ViewContext) -> Vec<BoardMerchPick>",
+      "body": "pub fn board_merch_picks(ctx: &ViewContext) -> Vec<BoardMerchPick> {\n    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| STAFF_ROLES.contains(&r.role.as_str()));\n    if !staff {\n        return Vec::new();\n    }\n    ctx.db\n        .merch_pick()\n        .attendee()\n        .filter(Identity::ZERO..)\n        .map(|p| BoardMerchPick {\n            id: p.id,\n            node_id: ctx.db.attendee().identity().find(p.attendee).map(|a| a.node_id).unwrap_or_default(),\n            attendee_name: ctx.db.attendee().identity().find(p.attendee).map(|a| a.display_name).unwrap_or_default(),\n            rank: p.rank,\n            template_id: p.template_id,\n            photo_id: p.photo_id,\n            photo_url: ctx.db.photo().id().find(p.photo_id).map(|x| x.url).unwrap_or_default(),\n            line: p.line,\n            reason: p.reason,\n            created_at: p.created_at,\n        })\n        .collect()\n}",
+      "line": 792,
+      "name": "board_merch_picks",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "All corresponding rows/projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 45,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 73,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "merch_pick",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 126
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "844d59dd33445ad25a125f0ffa09aaecc6ca3eaa6279d5602dac27a74276a4aa"
+    },
+    {
+      "signature": "pub fn board_notes(ctx: &ViewContext) -> Vec<IncidentNote>",
+      "body": "pub fn board_notes(ctx: &ViewContext) -> Vec<IncidentNote> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.incident_note().incident_id().filter(0u64..).collect()\n}",
+      "line": 149,
+      "name": "board_notes",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 43,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "incident_note",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 150
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "6034e4ea7bfcb04ec15b70a1c1abbf44552e68e441279feb085a4daaaa64add2"
+    },
+    {
+      "signature": "pub fn board_organizer_precedents(ctx: &ViewContext) -> RawQuery<OrganizerPrecedent>",
+      "body": "pub fn board_organizer_precedents(ctx: &ViewContext) -> RawQuery<OrganizerPrecedent> {\n    staff_query(ctx, \"organizer_precedent\")\n}",
+      "line": 170,
+      "name": "board_organizer_precedents",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 59,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "organizer_precedent",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 413
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "5468833b71d8797f4961e6d78aa0d142445afca25d6e5666edc7e06c189f3e5d"
+    },
+    {
+      "signature": "pub fn board_photos(ctx: &ViewContext) -> Vec<BoardPhoto>",
+      "body": "pub fn board_photos(ctx: &ViewContext) -> Vec<BoardPhoto> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db\n        .photo()\n        .zone_id()\n        .filter(0u64..)\n        .map(|p| BoardPhoto {\n            node_ids: ctx\n                .db\n                .photo_tag()\n                .photo_id()\n                .filter(p.id)\n                .filter_map(|t| ctx.db.attendee().identity().find(t.attendee).filter(|a| a.findable).map(|a| a.node_id))\n                .collect(),\n            zone_name: ctx.db.zone().id().find(p.zone_id).map(|z| z.name).unwrap_or_default(),\n            id: p.id,\n            url: p.url,\n            taken_at: p.taken_at,\n            caption: p.caption,\n            people_count: p.people_count,\n            read: p.features_call_id != 0,\n        })\n        .collect()\n}",
+      "line": 429,
+      "name": "board_photos",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "All event photos; tagged node_ids include findable attendees only",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 68,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        },
+        {
+          "name": "photo_tag",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 214
+        },
+        {
+          "name": "zone",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 41
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "c3a0faf55ace1d0d58024e8c436d171dc39f6940912a029d79fd9597f977d2f6"
+    },
+    {
+      "signature": "pub fn board_policies(ctx: &ViewContext) -> RawQuery<InsurancePolicy>",
+      "body": "pub fn board_policies(ctx: &ViewContext) -> RawQuery<InsurancePolicy> {\n    staff_query(ctx, \"insurance_policy\")\n}",
+      "line": 175,
+      "name": "board_policies",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 60,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "insurance_policy",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 26
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "4cf60b49a5f364f924bb876abcebe68faf320e3bc1822c20a46345bdf22cadf5"
+    },
+    {
+      "signature": "pub fn board_policy_documents(ctx: &ViewContext) -> RawQuery<PolicyDocument>",
+      "body": "pub fn board_policy_documents(ctx: &ViewContext) -> RawQuery<PolicyDocument> {\n    staff_query(ctx, \"policy_document\")\n}",
+      "line": 187,
+      "name": "board_policy_documents",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 62,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "policy_document",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/documents.rs",
+          "line": 19
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "89f3c3906c3c47885a184bede9575d89bc05f37f5f0f16b1a69cee1200f6f022"
+    },
+    {
+      "signature": "pub fn board_policy_terms(ctx: &ViewContext) -> RawQuery<PolicyTerm>",
+      "body": "pub fn board_policy_terms(ctx: &ViewContext) -> RawQuery<PolicyTerm> {\n    staff_query(ctx, \"policy_term\")\n}",
+      "line": 199,
+      "name": "board_policy_terms",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 63,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "policy_term",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/documents.rs",
+          "line": 55
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9c337c6f5e6f70226e9be511db7813714c5530224b5c45defb88d41ac504e116"
+    },
+    {
+      "signature": "pub fn board_precedents(ctx: &ViewContext) -> Vec<ClaimPrecedent>",
+      "body": "pub fn board_precedents(ctx: &ViewContext) -> Vec<ClaimPrecedent> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_precedent().claim_id().filter(0u64..).collect()\n}",
+      "line": 109,
+      "name": "board_precedents",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim_precedent",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 314
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "06ada7b904eeaae612c8ab384f50a60d0958858ed7be05cd130f843475a11e93"
+    },
+    {
+      "signature": "pub fn board_records(ctx: &ViewContext) -> Vec<MedicalRecord>",
+      "body": "pub fn board_records(ctx: &ViewContext) -> Vec<MedicalRecord> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.medical_record().claim_id().filter(0u64..).collect()\n}",
+      "line": 117,
+      "name": "board_records",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 54,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "medical_record",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 253
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "abee8bc4724d69211f643531c888e4294f459ae739564d9d52db488d3b966ba6"
+    },
+    {
+      "signature": "pub fn board_reviews(ctx: &ViewContext) -> Vec<ClaimReview>",
+      "body": "pub fn board_reviews(ctx: &ViewContext) -> Vec<ClaimReview> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_review().claim_id().filter(0u64..).collect()\n}",
+      "line": 101,
+      "name": "board_reviews",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 51,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim_review",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 350
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "3e0a53b025930c71267cbf2f308179859ab1a99891ac40e5ad61800c492dced2"
+    },
+    {
+      "signature": "pub fn board_rule_proposals(ctx: &ViewContext) -> RawQuery<RuleProposal>",
+      "body": "pub fn board_rule_proposals(ctx: &ViewContext) -> RawQuery<RuleProposal> {\n    staff_query(ctx, \"rule_proposal\")\n}",
+      "line": 164,
+      "name": "board_rule_proposals",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 58,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "rule_proposal",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 440
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "d2e58ba270fc7999f3ad992aef9db8990091af9a50e76a7bc888dba3c275c08f"
+    },
+    {
+      "signature": "pub fn board_rules(ctx: &ViewContext) -> RawQuery<SettlementRuleRow>",
+      "body": "pub fn board_rules(ctx: &ViewContext) -> RawQuery<SettlementRuleRow> {\n    staff_query(ctx, \"settlement_rule\")\n}",
+      "line": 158,
+      "name": "board_rules",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 57,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "settlement_rule",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 385
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "03cdb295f1d6594452e7c03033aaa667471d26badd7d1a5ddde3e7696e2deed4"
+    },
+    {
+      "signature": "pub fn board_venue_policy_lookups(ctx: &ViewContext) -> RawQuery<venue_policy_lookup::VenuePolicyLookup>",
+      "body": "pub fn board_venue_policy_lookups(ctx: &ViewContext) -> RawQuery<venue_policy_lookup::VenuePolicyLookup> {\n    staff_query(ctx, \"venue_policy_lookup\")\n}",
+      "line": 193,
+      "name": "board_venue_policy_lookups",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows if allowed; otherwise SQL WHERE id = 0",
+      "identity": "viewed(ctx)",
+      "notes": "staff_query denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 64,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "venue_policy_lookup",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/venue_policy_lookup.rs",
+          "line": 46
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "26f4c1154d44e6f73074fc8962cff83272a5e0f15c259465f9da0bb1f5760d86"
+    },
+    {
+      "signature": "pub fn claims_board(ctx: &ViewContext) -> Vec<Claim>",
+      "body": "pub fn claims_board(ctx: &ViewContext) -> Vec<Claim> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim().routed_to().filter(Identity::ZERO..).collect()\n}",
+      "line": 69,
+      "name": "claims_board",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role (STAFF_ROLES)",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 45,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "claim",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 107
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "363550482086969eb5f4bb4217a2fbd898c853a777c6c84282e00afb987b1f8b"
+    },
+    {
+      "signature": "pub fn incident_bands(ctx: &ViewContext, incident_id: u64) -> Vec<IncidentBand>",
+      "body": "pub fn incident_bands(ctx: &ViewContext, incident_id: u64) -> Vec<IncidentBand> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.incident_band().incident_id().filter(incident_id).collect()\n}",
+      "line": 553,
+      "name": "incident_bands",
+      "source": "spacetimedb/server/src/safety/mod.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "IncidentBand rows matching supplied incident_id",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "incident_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "incident_band",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 132
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9c401eb357edf5adb8ffe63e9aa1ad4e69058c9ed187d6d3a43fb450ca288ca0"
+    },
+    {
+      "signature": "pub fn open_incidents(ctx: &ViewContext) -> Vec<Incident>",
+      "body": "pub fn open_incidents(ctx: &ViewContext) -> Vec<Incident> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.incident().resolved().filter(false).collect()\n}",
+      "line": 544,
+      "name": "open_incidents",
+      "source": "spacetimedb/server/src/safety/mod.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "Unresolved incidents",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 40,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 42,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 44,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "incident",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 80
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "eb92ba967468cc03d4551da3ad5294a200e8cb901d2b11db5e70a05937e87b2e"
+    },
+    {
+      "signature": "pub fn unclaimed_injuries(ctx: &ViewContext) -> Vec<UnclaimedInjury>",
+      "body": "pub fn unclaimed_injuries(ctx: &ViewContext) -> Vec<UnclaimedInjury> {\n    if !is_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db\n        .incident()\n        .subject_band()\n        .filter(1u32..)\n        .filter(|i| i.resolved && i.kind.is_injury() && claim_id_for(ctx, i.id) == 0)\n        .filter_map(|i| {\n            let wearer = ctx.db.band_owner().band_id().find(radio_id(i.subject_band)?).filter(|o| o.claimed_at <= i.opened_at)?;\n            let mut notes: Vec<IncidentNote> = ctx.db.incident_note().incident_id().filter(i.id).collect();\n            notes.sort_by_key(|n| n.id);\n            Some(UnclaimedInjury {\n                incident_id: i.id,\n                kind: kind_name(i.kind),\n                zone_name: zone_name(ctx, i.zone_id),\n                band_id: i.subject_band,\n                wearer_name: ctx.db.attendee().identity().find(wearer.owner).map(|a| a.display_name).unwrap_or_default(),\n                opened_at: i.opened_at,\n                resolved_at: i.resolved_at,\n                notes: notes.into_iter().map(|n| n.text).collect(),\n            })\n        })\n        .collect()\n}",
+      "line": 315,
+      "name": "unclaimed_injuries",
+      "source": "spacetimedb/server/src/web.rs",
+      "audience_group": "Ops and medic board",
+      "access_check": "Owner or ops/medic role",
+      "row_scope": "Resolved injury incidents with no claim and wearer at incident time; staff notes",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 46,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "band_owner",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 32
+        },
+        {
+          "name": "incident",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 80
+        },
+        {
+          "name": "incident_note",
+          "public": false,
+          "source": "spacetimedb/server/src/safety/mod.rs",
+          "line": 150
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "c76a9e59523aae0f097686f89b27d9e6cad9f6915fd302484f0eca468b53f9a2"
+    },
+    {
+      "signature": "pub fn claim_checks(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimCheck>",
+      "body": "pub fn claim_checks(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimCheck> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_check().claim_id().filter(claim_id).collect()\n}",
+      "line": 30,
+      "name": "claim_checks",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "claim_check",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 234
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "78cc89db7171c13d3c5272d7582b02707538e22fb7f81013207122503d6dbb88"
+    },
+    {
+      "signature": "pub fn claim_clauses(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimClause>",
+      "body": "pub fn claim_clauses(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimClause> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_clause().claim_id().filter(claim_id).collect()\n}",
+      "line": 62,
+      "name": "claim_clauses",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 1148,
+          "condition": "On-demand claim detail subscription with claim_id"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "claim_clause",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 331
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "0cdb0dc9233864c298793a14ff60396bd0ca8a0e2a8b3d65a26ab850d4332f64"
+    },
+    {
+      "signature": "pub fn claim_facts(ctx: &ViewContext, claim_id: u64) -> Vec<EvidenceFact>",
+      "body": "pub fn claim_facts(ctx: &ViewContext, claim_id: u64) -> Vec<EvidenceFact> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.evidence_fact().claim_id().filter(claim_id).collect()\n}",
+      "line": 22,
+      "name": "claim_facts",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "evidence_fact",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 194
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "2d761cc895f0ee31b9a1f817d47c3acadab7e4a7c1ff92e3c1550272cee16065"
+    },
+    {
+      "signature": "pub fn claim_ledger(ctx: &ViewContext, claim_id: u64) -> Vec<LedgerEntry>",
+      "body": "pub fn claim_ledger(ctx: &ViewContext, claim_id: u64) -> Vec<LedgerEntry> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.ledger_entry().claim_id().filter(claim_id).collect()\n}",
+      "line": 54,
+      "name": "claim_ledger",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "ledger_entry",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 500
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "5b2e3633c0e68f4d5e8cce74aa4aab348a2b92fa2049f2103459f214d43aa5fd"
+    },
+    {
+      "signature": "pub fn claim_lines(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimLine>",
+      "body": "pub fn claim_lines(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimLine> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_line().claim_id().filter(claim_id).collect()\n}",
+      "line": 38,
+      "name": "claim_lines",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "claim_line",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 289
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "e67f0282235aa30c7c3d4db5bfe168220d078cc7506481c7538da58be3e5c152"
+    },
+    {
+      "signature": "pub fn claim_reviews(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimReview>",
+      "body": "pub fn claim_reviews(ctx: &ViewContext, claim_id: u64) -> Vec<ClaimReview> {\n    if !is_claims_staff(ctx) {\n        return Vec::new();\n    }\n    ctx.db.claim_review().claim_id().filter(claim_id).collect()\n}",
+      "line": 46,
+      "name": "claim_reviews",
+      "source": "spacetimedb/server/src/insurance/views.rs",
+      "audience_group": "Ops claim detail",
+      "access_check": "Owner or ops role (CLAIM_ROLES)",
+      "row_scope": "Rows matching supplied claim_id",
+      "identity": "viewed(ctx)",
+      "notes": "Role check plus claim_id; does not require routed_to == caller. Medic role alone is insufficient.",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [
+        [
+          "claim_id",
+          "u64"
+        ]
+      ],
+      "direct_table_reads": [
+        {
+          "name": "claim_review",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 350
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "28ea801c34cb64a8ddafc3e1e355b64ba82d78031f68542d82f4a829d114569a"
+    },
+    {
+      "signature": "pub fn board_merch_orders(ctx: &ViewContext) -> Vec<BoardMerchOrder>",
+      "body": "pub fn board_merch_orders(ctx: &ViewContext) -> Vec<BoardMerchOrder> {\n    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == \"ops\");\n    if !ops {\n        return Vec::new();\n    }\n    ctx.db\n        .merch_order()\n        .attendee()\n        .filter(Identity::ZERO..)\n        .map(|o| BoardMerchOrder {\n            id: o.id,\n            attendee_name: ctx.db.attendee().identity().find(o.attendee).map(|a| a.display_name).unwrap_or_default(),\n            template_id: o.template_id,\n            title: ctx.db.merch_template().id().find(o.template_id).map(|t| t.title).unwrap_or_default(),\n            size: o.size,\n            amount_cents: o.amount_cents,\n            status: o.status,\n            failure: o.failure,\n            nessie_purchase_id: o.nessie_purchase_id,\n            created_at: o.created_at,\n            line: o.line,\n            photo_url: ctx.db.photo().id().find(o.photo_id).map(|p| p.url).unwrap_or_default(),\n            node_id: ctx.db.attendee().identity().find(o.attendee).map(|a| a.node_id).unwrap_or_default(),\n        })\n        .collect()\n}",
+      "line": 380,
+      "name": "board_merch_orders",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Ops commerce board",
+      "access_check": "Owner or ops role",
+      "row_scope": "All corresponding order/shipping/wallet rows or projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/payments/store.ts",
+          "line": 15,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 42,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 70,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "merch_order",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 91
+        },
+        {
+          "name": "merch_template",
+          "public": true,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 46
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "d17e87ec3b61ed5a275ea794aa22b99fa0f16ed28c36a841c34dd628caf0af3e"
+    },
+    {
+      "signature": "pub fn board_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping>",
+      "body": "pub fn board_merch_shipping(ctx: &ViewContext) -> Vec<MerchShipping> {\n    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == \"ops\");\n    if !ops {\n        return Vec::new();\n    }\n    ctx.db.merch_order().attendee().filter(Identity::ZERO..).filter_map(|o| ctx.db.merch_shipping().order_id().find(o.id)).collect()\n}",
+      "line": 350,
+      "name": "board_merch_shipping",
+      "source": "spacetimedb/server/src/merch/mod.rs",
+      "audience_group": "Ops commerce board",
+      "access_check": "Owner or ops role",
+      "row_scope": "All corresponding order/shipping/wallet rows or projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 71,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "merch_order",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 91
+        },
+        {
+          "name": "merch_shipping",
+          "public": false,
+          "source": "spacetimedb/server/src/merch/mod.rs",
+          "line": 116
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "319ce1669efd35cd9522e6a9df975a5a8342fa016ab0f522c57a5a2d83bc7dc4"
+    },
+    {
+      "signature": "pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet>",
+      "body": "pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet> {\n    let ops = ctx.db.owner().identity().find(viewed(ctx)).is_some()\n        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| r.role == \"ops\");\n    if !ops {\n        return Vec::new();\n    }\n    ctx.db\n        .attendee()\n        .person_id()\n        .filter(0u64..)\n        .filter_map(|a| {\n            let account = ctx.db.claimant_account().identity().find(a.identity)?;\n            Some(BoardWallet { node_id: a.node_id, account_id: account.account_id, balance_cents: balance(ctx, a.identity) })\n        })\n        .collect()\n}",
+      "line": 160,
+      "name": "board_wallets",
+      "source": "spacetimedb/server/src/wallet/mod.rs",
+      "audience_group": "Ops commerce board",
+      "access_check": "Owner or ops role",
+      "row_scope": "All corresponding order/shipping/wallet rows or projections",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/payments/store.ts",
+          "line": 16,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 43,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 72,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "claimant_account",
+          "public": false,
+          "source": "spacetimedb/server/src/insurance/tables.rs",
+          "line": 374
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "e76bb82824f08060f1fe7c9c3ae3ce0956b99b7baf744928cbcf777b7a6ba083"
+    },
+    {
+      "signature": "pub fn board_staff(ctx: &ViewContext) -> RawQuery<StaffMember>",
+      "body": "pub fn board_staff(ctx: &ViewContext) -> RawQuery<StaffMember> {\n    let owner = ctx.db.owner().identity().find(ctx.sender()).is_some();\n    RawQuery::new(format!(\"SELECT * FROM staff_member{}\", if owner { \"\" } else { \" WHERE id = 0\" }))\n}",
+      "line": 223,
+      "name": "board_staff",
+      "source": "spacetimedb/server/src/roles.rs",
+      "audience_group": "Owner controls",
+      "access_check": "Real sender is owner",
+      "row_scope": "All staff_member rows if owner; otherwise SQL WHERE id = 0",
+      "identity": "ctx.sender()",
+      "notes": "Denied case is an id=0 sentinel query, not a literal false predicate.",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 77,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_member",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 102
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "bd10efddaaede6adaaa8fd61e662c2bac081dce7df5d6bed64d22fac538239e0"
+    },
+    {
+      "signature": "pub fn my_owner(ctx: &ViewContext) -> Vec<Owner>",
+      "body": "pub fn my_owner(ctx: &ViewContext) -> Vec<Owner> {\n    ctx.db.owner().identity().find(ctx.sender()).into_iter().collect()\n}",
+      "line": 87,
+      "name": "my_owner",
+      "source": "spacetimedb/server/src/roles.rs",
+      "audience_group": "Owner controls",
+      "access_check": "Real sender identity",
+      "row_scope": "Own owner row",
+      "identity": "ctx.sender()",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 31,
+          "condition": "STAFF_QUERIES: requested when connection has token"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 32,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "cdf335851c55caedf674574128296617e9dd5853468a8aea1ed766c552b3587b"
+    },
+    {
+      "signature": "pub fn view_as_people(ctx: &ViewContext) -> Vec<ViewablePerson>",
+      "body": "pub fn view_as_people(ctx: &ViewContext) -> Vec<ViewablePerson> {\n    if ctx.db.owner().identity().find(ctx.sender()).is_none() {\n        return Vec::new();\n    }\n    let band = |who: Identity| {\n        ctx.db\n            .band_owner()\n            .owner()\n            .find(who)\n            .map(|o| o.band_id.into())\n            .or_else(|| ctx.db.crowd_member().identity().find(who).map(|m| m.band_id))\n            .unwrap_or(0)\n    };\n    let staff = ctx.db.staff_role().identity().filter(Identity::ZERO..).filter(|r| VIEWED_ROLES.contains(&r.role.as_str())).map(|r| {\n        let name = ctx.db.attendee().identity().find(r.identity).map(|a| a.display_name).filter(|n| !n.is_empty()).unwrap_or(r.label);\n        ViewablePerson { identity: r.identity, name, role: r.role, band_id: band(r.identity), crowd: false }\n    });\n    let attendees = ctx.db.attendee().person_id().filter(0u64..).map(|a| ViewablePerson {\n        identity: a.identity,\n        name: a.display_name,\n        role: \"attendee\".into(),\n        band_id: band(a.identity),\n        crowd: a.crowd,\n    });\n    staff.chain(attendees).collect()\n}",
+      "line": 70,
+      "name": "view_as_people",
+      "source": "spacetimedb/server/src/view_as.rs",
+      "audience_group": "Owner controls",
+      "access_check": "Real sender is owner",
+      "row_scope": "All attendees plus ops/medic/photographer identities",
+      "identity": "ctx.sender()",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 86,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        },
+        {
+          "name": "band_owner",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 32
+        },
+        {
+          "name": "crowd_member",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 277
+        },
+        {
+          "name": "owner",
+          "public": false,
+          "source": "spacetimedb/server/src/tables.rs",
+          "line": 177
+        },
+        {
+          "name": "staff_role",
+          "public": false,
+          "source": "spacetimedb/server/src/roles.rs",
+          "line": 5
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "9f8633519eb0598aebbe888f60a60c1d744882ac9c6743fe37e1047e4fe32af9"
+    },
+    {
+      "signature": "pub fn claimed_people(ctx: &AnonymousViewContext) -> Vec<ClaimedPerson>",
+      "body": "pub fn claimed_people(ctx: &AnonymousViewContext) -> Vec<ClaimedPerson> {\n    ctx.db.person_claim().person_id().filter(0u64..).map(|c| ClaimedPerson { person_id: c.person_id }).collect()\n}",
+      "line": 199,
+      "name": "claimed_people",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Public projections",
+      "access_check": "AnonymousViewContext; no identity gate",
+      "row_scope": "Claimed person IDs only",
+      "identity": "anonymous",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "web/src/pages/t.ts",
+          "line": 42,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "person_claim",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 55
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "c73e38622356b4c86e752fe42ecefd67f1de4dad0722142a9f2e4b23f6bbe57b"
+    },
+    {
+      "signature": "pub fn event_graph(ctx: &AnonymousViewContext) -> Vec<EventLink>",
+      "body": "pub fn event_graph(ctx: &AnonymousViewContext) -> Vec<EventLink> {\n    ctx.db\n        .people_link()\n        .from_id()\n        .filter(0u64..)\n        .map(|l| EventLink {\n            id: l.id,\n            kind: l.kind,\n            from_kind: l.from_kind,\n            from_id: l.from_id,\n            to_kind: l.to_kind,\n            to_id: l.to_id,\n            weight: l.weight,\n        })\n        .collect()\n}",
+      "line": 330,
+      "name": "event_graph",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Public projections",
+      "access_check": "AnonymousViewContext; no identity gate",
+      "row_scope": "All graph links projected to IDs/kinds/weights, no names/zones/times",
+      "identity": "anonymous",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 54,
+          "condition": "DESK_QUERIES: requested after public floor, including anonymous connection"
+        },
+        {
+          "path": "web/src/pages/organizer.ts",
+          "line": 67,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "people_link",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 166
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "696d3f42da8db0a4f79c3d2aac18bf68bf07c962215c1f9c7b1b0fe786d15f77"
+    },
+    {
+      "signature": "pub fn venue_plan(ctx: &AnonymousViewContext) -> Vec<PlanArea>",
+      "body": "pub fn venue_plan(ctx: &AnonymousViewContext) -> Vec<PlanArea> {\n    use crate::venue::{booth__view, organization__view, venue_spot__view, zone__view};\n    let venue = Venue::build(\n        ctx.db.zone().station_id().filter(1u8..).collect(),\n        |zone_id| ctx.db.booth().zone_id().filter(zone_id).collect(),\n        |id| ctx.db.organization().id().find(id),\n        ctx.db.venue_spot().station_id().filter(0u8..).collect(),\n    );\n    let zones = venue.zones.iter().map(|(z, r)| PlanArea {\n        station_id: z.station_id,\n        booth_id: 0,\n        name: z.name.clone(),\n        x0_m: r.x0,\n        y0_m: r.y0,\n        x1_m: r.x1,\n        y1_m: r.y1,\n    });\n    let booths = venue.booths.iter().map(|b| PlanArea {\n        station_id: b.station,\n        booth_id: b.id,\n        name: b.name.clone(),\n        x0_m: b.staff.0,\n        y0_m: b.staff.1,\n        x1_m: b.visitor.0,\n        y1_m: b.visitor.1,\n    });\n    zones.chain(booths).collect()\n}",
+      "line": 508,
+      "name": "venue_plan",
+      "source": "spacetimedb/server/src/social/crowd.rs",
+      "audience_group": "Public projections",
+      "access_check": "AnonymousViewContext; no identity gate",
+      "row_scope": "Zone and booth plan areas",
+      "identity": "anonymous",
+      "notes": "",
+      "subscriptions": [],
+      "subscription_status": "no_production_subscription_found",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "booth",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 98
+        },
+        {
+          "name": "organization",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 64
+        },
+        {
+          "name": "venue_spot",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/spots.rs",
+          "line": 13
+        },
+        {
+          "name": "zone",
+          "public": true,
+          "source": "spacetimedb/server/src/venue/tables.rs",
+          "line": 41
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "47eec8d8f78b86d6a7ab3f4b3c8f2ac5d3ad40771933217b1b5de74a42e50625"
+    },
+    {
+      "signature": "pub fn api_sessions(ctx: &ViewContext) -> Vec<ApiSession>",
+      "body": "pub fn api_sessions(ctx: &ViewContext) -> Vec<ApiSession> {\n    if !allowed(ctx, &[\"api\"]) {\n        return Vec::new();\n    }\n    ctx.db.api_session().identity().filter(Identity::ZERO..).collect()\n}",
+      "line": 204,
+      "name": "api_sessions",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api role",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 44,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "api_session",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 81
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "bfca116a80494c61adbf359668ce2872f5ef692c535a7e5c489af8c21d841e07"
+    },
+    {
+      "signature": "pub fn social_attendees(ctx: &ViewContext) -> Vec<Attendee>",
+      "body": "pub fn social_attendees(ctx: &ViewContext) -> Vec<Attendee> {\n    if !allowed(ctx, SERVICES) {\n        return Vec::new();\n    }\n    ctx.db.attendee().person_id().filter(0u64..).collect()\n}",
+      "line": 212,
+      "name": "social_attendees",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api/indexer/worker role",
+      "row_scope": "All attendee rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 36,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "crates/bandit-indexer/src/main.rs",
+          "line": 34,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "attendee",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 4
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "8965ac514e7d62f69d6c913fdb0d0ef6c2a269be1e668f48bbcabf380461e70d"
+    },
+    {
+      "signature": "pub fn social_encounters(ctx: &ViewContext) -> Vec<SocialEncounter>",
+      "body": "pub fn social_encounters(ctx: &ViewContext) -> Vec<SocialEncounter> {\n    if !allowed(ctx, SERVICES) {\n        return Vec::new();\n    }\n    ctx.db.social_encounter().attendee_a().filter(Identity::ZERO..).filter(|e| e.met).collect()\n}",
+      "line": 236,
+      "name": "social_encounters",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api/indexer/worker role",
+      "row_scope": "Encounter rows with met=true",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 39,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "social_encounter",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 116
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "bce72781460e066b309ae28fe3b9fed6befaceeb4f91d0dba5f2ff1a6e9d83a3"
+    },
+    {
+      "signature": "pub fn social_handles(ctx: &ViewContext) -> Vec<SocialHandle>",
+      "body": "pub fn social_handles(ctx: &ViewContext) -> Vec<SocialHandle> {\n    if !allowed(ctx, &[\"api\"]) {\n        return Vec::new();\n    }\n    ctx.db.social_handle().owner().filter(Identity::ZERO..).collect()\n}",
+      "line": 220,
+      "name": "social_handles",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api role",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 37,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "social_handle",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 67
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "7f9eb6fe9641bd7584b70e45a06ccb963e76b538060e52cd0ef5ac7737bdc184"
+    },
+    {
+      "signature": "pub fn social_photo_tags(ctx: &ViewContext) -> Vec<PhotoTag>",
+      "body": "pub fn social_photo_tags(ctx: &ViewContext) -> Vec<PhotoTag> {\n    if !allowed(ctx, &[\"api\"]) {\n        return Vec::new();\n    }\n    ctx.db.photo_tag().photo_id().filter(0u64..).collect()\n}",
+      "line": 398,
+      "name": "social_photo_tags",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api role",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 42,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "photo_tag",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 214
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "d4679cdeca7a353410fef0e129736ae0e53a000116c75560a7f394d03c66fc73"
+    },
+    {
+      "signature": "pub fn social_photos(ctx: &ViewContext) -> Vec<Photo>",
+      "body": "pub fn social_photos(ctx: &ViewContext) -> Vec<Photo> {\n    if !allowed(ctx, &[\"api\"]) {\n        return Vec::new();\n    }\n    ctx.db.photo().zone_id().filter(0u64..).collect()\n}",
+      "line": 390,
+      "name": "social_photos",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api role",
+      "row_scope": "All corresponding rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 41,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "frontend/src/stdb/session.ts",
+          "line": 53,
+          "condition": "DESK_QUERIES: requested after public floor, including anonymous connection"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "photo",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 191
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "5bc3f96f22e4d9b71b2aa00ca3807f3df2cc60b90bfac2eecca9240c1da06cad"
+    },
+    {
+      "signature": "pub fn social_shared_visits(ctx: &ViewContext) -> Vec<SharedVisit>",
+      "body": "pub fn social_shared_visits(ctx: &ViewContext) -> Vec<SharedVisit> {\n    if !allowed(ctx, SERVICES) {\n        return Vec::new();\n    }\n    ctx.db.shared_visit().zone_id().filter(0u64..).collect()\n}",
+      "line": 244,
+      "name": "social_shared_visits",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api/indexer/worker role",
+      "row_scope": "All shared-visit rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 40,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "shared_visit",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 143
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "b44f2d100fa118d3578e8447764c6334be90962a370b38e00fa16a765be2b758"
+    },
+    {
+      "signature": "pub fn social_visits(ctx: &ViewContext) -> Vec<Visit>",
+      "body": "pub fn social_visits(ctx: &ViewContext) -> Vec<Visit> {\n    if !allowed(ctx, SERVICES) {\n        return Vec::new();\n    }\n    ctx.db.visit().zone_id().filter(0u64..).collect()\n}",
+      "line": 228,
+      "name": "social_visits",
+      "source": "spacetimedb/server/src/social/views.rs",
+      "audience_group": "Services",
+      "access_check": "Owner or api/indexer/worker role",
+      "row_scope": "All visit rows",
+      "identity": "viewed(ctx)",
+      "notes": "",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-api/src/main.rs",
+          "line": 38,
+          "condition": "Production query declaration; runtime delivery not verified"
+        },
+        {
+          "path": "crates/bandit-indexer/src/main.rs",
+          "line": 35,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "visit",
+          "public": false,
+          "source": "spacetimedb/server/src/social/tables.rs",
+          "line": 93
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "01f24d49348ac07ad9f88384a5d30f27aadb9cdc2a233626631c661e733c33db"
+    },
+    {
+      "signature": "pub fn worker_jobs(ctx: &ViewContext) -> Vec<Job>",
+      "body": "pub fn worker_jobs(ctx: &ViewContext) -> Vec<Job> {\n    if !is_worker(ctx) {\n        return Vec::new();\n    }\n    ctx.db.job().open().filter(true).collect()\n}",
+      "line": 364,
+      "name": "worker_jobs",
+      "source": "spacetimedb/server/src/jobs/mod.rs",
+      "audience_group": "Workers",
+      "access_check": "Real sender owner or worker role",
+      "row_scope": "All open jobs (queued and leased), including other workers leases",
+      "identity": "ctx.sender()",
+      "notes": "Result reducers separately require a valid lease held by the real caller.",
+      "subscriptions": [
+        {
+          "path": "crates/bandit-workers/src/main.rs",
+          "line": 116,
+          "condition": "Production query declaration; runtime delivery not verified"
+        }
+      ],
+      "subscription_status": "requested_in_production_code",
+      "parameters": [],
+      "direct_table_reads": [
+        {
+          "name": "job",
+          "public": false,
+          "source": "spacetimedb/server/src/jobs/mod.rs",
+          "line": 25
+        }
+      ],
+      "migration_view_body_identical": true,
+      "body_sha256": "b8cb8193611873a6758ced654efc8fe9341ab3d924327234882c6a1273e64935"
+    }
+  ]
+}
