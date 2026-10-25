@@ -142,6 +142,7 @@ pub mod fail_job_reducer;
 pub mod file_claim_for_wearer_reducer;
 pub mod file_claim_reducer;
 pub mod file_clinic_report_reducer;
+pub mod finish_plan_lookup_reducer;
 pub mod finish_venue_setup_reducer;
 pub mod force_state_reducer;
 pub mod gateway_table;
@@ -197,6 +198,7 @@ pub mod live_run_type;
 pub mod live_tick_reducer;
 pub mod load_merch_templates_reducer;
 pub mod load_venue_spots_reducer;
+pub mod look_up_plan_reducer;
 pub mod medic_card_type;
 pub mod medic_medical_cards_table;
 pub mod medical_access_log_table;
@@ -240,6 +242,7 @@ pub mod my_merch_suggestions_table;
 pub mod my_owner_table;
 pub mod my_photo_type;
 pub mod my_photos_table;
+pub mod my_plan_lookups_table;
 pub mod my_roles_table;
 pub mod my_shared_visit_type;
 pub mod my_shared_visits_table;
@@ -272,6 +275,9 @@ pub mod photo_type;
 pub mod place_band_reducer;
 pub mod place_booth_reducer;
 pub mod plan_area_type;
+pub mod plan_lookup_result_type;
+pub mod plan_lookup_table;
+pub mod plan_lookup_type;
 pub mod precedent_in_type;
 pub mod property_event_table;
 pub mod property_event_type;
@@ -376,6 +382,11 @@ pub mod venue_spot_table;
 pub mod venue_spot_type;
 pub mod venue_table;
 pub mod venue_type;
+pub mod view_as_people_table;
+pub mod view_as_reducer;
+pub mod viewable_person_type;
+pub mod viewing_as_table;
+pub mod viewing_as_type;
 pub mod vision_assessment_table;
 pub mod vision_assessment_type;
 pub mod visit_table;
@@ -526,6 +537,7 @@ pub use fail_job_reducer::fail_job;
 pub use file_claim_for_wearer_reducer::file_claim_for_wearer;
 pub use file_claim_reducer::file_claim;
 pub use file_clinic_report_reducer::file_clinic_report;
+pub use finish_plan_lookup_reducer::finish_plan_lookup;
 pub use finish_venue_setup_reducer::finish_venue_setup;
 pub use force_state_reducer::force_state;
 pub use gateway_table::*;
@@ -581,6 +593,7 @@ pub use live_run_type::LiveRun;
 pub use live_tick_reducer::live_tick;
 pub use load_merch_templates_reducer::load_merch_templates;
 pub use load_venue_spots_reducer::load_venue_spots;
+pub use look_up_plan_reducer::look_up_plan;
 pub use medic_card_type::MedicCard;
 pub use medic_medical_cards_table::*;
 pub use medical_access_log_table::*;
@@ -624,6 +637,7 @@ pub use my_merch_suggestions_table::*;
 pub use my_owner_table::*;
 pub use my_photo_type::MyPhoto;
 pub use my_photos_table::*;
+pub use my_plan_lookups_table::*;
 pub use my_roles_table::*;
 pub use my_shared_visit_type::MySharedVisit;
 pub use my_shared_visits_table::*;
@@ -656,6 +670,9 @@ pub use photo_type::Photo;
 pub use place_band_reducer::place_band;
 pub use place_booth_reducer::place_booth;
 pub use plan_area_type::PlanArea;
+pub use plan_lookup_result_type::PlanLookupResult;
+pub use plan_lookup_table::*;
+pub use plan_lookup_type::PlanLookup;
 pub use precedent_in_type::PrecedentIn;
 pub use property_event_table::*;
 pub use property_event_type::PropertyEvent;
@@ -760,6 +777,11 @@ pub use venue_spot_table::*;
 pub use venue_spot_type::VenueSpot;
 pub use venue_table::*;
 pub use venue_type::Venue;
+pub use view_as_people_table::*;
+pub use view_as_reducer::view_as;
+pub use viewable_person_type::ViewablePerson;
+pub use viewing_as_table::*;
+pub use viewing_as_type::ViewingAs;
 pub use vision_assessment_table::*;
 pub use vision_assessment_type::VisionAssessment;
 pub use visit_table::*;
@@ -893,6 +915,11 @@ pub enum Reducer {
         file_hash: String,
         call: ModelCallIn,
     },
+    FinishPlanLookup {
+        job_id: u64,
+        result: PlanLookupResult,
+        call: Option<ModelCallIn>,
+    },
     FinishVenueSetup {
         job_id: u64,
         result: VenueSetupResult,
@@ -941,6 +968,14 @@ pub enum Reducer {
     },
     LoadVenueSpots {
         spots: Vec<VenueSpotIn>,
+    },
+    LookUpPlan {
+        kind: String,
+        insurer: String,
+        plan: String,
+        state: String,
+        limit_cents: u64,
+        deductible_cents: u64,
     },
     OpenApiSession {
         token_hash: String,
@@ -1216,6 +1251,10 @@ pub enum Reducer {
         period_start: __sdk::Timestamp,
         period_end: __sdk::Timestamp,
     },
+    ViewAs {
+        viewer: __sdk::Identity,
+        target: __sdk::Identity,
+    },
     WatchBands {
         timer: IncidentWatchTimer,
     },
@@ -1258,6 +1297,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::FileClaim { .. } => "file_claim",
             Reducer::FileClaimForWearer { .. } => "file_claim_for_wearer",
             Reducer::FileClinicReport { .. } => "file_clinic_report",
+            Reducer::FinishPlanLookup { .. } => "finish_plan_lookup",
             Reducer::FinishVenueSetup { .. } => "finish_venue_setup",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
@@ -1271,6 +1311,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::LiveTick { .. } => "live_tick",
             Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
             Reducer::LoadVenueSpots { .. } => "load_venue_spots",
+            Reducer::LookUpPlan { .. } => "look_up_plan",
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
             Reducer::OpenIncident { .. } => "open_incident",
@@ -1332,6 +1373,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::UpsertCamera { .. } => "upsert_camera",
             Reducer::UpsertCoverageRule { .. } => "upsert_coverage_rule",
             Reducer::UpsertInsurancePolicy { .. } => "upsert_insurance_policy",
+            Reducer::ViewAs { .. } => "view_as",
             Reducer::WatchBands { .. } => "watch_bands",
             _ => unreachable!(),
         }
@@ -1533,6 +1575,15 @@ impl __sdk::Reducer for Reducer {
                 file_hash: file_hash.clone(),
                 call: call.clone(),
             }),
+            Reducer::FinishPlanLookup {
+                job_id,
+                result,
+                call,
+            } => __sats::bsatn::to_vec(&finish_plan_lookup_reducer::FinishPlanLookupArgs {
+                job_id: job_id.clone(),
+                result: result.clone(),
+                call: call.clone(),
+            }),
             Reducer::FinishVenueSetup { job_id, result } => {
                 __sats::bsatn::to_vec(&finish_venue_setup_reducer::FinishVenueSetupArgs {
                     job_id: job_id.clone(),
@@ -1614,6 +1665,21 @@ impl __sdk::Reducer for Reducer {
                     spots: spots.clone(),
                 })
             }
+            Reducer::LookUpPlan {
+                kind,
+                insurer,
+                plan,
+                state,
+                limit_cents,
+                deductible_cents,
+            } => __sats::bsatn::to_vec(&look_up_plan_reducer::LookUpPlanArgs {
+                kind: kind.clone(),
+                insurer: insurer.clone(),
+                plan: plan.clone(),
+                state: state.clone(),
+                limit_cents: limit_cents.clone(),
+                deductible_cents: deductible_cents.clone(),
+            }),
             Reducer::OpenApiSession { token_hash } => {
                 __sats::bsatn::to_vec(&open_api_session_reducer::OpenApiSessionArgs {
                     token_hash: token_hash.clone(),
@@ -2108,6 +2174,12 @@ impl __sdk::Reducer for Reducer {
                     period_end: period_end.clone(),
                 },
             ),
+            Reducer::ViewAs { viewer, target } => {
+                __sats::bsatn::to_vec(&view_as_reducer::ViewAsArgs {
+                    viewer: viewer.clone(),
+                    target: target.clone(),
+                })
+            }
             Reducer::WatchBands { timer } => {
                 __sats::bsatn::to_vec(&watch_bands_reducer::WatchBandsArgs {
                     timer: timer.clone(),
@@ -2224,6 +2296,7 @@ pub struct DbUpdate {
     my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
     my_owner: __sdk::TableUpdate<Owner>,
     my_photos: __sdk::TableUpdate<MyPhoto>,
+    my_plan_lookups: __sdk::TableUpdate<PlanLookup>,
     my_roles: __sdk::TableUpdate<StaffRole>,
     my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
     my_visits: __sdk::TableUpdate<MyVisit>,
@@ -2237,6 +2310,7 @@ pub struct DbUpdate {
     person_claim: __sdk::TableUpdate<PersonClaim>,
     photo: __sdk::TableUpdate<Photo>,
     photo_tag: __sdk::TableUpdate<PhotoTag>,
+    plan_lookup: __sdk::TableUpdate<PlanLookup>,
     property_event: __sdk::TableUpdate<PropertyEvent>,
     schedule_slot: __sdk::TableUpdate<ScheduleSlot>,
     settings: __sdk::TableUpdate<Settings>,
@@ -2262,6 +2336,8 @@ pub struct DbUpdate {
     venue_setup: __sdk::TableUpdate<VenueSetup>,
     venue_setup_step: __sdk::TableUpdate<VenueSetupStep>,
     venue_spot: __sdk::TableUpdate<VenueSpot>,
+    view_as_people: __sdk::TableUpdate<ViewablePerson>,
+    viewing_as: __sdk::TableUpdate<ViewingAs>,
     vision_assessment: __sdk::TableUpdate<VisionAssessment>,
     visit: __sdk::TableUpdate<Visit>,
     wallet_entry: __sdk::TableUpdate<WalletEntry>,
@@ -2582,6 +2658,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(my_photos_table::parse_table_update(table_update)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(my_plan_lookups_table::parse_table_update(table_update)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(my_roles_table::parse_table_update(table_update)?),
@@ -2621,6 +2700,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "photo_tag" => db_update
                     .photo_tag
                     .append(photo_tag_table::parse_table_update(table_update)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
+                    .append(plan_lookup_table::parse_table_update(table_update)?),
                 "property_event" => db_update
                     .property_event
                     .append(property_event_table::parse_table_update(table_update)?),
@@ -2696,6 +2778,12 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "venue_spot" => db_update
                     .venue_spot
                     .append(venue_spot_table::parse_table_update(table_update)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(view_as_people_table::parse_table_update(table_update)?),
+                "viewing_as" => db_update
+                    .viewing_as
+                    .append(viewing_as_table::parse_table_update(table_update)?),
                 "vision_assessment" => db_update
                     .vision_assessment
                     .append(vision_assessment_table::parse_table_update(table_update)?),
@@ -2941,6 +3029,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.photo_tag = cache
             .apply_diff_to_table::<PhotoTag>("photo_tag", &self.photo_tag)
             .with_updates_by_pk(|row| &row.id);
+        diff.plan_lookup = cache
+            .apply_diff_to_table::<PlanLookup>("plan_lookup", &self.plan_lookup)
+            .with_updates_by_pk(|row| &row.id);
         diff.property_event = cache
             .apply_diff_to_table::<PropertyEvent>("property_event", &self.property_event)
             .with_updates_by_pk(|row| &row.id);
@@ -2989,6 +3080,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.venue_spot = cache
             .apply_diff_to_table::<VenueSpot>("venue_spot", &self.venue_spot)
             .with_updates_by_pk(|row| &row.id);
+        diff.viewing_as = cache
+            .apply_diff_to_table::<ViewingAs>("viewing_as", &self.viewing_as)
+            .with_updates_by_pk(|row| &row.viewer);
         diff.vision_assessment = cache
             .apply_diff_to_table::<VisionAssessment>("vision_assessment", &self.vision_assessment)
             .with_updates_by_pk(|row| &row.id);
@@ -3092,6 +3186,8 @@ impl __sdk::DbUpdate for DbUpdate {
         );
         diff.my_owner = cache.apply_diff_to_table::<Owner>("my_owner", &self.my_owner);
         diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
+        diff.my_plan_lookups =
+            cache.apply_diff_to_table::<PlanLookup>("my_plan_lookups", &self.my_plan_lookups);
         diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
         diff.my_shared_visits =
             cache.apply_diff_to_table::<MySharedVisit>("my_shared_visits", &self.my_shared_visits);
@@ -3118,6 +3214,8 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.unclaimed_injuries = cache
             .apply_diff_to_table::<UnclaimedInjury>("unclaimed_injuries", &self.unclaimed_injuries);
         diff.venue_plan = cache.apply_diff_to_table::<PlanArea>("venue_plan", &self.venue_plan);
+        diff.view_as_people =
+            cache.apply_diff_to_table::<ViewablePerson>("view_as_people", &self.view_as_people);
         diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
@@ -3432,6 +3530,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3470,6 +3571,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "photo_tag" => db_update
                     .photo_tag
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
@@ -3545,6 +3649,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "venue_spot" => db_update
                     .venue_spot
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -3883,6 +3993,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "my_photos" => db_update
                     .my_photos
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_plan_lookups" => db_update
+                    .my_plan_lookups
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "my_roles" => db_update
                     .my_roles
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -3921,6 +4034,9 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "photo_tag" => db_update
                     .photo_tag
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "plan_lookup" => db_update
+                    .plan_lookup
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "property_event" => db_update
                     .property_event
@@ -3996,6 +4112,12 @@ impl __sdk::DbUpdate for DbUpdate {
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "venue_spot" => db_update
                     .venue_spot
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "view_as_people" => db_update
+                    .view_as_people
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "viewing_as" => db_update
+                    .viewing_as
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "vision_assessment" => db_update
                     .vision_assessment
@@ -4132,6 +4254,7 @@ pub struct AppliedDiff<'r> {
     my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
     my_owner: __sdk::TableAppliedDiff<'r, Owner>,
     my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
+    my_plan_lookups: __sdk::TableAppliedDiff<'r, PlanLookup>,
     my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
     my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
     my_visits: __sdk::TableAppliedDiff<'r, MyVisit>,
@@ -4145,6 +4268,7 @@ pub struct AppliedDiff<'r> {
     person_claim: __sdk::TableAppliedDiff<'r, PersonClaim>,
     photo: __sdk::TableAppliedDiff<'r, Photo>,
     photo_tag: __sdk::TableAppliedDiff<'r, PhotoTag>,
+    plan_lookup: __sdk::TableAppliedDiff<'r, PlanLookup>,
     property_event: __sdk::TableAppliedDiff<'r, PropertyEvent>,
     schedule_slot: __sdk::TableAppliedDiff<'r, ScheduleSlot>,
     settings: __sdk::TableAppliedDiff<'r, Settings>,
@@ -4170,6 +4294,8 @@ pub struct AppliedDiff<'r> {
     venue_setup: __sdk::TableAppliedDiff<'r, VenueSetup>,
     venue_setup_step: __sdk::TableAppliedDiff<'r, VenueSetupStep>,
     venue_spot: __sdk::TableAppliedDiff<'r, VenueSpot>,
+    view_as_people: __sdk::TableAppliedDiff<'r, ViewablePerson>,
+    viewing_as: __sdk::TableAppliedDiff<'r, ViewingAs>,
     vision_assessment: __sdk::TableAppliedDiff<'r, VisionAssessment>,
     visit: __sdk::TableAppliedDiff<'r, Visit>,
     wallet_entry: __sdk::TableAppliedDiff<'r, WalletEntry>,
@@ -4527,6 +4653,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Owner>("my_owner", &self.my_owner, event);
         callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
+        callbacks.invoke_table_row_callbacks::<PlanLookup>(
+            "my_plan_lookups",
+            &self.my_plan_lookups,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
         callbacks.invoke_table_row_callbacks::<MySharedVisit>(
             "my_shared_visits",
@@ -4560,6 +4691,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         );
         callbacks.invoke_table_row_callbacks::<Photo>("photo", &self.photo, event);
         callbacks.invoke_table_row_callbacks::<PhotoTag>("photo_tag", &self.photo_tag, event);
+        callbacks.invoke_table_row_callbacks::<PlanLookup>("plan_lookup", &self.plan_lookup, event);
         callbacks.invoke_table_row_callbacks::<PropertyEvent>(
             "property_event",
             &self.property_event,
@@ -4645,6 +4777,12 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<VenueSpot>("venue_spot", &self.venue_spot, event);
+        callbacks.invoke_table_row_callbacks::<ViewablePerson>(
+            "view_as_people",
+            &self.view_as_people,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ViewingAs>("viewing_as", &self.viewing_as, event);
         callbacks.invoke_table_row_callbacks::<VisionAssessment>(
             "vision_assessment",
             &self.vision_assessment,
@@ -5421,6 +5559,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         my_merch_suggestions_table::register_table(client_cache);
         my_owner_table::register_table(client_cache);
         my_photos_table::register_table(client_cache);
+        my_plan_lookups_table::register_table(client_cache);
         my_roles_table::register_table(client_cache);
         my_shared_visits_table::register_table(client_cache);
         my_visits_table::register_table(client_cache);
@@ -5434,6 +5573,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         person_claim_table::register_table(client_cache);
         photo_table::register_table(client_cache);
         photo_tag_table::register_table(client_cache);
+        plan_lookup_table::register_table(client_cache);
         property_event_table::register_table(client_cache);
         schedule_slot_table::register_table(client_cache);
         settings_table::register_table(client_cache);
@@ -5459,6 +5599,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         venue_setup_table::register_table(client_cache);
         venue_setup_step_table::register_table(client_cache);
         venue_spot_table::register_table(client_cache);
+        view_as_people_table::register_table(client_cache);
+        viewing_as_table::register_table(client_cache);
         vision_assessment_table::register_table(client_cache);
         visit_table::register_table(client_cache);
         wallet_entry_table::register_table(client_cache);
@@ -5563,6 +5705,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "my_merch_suggestions",
         "my_owner",
         "my_photos",
+        "my_plan_lookups",
         "my_roles",
         "my_shared_visits",
         "my_visits",
@@ -5576,6 +5719,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "person_claim",
         "photo",
         "photo_tag",
+        "plan_lookup",
         "property_event",
         "schedule_slot",
         "settings",
@@ -5601,6 +5745,8 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "venue_setup",
         "venue_setup_step",
         "venue_spot",
+        "view_as_people",
+        "viewing_as",
         "vision_assessment",
         "visit",
         "wallet_entry",

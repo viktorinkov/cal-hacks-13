@@ -1,7 +1,7 @@
 //! `plan_lookup`: finds the public wording of a plan an attendee named. Bright Data's search finds the
 //! plan's document, Claude picks it among the results (`plan_find`), the Web Unlocker fetches it, and
 //! Claude reads the insurer, plan and year it prints (`plan_check`). Code keeps only addresses the
-//! search gave, only real PDFs, and only a PDF whose printed insurer and plan share a word with what
+//! search gave, only real PDFs, and only a PDF whose printed insurer and plan hold most of the words
 //! the attendee typed. The PDF goes to the blob store, and the module lands it like an upload.
 
 use std::collections::HashSet;
@@ -181,11 +181,13 @@ fn words(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// A word the attendee typed is in what the document prints. A name with no telling word passes.
-fn shares_a_word(typed: &str, printed: &str) -> bool {
+/// At least half the telling words the attendee typed are in what the document prints, so "Blue
+/// Shield" finds "Blue Shield of California" but not "Anthem Blue Cross". A name with none passes.
+fn names_match(typed: &str, printed: &str) -> bool {
     let typed = words(typed);
     let printed: HashSet<String> = words(printed).into_iter().collect();
-    typed.is_empty() || typed.iter().any(|w| printed.contains(w))
+    let found = typed.iter().filter(|w| printed.contains(*w)).count();
+    found * 2 >= typed.len()
 }
 
 /// Why this PDF is not the attendee's plan, or `None` when it is.
@@ -194,10 +196,10 @@ fn mismatch(p: &Payload, d: &Printed) -> Option<String> {
     if d.document != wanted {
         return Some(format!("it is not a {}", if p.kind == HEALTH { "Summary of Benefits and Coverage" } else { "policy form" }));
     }
-    if d.insurer.is_empty() || !shares_a_word(&p.insurer, &format!("{} {}", d.insurer, d.plan)) {
+    if d.insurer.is_empty() || !names_match(&p.insurer, &format!("{} {}", d.insurer, d.plan)) {
         return Some(format!("it is from {:?}, not {:?}", d.insurer, p.insurer));
     }
-    if d.plan.is_empty() || !shares_a_word(&p.plan, &d.plan) {
+    if d.plan.is_empty() || !names_match(&p.plan, &d.plan) {
         return Some(format!("it is for {:?}, not {:?}", d.plan, p.plan));
     }
     None
