@@ -199,11 +199,23 @@ struct Looked {
     pdfs: usize,
 }
 
+/// One search, asked once more when it gives no web address: a search now and then comes back empty.
+async fn search(bd: &BrightData, q: &str) -> Result<String, JobError> {
+    let r = bd.search(q).await?;
+    if !urls_in(&r).is_empty() {
+        return Ok(r);
+    }
+    tracing::info!(query = q, chars = r.len(), "search gave no web address, asking again");
+    bd.search(q).await
+}
+
 async fn look_for(ctx: &Ctx, bd: &BrightData, p: &Payload, part: Part<'_>, calls: &mut Vec<bandit_bindings::ModelCallIn>) -> Result<Looked, JobError> {
     let mut results = String::new();
+    let mut sizes = Vec::new();
     let queries = queries(p, part);
     for q in &queries {
-        let r = bd.search(q).await?;
+        let r = search(bd, q).await?;
+        sizes.push(r.len().to_string());
         results.push_str(&format!("<search query={q:?}>\n{}\n</search>\n", r.chars().take(MAX_SEARCH_CHARS / queries.len()).collect::<String>()));
     }
     let urls = urls_in(&results);
@@ -216,7 +228,9 @@ async fn look_for(ctx: &Ctx, bd: &BrightData, p: &Payload, part: Part<'_>, calls
         tries.checked.map_err(|e| JobError { error: e.join("; "), calls: std::mem::take(calls) })?
     };
     let mut looked = Looked { found: None, notes: Vec::new(), pdfs: 0 };
-    if picked.is_empty() {
+    if urls.is_empty() {
+        looked.notes.push(format!("the searches gave no web addresses ({} characters back)", sizes.join(" and ")));
+    } else if picked.is_empty() {
         looked.notes.push("the search found no copy of it".into());
     }
     for url in &picked {
