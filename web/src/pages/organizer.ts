@@ -8,7 +8,7 @@
 // decides the claims afterwards.
 
 import {
-  act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
+  act, complicated, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
   signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
 } from '../lib';
 import { bandCode } from '../band-code';
@@ -20,6 +20,7 @@ import { venueSetupTab } from '../venue-setup';
 import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { matches, redrawOnSearch, searchWords, searchable } from '../table-search';
+import { keepTableHeights } from '../resize';
 import { defineTerms } from '../terms';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -74,6 +75,7 @@ const QUERIES = [
   'SELECT * FROM incident_marker',
   'SELECT * FROM decision',
   'SELECT * FROM band_place',
+  'SELECT * FROM venue_spot',
   'SELECT * FROM view_as_people',
 ];
 
@@ -828,6 +830,7 @@ async function fileRecord(claimId: bigint, form: HTMLFormElement) {
 const noLearn = new Set<bigint>();
 
 function decide(c: Claim) {
+  const gap = complicated(c);
   const approve = async (e: Event) => {
     e.preventDefault();
     const f = e.target as HTMLFormElement;
@@ -835,7 +838,7 @@ function decide(c: Claim) {
     await act(() => conn.reducers.approveClaim({
       claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash,
       requestedCeilingCents: ceiling ? BigInt(Math.round(Number(ceiling) * 100)) : undefined,
-      learn: !noLearn.has(c.id),
+      learn: !gap && !noLearn.has(c.id),
     }));
   };
   const refuse = async (e: Event) => {
@@ -845,9 +848,11 @@ function decide(c: Claim) {
   };
   return h('div', {},
     h('form', { onsubmit: approve },
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
-        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims are paid on their own'),
-      h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' })),
+      gap
+        ? h('p', { class: 'muted' }, 'A gap in the policy is decided one by one, so this teaches no rule. Your decision is shown on the next claim with the same gap.')
+        : [h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
+            onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims are paid on their own'),
+          h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' }))],
       h('button', {}, `Approve paying ${money(c.payoutCents)} to ${payee(c)}`)),
     h('form', { onsubmit: refuse },
       h('input', { name: 'reason', placeholder: 'Reason for refusing', required: true }),
@@ -1293,6 +1298,7 @@ function render() {
   const body = tab === 'attendees' ? attendees() : tab === 'claims' ? claimsTab() : tab === 'costs' ? costsTab(conn, id => { tab = 'claims'; location.hash = 'claims'; showClaim(id); }) : tab === 'graph' ? graphTab(conn) : tab === 'photos' ? photosTab() : tab === 'merch' ? merchTab() : tab === 'venue' ? venueSetupTab(conn, can('ops')) : tab === 'kibana' ? kibana() : tab === 'bands' ? bandsTab() : tab === 'staff' ? staffTab() : tab === 'viewas' ? viewAsTab() : [live(), personPanel(people)];
   mount('app', body);
   if (tab === 'claims' || tab === 'costs') defineTerms(document.getElementById('app')!);
+  keepTableHeights(document.getElementById('app')!);
   if (scrollToClaim) {
     scrollToClaim = false;
     document.getElementById('claim-detail')?.scrollIntoView({ block: 'start' });

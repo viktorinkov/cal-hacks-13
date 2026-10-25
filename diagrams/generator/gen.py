@@ -495,13 +495,12 @@ def insurance(y0):
 
     # 7. complications: each gap or mismatch in the policies is its own card, decided one by one
     ct = r3 + 165 + 120
-    cw, chh, gap = 540, 190, 24
+    cw, chh, gap = 798, 190, 24
     cards = (("no policy covers it\nno cover for incident", SHIELD), ("bill over limit\nabove $5,000 per claim", FILE),
-             ("service not listed\nnot on fee schedule", FILE), ("policies disagree\nwho pays first", HEART),
-             ("clauses conflict\ncover vs exclusion", HAMMER))
-    cz = Z(1240, ct, 3 * cw + 4 * gap, 70 + 2 * chh + gap + 30, "    complications", "rust")  # the label clears the step badge
+             ("policies disagree\nwho pays first", HEART), ("clauses conflict\ncover vs exclusion", HAMMER))
+    cz = Z(1240, ct, 2 * cw + 3 * gap, 70 + 2 * chh + gap + 30, "    complications", "rust")  # the label clears the step badge
     for i, (label, icon) in enumerate(cards):
-        B(1240 + gap + (i % 3) * (cw + gap), ct + 70 + (i // 3) * (chh + gap), label, "note", w=cw, h=chh,
+        B(1240 + gap + (i % 2) * (cw + gap), ct + 70 + (i // 2) * (chh + gap), label, "note", w=cw, h=chh,
           wordmark=icon, mark_h=70, **mk)
 
     # 8. the organizer decides complicated claims one by one, and whatever else the guard holds
@@ -513,7 +512,7 @@ def insurance(y0):
                 mark_h=90, cy=r4, **mk)
     rules = B(1240, 0, "learned rules\nversion, approver", "stdb", w=640, h=220, wordmark=STDB, mark_h=50,
               cy=L(org.y) + org.h * 0.72, **mk)
-    history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",
+    history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls, precedents", "stdb",
                 w=3860, h=200, wordmark=STDB, mark_h=50, **mk)
     gx = (guard.x + cz.right) / 2
     V(guard, cz, "policy gap", x=gx)
@@ -524,12 +523,12 @@ def insurance(y0):
     R(payout, "r", insurer, "l", [(payout.right + 110, payout.y + payout.h * 0.85), (payout.right + 110, insurer.cy)],
       label="health plan share", seg=1, fa=0.85)
     R(org, "l", refused, "l", [(1150, org.y + 80), (1150, refused.cy)], label="refuses", seg=1, fa=80 / org.h)
-    teach = H(org, rules, "teaches a rule", dashed=True, color="#2b8a3e", y=rules.cy)
+    teach = H(org, rules, "teaches a rule\nnever from a gap", dashed=True, color="#2b8a3e", y=rules.cy)
     teach["strokeWidth"] = 4
     top = guard.y - 65  # the rule ceiling runs above the refused card and into the guard from the left
     R(rules, "l", guard, "l", [(1080, rules.cy), (1080, top), (2300, top), (2300, guard.y + 90)],
       label="rule ceiling", seg=2, fb=90 / guard.h, dashed=True, color="#2b8a3e")
-    V(history, org, "shows", x=org.cx)
+    V(history, org, "shows last precedent\nnever applied", x=org.cx)
     for box, n in ((venue_pdf, 1), (ingest, 2), (reader, 3), (claim, 4), (pack, 5), (split, 6), (claude, 7),
                    (guard, 8), (cz, 9), (org, 10), (payout, 11)):
         badge(box, n)

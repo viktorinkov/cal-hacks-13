@@ -336,7 +336,7 @@ fn approve_larger_fall(w: &World) -> Claim {
     w.claude_pays(claim.id);
     let c = w.claim(claim.id);
     assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
-    assert_eq!(c.status_note, "Complication: the policy's fee schedule does not list 90715. Claude would pay $895.00");
+    assert!(c.status_note.starts_with("Claude would pay $895.00"), "{}", c.status_note);
     assert_eq!((c.routed_to_role.as_str(), c.routed_to_name.as_str(), c.routed_to), ("ops", "Organizer", Identity::ZERO));
 
     let stale = w.try_as("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, "0".repeat(64), None, true));
@@ -394,6 +394,44 @@ fn small_fall_settles_automatically_under_the_learned_rule() {
     let account = w.t.db.claimant_account().identity().find(id("Maya Chen")).unwrap();
     assert_eq!(account.account_id, "acct-1");
     assert_eq!(w.t.db.approval().claim_id().filter(c.id).count(), 0);
+}
+
+/// A gap in the policy is decided one by one: approving Jordan's claim over the
+/// per-claim limit teaches no rule, and Maya's claim over the same limit shows
+/// that decision to the organizer without applying it.
+#[test]
+fn a_claim_over_the_policy_limit_teaches_no_rule_and_shows_the_last_decision() {
+    let w = World::new();
+    w.as_("ops", |ctx| upsert_coverage_rule(ctx, "GL-2026-04417".into(), "medical_payments".into(), vec!["sos".into(), "fall".into()], 15_000, 2_500_000, 0, 365, true));
+    let incident = w.fall(7, 101, &[(2, 101), (4, 101), (9, 101)]);
+    let jordan = w.injury_claim(incident).id;
+    w.file_record(jordan, URGENT_CARE, 2);
+    w.verify(jordan);
+    w.claude_pays(jordan);
+    let c = w.claim(jordan);
+    assert_eq!(c.status, ClaimStatus::Routed, "{}", c.status_note);
+    assert_eq!(c.status_note, "Complication: the covered cost $895.00 is over the policy's limit, which pays at most $150.00. Claude would pay $150.00");
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, true));
+    w.pay(jordan);
+    assert_eq!(w.claim(jordan).status, ClaimStatus::Settled);
+    assert_eq!(w.t.db.settlement_rule().iter().count(), 0, "a gap in the policy teaches no rule");
+    assert!(w.history(jordan).contains(&("organizer".into(), "Precedent, over the policy's limit: approved $150.00 for Jordan Alvarez".into())));
+
+    w.advance(3600);
+    let incident = w.fall(3, 101, &[(1, 101), (5, 101)]);
+    let maya = w.injury_claim(incident).id;
+    w.file_record(maya, FIRST_AID, 1);
+    w.verify(maya);
+    w.claude_pays(maya);
+    let c = w.claim(maya);
+    assert_eq!(c.status, ClaimStatus::Routed, "the precedent is shown, never applied: {}", c.status_note);
+    assert_eq!(
+        c.status_note,
+        format!(
+            "Complication: the covered cost $180.00 is over the policy's limit, which pays at most $150.00. Claude would pay $150.00. \
+             Precedent, not applied: Ops desk approved $150.00 for Jordan Alvarez (claim {jordan})"
+        )
+    );
 }
 
 #[test]

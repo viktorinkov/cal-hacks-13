@@ -44,8 +44,8 @@ pub enum Decision {
 }
 
 /// First match wins:
-/// 1. a complication (no cover, a bill over the policy's limit, a service the
-///    fee schedule does not list) -> `Route("Complication: " + every one)`;
+/// 1. a complication (no cover, a bill over the policy's limit) ->
+///    `Route("Complication: " + every one)`;
 /// 2. `Disputed` -> `Refuse("evidence disputed: " + names of failed checks, comma-joined)`;
 /// 3. payout 0 -> `Refuse("payout is zero after limits")`;
 ///    payout below the cover's minimum -> `Route("payout below the policy's minimum of $X")`;
@@ -65,7 +65,7 @@ pub fn decide(input: &DecisionInput) -> Decision {
     let route = |reason: String| Decision::Route { reason };
     let payout = input.amounts.payout_cents;
 
-    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts });
     if !found.is_empty() {
         return route(reason("", &found));
     }

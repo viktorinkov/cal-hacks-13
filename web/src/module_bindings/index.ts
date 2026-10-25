@@ -51,6 +51,7 @@ import ClaimBandReducer from "./claim_band_reducer";
 import ClaimJobReducer from "./claim_job_reducer";
 import ClaimPersonReducer from "./claim_person_reducer";
 import ClearReducer from "./clear_reducer";
+import CloseClaimWithoutInjuryReducer from "./close_claim_without_injury_reducer";
 import CommandSentReducer from "./command_sent_reducer";
 import CompleteJobReducer from "./complete_job_reducer";
 import ConfirmMedicalCardReducer from "./confirm_medical_card_reducer";
@@ -1164,6 +1165,7 @@ const reducersSchema = __reducers(
   __reducerSchema("claim_job", ClaimJobReducer),
   __reducerSchema("claim_person", ClaimPersonReducer),
   __reducerSchema("clear", ClearReducer),
+  __reducerSchema("close_claim_without_injury", CloseClaimWithoutInjuryReducer),
   __reducerSchema("command_sent", CommandSentReducer),
   __reducerSchema("complete_job", CompleteJobReducer),
   __reducerSchema("confirm_medical_card", ConfirmMedicalCardReducer),
