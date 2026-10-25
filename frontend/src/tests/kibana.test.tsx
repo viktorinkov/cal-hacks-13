@@ -45,12 +45,12 @@ describe('kibana page', () => {
       }
     }
     expect(count).toBe(14)
-    expect(screen.getByText('Elastic, the Evidence Engine')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kibana' })).toBeInTheDocument()
   })
 
   it('names the views without links when the host has no Kibana address', async () => {
     render(<RouteProvider><KibanaPage /></RouteProvider>)
-    expect(await screen.findByText('This host has no Kibana address, so the views below cannot open.')).toBeInTheDocument()
+    expect(await screen.findByText('No Kibana address on this host.')).toBeInTheDocument()
     expect(screen.getByText('Band radio and photos')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Band radio and photos' })).not.toBeInTheDocument()
   })

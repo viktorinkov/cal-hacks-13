@@ -148,13 +148,10 @@ fn invalid_actions_and_repeated_actions_do_not_create_extra_incidents() {
 }
 
 #[test]
-fn offline_departed_and_unplaced_bots_are_rejected() {
+fn unplaced_and_departed_bots_are_rejected() {
     let w = World::new();
     let band = w.t.db.band().id().find(1000).unwrap();
-    w.t.db.band().id().update(Band { online: false, ..band });
-    assert!(w.action("ops", 1000, "injury").is_err());
-    let band = w.t.db.band().id().find(1000).unwrap();
-    w.t.db.band().id().update(Band { online: true, zone: 0, ..band });
+    w.t.db.band().id().update(Band { zone: 0, ..band });
     assert!(w.action("ops", 1000, "injury").is_err());
     let band = w.t.db.band().id().find(1000).unwrap();
     w.t.db.band().id().update(Band { zone: 101, ..band });
@@ -167,16 +164,14 @@ fn offline_departed_and_unplaced_bots_are_rejected() {
 }
 
 #[test]
-fn paused_evacuating_and_ended_runs_are_rejected() {
+fn staging_does_not_need_a_running_event() {
     let w = World::new();
+    w.t.db.live_run().id().delete(0);
+    let band = w.t.db.band().id().find(1000).unwrap();
+    w.t.db.band().id().update(Band { online: false, ..band });
     w.t.db.live_pause().insert(LivePause { id: 0, paused_at: w.t.clock.now(), paused_by: identity("ops") });
-    assert!(w.action("ops", 1000, "injury").is_err());
-    w.t.db.live_pause().id().delete(0);
+    w.action("ops", 1000, "injury").unwrap();
     w.t.db.live_evacuation().insert(LiveEvacuation { id: 0, started_at: w.t.clock.now(), started_by: identity("ops") });
-    assert!(w.action("ops", 1000, "injury").is_err());
-    w.t.db.live_evacuation().id().delete(0);
-    let run = w.t.db.live_run().id().find(0).unwrap();
-    w.t.db.live_run().id().update(LiveRun { phase: LivePhase::Ended, ..run });
-    assert!(w.action("ops", 1000, "injury").is_err());
-    assert_eq!(w.t.db.incident().iter().count(), 0);
+    w.action("ops", 1001, "theft").unwrap();
+    assert_eq!(w.t.db.incident().iter().count(), 2);
 }

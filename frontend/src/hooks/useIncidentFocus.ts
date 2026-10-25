@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { demoEntrance, useDemoRing } from '@/booth/demoRing'
-import { scriptedIncidentId, useHallDemo } from '@/booth/hallDemo'
 import { mapController } from '@/map/controller'
 import { useUi } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
@@ -29,18 +27,14 @@ export function useIncidentFocus(): string {
       seen.current.clear()
       located.current.clear()
     }
-    const rehearsal = scriptedIncidentId()
     for (const inc of list) {
-      // A rehearsal owns the camera. A crowd fall must not jump the map away from it.
-      if (rehearsal && inc.incidentId !== rehearsal) continue
       if (!seen.current.has(inc.incidentId)) {
         seen.current.add(inc.incidentId)
         if (inc.status !== 'resolved') useUi.getState().select({ kind: 'incident', id: inc.incidentId })
       }
       // fly in when the location first arrives, and again when the camera confirms it
       const key = `${inc.incidentId}:${inc.localizationStatus}`
-      const showingPath = useHallDemo.getState().pathOpen || (useHallDemo.getState().scripted && useHallDemo.getState().acknowledged)
-      if (!showingPath && inc.status !== 'resolved' && inc.location && !located.current.has(key)) {
+      if (inc.status !== 'resolved' && inc.location && !located.current.has(key)) {
         located.current.add(key)
         mapController.focusIncident(inc.incidentId)
       }
@@ -63,15 +57,6 @@ export function useIncidentFocus(): string {
   // a path was previewed: show the whole corridor with the person at its end
   useEffect(() => {
     for (const c of Object.values(commands)) {
-      if (c.corridorId === 'COR-DEMO') {
-        const stamp = useHallDemo.getState().startedAt
-        const key = `${c.commandId}:${stamp}:${c.approvalStatus}`
-        if (framed.current.has(key)) continue
-        framed.current.add(key)
-        const ring = useDemoRing.getState()
-        mapController.frame([demoEntrance(), { x: ring.x, y: ring.y }], 18)
-        continue
-      }
       if (c.approvalStatus !== 'pending_approval' || framed.current.has(c.commandId)) continue
       framed.current.add(c.commandId)
       const corridor = venue?.responderCorridors.find((x) => x.corridorId === c.corridorId)

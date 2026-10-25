@@ -5,8 +5,6 @@
  */
 import { toast } from 'sonner'
 import type { GuidanceCommand, Incident, ResolutionReason } from '@/contracts/domain'
-import { HALL_PATH, scriptedIncidentId } from '@/booth/hallDemo'
-import { guideHallAcknowledge, guideHallClosePath, guideHallPath, guideHallResolve } from '@/booth/hallGuide'
 import { useCatalog } from '@/stdb/catalog'
 import { addIncidentNote, assignMedic, ensureIncident, incidentForBand, resolveModuleIncident, useDesk } from '@/stdb/deskOps'
 import { useSession } from '@/stdb/session'
@@ -59,9 +57,8 @@ function mergeCommand(c: GuidanceCommand | null): GuidanceCommand | null {
   return c
 }
 
-/** A live band incident. The rehearsal's stand-in keeps the local guide and never calls the module. */
+/** A live band incident. */
 export function isModuleIncident(incidentId: string): boolean {
-  if (incidentId === scriptedIncidentId()) return false
   return /^\d+$/.test(incidentId) || /^live-\d+$/.test(incidentId)
 }
 
@@ -113,10 +110,6 @@ const RESOLUTION: Record<ResolutionReason, string> = {
 }
 
 export async function acknowledgeIncident(incidentId: string): Promise<Incident | null> {
-  if (incidentId === scriptedIncidentId()) {
-    guideHallAcknowledge()
-    return useWorld.getState().incidents[incidentId] ?? null
-  }
   if (isModuleIncident(incidentId)) {
     const res = await run(pendingKey.ack(incidentId), 'Not acknowledged. The incident is still open.', async () => {
       const id = await moduleId(incidentId)
@@ -133,7 +126,6 @@ export async function acknowledgeIncident(incidentId: string): Promise<Incident 
 }
 
 export async function resolveIncident(incidentId: string, reason: ResolutionReason): Promise<Incident | null> {
-  if (incidentId === scriptedIncidentId()) return guideHallResolve()
   if (isModuleIncident(incidentId)) {
     return run(pendingKey.resolve(incidentId), 'Not resolved. The incident is still open.', async () => {
       const id = await moduleId(incidentId)
@@ -168,10 +160,6 @@ export async function noteIncidentPath(incidentId: string, note: string, costDol
 }
 
 export async function previewGuidance(incidentId: string, corridorId?: string): Promise<GuidanceCommand | null> {
-  if (incidentId === scriptedIncidentId()) {
-    guideHallAcknowledge()
-    return useWorld.getState().commands[HALL_PATH] ?? null
-  }
   if (isModuleIncident(incidentId)) return null
   const res = await run(pendingKey.preview(incidentId), 'Could not preview a path.', () =>
     getAdapter()!.previewGuidance({ incidentId, corridorId }),
@@ -180,16 +168,11 @@ export async function previewGuidance(incidentId: string, corridorId?: string): 
 }
 
 export async function approveGuidance(commandId: string): Promise<GuidanceCommand | null> {
-  if (commandId === HALL_PATH) {
-    guideHallPath()
-    return useWorld.getState().commands[HALL_PATH] ?? null
-  }
   const res = await run(pendingKey.approve(commandId), 'Not sent. No band has changed.', () => getAdapter()!.approveGuidance(commandId))
   return mergeCommand(res)
 }
 
 export async function cancelGuidance(commandId: string): Promise<GuidanceCommand | null> {
-  if (commandId === HALL_PATH) return mergeCommand(guideHallClosePath())
   const res = await run(pendingKey.cancel(commandId), 'Could not stop the signals.', () => getAdapter()!.cancelGuidance(commandId))
   return mergeCommand(res)
 }

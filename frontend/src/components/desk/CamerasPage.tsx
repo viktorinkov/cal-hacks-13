@@ -74,11 +74,11 @@ export function LaptopCamera() {
           <p className="mt-1 text-[13px] text-ink-dim">Local preview on this laptop</p>
         </div>
         <span role="status" className="rounded-full bg-ground px-3 py-1 text-[12px] text-ink">
-          {status === 'live' ? 'Live' : status === 'starting' ? 'Waiting for camera' : 'Camera off'}
+          {status === 'live' ? 'On' : status === 'starting' ? 'Waiting for camera' : 'Camera off'}
         </span>
       </div>
       <div className="relative aspect-video bg-black">
-        <video ref={video} autoPlay muted playsInline aria-hidden={status !== 'live'} aria-label="Live laptop camera preview" className="h-full w-full object-contain" />
+        <video ref={video} autoPlay muted playsInline aria-hidden={status !== 'live'} aria-label="Laptop camera preview" className="h-full w-full object-contain" />
         {status !== 'live' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center text-ink-muted">
             <Camera size={32} aria-hidden />
@@ -232,7 +232,7 @@ function VenueCameras() {
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-[15px] text-ink">{camera.name}</h3>
                 <span className="rounded-full bg-ground px-2.5 py-0.5 text-[12px] text-ink">
-                  {camera.live ? 'Live' : 'Off'}
+                  {camera.live ? 'On' : 'Off'}
                 </span>
               </div>
               <p className="mt-1.5 text-[13px] text-ink-dim">

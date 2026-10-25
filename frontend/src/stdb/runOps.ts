@@ -86,6 +86,7 @@ export interface RunBand {
   neigh: number
   sos: boolean
   fall: boolean
+  hasPosition: boolean
 }
 
 export interface RunZone {
@@ -384,6 +385,7 @@ const READERS: Record<string, (db: Db) => Partial<RunState>> = {
       neigh: num(row.neigh),
       sos: row.sos === true,
       fall: row.fall === true,
+      hasPosition: Number.isFinite(Number(row.xM)) && Number.isFinite(Number(row.yM)),
     })),
   }),
   zone: (db) => ({

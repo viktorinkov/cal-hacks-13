@@ -20,7 +20,7 @@ import {
 import { useSession } from '@/stdb/session'
 import { Refusal, Section, TwoStep, field, pill } from './parts'
 
-const RUN_KEYS = ['start', 'pause', 'resume', 'evacuate', 'end', 'end-event', 'reopen', 'crowd', 'lowvis']
+export const RUN_KEYS = ['start', 'pause', 'resume', 'evacuate', 'end', 'end-event', 'reopen', 'crowd', 'lowvis']
 
 /** The run's state, word for word as the dev portal's run table. */
 export function RunStatus({ summary }: { summary: RunSummary }) {
@@ -54,7 +54,7 @@ export function RunStatus({ summary }: { summary: RunSummary }) {
   )
 }
 
-function StartForm() {
+export function StartForm() {
   const busy = useRun((s) => s.busy)
   const [crowd, setCrowd] = useState(String(RUN_DEFAULTS.crowd))
   const [minutes, setMinutes] = useState(String(RUN_DEFAULTS.minutes))
@@ -109,7 +109,7 @@ function StartForm() {
   )
 }
 
-function LiveControls({ summary }: { summary: RunSummary }) {
+export function LiveControls({ summary }: { summary: RunSummary }) {
   const busy = useRun((s) => s.busy)
   const lowVis = useRun((s) => s.lowVis)
   const running = summary.phase === 'running'
@@ -160,7 +160,7 @@ function LiveControls({ summary }: { summary: RunSummary }) {
 }
 
 /** The crowd's backend ticker, and the event's own end when no run is live. */
-function EventExtras({ summary }: { summary: RunSummary }) {
+export function EventExtras({ summary }: { summary: RunSummary }) {
   const busy = useRun((s) => s.busy)
   const ended = useSession((s) => s.eventEnded)
   const crowd = summary.crowd || RUN_DEFAULTS.crowd
@@ -207,6 +207,8 @@ function EventExtras({ summary }: { summary: RunSummary }) {
 
 /** The run table and, for organizers, the controls: start, pause, evacuate, end. */
 export function RunControls({ summary, ops }: { summary: RunSummary; ops: boolean }) {
+  const ended = useSession((s) => s.eventEnded)
+  if (ended) return null
   return (
     <Section id="run-heading" title="Event run">
       <div className="desk-card grid gap-8 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">

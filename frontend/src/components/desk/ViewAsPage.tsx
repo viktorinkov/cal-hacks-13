@@ -20,7 +20,7 @@ function OwnerView() {
   const viewed = people.find((person) => person.key === key)
   const target = viewed?.hex ?? ''
   const needle = query.trim().toLowerCase()
-  const matches = people.filter((person) => !needle || `${person.name} ${person.role} ${person.bandId}`.toLowerCase().includes(needle)).slice(0, 12)
+  const matches = people.filter((person) => !needle || `${person.name} ${person.role} ${person.bandId} ${person.bandId ? bandCode(person.bandId) : ''}`.toLowerCase().includes(needle))
 
   useLayoutEffect(() => {
     const host = window as ViewerHost
@@ -35,8 +35,11 @@ function OwnerView() {
 
   return <DeskFrame motif="viewas" title="View as" sentence="See a person’s pages with their live data. The view is read-only.">
     {!owner ? <p className="text-[15px] text-ink">Only the owner can view the event as someone else.</p> : <>
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, role, or band" aria-label="Find a person" className="w-full max-w-sm border-b border-line bg-transparent py-1 text-[14px] text-ink outline-none placeholder:text-ink-muted" />
-      <ul className="mt-3 flex max-w-lg flex-col" aria-label="People">
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, role, or band" aria-label="Find a person" className="w-full max-w-sm border-b border-line bg-transparent py-1 text-[14px] text-ink outline-none placeholder:text-ink-muted" />
+        <p className="text-[13px] text-ink-dim">{needle ? `${matches.length.toLocaleString('en-US')} of ${people.length.toLocaleString('en-US')} people` : `${people.length.toLocaleString('en-US')} people`}</p>
+      </div>
+      <ul className="mt-3 flex max-h-[60vh] max-w-lg flex-col overflow-y-auto" aria-label="People">
         {matches.map((person) => <li key={person.key}><button type="button" onClick={() => { setKey(person.key); setScreen(personScreens(person)[0][0]) }} className="flex w-full items-baseline justify-between gap-4 py-2 text-left text-[14px] hover:text-champagne">
           <span className="text-ink">{person.name || 'Unnamed'}</span><span className="text-[13px] text-ink-dim">{`${person.role}${person.bandId ? ` · band ${bandCode(person.bandId)}` : ''}${person.crowd ? ' · crowd' : ''}`}</span>
         </button></li>)}

@@ -31,7 +31,7 @@ beforeEach(() => {
       { nodeId: '400', displayName: 'Jordan Alvarez', bandId: 100, crowd: true, organization: '' },
       { nodeId: '401', displayName: 'Nia Patel', bandId: 101, crowd: false, organization: '' },
     ],
-    bands: [100, 101].map((id) => ({ id, online: true, lastSeen: 10, zone: 2, neigh: 0, sos: false, fall: false })),
+    bands: [100, 101].map((id) => ({ id, online: true, lastSeen: 10, zone: 2, neigh: 0, sos: false, fall: false, hasPosition: true })),
     zones: [{ id: '9', name: 'Sponsor booths', stationId: 2, capacity: 100, exitColour: 0, xM: 1, yM: 2 }],
   })
   useUi.setState({ selection: { kind: 'device', id: 'band-100' } })
@@ -78,9 +78,18 @@ describe('selected person actions', () => {
   })
 
   it.each([
-    ['paused', { pausedAt: 1 }, 'Resume'],
-    ['evacuating', { evacuatingAt: 1 }, 'evacuation'],
-    ['offline', { bands: [] }, 'offline'],
+    ['paused', { pausedAt: 1 }],
+    ['evacuating', { evacuatingAt: 1 }],
+    ['ended', { eventEnded: true, run: null }],
+  ])('still stages an action while %s', async (_state, values) => {
+    useRun.setState(values)
+    showPerson()
+    await userEvent.click(screen.getByRole('button', { name: 'Gets injured' }))
+    expect(stageCrowdAction).toHaveBeenCalledExactlyOnceWith({ bandId: 100, action: 'injury' })
+  })
+
+  it.each([
+    ['unplaced', { bands: [] }, 'recorded place'],
     ['disconnected', { linked: false }, 'connection'],
   ])('blocks actions while %s', async (_state, values, reason) => {
     useRun.setState(values)

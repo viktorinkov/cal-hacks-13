@@ -13,7 +13,7 @@ function NightHeader() {
       </button>
       <nav aria-label="Night" className="flex items-baseline gap-5 text-[14px]">
         <button type="button" onClick={() => go('/')} className="text-ink-dim hover:text-ink">
-          Live
+          Map
         </button>
       </nav>
     </header>

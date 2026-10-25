@@ -422,6 +422,13 @@ describe('run page', () => {
     page()
     const banner = within(screen.getByRole('region', { name: 'Event ended' }))
     expect(banner.getByText(/The event ended at/)).toBeInTheDocument()
+    // The ended card is the event's controller: the venue's numbers and every control.
+    expect(banner.getByText('Attendees')).toBeInTheDocument()
+    expect(banner.getByText('Zones')).toBeInTheDocument()
+    expect(banner.getByRole('button', { name: 'Start the event' })).toBeInTheDocument()
+    expect(banner.getByRole('button', { name: 'Resume the crowd' })).toBeInTheDocument()
+    expect(banner.getByRole('button', { name: 'Dim the hall' })).toBeInTheDocument()
+    expect(banner.queryByRole('button', { name: 'End the event' })).not.toBeInTheDocument()
     await user.click(banner.getByRole('button', { name: 'Reopen the event' }))
     expect(calls.reopenEvent).toHaveBeenCalledWith({})
   })

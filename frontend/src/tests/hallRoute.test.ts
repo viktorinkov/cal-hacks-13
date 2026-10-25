@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_DEMO_RING, demoEntrance, demoRoute } from '@/booth/demoRing'
 import { onStair } from '@/booth/hallRoute'
 import { calhacksVenue } from '@/mock/calhacks'
-import { floorUse } from '@/mock/calhacksCrowd'
+import { floorUse } from '@/mock/floorUse'
 import { pointInPolygon } from '@/lib/geometry'
 
 function samples(points: { x: number; y: number }[]): { x: number; y: number }[] {

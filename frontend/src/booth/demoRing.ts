@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { FloorBand } from '@/stdb/floor'
-import type { Device, GuidanceCommand, Incident, LedPattern, Vec2 } from '@/contracts/domain'
+import type { Device, Incident, LedPattern, Vec2 } from '@/contracts/domain'
 import { routeToRing } from '@/booth/hallRoute'
 import { calhacksVenue } from '@/mock/calhacks'
 import { boothHandle } from './circle'
@@ -287,34 +287,6 @@ export function withDemoIncidents(open: Incident[], bands: FloorBand[], ring: Pi
     })
   }
   return moved
-}
-
-/** Drawn locally. Nothing here is sent to a wristband. The firmware already lit the neighbours. */
-export function demoCommand(lengthM: number): GuidanceCommand {
-  return {
-    commandId: 'demo-path',
-    corridorId: 'COR-DEMO',
-    targetZoneIds: [],
-    targetDeviceIds: [],
-    targets: [],
-    patternCode: 'step_aside',
-    reason: 'Clear a path from the entrance to the test ring',
-    preview: {
-      corridorId: 'COR-DEMO',
-      corridorName: 'Entrance to the test ring',
-      lengthM,
-      groups: [],
-      advisoryCode: '',
-      alternativeCorridorIds: [],
-    },
-    approvalStatus: 'approved',
-    createdAt: 0,
-    expiresAt: 0,
-    deliveryStatus: 'delivered',
-    acknowledgedDevices: [],
-    failedDevices: [],
-    isSimulated: true,
-  }
 }
 
 interface HardwareState {

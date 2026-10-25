@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { RunBar } from '@/components/run/RunBar'
 import { EventClose } from './EventClose'
 
 const MARK = {
@@ -27,6 +28,7 @@ export function DeskFrame({ motif, title, sentence, figures, children }: { motif
     <div data-motif={motif} className="desk-night h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1360px] px-5 py-6 md:px-10 md:py-8">
         <EventClose />
+        <RunBar />
         {(title || sentence) && (
           <div className="desk-head mt-8">
             <p className="desk-mark" aria-hidden="true">{MARK[motif]}</p>
