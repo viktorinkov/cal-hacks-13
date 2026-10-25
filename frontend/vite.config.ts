@@ -25,6 +25,15 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  build: {
+    // home.html is the public front page at band1t.vip/; it ships without the command center's bundle.
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        home: fileURLToPath(new URL('./home.html', import.meta.url)),
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: false,
