@@ -282,10 +282,10 @@ function handles(value: unknown): Handle[] {
   })
 }
 
-/** The crowd demo's stick-figure illustration, also stored once as a blob. */
+/** The crowd run's stick-figure illustration, also stored once as a blob. */
 const PLACEHOLDER_BLOB = '/blobs/57ffcb4537f3a613394b721542274643dc36758944c1a5bd64d487169be8238a'
 
-/** The crowd demo files this illustration for every generated group. The album shows the event frames instead. */
+/** The crowd run files this illustration for every generated group. The album shows the event frames instead. */
 function isPlaceholder(url: string): boolean {
   return url.endsWith('/sponsor-row.jpg') || url === PLACEHOLDER_BLOB
 }

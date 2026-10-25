@@ -270,11 +270,11 @@ export class MockBackend {
     })
     this.sources.clear()
     const list: SourceStatus[] = [
-      ok({ sourceId: 'backend', kind: 'backend', label: 'Mock backend', isSimulated: true, detail: 'Runs in this browser tab' }),
+      ok({ sourceId: 'backend', kind: 'backend', label: 'Local backend', isSimulated: true, detail: 'Runs in this browser tab' }),
       ok({ sourceId: 'gateway:GW-01', kind: 'gateway', label: 'Gateway gw-01', isSimulated: true }),
       ok({ sourceId: 'camera:CAM-01', kind: 'camera', label: 'CAM-01', isSimulated: true }),
       ok({ sourceId: 'camera:CAM-02', kind: 'camera', label: 'CAM-02', isSimulated: true }),
-      ok({ sourceId: 'crowd', kind: 'crowd', label: `Crowd · seed ${this.seed}`, isSimulated: true, detail: `${this.crowdSize.toLocaleString('en-US')} simulated attendees` }),
+      ok({ sourceId: 'crowd', kind: 'crowd', label: `Crowd · seed ${this.seed}`, isSimulated: true, detail: `${this.crowdSize.toLocaleString('en-US')} local attendees` }),
     ]
     for (const s of list) this.sources.set(s.sourceId, s)
   }
@@ -409,7 +409,7 @@ export class MockBackend {
     return `${prefix}-${this.seed.toString(36)}${this.idCounter.toString(36).padStart(4, '0')}`
   }
 
-  // ------------------------------------------------------------------ demo triggers
+  // ------------------------------------------------------------------ scripted triggers
 
   triggerCongestion(): void {
     this.sim.startSurge(50)
@@ -417,7 +417,7 @@ export class MockBackend {
   }
 
   /** The equivalent of someone holding the SOS button on a band. */
-  pressSos(deviceId = 'band-03', actor = 'demo'): Incident | null {
+  pressSos(deviceId = 'band-03', actor = 'test'): Incident | null {
     const dev = this.devices.get(deviceId)
     if (!dev || dev.connectionStatus === 'disconnected') return null
     const agent = this.agentOfDevice.get(deviceId)
@@ -798,8 +798,8 @@ export class MockBackend {
     if (inc) {
       inc.status = 'responding'
       const crowd = this.scenario.simulatedBands?.commandId === cmd.commandId ? this.scenario.simulatedBands : undefined
-      const also = crowd ? ` and about ${crowd.signalled} simulated crowd bands` : ''
-      inc.timeline.push({ at: this.now, source: 'operator', text: `Path approved by ${actor}; sending to ${cmd.targets.length} demo bands${also}`, actor })
+      const also = crowd ? ` and about ${crowd.signalled} crowd bands` : ''
+      inc.timeline.push({ at: this.now, source: 'operator', text: `Path approved by ${actor}; sending to ${cmd.targets.length} test bands${also}`, actor })
       inc.timeline.push({ at: this.now, source: 'system', text: `${MEDIC} sent along the path, radio Ch 5` })
       this.emitIncident(inc)
       this.startIntervention(cmd, inc)
@@ -1003,7 +1003,7 @@ export class MockBackend {
     if (cmd.deliveryStatus === 'delivered') {
       const inc = cmd.incidentId ? this.incidents.get(cmd.incidentId) : undefined
       if (inc) {
-        inc.timeline.push({ at: this.now, source: 'device', text: `${cmd.acknowledgedDevices.length} demo bands confirmed their signals` })
+        inc.timeline.push({ at: this.now, source: 'device', text: `${cmd.acknowledgedDevices.length} test bands confirmed their signals` })
         this.emitIncident(inc)
       }
     }

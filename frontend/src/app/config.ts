@@ -1,6 +1,6 @@
 /**
  * Runtime configuration. Environment variables set the default; a `?mode=` query parameter can
- * override it on the demo laptop without a rebuild.
+ * override it on the test laptop without a rebuild.
  */
 export type BanditMode = 'mock' | 'live'
 
@@ -10,7 +10,7 @@ export interface AppConfig {
   wsUrl: string
   /** Hybrid: run the in-browser crowd while bands and incidents come from the backend. */
   localCrowd: boolean
-  /** The backend exposes the /v1/demo/* presentation endpoints. */
+  /** The backend exposes the presentation endpoints under /v1. */
   demoService: boolean
 }
 

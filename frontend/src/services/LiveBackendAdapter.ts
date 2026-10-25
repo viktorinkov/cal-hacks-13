@@ -16,7 +16,7 @@ export interface LiveAdapterOptions {
   wsUrl: string
   /** Run the in-browser crowd until the backend streams entities. */
   localCrowd: boolean
-  /** The backend exposes /v1/demo/* (an authorised demo service). */
+  /** The backend exposes the presentation endpoints under /v1. */
   demoService: boolean
   fetchImpl?: typeof fetch
   createSocket?: (url: string) => WebSocket
@@ -40,7 +40,7 @@ export class LiveBackendAdapter implements BackendAdapter {
 
   constructor(opts: LiveAdapterOptions) {
     this.opts = opts
-    this.label = opts.localCrowd ? 'Live backend · simulated crowd' : 'Live backend'
+    this.label = opts.localCrowd ? 'Live backend · local crowd' : 'Live backend'
     this.http = createHttp({ baseUrl: opts.apiBaseUrl, fetchImpl: opts.fetchImpl })
     this.socket = new ReconnectingSocket({ url: opts.wsUrl, createSocket: opts.createSocket })
     this.demo = this.buildDemo()
@@ -123,7 +123,7 @@ export class LiveBackendAdapter implements BackendAdapter {
   }
 
   async resetSimulation(): Promise<void> {
-    if (!this.opts.demoService) throw new BackendError('unavailable', 'This backend has no demo service')
+    if (!this.opts.demoService) throw new BackendError('unavailable', 'This backend has no scripted-run service')
     await this.http.post(routes.demo('reset'))
   }
 
@@ -176,7 +176,7 @@ export class LiveBackendAdapter implements BackendAdapter {
     }
     if (caps.size === 0) return null
     const remote = (action: string, body: unknown = {}) => async () => {
-      if (!this.opts.demoService) throw new BackendError('unavailable', 'This backend has no demo service')
+      if (!this.opts.demoService) throw new BackendError('unavailable', 'This backend has no scripted-run service')
       await this.http.post(routes.demo(action), body)
     }
     return {
@@ -190,7 +190,7 @@ export class LiveBackendAdapter implements BackendAdapter {
       setCameraOutcome: (outcome) => remote('camera-outcome', { outcome })(),
       setFlakyRadio: (on) => remote('flaky-radio', { on })(),
       setLinkDown: async () => {
-        throw new BackendError('unavailable', 'Link simulation is mock-only')
+        throw new BackendError('unavailable', 'Link drops can only be staged locally')
       },
       setPlaying: (on) => remote('playing', { on })(),
       setSpeed: (speed) => remote('speed', { speed })(),

@@ -138,7 +138,7 @@ export function scriptedBands(): FloorBand[] {
       lastSeen: startedAt,
       hasMotor: true,
       hasMpu: true,
-      wearer: id === sosId ? 'Demo' : null,
+      wearer: id === sosId ? 'Test' : null,
       xM: null,
       yM: null,
       boothId: 0,

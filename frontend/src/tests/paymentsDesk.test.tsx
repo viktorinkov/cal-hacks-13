@@ -125,7 +125,7 @@ describe('the payments desk', () => {
   it('labels every figure as sample data in fixture mode', () => {
     usePayments.setState({ desk: EMPTY_DESK })
     renderDesk('/payments?fixture=payments')
-    expect(screen.getAllByText('sim').length).toBeGreaterThanOrEqual(4)
+    expect(screen.getAllByText('local').length).toBeGreaterThanOrEqual(4)
     expect(screen.getByText('Through the bands')).toBeInTheDocument()
   })
 

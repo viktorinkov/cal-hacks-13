@@ -119,7 +119,7 @@ export class StreamSync {
 
   private onEvent(e: StreamEvent): void {
     if (e.type === 'snapshot') {
-      // the backend pushed a full state (e.g. after a demo reset)
+      // the backend pushed a full state (e.g. after a scripted reset)
       this.loadToken++
       this.applySnapshot(e.snapshot)
       this.sinks.phase('live')

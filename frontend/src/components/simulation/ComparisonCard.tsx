@@ -5,7 +5,7 @@ import { useWorld } from '@/stores/world'
 
 /**
  * Same seed, two runs: the crowd with band guidance and the crowd without it, forked at the moment
- * the path was approved. It shows what the bands change in the simulation; it is not a safety model.
+ * the path was approved. It shows what the bands change in the estimate; it is not a safety model.
  */
 export function ComparisonCard() {
   const cmp = useWorld((s) => s.scenario?.comparison)
@@ -27,7 +27,7 @@ export function ComparisonCard() {
             With the bands, and without
           </h2>
           <p className="mt-0.5 text-[11.5px] text-ink-muted">
-            Simulated · same seed {seed} · {Math.round((compliance ?? 0) * 100)}% follow their band
+            Estimate · same seed {seed} · {Math.round((compliance ?? 0) * 100)}% follow their band
           </p>
         </div>
         <span aria-hidden className="nc-sim-stripes mt-1 h-3 w-5 rounded-[2px]" />

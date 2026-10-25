@@ -1,5 +1,5 @@
 /**
- * Seeded demo venue: one main stage, eleven crowd zones, two open passages and a closed one, four
+ * Seeded test venue: one main stage, eleven crowd zones, two open passages and a closed one, four
  * exits and gates, two cameras, a gateway and anchor stations, preapproved responder corridors and
  * the built structures the 3D map extrudes (stage, LED wall, towers, tents, bars, food trucks...).
  *

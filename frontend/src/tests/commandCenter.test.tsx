@@ -132,11 +132,11 @@ describe('command center', () => {
     expect(screen.getByText('Nothing changes on any band until you send it.')).toBeInTheDocument()
     await user.click(approve)
     await waitFor(() => expect(within(incidentPanel()).getByText('Responding')).toBeInTheDocument())
-    expect(screen.getByText(/0 of \d+ demo bands confirmed so far/)).toBeInTheDocument()
+    expect(screen.getByText(/0 of \d+ test bands confirmed so far/)).toBeInTheDocument()
     await advance(3)
     const cmd = Object.values(useWorld.getState().commands).find((c) => c.approvalStatus === 'approved')!
     expect(cmd.deliveryStatus).toBe('delivered')
-    expect(screen.getByText(new RegExp(`${cmd.targets.length} of ${cmd.targets.length} demo bands confirmed$`))).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`${cmd.targets.length} of ${cmd.targets.length} test bands confirmed$`))).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('A path is open.')
   })
 

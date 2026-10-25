@@ -44,7 +44,7 @@ import {
 } from './projection'
 
 const NEAR_RADIUS = 4
-/** Metres past the demo ring that turn red while an SOS is up. */
+/** Metres past the test ring that turn red while an SOS is up. */
 const RING_HALO = 2.8
 const LANE_HALF = 1.5
 const REVEAL_SPEED = 40
@@ -588,7 +588,7 @@ export class MapEngine {
 
   /**
    * CalHacks draws database people as figures. Wristband icons stay with the few hardware bands
-   * in the ring, never one pin per row. The concert demo still shows its bands.
+   * in the ring, never one pin per row. The concert plan still shows its bands.
    */
   private demoDevices(): Record<string, Device> {
     const devices: Record<string, Device> = {}

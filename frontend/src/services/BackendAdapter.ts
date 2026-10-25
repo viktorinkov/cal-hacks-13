@@ -37,7 +37,7 @@ export interface BackendAdapter {
   cancelGuidance(commandId: string): Promise<GuidanceCommand>
   resendGuidance(commandId: string): Promise<GuidanceCommand>
   resetSimulation(): Promise<void>
-  /** Presentation controls. Null when no authorised demo service is available. */
+  /** Presentation controls. Null when no authorised presentation service is available. */
   readonly demo: DemoControls | null
 }
 
@@ -53,7 +53,7 @@ export type DemoCapability =
   | 'setAutoplay'
 
 export interface DemoControls {
-  /** Which controls this demo service supports; the panel hides the rest. */
+  /** Which controls this presentation service supports; the panel hides the rest. */
   readonly capabilities: ReadonlySet<DemoCapability>
   triggerCongestion(): Promise<void>
   pressSos(deviceId?: string): Promise<void>

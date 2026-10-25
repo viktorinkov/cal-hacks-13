@@ -2,8 +2,8 @@ import { cn } from '@/lib/utils'
 import { sourceTagText, type SourceTag } from '@/lib/status'
 
 /**
- * Where a number came from. Simulated values carry the striped mark so they can never be mistaken
- * for live measurements, even in a screenshot.
+ * Where a number came from. Locally generated values carry the striped mark so they can never be
+ * mistaken for live measurements, even in a screenshot.
  */
 export function SourceChip({ tag, className }: { tag: SourceTag; className?: string }) {
   const sim = tag === 'sim'
@@ -14,7 +14,7 @@ export function SourceChip({ tag, className }: { tag: SourceTag; className?: str
         sim && 'text-[#cfc4ff]',
         className,
       )}
-      title={sim ? 'Simulated, not measured' : undefined}
+      title={sim ? 'Generated locally, not measured' : undefined}
     >
       {sim && <span aria-hidden className="nc-sim-stripes inline-block h-2 w-2 rounded-[1px]" />}
       {sourceTagText[tag]}

@@ -94,7 +94,7 @@ export function MapToolbar() {
           </ToolButton>
         )}
         {venueId === 'calhacks' && (
-          <ToolButton label="Move the demo ring" onClick={() => setDemoRingEditing(!editingRing)} pressed={editingRing}>
+          <ToolButton label="Move the test ring" onClick={() => setDemoRingEditing(!editingRing)} pressed={editingRing}>
             <Circle />
           </ToolButton>
         )}

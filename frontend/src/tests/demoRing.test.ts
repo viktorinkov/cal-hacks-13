@@ -83,7 +83,7 @@ describe('demo ring', () => {
     expect(snap.incidents[0]?.location).toEqual({ x: DEFAULT_DEMO_RING.x, y: DEFAULT_DEMO_RING.y })
     expect(snap.incidents[0]?.isSimulated).toBe(false)
     expect(hardwareAlerts(input.bands, DEFAULT_DEMO_RING)).toHaveLength(1)
-    expect(snap.sources.find((source) => source.sourceId === 'spacetimedb')?.detail).toMatch(/^2 live in the demo/)
+    expect(snap.sources.find((source) => source.sourceId === 'spacetimedb')?.detail).toMatch(/^2 live on the floor/)
   })
 
   it('opens the ring from the beacon flag bit, before an incident row arrives', () => {

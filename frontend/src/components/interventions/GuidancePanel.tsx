@@ -61,8 +61,8 @@ export function GuidancePanel({
   const anyHaptic = command.targets.some((t) => t.haptic)
   const failed = command.targets.filter((t) => t.status === 'failed')
   const acked = command.targets.filter((t) => t.status === 'acknowledged').length
-  // with a simulated crowd, the listed bands are the few on the demo table; the crowd's are counted below
-  const which = crowd ? ' demo bands' : ''
+  // with a local crowd, the listed bands are the few on the test bench; the crowd's are counted below
+  const which = crowd ? ' test bands' : ''
 
   return (
     <section aria-labelledby="path-h" className="flex flex-col gap-3">
