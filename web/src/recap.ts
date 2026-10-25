@@ -201,11 +201,15 @@ async function share(p: MyPhoto, event: string) {
   }
 }
 
+/** Everyone the bands put in the photo with you, by name and socials. */
 function who(p: MyPhoto) {
-  if (!p.people.length) return 'Just you';
-  const named = p.people.filter(x => x.nodeId !== 0n).map(x => x.name);
-  const others = p.people.length - named.length;
-  return `You with ${[...named, others && `${others} other${others > 1 ? 's' : ''}`].filter(Boolean).join(', ')}`;
+  if (!p.people.length) return h('div', { class: 'muted' }, 'Just you');
+  return [
+    h('div', {}, 'You with:'),
+    h('ul', {}, p.people.map(x => h('li', {},
+      h('b', {}, x.name), ' ',
+      x.handles.length ? handleLinks(x.handles) : h('span', { class: 'muted' }, 'no socials shared')))),
+  ];
 }
 
 function photos(conn: DbConnection, event: string) {
@@ -215,7 +219,7 @@ function photos(conn: DbConnection, event: string) {
     h('img', { src: p.url }),
     h('figcaption', {},
       h('b', {}, p.caption || p.zoneName), ` · ${p.zoneName} · ${time(p.takenAt)}`,
-      h('div', {}, who(p)),
+      who(p),
       h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
 }
 
