@@ -265,6 +265,8 @@ export interface EntityFrame {
   kinds: Uint8Array
   /** 0 walking, 1 standing, 2 seated. Local crowd only; absent means everyone is upright. */
   pose?: Uint8Array
+  /** Floor height under each person, metres. Absent means the plan point's surface, which is wrong under a balcony. */
+  heights?: Float32Array
   /** Same-seed run without guidance, for the comparison overlay. Simulation only. */
   baseline?: { count: number; positions: Float32Array }
 }

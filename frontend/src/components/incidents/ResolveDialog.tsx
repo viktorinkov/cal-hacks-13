@@ -3,6 +3,7 @@ import type { Incident, ResolutionReason } from '@/contracts/domain'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { scriptedIncidentId } from '@/booth/hallDemo'
 import { pendingKey, resolveIncident } from '@/services/operatorCommands'
 import { useUi } from '@/stores/ui'
 
@@ -32,7 +33,9 @@ export function ResolveDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-[30px] font-normal leading-none">Resolve {incident.displayId}</DialogTitle>
           <DialogDescription className="text-[13px] text-ink-dim">
-            Every band goes back to ready once it confirms. This closes the incident for everyone.
+            {incident.incidentId === scriptedIncidentId()
+              ? 'This ends the rehearsal. The circle, the red neighbours, and the path all clear. Nothing is sent to a wristband.'
+              : 'Every band goes back to ready once it confirms. This closes the incident for everyone.'}
           </DialogDescription>
         </DialogHeader>
         <fieldset className="flex flex-col gap-1.5">

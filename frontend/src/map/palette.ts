@@ -87,9 +87,17 @@ export const CONGESTION_TINT = 0xf09a62
 /** Density heat. Bloom is ember, the core fades to pale peach, and neither matches the SOS red. */
 export const HEAT = { bloom: 0xff5524, warm: 0xff8640, core: 0xffc9a0 }
 
-/** People per m², smoothed over a few metres, where each part of the glow starts and is full. */
-export const HEAT_BLOOM = [0.24, 1.2] as const
-export const HEAT_CORE = [1.0, 2.3] as const
+/**
+ * People per m², smoothed over a few metres, where each part of the glow starts and is full. High
+ * enough that seated hacking tables and a thin crowd stay dark.
+ */
+export const HEAT_BLOOM = [0.45, 1.6] as const
+export const HEAT_CORE = [1.4, 2.8] as const
+/**
+ * Where a crowd is expected (the entrance, food and drink, and the gates), density counts this much
+ * more, so a queue there glows well before the busy hall does.
+ */
+export const HEAT_GATHER = 1.7
 
 const smooth = (v: number, [lo, hi]: readonly [number, number]) => {
   const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo)))

@@ -10,19 +10,19 @@ function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContex
 }
 
 /**
- * A standing person, shaped like an i: a slim stem with a sphere of about the same width on top.
- * Fills stay near white so the crowd tint colors them. The head is shaded so it reads as a ball.
- * The outline is painted first and the fills cover the join, so the stroke follows the outer
+ * A standing person, shaped like an i: a short narrow stem with a sphere on top.
+ * Fills stay light so the crowd tint colors them. The head carries the bright spot;
+ * the stem stays a shade darker so it does not read as a white block. The outline is
+ * painted first and the fills cover the join, so the stroke follows the outer
  * silhouette and does not cut across the neck. Anchored at the bottom.
  */
 export function personTexture(): Texture {
   const w = 56
-  const h = 76
+  const h = 48
   const [cv, g] = canvas(w, h)
-  const edge = 2.4
-  // Same width as the head, but the sides stay straight so the stem is an i, not an oval.
-  const body = { x: 15, y: 27, w: 26, h: 44, r: 8 }
-  const head = { x: 28, y: 18, r: 13 }
+  const edge = 1.6
+  const body = { x: 23, y: 27, w: 10, h: 16, r: 3 }
+  const head = { x: 28, y: 16, r: 13 }
 
   const capsule = (extra: number) => {
     g.beginPath()
@@ -40,9 +40,9 @@ export function personTexture(): Texture {
   sphere(edge)
 
   const barrel = g.createLinearGradient(body.x, 0, body.x + body.w, 0)
-  barrel.addColorStop(0, '#cfcfcf')
-  barrel.addColorStop(0.42, '#ffffff')
-  barrel.addColorStop(1, '#c2c2c2')
+  barrel.addColorStop(0, '#b4b4b4')
+  barrel.addColorStop(0.38, '#d8d8d8')
+  barrel.addColorStop(1, '#a6a6a6')
   g.fillStyle = barrel
   capsule(0)
 

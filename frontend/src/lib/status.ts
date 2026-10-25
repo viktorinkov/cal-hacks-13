@@ -266,12 +266,19 @@ export function headline(args: {
         title: first.source === 'manual_sos' ? 'Someone pressed SOS.' : first.source === 'imu_suspicion' ? 'Someone may have fallen.' : 'Someone may need help.',
         sentence:
           args.venueId === 'calhacks'
-            ? `${where}, ${who}. Nearby wristbands are already red, and a path is clearing from the entrance.${more}`
+            ? `${where}, ${who}. Nearby wristbands are already red.${more}`
             : `${where}, ${who}. Nothing changes on the bands until you approve.${more}`,
         tone: 'critical',
       }
     }
     const active = commands.find((c) => c.incidentId === first.incidentId && c.approvalStatus === 'approved')
+    if (first.status === 'responding' && active?.commandId === 'demo-path' && args.venueId === 'calhacks') {
+      return {
+        title: 'A path is open.',
+        sentence: `A yellow path is clearing from the entrance to ${where}. People along it are stepping aside.${more}`,
+        tone: 'help',
+      }
+    }
     if (first.status === 'responding' && active) {
       const confirmed = active.acknowledgedDevices.length
       const total = active.targets.length
@@ -286,6 +293,13 @@ export function headline(args: {
     }
     if (first.status === 'responding') {
       return { title: 'Help is on the way.', sentence: `First Aid is heading to ${where}. The bands are back to ready.${more}`, tone: 'help' }
+    }
+    if (args.venueId === 'calhacks') {
+      return {
+        title: 'You are on it.',
+        sentence: `Open the path from the entrance to ${where} when you are ready. Nothing is sent to the wristbands.${more}`,
+        tone: 'caution',
+      }
     }
     return {
       title: 'You are on it.',

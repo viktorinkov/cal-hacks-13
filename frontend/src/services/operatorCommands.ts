@@ -5,6 +5,8 @@
  */
 import { toast } from 'sonner'
 import type { GuidanceCommand, Incident, ResolutionReason } from '@/contracts/domain'
+import { HALL_PATH, scriptedIncidentId } from '@/booth/hallDemo'
+import { guideHallAcknowledge, guideHallClosePath, guideHallPath, guideHallResolve } from '@/booth/hallGuide'
 import { useUi } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
 import { BackendError } from './BackendAdapter'
@@ -56,6 +58,10 @@ function mergeCommand(c: GuidanceCommand | null): GuidanceCommand | null {
 }
 
 export async function acknowledgeIncident(incidentId: string): Promise<Incident | null> {
+  if (incidentId === scriptedIncidentId()) {
+    guideHallAcknowledge()
+    return useWorld.getState().incidents[incidentId] ?? null
+  }
   const res = await run(pendingKey.ack(incidentId), 'Not acknowledged. The incident is still open.', () =>
     getAdapter()!.acknowledgeIncident(incidentId),
   )
@@ -63,6 +69,7 @@ export async function acknowledgeIncident(incidentId: string): Promise<Incident 
 }
 
 export async function resolveIncident(incidentId: string, reason: ResolutionReason): Promise<Incident | null> {
+  if (incidentId === scriptedIncidentId()) return guideHallResolve()
   const res = await run(pendingKey.resolve(incidentId), 'Not resolved. The incident is still open.', () =>
     getAdapter()!.resolveIncident(incidentId, reason),
   )
@@ -70,6 +77,10 @@ export async function resolveIncident(incidentId: string, reason: ResolutionReas
 }
 
 export async function previewGuidance(incidentId: string, corridorId?: string): Promise<GuidanceCommand | null> {
+  if (incidentId === scriptedIncidentId()) {
+    guideHallAcknowledge()
+    return useWorld.getState().commands[HALL_PATH] ?? null
+  }
   const res = await run(pendingKey.preview(incidentId), 'Could not preview a path.', () =>
     getAdapter()!.previewGuidance({ incidentId, corridorId }),
   )
@@ -77,11 +88,16 @@ export async function previewGuidance(incidentId: string, corridorId?: string): 
 }
 
 export async function approveGuidance(commandId: string): Promise<GuidanceCommand | null> {
+  if (commandId === HALL_PATH) {
+    guideHallPath()
+    return useWorld.getState().commands[HALL_PATH] ?? null
+  }
   const res = await run(pendingKey.approve(commandId), 'Not sent. No band has changed.', () => getAdapter()!.approveGuidance(commandId))
   return mergeCommand(res)
 }
 
 export async function cancelGuidance(commandId: string): Promise<GuidanceCommand | null> {
+  if (commandId === HALL_PATH) return mergeCommand(guideHallClosePath())
   const res = await run(pendingKey.cancel(commandId), 'Could not stop the signals.', () => getAdapter()!.cancelGuidance(commandId))
   return mergeCommand(res)
 }

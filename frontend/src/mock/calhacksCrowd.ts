@@ -10,13 +10,14 @@ import { bbox, newProjectResult, Path, pointInPolygon, type ProjectResult } from
 import { frames } from '@/stores/frames'
 import { useWorld } from '@/stores/world'
 import { MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
-import { DEMO_LANE, demoIsActive, demoPath, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
-import { liveBands } from '@/booth/place'
+import { DEMO_LANE, demoIsActive, demoRoute, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
+import { onStair } from '@/booth/hallRoute'
+import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
 import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
 import { Rng } from './sim/rng'
 
 /** Simulated attendees on the floor. A smaller page of them carries the live band ids. */
-const COUNT = 1500
+const COUNT = 1000
 const DT = 0.1
 const WALK = ['theater', 'food', 'entrance', 'sponsor', 'broadway', 'atrium', 'mezzanine']
 
@@ -151,7 +152,7 @@ export function floorUse(x: number, y: number): 'walk' | 'seat' | 'closed' | 'ou
 }
 
 function walkable(x: number, y: number): boolean {
-  return floorUse(x, y) === 'walk'
+  return floorUse(x, y) === 'walk' && !onStair(x, y)
 }
 
 /** Points on the chair band, inset from the table ends so nobody sits in the aisle. */
@@ -306,6 +307,8 @@ export class CalhacksCrowd {
   private keep: { x: number; y: number; r: number } | null = null
   /** Cleared walk from the entrance, revealed from the door toward the ring. */
   private lane: Path | null = null
+  /** Floor height at each point of the lane. A person on another floor does not step aside for it. */
+  private laneZ: number[] | null = null
   private laneReveal = 0
   private readonly hit: ProjectResult = newProjectResult()
 
@@ -357,10 +360,11 @@ export class CalhacksCrowd {
   }
 
   /** Keep the ring empty, and while a hardware SOS is up, clear the entrance path as it draws in. */
-  setDemo(circle: { x: number; y: number; r: number } | null, points: { x: number; y: number }[] | null): void {
+  setDemo(circle: { x: number; y: number; r: number } | null, points: { x: number; y: number }[] | null, z: number[] | null = null): void {
     this.keep = circle
     if (!points || points.length < 2) {
       this.lane = null
+      this.laneZ = null
       this.laneReveal = 0
       return
     }
@@ -370,6 +374,7 @@ export class CalhacksCrowd {
       points.every((point, i) => Math.hypot(point.x - this.lane!.points[i]!.x, point.y - this.lane!.points[i]!.y) < 0.25)
     if (!same) {
       this.lane = new Path(points)
+      this.laneZ = z
       this.laneReveal = 0
     }
   }
@@ -431,7 +436,7 @@ export class CalhacksCrowd {
       person.vy = (dy / dist) * pace
       const nx = person.x + person.vx * DT
       const ny = person.y + person.vy * DT
-      if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny)) {
+      if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny, person.zone)) {
         person.x = nx
         person.y = ny
       } else {
@@ -450,6 +455,7 @@ export class CalhacksCrowd {
     const velocities = new Float32Array(count * 2)
     const kinds = new Uint8Array(count)
     const pose = new Uint8Array(count)
+    const heights = new Float32Array(count)
     for (let i = 0; i < count; i++) {
       const person = this.people[i]
       positions[2 * i] = person.x
@@ -458,8 +464,9 @@ export class CalhacksCrowd {
       velocities[2 * i + 1] = person.vy
       kinds[i] = EntityKind.SimAttendee
       pose[i] = person.pose
+      heights[i] = rooms[person.zone]?.elevationM ?? 0
     }
-    return { seq: this.seq, t: this.t, source: 'simulation', count, positions, velocities, kinds, pose }
+    return { seq: this.seq, t: this.t, source: 'simulation', count, positions, velocities, kinds, pose, heights }
   }
 
   /** One person per database row. A coordinate on this plan is the start; anything else is placed locally. */
@@ -587,8 +594,8 @@ export class CalhacksCrowd {
     return 0
   }
 
-  private openSpot(x: number, y: number): boolean {
-    return walkable(x, y) && !this.insideRing(x, y) && !this.insideLane(x, y)
+  private openSpot(x: number, y: number, zone = zoneAt(x, y)): boolean {
+    return walkable(x, y) && !this.insideRing(x, y) && !this.insideLane(x, y, zone)
   }
 
   private insideRing(x: number, y: number): boolean {
@@ -597,31 +604,64 @@ export class CalhacksCrowd {
     return Math.hypot(x - circle.x, y - circle.y) < circle.r + 0.35
   }
 
-  private insideLane(x: number, y: number): boolean {
+  /** Height of the cleared path at a distance along it. */
+  private pathZ(along: number): number {
+    const lane = this.lane
+    const z = this.laneZ
+    if (!lane || !z || z.length !== lane.points.length) return 0
+    const cum = lane.cumulative
+    const t = Math.max(0, Math.min(lane.length, along))
+    let k = 0
+    while (k < cum.length - 2 && cum[k + 1]! < t) k++
+    const span = (cum[k + 1] ?? t) - (cum[k] ?? 0) || 1
+    const f = (t - (cum[k] ?? 0)) / span
+    const z0 = z[k] ?? 0
+    const z1 = z[Math.min(k + 1, z.length - 1)] ?? z0
+    return z0 + (z1 - z0) * f
+  }
+
+  private floorOf(zone: number): number {
+    return rooms[zone]?.elevationM ?? 0
+  }
+
+  /**
+   * Somewhere this person can put a foot: their own floor, not a stair and not off the railing.
+   * Furniture inside the ring does not count, because that spot is being cleared.
+   */
+  private foot(x: number, y: number, person: Person, ignoreFurniture: boolean): boolean {
+    if (onStair(x, y)) return false
+    const room = rooms[person.zone]
+    if (!room || !pointInPolygon(x, y, room.polygon)) return false
+    if (ignoreFurniture) return true
+    const use = floorUse(x, y)
+    return use === 'walk' || use === 'seat'
+  }
+
+  private insideLane(x: number, y: number, zone: number): boolean {
     const lane = this.lane
     if (!lane || this.laneReveal <= 0) return false
     lane.project(x, y, this.hit)
-    return this.hit.distance < DEMO_LANE && this.hit.along <= this.laneReveal + 0.4
+    if (this.hit.distance >= DEMO_LANE || this.hit.along > this.laneReveal + 0.4) return false
+    return Math.abs(this.pathZ(this.hit.along) - this.floorOf(zone)) < 1.5
   }
 
   /** Step sideways off the path. The arrow on the map points the same way. */
   private yieldLane(person: Person): boolean {
     const lane = this.lane
     if (!lane || this.laneReveal <= 0) return false
-    lane.project(person.x, person.y, this.hit)
-    if (this.hit.distance >= DEMO_LANE || this.hit.along > this.laneReveal + 0.4) return false
+    if (!this.insideLane(person.x, person.y, person.zone)) return false
     const pace = 1.35
     let nx = this.hit.nx
     let ny = this.hit.ny
     let tx = person.x + nx * pace * DT
     let ty = person.y + ny * pace * DT
-    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') {
+    if (!this.foot(tx, ty, person, false)) {
       nx = -nx
       ny = -ny
       tx = person.x + nx * pace * DT
       ty = person.y + ny * pace * DT
     }
-    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') return false
+    if (!this.foot(tx, ty, person, false)) return false
     person.x = tx
     person.y = ty
     person.vx = nx * pace
@@ -642,11 +682,22 @@ export class CalhacksCrowd {
     const dx = person.x - circle.x
     const dy = person.y - circle.y
     const dist = Math.hypot(dx, dy)
-    const nx = dist > 0.05 ? dx / dist : Math.cos((person.bandId || 1) * 0.7)
-    const ny = dist > 0.05 ? dy / dist : Math.sin((person.bandId || 1) * 0.7)
+    let nx = dist > 0.05 ? dx / dist : Math.cos((person.bandId || 1) * 0.7)
+    let ny = dist > 0.05 ? dy / dist : Math.sin((person.bandId || 1) * 0.7)
     const pace = 1.6
-    person.x += nx * pace * DT
-    person.y += ny * pace * DT
+    let tx = person.x + nx * pace * DT
+    let ty = person.y + ny * pace * DT
+    if (!this.foot(tx, ty, person, this.insideRing(tx, ty))) {
+      const sx = -ny
+      const sy = nx
+      nx = sx
+      ny = sy
+      tx = person.x + nx * pace * DT
+      ty = person.y + ny * pace * DT
+      if (!this.foot(tx, ty, person, this.insideRing(tx, ty))) return false
+    }
+    person.x = tx
+    person.y = ty
     person.vx = nx * pace
     person.vy = ny * pace
     person.pose = WALKING
@@ -678,8 +729,8 @@ export class CalhacksCrowd {
     const room = rooms[person.zone]
     if (!room) return
     let at = spotIn(room, this.rng)
-    for (let attempt = 0; attempt < 24 && !this.openSpot(at.x, at.y); attempt++) at = spotIn(room, this.rng)
-    if (!this.openSpot(at.x, at.y)) return
+    for (let attempt = 0; attempt < 24 && !this.openSpot(at.x, at.y, person.zone); attempt++) at = spotIn(room, this.rng)
+    if (!this.openSpot(at.x, at.y, person.zone)) return
     person.gx = at.x
     person.gy = at.y
   }
@@ -876,15 +927,31 @@ export function characterAt(bandId: number): { x: number; y: number } | null {
   return crowd?.character(bandId) ?? null
 }
 
+type CrowdHold = { crowd: CalhacksCrowd; timer: ReturnType<typeof setInterval> | null; owner: () => void }
+
+function crowdHold(): { current?: CrowdHold } {
+  const slot = globalThis as typeof globalThis & { __banditCrowd?: { current?: CrowdHold } }
+  if (!slot.__banditCrowd) slot.__banditCrowd = {}
+  return slot.__banditCrowd
+}
+
 export function startCalhacksCrowd(): void {
-  if (crowd || import.meta.env.MODE === 'test') return
-  crowd = new CalhacksCrowd()
+  if (import.meta.env.MODE === 'test') return
+  const slot = crowdHold()
+  if (slot.current?.owner === startCalhacksCrowd) {
+    crowd = slot.current.crowd
+    timer = slot.current.timer
+    return
+  }
+  if (slot.current?.timer) clearInterval(slot.current.timer)
+  crowd = slot.current?.crowd ?? new CalhacksCrowd()
   frames.push(crowd.frame())
   timer = setInterval(() => {
     if (!crowd) return
     const ring = useDemoRing.getState()
-    const active = demoIsActive(liveBands(), Object.values(useWorld.getState().incidents))
-    crowd.setDemo(ring, active ? demoPath(ring) : null)
+    const alerting = demoIsActive(bandsOnFloor(), Object.values(useWorld.getState().incidents))
+    const route = alerting && useHallDemo.getState().pathOpen ? demoRoute(ring) : null
+    crowd.setDemo(ring, route ? route.points : null, route ? route.z : null)
     crowd.step()
     frames.push(crowd.frame())
     const now = Date.now()
@@ -892,9 +959,13 @@ export function startCalhacksCrowd(): void {
     publishedAt = now
     publishCounts()
   }, DT * 1000)
+  slot.current = { crowd, timer, owner: startCalhacksCrowd }
 }
 
 export function stopCalhacksCrowd(): void {
+  const slot = crowdHold()
+  if (slot.current?.timer) clearInterval(slot.current.timer)
+  slot.current = undefined
   if (timer) clearInterval(timer)
   timer = null
   crowd = null

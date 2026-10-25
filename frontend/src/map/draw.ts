@@ -50,6 +50,34 @@ export function dashedPath(
   }
 }
 
+/** Dashes that follow a path whose floor height changes, such as a stair. */
+export function dashedPathZ(
+  g: Graphics,
+  cam: Camera,
+  path: Path,
+  from: number,
+  to: number,
+  zAt: (s: number) => number,
+  dash: number,
+  gap: number,
+  offset = 0,
+): void {
+  const period = dash + gap
+  let s = from + (((offset % period) + period) % period) - period
+  const a: ScreenPoint = { x: 0, y: 0, depth: 0 }
+  const b: ScreenPoint = { x: 0, y: 0, depth: 0 }
+  for (; s < to; s += period) {
+    const s0 = Math.max(from, s)
+    const s1 = Math.min(to, s + dash)
+    if (s1 <= s0) continue
+    const p = path.at(s0)
+    const q = path.at(s1)
+    project(cam, p.x, p.y, zAt(s0), a)
+    project(cam, q.x, q.y, zAt(s1), b)
+    g.moveTo(a.x, a.y).lineTo(b.x, b.y)
+  }
+}
+
 /** Solid polyline along a path from 0 to `to` metres. */
 export function pathLine(g: Graphics, cam: Camera, path: Path, to: number, z: number): void {
   const pts = path.points
@@ -67,14 +95,32 @@ export function pathLine(g: Graphics, cam: Camera, path: Path, to: number, z: nu
   }
 }
 
+/** The same line, with each vertex at its own floor height so a stair climbs instead of cutting through. */
+export function pathLineZ(g: Graphics, cam: Camera, path: Path, to: number, zAt: (s: number) => number): void {
+  const end = Math.min(path.length, Math.max(0, to))
+  const step = 1.1
+  const a = { x: 0, y: 0, depth: 0 }
+  const p0 = path.at(0)
+  project(cam, p0.x, p0.y, zAt(0), a)
+  g.moveTo(a.x, a.y)
+  for (let s = step; s < end; s += step) {
+    const p = path.at(s)
+    project(cam, p.x, p.y, zAt(s), a)
+    g.lineTo(a.x, a.y)
+  }
+  const p1 = path.at(end)
+  project(cam, p1.x, p1.y, zAt(end), a)
+  g.lineTo(a.x, a.y)
+}
+
 /** Dashed ellipse for a ground circle of radius r metres, drawn as projected segments. */
-export function groundCircle(g: Graphics, cam: Camera, cx: number, cy: number, r: number, segments: number, dashFrac = 1, rotation = 0): void {
+export function groundCircle(g: Graphics, cam: Camera, cx: number, cy: number, r: number, segments: number, dashFrac = 1, rotation = 0, z = 0): void {
   const a: ScreenPoint = { x: 0, y: 0, depth: 0 }
   const b: ScreenPoint = { x: 0, y: 0, depth: 0 }
   for (let k = 0; k < segments; k++) {
     const t0 = rotation + (k / segments) * Math.PI * 2
     const t1 = t0 + (Math.PI * 2 * dashFrac) / segments
-    project(cam, cx + Math.cos(t0) * r, cy + Math.sin(t0) * r, 0, a)
+    project(cam, cx + Math.cos(t0) * r, cy + Math.sin(t0) * r, z, a)
     if (dashFrac >= 1 && k > 0) {
       g.lineTo(a.x, a.y)
     } else {
@@ -83,19 +129,19 @@ export function groundCircle(g: Graphics, cam: Camera, cx: number, cy: number, r
     const steps = dashFrac >= 1 ? 1 : 3
     for (let j = 1; j <= steps; j++) {
       const t = t0 + ((t1 - t0) * j) / steps
-      project(cam, cx + Math.cos(t) * r, cy + Math.sin(t) * r, 0, b)
+      project(cam, cx + Math.cos(t) * r, cy + Math.sin(t) * r, z, b)
       g.lineTo(b.x, b.y)
     }
   }
 }
 
 /** Filled ground disc. */
-export function groundDisc(g: Graphics, cam: Camera, cx: number, cy: number, r: number, segments = 40): number[] {
+export function groundDisc(g: Graphics, cam: Camera, cx: number, cy: number, r: number, segments = 40, z = 0): number[] {
   const out: number[] = []
   const a: ScreenPoint = { x: 0, y: 0, depth: 0 }
   for (let k = 0; k < segments; k++) {
     const t = (k / segments) * Math.PI * 2
-    project(cam, cx + Math.cos(t) * r, cy + Math.sin(t) * r, 0, a)
+    project(cam, cx + Math.cos(t) * r, cy + Math.sin(t) * r, z, a)
     out.push(a.x, a.y)
   }
   g.poly(out, true)

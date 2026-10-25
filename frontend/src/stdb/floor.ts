@@ -2,7 +2,8 @@ import type { Device, Incident, SectionKind, Venue, VenueZone, WorldSnapshot, Zo
 import { rect } from '@/lib/geometry'
 import { CALHACKS_CAPACITY, calhacksHome, calhacksVenue } from '@/mock/calhacks'
 import { bindCrowdCast, crowdIsSeeded, crowdOccupancy, crowdSize, startCalhacksCrowd } from '@/mock/calhacksCrowd'
-import { HARDWARE_ID_MAX, isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
+import { HARDWARE_ID_MAX, demoDevices, isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
+import { applyHallDemo, overlayScripted, scriptedBands } from '@/booth/hallDemo'
 import { setLiveBands } from '@/booth/place'
 import { currentPlan } from '@/map/venuePlan'
 import { resetServerTime, setClockRate } from '@/stores/clock'
@@ -122,16 +123,21 @@ function finite(value: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** Beacon flag bits, the same ones `ingest_band` copies onto the public `band` row. */
+const F_SOS = 1
+const F_FALL = 2
+
 /** One `band` row. `id` is a u32. `x_m` and `y_m` are optional in older rows. */
 export function bandFromRow(row: Record<string, unknown>, wearer: string | null): FloorBand {
   const xM = finite(row.xM)
   const yM = finite(row.yM)
+  const flags = num(row.flags)
   return {
     id: num(row.id),
     zone: num(row.zone),
     online: row.online === true,
-    sos: row.sos === true,
-    fall: row.fall === true,
+    sos: row.sos === true || (flags & F_SOS) !== 0,
+    fall: row.fall === true || (flags & F_FALL) !== 0,
     lastSeen: millis(row.lastSeen),
     hasMotor: row.hasMotor === true,
     hasMpu: row.hasMpu === true,
@@ -395,6 +401,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   const ring = useDemoRing.getState()
   const laid = layoutDemo(input?.bands ?? [], ring)
   for (const incident of input?.incidents ?? []) {
+    // The crowd roster starts at 100. Those rows are the local people, not operator incidents.
     if (incident.bandId > HARDWARE_ID_MAX) continue
     const source = byId.get(incident.zoneId) ?? byStation.get(incident.stationId)
     const home = calhacksHome(source?.name ?? '')
@@ -420,7 +427,24 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       isSimulated: false,
     })
   }
-  const reported = mergeHardwareAlerts(incidents, input?.bands ?? [], ring, now)
+  const overlaid = overlayScripted(input?.bands ?? [])
+  const reported = mergeHardwareAlerts(incidents, overlaid, ring, now)
+  const guided = applyHallDemo(reported, [])
+  for (const device of demoDevices(scriptedBands(), ring)) {
+    const index = devices.findIndex((item) => item.deviceId === device.deviceId)
+    if (index >= 0) {
+      devices[index] = {
+        ...devices[index],
+        currentPattern: device.currentPattern,
+        sosActive: device.sosActive,
+        connectionStatus: 'connected',
+        location: device.location,
+        wearerLabel: 'Demo',
+      }
+      continue
+    }
+    devices.push(device)
+  }
 
   seq += 1
   return {
@@ -430,9 +454,9 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
     venue: calhacksVenue,
     zones,
     devices,
-    incidents: reported,
+    incidents: guided.incidents,
     observations: [],
-    commands: [],
+    commands: guided.commands,
     sources: [
       ...(input
         ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live in the demo · ${input.venueName}` }]
@@ -456,9 +480,12 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
 
 /** Shows the CalHacks plan, with live bands once a subscription has arrived. */
 export function presentCalhacks(): void {
+  const world = useWorld.getState()
+  // A hot-reloaded copy of this module has no rows yet. It must not wipe the floor the live socket is drawing.
+  if (!lastInput && world.venue?.venueId === 'calhacks' && (Object.keys(world.devices).length > 0 || Object.keys(world.incidents).length > 0)) return
   resetServerTime(Date.now())
   setClockRate(1)
-  if (useWorld.getState().venue?.venueId !== 'calhacks') {
+  if (world.venue?.venueId !== 'calhacks') {
     frames.clear()
     baselineFrames.clear()
   }

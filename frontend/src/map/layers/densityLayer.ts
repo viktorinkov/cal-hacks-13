@@ -9,7 +9,7 @@ import type { CongestionStatus, Venue } from '@/contracts/domain'
 import type { ElevationAt } from '@/lib/elevation'
 import { bbox, pointInPolygon } from '@/lib/geometry'
 import { px } from '@/lib/tokens'
-import { CONGESTION_TINT, heatColor, shade } from '../palette'
+import { CONGESTION_TINT, HEAT_GATHER, heatColor, shade } from '../palette'
 import { groundMatrix, project, depthOf, type Camera, type ScreenPoint } from '../projection'
 
 const CELL = 0.5
@@ -26,6 +26,17 @@ const BLOOM_R = 4
 const AREA_MIN = 0.35
 /** Walkable share below which the glow fades out. */
 const EDGE_FADE = 0.55
+/** Sections where a crowd is expected, so the glow there starts earlier. */
+const GATHER_SECTIONS = new Set<string>(['plaza', 'food'])
+/** Metres either side of a gate that count as its queue. */
+const GATE_REACH = 8
+
+function segmentDistance(x: number, y: number, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const vx = b.x - a.x
+  const vy = b.y - a.y
+  const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (y - a.y) * vy) / (vx * vx + vy * vy || 1)))
+  return Math.hypot(x - a.x - t * vx, y - a.y - t * vy)
+}
 
 export interface Column {
   x: number
@@ -64,6 +75,8 @@ interface Surface {
   bloom: Float32Array
   areaCore: Float32Array
   areaBloom: Float32Array
+  /** 1 where a crowd is expected, feathered over a few metres; the glow there counts `HEAT_GATHER` times. */
+  gather: Float32Array
   hwalk: Uint8Array
   /** Glow only on `walk` (a raised deck), or anywhere people are (the floor). */
   clip: boolean
@@ -122,6 +135,7 @@ export class DensityLayer {
     // the floor glows wherever people are; a raised stand only on its own deck
     this.ground = this.surface((z) => !(z.elevationM ?? 0), false)
     this.upper = this.surface((z) => (z.elevationM ?? 0) > 0, true)
+    this.ground.gather.set(this.gatherMask())
     this.upperZ = Math.max(0, ...venue.zones.map((z) => z.elevationM ?? 0))
     this.heat = glowOf(this.ground.texture)
     this.heatUpper = glowOf(this.upper.texture)
@@ -165,11 +179,31 @@ export class DensityLayer {
       bloom: coarse(),
       areaCore: coarse(),
       areaBloom: coarse(),
+      gather: coarse(),
       hwalk,
       clip,
       empty: zones.length === 0,
       lit: false,
     }
+  }
+
+  /** Ground cells at an entrance plaza, at food and drink, or beside a gate, feathered so the glow has no hard edge. */
+  private gatherMask(): Float32Array {
+    const { hw, hh } = this
+    const out = new Float32Array(hw * hh)
+    const zones = this.venue.zones.filter((z) => GATHER_SECTIONS.has(z.section) && !(z.elevationM ?? 0)).map((z) => ({ z, b: bbox(z.polygon) }))
+    const gates = this.venue.exits.filter((e) => e.kind === 'gate')
+    for (let hy = 0; hy < hh; hy++) {
+      for (let hx = 0; hx < hw; hx++) {
+        const x = (hx + 0.5) * HCELL
+        const y = (hy + 0.5) * HCELL
+        const atGate = gates.some((e) => segmentDistance(x, y, e.segment[0], e.segment[1]) < GATE_REACH)
+        const inZone = zones.some(({ z, b }) => x >= b.x && y >= b.y && x <= b.x + b.w && y <= b.y + b.h && pointInPolygon(x, y, z.polygon))
+        if (atGate || inZone) out[hy * hw + hx] = 1
+      }
+    }
+    this.smooth(out, BLOOM_R, hw, hh, this.htmp)
+    return out
   }
 
   /** Rebuild the fields from positions (every 0.5 s). */
@@ -231,7 +265,11 @@ export class DensityLayer {
           data[4 * k + 3] = 0
           continue
         }
-        const [c, a] = heatColor(surf.bloom[k] / Math.max(AREA_MIN, surf.areaBloom[k]), surf.core[k] / Math.max(AREA_MIN, surf.areaCore[k]))
+        const boost = 1 + (HEAT_GATHER - 1) * surf.gather[k]
+        const [c, a] = heatColor(
+          (boost * surf.bloom[k]) / Math.max(AREA_MIN, surf.areaBloom[k]),
+          (boost * surf.core[k]) / Math.max(AREA_MIN, surf.areaCore[k]),
+        )
         // fade out where the floor ends, so the glow does not spill over the outer walls
         const edge = Math.min(1, surf.areaCore[k] / EDGE_FADE)
         data[4 * k] = (c >> 16) & 0xff

@@ -5,8 +5,8 @@ import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
 import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
-import { schedulePayments } from '@/payments/store'
 import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
+import { schedulePayments } from '@/payments/store'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -474,7 +474,19 @@ function storedToken(database: string): string | undefined {
   return id || kept
 }
 
+type FloorLink = { disconnect: () => void; generation: number }
+
+function linkSlot(): { current?: FloorLink } {
+  const slot = globalThis as typeof globalThis & { __banditLink?: { current?: FloorLink } }
+  if (!slot.__banditLink) slot.__banditLink = {}
+  return slot.__banditLink
+}
+
+let generation = 0
+
 function safePublish() {
+  const current = linkSlot().current
+  if (current && current.generation !== generation) return
   try {
     publish()
   } catch (error) {
@@ -553,6 +565,17 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .withDatabaseName(host.database)
       .withToken(token)
       .onConnect((next, identity, newToken) => {
+        const slot = linkSlot()
+        const previous = slot.current
+        generation = (previous?.generation ?? 0) + 1
+        slot.current = { disconnect: () => next.disconnect(), generation }
+        if (previous && previous.generation !== generation) {
+          try {
+            previous.disconnect()
+          } catch {
+            // The replaced socket is already gone.
+          }
+        }
         conn = next
         apiSession = null
         claimRequests.clear()
@@ -661,6 +684,19 @@ export function startSession() {
   if (import.meta.env.MODE === 'test') return
   if (opening) return
   opening = open()
+}
+
+type SessionHot = {
+  dispose: (cb: (data: Record<string, unknown>) => void) => void
+  data: Record<string, unknown>
+}
+
+const sessionHot = (import.meta as ImportMeta & { hot?: SessionHot }).hot
+if (sessionHot) {
+  sessionHot.dispose((data) => {
+    data.restart = true
+  })
+  if (sessionHot.data.restart) startSession()
 }
 
 export const useSession = create<SessionState>((set, get) => ({

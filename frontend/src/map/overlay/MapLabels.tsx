@@ -14,6 +14,8 @@ import { useWorld } from '@/stores/world'
 import { useServerNow } from '@/hooks/useServerNow'
 import { useBooth } from '@/booth/circle'
 import { demoIsActive, demoPath, layoutDemo, useDemoRing, useHardware } from '@/booth/demoRing'
+import { Path } from '@/lib/geometry'
+import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
 import { demoReveal } from '@/mock/calhacksCrowd'
 import { calhacksMarks } from '@/mock/calhacks'
 import { useSession } from '@/stdb/session'
@@ -314,20 +316,28 @@ function RouteTags({ engine }: { engine: MapEngine }) {
 
 function DemoRingTag({ engine }: { engine: MapEngine }) {
   const venueId = useWorld((s) => s.venue?.venueId)
+  const incidents = useWorld((s) => s.incidents)
   const ring = useDemoRing()
   const phase = useSession((s) => s.phase)
+  const scripted = useHallDemo((s) => s.scripted)
+  const bands = useHardware((s) => s.bands)
   if (venueId !== 'calhacks') return null
   const live = phase === 'live'
   const lost = phase === 'error'
+  const alerting = scripted || demoIsActive(bands, Object.values(incidents))
   return (
     <Anchored engine={engine} id="demo-ring" resolve={() => ({ x: ring.x, y: ring.y, z: 1.2 })} className="-translate-x-1/2 -translate-y-full">
       <span
         className={cn(
-          'block rounded-[3px] px-2 py-1 text-[12px] font-medium shadow-[inset_0_0_0_1px_rgba(220,199,159,0.7)]',
-          lost ? 'bg-[rgba(20,20,22,0.9)] text-ink-muted shadow-[inset_0_0_0_1px_rgba(125,125,131,0.7)]' : 'bg-[rgba(20,18,14,0.9)] text-champagne',
+          'block rounded-[3px] px-2 py-1 text-[12px] font-medium',
+          alerting
+            ? 'bg-[rgba(42,12,10,0.92)] text-signal shadow-[inset_0_0_0_1px_rgba(255,59,48,0.85)] motion-safe:animate-pulse'
+            : lost
+              ? 'bg-[rgba(20,20,22,0.9)] text-ink-muted shadow-[inset_0_0_0_1px_rgba(125,125,131,0.7)]'
+              : 'bg-[rgba(20,18,14,0.9)] text-champagne shadow-[inset_0_0_0_1px_rgba(220,199,159,0.7)]',
         )}
       >
-        {lost ? 'Connection lost' : live ? 'LIVE · demo' : 'Demo'}
+        {alerting ? 'SOS' : lost ? 'Connection lost' : live ? 'LIVE · demo' : 'Demo'}
         {ring.editing && <span className="ml-1.5 font-mono text-[10px] text-ink-dim">drag</span>}
       </span>
     </Anchored>
@@ -337,23 +347,26 @@ function DemoRingTag({ engine }: { engine: MapEngine }) {
 function DemoPathTag({ engine }: { engine: MapEngine }) {
   const venueId = useWorld((s) => s.venue?.venueId)
   const ring = useDemoRing()
-  const bands = useHardware((s) => s.bands)
-  const incidents = useWorld((s) => s.incidents)
+  const hardware = useHardware((s) => s.bands)
+  const scripted = useHallDemo((s) => s.scripted)
+  const pathOpen = useHallDemo((s) => s.pathOpen)
+  const acknowledged = useHallDemo((s) => s.acknowledged)
   const onPath = useMapStats((s) => s.onCorridor)
-  if (venueId !== 'calhacks' || !demoIsActive(bands, Object.values(incidents))) return null
+  if (venueId !== 'calhacks' || (!pathOpen && !(scripted && acknowledged))) return null
   const path = demoPath(ring)
-  const mid = { x: (path[0]!.x + path[1]!.x) / 2, y: (path[0]!.y + path[1]!.y) / 2 }
-  const lengthM = Math.round(Math.hypot(path[1]!.x - path[0]!.x, path[1]!.y - path[0]!.y))
-  const open = demoReveal() > 1
+  const line = new Path(path)
+  const mid = line.at(line.length / 2)
+  const lengthM = Math.round(line.length)
+  const open = pathOpen && demoReveal() > 1
+  const count = scripted ? bandsOnFloor().length : hardware.length
   return (
-    <Anchored engine={engine} id="demo-path" resolve={() => ({ x: mid.x, y: mid.y, z: 0.2 })} className="-translate-x-[calc(100%+1rem)] -translate-y-1/2">
-      <span className="flex flex-col gap-0.5 rounded-[3px] bg-[rgba(14,14,16,0.88)] px-2.5 py-1.5 shadow-[inset_0_0_0_1px_rgba(220,199,159,0.45)]">
-        <span className="text-[12px] font-medium text-ink">Clear path · {lengthM} m</span>
+    <Anchored engine={engine} id="demo-path" resolve={() => ({ x: mid.x, y: mid.y, z: 0.2 })} className="translate-x-4 -translate-y-1/2">
+      <span className="flex flex-col gap-0.5 rounded-[3px] bg-[rgba(28,20,10,0.9)] px-2.5 py-1.5 shadow-[inset_0_0_0_1px_rgba(255,181,71,0.75)]">
+        <span className="text-[12px] font-medium text-aside">{pathOpen ? `Clear path · ${lengthM} m` : `Path ready · ${lengthM} m`}</span>
+        <span className="text-[11px] text-ink-dim">{count} in the ring</span>
         <span className="text-[11px] text-ink-dim">
-          {bands.length} live in the ring
-        </span>
-        <span className="text-[11px] text-ink-dim">
-          {open ? `${onPath} still on the path` : 'Opening from the entrance'} <span className="font-mono text-ink-muted">sim</span>
+          {pathOpen ? (open ? `${onPath} still on the path` : 'Opening from the entrance') : 'Opens when you clear it'}{' '}
+          <span className="font-mono text-ink-muted">sim</span>
         </span>
       </span>
     </Anchored>
@@ -364,7 +377,9 @@ function DemoBandLabels({ engine }: { engine: MapEngine }) {
   const venueId = useWorld((s) => s.venue?.venueId)
   const show = useUi((s) => s.layers.bands)
   const ring = useDemoRing()
-  const bands = useHardware((s) => s.bands)
+  const hardware = useHardware((s) => s.bands)
+  const scripted = useHallDemo((s) => s.scripted)
+  const bands = scripted ? bandsOnFloor() : hardware
   if (!show || venueId !== 'calhacks' || bands.length === 0) return null
   const laid = layoutDemo(bands, ring)
   return (
