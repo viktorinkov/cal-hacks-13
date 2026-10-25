@@ -559,7 +559,7 @@ def claude_jobs(y0):
     S.begin_frame("8 · Claude jobs", 0, y0, 1000, 600)
     title("Claude")
     jobs = [("medical_extract", "apply_medical_extract", "reads medical PDF"),
-            ("claim_record_extract", "apply_medical_record", "reads hospital report"),
+            ("clinic_report", "file_clinic_report", "writes hospital report"),
             ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
             ("claim_draft", "attach_claim_letters", "drafts letters")]
     rows = []
