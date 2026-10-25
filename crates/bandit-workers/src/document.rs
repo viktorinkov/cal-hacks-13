@@ -82,9 +82,7 @@ pub async fn read_pdf(ctx: &Ctx, job: &JobIn, hash: &str, kind: &str, pages: &[V
     let page_count = pages.len() as u32;
     let stored = es.document_pages(hash).await?;
     if stored.len() != pages.len() || stored.iter().any(|s| s.needs_transcription) {
-        for (i, page) in pages.iter().enumerate() {
-            es.put_page(hash, kind, i as u32 + 1, page, None).await?;
-        }
+        es.put_pages(hash, kind, pages).await?;
         let scans: Vec<u32> = es.document_pages(hash).await?.iter().filter(|s| s.needs_transcription).map(|s| s.page).collect();
         for n in scans {
             let page = pages.get(n as usize - 1).with_context(|| format!("page {n} is not in the PDF"))?;
