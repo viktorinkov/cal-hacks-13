@@ -145,12 +145,13 @@ pub fn show(app: &App, id: u64) -> Result<()> {
         }
     }
 
-    let mut precedents: Vec<ClaimPrecedent> = db.db.claim_precedent().iter().filter(|p| p.claim_id == id && p.pack_version == v).collect();
-    precedents.sort_by(|a, b| b.score.total_cmp(&a.score));
-    if !precedents.is_empty() {
-        println!("\nprecedents from Elastic (v{v})");
-        for p in precedents {
-            println!("  {:.2}  {}  {}  {}  {}", p.score, p.reference, p.outcome, money(p.payout_cents), p.narrative);
+    let mut clauses: Vec<ClaimClause> = db.db.claim_clause().iter().filter(|k| k.claim_id == id && k.pack_version == v).collect();
+    clauses.sort_by(|a, b| b.score.total_cmp(&a.score));
+    if !clauses.is_empty() {
+        println!("\npolicy clauses from Elastic (v{v})");
+        for k in clauses {
+            println!("  {:.2}  {}  {} policy, {}, page {}", k.score, k.clause_id, k.policy, k.section.replace('_', " "), k.page);
+            println!("        {}", clip(k.text.trim(), 160));
         }
     }
 

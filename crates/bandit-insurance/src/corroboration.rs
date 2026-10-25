@@ -188,6 +188,7 @@ mod tests {
             vision: None,
             record: None,
             policy: None,
+            responsible: None,
         }
     }
 

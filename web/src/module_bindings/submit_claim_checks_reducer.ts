@@ -12,7 +12,7 @@ import {
 
 import {
   CheckIn,
-  PrecedentIn,
+  ClauseIn,
 } from "./types";
 
 export default {
@@ -20,7 +20,7 @@ export default {
   get checks() {
     return __t.array(CheckIn);
   },
-  get precedents() {
-    return __t.array(PrecedentIn);
+  get clauses() {
+    return __t.array(ClauseIn);
   },
 };

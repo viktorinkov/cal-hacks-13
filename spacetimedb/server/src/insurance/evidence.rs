@@ -25,8 +25,21 @@ pub fn cover_of(claim: &Claim) -> CoverKind {
     CoverKind::parse(&claim.cover_kind).unwrap_or(CoverKind::Property)
 }
 
+/// The cover a claim is paid from: one of the venue policy's, or the attendee's own policy's one cover.
 pub fn policy_rule(ctx: &ReducerContext, policy_id: u64, cover: CoverKind) -> Option<CoverageRuleRow> {
+    if cover.is_attendee_policy() {
+        return ctx.db.attendee_policy().id().find(policy_id).map(|p| super::own_policy::cover_rule(&p));
+    }
     ctx.db.coverage_rule().policy_id().filter(policy_id).find(|r| r.cover_kind == cover.as_str())
+}
+
+/// Paid so far under the claim's cover, against its aggregate limit.
+pub fn used_cents(ctx: &ReducerContext, claim: &Claim) -> u64 {
+    let cover = cover_of(claim);
+    if cover.is_attendee_policy() {
+        return ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| p.used_cents).unwrap_or(0);
+    }
+    ctx.db.insurance_policy().id().find(claim.policy_id).map(|p| aggregate_used(&p, cover)).unwrap_or(0)
 }
 
 pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRule {
@@ -45,7 +58,7 @@ pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRul
 pub fn aggregate_used(policy: &InsurancePolicy, cover: CoverKind) -> u64 {
     match cover {
         CoverKind::MedicalPayments => policy.medical_used_cents,
-        CoverKind::Property => policy.property_used_cents,
+        CoverKind::Property | CoverKind::PersonalProperty => policy.property_used_cents,
     }
 }
 
@@ -184,21 +197,36 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
     });
 
     let cover = cover_of(claim);
-    let policy = ctx.db.insurance_policy().id().find(claim.policy_id).and_then(|p| {
-        policy_rule(ctx, p.id, cover).map(|r| PolicyInfo {
+    let policy = if cover.is_attendee_policy() {
+        ctx.db.attendee_policy().id().find(claim.policy_id).map(|p| PolicyInfo {
             policy_id: p.id,
             policy_number: p.policy_number.clone(),
             insurer_name: p.insurer_name.clone(),
             cover_kind: cover,
-            per_claim_limit_cents: r.per_claim_limit_cents,
-            aggregate_limit_cents: r.aggregate_limit_cents,
-            aggregate_used_cents: aggregate_used(&p, cover),
-            deductible_cents: r.deductible_cents,
+            per_claim_limit_cents: p.per_claim_limit_cents,
+            aggregate_limit_cents: p.aggregate_limit_cents,
+            aggregate_used_cents: p.used_cents,
+            deductible_cents: p.deductible_cents,
             read_at: micros(ctx.timestamp),
         })
-    });
+    } else {
+        ctx.db.insurance_policy().id().find(claim.policy_id).and_then(|p| {
+            policy_rule(ctx, p.id, cover).map(|r| PolicyInfo {
+                policy_id: p.id,
+                policy_number: p.policy_number.clone(),
+                insurer_name: p.insurer_name.clone(),
+                cover_kind: cover,
+                per_claim_limit_cents: r.per_claim_limit_cents,
+                aggregate_limit_cents: r.aggregate_limit_cents,
+                aggregate_used_cents: aggregate_used(&p, cover),
+                deductible_cents: r.deductible_cents,
+                read_at: micros(ctx.timestamp),
+            })
+        })
+    };
+    let responsible = super::charges::responsible_info(ctx, inc.id);
 
-    EvidenceInput { incident, snapshot, witnesses, notes, zone, presence, vision, record, policy }
+    EvidenceInput { incident, snapshot, witnesses, notes, zone, presence, vision, record, policy, responsible }
 }
 
 /// The record's encounter as a timestamp: its date and time of service in
@@ -281,7 +309,7 @@ pub fn occurrence(ctx: &ReducerContext, incident_id: u64) -> Vec<Incident> {
     let Some(inc) = ctx.db.incident().id().find(incident_id) else {
         return Vec::new();
     };
-    if inc.kind == IncidentKind::Property || inc.zone_id == 0 {
+    if !inc.kind.is_injury() || inc.zone_id == 0 {
         return vec![inc];
     }
     let at = micros(inc.opened_at);
@@ -289,7 +317,7 @@ pub fn occurrence(ctx: &ReducerContext, incident_id: u64) -> Vec<Incident> {
         .db
         .incident()
         .iter()
-        .filter(|i| i.kind != IncidentKind::Property && i.zone_id == inc.zone_id && (micros(i.opened_at) - at).abs() <= OCCURRENCE_MICROS)
+        .filter(|i| i.kind.is_injury() && i.zone_id == inc.zone_id && (micros(i.opened_at) - at).abs() <= OCCURRENCE_MICROS)
         .collect();
     all.sort_by_key(|i| i.id);
     all

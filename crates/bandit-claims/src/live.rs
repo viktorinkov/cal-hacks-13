@@ -1,17 +1,33 @@
-//! `bandit-claims live`: the floor staff while the live run is on. The module decides who falls, where and
-//! when; this plays the people who answer it. The medic reaches each person, notes what they found and
-//! resolves the incident; the person who fell files their claim (staff file it for them) and the hospital
-//! report follows on its own; the camera confirms broken equipment and the organizer logs the repair cost.
-//! A claim left waiting for the organizer, in this run or an earlier one, is decided after `--approve-after`
-//! seconds so the run keeps moving: approved with a learned rule, or refused when Claude recommended refusing
-//! it. While the run is paused, the floor staff wait too.
+//! `bandit-claims live`: the floor staff while the live run is on. The module decides who falls, what breaks
+//! or goes missing, where and when; this plays the people who answer it. The medic reaches each person, notes
+//! what they found and resolves the incident; the person who fell files their claim (staff file it for them)
+//! and the hospital report follows on its own; for broken equipment and an attendee's stolen or broken
+//! belonging, the camera confirms it, staff log the cost, name who did it and resolve it. A claim left waiting
+//! for the organizer, in this run or an earlier one, is decided after `--approve-after` seconds so the run
+//! keeps moving: approved with a learned rule, or refused when Claude recommended refusing it; a proposed
+//! charge is approved when Claude recommends it and the band's checks passed, else waived. While the run is
+//! paused, the floor staff wait too.
 //!
-//! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
-//! band, is treated as a sprain at first aid.
+//! - A fall or an SOS: the medic reaches the person, notes what they found and resolves the incident; the
+//!   person files their claim (staff file it for them) and the hospital report follows on its own.
+//! - Broken equipment (`property`), an attendee's belonging stolen (`theft`) or broken by someone else
+//!   (`breakage`): security answers it. The camera sighting when a camera covers the spot, the cost note (the
+//!   repair estimate, or the item and its value), the attendee who broke or took it named by their band, then
+//!   the incident resolved, which opens the claim.
+//!
+//! After `--approve-after` seconds the organizer decides what is still waiting, so the run keeps moving: a
+//! routed claim is approved with a learned rule, or refused when the claims agent found the injury happened
+//! away from the event; a proposed charge the claims review has recommended on is approved when the band's
+//! checks passed and the review recommends charging, and waived otherwise. While the run is paused, the floor
+//! staff wait too.
+//!
+//! Each incident's plan comes from `live_plan`. An injury with no plan, such as a fall on a presenter's own
+//! band, is treated as a sprain at first aid; broken or taken things with no plan are looked into and resolved
+//! with no cost and nobody named.
 
 use crate::app::*;
 use crate::{decide, flow};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bandit_bindings::*;
 use spacetimedb_sdk::Table;
 use std::collections::HashSet;
@@ -33,23 +49,27 @@ const LIVE_TABLES: &[&str] = &[
     "insurance_policy",
     "coverage_rule",
     "insurance_settings",
+    "charge",
     "live_run",
     "live_plan",
     "live_pause",
     "incident_marker",
 ];
 
-/// The plan for an incident nobody scripted: a sprain treated at first aid.
-fn default_plan(m: &IncidentMarker) -> LivePlan {
+/// The plan for an incident nobody scripted: a sprain treated at first aid, or broken or taken things looked
+/// into with no record, no cost and nobody named.
+fn default_plan(m: &IncidentMarker, kind: IncidentKind) -> LivePlan {
     let place = if m.place.is_empty() { "the floor".to_string() } else { m.place.clone() };
-    LivePlan {
-        incident_id: m.incident_id,
-        record: "first-aid-wrist".into(),
-        note: format!("on scene at {place}: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
-        resolution: "treated on site".into(),
-        cost_cents: 0,
-        camera: false,
-    }
+    let (record, note, resolution) = if is_injury(kind) {
+        (
+            "first-aid-wrist".to_string(),
+            format!("on scene at {place}: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
+            "treated on site".to_string(),
+        )
+    } else {
+        (String::new(), String::new(), format!("security looked into it at {place}; nothing to claim"))
+    };
+    LivePlan { incident_id: m.incident_id, record, note, resolution, cost_cents: 0, camera: false, culprit_band: 0, naming: String::new() }
 }
 
 /// Seconds since a timestamp.
@@ -69,7 +89,7 @@ fn treat_secs(id: u64) -> i64 {
 /// The person files their claim this long after the medic resolves the incident; the hospital report then
 /// arrives on its own, drawn by the module's seeded generator.
 const FILE_SECS: i64 = 8;
-/// The camera's assessment and the organizer's cost note for broken equipment.
+/// The camera's sighting, then security's cost note, naming and resolution, for broken or taken things.
 const CAMERA_SECS: i64 = 6;
 const COST_SECS: i64 = 16;
 
@@ -96,8 +116,8 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
         }
         let markers: Vec<IncidentMarker> = db.db.incident_marker().iter().filter(|m| m.opened_at >= r.started_at).collect();
         for m in markers {
-            let plan = db.db.live_plan().incident_id().find(&m.incident_id).unwrap_or_else(|| default_plan(&m));
-            if let Err(e) = floor(app, &m, &plan, &mut done) {
+            let plan = db.db.live_plan().incident_id().find(&m.incident_id);
+            if let Err(e) = floor(app, &m, plan, &mut done) {
                 say!(app, "live       incident {}: {e:#}", m.incident_id);
             }
         }
@@ -114,6 +134,20 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
                 if done.insert((c.id, "decide")) {
                     if let Err(e) = decide_claim(app, &c) {
                         say!(app, "live       claim {}: {e:#}", c.id);
+                    }
+                }
+            }
+            // A charge waits for its claim's review: the recommendation is set once the claim is decided.
+            let charges: Vec<Charge> = db
+                .db
+                .charge()
+                .iter()
+                .filter(|c| c.status == "proposed" && !c.recommendation.is_empty() && c.created_at >= r.started_at && since(c.updated_at) >= approve_after as i64)
+                .collect();
+            for c in charges {
+                if done.insert((c.id, "charge")) {
+                    if let Err(e) = decide_charge(app, &c) {
+                        say!(app, "live       charge {}: {e:#}", c.id);
                     }
                 }
             }
@@ -159,11 +193,12 @@ fn file_left_records(app: &App, db: &DbConnection) -> Result<()> {
 }
 
 /// The next step on one incident, when its time has come.
-fn floor(app: &App, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
+fn floor(app: &App, m: &IncidentMarker, plan: Option<LivePlan>, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
     let id = m.incident_id;
     let i = app.incident(id)?;
-    if plan.camera || i.kind == IncidentKind::Property {
-        return property(app, &i, m, plan, done);
+    let plan = plan.unwrap_or_else(|| default_plan(m, i.kind));
+    if !is_injury(i.kind) {
+        return loss(app, &i, m, &plan, done);
     }
     if !i.resolved {
         if i.assigned_medic.is_none() {
@@ -208,8 +243,10 @@ fn statement(record: &str, place: &str) -> String {
     }
 }
 
-/// Broken equipment: the camera confirms it, the organizer logs the repair cost and resolves it.
-fn property(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
+/// Broken equipment, or an attendee's belonging stolen or broken: security answers it. The camera sighting
+/// when a camera covers the spot, the cost note, the attendee who did it named, then the incident resolved,
+/// which opens its claim. Each step runs once; a step that fails leaves the next ones to the next tick.
+fn loss(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
     if i.resolved {
         return Ok(());
     }
@@ -217,17 +254,41 @@ fn property(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: 
     if plan.camera && age >= CAMERA_SECS && i.vision_status == "none" && done.insert((i.id, "camera")) {
         let db = app.db()?;
         let zone = db.db.zone().id().find(&i.zone_id).ok_or_else(|| anyhow::anyhow!("no zone {}", i.zone_id))?;
+        camera_on(app, &zone)?;
         flow::vision_stub(app, i, &zone, &plan.note, &plan.note)?;
     }
-    if age >= COST_SECS && done.insert((i.id, "cost")) {
+    if age < COST_SECS {
+        return Ok(());
+    }
+    if plan.cost_cents > 0 && done.insert((i.id, "cost")) {
         let ops = app.actor("ops")?;
-        if plan.cost_cents > 0 {
-            let note = format!("repair estimate from the vendor: {}", money(plan.cost_cents));
-            call!(ops, add_incident_note_then(i.id, note, Some(plan.cost_cents)))?;
-            say!(app, "organizer  incident {} at {}: logged the repair cost {}", i.id, m.place, money(plan.cost_cents));
-        }
+        // Broken equipment gets the vendor's repair estimate; a belonging's note already says the item and its value.
+        let note =
+            if i.kind == IncidentKind::Property { format!("repair estimate from the vendor: {}", money(plan.cost_cents)) } else { plan.note.clone() };
+        call!(ops, add_incident_note_then(i.id, note, Some(plan.cost_cents)))?;
+        say!(app, "organizer  incident {} at {}: logged the cost {}", i.id, m.place, money(plan.cost_cents));
+    }
+    if plan.culprit_band != 0 && done.insert((i.id, "name")) {
+        let ops = app.actor("ops")?;
+        call!(ops, name_responsible_band_then(i.id, plan.culprit_band, plan.naming.clone()))?;
+        say!(app, "organizer  incident {} at {}: named band {}: {}", i.id, m.place, plan.culprit_band, plan.naming);
+    }
+    if done.insert((i.id, "resolve")) {
         flow::resolve(app, i.id, &plan.resolution, "ops")?;
     }
+    Ok(())
+}
+
+/// The plan says a camera covers the spot: when no camera row covers the zone yet, security puts one up.
+fn camera_on(app: &App, zone: &Zone) -> Result<()> {
+    let db = app.db()?;
+    if db.db.camera().iter().any(|c| c.zone_id == zone.id) {
+        return Ok(());
+    }
+    let vision = app.actor("vision")?;
+    call!(vision, upsert_camera_then(format!("{} camera", zone.name), zone.id, "overhead".into()))?;
+    until(3.0, || db.db.camera().iter().any(|c| c.zone_id == zone.id).then_some(())).with_context(|| format!("no camera appeared on {}", zone.name))?;
+    say!(app, "vision     camera up on {}", zone.name);
     Ok(())
 }
 
@@ -240,6 +301,21 @@ fn decide_claim(app: &App, c: &Claim) -> Result<()> {
         decide::refuse(app, c.id, None, "nothing to pay: no hospital report covers it", false)?;
     } else {
         decide::approve(app, c.id, None, None, true, false, false)?;
+    }
+    Ok(())
+}
+
+/// The organizer's decision on a proposed charge: approved with exactly the amount and pack it shows when the
+/// band's checks passed and the review recommends charging, waived otherwise.
+fn decide_charge(app: &App, c: &Charge) -> Result<()> {
+    let ops = app.actor("ops")?;
+    if c.checks_passed && c.recommendation == "charge" {
+        call!(ops, approve_charge_then(c.id, c.amount_cents, c.pack_hash.clone()))?;
+        say!(app, "organizer  charge {}: approved {} to {} on pack {}", c.id, money(c.amount_cents), c.attendee_name, short_hash(&c.pack_hash));
+    } else {
+        let reason = if c.checks_passed { "the review recommends no charge" } else { "a check of the named band failed" };
+        call!(ops, waive_charge_then(c.id, reason.to_string()))?;
+        say!(app, "organizer  charge {}: waived the charge to {}: {reason}", c.id, c.attendee_name);
     }
     Ok(())
 }

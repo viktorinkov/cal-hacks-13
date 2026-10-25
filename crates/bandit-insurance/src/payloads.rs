@@ -21,8 +21,11 @@ pub const KIND_RECOVERY: &str = "recovery_letter";
 pub const KIND_PAYOUT: &str = "claim_payout";
 /// The hospital sends its report for an injury claim, written for the case the module drew.
 pub const KIND_CLINIC: &str = "clinic_report";
+/// The attendee pays a charge from their wallet: a Nessie purchase at the venue.
+pub const KIND_CHARGE_PAYMENT: &str = "charge_payment";
 
-pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC];
+pub const INSURANCE_KINDS: &[&str] =
+    &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC, KIND_CHARGE_PAYMENT];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RecordExtractPayload {
@@ -59,19 +62,45 @@ pub struct VerifyPayload {
     pub payout_cents: Cents,
     /// For property claims: what the staff note says was damaged.
     pub property_description: String,
+    /// The loss staff logged: the repair cost or the item's value, for every kind but an injury.
+    #[serde(default)]
+    pub cost_cents: Cents,
+    /// True when staff named the attendee who broke or took it.
+    #[serde(default)]
+    pub responsible_named: bool,
+    /// The attendee's own policy document (`attendee_policy.document_hash`), empty when none is on file.
+    #[serde(default)]
+    pub attendee_policy_hash: String,
     /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
     #[serde(default)]
     pub venue_policy_hash: String,
 }
 
-/// A similar past claim Elastic found, as the module stored it.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Precedent {
-    pub reference: String,
-    pub outcome: String,
-    pub payout_cents: Cents,
-    pub narrative: String,
+/// A policy clause the Evidence Engine found for a claim, as the module stored it (`claim_clause`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClauseRef {
+    pub clause_id: String,
+    /// `venue` or `attendee`.
+    pub policy: String,
+    pub section: String,
+    pub page: u32,
+    pub text: String,
     pub score: f32,
+}
+
+/// The charge staff proposed on the claim's incident, for Claude's recommendation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChargeBrief {
+    pub charge_id: u64,
+    pub band_id: u32,
+    pub attendee_name: String,
+    /// What code would charge: the claim's whole loss.
+    pub amount_cents: Cents,
+    pub named_by_role: String,
+    pub note: String,
+    /// Code's checks of the named band: in the zone, at the spot, the cameras.
+    pub checks: Vec<Check>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -94,12 +123,20 @@ pub struct ReviewPayload {
     /// The record's history of present illness and reason for visit, as extracted.
     pub record_history: String,
     pub record_reason: String,
-    pub precedents: Vec<Precedent>,
+    /// The policy clauses the Evidence Engine found for this pack version, closest first.
+    #[serde(default)]
+    pub clauses: Vec<ClauseRef>,
     /// What the cover pays for and what it excludes, in a few lines.
     pub policy_summary: String,
     /// What the attendee wrote when they filed the claim, in their own words.
     #[serde(default)]
     pub claimant_statement: String,
+    /// The charge staff proposed on this incident, when they named someone.
+    #[serde(default)]
+    pub charge: Option<ChargeBrief>,
+    /// The attendee's own policy document, empty when none is on file: Claude's policy search covers it too.
+    #[serde(default)]
+    pub attendee_policy_hash: String,
     /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
     #[serde(default)]
     pub venue_policy_hash: String,
@@ -130,6 +167,22 @@ pub struct PayoutPayload {
     pub customer_id: String,
     pub account_id: String,
     pub payout_cents: Cents,
+    pub memo: String,
+}
+
+/// Input of `charge_payment`: the attendee pays a charge from their wallet.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChargePaymentPayload {
+    pub charge_id: u64,
+    /// The paying attendee's SpacetimeDB identity, hex.
+    pub payer: String,
+    pub payer_name: String,
+    /// The attendee's Nessie customer and account; empty when they have no wallet yet.
+    pub customer_id: String,
+    pub account_id: String,
+    pub amount_cents: Cents,
+    /// The merchant the purchase is made at: the venue.
+    pub merchant_name: String,
     pub memo: String,
 }
 

@@ -15,13 +15,14 @@ use crate::model::new_call;
 #[derive(Clone, Debug)]
 pub enum Finish {
     MedicalRecord { record_json: String },
-    ClaimChecks { checks: Vec<CheckIn>, precedents: Vec<PrecedentIn> },
+    ClaimChecks { checks: Vec<CheckIn>, clauses: Vec<ClauseIn> },
     ClaimReview { review_json: String },
     ClaimLetters { fnol_hash: String, summary_hash: String, determination_hash: String },
     RecoveryLetter { hash: String },
     ClaimPayout { customer_id: String, account_id: String, deposit_id: String },
     WalletOpened { customer_id: String, account_id: String },
     MerchPaid { merchant_id: String, purchase_id: String },
+    ChargePaid { customer_id: String, account_id: String, purchase_id: String },
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
     PlanLookup { result: PlanLookupResult },
@@ -136,7 +137,7 @@ impl Sink {
         let required = || last.clone().unwrap_or_else(|| new_call("none"));
         match finish {
             Finish::MedicalRecord { record_json } => reduce!(conn, apply_medical_record_then(job_id, record_json, required())),
-            Finish::ClaimChecks { checks, precedents } => reduce!(conn, submit_claim_checks_then(job_id, checks, precedents)),
+            Finish::ClaimChecks { checks, clauses } => reduce!(conn, submit_claim_checks_then(job_id, checks, clauses)),
             Finish::ClaimReview { review_json } => reduce!(conn, submit_claim_review_then(job_id, review_json, required())),
             Finish::ClaimLetters { fnol_hash, summary_hash, determination_hash } => {
                 reduce!(conn, attach_claim_letters_then(job_id, fnol_hash, summary_hash, determination_hash, last))
@@ -147,6 +148,9 @@ impl Sink {
             }
             Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
+            Finish::ChargePaid { customer_id, account_id, purchase_id } => {
+                reduce!(conn, record_charge_payment_then(job_id, customer_id, account_id, purchase_id))
+            }
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
             Finish::PlanLookup { result } => reduce!(conn, finish_plan_lookup_then(job_id, result, last)),
@@ -203,11 +207,11 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
     let call = call.map(call_json);
     let (reducer, args) = match finish {
         Finish::MedicalRecord { record_json } => ("apply_medical_record", json!({"record_json": parse_or_text(record_json), "call": call})),
-        Finish::ClaimChecks { checks, precedents } => (
+        Finish::ClaimChecks { checks, clauses } => (
             "submit_claim_checks",
             json!({
                 "checks": checks.iter().map(|c| json!({"name": c.name, "result": c.result, "detail": c.detail})).collect::<Vec<_>>(),
-                "precedents": precedents.iter().map(|p| json!({"reference": p.reference, "outcome": p.outcome, "payout_cents": p.payout_cents, "narrative": p.narrative, "score": p.score})).collect::<Vec<_>>(),
+                "clauses": clauses.iter().map(|c| json!({"clause_id": c.clause_id, "policy": c.policy, "section": c.section, "page": c.page, "text": c.text, "score": c.score})).collect::<Vec<_>>(),
             }),
         ),
         Finish::ClaimReview { review_json } => ("submit_claim_review", json!({"review_json": parse_or_text(review_json), "call": call})),
@@ -221,6 +225,9 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         }
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
+        Finish::ChargePaid { customer_id, account_id, purchase_id } => {
+            ("record_charge_payment", json!({"customer_id": customer_id, "account_id": account_id, "purchase_id": purchase_id}))
+        }
         Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
         Finish::ClinicReport { record_json, file_hash } => {
             ("file_clinic_report", json!({"record_json": parse_or_text(record_json), "file_hash": file_hash, "call": call}))

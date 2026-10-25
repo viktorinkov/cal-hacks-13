@@ -15,6 +15,10 @@ pub enum Account {
     InsurerReceivable,
     /// Asset.
     Cash,
+    /// Asset: what an attendee owes for something they broke or took.
+    AttendeeReceivable,
+    /// Income: what attendees pay back for losses they caused.
+    Recoveries,
 }
 
 impl Account {
@@ -24,6 +28,8 @@ impl Account {
             Account::ClaimsReserve => "claims_reserve",
             Account::InsurerReceivable => "insurer_receivable",
             Account::Cash => "cash",
+            Account::AttendeeReceivable => "attendee_receivable",
+            Account::Recoveries => "recoveries",
         }
     }
 }
@@ -38,7 +44,7 @@ pub struct Line {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Journal {
-    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`.
+    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`, `J5 charge`, `J6 charge payment`.
     pub name: String,
     pub lines: Vec<Line>,
 }
@@ -91,6 +97,21 @@ pub fn insurer_payment(received_cents: Cents, recoverable_cents: Cents) -> Journ
         lines.push(line(Account::ClaimsExpense, 0, received_cents - recoverable_cents, "insurer paid more than recoverable"));
     }
     Journal { name: "J4 reconciliation".to_string(), lines }
+}
+
+/// J5 when the organizer approves a charge: debit `attendee_receivable`, credit `recoveries`.
+pub fn charge_approved(amount_cents: Cents) -> Journal {
+    pair("J5 charge", Account::AttendeeReceivable, Account::Recoveries, amount_cents, "charge to the attendee responsible")
+}
+
+/// J5r when the organizer waives an approved charge: debit `recoveries`, credit `attendee_receivable`.
+pub fn charge_waived(amount_cents: Cents) -> Journal {
+    pair("J5r charge waived", Account::Recoveries, Account::AttendeeReceivable, amount_cents, "charge waived")
+}
+
+/// J6 when the attendee pays the charge from their wallet: debit `cash`, credit `attendee_receivable`.
+pub fn charge_paid(amount_cents: Cents) -> Journal {
+    pair("J6 charge payment", Account::Cash, Account::AttendeeReceivable, amount_cents, "charge paid from the attendee's wallet")
 }
 
 fn line(account: Account, debit_cents: Cents, credit_cents: Cents, memo: &str) -> Line {
@@ -190,6 +211,15 @@ mod tests {
         assert_eq!(balance(&life, Account::InsurerReceivable), 0);
         assert_eq!(balance(&life, Account::ClaimsExpense), 50000);
         assert_eq!(balance(&life, Account::Cash), -50000);
+    }
+
+    #[test]
+    fn a_paid_charge_ends_in_cash_and_recoveries() {
+        let life = [charge_approved(240000), charge_paid(240000)];
+        assert!(life.iter().all(Journal::is_balanced));
+        assert_eq!(balance(&life, Account::AttendeeReceivable), 0);
+        assert_eq!(balance(&life, Account::Cash), 240000);
+        assert_eq!(balance(&life, Account::Recoveries), -240000);
     }
 
     #[test]

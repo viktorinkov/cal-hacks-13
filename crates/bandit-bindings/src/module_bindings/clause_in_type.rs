@@ -6,14 +6,15 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct PrecedentIn {
-    pub reference: String,
-    pub outcome: String,
-    pub payout_cents: u64,
-    pub narrative: String,
+pub struct ClauseIn {
+    pub clause_id: String,
+    pub policy: String,
+    pub section: String,
+    pub page: u32,
+    pub text: String,
     pub score: f32,
 }
 
-impl __sdk::InModule for PrecedentIn {
+impl __sdk::InModule for ClauseIn {
     type Module = super::RemoteModule;
 }

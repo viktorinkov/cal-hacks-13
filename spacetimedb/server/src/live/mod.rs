@@ -106,10 +106,16 @@ pub struct LivePlan {
     /// The medic's note on scene, or the organizer's note on the damage; empty when nobody writes one.
     pub note: String,
     pub resolution: String,
-    /// The repair cost the organizer logs on property damage, in cents.
+    /// The repair cost or the item's value staff log, in cents.
     pub cost_cents: u64,
     /// Whether a camera sees the damage.
     pub camera: bool,
+    /// The band of the attendee who broke or took it, whom staff name; 0 when nobody is named.
+    #[default(0)]
+    pub culprit_band: u32,
+    /// What staff write when they name them.
+    #[default("")]
+    pub naming: String,
 }
 
 /// Every incident on the 3D floor, whoever opened it: where, who, and how far along it is.
@@ -118,7 +124,7 @@ pub struct LivePlan {
 pub struct IncidentMarker {
     #[primary_key]
     pub incident_id: u64,
-    /// `fall`, `sos` or `property`.
+    /// `fall`, `sos`, `property`, `theft` or `breakage`.
     pub kind: String,
     #[index(btree)]
     pub band_id: u32,
@@ -198,7 +204,7 @@ pub fn down_bands(ctx: &ReducerContext) -> Vec<Down> {
     ctx.db
         .incident_marker()
         .iter()
-        .filter(|m| m.status != "resolved" && m.band_id != 0 && m.kind != "property")
+        .filter(|m| m.status != "resolved" && m.band_id != 0 && (m.kind == "fall" || m.kind == "sos"))
         .map(|m| Down {
             incident_id: m.incident_id,
             band_id: m.band_id,
@@ -526,11 +532,7 @@ pub fn radio_band_spot(ctx: &ReducerContext, band_id: u32, zone: u8) -> (f32, f3
 
 /// Puts a new incident on the floor. Called by the safety system for every incident it opens.
 pub fn mark(ctx: &ReducerContext, incident: &safety::Incident, x_m: f32, y_m: f32) {
-    let kind = match incident.kind {
-        IncidentKind::Fall => "fall",
-        IncidentKind::Sos => "sos",
-        IncidentKind::Property => "property",
-    };
+    let kind = incident.kind.as_str();
     let person = if incident.subject_band == 0 {
         String::new()
     } else {

@@ -3,17 +3,20 @@
 // PDFs (or the plan's name), the insurance for their things, the Capital One wallet, then a thank-you.
 // When the host ends the event, the same page turns into the recap.
 // After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
-// shows how the payment is going until it lands in the wallet.
+// shows how each claim is going until it lands in the wallet, a stolen or broken belonging's claim too.
+// Below it, any charge the organizer approved for something the wearer broke or took, to pay from the
+// wallet or dispute; at the bottom, the wallet with its movements and the wearer's own policy.
 // Someone with the medic role who taps a band gets the medic view instead: the wearer's medical card
 // for first aid.
 
 import {
-  act, actors, api, apiSession, config, connect, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
+  act, actors, api, apiSession, capital, config, connect, date, finishSignIn, h, idToken, medicalCard, money, mount, playedToken,
   signIn, signOut, signedInEmail, testAs, time, viewing, type Actor, PLATFORMS,
 } from '../lib';
 import { bandCode, bandFromCode } from '../band-code';
-import { recap } from '../recap';
+import { movements, recap } from '../recap';
 import type { DbConnection } from '../module_bindings';
+import type { MyCharge } from '../module_bindings/types';
 
 const QUERIES = [
   'SELECT * FROM my_attendee',
@@ -40,6 +43,8 @@ const QUERIES = [
   'SELECT * FROM medic_medical_cards',
   'SELECT * FROM my_incidents',
   'SELECT * FROM my_claims',
+  'SELECT * FROM my_charges',
+  'SELECT * FROM my_attendee_policy',
 ];
 
 const token = decodeURIComponent(location.pathname.split('/').pop() ?? '');
@@ -348,10 +353,12 @@ function setup() {
 
 // --- Claims ---------------------------------------------------------------------------------
 
-/** What a claim's status means for the attendee, in plain words. */
-function claimStatus(tag: string, payoutCents: bigint): string {
+const INJURIES = ['fall', 'sos'];
+
+/** What a claim's status means for the attendee, in plain words. Only an injury waits for a hospital report. */
+function claimStatus(tag: string, payoutCents: bigint, kind: string): string {
   switch (tag) {
-    case 'AwaitingRecord': return 'Waiting for the hospital report';
+    case 'AwaitingRecord': return INJURIES.includes(kind) ? 'Waiting for the hospital report' : 'Being reviewed';
     case 'ReadingRecord': case 'Verifying': case 'Reviewing': return 'Being reviewed';
     case 'Routed': return 'Waiting for the organizer to approve the payment';
     case 'Paying': return 'Approved, paying into your wallet';
@@ -361,12 +368,19 @@ function claimStatus(tag: string, payoutCents: bigint): string {
   }
 }
 
-const KIND_WORDS: Record<string, string> = { fall: 'a fall', sos: 'a call for help' };
+const KIND_WORDS: Record<string, string> = {
+  fall: 'a fall',
+  sos: 'a call for help',
+  theft: 'something of yours that was stolen',
+  breakage: 'something of yours that was broken',
+};
 
-/** After a fall or a call for help: ask the venue to pay, in your own words, then follow the payment to the wallet. */
+/** After a fall or a call for help: ask the venue to pay, in your own words. Then every claim, of any kind,
+ *  followed to the wallet. */
 function claims() {
   const open = [...conn.db.myIncidents.iter()].filter(i => i.resolved && i.claimId === 0n).sort((a, b) => Number(a.incidentId - b.incidentId));
   const mine = [...conn.db.myClaims.iter()].sort((a, b) => Number(a.id - b.id));
+  const policy = conn.db.myAttendeePolicy.iter().next().value;
   const file = (incidentId: bigint) => async (e: Event) => {
     e.preventDefault();
     const statement = ((e.target as HTMLFormElement).elements.namedItem(`statement-${incidentId}`) as HTMLTextAreaElement).value.trim();
@@ -380,12 +394,77 @@ function claims() {
         h('textarea', { name: `statement-${i.incidentId}`, rows: 4, required: true, placeholder: 'Tell us what happened…' }),
         h('button', {}, 'Ask the venue to pay')))),
     mine.length > 0 && h('section', {},
-      h('h3', {}, 'Your payment'),
-      mine.map(c => h('div', {},
-        h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents)),
-        h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an injury'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
-        c.statement && h('p', {}, `You said: "${c.statement}"`)))),
+      h('h3', {}, mine.length > 1 ? 'Your claims' : 'Your claim'),
+      mine.map(c => {
+        const belonging = !INJURIES.includes(c.incidentKind);
+        return h('div', {},
+          h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents, c.incidentKind)),
+          h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an incident'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
+          belonging && (policy
+            ? h('p', { class: 'muted' }, `Your own policy with ${policy.insurerName} pays it, less your ${money(policy.deductibleCents)} deductible.`)
+            : h('p', { class: 'muted' }, `No policy of your own is on file, so the organizer decides it. For your own insurer: incident ${c.incidentId} at the ${c.zoneName}, ${date(c.openedAt)}.`)),
+          c.statement && h('p', {}, `You said: "${c.statement}"`));
+      })),
   ];
+}
+
+const CHARGE_WHAT: Record<string, string> = {
+  property: 'Venue equipment broken',
+  theft: "Another attendee's belonging stolen",
+  breakage: "Another attendee's belonging broken",
+};
+
+function chargeStatus(c: MyCharge): string {
+  switch (c.status) {
+    case 'approved': return 'To pay. Nothing leaves your wallet until you press pay.';
+    case 'paying': return 'Paying from your wallet…';
+    case 'paid': return `Paid from your wallet${c.paidAt ? ` at ${time(c.paidAt)}` : ''}.`;
+    case 'disputed': return 'Disputed. The organizer looks at it again.';
+    case 'waived': return 'Waived. You owe nothing.';
+    default: return c.status;
+  }
+}
+
+/** Charges the organizer approved for something the attendee broke or took, each like a receipt: pay it from
+ *  the wallet or dispute it in their own words. */
+function charges() {
+  const mine = [...conn.db.myCharges.iter()].sort((a, b) => Number(b.id - a.id));
+  const dispute = (chargeId: bigint) => async (e: Event) => {
+    e.preventDefault();
+    const text = ((e.target as HTMLFormElement).elements.namedItem(`dispute-${chargeId}`) as HTMLTextAreaElement).value.trim();
+    await act(() => conn.reducers.disputeCharge({ chargeId, text }));
+  };
+  return mine.length > 0 && h('section', {},
+    h('h3', {}, 'Your charges'),
+    mine.map(c => h('div', {},
+      h('p', { class: 'big' }, `${CHARGE_WHAT[c.incidentKind] ?? 'Something broken or taken'} at the ${c.zoneName}, ${time(c.happenedAt)}. ${money(c.amountCents)}.`),
+      c.why && h('p', {}, `Why: ${c.why.replace(/\.$/, '')}.`),
+      c.clause && h('p', {}, `${capital(c.clause.replace(/\.$/, ''))}.`),
+      h('p', {}, h('b', {}, chargeStatus(c))),
+      c.disputeText && h('p', {}, `You said: "${c.disputeText}"`),
+      c.status === 'approved' && [
+        h('button', { onclick: () => act(() => conn.reducers.payCharge({ chargeId: c.id })) }, 'Pay from wallet'),
+        h('form', { onsubmit: dispute(c.id) },
+          h('label', {}, 'Not you, or not right? Say why in your own words',
+            h('textarea', { name: `dispute-${c.id}`, rows: 3, required: true, placeholder: 'What happened…' })),
+          h('button', {}, 'Dispute'))])));
+}
+
+/** The wallet and its movements, and the attendee's own policy, during the event. The recap shows the wallet after it. */
+function wallet(ended: boolean) {
+  const w = conn.db.myWallet.iter().next().value;
+  const policy = conn.db.myAttendeePolicy.iter().next().value;
+  const showWallet = !!w && !ended && step !== 'wallet';
+  if (!showWallet && !policy) return null;
+  return h('section', {},
+    showWallet && [
+      h('h3', {}, 'Your wallet'),
+      h('p', { class: 'big' }, `${money(w!.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w!.accountId.slice(0, 8)}`)),
+      movements(conn)],
+    policy && [
+      h(showWallet ? 'h4' : 'h3', {}, 'Your own insurance for your things'),
+      h('p', {}, `${policy.insurerName}, policy ${policy.policyNumber}: up to ${money(policy.perClaimLimitCents)} a claim and ${money(policy.aggregateLimitCents)} a year, with a ${money(policy.deductibleCents)} deductible you carry.`),
+      h('p', { class: 'muted' }, 'It pays for your belongings stolen or broken here, into your wallet.')]);
 }
 
 // --- Medic view -------------------------------------------------------------------------------
@@ -411,7 +490,7 @@ async function tapAsMedic() {
 
 function medicView() {
   const m = [...conn.db.medicMedicalCards.iter()].filter(c => c.bandId === bandId).pop();
-  const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && i.kind.tag !== 'Property');
+  const incident = [...conn.db.openIncidents.iter()].find(i => i.subjectBand === bandId && ['Sos', 'Fall'].includes(i.kind.tag));
   const title = h('h2', {}, `Medic view: band ${code}`);
   const again = h('button', { class: 'link', onclick: tapAsMedic }, 'Tap again');
   if (m) {
@@ -455,11 +534,14 @@ function render() {
   const wears = mb && mb.bandId === bandId && mb.status === 'claimed';
   if (wears || (viewing() && conn.db.myAttendee.count() > 0)) {
     const screen = viewing() && viewedScreen();
-    if (screen) return mount('app', top, claims(), screen);
+    // The recap shows the wallet itself.
+    if (screen) return mount('app', top, claims(), charges(), screen, wallet(ended || location.hash === '#recap'));
     if (ended) {
-      return mount('app', top, claims(), recap(conn, render));
+      return mount('app', top, claims(), charges(), recap(conn, render), wallet(ended));
     }
-    return mount('app', top, claims(), setup());
+    // The setup first: it can move on a step, and the wallet's balance shows once, on the wallet step or below.
+    const steps = setup();
+    return mount('app', top, claims(), charges(), steps, wallet(ended));
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));

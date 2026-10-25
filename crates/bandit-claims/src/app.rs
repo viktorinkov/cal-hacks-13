@@ -56,7 +56,7 @@ pub const TABLES: &[&str] = &[
     "claim_check",
     "medical_record",
     "claim_line",
-    "claim_precedent",
+    "claim_clause",
     "claim_review",
     "decision",
     "approval",
@@ -259,7 +259,7 @@ impl App {
     }
 
     /// How to start the worker; a local database gets its own Elastic index so
-    /// test claims never become precedents in the live one.
+    /// test claims stay out of the live one.
     pub fn worker_hint(&self) -> String {
         let local = self.uri.contains("127.0.0.1") || self.uri.contains("localhost");
         let index = if local { format!(" ELASTIC_INDEX_PREFIX={}-local", self.database) } else { String::new() };
@@ -382,5 +382,13 @@ pub fn kind_name(k: IncidentKind) -> &'static str {
         IncidentKind::Sos => "sos",
         IncidentKind::Fall => "fall",
         IncidentKind::Property => "property",
+        IncidentKind::Theft => "theft",
+        IncidentKind::Breakage => "breakage",
     }
+}
+
+/// A fall or an SOS: a person who needs the medic and files their own claim. The other kinds are broken or
+/// taken things: security answers them, and resolving one with a cost note opens its claim.
+pub fn is_injury(k: IncidentKind) -> bool {
+    matches!(k, IncidentKind::Sos | IncidentKind::Fall)
 }

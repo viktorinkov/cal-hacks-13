@@ -17,7 +17,7 @@ pub fn fall(app: &App, test_bands: &TestBands, band: u8, station: u8, witnesses:
     check_bands(&[band])?;
     check_bands(witnesses)?;
     let db = app.db()?;
-    if let Some(open) = db.db.incident().iter().find(|i| i.subject_band == u32::from(band) && !i.resolved && i.kind != IncidentKind::Property) {
+    if let Some(open) = db.db.incident().iter().find(|i| i.subject_band == u32::from(band) && !i.resolved && is_injury(i.kind)) {
         bail!("band {band} already has open incident {}; resolve it first", open.id);
     }
     if witnesses.contains(&band) {
@@ -72,7 +72,7 @@ pub fn print_incident(app: &App, id: u64) -> Result<()> {
     }
     let mut rows: Vec<IncidentBand> = db.db.incident_band().iter().filter(|r| r.incident_id == i.id && r.role == "witness").collect();
     rows.sort_by_key(|r| r.band_id);
-    if rows.is_empty() && i.kind != IncidentKind::Property {
+    if rows.is_empty() && is_injury(i.kind) {
         println!("  witnesses none");
     }
     for r in rows {
@@ -94,14 +94,14 @@ pub fn treat(app: &App, incident: u64, note: &str) -> Result<()> {
     Ok(())
 }
 
-/// Resolves the incident as `actor` and returns its claim, if any. Property
-/// claims open on resolve; for an injury the organizer files the wearer's
+/// Resolves the incident as `actor` and returns its claim, if any. Claims for
+/// broken or taken things open on resolve; for an injury the organizer files the wearer's
 /// claim in their words, with the record to come as a PDF the run files.
 pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Result<Option<Claim>> {
     let conn = app.actor(actor)?;
     call!(conn, resolve_incident_then(incident, resolution.to_string()))?;
     let i = app.incident(incident)?;
-    if i.kind != IncidentKind::Property {
+    if is_injury(i.kind) {
         let ops = app.actor("ops")?;
         call!(ops, file_claim_for_wearer_then(incident, wearer_statement(app, &i), "pdf".to_string()))?;
     }
@@ -118,7 +118,7 @@ pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Resul
             if c.status_note.is_empty() { String::new() } else { format!(" ({})", c.status_note) }
         ),
         None => {
-            say!(app, "resolved   incident {incident} by {who}: no claim opened (an injury needs a staff note, property a logged cost)")
+            say!(app, "resolved   incident {incident} by {who}: no claim opened (an injury needs a staff note, broken or taken things a logged cost)")
         }
     }
     Ok(claim)
@@ -170,6 +170,11 @@ pub fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str, saw:
         incident.id
     );
     let blob = app.blobs().put(frame.as_bytes())?;
+    let (event, action) = match incident.kind {
+        IncidentKind::Theft => ("missing_object", "review the footage and check the exits"),
+        IncidentKind::Property => ("fallen_object", "rope off the area and remove the equipment"),
+        _ => ("fallen_object", "help the attendee and take the names of those around them"),
+    };
     let vision = app.actor("vision")?;
     call!(vision, register_blob_then(blob.sha256.clone(), None, "staff".into(), "frame".into(), "image/svg+xml".into(), blob.size_bytes))?;
     call!(
@@ -177,7 +182,7 @@ pub fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str, saw:
         report_property_event_then(
             incident.id,
             cam.id,
-            "fallen_object".into(),
+            event.into(),
             saw.to_string(),
             0.9,
             vec![blob.sha256.clone()]
@@ -191,7 +196,7 @@ pub fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str, saw:
             true,
             0.92,
             saw.to_string(),
-            "rope off the area and remove the equipment".into(),
+            action.into(),
             format!("Camera {} on {} confirms what the floor manager reported: {note}", cam.name, zone.name),
             cam.id,
             vec![blob.sha256.clone()],

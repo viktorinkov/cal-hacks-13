@@ -244,7 +244,7 @@ A claim is paid with nobody involved only when all of these hold:
 7. An active learned rule matches: same incident kind and cover kind, any zone.
 8. The payout is at or under that rule's ceiling.
 9. Fewer than 3 injury incidents happened in the same zone within 5 minutes.
-10. For a belongings claim, the attendee's `attendee_policy` did not come from a plan lookup. A `plan_lookup` policy's limit and deductible are the attendee's own word, so the organizer sees the plan's wording and the typed numbers side by side and decides (next to build).
+10. For a belongings claim, the attendee's `attendee_policy` did not come from a plan lookup. A `plan_lookup` policy's limit and deductible are the attendee's own word, so the organizer sees the plan's wording and the typed numbers side by side and decides.
 
 ### Where each gate's numbers come from (next to build)
 

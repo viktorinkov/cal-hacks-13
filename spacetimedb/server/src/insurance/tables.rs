@@ -118,6 +118,8 @@ pub struct Claim {
     pub band_id: u32,
     pub zone_id: u64,
     pub zone_name: String,
+    /// The venue's `insurance_policy`, or the attendee's own `attendee_policy` for a `personal_property`
+    /// claim (0 when they have none on file).
     pub policy_id: u64,
     pub status: ClaimStatus,
     /// Why the claim is where it is, in one line.
@@ -307,7 +309,8 @@ pub struct ClaimLine {
     pub page: u32,
 }
 
-/// A similar past claim Elastic ranked by meaning, shown to the agent and the approver.
+/// A similar past claim Elastic ranked by meaning. Policy clauses (`claim_clause`) replaced it; the table
+/// stays so the live database keeps its schema.
 #[derive(Clone, Debug)]
 #[spacetimedb::table(accessor = claim_precedent)]
 pub struct ClaimPrecedent {
@@ -321,6 +324,25 @@ pub struct ClaimPrecedent {
     pub outcome: String,
     pub payout_cents: u64,
     pub narrative: String,
+    pub score: f32,
+}
+
+/// One policy clause the Evidence Engine found for one pack version, closest in meaning first.
+#[derive(Clone, Debug)]
+#[spacetimedb::table(accessor = claim_clause)]
+pub struct ClaimClause {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub claim_id: u64,
+    pub pack_version: u32,
+    pub clause_id: String,
+    /// `venue` or `attendee`.
+    pub policy: String,
+    pub section: String,
+    pub page: u32,
+    pub text: String,
     pub score: f32,
 }
 
@@ -431,7 +453,18 @@ pub struct CheckIn {
     pub detail: String,
 }
 
-/// A similar past claim reported by a worker (Elastic).
+/// A policy clause reported by a worker (Elastic).
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ClauseIn {
+    pub clause_id: String,
+    pub policy: String,
+    pub section: String,
+    pub page: u32,
+    pub text: String,
+    pub score: f32,
+}
+
+/// A similar past claim reported by a worker (Elastic). Nothing sends one any more.
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct PrecedentIn {
     pub reference: String,

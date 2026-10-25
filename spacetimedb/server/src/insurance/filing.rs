@@ -48,7 +48,7 @@ fn file(ctx: &ReducerContext, incident_id: u64, statement: String, report: &str,
     if !incident.resolved {
         return Err(format!("incident {incident_id} is not resolved yet"));
     }
-    if incident.kind == IncidentKind::Property || incident.subject_band == 0 {
+    if !incident.kind.is_injury() || incident.subject_band == 0 {
         return Err(format!("incident {incident_id} is not an injury on a band"));
     }
     let wearer = super::people::wore_band_at(ctx, incident.subject_band, incident.opened_at)

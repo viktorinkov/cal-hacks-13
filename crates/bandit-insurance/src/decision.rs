@@ -1,8 +1,11 @@
 //! The Decision Engine's decision. Claude investigates a claim one evidence
 //! source at a time (the bands, the light circle, the security cameras, the
-//! medic's notes, the hospital report, the checks and the Evidence Engine's
-//! past claims) and decides: pay, refuse, or ask the organizer. Code then
-//! checks the answer and holds the decision to the limits a person set:
+//! staff notes, the hospital report, the person security named, the checks,
+//! and the clauses of the venue's and the attendee's policies that the
+//! Evidence Engine finds) and decides: pay, refuse, or ask the organizer. When
+//! security named someone it also recommends a charge or none; code sets the
+//! amount and the organizer approves or waives every charge. Code then checks
+//! the answer and holds the decision to the limits a person set:
 //!
 //! - Claude never sets an amount. The fee schedule and the policy limits did.
 //! - A claim with a complication, a gap or mismatch in the policies (no cover
@@ -16,8 +19,12 @@
 //!   failed. A refusal on judgment alone goes to the organizer, because a
 //!   wrong refusal hurts an injured attendee more than a wrong small payment
 //!   hurts the venue.
-//! - Claude pays only after it has read the band evidence, the light circle
-//!   and, for an injury, the hospital report itself.
+//! - Claude pays only after it has read what decides its kind of claim:
+//!   the band, the light circle and the hospital report for an injury; the
+//!   security cameras for broken venue equipment; the cameras and the
+//!   attendee's own policy for a theft or a breakage of their belonging.
+//! - Every clause Claude cites is one the Evidence Engine found for this
+//!   claim or one Claude found itself with its policy tools.
 
 use crate::complications::{ClaimState, complications, reason};
 use crate::coverage::Amounts;
@@ -26,7 +33,7 @@ use crate::money::format_cents;
 use crate::outcome::{Decision, failed_check_names};
 use crate::payloads::ReviewPayload;
 use crate::rules::SettlementRule;
-use crate::{Causation, Cents, Check, CheckResult, Corroboration};
+use crate::{Causation, Cents, Check, CheckResult, Corroboration, IncidentKind};
 use serde::{Deserialize, Serialize};
 
 /// What Claude decides.
@@ -68,12 +75,14 @@ pub enum EvidenceSource {
     Policy,
     /// The code and Evidence Engine checks.
     Checks,
-    /// Decided past claims from the Evidence Engine.
-    PastClaims,
+    /// The clauses of the venue's and the attendee's policies, from the Evidence Engine.
+    PolicyClauses,
+    /// The person security named as having broken or taken it, and code's checks of their band.
+    Responsible,
 }
 
 impl EvidenceSource {
-    pub const ALL: [EvidenceSource; 9] = [
+    pub const ALL: [EvidenceSource; 10] = [
         EvidenceSource::Band,
         EvidenceSource::LightCircle,
         EvidenceSource::Camera,
@@ -82,7 +91,8 @@ impl EvidenceSource {
         EvidenceSource::Zone,
         EvidenceSource::Policy,
         EvidenceSource::Checks,
-        EvidenceSource::PastClaims,
+        EvidenceSource::PolicyClauses,
+        EvidenceSource::Responsible,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -95,7 +105,8 @@ impl EvidenceSource {
             EvidenceSource::Zone => "zone",
             EvidenceSource::Policy => "policy",
             EvidenceSource::Checks => "checks",
-            EvidenceSource::PastClaims => "past_claims",
+            EvidenceSource::PolicyClauses => "policy_clauses",
+            EvidenceSource::Responsible => "responsible",
         }
     }
 
@@ -114,7 +125,8 @@ impl EvidenceSource {
             EvidenceSource::Zone => "the zone",
             EvidenceSource::Policy => "the policy",
             EvidenceSource::Checks => "the checks",
-            EvidenceSource::PastClaims => "past claims",
+            EvidenceSource::PolicyClauses => "the policy clauses",
+            EvidenceSource::Responsible => "the attendee named",
         }
     }
 }
@@ -179,6 +191,30 @@ pub struct AgentDecision {
     pub question: String,
     /// Facts the decision rests on, by `seq`.
     pub cited_fact_ids: Vec<u32>,
+    /// Policy clauses the decision rests on, by `clause_id`: the clause that
+    /// covers the claim for a pay, the exclusion for a refusal.
+    #[serde(default)]
+    pub cited_clause_ids: Vec<String>,
+    /// Required when security named someone and staff proposed a charge
+    /// (`ReviewPayload.charge`), absent (`null`) otherwise. Claude only
+    /// recommends: code sets the amount and the organizer decides.
+    #[serde(default)]
+    pub charge: Option<ChargeRecommendation>,
+}
+
+/// Claude's recommendation on the charge staff proposed.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChargeRecommendation {
+    /// True to recommend charging the person named, false for no charge.
+    pub recommend: bool,
+    /// Why, in at most 400 characters, for the organizer and the charged person.
+    pub reason: String,
+    /// Facts it rests on, by `seq`; at least one when it recommends a charge.
+    #[serde(default)]
+    pub fact_ids: Vec<u32>,
+    /// Clauses it rests on, such as the subrogation clause of the policy that paid.
+    #[serde(default)]
+    pub clause_ids: Vec<String>,
 }
 
 impl Finding {
@@ -187,7 +223,7 @@ impl Finding {
         let label = self.source.label();
         let mut chars = label.chars();
         let label: String = chars.next().map(|c| c.to_uppercase().chain(chars).collect()).unwrap_or_default();
-        let plural = matches!(self.source, EvidenceSource::Camera | EvidenceSource::Medic | EvidenceSource::Checks | EvidenceSource::PastClaims);
+        let plural = matches!(self.source, EvidenceSource::Camera | EvidenceSource::Medic | EvidenceSource::Checks | EvidenceSource::PolicyClauses);
         let says = match (self.stance, plural) {
             (Stance::Supports, false) => "supports the claim",
             (Stance::Supports, true) => "support the claim",
@@ -226,15 +262,38 @@ pub struct Investigation {
     pub steps: Vec<Step>,
     /// The sources Claude read with the evidence tools.
     pub sources_read: Vec<EvidenceSource>,
+    /// The clause ids Claude saw with `search_policy` and `read_clause`, each a
+    /// clause of a policy on this claim; it may cite these and `ReviewPayload.clauses`.
+    pub clauses_seen: Vec<String>,
 }
 
-/// What Claude must have read before it may pay this claim: for an injury the
-/// band and the light circle, and the hospital report once one is filed; for
-/// property the security cameras.
+/// What Claude must have read before it may pay this claim:
+/// - an injury (`sos`, `fall`): the band and the light circle, and the
+///   hospital report once one is filed;
+/// - the venue's broken equipment (`property`): the security cameras;
+/// - an attendee's belonging stolen or broken (`theft`, `breakage`): the
+///   security cameras and the policy, which is the attendee's own;
+/// - and, whenever security named someone (`p.charge`), the attendee named.
+///
+/// A kind code does not know is read by its cover, as an injury unless the
+/// cover pays for property.
 pub fn required_reading(p: &ReviewPayload) -> Vec<EvidenceSource> {
-    if p.cover_kind == "property" {
-        return vec![EvidenceSource::Camera];
+    let kind = IncidentKind::parse(&p.incident_kind);
+    let mut v = match kind {
+        Some(IncidentKind::Property) => vec![EvidenceSource::Camera],
+        Some(IncidentKind::Theft | IncidentKind::Breakage) => vec![EvidenceSource::Camera, EvidenceSource::Policy],
+        Some(IncidentKind::Sos | IncidentKind::Fall) => injury_reading(p),
+        None if p.cover_kind == "property" => vec![EvidenceSource::Camera],
+        None if p.cover_kind == "personal_property" => vec![EvidenceSource::Camera, EvidenceSource::Policy],
+        None => injury_reading(p),
+    };
+    if p.charge.is_some() {
+        v.push(EvidenceSource::Responsible);
     }
+    v
+}
+
+fn injury_reading(p: &ReviewPayload) -> Vec<EvidenceSource> {
     let mut v = vec![EvidenceSource::Band, EvidenceSource::LightCircle];
     if !p.lines.is_empty() {
         v.push(EvidenceSource::HospitalReport);
@@ -242,11 +301,58 @@ pub fn required_reading(p: &ReviewPayload) -> Vec<EvidenceSource> {
     v
 }
 
-/// Code validation of a decision:
-/// - every cited id (top level, concerns, findings) is one of `fact_seqs`;
+/// The figures a decision may print: the four amounts, every line's billed,
+/// allowed and covered cents, and what code would charge the person named.
+pub fn allowed_amounts(p: &ReviewPayload) -> Vec<Cents> {
+    let mut allowed = p.amounts.figures().to_vec();
+    allowed.extend(p.lines.iter().flat_map(|l| [l.billed_cents, l.allowed_cents, l.covered_cents]));
+    allowed.extend(p.charge.as_ref().map(|c| c.amount_cents));
+    allowed
+}
+
+/// Every check of [`validate_decision`], with the payload's facts, checks,
+/// figures ([`allowed_amounts`]) and reading ([`required_reading`]), plus the
+/// clauses and the charge:
+/// - every cited clause, at the top level and in the charge, is one the
+///   Evidence Engine found for this pack version (`p.clauses`) or one Claude
+///   saw with its policy tools (`clauses_seen`);
+/// - a charge recommendation exactly when security named someone
+///   (`p.charge`), made after reading the attendee named.
+///
+/// The worker and the module both call this on the same inputs.
+pub fn validate_review(d: &AgentDecision, p: &ReviewPayload, read: &[EvidenceSource], clauses_seen: &[String]) -> Result<(), Vec<String>> {
+    let seqs: Vec<u32> = p.facts.iter().map(|f| f.seq).collect();
+    let must_read = required_reading(p);
+    let mut errors = validate_decision(d, &seqs, &p.checks, &allowed_amounts(p), read, &must_read).err().unwrap_or_default();
+
+    let known = |id: &str| p.clauses.iter().any(|c| c.clause_id == id) || clauses_seen.iter().any(|c| c == id);
+    let mut unknown: Vec<&str> = Vec::new();
+    for id in d.cited_clause_ids.iter().chain(d.charge.iter().flat_map(|c| &c.clause_ids)) {
+        if !known(id) && !unknown.contains(&id.as_str()) {
+            unknown.push(id);
+        }
+    }
+    errors.extend(unknown.iter().map(|id| format!("cited clause {id} is not one the Evidence Engine found for this claim (search_policy or read_clause)")));
+
+    match (&d.charge, &p.charge) {
+        (None, Some(_)) => errors.push("security named someone, so charge needs your recommendation: recommend true or false, with the reason".into()),
+        (Some(_), None) => errors.push("charge must be null: no one was named for this incident".into()),
+        (Some(_), Some(_)) if !read.contains(&EvidenceSource::Responsible) && d.decision != Choice::Pay => {
+            errors.push("a charge recommendation without reading the attendee named (call read_evidence with source responsible)".into());
+        }
+        _ => {}
+    }
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
+}
+
+/// Code validation of a decision (see [`validate_review`] for the clauses
+/// and whether a charge recommendation belongs):
+/// - every cited id (top level, concerns, findings, the charge) is one of `fact_seqs`;
 /// - lengths: summary 1 to 800 characters, each concern and finding detail at
-///   most 400, the question and the trusted source at most 400; at most 6
-///   concerns, explanations and missing-evidence items; 1 to 10 findings;
+///   most 400, the question and the trusted source at most 400, the charge
+///   reason 1 to 400; at most 6 concerns, explanations and missing-evidence
+///   items; 1 to 10 findings;
+/// - a recommended charge cites at least one fact;
 /// - every dollar figure in the text is one of `allowed_amounts`;
 /// - `pay`: causation supported, no concerns, no refusal checks, no finding
 ///   that contradicts the claim unless `trusted_source` says why, and every
@@ -269,7 +375,8 @@ pub fn validate_decision(
         .cited_fact_ids
         .iter()
         .chain(d.concerns.iter().flat_map(|c| &c.fact_ids))
-        .chain(d.findings.iter().flat_map(|f| &f.fact_ids));
+        .chain(d.findings.iter().flat_map(|f| &f.fact_ids))
+        .chain(d.charge.iter().flat_map(|c| &c.fact_ids));
     for id in cited {
         if !fact_seqs.contains(id) && !unknown.contains(id) {
             unknown.push(*id);
@@ -311,11 +418,21 @@ pub fn validate_decision(
     if !(1..=10).contains(&d.findings.len()) {
         errors.push(format!("{} findings, expected 1 to 10 (one per source examined)", d.findings.len()));
     }
+    if let Some(c) = &d.charge {
+        let n = c.reason.trim().chars().count();
+        if !(1..=400).contains(&n) {
+            errors.push(format!("charge reason is {n} characters, expected 1 to 400"));
+        }
+        if c.recommend && c.fact_ids.is_empty() {
+            errors.push("a recommended charge needs the facts it rests on in charge.fact_ids".into());
+        }
+    }
 
     let texts = std::iter::once(("summary".to_string(), &d.summary))
         .chain(d.concerns.iter().enumerate().map(|(i, c)| (format!("concern {}", i + 1), &c.detail)))
         .chain(d.findings.iter().enumerate().map(|(i, f)| (format!("finding {}", i + 1), &f.detail)))
-        .chain([("question".to_string(), &d.question), ("trusted_source".to_string(), &d.trusted_source)]);
+        .chain([("question".to_string(), &d.question), ("trusted_source".to_string(), &d.trusted_source)])
+        .chain(d.charge.iter().map(|c| ("charge reason".to_string(), &c.reason)));
     for (what, text) in texts {
         for f in unknown_figures(text, allowed_amounts) {
             errors.push(format!("{what} figure {f} is not one of the claim's amounts"));
@@ -511,6 +628,8 @@ mod tests {
             refusal_checks: vec![],
             question: String::new(),
             cited_fact_ids: vec![1, 2, 5],
+            cited_clause_ids: vec![],
+            charge: None,
         }
     }
 
@@ -527,6 +646,8 @@ mod tests {
             refusal_checks: vec![],
             question: String::new(),
             cited_fact_ids: vec![5],
+            cited_clause_ids: vec![],
+            charge: None,
         }
     }
 
@@ -672,6 +793,167 @@ mod tests {
         assert_eq!((g.decision, g.decided_by), (Decision::Route { reason: gap.into() }, "code"));
         let zero = GuardInput { amounts: Amounts::default(), ..input(&checks, Some(&rule)) };
         assert_eq!(guard(&pay(), &zero).decision, Decision::Refuse { reason: "payout is zero after limits".into() });
+    }
+
+    /// A claim of `kind` with facts 1 to 6, the passing checks and the payout of [`input`].
+    fn payload(kind: IncidentKind) -> ReviewPayload {
+        let fact = |seq: u32| crate::Fact {
+            seq,
+            source: crate::Source::StaffNote,
+            key: "note".into(),
+            value: format!("fact {seq}"),
+            observed_at: 0,
+            reader: crate::Reader::Code,
+            reference: format!("incident_note:{seq}"),
+        };
+        ReviewPayload {
+            claim_id: 12,
+            pack_version: 2,
+            pack_hash: "ab".repeat(32),
+            incident_kind: kind.as_str().into(),
+            cover_kind: CoverKind::for_incident(kind).as_str().into(),
+            zone_name: "Hacking floor".into(),
+            incident_time: "2026-10-24 21:10:00".into(),
+            claimant_name: "Maya Chen".into(),
+            corroboration: "corroborated".into(),
+            facts: SEQS.iter().map(|s| fact(*s)).collect(),
+            checks: passing(),
+            amounts: Amounts { cost_cents: 18_000, payout_cents: 18_000, recoverable_cents: 18_000, venue_cost_cents: 0 },
+            lines: vec![],
+            record_history: String::new(),
+            record_reason: String::new(),
+            clauses: vec![crate::payloads::ClauseRef {
+                clause_id: "att-c2".into(),
+                policy: "attendee".into(),
+                section: "insuring_agreement".into(),
+                page: 2,
+                text: "We cover your personal property against theft.".into(),
+                score: 0.8,
+            }],
+            policy_summary: "the attendee's own personal property cover".into(),
+            claimant_statement: String::new(),
+            charge: None,
+            attendee_policy_hash: "att".into(),
+            venue_policy_hash: String::new(),
+        }
+    }
+
+    fn charge_brief() -> crate::payloads::ChargeBrief {
+        crate::payloads::ChargeBrief {
+            charge_id: 3,
+            band_id: 41,
+            attendee_name: "Sam Patel".into(),
+            amount_cents: 119_900,
+            named_by_role: "ops".into(),
+            note: "seen at the table".into(),
+            checks: vec![Check::pass("responsible_at_spot", "band 41 was 4 m away")],
+        }
+    }
+
+    fn theft_pay() -> AgentDecision {
+        AgentDecision {
+            findings: vec![finding(EvidenceSource::Camera, Stance::Supports, &[4]), finding(EvidenceSource::Policy, Stance::Supports, &[6])],
+            summary: "The camera saw the laptop taken from the table; the attendee's own policy covers theft.".into(),
+            cited_fact_ids: vec![4, 6],
+            cited_clause_ids: vec!["att-c2".into()],
+            ..pay()
+        }
+    }
+
+    #[test]
+    fn each_kind_has_its_reading() {
+        let mut fall = payload(IncidentKind::Fall);
+        assert_eq!(required_reading(&fall), [EvidenceSource::Band, EvidenceSource::LightCircle]);
+        fall.lines.push(crate::fee_schedule::LineDecision {
+            line_no: 1,
+            code: "99211".into(),
+            description: "first-aid visit".into(),
+            service_date: "2026-10-24".into(),
+            units: 1,
+            billed_cents: 18_000,
+            allowed_cents: 6_500,
+            covered_cents: 6_500,
+            outcome: crate::fee_schedule::LineOutcome::Reduced,
+            reason: String::new(),
+            page: 2,
+        });
+        assert_eq!(required_reading(&fall), READ);
+        assert_eq!(required_reading(&payload(IncidentKind::Property)), [EvidenceSource::Camera]);
+        assert_eq!(required_reading(&payload(IncidentKind::Theft)), [EvidenceSource::Camera, EvidenceSource::Policy]);
+        let mut broken = payload(IncidentKind::Breakage);
+        broken.charge = Some(charge_brief());
+        assert_eq!(required_reading(&broken), [EvidenceSource::Camera, EvidenceSource::Policy, EvidenceSource::Responsible]);
+        let mut odd = payload(IncidentKind::Theft);
+        odd.incident_kind = "slip".into();
+        assert_eq!(required_reading(&odd), [EvidenceSource::Camera, EvidenceSource::Policy], "read by its cover");
+    }
+
+    #[test]
+    fn cited_clauses_must_be_found_for_this_claim() {
+        let p = payload(IncidentKind::Theft);
+        let read = [EvidenceSource::Camera, EvidenceSource::Policy];
+        assert_eq!(validate_review(&theft_pay(), &p, &read, &[]), Ok(()), "a clause the Evidence Engine found");
+        let mut d = theft_pay();
+        d.cited_clause_ids = vec!["att-c2".into(), "venue-c7".into(), "other-c1".into(), "other-c1".into()];
+        assert_eq!(validate_review(&d, &p, &read, &["venue-c7".into()]).unwrap_err(), [
+            "cited clause other-c1 is not one the Evidence Engine found for this claim (search_policy or read_clause)"
+        ]);
+        assert_eq!(validate_review(&theft_pay(), &p, &[EvidenceSource::Camera], &[]).unwrap_err(), [
+            "pay without reading the policy (call read_evidence with source policy)"
+        ]);
+    }
+
+    #[test]
+    fn a_named_person_needs_a_charge_recommendation() {
+        let mut p = payload(IncidentKind::Theft);
+        p.charge = Some(charge_brief());
+        let all = [EvidenceSource::Camera, EvidenceSource::Policy, EvidenceSource::Responsible];
+        let errors = validate_review(&theft_pay(), &p, &all, &[]).unwrap_err();
+        assert_eq!(errors, ["security named someone, so charge needs your recommendation: recommend true or false, with the reason"]);
+
+        let mut d = theft_pay();
+        d.charge = Some(ChargeRecommendation {
+            recommend: true,
+            reason: "The camera and the band put the person named at the table when the laptop went; charge $1,199.00.".into(),
+            fact_ids: vec![4, 5],
+            clause_ids: vec!["att-sub-c9".into()],
+        });
+        assert_eq!(validate_review(&d, &p, &all, &["att-sub-c9".into()]), Ok(()), "the charge's figure is what code would charge");
+        let errors = validate_review(&d, &p, &[EvidenceSource::Camera, EvidenceSource::Policy], &[]).unwrap_err();
+        assert_eq!(errors, [
+            "pay without reading the attendee named (call read_evidence with source responsible)",
+            "cited clause att-sub-c9 is not one the Evidence Engine found for this claim (search_policy or read_clause)",
+        ]);
+
+        let mut ask = AgentDecision { decision: Choice::AskOrganizer, question: "Was the laptop left unattended?".into(), ..d.clone() };
+        ask.charge.as_mut().unwrap().fact_ids = vec![9];
+        ask.charge.as_mut().unwrap().reason = format!("{} The bill was $2,000.00.", "x".repeat(380));
+        let errors = validate_review(&ask, &p, &[EvidenceSource::Camera], &["att-sub-c9".into()]).unwrap_err();
+        assert_eq!(errors, [
+            "cited fact 9 is not in the pack",
+            "charge reason is 404 characters, expected 1 to 400",
+            "charge reason figure $2,000.00 is not one of the claim's amounts",
+            "a charge recommendation without reading the attendee named (call read_evidence with source responsible)",
+        ]);
+        ask.charge = Some(ChargeRecommendation { recommend: true, reason: "the camera saw it".into(), fact_ids: vec![], clause_ids: vec![] });
+        assert_eq!(validate_review(&ask, &p, &all, &[]).unwrap_err(), ["a recommended charge needs the facts it rests on in charge.fact_ids"]);
+        ask.charge.as_mut().unwrap().recommend = false;
+        assert_eq!(validate_review(&ask, &p, &all, &[]), Ok(()), "no charge needs no facts");
+
+        p.charge = None;
+        assert_eq!(validate_review(&ask, &p, &all, &[]).unwrap_err(), ["charge must be null: no one was named for this incident"]);
+    }
+
+    #[test]
+    fn a_decision_without_the_new_fields_still_parses() {
+        let mut v = serde_json::to_value(pay()).unwrap();
+        let o = v.as_object_mut().unwrap();
+        o.remove("cited_clause_ids");
+        o.remove("charge");
+        let d: AgentDecision = serde_json::from_value(v).unwrap();
+        assert_eq!((d.cited_clause_ids.len(), d.charge), (0, None));
+        let inv: Investigation = serde_json::from_value(serde_json::json!({ "decision": {}, "steps": [], "sources_read": ["policy_clauses", "responsible"] })).unwrap();
+        assert_eq!((inv.sources_read, inv.clauses_seen.len()), (vec![EvidenceSource::PolicyClauses, EvidenceSource::Responsible], 0));
     }
 
     #[test]

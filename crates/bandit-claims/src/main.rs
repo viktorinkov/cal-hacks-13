@@ -161,9 +161,9 @@ enum Cmd {
         #[arg(long, default_value_t = 3)]
         rounds: u32,
     },
-    /// The floor staff for the live run: the medic, the clinic, the camera and the organizer's cost notes
+    /// The floor staff for the live run: the medic, the camera, security's cost notes and naming, the organizer
     Live {
-        /// Decide a claim left waiting for the organizer this many seconds (0: never)
+        /// Decide a claim or a charge left waiting for the organizer this many seconds (0: never)
         #[arg(long, default_value_t = 30)]
         approve_after: u64,
     },

@@ -17,6 +17,7 @@ use crate::social::tables::*;
 use crate::tables::*;
 use crate::venue::*;
 use crate::vision::*;
+use crate::wallet::wallet_entry;
 use bandit_insurance::payloads::*;
 use bandit_insurance::time::micros_at;
 use spacetimedb::test_utils::{TestAuth, TestContext};
@@ -229,14 +230,15 @@ impl World {
     fn verify(&self, claim_id: u64) {
         let job = self.lease(KIND_VERIFY, claim_id);
         let checks = vec![CheckIn { name: "elastic_validation".into(), result: "pass".into(), detail: "0 validation errors".into() }];
-        let precedents = vec![PrecedentIn {
-            reference: "history-03".into(),
-            outcome: "approved".into(),
-            payout_cents: 15_000,
-            narrative: "Fall in zone Main stage left at 22:10; wrist sprain S63.5; first aid only.".into(),
+        let clauses = vec![ClauseIn {
+            clause_id: "venue-c4".into(),
+            policy: "venue".into(),
+            section: "insuring_agreement".into(),
+            page: 2,
+            text: "We will pay reasonable expenses for bodily injury caused by an accident on premises you own or rent.".into(),
             score: 0.81,
         }];
-        self.as_("worker", |ctx| submit_claim_checks(ctx, job.id, checks, precedents));
+        self.as_("worker", |ctx| submit_claim_checks(ctx, job.id, checks, clauses));
     }
 
     /// Claude's investigation: one step reported while it runs, then the
@@ -848,6 +850,146 @@ fn the_wearer_sees_their_incidents_and_staff_see_the_unclaimed_ones() {
     assert_eq!((claims[0].incident_id, claims[0].statement.as_str()), (incident, STATEMENT));
     assert_eq!(board_clinic_reports(&w.view("ops")).len(), 1);
     assert!(board_clinic_reports(&w.view("Maya Chen")).is_empty());
+}
+
+/// An attendee's wallet with `cents` in it.
+fn wallet_with(w: &World, who: &str, cents: i64) {
+    w.t.db.claimant_account().insert(ClaimantAccount { identity: id(who), customer_id: format!("cust-{who}"), account_id: format!("acct-{who}"), created_at: w.t.clock.now() });
+    w.t.db.wallet_entry().insert(crate::wallet::WalletEntry {
+        id: 0,
+        identity: id(who),
+        kind: "opening".into(),
+        amount_cents: cents,
+        memo: "BandIt wallet opened".into(),
+        nessie_id: format!("acct-{who}"),
+        created_at: w.t.clock.now(),
+    });
+}
+
+/// Claude pays and recommends charging the attendee staff named.
+fn pays_and_charges(p: &ReviewPayload) -> serde_json::Value {
+    let mut d = decision(p, "pay");
+    assert!(p.charge.is_some(), "the proposed charge reaches Claude");
+    d["findings"] = serde_json::json!([{ "source": "camera", "stance": "supports", "detail": "the camera saw it", "fact_ids": [p.facts[0].seq] }]);
+    d["charge"] = serde_json::json!({ "recommend": true, "reason": "the camera and the band put them at the spot", "fact_ids": [p.facts[0].seq], "clause_ids": [] });
+    d
+}
+
+#[test]
+fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.as_("vision", |ctx| upsert_camera(ctx, "overhead pit".into(), zone, "overhead".into()));
+    w.as_("ops", |ctx| open_incident(ctx, "property".into(), zone, 0, "speaker knocked off its stand at Main stage".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Property).unwrap();
+    let cam = w.t.db.camera().iter().next().unwrap().id;
+    let frame_at = w.t.clock.now();
+    w.as_("vision", |ctx| {
+        submit_vision_assessment(ctx, incident.id, "staff_button".into(), true, 0.9, "a guest backs into the speaker stand".into(), "rope off the area".into(), "a speaker fell".into(), cam, vec!["cd".repeat(32)], vec![frame_at], 0)
+    });
+    // Nobody wore band 2, and a claimant's own band is never named.
+    assert!(w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 2, "camera".into())).is_err());
+    w.as_("ops", |ctx| name_responsible_band(ctx, incident.id, 7, "the stage camera shows this guest backing into the stand".into()));
+    let charge = w.t.db.charge().incident_id().find(incident.id).unwrap();
+    assert_eq!((charge.status.as_str(), charge.attendee_name.as_str(), charge.checks_passed), ("proposed", "Jordan Alvarez", true));
+    w.advance(600);
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "repair estimate from the AV vendor".into(), Some(240_000)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "area cleared".into()));
+    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
+    assert!(w.t.db.evidence_fact().claim_id().filter(claim.id).any(|f| f.key == "responsible_name" && f.value == "Jordan Alvarez"));
+    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().amount_cents, 240_000);
+    w.verify(claim.id);
+    w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    let charge = w.t.db.charge().id().find(charge.id).unwrap();
+    assert_eq!(charge.recommendation, "charge");
+    // A stale amount fails closed, then the organizer approves what they see.
+    assert!(w.try_as("ops", |ctx| approve_charge(ctx, charge.id, 1, c.pack_hash.clone())).is_err());
+    w.as_("ops", |ctx| approve_charge(ctx, charge.id, 240_000, c.pack_hash.clone()));
+    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "approved");
+    let mine = crate::insurance::charges::my_charges(&w.view("Jordan Alvarez"));
+    assert_eq!((mine.len(), mine[0].amount_cents, mine[0].status.as_str()), (1, 240_000, "approved"));
+    assert!(mine[0].why.contains("a security camera saw it"), "{}", mine[0].why);
+    assert!(crate::insurance::charges::my_charges(&w.view("Maya Chen")).is_empty());
+    // Only Jordan pays, and only with enough in the wallet.
+    assert!(w.try_as("Maya Chen", |ctx| pay_charge(ctx, charge.id)).is_err());
+    wallet_with(&w, "Jordan Alvarez", 20_000);
+    assert!(w.try_as("Jordan Alvarez", |ctx| pay_charge(ctx, charge.id)).unwrap_err().contains("your wallet has $200.00"));
+    w.t.db.wallet_entry().insert(crate::wallet::WalletEntry { id: 0, identity: id("Jordan Alvarez"), kind: "payout".into(), amount_cents: 300_000, memo: "top up".into(), nessie_id: "dep".into(), created_at: w.t.clock.now() });
+    w.as_("Jordan Alvarez", |ctx| pay_charge(ctx, charge.id));
+    let job = w.t.db.job().iter().find(|j| j.kind == KIND_CHARGE_PAYMENT && j.subject_id == charge.id).unwrap();
+    let p: ChargePaymentPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!((p.amount_cents, p.account_id.as_str()), (240_000, "acct-Jordan Alvarez"));
+    w.as_("worker", |ctx| claim_job(ctx, job.id));
+    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "cust".into(), "acct".into(), "purchase-1".into()));
+    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "paid");
+    assert_eq!(crate::wallet::my_wallet(&w.view("Jordan Alvarez")).unwrap().balance_cents, 80_000);
+    let journals: Vec<String> = w.ledger(claim.id).into_iter().map(|e| e.0).collect();
+    assert!(journals.contains(&"J5 charge".to_string()) && journals.contains(&"J6 charge payment".to_string()), "{journals:?}");
+}
+
+#[test]
+fn a_band_that_was_not_at_the_spot_cannot_be_named() {
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.set_band(8, |b| b.zone = 102);
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 3, "Maya's phone is gone from her table".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
+    let err = w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 8, "looked like them".into())).unwrap_err();
+    assert!(err.contains("neither in the zone nor at the spot"), "{err}");
+    assert!(w.try_as("ops", |ctx| name_responsible_band(ctx, incident.id, 3, "her own band".into())).is_err());
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "her phone, $899.00 to replace".into(), Some(89_900)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "security walked the area".into()));
+    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
+    // A theft of an attendee's belonging is their claim on their own policy; with none on file it pays nothing yet.
+    assert_eq!((claim.cover_kind.as_str(), claim.claimant_name.as_str(), claim.policy_id), ("personal_property", "Maya Chen", 0));
+}
+
+#[test]
+fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.as_("ops", |ctx| upsert_attendee_policy(ctx, id("Maya Chen"), "Golden Gate Mutual".into(), "PP-000123".into(), 150_000, 600_000, 25_000, "document".into(), "AB".repeat(32)));
+    w.as_("ops", |ctx| open_incident(ctx, "breakage".into(), zone, 3, "Maya's laptop was knocked off her table".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Breakage).unwrap();
+    w.as_("ops", |ctx| name_responsible_band(ctx, incident.id, 7, "his bag swept it off the table".into()));
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "cracked screen, $1,199.00 to replace".into(), Some(119_900)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "both names taken".into()));
+    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
+    assert_eq!((claim.cover_kind.as_str(), claim.claimant_name.as_str()), ("personal_property", "Maya Chen"));
+    // Her own policy pays the value less her $250.00 deductible; the venue carries nothing.
+    assert_eq!((claim.cost_cents, claim.payout_cents, claim.recoverable_cents, claim.venue_cost_cents), (119_900, 94_900, 94_900, 0));
+    let job = w.open_job(KIND_VERIFY, claim.id);
+    let p: VerifyPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!((p.attendee_policy_hash.as_str(), p.responsible_named, p.cost_cents), ("ab".repeat(32).as_str(), true, 119_900));
+    w.verify(claim.id);
+    w.investigate(claim.id, &["camera", "policy", "responsible"], pays_and_charges);
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, false));
+    w.pay(c.id);
+    assert_eq!(w.claim(c.id).status, ClaimStatus::Settled);
+    assert_eq!(w.t.db.attendee_policy().holder().find(id("Maya Chen")).unwrap().used_cents, 94_900);
+    let charge = w.t.db.charge().incident_id().find(incident.id).unwrap();
+    assert_eq!((charge.attendee_name.as_str(), charge.amount_cents), ("Jordan Alvarez", 119_900));
+}
+
+#[test]
+fn a_stolen_bag_with_no_policy_on_file_goes_to_the_organizer() {
+    let w = World::new();
+    let zone = w.t.db.zone().station_id().filter(101u8).next().unwrap().id;
+    w.as_("ops", |ctx| open_incident(ctx, "theft".into(), zone, 6, "Lee's backpack is gone".into()));
+    let incident = w.t.db.incident().iter().find(|i| i.kind == IncidentKind::Theft).unwrap();
+    w.as_("ops", |ctx| add_incident_note(ctx, incident.id, "headphones and a charger, $340.00".into(), Some(34_000)));
+    w.as_("ops", |ctx| resolve_incident(ctx, incident.id, "no camera covers the seats".into()));
+    let claim = w.t.db.claim().incident_id().find(incident.id).unwrap();
+    assert_eq!((claim.policy_id, claim.cost_cents, claim.payout_cents), (0, 34_000, 0));
+    w.verify(claim.id);
+    w.investigate(claim.id, &["camera", "policy"], |p| decision(p, "pay"));
+    let c = w.claim(claim.id);
+    assert_eq!(c.status, ClaimStatus::Routed);
+    assert!(c.status_note.contains("no policy of their own on file"), "{}", c.status_note);
 }
 
 /// The text layer of the venue's policy, one string per page.

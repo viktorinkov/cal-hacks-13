@@ -174,6 +174,7 @@ impl CoverTerms {
         match self.cover {
             CoverKind::MedicalPayments => vec![IncidentKind::Sos, IncidentKind::Fall],
             CoverKind::Property => vec![IncidentKind::Property],
+            CoverKind::PersonalProperty => vec![IncidentKind::Theft, IncidentKind::Breakage],
         }
     }
 

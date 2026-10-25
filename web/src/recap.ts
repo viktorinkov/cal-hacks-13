@@ -279,10 +279,15 @@ function balance(conn: DbConnection) {
   return h('p', { class: 'big' }, `${money(w.balanceCents)} in your BandIt wallet`, h('span', { class: 'muted' }, ` · Capital One account ${w.accountId.slice(0, 8)}`));
 }
 
-function movements(conn: DbConnection) {
+const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid in for your claim', charge: 'Charge paid' };
+
+/** The wallet's movements, newest first: payouts in, charges and merch out. */
+export function movements(conn: DbConnection) {
   const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
+  const what = (kind: string, memo: string) => kind === 'purchase' ? memo.replace(/^BandIt merch: /, 'Merch: ') : MOVES[kind] ?? (memo || kind);
   return entries.length > 0 && [h('h4', {}, 'Wallet activity'), h('table', {}, entries.map(e => h('tr', {},
-    h('td', {}, date(e.createdAt)), h('td', {}, e.memo || e.kind), h('td', { class: e.amountCents < 0n ? '' : 'pass' }, money(e.amountCents)))))];
+    h('td', {}, date(e.createdAt)), h('td', {}, what(e.kind, e.memo)),
+    h('td', { class: e.amountCents < 0n ? '' : 'pass' }, `${e.amountCents < 0n ? 'out' : 'in'} ${money(e.amountCents < 0n ? -e.amountCents : e.amountCents)}`))))];
 }
 
 function merch(conn: DbConnection) {

@@ -15,7 +15,7 @@ import { matches, searchWords, searchable } from './table-search';
 import { dragBar, dragged } from './resize';
 import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
-import type { Band, Claim, IncidentMarker, LiveRun } from './module_bindings/types';
+import type { Band, Charge, Claim, IncidentMarker, LiveRun } from './module_bindings/types';
 
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
@@ -52,6 +52,12 @@ const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.Do
 const dropPin = new THREE.Group().add(
   new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
   new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
+/** Each incident kind in a word or two, for the tables. */
+const SHORT: Record<string, string> = { sos: 'SOS', fall: 'fall', property: 'equipment broken', theft: 'belonging stolen', breakage: 'belonging broken' };
+
+function short(kind: string): string {
+  return SHORT[kind] ?? kind;
+}
 
 function setUp(c: DbConnection) {
   conn = c;
@@ -304,12 +310,24 @@ function status(r: LiveRun | undefined, list: IncidentMarker[]) {
   // The first incident comes a minute in, once the crowd has reached its tables.
   const secs = Math.max(0, Math.round((Number(r.nextIncidentAt.microsSinceUnixEpoch / 1000n) - now) / 1000));
   const next = r.phase.tag === 'Running' && !conn.db.livePause.id.find(0) ? `, next in ${secs} s` : '';
+  const ids = new Set(list.map(m => m.incidentId));
+  const charges = [...conn.db.boardCharges.iter()].filter(c => ids.has(c.incidentId));
+  const charged = (...s: string[]) => charges.filter(c => s.includes(c.status)).length;
   return h('table', {},
     row('Event run', `${phaseWords(r)}: started ${time(r.startedAt)}, ends ${time(r.endsAt)}, ${r.pace}× speed`),
     row('People', `${people.toLocaleString()} of ${r.crowd.toLocaleString()}`),
     row('Incidents', `${list.length}, ${open} open${next}`),
     row('Claims', `${paid} paid, ${count('waiting for the organizer')} waiting for the organizer, ${count('refused')} refused`),
+    charges.length > 0 && row('Charges', `${charges.length} named: ${charged('proposed', 'disputed')} waiting for the organizer, ${charged('approved', 'paying')} to pay, ${charged('paid')} paid, ${charged('waived')} waived`),
     row('Seed', String(r.seed)));
+}
+
+const CHARGE_WORDS: Record<string, string> = {
+  proposed: 'waits for the organizer', approved: 'to pay', paying: 'paying', paid: 'paid', disputed: 'disputed', waived: 'waived',
+};
+
+function chargeWords(c: Charge | undefined): string {
+  return c ? `charge to ${c.attendeeName}: ${CHARGE_WORDS[c.status] ?? c.status}${c.amountCents ? `, ${money(c.amountCents)}` : ''}` : '';
 }
 
 function controls(r: LiveRun | undefined) {
@@ -430,6 +448,7 @@ export function runBar(c: DbConnection, canRun: boolean) {
 function incidents(r: LiveRun | undefined, canRun: boolean) {
   const list = markers(r).sort((a, b) => Number(b.incidentId - a.incidentId));
   const claims = new Map([...conn.db.claimsBoard.iter()].map(c => [c.id, c]));
+  const charges = new Map([...conn.db.boardCharges.iter()].map(c => [c.incidentId, c]));
   return h('section', {},
     h('h4', {}, `Incidents (${list.length})`),
     list.length === 0
@@ -440,9 +459,10 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
           const c = claims.get(m.claimId);
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
-            h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${m.kind}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
+            h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${short(m.kind)}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
+              charges.has(m.incidentId) && [h('br'), chargeWords(charges.get(m.incidentId))],
               waiting && [h('br'), approveButton(c!)]),
             h('td', {}, h('button', { class: 'link', onclick: () => focusOn(m) }, 'Show')));
         }))));
