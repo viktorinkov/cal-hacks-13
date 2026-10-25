@@ -79,7 +79,7 @@ function statusPill(status: string, replaying: boolean) {
 
 function Panel({ title, aside, children, className }: { title: string; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn('flex flex-col rounded-[4px] border border-line bg-panel p-5', className)}>
+    <section className={cn('desk-card flex flex-col p-5', className)}>
       <div className="flex min-h-6 flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
         {aside}
@@ -489,7 +489,7 @@ export function VenuePage() {
     : `Started ${when(run.start)} · ${clock(frame.span)}${frame.finished ? ' in all' : ' so far'}`
 
   return (
-    <DeskFrame title="Venue setup" sentence={findingOf(frame, run.setup.eventName)}>
+    <DeskFrame motif="venue" title="Venue setup" sentence={findingOf(frame, run.setup.eventName)}>
       <Toolbar runs={runs} selected={run.setup.id} onSelect={select} onStarted={() => setFollow(true)} />
 
       <section aria-labelledby="venue-run" className="mt-12">

@@ -84,7 +84,7 @@ function NeedsYou({ rows, state, sim, onOpen }: { rows: Payment[]; state: BlockS
       ) : (
         <ul className="mt-2">
           {shown.map((payment) => (
-            <li key={payment.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 border-t border-line py-3 lg:h-12 lg:grid-cols-[9.5rem_6.5rem_minmax(0,1fr)_minmax(0,14rem)_3.5rem_7.5rem] lg:py-0">
+            <li key={payment.id} className="desk-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 lg:h-12 lg:grid-cols-[9.5rem_6.5rem_minmax(0,1fr)_minmax(0,14rem)_3.5rem_7.5rem] lg:py-0">
               <span className="col-start-1 row-start-1 truncate text-[14px] text-ink lg:col-start-3">
                 {payment.what}{payment.status === 'failed' && payment.failure && <span className="text-ink-dim"> · {payment.failure}</span>}
               </span>
@@ -157,7 +157,7 @@ function WalletCard({ pinned, desk, payments, sim }: { pinned: PinnedWallet; des
     return <div className="mt-3 rounded-[6px] bg-panel px-4 py-3 text-[13px] text-ink-dim">No one is registered on {band.toLowerCase()} tonight.</div>
   }
   return (
-    <div aria-label={`${band} wallet`} className="mt-3 grid gap-x-8 gap-y-4 rounded-[6px] bg-panel px-4 py-4 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+    <div aria-label={`${band} wallet`} className="desk-card mt-3 grid gap-x-8 gap-y-4 px-4 py-4 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
       <div className="min-w-0">
         <p className="flex items-center gap-2 text-[13px] text-ink-dim">{band} wallet{sim && <SourceChip tag="sim" />}</p>
         {pinned.wallet ? (
@@ -258,8 +258,9 @@ function PaymentsTable({ payments, desk, state, partial, sim, onOpen, openId }: 
                 aria-label={`${payment.what}, ${formatCents(payment.amountCents)}, ${payment.label}, ${bandLabel(payment.bandId)}`}
                 onClick={() => onOpen(payment.id)}
                 onKeyDown={openOnEnter(() => onOpen(payment.id))}
+                data-open={openId === payment.id ? '' : undefined}
                 className={cn(
-                  'flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line py-3 hover:bg-ink/[0.03] focus-visible:bg-ink/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-champagne lg:table-row lg:py-0',
+                  'desk-row flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 py-3 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-champagne lg:table-row lg:py-0',
                   openId === payment.id && 'bg-ink/[0.05]',
                 )}
               >
@@ -327,6 +328,7 @@ export function PaymentsPage() {
 
   return (
     <DeskFrame
+      motif="payments"
       title={title}
       sentence={sentence}
       figures={

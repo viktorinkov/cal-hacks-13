@@ -407,7 +407,7 @@ export function WalletPage() {
   else body = <TapYourBand />
 
   return (
-    <div data-page data-lights="off" className="signup-page h-full overflow-y-auto bg-ground text-ink">
+    <div data-page data-lights="off" data-motif="pass" className="desk-night signup-page h-full overflow-y-auto bg-ground text-ink">
       <div className="signup-shell">
         <header className="signup-header">
           <button type="button" onClick={() => go('/join')} className="font-display text-[30px] leading-none text-ink">BandIt</button>

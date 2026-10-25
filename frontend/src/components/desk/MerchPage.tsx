@@ -11,6 +11,7 @@ export function MerchPage() {
 
   return (
     <DeskFrame
+      motif="merch"
       title={merch.length ? `${merch.length} pieces in the case.` : 'The merch case is empty.'}
       sentence="What the event is selling, with the price kept in cents. Orders shown here are the ones this sign-in can see."
       figures={
@@ -27,7 +28,7 @@ export function MerchPage() {
       ) : (
         <ul className="grid gap-8 md:grid-cols-2">
           {merch.map((piece) => (
-            <li key={piece.id} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4">
+            <li key={piece.id} className="desk-card grid grid-cols-[7.5rem_minmax(0,1fr)] gap-4">
               <span className="block aspect-square overflow-hidden bg-raised">
                 {piece.imageUrl && <img src={piece.imageUrl} alt="" className="h-full w-full object-cover" />}
               </span>

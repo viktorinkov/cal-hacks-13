@@ -32,6 +32,7 @@ export function AttendeesPage() {
 
   return (
     <DeskFrame
+      motif="attendees"
       title={title}
       sentence="Who joined is listed first, with the wristband they claimed. The import is everyone the event already knew."
       figures={
@@ -53,7 +54,7 @@ export function AttendeesPage() {
       {actionError && <p className="mt-4 text-[14px] text-signal">{actionError}</p>}
       <ul className="mt-6 divide-y divide-line">
         {shown.map((person) => (
-          <li key={person.nodeId || `${person.bandId}-${person.displayName}`} className="grid gap-2 py-3 md:grid-cols-[minmax(0,1.4fr)_6rem_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-baseline">
+          <li key={person.nodeId || `${person.bandId}-${person.displayName}`} className="desk-row grid gap-2 py-3 md:grid-cols-[minmax(0,1.4fr)_6rem_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-baseline">
             <div className="min-w-0">
               <p className="truncate text-[15px] text-ink">{person.displayName || 'No name yet'}</p>
               <p className="mt-1 truncate text-[13px] text-ink-dim">
@@ -92,7 +93,7 @@ export function AttendeesPage() {
           <h2 className="text-[13px] text-ink-dim">Imported</h2>
           <ul className="mt-3 divide-y divide-line">
             {imported.slice(0, 400).map((person) => (
-              <li key={person.id} className="grid gap-1 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-baseline">
+              <li key={person.id} className="desk-row grid gap-1 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-baseline">
                 <p className="truncate text-[15px] text-ink">{person.displayName || 'No name yet'}</p>
                 <p className="truncate text-[13px] text-ink-dim">{person.title || person.role || 'No title'}</p>
                 <p className="truncate text-[13px] text-ink-muted">{person.organization || 'No company'}</p>

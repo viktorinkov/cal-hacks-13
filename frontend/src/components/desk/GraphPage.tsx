@@ -201,6 +201,9 @@ export function GraphPage() {
 
   return (
     <DeskFrame
+      motif="graph"
+      title={linkCount ? `${linkCount.toLocaleString('en-US')} meetings in the room.` : 'No meetings drawn yet.'}
+      sentence="People, booths and companies linked by where they stood."
       figures={
         <>
           <Figure lead label="Links" value={linkCount.toLocaleString('en-US')} note={linkCount > links.length ? `${links.length.toLocaleString('en-US')} drawn` : 'in the graph'} />
@@ -210,7 +213,7 @@ export function GraphPage() {
         </>
       }
     >
-      <div ref={frame} className="nc-graph relative h-[70vh] min-h-[520px] overflow-hidden rounded-[4px] bg-panel shadow-[0_0_0_1px_var(--nc-line)]">
+      <div ref={frame} className="desk-card nc-graph relative h-[70vh] min-h-[520px] overflow-hidden">
         <div ref={stage} className="absolute inset-0" />
         {!ready && (
           <p className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-ink-dim">

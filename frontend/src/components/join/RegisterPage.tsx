@@ -385,7 +385,7 @@ export function RegisterPage() {
   const { search } = useRoute()
   const band = bandFromLocation(search)
   return (
-    <div data-page data-lights={lights ? 'on' : 'off'} className="signup-page h-full overflow-y-auto bg-ground text-ink">
+    <div data-page data-motif="signup" data-lights={lights ? 'on' : 'off'} className="desk-night signup-page h-full overflow-y-auto bg-ground text-ink">
       <ConcertLights enabled={lights} />
       <div className="signup-shell">
         <NightHeader lights={lights} onToggleLights={() => setLights((current) => !current)} />

@@ -42,12 +42,12 @@ export function JoinPage() {
   const related = claims.find((claim) => claim.bandId === Number(band?.label))
 
   return (
-    <div data-page className="h-full overflow-y-auto bg-ground text-ink">
+    <div data-page data-motif="invite" className="desk-night h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1200px] px-5 py-6 md:px-10 md:py-8">
         <NightHeader />
 
         <div className="mt-14 grid items-start gap-12 md:mt-20 md:grid-cols-2">
-          <div>
+          <div className="desk-card">
             <h1 className="font-display text-[clamp(40px,5vw,64px)] leading-[0.95] tracking-[-0.03em] text-ink">
               The wristband holds the night.
             </h1>

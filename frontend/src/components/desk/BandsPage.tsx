@@ -37,6 +37,7 @@ export function BandsPage() {
 
   return (
     <DeskFrame
+      motif="bands"
       title={alerts ? `${alerts} band${alerts === 1 ? '' : 's'} asking for help.` : `${online.toLocaleString('en-US')} bands online.`}
       sentence="The roster from the live database. A band stays on the list even when this map is not drawing a pin for it."
       figures={
@@ -75,7 +76,7 @@ export function BandsPage() {
       </div>
       <ul className="mt-6 divide-y divide-line">
         {shown.slice(0, 400).map((band) => (
-          <li key={band.id} className="grid grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,8rem)_5.5rem] items-baseline gap-3 py-2.5">
+          <li key={band.id} className="desk-row grid grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,8rem)_5.5rem] items-baseline gap-3 py-2.5">
             <span className="font-mono text-[13px] text-ink">{band.id}</span>
             <span className="min-w-0 truncate text-[14px] text-ink">{wearer.get(band.id) || 'No name yet'}</span>
             <span className="truncate text-[13px] text-ink-dim">{zoneName.get(band.zone) || (band.zone ? `Station ${band.zone}` : 'No zone')}</span>
