@@ -138,10 +138,12 @@ export function viewing(): string {
 
 /**
  * Points this page's viewer, a fresh identity kept for the browser tab, at the person through the
- * owner's portal around it: the module then answers every view for them.
+ * nearest owner page around it (see view-as.ts): the module then answers every view for them.
  */
 async function pointViewer(viewer: string, person: string): Promise<void> {
-  const viewAs = (window.top as any)?.banditViewAs;
+  let w: Window = window.parent;
+  while (!(w as any).banditViewAs && w !== w.parent) w = w.parent;
+  const viewAs = (w as any).banditViewAs;
   if (!viewAs) throw new Error("Open this page from the organizer portal's View as tab.");
   await viewAs(viewer, person);
 }

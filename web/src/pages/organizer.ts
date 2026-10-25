@@ -6,7 +6,6 @@
 // and the module checks every role again. The medic works incidents during the event; the organizer
 // decides the claims afterwards.
 
-import { Identity } from 'spacetimedb';
 import {
   act, config, connect, date, field, h, idToken, medicalCard, money, mount, risk, signIn,
   signOut, signedInEmail, time, viewing, type Config, EXIT_COLOURS,
@@ -16,6 +15,7 @@ import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
+import { screens, serveViewers, viewUrl } from '../view-as';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
 import type { BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
@@ -294,17 +294,16 @@ function viewed(): ViewablePerson | undefined {
   return [...conn.db.viewAsPeople.iter()].find(p => keyOf(p) === viewKey);
 }
 
-/** The screens a person sees, by the hash their page opens at: attendees their band page, staff this portal. */
-function screens(p: ViewablePerson): [string, string][] {
-  if (p.role === 'attendee') return [['now', 'Their band page now'], ['card', 'Medical card'], ['recap', 'Recap and merch']];
-  if (p.role === 'photographer') return [['now', 'Photo page']];
-  return [['claims', 'Organizer portal']];
-}
-
-function viewUrl(p: ViewablePerson, screen: string): string {
-  const view = `?view=${p.identity.toHexString()}#${screen}`;
-  if (p.role === 'attendee') return `/t/${bandCode(p.bandId)}${view}`;
-  return p.role === 'photographer' ? `/photo${view}` : `/organizer${view}`;
+/** Opens /organizer#viewas/<identity hex> on that person, as an attendee when they are one. */
+function openFromHash() {
+  const hex = location.hash.match(/^#viewas\/([0-9a-f]+)/i)?.[1]?.toLowerCase();
+  if (!hex) return;
+  tab = 'viewas';
+  const matches = [...conn.db.viewAsPeople.iter()].filter(p => p.identity.toHexString() === hex);
+  const p = matches.find(x => x.role === 'attendee') ?? matches[0];
+  if (!p) return;
+  viewKey = keyOf(p);
+  viewScreen = screens(p)[0][0];
 }
 
 /** The owner picks a person; their page shows below, live with their data. Nothing on it can be pressed. */
@@ -1035,10 +1034,10 @@ async function main() {
   if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
-  // A View as frame points its viewer at the chosen person through this owner's connection.
-  (window as any).banditViewAs = (viewer: string, person: string) =>
-    conn.reducers.viewAs({ viewer: Identity.fromString(viewer), target: Identity.fromString(person) });
-  window.addEventListener('hashchange', () => { tab = location.hash.slice(1); render(); });
+  serveViewers(conn);
+  openFromHash();
+  render();
+  window.addEventListener('hashchange', () => { tab = location.hash.slice(1); openFromHash(); render(); });
   setInterval(() => { if (!(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLSelectElement)) render(); }, 1000);
 }
 
