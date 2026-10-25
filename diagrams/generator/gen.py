@@ -1,4 +1,4 @@
-"""BandIt system design in Excalidraw: eighteen frames stacked top to bottom, the last four drawn by\n../medic-routing/medic.py. Labels follow LABELS.md."""
+"""BandIt system design in Excalidraw: nineteen frames stacked top to bottom, the last four drawn by\n../medic-routing/medic.py. Labels follow LABELS.md."""
 import json
 import pathlib
 import sys
@@ -112,7 +112,7 @@ SCREEN_ICONS = {0: PHONE, 1: MONITOR}
 # ---------------------------------------------------------------- 1. Overview
 def overview(y0):
     S.begin_frame("1 · Overview", 0, y0, 1000, 600)
-    title("BandIt")
+    title("Band1t")
     A, C1, C2, C3 = 60, 760, 1660, 2420
     r1, r2, r3 = 250, 520, 860
     bands = B(A, r1, "band\nstation marker", "device", w=400, icons={0: WATCH, 1: RADIO})
@@ -192,7 +192,7 @@ def spacetimedb(y0):
     ingest = B(640, r1, "ingest_band", "stdb", w=420)
     watch = B(1340, r1, "watch_bands\n500 ms", "stdb", w=420)
     resolve = B(2040, r1, "resolve_incident", "stdb", w=420)
-    B(640, r2, "timers\nsweep, social_tick, crowd_tick, job_reaper", "stdb", w=800)
+    B(640, r2, "timers\nsweep, social_tick, live_tick\ncrowd_tick, job_reaper", "stdb", w=800, h=150)
     views = B(1660, r2, "views\nmy_band, my_wallet, claims_board", "stdb", w=800)
     screens = B(1660, r3, "tap page (/t/code)\norganizer portal (/organizer)\nphoto page (/photo)", "web", w=800,
                 h=150, icons={0: PHONE, 1: MONITOR, 2: IMAGE})
@@ -391,19 +391,19 @@ def insurance(y0):
     att_pdf = B(Bx, 0, "attendee policy\nhealth plan, belongings\nPDF", "note", w=460, h=260, wordmark=FILE,
                 mark_h=100, cy=p[3])
     lookup = B(A, 0, "plan lookup\nfinds policy PDFs", "ext", w=400, h=220, wordmark=BRIGHT, mark_h=56, cy=p[2], **mk)
-    pick = B(A, 0, "Claude\npicks, checks plan", "claude", w=400, h=240, wordmark=CLAUDE, mark_h=90, cy=p[3], **mk)
+    pick = B(A, 0, "Claude\npicks plan PDF", "claude", w=400, h=240, wordmark=CLAUDE, mark_h=90, cy=p[3], **mk)
     H(organizer, venue_pdf, "uploads at setup")
     H(attendee, report, "uploads with claim")
     V(attendee, lookup, "names plan", x=attendee.cx)
     V(lookup, pick, "policy PDFs", x=lookup.cx)
-    H(pick, att_pdf, "checked plan", y=att_pdf.cy)
+    H(pick, att_pdf, "picked PDF", y=att_pdf.cy)
 
     # 2. the Evidence Engine reads every PDF
     top, bot = p[0] - 130, p[3] + 130
     Z(C1 - 40, top - 70, C2 + 560 - C1 + 80, bot + 40 - top + 70, "Evidence Engine", "ext", logo_=ELASTIC)
     ingest = B(C1, top, "ingest pipeline\nPDF text, pages", "ext", w=520, h=bot - top, wordmark=ELASTIC,
                mark_h=70, **mk)
-    reader = B(C2, top, "Agent Builder\nWorkflows\nreads PDFs", "ext", w=520, h=p[1] + 130 - top, wordmark=ELASTIC,
+    reader = B(C2, top, "Agent Builder\nWorkflows\nreads, checks PDFs", "ext", w=520, h=p[1] + 130 - top, wordmark=ELASTIC,
                mark_h=70, **mk)
     clauses = B(C2, 860, "policy clauses\nfall, SOS, property\ntheft, breakage", "ext", w=520, h=370, wordmark=HEART,
                 mark_h=90, **mk)
@@ -554,16 +554,98 @@ def insurance(y0):
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 8. Claude jobs
+# ---------------------------------------------------------------- Queues
+CLAUDE_JOBS = [  # job kind, result reducer, what Claude does
+    ("medical_extract", "apply_medical_extract", "reads medical PDF"),
+    ("claim_record_extract", "apply_medical_record", "reads hospital report"),
+    ("clinic_report", "file_clinic_report", "writes hospital report"),
+    ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
+    ("claim_draft", "attach_claim_letters", "drafts letters"),
+    ("recovery_letter", "attach_recovery_letter", "drafts letter"),
+    ("rule_proposal", "submit_rule_proposal", "proposes rule"),
+    ("merch_picks", "submit_merch_picks", "picks merch"),
+    ("photo_features", "submit_photo_features", "counts people"),
+]
+JOB_KINDS = [  # every job kind in the code, by the outside service its worker calls
+    ("Anthropic Claude API", "ext", CLAUDE, "asks", [k for k, _, _ in CLAUDE_JOBS]),
+    ("(Evidence Engine)", "ext", ELASTIC, "reads, checks", ["claim_verify", "document_read"]),
+    ("Web MCP (scraper)", "ext", BRIGHT, "scrapes", ["venue_setup", "plan_lookup", "venue_policy_lookup"]),
+    ("Nessie (wallet)", "ext", CAPONE, "pays", ["wallet_open", "merch_purchase", "charge_payment", "claim_payout"]),
+]
+KIND_W, KIND_H, KIND_STEP = 460, 96, 30  # one job kind box, and the gap between boxes
+
+
+def queues(y0):
+    S.begin_frame("Queues", 0, y0, 1000, 600)
+    title("Queues")
+    # 1. job queue: feature reducers queue jobs; bandit-workers leases each one and calls one outside service
+    zx, zw = 1440, 60 + 3 * KIND_W + 2 * KIND_STEP
+    y, zones = 200, []
+    for name, kind, mark, verb, kinds in JOB_KINDS:
+        rows = (len(kinds) + 2) // 3
+        h = 90 + rows * KIND_H + (rows - 1) * KIND_STEP + 30
+        z = Z(zx, y, zw, h, name, kind, mark)
+        for i, k in enumerate(kinds):
+            B(zx + 30 + (i % 3) * (KIND_W + KIND_STEP), y + 90 + (i // 3) * (KIND_H + KIND_STEP), k, kind, w=KIND_W,
+              h=KIND_H, fill=WHITE)
+        zones.append((z, verb))
+        y += h + 40
+    top, bottom = 200, y - 40
+    workers = B(760, top + 90, "bandit-workers", "rust", w=420, h=bottom - top - 120, icons={0: RUST})
+    job = B(80, 0, "job\nworker_jobs", "stdb", w=420, h=300, cy=L(workers.cy))
+    Z(40, L(job.y) - 90, 500, job.h + 130, "job queue", "stdb", STDB)
+    H(job, workers, "leases 60 s", y=job.y + 70)
+    H(workers, job, "submits result", y=job.bottom - 70)
+    for z, verb in zones:
+        H(workers, z, verb, y=z.cy)
+
+    # 2. command queue: one-shot commands wait as pending rows until band1t-bridge sends them to the bands
+    r = bottom + 200
+    portal = B(60, r, "organizer portal (/organizer)", "web", w=560, icons={0: MONITOR})
+    cmd = B(940, r, "command\npending = true", "stdb", w=420)
+    bridge = B(1680, r, "band1t-bridge", "rust", w=420, icons={0: RUST})
+    gateway = B(2400, r, "gateway", "device", w=340)
+    band = B(3040, r, "band", "device", w=300, icons={0: WATCH})
+    Z(900, r - 90, 500, BH + 130, "command queue", "stdb", STDB)
+    H(portal, cmd, "sends command")
+    H(cmd, bridge, "takes pending", y=cmd.y + 36)
+    H(bridge, cmd, "marks sent", y=cmd.bottom - 36)
+    H(bridge, gateway, "writes line")
+    H(gateway, band, "broadcasts 3x")
+
+    # 3. organizer queue: what code and Claude do not settle waits for the organizer
+    r = L(cmd.bottom) + 240
+    rows = [("submit_claim_review", "claim\nRouted", "routes", "approve_claim"),
+            ("submit_rule_proposal", "rule_proposal\nproposed", "proposes", "approve_rule_proposal"),
+            ("name_responsible_band", "charge\nproposed", "names band", "approve_charge")]
+    drawn = []
+    for i, (src, row, verb, dec) in enumerate(rows):
+        yy = r + i * (BH + 40)
+        drawn.append((B(60, yy, src, "stdb", w=560), B(940, yy, row, "stdb", w=420), verb,
+                      B(2560, yy, dec, "good", w=520)))
+    rb = L(drawn[-1][1].bottom)
+    org = B(1640, r, "organizer\norganizer portal (/organizer)", "web", w=640, h=rb - r, icons={0: USER, 1: MONITOR})
+    Z(900, r - 90, 500, rb - r + 130, "organizer queue", "stdb", STDB)
+    for src, row, verb, dec in drawn:
+        H(src, row, verb)
+        H(row, org, "shows", y=row.cy)
+        H(org, dec, "approves", y=dec.cy)
+
+    # 4. timers: each one a schedule table that calls its reducer on an interval
+    r = rb + 200
+    timers = [("watch_bands", "500 ms"), ("sweep", "1 s"), ("social_tick", "1 s"), ("live_tick", "1 s"),
+              ("crowd_tick", "2 s"), ("job_reaper", "10 s")]
+    for i, (name, every) in enumerate(timers):
+        B(80 + i * 540, r, f"{name}\n{every}", "stdb", w=460, icons={1: TIMER})
+    Z(40, r - 90, 6 * 540 + 20, BH + 130, "timers", "stdb", STDB)
+    return S.end_frame()
+
+
 def claude_jobs(y0):
-    S.begin_frame("8 · Claude jobs", 0, y0, 1000, 600)
+    S.begin_frame("Claude jobs", 0, y0, 1000, 600)
     title("Claude")
-    jobs = [("medical_extract", "apply_medical_extract", "reads medical PDF"),
-            ("claim_record_extract", "apply_medical_record", "reads hospital report"),
-            ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
-            ("claim_draft", "attach_claim_letters", "drafts letters")]
     rows = []
-    for i, (job, res, verb) in enumerate(jobs):
+    for i, (job, res, verb) in enumerate(CLAUDE_JOBS):
         y = 270 + i * (BH + 50)
         rows.append((B(980, y, job, "ext", w=440), B(1710, y, res, "stdb", w=460), verb))
     top, bottom = 270, L(rows[-1][0].bottom)
@@ -901,15 +983,18 @@ def stack(path, y0, first):
     return max(e["y"] + e["height"] for e in frames) - min(e["y"] for e in frames)
 
 
-FRAMES = (overview, architecture, spacetimedb, vision, pipeline, evidence, insurance, claude_jobs, social, interests, merch,
+FRAMES = (overview, architecture, spacetimedb, queues, vision, pipeline, evidence, insurance, claude_jobs, social, interests, merch,
           nessie, vultr, hardware)
 MEDIC = LOGOS.parent / "medic-routing" / "medic-routing.excalidraw"  # medic routing, walk, light circle, exits
 only = sys.argv[2:]  # frame function names, for a board of just those frames
-y = 0
+y = n = 0
 for draw in FRAMES:
     if not only or draw.__name__ in only:
         y += draw(y) + GAP
+        n += 1
+        frame = next(e for e in reversed(S.elements) if e["type"] == "frame")
+        frame["name"] = f"{n} · {frame['name'].split(' · ')[-1]}"  # numbered in board order
 if not only or "medic" in only:
-    y += stack(MEDIC, y, len(FRAMES) + 1) + GAP
+    y += stack(MEDIC, y, n + 1) + GAP
 S.dump(sys.argv[1] if len(sys.argv) > 1 else "bandit-system-design.excalidraw")
 print(len(S.elements), "elements")

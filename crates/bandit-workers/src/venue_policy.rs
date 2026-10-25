@@ -18,7 +18,7 @@ use crate::brightdata::{BrightData, err, urls_in};
 use crate::document::{self, MAX_CHECK_PAGES, join_pdfs, page_count, pdf_pages, split_pages};
 use crate::jobs::{Ctx, JobError, JobIn};
 use crate::model::ask_twice;
-use crate::plan::{DOCUMENTS, MAX_PDF_BYTES, MAX_SEARCH_CHARS, check_find, find_schema, short};
+use crate::plan::{MAX_PDF_BYTES, MAX_SEARCH_CHARS, check_find, find_schema, short};
 use crate::sink::Finish;
 
 pub const KIND: &str = "venue_policy_lookup";
@@ -27,6 +27,8 @@ const LIABILITY: &str = "liability";
 const PROPERTY: &str = "property";
 /// The reading takes 1 to 50 pages.
 const MAX_PAGES: u32 = 50;
+/// Addresses tried for each form: many copies of a standard form sit on sites that turn the fetch away.
+const PICKS: usize = 5;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Payload {
@@ -82,9 +84,9 @@ Use only web addresses that appear in the results, copied exactly.";
 fn find_prompt(p: &Payload, part: Part, results: &str) -> String {
     format!(
         "The organizer is looking for {}. Below are Bright Data's web search results.\n\n\
-List in `documents` up to {DOCUMENTS} addresses of that form, best first, each with a short reason. Prefer a direct link to a PDF of the form on the \
-insurer's own site, then a state insurance department's filing, then any copy of the form with that form number and edition. Insurers often use \
-the standard ISO form as it is. Leave out articles, broker and agent pages that explain the form, endorsements and other forms. Leave `documents` \
+List in `documents` up to {PICKS} addresses of that form, best first, each with a short reason. Prefer a direct link to a PDF of the form on the \
+insurer's own site, then a state insurance department's filing, then any copy of the form with that form number and edition, also a specimen \
+policy that holds it. Insurers often use the standard ISO form as it is. Leave out articles, broker and agent pages that explain the form, endorsements and other forms. Leave `documents` \
 empty when no result is that form or links straight to it.\n\n\
 <search_results>\n{results}\n</search_results>",
         what(p, part)
@@ -185,6 +187,17 @@ struct Looked {
     pdfs: usize,
 }
 
+/// One fetch, asked once more when it fails: a site now and then answers the Web Unlocker with an error.
+async fn fetch(bd: &BrightData, url: &str) -> Result<Vec<u8>, String> {
+    match bd.fetch(url).await {
+        Ok(b) => Ok(b),
+        Err(e) => {
+            tracing::info!(url = short(url), error = %e, "fetch failed, asking again");
+            bd.fetch(url).await
+        }
+    }
+}
+
 /// One search, asked once more when it gives no web address: a search now and then comes back empty.
 async fn search(bd: &BrightData, q: &str) -> Result<String, JobError> {
     let r = bd.search(q).await?;
@@ -210,7 +223,7 @@ async fn look_for(ctx: &Ctx, job: &JobIn, bd: &BrightData, p: &Payload, part: Pa
         Vec::new()
     } else {
         let request = || MessageRequest::new().system(SYSTEM).text(find_prompt(p, part, &results)).json_schema(find_schema());
-        let tries = ask_twice(&ctx.claude, "venue_policy_find", Effort::Low, request, |v| check_find(v, &urls)).await?;
+        let tries = ask_twice(&ctx.claude, "venue_policy_find", Effort::Low, request, |v| check_find(v, &urls, PICKS)).await?;
         calls.extend(tries.calls);
         tries.checked.map_err(|e| JobError { error: e.join("; "), calls: std::mem::take(calls) })?
     };
@@ -221,7 +234,7 @@ async fn look_for(ctx: &Ctx, job: &JobIn, bd: &BrightData, p: &Payload, part: Pa
         looked.notes.push("the search found no copy of it".into());
     }
     for url in &picked {
-        let pdf = match bd.fetch(url).await {
+        let pdf = match fetch(bd, url).await {
             Ok(b) if b.starts_with(b"%PDF-") && b.len() <= MAX_PDF_BYTES => b,
             Ok(b) if b.starts_with(b"%PDF-") => {
                 looked.notes.push(format!("{} is over 15 MB", short(url)));

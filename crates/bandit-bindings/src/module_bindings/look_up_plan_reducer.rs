@@ -7,23 +7,17 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct LookUpPlanArgs {
-    pub kind: String,
     pub insurer: String,
     pub plan: String,
     pub state: String,
-    pub limit_cents: u64,
-    pub deductible_cents: u64,
 }
 
 impl From<LookUpPlanArgs> for super::Reducer {
     fn from(args: LookUpPlanArgs) -> Self {
         Self::LookUpPlan {
-            kind: args.kind,
             insurer: args.insurer,
             plan: args.plan,
             state: args.state,
-            limit_cents: args.limit_cents,
-            deductible_cents: args.deductible_cents,
         }
     }
 }
@@ -43,24 +37,8 @@ pub trait look_up_plan {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`look_up_plan:look_up_plan_then`] to run a callback after the reducer completes.
-    fn look_up_plan(
-        &self,
-        kind: String,
-        insurer: String,
-        plan: String,
-        state: String,
-        limit_cents: u64,
-        deductible_cents: u64,
-    ) -> __sdk::Result<()> {
-        self.look_up_plan_then(
-            kind,
-            insurer,
-            plan,
-            state,
-            limit_cents,
-            deductible_cents,
-            |_, _| {},
-        )
+    fn look_up_plan(&self, insurer: String, plan: String, state: String) -> __sdk::Result<()> {
+        self.look_up_plan_then(insurer, plan, state, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `look_up_plan` to run as soon as possible,
@@ -71,12 +49,9 @@ pub trait look_up_plan {
     ///  and its status can be observed with the `callback`.
     fn look_up_plan_then(
         &self,
-        kind: String,
         insurer: String,
         plan: String,
         state: String,
-        limit_cents: u64,
-        deductible_cents: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -87,12 +62,9 @@ pub trait look_up_plan {
 impl look_up_plan for super::RemoteReducers {
     fn look_up_plan_then(
         &self,
-        kind: String,
         insurer: String,
         plan: String,
         state: String,
-        limit_cents: u64,
-        deductible_cents: u64,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -100,12 +72,9 @@ impl look_up_plan for super::RemoteReducers {
     ) -> __sdk::Result<()> {
         self.imp.invoke_reducer_with_callback(
             LookUpPlanArgs {
-                kind,
                 insurer,
                 plan,
                 state,
-                limit_cents,
-                deductible_cents,
             },
             callback,
         )

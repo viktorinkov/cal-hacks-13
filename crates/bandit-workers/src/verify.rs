@@ -1,5 +1,6 @@
 //! `claim_verify`: Elastic validates the de-identified claim document and finds
-//! the clauses of the claim's two policies that bear on it.
+//! the clauses of the claim's policies that bear on it: the venue's, and for an
+//! injury the attendee's health plan when one is on file.
 
 use bandit_bindings::{CheckIn, ClauseIn};
 use bandit_insurance::IncidentKind;
@@ -31,9 +32,15 @@ pub async fn run(ctx: &Ctx, job: &JobIn, p: VerifyPayload) -> Result<(), JobErro
     Ok(())
 }
 
-/// The attendee's own policy document, when one is on file.
+/// The attendee's health plan document, for an injury when one is on file. The
+/// venue's property, broken or stolen, is the venue's loss: only its policy answers it.
 fn attendee_hash(p: &VerifyPayload) -> Option<&str> {
-    Some(p.attendee_policy_hash.trim()).filter(|h| !h.is_empty())
+    Some(p.attendee_policy_hash.trim()).filter(|h| !h.is_empty() && is_injury(&p.incident_kind))
+}
+
+/// An injury, or a kind code does not know (read as one).
+fn is_injury(kind: &str) -> bool {
+    IncidentKind::parse(kind).is_none_or(IncidentKind::is_injury)
 }
 
 fn clause_in(c: ClauseHit) -> ClauseIn {
@@ -54,14 +61,10 @@ pub fn validation_check(v: &ValidationResult) -> CheckIn {
 fn looked_for(kind: &str) -> &'static str {
     match kind {
         "sos" | "fall" => "the venue's medical payments cover, its limits, exclusions and service window, and the other-insurance clause",
-        "property" => "the venue's property policy, its limits and deductible, its exclusions and the subrogation clause",
+        "property" | "breakage" => "the venue's property policy, its limits and deductible, its exclusions and the subrogation clause",
         "theft" => {
-            "the attendee's own personal property cover, its limits, deductible and exclusions such as property left unattended, \
-             the subrogation clause, and the venue's exclusion of guests' property"
-        }
-        "breakage" => {
-            "the attendee's own personal property cover, its limits, deductible and exclusions, the subrogation clause, \
-             and the venue's exclusion of guests' property"
+            "the venue's property policy on theft: theft as a cause of loss, its conditions and exclusions, its limits and deductible, \
+             and the subrogation clause"
         }
         _ => "the clauses of the claim's policies",
     }
@@ -82,8 +85,9 @@ fn share(found: &[ClauseHit], policy: &str) -> (usize, String) {
 
 /// The `policy_clauses` check: what the Evidence Engine looked for for this
 /// kind of incident and what it found, for example `3 clauses of the venue's
-/// policy (theft, subrogation) and 0 of the attendee's; looked for ...`. It
-/// passes when a clause was found and is `info` otherwise; it never fails a claim.
+/// policy (theft, subrogation); looked for ...`, and for an injury the
+/// attendee's health plan too. It passes when a clause was found and is `info`
+/// otherwise; it never fails a claim.
 pub fn clauses_check(kind: &str, attendee_on_file: bool, found: &Result<Vec<ClauseHit>, String>) -> CheckIn {
     let what = looked_for(kind);
     let (result, detail) = match found {
@@ -92,10 +96,13 @@ pub fn clauses_check(kind: &str, attendee_on_file: bool, found: &Result<Vec<Clau
             let (venue, venue_sections) = share(found, "venue");
             let (attendee, attendee_sections) = share(found, "attendee");
             let clauses = if venue == 1 { "clause" } else { "clauses" };
-            let attendee = if attendee_on_file { format!("{attendee} of the attendee's{attendee_sections}") } else { "no attendee policy on file".to_string() };
-            let joiner = if attendee_on_file { " and " } else { "; " };
+            let plan = match (is_injury(kind), attendee_on_file) {
+                (_, true) => format!(" and {attendee} of the attendee's health plan{attendee_sections}"),
+                (true, false) => "; no health plan on file".to_string(),
+                (false, false) => String::new(),
+            };
             let result = if found.is_empty() { "info" } else { "pass" };
-            (result, format!("{venue} {clauses} of the venue's policy{venue_sections}{joiner}{attendee}; looked for {what}"))
+            (result, format!("{venue} {clauses} of the venue's policy{venue_sections}{plan}; looked for {what}"))
         }
     };
     CheckIn { name: "policy_clauses".into(), result: result.into(), detail }
@@ -105,7 +112,7 @@ pub fn clauses_check(kind: &str, attendee_on_file: bool, found: &Result<Vec<Clau
 /// generic word, and a code-built narrative. No names and no staff free text:
 /// the staff description only picks a word from `claims_elastic::ITEM_KINDS`.
 pub fn claim_doc(p: &VerifyPayload) -> ClaimDoc {
-    let injury = IncidentKind::parse(&p.incident_kind).is_none_or(IncidentKind::is_injury);
+    let injury = is_injury(&p.incident_kind);
     let item_kind = if injury { "" } else { item_kind_of(&p.property_description) };
     let diagnoses: Vec<(&str, &str)> = p.diagnoses.iter().map(|(c, d)| (c.as_str(), d.as_str())).collect();
     let narrative = narrative_for(&NarrativeParts {
@@ -211,18 +218,26 @@ mod tests {
     fn theft_doc_names_the_item_never_the_people() {
         let mut p = testdata::verify_payload();
         p.incident_kind = "theft".into();
-        p.cover_kind = "personal_property".into();
-        p.property_description = "Maya's MacBook taken from table 4 while she was at the stage".into();
-        p.cost_cents = 119_900;
+        p.cover_kind = "property".into();
+        p.property_description = "Theft from the venue at Booth 3 Dana's display laptop is gone from the Acme booth; receipt $1,299.00".into();
+        p.cost_cents = 129_900;
         p.responsible_named = true;
-        p.attendee_policy_hash = "ab12".into();
         let d = claim_doc(&p);
-        assert_eq!((d.item_kind.as_str(), d.cost_cents, d.responsible_named), ("laptop", 119_900, true));
-        assert!(d.narrative.starts_with("Theft in zone Main stage at 21:45: an attendee's own laptop stolen; staff note within 6 minutes; "), "{}", d.narrative);
-        assert!(d.narrative.contains("value $1,199.00 logged by staff; a person named at the spot"), "{}", d.narrative);
-        assert!(!d.narrative.contains("Maya") && !d.narrative.contains("table 4") && !d.narrative.contains("x-ray"), "{}", d.narrative);
+        assert_eq!((d.cover_kind.as_str(), d.item_kind.as_str(), d.cost_cents, d.responsible_named), ("property", "laptop", 129_900, true));
+        assert!(d.narrative.starts_with("Theft in zone Main stage at 21:45: venue property stolen (laptop); staff note within 6 minutes; "), "{}", d.narrative);
+        assert!(d.narrative.contains("loss $1,299.00 logged by staff; a person named at the spot"), "{}", d.narrative);
+        assert!(!d.narrative.contains("Dana") && !d.narrative.contains("Acme") && !d.narrative.contains("x-ray"), "{}", d.narrative);
         assert!(d.diagnosis_codes.len() == 2, "codes still copy as they are");
+    }
+
+    #[test]
+    fn only_an_injury_searches_the_attendees_health_plan() {
+        let mut p = testdata::verify_payload();
+        p.attendee_policy_hash = "ab12".into();
         assert_eq!(attendee_hash(&p), Some("ab12"));
+        p.incident_kind = "theft".into();
+        assert_eq!(attendee_hash(&p), None, "a theft is the venue's loss");
+        p.incident_kind = "fall".into();
         p.attendee_policy_hash = " ".into();
         assert_eq!(attendee_hash(&p), None);
     }
@@ -237,20 +252,23 @@ mod tests {
 
     #[test]
     fn the_clause_check_says_what_was_looked_for() {
-        let found = Ok(vec![hit("attendee", "insuring_agreement"), hit("venue", "exclusions"), hit("attendee", "exclusions"), hit("venue", "exclusions")]);
-        let c = clauses_check("theft", true, &found);
+        let found = Ok(vec![hit("venue", "theft"), hit("venue", "exclusions"), hit("venue", "subrogation")]);
+        let c = clauses_check("theft", false, &found);
         assert_eq!((c.name.as_str(), c.result.as_str()), ("policy_clauses", "pass"));
-        assert!(
-            c.detail.starts_with("2 clauses of the venue's policy (exclusions) and 2 of the attendee's (insuring agreement, exclusions); looked for the attendee's own personal property cover"),
-            "{}",
-            c.detail
+        assert_eq!(
+            c.detail,
+            "3 clauses of the venue's policy (theft, exclusions, subrogation); looked for the venue's property policy on theft: \
+             theft as a cause of loss, its conditions and exclusions, its limits and deductible, and the subrogation clause"
         );
         let c = clauses_check("property", false, &Ok(vec![hit("venue", "subrogation")]));
-        assert!(c.detail.starts_with("1 clause of the venue's policy (subrogation); no attendee policy on file; looked for the venue's property policy"), "{}", c.detail);
+        assert!(c.detail.starts_with("1 clause of the venue's policy (subrogation); looked for the venue's property policy"), "{}", c.detail);
+        assert_eq!(looked_for("breakage"), looked_for("property"), "breakage is answered like property");
+        let fall = clauses_check("fall", true, &Ok(vec![hit("venue", "exclusions"), hit("attendee", "other_insurance")]));
+        assert!(fall.detail.starts_with("1 clause of the venue's policy (exclusions) and 1 of the attendee's health plan (other insurance); looked for"), "{}", fall.detail);
         let none = clauses_check("fall", false, &Ok(vec![]));
         assert_eq!(none.result, "info");
-        assert!(none.detail.starts_with("0 clauses of the venue's policy; no attendee policy on file; looked for the venue's medical payments cover"), "{}", none.detail);
-        let failed = clauses_check("breakage", true, &Err("POST bandit-policy-clauses/_search returned 500".into()));
+        assert!(none.detail.starts_with("0 clauses of the venue's policy; no health plan on file; looked for the venue's medical payments cover"), "{}", none.detail);
+        let failed = clauses_check("breakage", false, &Err("POST bandit-policy-clauses/_search returned 500".into()));
         assert_eq!(failed.result, "info");
         assert!(failed.detail.starts_with("the clause search failed (POST"), "{}", failed.detail);
         for kind in ["sos", "fall", "property", "theft", "breakage"] {

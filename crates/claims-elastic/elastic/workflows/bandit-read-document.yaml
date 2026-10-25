@@ -13,7 +13,7 @@ triggers:
       - name: kind
         type: string
         required: true
-        description: venue_policy, health_plan, attendee_policy, or coverage_form for a PDF a venue policy lookup fetched.
+        description: venue_policy, health_plan, or coverage_form for a PDF a venue policy lookup fetched.
       - name: page_count
         type: number
         required: true

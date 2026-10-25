@@ -19,9 +19,7 @@ pub const KIND_DOCUMENT_READ: &str = "document_read";
 pub const VENUE_POLICY: &str = "venue_policy";
 /// An attendee's health plan document, such as the plan's summary of benefits.
 pub const HEALTH_PLAN: &str = "health_plan";
-/// An attendee's own policy, such as renters or personal property.
-pub const ATTENDEE_POLICY: &str = "attendee_policy";
-pub const DOCUMENT_KINDS: [&str; 3] = [VENUE_POLICY, HEALTH_PLAN, ATTENDEE_POLICY];
+pub const DOCUMENT_KINDS: [&str; 2] = [VENUE_POLICY, HEALTH_PLAN];
 
 /// Input of `document_read`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -176,8 +174,7 @@ impl CoverTerms {
     pub fn incident_kinds(&self) -> Vec<IncidentKind> {
         match self.cover {
             CoverKind::MedicalPayments => vec![IncidentKind::Sos, IncidentKind::Fall],
-            CoverKind::Property => vec![IncidentKind::Property],
-            CoverKind::PersonalProperty => vec![IncidentKind::Theft, IncidentKind::Breakage],
+            CoverKind::Property => vec![IncidentKind::Property, IncidentKind::Theft, IncidentKind::Breakage],
         }
     }
 
@@ -693,9 +690,9 @@ pub fn venue_policy_schema() -> serde_json::Value {
 }
 
 /// The JSON schema `bandit-read-document` gives the reader for `kind`: the
-/// venue policy's terms and clauses; what an attendee's health plan or own
-/// policy prints about itself, and its clauses; or the coverage forms a PDF
-/// that a venue policy lookup fetched holds.
+/// venue policy's terms and clauses; what an attendee's health plan prints
+/// about itself, and its clauses; or the coverage forms a PDF that a venue
+/// policy lookup fetched holds.
 pub fn document_schema(kind: &str) -> serde_json::Value {
     let venue = venue_policy_schema();
     if kind == VENUE_POLICY {
@@ -917,9 +914,9 @@ mod tests {
     }
 
     #[test]
-    fn an_attendee_document_is_read_for_what_it_prints_and_its_clauses() {
+    fn a_health_plan_is_read_for_what_it_prints_and_its_clauses() {
         assert_eq!(document_schema(VENUE_POLICY), venue_policy_schema());
-        for kind in [HEALTH_PLAN, ATTENDEE_POLICY] {
+        for kind in [HEALTH_PLAN] {
             let s = document_schema(kind);
             assert_eq!(s["required"], serde_json::json!(["printed", "clauses"]));
             assert_eq!(s["properties"]["printed"], crate::printed::plan_schema());

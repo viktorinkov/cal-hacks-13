@@ -111,7 +111,7 @@ The Live tab lists every present band with SOS or fall under "Alerts", as "SOS o
 - **Notes.** "Treatment note", "Cost in dollars (optional)" and "Add note" call `add_incident_note`, which records the author's role and the cost in cents.
 - **Resolve.** "Resolve" (an organizer or a medic) calls `resolve_incident` with the resolution "treated on site". It sets the status to `Resolved` and writes one `clear` command to the subject band, which releases the SOS and fall latch, any forced state and the light circle on that band. The witness rows, the snapshot and the notes stay.
 - Test-Bands.md: a test band gets no `clear`, so if it still reports the flag 10 s after the resolve, a new incident opens.
-- Insurance.md: `resolve_incident` ends with the claim hook. An `sos` or `fall` incident with at least one note, or a `property` incident with a note whose cost is above 0, opens a claim; when it qualifies and no `insurance_policy` row exists, the resolve fails and rolls back ([Insurance](Insurance.md)).
+- Insurance.md: `resolve_incident` ends with the claim hook. An `sos` or `fall` incident with at least one note, or a `property` or `theft` incident with a note whose cost is above 0, opens a claim; when it qualifies and no `insurance_policy` row exists, the resolve fails and rolls back ([Insurance](Insurance.md)).
 
 **Property incidents.** `open_incident` (roles `ops`, `medic`) opens one by hand with kind `property`, a zone and a note, with the same snapshot. No page calls it.
 

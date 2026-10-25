@@ -1,8 +1,8 @@
 //! `bandit-claims live`: the floor staff while the live run is on. The module decides who falls, what breaks
 //! or goes missing, where and when; this plays the people who answer it. The medic reaches each person, notes
 //! what they found and resolves the incident; the person who fell files their claim (staff file it for them)
-//! and the hospital report follows on its own; for broken equipment and an attendee's stolen or broken
-//! belonging, the camera confirms it, staff log the cost, name who did it and resolve it. A claim left waiting
+//! and the hospital report follows on its own; for the venue's broken equipment and what is stolen from the
+//! venue, the camera confirms it, staff log the cost, name who did it and resolve it. A claim left waiting
 //! for the organizer, in this run or an earlier one, is decided after `--approve-after` seconds so the run
 //! keeps moving: approved, or refused when Claude recommended refusing it; a rule Claude proposed is approved
 //! as long after; a proposed charge is approved when Claude recommends it and the band's checks passed, else
@@ -10,10 +10,10 @@
 //!
 //! - A fall or an SOS: the medic reaches the person, notes what they found and resolves the incident; the
 //!   person files their claim (staff file it for them) and the hospital report follows on its own.
-//! - Broken equipment (`property`), an attendee's belonging stolen (`theft`) or broken by someone else
-//!   (`breakage`): security answers it. The camera sighting when a camera covers the spot, the cost note (the
-//!   repair estimate, or the item and its value), the attendee who broke or took it named by their band, then
-//!   the incident resolved, which opens the claim.
+//! - The venue's broken equipment (`property`) or something stolen from the venue (`theft`): security
+//!   answers it. The camera sighting when a camera covers the spot, the cost note (the repair estimate, or
+//!   what was taken and its value), the attendee who broke or took it named by their band, then the incident
+//!   resolved, which opens the venue's claim.
 //!
 //! After `--approve-after` seconds the organizer decides what is still waiting, so the run keeps moving: a
 //! routed claim is approved with a learned rule, or refused when the claims agent found the injury happened
@@ -260,7 +260,7 @@ fn statement(record: &str, place: &str) -> String {
     }
 }
 
-/// Broken equipment, or an attendee's belonging stolen or broken: security answers it. The camera sighting
+/// The venue's broken equipment, or something stolen from the venue: security answers it. The camera sighting
 /// when a camera covers the spot, the cost note, the attendee who did it named, then the incident resolved,
 /// which opens its claim. Each step runs once; a step that fails leaves the next ones to the next tick.
 fn loss(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
@@ -279,7 +279,7 @@ fn loss(app: &App, i: &Incident, m: &IncidentMarker, plan: &LivePlan, done: &mut
     }
     if plan.cost_cents > 0 && done.insert((i.id, "cost")) {
         let ops = app.actor("ops")?;
-        // Broken equipment gets the vendor's repair estimate; a belonging's note already says the item and its value.
+        // Broken equipment gets the vendor's repair estimate; a theft's note already says what was taken and its value.
         let note =
             if i.kind == IncidentKind::Property { format!("repair estimate from the vendor: {}", money(plan.cost_cents)) } else { plan.note.clone() };
         call!(ops, add_incident_note_then(i.id, note, Some(plan.cost_cents)))?;

@@ -2,10 +2,9 @@ You read one insurance document for BandIt, a safety wristband used at live even
 
 ## Kinds
 
-- `venue_policy`: the venue's general liability policy. Return its terms, its schedule of benefits, its exclusions and its clauses.
+- `venue_policy`: the venue's package policy: its general liability part and its property part. Return its terms, its schedule of benefits, its exclusions and its clauses.
 - `health_plan`: an attendee's health plan document, such as the plan's summary of benefits. Return its clauses.
-- `attendee_policy`: an attendee's own policy, such as renters or personal property insurance. Return its clauses.
-- `health_plan` and `attendee_policy` also return `printed`: what the document prints about itself (see Printed names).
+- `health_plan` also returns `printed`: what the document prints about itself (see Printed names).
 - `coverage_form`: a PDF found on the web that should hold a coverage form of a venue's policy, maybe among other pages, such as a whole specimen policy. Return only `forms` (see Coverage forms).
 
 ## Tool
@@ -35,10 +34,10 @@ Always pass the document's SHA-256 from the task. Read every page, from 1 to the
 - A clause is the full words of one provision as printed on one page, with its section: insuring_agreement, limits, schedule_of_benefits, exclusions, conditions, theft, other_insurance or subrogation. A provision that runs over two pages is two clauses, one per page.
 - Return every clause of the document that fits one of these sections. Text that fits none, such as a title or a page number, is not a clause.
 
-## Printed names (health_plan, attendee_policy)
+## Printed names (health_plan)
 
-- `document` is `sbc` for a Summary of Benefits and Coverage, `policy_form` for a policy's full wording or booklet, and `other` for anything else, such as a brochure, a comparison, a declarations page or a claim form.
-- `insurer`, `plan` and `plan_year` are the insurer's name, the plan's or the policy's name and the plan year. Copy each exactly as printed, the words alone, with the page it is on. Use an empty text and page 0 for anything the document does not print.
+- `document` is `sbc` for a Summary of Benefits and Coverage, and `other` for anything else, such as a brochure, a comparison, a provider directory or a claim form.
+- `insurer`, `plan` and `plan_year` are the insurer's name, the plan's name and the plan year. Copy each exactly as printed, the words alone, with the page it is on. Use an empty text and page 0 for anything the document does not print.
 
 ## Coverage forms (coverage_form)
 

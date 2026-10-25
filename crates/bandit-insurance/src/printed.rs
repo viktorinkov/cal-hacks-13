@@ -1,6 +1,6 @@
 //! What a PDF prints about itself, as `bandit-read-document` reads it: the
 //! kind of document, and the insurer, plan and plan year of an attendee's
-//! plan, or the coverage forms a venue policy lookup fetched, each with its
+//! health plan, or the coverage forms a venue policy lookup fetched, each with its
 //! form number, title and pages. A plan lookup and a venue policy lookup keep
 //! a fetched PDF only when this matches what was typed, and code finds every
 //! printed name word for word on its page first.
@@ -14,9 +14,8 @@ use serde_json::{Value, json};
 /// filed, so it is not one of `policy::DOCUMENT_KINDS`.
 pub const COVERAGE_FORM: &str = "coverage_form";
 
-/// What a plan's document is: a Summary of Benefits and Coverage, a policy's
-/// full wording or booklet, or anything else.
-pub const PLAN_DOCUMENTS: [&str; 3] = ["sbc", "policy_form", "other"];
+/// What a health plan's document is: a Summary of Benefits and Coverage, or anything else.
+pub const PLAN_DOCUMENTS: [&str; 2] = ["sbc", "other"];
 /// What one coverage form is: the liability part, the property part, or another form.
 pub const FORM_DOCUMENTS: [&str; 3] = ["liability_form", "property_form", "other"];
 
@@ -31,8 +30,8 @@ pub struct PrintedText {
     pub page: u32,
 }
 
-/// What an attendee's plan document prints about itself: the `printed` part of a
-/// `health_plan` or `attendee_policy` read.
+/// What an attendee's health plan document prints about itself: the `printed`
+/// part of a `health_plan` read.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PlanPrinted {
@@ -67,15 +66,15 @@ fn item_schema(what: &str) -> Value {
     })
 }
 
-/// The `printed` part of the schema of a `health_plan` or an `attendee_policy`.
+/// The `printed` part of the schema of a `health_plan`.
 pub fn plan_schema() -> Value {
     json!({
         "type": "object",
         "required": ["document", "insurer", "plan", "plan_year"],
         "properties": {
-            "document": {"type": "string", "enum": PLAN_DOCUMENTS, "description": "sbc for a Summary of Benefits and Coverage, policy_form for a policy's full wording or booklet, other for anything else"},
+            "document": {"type": "string", "enum": PLAN_DOCUMENTS, "description": "sbc for a Summary of Benefits and Coverage, other for anything else"},
             "insurer": item_schema("the insurer's name"),
-            "plan": item_schema("the plan's or the policy's name"),
+            "plan": item_schema("the plan's name"),
             "plan_year": item_schema("the plan year")
         }
     })

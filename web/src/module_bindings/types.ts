@@ -70,21 +70,6 @@ export const AttendeeOut = __t.object("AttendeeOut", {
 });
 export type AttendeeOut = __Infer<typeof AttendeeOut>;
 
-export const AttendeePolicy = __t.object("AttendeePolicy", {
-  id: __t.u64(),
-  holder: __t.identity(),
-  insurerName: __t.string(),
-  policyNumber: __t.string(),
-  perClaimLimitCents: __t.u64(),
-  aggregateLimitCents: __t.u64(),
-  deductibleCents: __t.u64(),
-  usedCents: __t.u64(),
-  source: __t.string(),
-  documentHash: __t.string(),
-  updatedAt: __t.timestamp(),
-});
-export type AttendeePolicy = __Infer<typeof AttendeePolicy>;
-
 export const AuthorityLimitRow = __t.object("AuthorityLimitRow", {
   role: __t.string(),
   rank: __t.u8(),

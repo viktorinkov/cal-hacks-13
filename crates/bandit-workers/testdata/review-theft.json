@@ -3,10 +3,10 @@
   "pack_version": 1,
   "pack_hash": "5d0b6c3e8f1a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c",
   "incident_kind": "theft",
-  "cover_kind": "personal_property",
-  "zone_name": "Hacking floor",
+  "cover_kind": "property",
+  "zone_name": "Sponsor tables",
   "incident_time": "2026-10-24 21:10:00",
-  "claimant_name": "Maya Chen",
+  "claimant_name": "Cal Hacks 13.0",
   "corroboration": "corroborated",
   "facts": [
     {
@@ -31,7 +31,7 @@
       "seq": 3,
       "source": "incident_snapshot",
       "key": "zone_id",
-      "value": "103",
+      "value": "104",
       "observed_at": 1792901400000000,
       "reader": "code",
       "reference": "incident:900301"
@@ -76,7 +76,7 @@
       "seq": 8,
       "source": "staff_note",
       "key": "note",
-      "value": "ops: attendee reports her laptop taken from table 4 while she was at the stage; value from the receipt on her phone",
+      "value": "ops: theft from the venue at booth 3: the sponsor's display laptop is gone from its table; the sponsor's receipt puts it at $1,299.00",
       "observed_at": 1792901640000000,
       "reader": "code",
       "reference": "incident_note:900321"
@@ -85,7 +85,7 @@
       "seq": 9,
       "source": "staff_note",
       "key": "cost_cents",
-      "value": "119900",
+      "value": "129900",
       "observed_at": 1792901640000000,
       "reader": "code",
       "reference": "incident_note:900321"
@@ -94,10 +94,10 @@
       "seq": 10,
       "source": "zone_context",
       "key": "zone_name",
-      "value": "Hacking floor",
+      "value": "Sponsor tables",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 11,
@@ -106,34 +106,34 @@
       "value": "hall",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 12,
       "source": "zone_context",
       "key": "zone_area_m2",
-      "value": "1200.0",
+      "value": "800.0",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 13,
       "source": "zone_context",
       "key": "zone_capacity",
-      "value": "600",
+      "value": "400",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 14,
       "source": "zone_context",
       "key": "nearby_booths",
-      "value": "Table 4, Table 5",
+      "value": "Booth 3, Booth 4",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 15,
@@ -142,7 +142,7 @@
       "value": "Hacking",
       "observed_at": 1792901400000000,
       "reader": "code",
-      "reference": "zone:103"
+      "reference": "zone:104"
     },
     {
       "seq": 16,
@@ -166,7 +166,7 @@
       "seq": 18,
       "source": "vision_assessment",
       "key": "vision_description",
-      "value": "a person lifts a laptop from an empty table and walks toward the east doors",
+      "value": "a person lifts a laptop off the table at booth 3 and walks toward the food line",
       "observed_at": 1792901520000000,
       "reader": "model",
       "reference": "vision_assessment:900331"
@@ -175,7 +175,7 @@
       "seq": 19,
       "source": "vision_assessment",
       "key": "camera_zone_id",
-      "value": "103",
+      "value": "104",
       "observed_at": 1792901520000000,
       "reader": "code",
       "reference": "vision_assessment:900331"
@@ -184,55 +184,55 @@
       "seq": 20,
       "source": "policy",
       "key": "policy_number",
-      "value": "HO-4471-2209",
+      "value": "GL-2026-0412",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 21,
       "source": "policy",
       "key": "insurer",
-      "value": "Lakeside Home and Renters",
+      "value": "Harborline Mutual",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 22,
       "source": "policy",
       "key": "cover_kind",
-      "value": "personal_property",
+      "value": "property",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 23,
       "source": "policy",
       "key": "per_claim_limit_cents",
-      "value": "150000",
+      "value": "1000000",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 24,
       "source": "policy",
       "key": "deductible_cents",
-      "value": "25000",
+      "value": "50000",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 25,
       "source": "policy",
       "key": "aggregate_remaining_cents",
-      "value": "1000000",
+      "value": "5000000",
       "observed_at": 1792902000000000,
       "reader": "code",
-      "reference": "attendee_policy:900341"
+      "reference": "insurance_policy:900341"
     },
     {
       "seq": 26,
@@ -265,7 +265,7 @@
       "seq": 29,
       "source": "responsible_party",
       "key": "naming_note",
-      "value": "camera shows band 41 at table 4 at 21:09",
+      "value": "camera shows band 41 at booth 3 at 21:09",
       "observed_at": 1792901880000000,
       "reader": "code",
       "reference": "charge:900351"
@@ -305,19 +305,13 @@
     {
       "name": "vision_zone",
       "result": "pass",
-      "detail": "camera zone 103, incident zone 103",
+      "detail": "camera zone 104, incident zone 104",
       "reader": "code"
     },
     {
       "name": "vision_time",
       "result": "pass",
       "detail": "frames 58 s before the incident opened",
-      "reader": "code"
-    },
-    {
-      "name": "claimant_not_staff",
-      "result": "pass",
-      "detail": "Maya Chen holds no staff role",
       "reader": "code"
     },
     {
@@ -329,59 +323,51 @@
     {
       "name": "policy_clauses",
       "result": "pass",
-      "detail": "1 clause of the venue's policy (exclusions) and 2 of the attendee's (insuring agreement, subrogation); looked for the attendee's own personal property cover",
+      "detail": "2 clauses of the venue's policy (theft, subrogation); looked for the venue's property policy on theft: theft as a cause of loss, its conditions and exclusions, its limits and deductible, and the subrogation clause",
       "reader": "elastic"
     }
   ],
   "amounts": {
-    "cost_cents": 119900,
-    "payout_cents": 94900,
-    "recoverable_cents": 94900,
-    "venue_cost_cents": 0
+    "cost_cents": 129900,
+    "payout_cents": 129900,
+    "recoverable_cents": 79900,
+    "venue_cost_cents": 50000
   },
   "lines": [],
   "record_history": "",
   "record_reason": "",
   "clauses": [
     {
-      "clause_id": "4b1e-c2",
-      "policy": "attendee",
-      "section": "insuring_agreement",
-      "page": 2,
-      "text": "We cover personal property owned by you against theft and accidental loss anywhere in the world, less the deductible shown in the declarations.",
+      "clause_id": "9f2c-c11",
+      "policy": "venue",
+      "section": "theft",
+      "page": 4,
+      "text": "We will pay for direct physical loss of covered property by theft, including personal property of others in your care, custody or control at the premises, less the deductible shown in the declarations.",
       "score": 0.81
     },
     {
-      "clause_id": "4b1e-c9",
-      "policy": "attendee",
-      "section": "subrogation",
-      "page": 7,
-      "text": "If we pay for a loss, your right to recover from anyone who caused it passes to us up to the amount we paid.",
-      "score": 0.74
-    },
-    {
-      "clause_id": "9f2c-c6",
+      "clause_id": "9f2c-c14",
       "policy": "venue",
-      "section": "exclusions",
-      "page": 6,
-      "text": "This insurance does not apply to personal property of guests, including property in the care, custody or control of the insured.",
-      "score": 0.7
+      "section": "subrogation",
+      "page": 9,
+      "text": "If we pay for a loss, your right to recover damages from anyone who caused it is transferred to us up to the amount we paid.",
+      "score": 0.74
     }
   ],
-  "policy_summary": "The attendee's own policy, personal property cover: pays the value of their own belongings stolen or broken, up to $1,500.00 per claim, after a $250.00 deductible the attendee carries. The venue's policy excludes guests' property.",
-  "claimant_statement": "My laptop was on table 4 while I watched the main stage, and it was gone when I got back.",
+  "policy_summary": "The venue's property policy, the property part of its package policy: pays to replace the venue's own property, or a sponsor's gear in its care, stolen during the event, up to $10,000.00 per claim, after a $500.00 deductible the venue carries. The insurer may recover what it paid from the person who took it.",
+  "claimant_statement": "",
   "charge": {
     "charge_id": 900351,
     "band_id": 41,
     "attendee_name": "Sam Patel",
-    "amount_cents": 119900,
+    "amount_cents": 129900,
     "named_by_role": "ops",
-    "note": "camera shows band 41 at table 4 at 21:09",
+    "note": "camera shows band 41 at booth 3 at 21:09",
     "checks": [
       {
         "name": "responsible_in_zone",
         "result": "pass",
-        "detail": "band 41 was in zone 103 at 21:10",
+        "detail": "band 41 was in zone 104 at 21:10",
         "reader": "code"
       },
       {
@@ -393,10 +379,11 @@
       {
         "name": "responsible_camera",
         "result": "pass",
-        "detail": "the camera saw a person at table 4 at 21:09",
+        "detail": "the camera saw a person at booth 3 at 21:09",
         "reader": "code"
       }
     ]
   },
-  "attendee_policy_hash": "4b1e"
+  "attendee_policy_hash": "",
+  "venue_policy_hash": ""
 }

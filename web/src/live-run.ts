@@ -60,7 +60,7 @@ const dropPin = new THREE.Group().add(
   new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
   new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
 /** Each incident kind in a word or two, for the tables. */
-const SHORT: Record<string, string> = { sos: 'SOS', fall: 'fall', property: 'equipment broken', theft: 'belonging stolen', breakage: 'belonging broken' };
+const SHORT: Record<string, string> = { sos: 'SOS', fall: 'fall', property: 'equipment broken', theft: 'stolen from the venue', breakage: 'equipment broken' };
 
 function short(kind: string): string {
   return SHORT[kind] ?? kind;
