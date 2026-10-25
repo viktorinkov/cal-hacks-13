@@ -244,9 +244,9 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 #### Read every insurance document (next to build)
 
-**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card in band setup, or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read`.
+**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card or their own policy in band setup, a plan lookup fetches the public wording of a plan the attendee named ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`.
 
-**Input.** The PDF from blob storage, its SHA-256 and its kind: `venue_policy`, `insurance_card` or `hospital_report`.
+**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan`, `attendee_policy` or `hospital_report`) and its source: `upload`, or `plan_lookup` with the address it came from.
 
 **In Elastic.**
 
@@ -682,7 +682,7 @@ flowchart TB
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
 
-  PDF["PDF in blob storage<br/>venue_policy, insurance_card or hospital_report"]:::stdb
+  PDF["PDF in blob storage<br/>venue_policy, insurance_card, health_plan, attendee_policy or hospital_report;<br/>uploaded, or fetched by a plan lookup"]:::stdb
   DR["bandit-workers, job document_read<br/>splits the pages; a scan is transcribed word for word"]:::rust
   EX["bandit-documents-extract<br/>attachment, then semantic_text"]:::ext
   DOCS["bandit-documents<br/>one page each"]:::ext
@@ -733,6 +733,8 @@ What each kind's schema asks for:
 |---|---|---|
 | `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `care_custody_control`, `other`); the theft clause and its conditions; other insurance (`primary` or `excess`); the subrogation clause | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, theft, other insurance, subrogation |
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
+| `health_plan` | a plan's Summary of Benefits and Coverage: insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | every row of its benefits table and its excluded services |
+| `attendee_policy` | insurer, policy form; personal property cover: what it pays for, theft away from home, the limits for kinds of items, exclusions; from a declarations page also the personal property limit and deductible | every clause, with its section |
 | `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
 
 **The clause search.** `claim_verify` and Claude's `search_policy` run one `semantic` query on `bandit-policy-clauses` `text`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card, and take the top 5: clause id, policy, section, page, text and score. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.

@@ -57,6 +57,10 @@ A new upload is a new document; when it is read, its fields overwrite that kind'
 
 In test mode each upload step also has "Use a test record". It loads the synthetic `medical-history.pdf` or `insurance-card.pdf` from `bandit-api`'s `/test-records` route and files it the same way.
 
+"Your health insurance" also has "Name your plan instead" (next to build). The attendee types their insurer, plan and state, and `look_up_plan` with kind `health` finds the plan's Summary of Benefits and Coverage on the web through Bright Data ([Bright-Data](../7-integrations/Bright-Data.md)). The step shows "Looking up your plan" until `my_plan_lookups` says `found` or `not_found`; on `not_found` it offers the upload again.
+
+A found plan fills the card's `insurer` and `plan` when they are empty, and its clauses become the attendee's health plan for their claims ([Insurance](Insurance.md)). The card shows "Plan found online" with the document's title instead of a page, and `member_id` stays empty until a card is uploaded.
+
 Only the attendee's own `my_medical_documents` shows the file hash. Only a medic sees the card, after their own tap, and no staff member sees the PDF.
 
 ### Extraction

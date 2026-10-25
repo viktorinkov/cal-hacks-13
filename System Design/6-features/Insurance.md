@@ -2,7 +2,7 @@
 
 Insurance resolves the money after an incident: who is paid, how much, from which policy, and who pays it back. It turns each incident into a claim that is paid, refused or sent to the organizer, posts every movement on a double-entry ledger, and reconciles what the venue's insurer pays back. It is built for Hyphenate's "autonomous systems for finance" track. When an attendee broke or took something, it can also turn the incident into a charge that the attendee sees on their tap page (next to build). Three parts share the work, and each does what only it can do:
 
-- **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own health insurance card and the hospital report. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
+- **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own health insurance card, health plan and policy for their belongings, and the hospital report. An attendee who names their plan instead of uploading it gets the plan's public wording through Bright Data, read the same way. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
 - **The organizer** decides each claim that Claude or the guard sends them. Each approval can teach a rule, and the next claim of that shape is then paid with nobody involved.
 
@@ -191,7 +191,7 @@ Then the guard holds the decision to the policy terms and the checks:
 
 | Claude decides | Goes through only when | Otherwise |
 |---|---|---|
-| `pay` | every check of the pack passed, the payout is above $0 and above the policy's minimum, the evidence is `corroborated`, there is no mass occurrence, and the payout is at or under the ceiling of a learned rule for this kind of claim | sent to the organizer with Claude's recommendation |
+| `pay` | every check of the pack passed, the payout is above $0 and above the policy's minimum, the evidence is `corroborated`, there is no mass occurrence, the payout is at or under the ceiling of a learned rule for this kind of claim, and a belongings claim's `attendee_policy` is not from a plan lookup | sent to the organizer with Claude's recommendation |
 | `refuse` | at least one check failed, and the refusal cites it in `refusal_checks` | sent to the organizer with Claude's recommendation |
 | `ask_organizer` | always: it goes to the organizer with Claude's question | |
 
@@ -212,6 +212,7 @@ A claim is paid with nobody involved only when all of these hold:
 7. An active learned rule matches: same incident kind and cover kind, any zone.
 8. The payout is at or under that rule's ceiling.
 9. Fewer than 3 injury incidents happened in the same zone within 5 minutes.
+10. For a belongings claim, the attendee's `attendee_policy` did not come from a plan lookup. A `plan_lookup` policy's limit and deductible are the attendee's own word, so the organizer sees the plan's wording and the typed numbers side by side and decides (next to build).
 
 ### Where each gate's numbers come from (next to build)
 
@@ -283,7 +284,13 @@ Every document in a claim is a PDF, and The Evidence Engine reads all of them th
 |---|---|---|---|
 | The venue's insurance policy | the organizer, on the Venue setup tab, when the event is set up (`POST /api/blobs` purpose `policy`, then `submit_policy_document`) | insurer, policy number, period, FNOL contact; each cover with its incident kinds, limits, deductible, minimum payout and service window; the schedule of benefits (code and cap); exclusions; which insurance pays first | `policy_term` rows, then `insurance_policy`, `coverage_rule` and `fee_schedule_line` once confirmed; every clause into `bandit-policy-clauses` |
 | The attendee's own insurance: their health insurance card | the attendee, in band setup ("Your health insurance", [Medical-Card](Medical-Card.md)) | insurer, plan, member name, member id, group number, the copays printed on it for urgent care and the emergency room, and its coverage wording | the attendee's `medical_card`; its clauses into `bandit-policy-clauses`; a claim reads it when the attendee files |
+| The attendee's health plan: its Summary of Benefits and Coverage (`health_plan`) | found on the web when the attendee names their insurer and plan in band setup (`look_up_plan`, kind `health`, [Bright-Data](../7-integrations/Bright-Data.md)) | insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | an empty insurer and plan on the attendee's `medical_card`; its clauses into `bandit-policy-clauses` as the attendee's policy |
+| The attendee's own policy for their belongings (`attendee_policy`) | the attendee uploads it, or names their insurer and policy and it is found on the web (`look_up_plan`, kind `belongings`) | insurer, what personal property cover pays for, theft away from home, the limits for kinds of items, exclusions; from an uploaded declarations page also the personal property limit and deductible | the attendee's `attendee_policy` ([Incident-Types](Incident-Types.md)); its clauses into `bandit-policy-clauses` as the attendee's policy |
 | The hospital report | written for the drawn case and rendered as a PDF, or filed by staff (`submit_medical_record`) | the same fields as today's record: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | `medical_record` and `claim_line` |
+
+**An attendee's plan by name.** Most attendees know their insurer and plan but carry no PDF. They type the insurer, the plan and their state, and a plan lookup finds the plan's public document and fetches its PDF through Bright Data ([Bright-Data](../7-integrations/Bright-Data.md)). The module files it with `queue_document_read`, source `plan_lookup` and the address it came from, and from there it is read like an upload.
+
+A health plan's Summary of Benefits and Coverage is the same for every member of the plan, so its copays set money like a card's would. A belongings policy's public form has no personal property limit or deductible, because each policyholder picks their own. The attendee types both from their declarations page, `attendee_policy.source` is `plan_lookup`, and every pay that rests on them goes to the organizer.
 
 The worker `document_read` splits each PDF into pages and indexes them into `bandit-documents` through the ingest pipeline `bandit-documents-extract`. Its `attachment` processor takes each page's text layer, and a `semantic_text` field makes the pages searchable by meaning. A page with no text layer, a scan, is first transcribed word for word by the Anthropic Claude API, which extracts nothing from it.
 
@@ -775,6 +782,7 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | The Evidence Engine reads every insurance PDF: the venue's policy, the attendee's insurance card and the hospital report (next to build) | reading documents into searchable, quoted terms is search work; Claude's turn is the judgment that follows |
 | Every term read from the venue's policy quotes its clause and page, code checks the quote word for word, and the organizer confirms the terms before they set any money (next to build) | the limits that move money must trace to the venue's own contract, never to a model's summary of it |
 | Both the venue and the attendee are insured, and the venue's policy says which pays first (`primary` or `excess`) (next to build) | that is how a venue's medical payments cover meets an attendee's own health plan |
+| An attendee may name their plan instead of uploading it, and Bright Data fetches the plan's public wording for the same reading (next to build) | attendees know their plan but rarely carry its PDF; a health plan's terms are the same for every member, while a belongings policy's limit and deductible are personal, so a pay that rests on typed numbers goes to the organizer |
 | The Evidence Engine matches a claim against the clauses of both policies, not against past claims (next to build) | a claim is covered or excluded by its contract's wording; how other claims ended says nothing about this one, and the organizer's learned rules already carry what earlier approvals taught |
 | Claude cites a clause for the decision, for each billed line and for which policy pays; code checks each clause belongs to a policy on this claim (next to build) | every call traces back to the contract, the way a finance reviewer checks it |
 | A charge to an attendee needs a band staff named, the evidence's checks, and the organizer's approval, and the attendee can dispute it (next to build) | a wrong charge hurts an attendee as much as a wrong refusal, so no charge rests on a model or on one person alone |
