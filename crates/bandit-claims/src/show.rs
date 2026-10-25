@@ -111,8 +111,20 @@ pub fn show(app: &App, id: u64) -> Result<()> {
         println!("  billed {}  covered {}", money(billed), money(covered));
     }
 
+    let mut history: Vec<Decision> = db.db.decision().iter().filter(|d| d.claim_id == id).collect();
+    history.sort_by_key(|d| d.id);
+    if !history.is_empty() {
+        println!("\nhow it was decided");
+        for d in &history {
+            println!("  {:<16} {}", d.actor, d.what);
+            if !d.why.is_empty() {
+                println!("  {:<16}   {}", "", d.why);
+            }
+        }
+    }
+
     for r in db.db.claim_review().iter().filter(|r| r.claim_id == id && r.pack_version == v) {
-        println!("\nclaims agent (v{v})  {}  causation {}", r.verdict, if r.causation.is_empty() { "-" } else { &r.causation });
+        println!("\nClaude's decision (v{v})  {}  causation {}", r.verdict, if r.causation.is_empty() { "-" } else { &r.causation });
         if !r.summary.is_empty() {
             println!("  summary  {}", r.summary);
         }
@@ -165,7 +177,8 @@ pub fn show(app: &App, id: u64) -> Result<()> {
     for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
         println!("learned  {}", rule_line(app, &r));
     }
-    if c.decided_by == "rule"
+    if matches!(c.decided_by.as_str(), "rule" | "claude")
+        && c.settlement_rule_id != 0
         && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
     {
         println!("settled under {}", rule_line(app, &r));
@@ -308,7 +321,7 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
         }
     }
     if let Some(r) = db.db.claim_review().iter().filter(|r| r.claim_id == id && r.pack_version == v).max_by_key(|r| r.id) {
-        println!("  agent    {} (causation {}): {}", r.verdict, r.causation, r.summary);
+        println!("  Claude   {} (causation {}): {}", r.verdict, r.causation, r.summary);
         for x in &r.concerns {
             println!("    concern {x}");
         }
@@ -327,7 +340,8 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
     for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
         println!("  learned  {}", rule_line(app, &r));
     }
-    if c.decided_by == "rule"
+    if matches!(c.decided_by.as_str(), "rule" | "claude")
+        && c.settlement_rule_id != 0
         && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
     {
         println!("  under    {}", rule_line(app, &r));

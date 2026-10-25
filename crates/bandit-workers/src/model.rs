@@ -1,11 +1,12 @@
 //! Claude calls: every call, success or failure, becomes a `ModelCallIn` for
-//! the module's audit table, and answers code rejects get one more try.
+//! the module's audit table, and answers code rejects get one more try. A
+//! tool loop calls [`Model::turn`] once per turn.
 
 use std::future::Future;
 use std::time::Instant;
 
 use bandit_bindings::ModelCallIn;
-use claude_client::{CallOutcome, ClaudeClient, ClaudeError, Effort, MessageRequest};
+use claude_client::{CallOutcome, ClaudeClient, ClaudeError, Effort, MessageRequest, ToolUse};
 use serde_json::Value;
 
 use crate::jobs::JobError;
@@ -20,6 +21,15 @@ pub struct Answer {
     pub call: ModelCallIn,
 }
 
+/// One turn of a tool loop: Claude's blocks, the tools it called, its
+/// structured answer once it stops calling tools, and the call record.
+pub struct Turn {
+    pub content: Vec<Value>,
+    pub tool_uses: Vec<ToolUse>,
+    pub json: Option<Value>,
+    pub call: ModelCallIn,
+}
+
 /// A failed call and its record.
 pub struct Failed {
     pub error: String,
@@ -30,6 +40,9 @@ pub struct Failed {
 pub trait Model: Sync {
     /// Sends `request` with `effort` and the refusal fallback; `kind` labels the call record.
     fn ask(&self, kind: &str, effort: Effort, request: MessageRequest) -> impl Future<Output = Result<Answer, Failed>> + Send;
+
+    /// Sends one turn of a tool loop; a turn that only calls tools is not a failure.
+    fn turn(&self, kind: &str, effort: Effort, request: MessageRequest) -> impl Future<Output = Result<Turn, Failed>> + Send;
 }
 
 /// The real model behind `claude-client`.
@@ -40,6 +53,19 @@ pub struct Claude {
 
 impl Model for Claude {
     async fn ask(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Answer, Failed> {
+        let turn = self.turn(kind, effort, request).await?;
+        match turn.json {
+            Some(json) => Ok(Answer { json, call: turn.call }),
+            None => {
+                let mut call = turn.call;
+                call.status = "error".into();
+                call.error = "no structured output".into();
+                Err(Failed { error: call.error.clone(), call })
+            }
+        }
+    }
+
+    async fn turn(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Turn, Failed> {
         let request = request.effort(effort).refusal_fallback(true);
         let started = Instant::now();
         let mut call = new_call(kind);
@@ -50,14 +76,7 @@ impl Model for Claude {
             Ok(outcome) => {
                 fill(&mut call, &outcome);
                 call.status = "ok".into();
-                match outcome.json {
-                    Some(json) => Ok(Answer { json, call }),
-                    None => {
-                        call.status = "error".into();
-                        call.error = "no structured output".into();
-                        Err(Failed { error: call.error.clone(), call })
-                    }
-                }
+                Ok(Turn { content: outcome.content, tool_uses: outcome.tool_uses, json: outcome.json, call })
             }
             Err(e) => {
                 call.status = if matches!(e, ClaudeError::Refused { .. }) { "refusal" } else { "error" }.into();
@@ -150,6 +169,7 @@ pub mod fake {
     use std::sync::Mutex;
 
     /// Serves canned answers in order (`Err` strings are failed calls) and keeps every request body.
+    /// For [`Model::turn`], an answer `{"_tools": [{"id", "name", "input"}]}` is a turn that calls those tools.
     #[derive(Default)]
     pub struct FakeModel {
         pub answers: Mutex<VecDeque<Result<Value, String>>>,
@@ -176,6 +196,11 @@ pub mod fake {
         pub fn calls(&self) -> usize {
             self.seen.lock().unwrap().len()
         }
+
+        /// The request body of call `i`.
+        pub fn body(&self, i: usize) -> Value {
+            self.seen.lock().unwrap()[i].1.clone()
+        }
     }
 
     impl Model for FakeModel {
@@ -187,6 +212,23 @@ pub mod fake {
                 Ok(json) => Ok(Answer { json, call }),
                 Err(error) => Err(Failed { error: error.clone(), call: ModelCallIn { status: "error".into(), error, ..call } }),
             }
+        }
+
+        async fn turn(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Turn, Failed> {
+            let answer = self.ask(kind, effort, request).await?;
+            let Some(tools) = answer.json.get("_tools").and_then(Value::as_array) else {
+                let content = vec![serde_json::json!({"type": "text", "text": answer.json.to_string()})];
+                return Ok(Turn { content, tool_uses: Vec::new(), json: Some(answer.json), call: answer.call });
+            };
+            let tool_uses: Vec<ToolUse> = tools
+                .iter()
+                .map(|t| ToolUse { id: t["id"].as_str().unwrap().into(), name: t["name"].as_str().unwrap().into(), input: t["input"].clone() })
+                .collect();
+            let content = tool_uses
+                .iter()
+                .map(|t| serde_json::json!({"type": "tool_use", "id": t.id, "name": t.name, "input": t.input}))
+                .collect();
+            Ok(Turn { content, tool_uses, json: None, call: answer.call })
         }
     }
 }

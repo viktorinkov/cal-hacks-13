@@ -1,5 +1,5 @@
-// The organizer portal: the live event from the bands, alerts, who joined, insurance claims from the
-// attendee's filing (or staff filing for them) to the named approver's decision, the event graph with its photos,
+// The organizer portal: the live event from the bands, alerts, who joined, settlements: who pays what on each
+// claim, from the attendee's filing (or staff filing for them) to the named approver's sign-off and the payout, the event graph with its photos,
 // the merch templates and orders, Elastic's jobs with their Kibana views, the venue setup from the event's name, and "Event ended".
 // The owner also views the portal and the attendee pages as any person sees them, read-only.
 // One portal for every staff member: the same tabs for all. Buttons a person cannot use are hidden,
@@ -42,6 +42,7 @@ const QUERIES = [
   'SELECT * FROM board_checks',
   'SELECT * FROM board_lines',
   'SELECT * FROM board_reviews',
+  'SELECT * FROM decision',
   'SELECT * FROM board_precedents',
   'SELECT * FROM board_records',
   'SELECT * FROM board_approvals',
@@ -99,7 +100,7 @@ function can(...wanted: string[]): boolean {
 /** Every tab, for anyone with a staff role; nothing for anyone else. */
 function tabs(): [string, string][] {
   if (!can(...STAFF_ROLES)) return [];
-  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Claims'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
+  const all: [string, string][] = [['live', 'Live'], ['attendees', 'Attendees'], ['claims', 'Settlements'], ['graph', 'Event graph'], ['photos', 'Photos'], ['merch', 'Merch'], ['venue', 'Venue setup'], ['kibana', 'Kibana']];
   const owned: [string, string][] = isOwner() ? [...all, ['staff', 'Staff'], ['viewas', 'View as']] : all;
   return cfg.test_mode ? [...owned, ['bands', 'Bands']] : owned;
 }
@@ -160,7 +161,7 @@ function noRole() {
 function signInScreen() {
   return [
     h('h2', {}, 'BandIt organizer portal'),
-    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, claims and the end of the event.'),
+    h('p', {}, 'Sign in with your staff email to run the event: live zones and alerts, attendees, who pays for each claim and the end of the event.'),
     h('button', { onclick: signIn }, 'Sign in with email'),
   ];
 }
@@ -189,7 +190,7 @@ function live() {
           return h('li', {}, h('b', {}, b.fall ? 'Fall' : 'SOS'), ` on band ${bandCode(b.id)}${wearer(b.id)} in ${z?.name ?? 'no zone'}: the bands around it show the light circle.`);
         }),
         incidents.map(i => h('li', {}, `Incident ${i.id}: ${i.kind.tag} in ${zoneName(i.zoneId)}, ${i.subjectBand ? `band ${bandCode(i.subjectBand)}${wearer(i.subjectBand)}` : 'no band'}, ${i.status.tag}, opened ${time(i.openedAt)} `,
-          h('a', { href: '#claims' }, 'open in Claims'))))),
+          h('a', { href: '#claims' }, 'open in Settlements'))))),
     h('section', {},
       h('h3', {}, 'Zones'),
       h('p', { class: 'muted' }, `${bands.length} bands at the event right now: ${crowd} in the crowd, ${test} test bands and ${bands.length - crowd - test} hardware bands.`),
@@ -510,30 +511,52 @@ function decides(c: Claim): boolean {
   return c.routedTo.isEqual(conn.identity!) || can(c.routedToRole);
 }
 
+/** Where a claim's payout goes: the attendee's wallet, or the repair vendor for the venue's own equipment. */
+function payee(c: Claim): string {
+  return c.coverKind === 'property' ? 'the repair vendor' : `${c.claimantName || 'the claimant'}'s wallet`;
+}
+
+const COVER_WORDS: Record<string, string> = { medical_payments: 'medical payments', property: 'property' };
+
+/** Who pays what on a claim: the payout, what the insurer pays back under which policy, the venue's share and what is not covered. */
+function whoPays(c: Claim) {
+  if (!c.costCents && !c.payoutCents) return null;
+  const policy = [...conn.db.boardPolicies.iter()].find(p => p.id === c.policyId);
+  const insurer = policy ? `${policy.insurerName} pays back, policy ${policy.policyNumber}, ${COVER_WORDS[c.coverKind] ?? c.coverKind} cover` : 'The insurer pays back';
+  const rows: [string, bigint][] = [
+    ['Cost', c.costCents],
+    [`Paid to ${payee(c)}`, c.payoutCents],
+    [insurer, c.recoverableCents],
+    ['The venue carries (deductible)', c.venueCostCents],
+  ];
+  if (c.costCents > c.payoutCents) rows.push(['Not covered', c.costCents - c.payoutCents]);
+  return [h('h4', {}, 'Who pays what'), h('table', {}, rows.map(([label, cents]) => h('tr', {}, h('td', {}, label), h('td', {}, money(cents)))))];
+}
+
 /** The organizer's queue: claims no learned rule settled, oldest first. */
 function myQueue() {
   const mine = [...conn.db.claimsBoard.iter()].filter(c => c.status.tag === 'Routed' && decides(c)).sort((a, b) => Number(a.id - b.id));
   if (!can('ops')) return null;
   return h('section', { class: mine.length ? 'alert' : '' },
-    h('h3', {}, `Waiting for your decision (${mine.length})`),
-    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Claims a learned rule covers settle on their own.'),
+    h('h3', {}, `Payments waiting for your sign-off (${mine.length})`),
+    !mine.length && h('p', { class: 'muted' }, 'Nothing right now. Payments a learned rule covers go out on their own.'),
     h('ul', {}, mine.map(c => h('li', {},
       h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`),
-      ` ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}, ${money(c.payoutCents)}: ${c.statusNote}`))));
+      ` ${money(c.payoutCents)} to ${payee(c)}, ${c.incidentKind} in ${c.zoneName}: ${c.statusNote}`))));
 }
 
 function claimList() {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(b.id - a.id));
   return h('section', {},
-    h('h3', {}, 'All claims'),
+    h('h3', {}, 'All claims and who pays them'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. An attendee files one from their band page after an injury, or staff file it for them above.'),
     claims.length > 0 && h('table', {},
-      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Payout'), h('th', {}, 'Waiting for')),
+      h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Insurer pays back'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
         h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
+        h('td', {}, money(c.costCents)), h('td', {}, money(c.payoutCents)), h('td', {}, money(c.recoverableCents)), h('td', {}, money(c.venueCostCents)),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
-        h('td', {}, money(c.payoutCents)),
         h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : '')))));
 }
 
@@ -575,12 +598,12 @@ function decide(c: Claim) {
   return h('div', {},
     h('form', { onsubmit: approve },
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !noLearn.has(c.id),
-        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims settle on their own'),
+        onchange: (e: Event) => { (e.target as HTMLInputElement).checked ? noLearn.delete(c.id) : noLearn.add(c.id); } }), 'Learn a rule from this approval, so similar claims are paid on their own'),
       h('label', {}, 'Rule ceiling in dollars (optional)', h('input', { name: 'ceiling', inputmode: 'decimal' })),
-      h('button', {}, `Approve ${money(c.payoutCents)}`)),
+      h('button', {}, `Approve paying ${money(c.payoutCents)} to ${payee(c)}`)),
     h('form', { onsubmit: refuse },
       h('input', { name: 'reason', placeholder: 'Reason for refusing', required: true }),
-      h('button', {}, 'Refuse')));
+      h('button', {}, 'Refuse to pay')));
 }
 
 /** A Nessie deposit that failed leaves the claim in Paying with this in its note. */
@@ -596,11 +619,11 @@ function waiting(c: Claim, hospital: boolean): string {
     case 'ReadingRecord': return `Waiting for Claude to read the ${hospital ? 'hospital report' : 'medical record'}.`;
     case 'Verifying': return 'Waiting for the Elastic checks.';
     case 'Reviewing': return 'Waiting for the claims agent\'s review.';
-    case 'Routed': return decides(c) ? 'Waiting for your decision.' : `Waiting for the ${c.routedToName.toLowerCase()} to decide.`;
+    case 'Routed': return decides(c) ? `Waiting for your sign-off to pay ${money(c.payoutCents)} to ${payee(c)}.` : `Waiting for the ${c.routedToName.toLowerCase()} to sign off the payment.`;
     case 'Paying': return payoutFailed(c) ? `Approved. The payout to ${name}'s wallet failed and waits for a retry.` : `Approved. Paying ${money(c.payoutCents)} into ${name}'s wallet.`;
-    case 'Settled': return `Settled. Waiting for the insurer to pay ${money(c.recoverableCents)}.`;
-    case 'Refused': return 'Refused. Nothing is waiting.';
-    case 'Reconciled': return 'Closed: the insurer paid. Nothing is waiting.';
+    case 'Settled': return `Paid out. Waiting for the insurer to pay ${money(c.recoverableCents)} back.`;
+    case 'Refused': return 'Refused: nothing is paid. Nothing is waiting.';
+    case 'Reconciled': return `Closed: the insurer paid ${money(c.recoverableCents)} back. Nothing is waiting.`;
     default: return '';
   }
 }
@@ -675,7 +698,8 @@ function claimDetail(id: bigint) {
   return h('section', { id: 'claim-detail' },
     h('h3', {}, `Claim #${c.id}: ${c.claimantName || 'no claimant'}, ${c.incidentKind} in ${c.zoneName}`, ' ', h('button', { class: 'link', onclick: () => { openClaim = undefined; render(); } }, 'close')),
     h('p', { class: 'big' }, h('b', {}, statusOf(c)), c.statusNote && `: ${c.statusNote}`),
-    h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claims agent (Claude): ${verdict(review.verdict)}.`),
+    h('p', {}, h('b', {}, waiting(c, !!hospital)), review && ` Claude decided: ${verdict(review.verdict)}.`),
+    whoPays(c),
     c.statement && h('p', {}, h('b', {}, 'In their words: '), `"${c.statement}"`),
     evidenceTrail(conn, c),
     hospital && [h('h4', {}, 'Hospital report'),
@@ -688,14 +712,15 @@ function claimDetail(id: bigint) {
       h('label', {}, 'Clinic report PDF', h('input', { type: 'file', name: `record-${c.id}`, accept: 'application/pdf' })),
       cfg.test_mode && h('label', {}, 'or a test report, dated for this incident', h('select', { name: 'test-record' }, h('option', { value: '' }, '—'), TEST_RECORDS.map(([f, label]) => h('option', { value: f }, label)))),
       h('button', {}, 'Upload it, Claude reads it')),
-    review && [h('h4', {}, `Claims agent review (Claude): ${verdict(review.verdict)}`),
+    review && [h('h4', {}, `Claude's decision: ${verdict(review.verdict)}`),
       h('p', {}, review.summary), review.causation && h('p', {}, `Causation: ${review.causation}`),
       review.concerns.length > 0 && h('ul', {}, review.concerns.map(x => h('li', {}, x))),
+      review.innocentExplanations.length > 0 && h('p', {}, `Innocent readings: ${review.innocentExplanations.join('; ')}`),
       review.missingEvidence.length > 0 && h('p', {}, `Missing: ${review.missingEvidence.join('; ')}`),
-      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code rejected the review: ${review.rejected.join('; ')}`)],
-    c.status.tag === 'Routed' && decides(c) && h('div', {}, h('h4', {}, 'Your decision'), decide(c)),
+      review.citedFactIds.length > 0 && h('p', { class: 'muted' }, `Rests on facts ${review.citedFactIds.map(n => `[${n}]`).join(' ')}`),
+      review.rejected.length > 0 && h('p', { class: 'fail' }, `Code set Claude's decision aside: ${review.rejected.join('; ')}`)],
+    c.status.tag === 'Routed' && decides(c) && h('div', {}, h('h4', {}, 'Your sign-off'), decide(c)),
     afterDecision(c),
-    h('p', {}, `Cost ${money(c.costCents)} · payout ${money(c.payoutCents)} · recoverable from the insurer ${money(c.recoverableCents)} · venue pays ${money(c.venueCostCents)}`),
     h('p', { class: 'muted' }, `Evidence pack v${v}, sha ${c.packHash.slice(0, 12)} · corroboration ${c.corroboration || 'n/a'} · decided by ${c.decidedBy || 'nobody yet'}${rule ? ` under rule v${rule.version} from ${rule.approverName}` : ''}${c.payoutReference ? ` · ${c.payoutReference}` : ''}`),
     h('h4', {}, 'Checks'),
     h('table', {}, checks.map(x => h('tr', {}, h('td', { class: x.result }, x.result), h('td', {}, x.name), h('td', {}, x.detail), h('td', { class: 'muted' }, x.reader)))),
@@ -725,12 +750,12 @@ function rules() {
   const rows = [...conn.db.boardRules.iter()].sort((a, b) => b.version - a.version);
   const policy = conn.db.boardPolicies.iter().next().value;
   return h('section', {},
-    h('h3', {}, 'Learned rules'),
+    h('h3', {}, 'Learned payment rules'),
     !rows.length && h('p', { class: 'muted' }, 'None yet. An approval with "learn" checked creates one.'),
-    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${r.coverKind}`),
-      h('td', {}, `up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
+    h('table', {}, rows.map(r => h('tr', {}, h('td', {}, `v${r.version}`), h('td', {}, `${r.incidentKind} under ${COVER_WORDS[r.coverKind] ?? r.coverKind} cover`),
+      h('td', {}, `pays up to ${money(r.ceilingCents)}${r.requiresCorroborated ? ', corroborated only' : ''}`),
       h('td', {}, `from ${r.approverName} (${r.approverRole})`), h('td', {}, r.status)))),
-    policy && h('p', { class: 'muted' }, `Policy ${policy.policyNumber} with ${policy.insurerName}. Medical payments used ${money(policy.medicalUsedCents)}, property used ${money(policy.propertyUsedCents)}.`));
+    policy && h('p', { class: 'muted' }, `Venue policy ${policy.policyNumber} with ${policy.insurerName}: paid out so far ${money(policy.medicalUsedCents)} for injuries and ${money(policy.propertyUsedCents)} for the venue's equipment.`));
 }
 
 function claimsTab() {
@@ -932,8 +957,8 @@ const EVIDENCE_ENGINE: { job: string; what: string; views: [string, string][] }[
     views: [
       ['Scrape pipeline: raw records, merges and the reason for each', '/app/dashboards#/view/bandit-pipeline-calhacks-13'],
       ['Sponsors and prizes: what the scrape found', '/app/dashboards#/view/bandit-event-calhacks-13'],
-      ['bandit-organize runs, step by step', '/app/workflows'],
-      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder'],
+      ['bandit-organize runs, step by step', '/app/workflows/bandit-organize'],
+      ['bandit-organizer, the agent and its tool calls', '/app/agent_builder/agents/bandit-organizer'],
     ],
   },
   {

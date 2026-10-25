@@ -270,54 +270,88 @@ def pipeline(y0):
 def evidence(y0):
     S.begin_frame("6 · The Evidence Engine", 0, y0, 1000, 600)
     title("Evidence Engine")
-    lanes = [
-        ("organize scrape (bandit-ingest)",
-         [lambda x, y: SV(x, y, ELASTIC, "Workflows\n(bandit-organize)", w=480, h=160),
-          lambda x, y: SV(x, y, ELASTIC, "Agent Builder\n(bandit-organizer)", w=480, h=160),
-          lambda x, y: B(x, y, "import_event", "stdb", w=480, h=160)], ["merges", "loads bundle"]),
-        ("check claims (bandit-workers)",
-         [lambda x, y: SV(x, y, ELASTIC, "ingest pipeline\n(bandit-claims-validate)", w=480, h=160),
-          lambda x, y: SV(x, y, ELASTIC, "semantic search\n(similar claims)", w=480, h=160),
-          lambda x, y: B(x, y, "submit_claim_checks", "stdb", w=480, h=160)], ["searches", "returns checks"]),
-    ]
-    X = [80 + j * 740 for j in range(3)]
+    RIGHT = 3900  # right edge of the two long lanes
+    WRITE = "#2b8a3e"  # the write-back loop
     zones = []
-    for i, (name, makers, labels) in enumerate(lanes):
-        top = 170 + i * 270
-        zones.append(Z(40, top, 2040, 250, name, "ext"))
-        boxes = [mk(X[j], top + 64) for j, mk in enumerate(makers)]
-        for a, b, lbl in zip(boxes, boxes[1:], labels):
-            H(a, b, lbl)
-    # raw band radio data and event photos, kept as they came for the dashboards
-    top = 170 + 2 * 270
-    zones.append(Z(40, top, 2040, 340, "store raw data (pipeline)", "ext"))
-    raw = SV(X[2], top + 64, ELASTIC, "bandit-raw-radio\nbandit-raw-heard\nbandit-raw-gateway\nbandit-raw-photos",
-             w=480, h=240)
-    scripts = B(X[1], top + 64, "feed.py\nphotos.py", "rust", w=480, h=240, icons={0: PYTHON, 1: PYTHON})
-    gateway = B(X[0], top + 64, "gateway", "device", w=480, h=100, icons={0: RADIO})
-    photos = B(X[0], top + 64 + 140, "event photos", "note", w=480, h=100, icons={0: IMAGE})
-    H(gateway, scripts, "records", y=gateway.cy)
-    H(photos, scripts, "imports", y=photos.cy)
-    H(scripts, raw, "stores")
-    # recap suggestions: interests from the booths with the most minutes, ranked by meaning
-    top = zones[-1].bottom - S.oy + 20
-    zones.append(Z(40, top, 2040, 420, "rank recap (bandit-indexer, bandit-api)", "ext"))
+    # organize scrape: exact joins in ES|QL first, then the agent merges the rest and gives a reason per merge
+    top = 170
+    y = top + 64
+    raw = SV(80, y, ELASTIC, "bandit-raw-pages\nbandit-raw-orgs\nbandit-raw-plan", w=440, h=200)
+    wf = SV(780, y, ELASTIC, "Workflows\n(bandit-organize)\nES|QL LOOKUP JOIN", w=460, h=200)
+    agent = SV(1500, y, ELASTIC, "Agent Builder\n(bandit-organizer)\nhybrid search", w=460, h=200)
+    bundles = SV(2220, y, ELASTIC, "bandit-bundles", w=420, h=200)
+    val = B(2900, 0, "validate", "rust", w=300, cy=L(bundles.cy), icons={0: RUST})
+    imp = B(3460, 0, "import_event", "stdb", w=400, cy=L(bundles.cy))
+    reasons = SV(1470, L(agent.bottom) + 90, ELASTIC, "bandit-organizer-decisions", w=520)
+    zones.append(Z(40, top, RIGHT - 40, L(reasons.bottom) + 40 - top, "organize scrape (bandit-ingest)", "ext"))
+    H(raw, wf, "reads rows")
+    H(wf, agent, "sends joins")
+    H(agent, bundles, "writes merges")
+    V(agent, reasons, "writes reasons")
+    H(bundles, val, "reads bundle")
+    H(val, imp, "loads bundle")
+    # check claims: find evidence (Elastic) apart from deciding (the Decision Engine), and write each outcome back
+    top = L(zones[-1].bottom) + 20
+    y = top + 64
+    doc = B(80, y, "de-identified claim\ncodes, amounts, zone\ntime, narrative", "note", w=440, h=160,
+            icons={0: FILE})
+    pipe = SV(780, y, ELASTIC, "ingest pipeline\n(bandit-claims-validate)\npainless checks\nrequired fields\n"
+                               "ICD-10, CPT shape\ncents, no future date\ncovered <= billed", w=480, h=340)
+    sem = SV(2440, y, ELASTIC, "semantic search\n3 closest claims", w=460, h=160)
+    checks = B(3200, y, "submit_claim_checks\nelastic_validation\nprecedents", "stdb", w=460, h=160)
+    dz = y + 220  # the Decision Engine part of this lane
+    search = B(2440, dz + 64, "search_past_claims\nsemantic search", "ext", w=460)
+    stats = B(2440, L(search.bottom) + 40, "past_claim_stats\nES|QL STATS\nCOUNT, MEDIAN, MAX\nBY outcome", "ext",
+              w=460, h=180)
+    draft = B(2440, L(stats.bottom) + 40, "claim_draft\nset_outcome", "ext", w=460, h=BH, icons={0: CLAUDE, 1: RUST})
+    review = B(3200, dz + 64, "Claude Opus 5.5\n(claim_review)", "ext", w=460, h=L(stats.bottom) - dz - 64,
+               icons={0: CLAUDE}, fill=WHITE)
+    index = SV(1500, y, ELASTIC, "bandit-claims\nsemantic_text narrative\n.jina-embeddings-v5-text-small\n"
+                                 "30 past claims", w=600, h=L(draft.bottom) - y)
+    zones.append(Z(40, top, RIGHT - 40, L(draft.bottom) + 80 - top, "check claims (bandit-workers)", "ext"))
+    Z(2400, dz, RIGHT - 40 - 2400, L(draft.bottom) + 40 - dz, "Decision Engine", "rust")
+    H(doc, pipe, "indexes", y=doc.cy)
+    H(pipe, index, "writes claim", y=pipe.cy)
+    H(index, sem, "ranks by meaning", y=sem.cy)
+    H(sem, checks, "sends checks")
+    H(review, search, "writes query", y=search.cy)
+    H(review, stats, "asks counts", y=stats.cy)
+    H(search, index, "searches", y=search.cy)
+    H(stats, index, "counts", y=stats.cy)
+    R(review, "b", draft, "r", [(review.cx, draft.cy)], label="decides", seg=0)
+    H(draft, index, "writes outcome", y=draft.cy, dashed=True, color=WRITE)
+    # store raw data: band radio data and event photos, kept as they came for the dashboards
+    top = L(zones[-1].bottom) + 20
+    y = top + 64
+    gateway = B(80, y, "gateway", "device", w=440, h=100, icons={0: RADIO})
+    photos = B(80, y + 140, "event photos", "note", w=440, h=100, icons={0: IMAGE})
+    scripts = B(780, y, "feed.py\nphotos.py", "rust", w=480, h=240, icons={0: PYTHON, 1: PYTHON})
+    rawd = SV(1500, y, ELASTIC, "bandit-raw-radio\nbandit-raw-heard\nbandit-raw-gateway\nbandit-raw-photos", w=600,
+              h=240)
+    zones.append(Z(40, top, 2120, 340, "store raw data (pipeline)", "ext"))
+    H(gateway, scripts, "sends lines", y=gateway.cy)
+    H(photos, scripts, "reads photos", y=photos.cy)
+    H(scripts, rawd, "indexes")
+    # rank recap: interests from the booths with the most minutes, ranked by meaning
+    top = L(zones[-1].bottom) + 20
     r1, r2 = top + 64, top + 64 + BH + 80
-    visit = B(X[0], r1, "visit\ntop 5 booths", "stdb", w=480, icons={0: WALK})
-    indexer = B(X[1], r1, "bandit-indexer", "rust", w=480, icons={0: RUST})
-    people = SV(X[2], r1, ELASTIC, "bandit-people\nbandit-booths\n(semantic search)", w=480, h=r2 + BH - r1)
-    api = B(X[1], r2, "bandit-api\nGET /api/recap", "rust", w=480, icons={0: RUST})
-    recap = B(X[0], r2, "recap (/t/code)", "web", w=480, icons={0: PHONE})
+    visit = B(80, r1, "visit\ntop 5 booths", "stdb", w=440, icons={0: WALK})
+    indexer = B(780, r1, "bandit-indexer\nfindable only", "rust", w=480, icons={0: RUST})
+    people = SV(1500, r1, ELASTIC, "bandit-people\nbandit-booths\nsemantic_text", w=600, h=r2 + BH - r1)
+    api = B(780, r2, "bandit-api\nGET /api/recap\nsemantic search", "rust", w=480, h=BH + 20, icons={0: RUST})
+    recap = B(80, 0, "recap (/t/code)", "web", w=440, cy=L(api.cy), icons={0: PHONE})
+    zones.append(Z(40, top, 2120, L(api.bottom) + 40 - top, "rank recap (bandit-indexer, bandit-api)", "ext"))
     H(visit, indexer, "sets interests")
     H(indexer, people, "copies rows", y=indexer.cy)
     H(people, api, "ranks", y=api.cy)
     H(api, recap, "orders lists")
     # Kibana: the organizer's screen for the event data, the past claims and the raw data
-    first, last = zones[0].cy, zones[2].cy
-    kib = B(2260, 0, "Kibana\n(dashboards)", "ext", w=420, h=last - first + 160, icons={0: KIBANA}, fill=WHITE,
-            cy=(first + last) / 2 - S.oy)
-    for z in zones[:3]:
-        H(z, kib, "shows", y=z.cy)
+    kib = B(2740, L(zones[2].y) + 100, "Kibana\n(dashboards)", "ext", w=560, h=300, icons={0: KIBANA}, fill=WHITE)
+    H(zones[2], kib, "shows", y=zones[2].cy)
+    V(zones[1], kib, "shows", x=kib.cx)
+    lane1 = zones[0]
+    R(lane1, "r", kib, "r", [(RIGHT + 40, lane1.cy), (RIGHT + 40, kib.y + 60)], label="shows", seg=2,
+      fb=60 / kib.h)
     return S.end_frame()
 
 
@@ -325,39 +359,90 @@ def evidence(y0):
 def insurance(y0):
     S.begin_frame("7 · The Decision Engine", 0, y0, 1000, 600)
     title("Decision Engine")
-    c = [60, 780, 1460, 2240, 2900]
+    c = [60, 740, 1400]
     r1, r2, r3 = 240, 520, 800
-    attendee = B(c[0], r1, "attendee", "web", w=460, icons={0: USER})
-    tap = B(c[0], r2, "tap page (/t/code)", "web", w=460, icons={0: PHONE})
+    LEARN = "#2b8a3e"
+    # intake: the claim and the facts that make up its evidence pack
+    attendee = B(c[0], r1, "attendee", "web", w=440, icons={0: USER})
+    tap = B(c[0], r2, "tap page (/t/code)", "web", w=440, icons={0: PHONE})
     incident = B(c[1], r1, "incident\nlight circle\ncamera sighting", "stdb", w=420, h=150)
     file_ = B(c[1], r2, "file_claim", "stdb", w=420)
     report = B(c[1], r3, "hospital report\nPDF, itemized bill", "note", w=420, icons={0: FILE})
-    pack = B(c[2], r1, "evidence pack\nprice, date, cover", "stdb", w=520, h=r2 + BH - r1)
-    extract = B(c[2], r3, "Anthropic Claude API\n(claim_record_extract)", "ext", w=520, icons={0: CLAUDE},
+    pack = B(c[2], r1, "evidence pack\nprice, date, cover", "stdb", w=500, h=r2 + BH - r1)
+    extract = B(c[2], r3, "Anthropic Claude API\n(claim_record_extract)", "ext", w=500, icons={0: CLAUDE},
                 fill=WHITE)
-    refused = B(c[3], r1, "refused\nchecks listed", "bad", w=400)
-    review = B(c[3], r2, "Claude\n(claim_review)", "ext", w=400, icons={0: CLAUDE}, fill=WHITE)
-    payout = SV(c[4], r1, CAPONE, "Nessie (payout)", w=480)
-    rule = B(c[4], 0, "rule match", "stdb", w=480, h=220, shape="diamond", cy=r2 + BH / 2)
-    org = B(c[4], r3, "organizer portal\n(/organizer, Claims)", "web", w=480, icons={0: MONITOR})
-    venue = B(c[4], r3 + BH + 140, "venue damage", "stdb")
-    V(org, venue, "opens claim", x=org.x + 0.3 * org.w)
     V(attendee, tap, "opens")
     H(tap, file_, "files claim")
     H(file_, pack, "opens claim", y=file_.cy)
     H(incident, pack, "adds facts", y=incident.cy)
     V(file_, report, "requests report")
-    H(report, extract)
+    H(report, extract, "sends PDF")
     V(extract, pack, "adds lines")
-    H(pack, refused, "fails", y=refused.cy)
-    H(pack, review, "passes", y=review.cy)
-    H(review, rule, "confirms story", y=rule.cy)
-    V(rule, payout, "settles", x=rule.cx)
-    V(rule, org, "escalates", x=rule.cx)
-    lx = rule.cx + 170  # the learning loop meets the diamond's lower right edge
-    edge = rule.cy + rule.h / 2 * (1 - 170 / (rule.w / 2)) + 5
-    S.arrow(org, rule, [(lx, org.y), (lx, edge)], label="learns rule", dashed=True, color="#2b8a3e", fs=AFS)
-    R(org, "r", payout, "r", [(org.right + 90, org.cy), (org.right + 90, payout.cy)], label="approves", seg=1)
+    # Evidence Engine: finds the evidence, decides nothing
+    ex, er = 2120, 3880  # left and right edge of the investigation
+    et = 170
+    checks = SV(ex + 40, et + 64, ELASTIC, "bandit-claims-validate\n3 closest claims", w=500, h=160)
+    past = SV(2920, et + 64, ELASTIC, "bandit-claims\n(past claims)", w=920, h=160)
+    ez = Z(ex, et, er - ex, L(checks.bottom) + 36 - et, "Evidence Engine", "ext", ELASTIC)
+    # Claude investigates: a loop of tool calls over the evidence
+    ct = L(ez.bottom) + 90
+    tz_y = ct + 50
+    search = B(2920, tz_y + 64, "search_past_claims\nsemantic search", "ext", w=440)
+    stats = B(3400, tz_y + 64, "past_claim_stats\nES|QL STATS", "ext", w=440)
+    read_ev = B(2920, L(search.bottom) + 40, "read_evidence\nband, light circle\nsecurity cameras\nmedic notes\n"
+                                            "hospital report", "ext", w=440, h=210,
+                icons={1: WATCH, 2: CAMERA, 4: FILE})
+    read_ck = B(3400, L(search.bottom) + 40, "read_checks", "ext", w=440)
+    tz_b = L(read_ev.bottom) + 30
+    claude = B(ex + 40, tz_y, "Claude Opus 5.5\n(claim_review)", "ext", w=500, h=tz_b - tz_y, icons={0: CLAUDE},
+               fill=WHITE)
+    cz = Z(ex, ct, er - ex, tz_b + 36 - ct, "Anthropic Claude API", "ext", CLAUDE)
+    tools = Z(2900, tz_y, er - 20 - 2900, tz_b - tz_y, "tools", "plain")
+    R(pack, "r", checks, "l", [], label="sends claim", fb=0.5, fa=(checks.cy - pack.y) / pack.h)
+    mid = (ez.bottom + cz.y) / 2  # labels sit in the gap between the two zones
+    ax = checks.right - 70  # clear of the zone label
+    R(checks, "b", claude, "t", [(ax, 2 * mid - checks.bottom)], label="adds checks", seg=0,
+      fa=(ax - checks.x) / checks.w, fb=(ax - claude.x) / claude.w)
+    for tool, verb in ((search, "searches"), (stats, "counts")):
+        R(tool, "t", past, "b", [(tool.cx, 2 * mid - past.bottom)], label=verb, seg=1,
+          fb=(tool.cx - past.x) / past.w)
+    H(claude, tools, "calls", y=claude.y + 70)
+    H(tools, claude, "returns", y=claude.bottom - 70)
+    # decision: Claude picks one of three, code holds it to the limits
+    bt = L(cz.bottom) + 110
+    gz_y = bt
+    guard = B(840, gz_y + 64, "guard", "rust", w=1120, h=100, icons={0: RUST})
+    gy = L(guard.bottom) + 24
+    amounts = B(840, gy, "amounts from code", "stdb", w=540, h=104)
+    refuse = B(1420, gy, "refuse only on\nfailed check", "bad", w=540, h=104)
+    gy2 = gy + 104 + 24
+    pay = B(840, gy2, "pay only if\nevery check passed\nevidence corroborated\ninside rule ceiling", "good", w=540,
+            h=174)
+    before = B(1420, gy2, "before pay, read\nband, light circle\nhospital report", "good", w=540, h=174)
+    choice = B(60, 0, "pay\nrefuse\nask organizer", "stdb", w=500, h=260, shape="diamond", cy=L(guard.cy))
+    corridor = cz.bottom + 50
+    R(claude, "b", choice, "t", [(claude.x + 140, corridor), (choice.cx, corridor)], label="decides", seg=1,
+      fa=140 / claude.w)
+    H(choice, guard, "checks limits", y=guard.cy)
+    ox = 2260
+    refused = B(ox, gz_y, "refused\nchecks listed", "bad", w=480)
+    payout = SV(ox, L(refused.bottom) + 90, CAPONE, "Nessie (payout)", w=480)
+    org = B(ox, L(payout.bottom) + 90, "organizer portal\n(/organizer, Claims)", "web", w=480, h=170,
+            icons={0: MONITOR})
+    gz = Z(800, gz_y, 1200, max(L(before.bottom) + 30, L(org.bottom) - 10) - gz_y, "bandit-insurance (decision.rs)",
+           "rust", RUST)
+    venue = B(3000, 0, "venue damage", "stdb", w=360, cy=L(org.cy))
+    H(gz, refused, "refuses", y=refused.cy)
+    H(gz, payout, "pays", y=payout.cy)
+    H(gz, org, "escalates", y=org.y + 45)
+    H(org, gz, "learns rule", y=org.bottom - 45, dashed=True, color=LEARN)
+    V(org, payout, "approves")
+    H(org, venue, "opens claim")
+    # every step lands in the decision history the organizer reads
+    hist = B(800, L(max(gz.bottom, org.bottom)) + 150, "decision (decision history)", "stdb", w=er - 20 - 800)
+    V(gz, hist, "records outcome")
+    V(cz, hist, "reports steps", x=3720)
+    V(hist, org, "shows history")
     return S.end_frame()
 
 
@@ -367,7 +452,7 @@ def claude_jobs(y0):
     title("Claude")
     jobs = [("medical_extract", "apply_medical_extract", "reads medical PDF"),
             ("claim_record_extract", "apply_medical_record", "reads hospital report"),
-            ("claim_review", "submit_claim_review", "reviews claim"),
+            ("claim_review", "report_claim_step\nsubmit_claim_review", "investigates, decides"),
             ("claim_draft", "attach_claim_letters", "drafts letters")]
     rows = []
     for i, (job, res, verb) in enumerate(jobs):
