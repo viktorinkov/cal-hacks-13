@@ -2,7 +2,7 @@
 
 The medical card is the attendee's own health information, the "Wrist assured" card. In band setup an attendee may upload two PDFs: their medical history and their health insurance card. A worker sends each to the Anthropic Claude API, which returns the card fields with the page each item came from. In the design, The Evidence Engine reads the insurance card instead, like every insurance document, because the attendee's own policy is the other insurance on their claim (next to build, [Insurance](Insurance.md#reading-the-insurance-documents-next-to-build)).
 
-Code checks the answer and writes it into the attendee's one `medical_card`, which the attendee checks once before setup ends. A medic sees the card by tapping the attendee's band with their phone, or from the incident desk in the organizer portal (/organizer), and every tap is written to `medical_access_log`.
+Code checks the answer and writes it into the attendee's one `medical_card`, which the attendee checks once before setup ends. A medic sees the card by tapping the attendee's band with their phone, or from the incident desk in the organizer portal (/organizer), and every tap is written to `medical_access_log`. The owner's View as shows an attendee's card only on their "Medical card" screen, under the same medic check, and logs each opening the same way.
 
 The model reads the document; code decides who sees the card.
 
@@ -14,6 +14,7 @@ Responsibilities:
 - Read each document into the attendee's one `medical_card` with the `medical_extract` job, checked in code.
 - Let the attendee check the card once, in setup, and confirm it.
 - Apply the medic access rule in one reducer and log every tap.
+- Hold the card back from the owner's View as until the owner opens it, with the same check and a log row.
 - Show the medic view when a medic taps a band.
 - Serve the card of each band a medic tapped to the medic view and the incident desk.
 
@@ -37,11 +38,12 @@ Non-responsibilities:
 | Anthropic Claude API (Messages) | out | `bandit-workers` through `claude-client` | the PDF, the prompt naming the kind and the page count, one JSON schema; the answer back | HTTPS ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)) |
 | `apply_medical_extract` | in | role `worker` | job id, the checked card as JSON, the model call | reducer; refuses a job the caller does not hold |
 | `confirm_medical_card` | in | the attendee (own identity), in setup | nothing | reducer |
-| View `my_medical_documents` | out | the attendee, the card step of setup | own `medical_document` rows | subscription |
-| View `my_medical_card` | out | the attendee, the card step of setup | own `medical_card` | subscription |
+| View `my_medical_documents` | out | the attendee, the card step of setup | own `medical_document` rows; a View as viewer gets them without the file hash and the dropped items | subscription |
+| View `my_medical_card` | out | the attendee, the card step of setup; the View as frame's "Medical card" screen | own `medical_card`; a View as viewer gets it only after the owner opened it | subscription |
 | `request_medical_card` | in | role `medic`, the medic view and the incident desk | the band id | reducer; applies the access rule, writes `medical_access_log` |
-| View `medic_medical_cards` | out | role `medic`, the medic view and the incident desk | one row per band the medic tapped, from the latest tap: incident id (0 without an open incident), band id, name, card | subscription |
-| View `board_medical_access` | out | the owner, role `ops` or `medic` | every `medical_access_log` row | subscription |
+| `view_as_medical_card` | in | the owner, through the View as frame's "Medical card" screen | the viewer identity | reducer; the medic check of a tap, writes `medical_access_log` with the reason "view as" |
+| View `medic_medical_cards` | out | role `medic`, the medic view and the incident desk | one row per band the medic tapped, from the latest tap: incident id (0 without an open incident), band id, name, card; nothing for a View as viewer | subscription |
+| View `board_medical_access` | out | the owner, role `ops` or `medic`, the Medical access log on the Claims tab | every `medical_access_log` row | subscription |
 
 ## Design
 
@@ -145,9 +147,25 @@ When the band has an open `sos` or `fall` incident, the view also shows the inci
 
 In both places the card reads "Medical card: <name>, band <band code>", with " (not yet confirmed by the wearer)" until the attendee confirmed it. It lists the blood type, allergies, conditions, medications, emergency contact, insurance and notes, each item with its page. The medic's latest tap on a band decides the card they see for it, and it stays after an incident resolves.
 
+### View as
+
+The owner's View as ([Organizer-Portal](../5-apps/Organizer-Portal.md#people-on-the-live-tab)) points a fresh viewer identity at a person, and every view then answers for that person. The medical card is held back: a viewer sees it only after the owner opens it, and each opening is logged like a medic's tap.
+
+- `my_medical_card` answers a viewer only when the owner who pointed it has a "view as" log row for that attendee since pointing it. Otherwise it returns nothing.
+- `my_medical_documents` answers a viewer without the file hash and the dropped items, because no staff member sees the PDF.
+- `medic_medical_cards` answers a viewer nothing, so viewing as a medic never shows the cards that medic opened.
+
+The attendee's "Medical card" screen opens the card. Each time the screen shows, the frame asks the owner's page to call `view_as_medical_card(viewer)` on the owner's own connection. The reducer refuses "only the owner who opened this view can open its medical card" unless the caller pointed that viewer, then applies the medic check of a tap; the owner passes every role check.
+
+It writes a `medical_access_log` row with the owner as reader, the attendee, their band (0 when the band id is above 255, as for most crowd bands), the band's open `sos` or `fall` incident or 0, `granted` true and the reason "view as".
+
+The screen reads "Opening the medical card…" until the card arrives. It then shows the card as the medic view does, with "Opened at <time>, written to the medical access log." An attendee without a card shows "No medical card on file."
+
+"Their band page now" skips the card step of setup, so the card shows on no other screen. Pointing the viewer again, at another person or when the frame reloads, hides the card until the next opening. A "view as" row is not a tap, so `medic_medical_cards` leaves it out for the owner too.
+
 ### Access rule
 
-The rule lives in one reducer, `request_medical_card(band_id)`, and nowhere else. The checks, in order:
+The rule lives in one reducer, `request_medical_card(band_id)`, and `view_as_medical_card` applies the same check and log for View as. The checks, in order:
 
 1. The caller holds role `medic`.
 2. Someone wears the band. Otherwise it refuses "nobody wears that band".
@@ -155,7 +173,7 @@ The rule lives in one reducer, `request_medical_card(band_id)`, and nowhere else
 
 There is no incident check: a medic sees the card of any worn band. The view `medic_medical_cards` returns, for the calling medic, one row per band they tapped, from their latest tap, with that tap's incident.
 
-The only writer of the log is this reducer, so every card a medic sees has a log row. `board_medical_access` shows every tap to the owner, `ops` and `medic`.
+The only writers of the log are these two reducers, and every view that shows a card to someone other than its attendee reads a log row first. So every card staff see has a log row. `board_medical_access` shows every row to the owner, `ops` and `medic`, in the Medical access log on the Claims tab.
 
 The flowchart below answers one question: what does a medic's tap on a band show.
 
@@ -181,7 +199,7 @@ flowchart TD
 |---|---|---|
 | `medical_document` | one uploaded PDF | `id`, `attendee`, `kind` (`history`, `insurance`), `file_hash`, `page_count`, `status` (`reading`, `read`, `failed`), `job_id`, `model_call_id`, `dropped` (the items the Anthropic Claude API returned without a page on the document), `uploaded_at` |
 | `medical_card` | one attendee's card, keyed by `attendee` | `attendee`, `blood_type`, `allergies`, `conditions`, `medications` (each a list of text lines ending with their page), `emergency_contact` (one line), `insurer`, `plan`, `member_id`, `group_number`, `insurer_phone`, `notes`, `status` (`extracted`, `confirmed`), `updated_at` |
-| `medical_access_log` | one medic tap | `id`, `reader`, `attendee`, `band_id`, `incident_id`, `granted`, `reason`, `read_at` |
+| `medical_access_log` | one medic tap, or one opening in the owner's View as | `id`, `reader`, `attendee`, `band_id`, `incident_id`, `granted`, `reason`, `read_at` |
 
 ### Reducers and views
 
@@ -191,9 +209,10 @@ flowchart TD
 | `apply_medical_extract` | reducer | `worker` | merges the document kind's fields into the card; card `extracted`, document `read`, or `failed` on an unreadable answer |
 | `confirm_medical_card` | reducer | the attendee | card `confirmed`; refuses "no medical card yet" |
 | `request_medical_card` | reducer | `medic` | the access rule; writes the log |
-| `my_medical_documents` | view | the attendee | own documents and their status |
-| `my_medical_card` | view | the attendee | own card |
-| `medic_medical_cards` | view | `medic` | the card of each band the caller tapped, from the latest tap, with the incident, band and name |
+| `view_as_medical_card` | reducer | the owner who pointed the viewer | the same check; writes the log with the reason "view as" |
+| `my_medical_documents` | view | the attendee | own documents and their status; to a View as viewer without the file hash and dropped items |
+| `my_medical_card` | view | the attendee | own card; to a View as viewer only after a "view as" log row since it was pointed |
+| `medic_medical_cards` | view | `medic` | the card of each band the caller tapped, from the latest tap, with the incident, band and name; nothing for a View as viewer |
 | `board_medical_access` | view | the owner, `ops`, `medic` | every access log row |
 
 ## Failure modes and fallbacks
@@ -206,6 +225,7 @@ flowchart TD
 | Attendee never confirms | card not checked by the attendee | the medic still sees it, labelled "not yet confirmed by the wearer", because a card with a caveat beats no card in an emergency |
 | A medic taps a band nobody wears | nothing to show | the reducer refuses "nobody wears that band"; the medic view shows "Nobody wears band <band code>." with "Tap again" |
 | Someone without role `medic` calls `request_medical_card` | could expose the card | the role check comes first and refuses |
+| The owner's View as frame reads the card through the attendee's own views | a card read with no log row | the views hold the card back from a viewer until `view_as_medical_card` logged an opening |
 | The attendee who wears the band has no card | nothing to show | the tap is still logged; the medic view and the desk show "Medical card: <name>, band <band code>" with "No medical card on file." and the incident goes on |
 
 ## Dependencies
@@ -247,4 +267,5 @@ flowchart TD
 | The attendee sees the card only on the card step in setup | during the event the tap page is the thank-you screen; the card is for medics |
 | There is no manual form | the PDF is the source; when it cannot be read the attendee goes on without a card |
 | An unconfirmed card is still shown to a medic, labelled | a card with a caveat beats no card in an emergency |
+| View as shows the card only on the "Medical card" screen, after a logged opening by the owner | only medics open a card, and every opening is logged with who, whose card and when; the owner passes the medic check as everywhere else |
 | Effort low for the reading | it copies printed fields; there is nothing to reason about |
