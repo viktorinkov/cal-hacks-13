@@ -15,8 +15,8 @@ pub mod api_session_table;
 pub mod api_session_type;
 pub mod api_sessions_table;
 pub mod apply_document_terms_reducer;
+pub mod apply_hospital_report_reducer;
 pub mod apply_medical_extract_reducer;
-pub mod apply_medical_record_reducer;
 pub mod approval_table;
 pub mod approval_type;
 pub mod approve_charge_reducer;
@@ -471,8 +471,8 @@ pub use api_session_table::*;
 pub use api_session_type::ApiSession;
 pub use api_sessions_table::*;
 pub use apply_document_terms_reducer::apply_document_terms;
+pub use apply_hospital_report_reducer::apply_hospital_report;
 pub use apply_medical_extract_reducer::apply_medical_extract;
-pub use apply_medical_record_reducer::apply_medical_record;
 pub use approval_table::*;
 pub use approval_type::Approval;
 pub use approve_charge_reducer::approve_charge;
@@ -944,14 +944,14 @@ pub enum Reducer {
         read_json: String,
         pages: Vec<String>,
     },
+    ApplyHospitalReport {
+        job_id: u64,
+        read_json: String,
+        pages: Vec<String>,
+    },
     ApplyMedicalExtract {
         job_id: u64,
         card_json: String,
-        call: ModelCallIn,
-    },
-    ApplyMedicalRecord {
-        job_id: u64,
-        record_json: String,
         call: ModelCallIn,
     },
     ApproveCharge {
@@ -1470,8 +1470,8 @@ impl __sdk::Reducer for Reducer {
             Reducer::AddOwner { .. } => "add_owner",
             Reducer::AddStaff { .. } => "add_staff",
             Reducer::ApplyDocumentTerms { .. } => "apply_document_terms",
+            Reducer::ApplyHospitalReport { .. } => "apply_hospital_report",
             Reducer::ApplyMedicalExtract { .. } => "apply_medical_extract",
-            Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
             Reducer::ApproveCharge { .. } => "approve_charge",
             Reducer::ApproveClaim { .. } => "approve_claim",
             Reducer::ApproveRuleProposal { .. } => "approve_rule_proposal",
@@ -1631,6 +1631,15 @@ impl __sdk::Reducer for Reducer {
                 read_json: read_json.clone(),
                 pages: pages.clone(),
             }),
+            Reducer::ApplyHospitalReport {
+                job_id,
+                read_json,
+                pages,
+            } => __sats::bsatn::to_vec(&apply_hospital_report_reducer::ApplyHospitalReportArgs {
+                job_id: job_id.clone(),
+                read_json: read_json.clone(),
+                pages: pages.clone(),
+            }),
             Reducer::ApplyMedicalExtract {
                 job_id,
                 card_json,
@@ -1638,15 +1647,6 @@ impl __sdk::Reducer for Reducer {
             } => __sats::bsatn::to_vec(&apply_medical_extract_reducer::ApplyMedicalExtractArgs {
                 job_id: job_id.clone(),
                 card_json: card_json.clone(),
-                call: call.clone(),
-            }),
-            Reducer::ApplyMedicalRecord {
-                job_id,
-                record_json,
-                call,
-            } => __sats::bsatn::to_vec(&apply_medical_record_reducer::ApplyMedicalRecordArgs {
-                job_id: job_id.clone(),
-                record_json: record_json.clone(),
                 call: call.clone(),
             }),
             Reducer::ApproveCharge {

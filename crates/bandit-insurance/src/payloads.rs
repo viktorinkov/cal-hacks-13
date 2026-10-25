@@ -7,8 +7,6 @@ use crate::letters::LetterData;
 use crate::{Cents, Check, Fact};
 use serde::{Deserialize, Serialize};
 
-/// Claude reads the medical record PDF into a structured record.
-pub const KIND_RECORD_EXTRACT: &str = "claim_record_extract";
 /// Elastic validates the evidence document and finds similar past claims.
 pub const KIND_VERIFY: &str = "claim_verify";
 /// The claims agent reviews the whole pack and gives its verdict.
@@ -28,16 +26,7 @@ pub const KIND_CHARGE_PAYMENT: &str = "charge_payment";
 pub const KIND_RULE_PROPOSAL: &str = "rule_proposal";
 
 pub const INSURANCE_KINDS: &[&str] =
-    &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC, KIND_CHARGE_PAYMENT];
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RecordExtractPayload {
-    pub claim_id: u64,
-    pub record_id: u64,
-    /// SHA-256 of the PDF in the blob store.
-    pub file_hash: String,
-    pub page_count: u32,
-}
+    &[KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC, KIND_CHARGE_PAYMENT];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VerifyPayload {

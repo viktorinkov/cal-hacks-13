@@ -14,7 +14,7 @@ use crate::model::new_call;
 /// The one result reducer a handler ends with.
 #[derive(Clone, Debug)]
 pub enum Finish {
-    MedicalRecord { record_json: String },
+    HospitalReport { read_json: String, pages: Vec<String> },
     ClaimChecks { checks: Vec<CheckIn>, clauses: Vec<ClauseIn> },
     ClaimReview { review_json: String },
     ClaimLetters { fnol_hash: String, summary_hash: String, determination_hash: String },
@@ -77,13 +77,18 @@ macro_rules! reduce {
 pub(crate) use reduce;
 
 impl Sink {
-    /// Registers a text blob the handler stored (a letter or a hospital report) for staff.
+    /// Registers a text blob the handler stored (a letter) for staff.
     pub async fn register_text(&self, blob: &BlobInfo, purpose: &str) -> Result<()> {
+        self.register_staff(blob, purpose, "text/plain").await
+    }
+
+    /// Registers a file the handler stored (a letter or a hospital report) for staff.
+    pub async fn register_staff(&self, blob: &BlobInfo, purpose: &str, content_type: &str) -> Result<()> {
         let (hash, size) = (blob.sha256.clone(), blob.size_bytes);
         match self {
-            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), purpose.into(), "text/plain".into(), size)),
+            Sink::Db(conn) => reduce!(conn, register_blob_then(hash, None, "staff".into(), purpose.into(), content_type.into(), size)),
             Sink::Print => {
-                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": purpose, "content_type": "text/plain", "size_bytes": size}));
+                print_call("register_blob", json!({"hash": hash, "owner": null, "access": "staff", "purpose": purpose, "content_type": content_type, "size_bytes": size}));
                 Ok(())
             }
         }
@@ -128,7 +133,7 @@ impl Sink {
     /// ones (rejected first answers) are recorded with `record_model_call`.
     pub async fn finish(&self, job_id: u64, finish: Finish, mut calls: Vec<ModelCallIn>) -> Result<()> {
         // The venue setup and document reducers take no call record, so their last call is recorded too.
-        let last = if matches!(finish, Finish::VenueSetup { .. } | Finish::DocumentTerms { .. }) { None } else { calls.pop() };
+        let last = if matches!(finish, Finish::VenueSetup { .. } | Finish::DocumentTerms { .. } | Finish::HospitalReport { .. }) { None } else { calls.pop() };
         for call in calls {
             self.record_call(call).await?;
         }
@@ -138,7 +143,7 @@ impl Sink {
         };
         let required = || last.clone().unwrap_or_else(|| new_call("none"));
         match finish {
-            Finish::MedicalRecord { record_json } => reduce!(conn, apply_medical_record_then(job_id, record_json, required())),
+            Finish::HospitalReport { read_json, pages } => reduce!(conn, apply_hospital_report_then(job_id, read_json, pages)),
             Finish::ClaimChecks { checks, clauses } => reduce!(conn, submit_claim_checks_then(job_id, checks, clauses)),
             Finish::ClaimReview { review_json } => reduce!(conn, submit_claim_review_then(job_id, review_json, required())),
             Finish::ClaimLetters { fnol_hash, summary_hash, determination_hash } => {
@@ -210,7 +215,7 @@ fn print_call(reducer: &str, args: Value) {
 fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
     let call = call.map(call_json);
     let (reducer, args) = match finish {
-        Finish::MedicalRecord { record_json } => ("apply_medical_record", json!({"record_json": parse_or_text(record_json), "call": call})),
+        Finish::HospitalReport { read_json, pages } => ("apply_hospital_report", json!({"read_json": parse_or_text(read_json), "pages": pages})),
         Finish::ClaimChecks { checks, clauses } => (
             "submit_claim_checks",
             json!({

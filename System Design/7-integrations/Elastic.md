@@ -52,7 +52,7 @@ Non-responsibilities:
 
   Insurance.md: the one exception for insurance data is the de-identified claim copy in `bandit-claims`: incident kind, zone, time, witness count, corroboration, diagnosis and service codes, amounts, the hospital report's SHA-256 and a narrative built by code. It holds no names, no attendee or band ids, and no staff notes, visit reasons or history.
 
-  Insurance.md: the insurance documents are the other exception (next to build). An attendee's insurance card and hospital report are indexed in `bandit-documents` and `bandit-policy-clauses` under their file's SHA-256 with no name in the document id, readable only with the workers' own API key, shown on no dashboard, and deleted once the claim is decided. The venue's policy is the venue's own contract and stays for the event.
+  Insurance.md: the insurance documents are the other exception. An attendee's insurance card and hospital report are indexed in `bandit-documents`, and the card's clauses in `bandit-policy-clauses`, under their file's SHA-256 with no name in the document id, readable only with the workers' own API key, shown on no dashboard, and deleted once the claim is decided (next to build). The venue's policy is the venue's own contract and stays for the event.
 - Does not fetch pages. Bright Data owns every step that touches the web ([Bright-Data](Bright-Data.md)). Elastic receives JSON records that `bandit-ingest` parsed in Rust, never HTML or Markdown, and makes no web call.
 
 ## Interfaces
@@ -260,11 +260,13 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 **Can change** the order of the three lists, and which pair of booths a card's "why" line names when two people share none. **Cannot** add a person or a booth (every query is filtered to the candidates), decide who is findable, or hold up the recap: after 10 s, or on any error, the lists stay in minutes order. Detail: [Part two](#part-two-the-one-way-copy-downstream-of-spacetimedb) and [Part three](#part-three-ordering-the-recaps-suggestions).
 
-#### Read every insurance document (next to build)
+#### Read every insurance document
 
-**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read` through `queue_document_read`. A plan lookup and a venue policy lookup run the same steps on each PDF they fetch before they keep it, to read what it prints about itself ([Bright-Data](Bright-Data.md)).
+The `venue_policy`, `health_plan` and `hospital_report` kinds are built. The `insurance_card` kind is next to build.
 
-**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address.
+**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card, a plan lookup fetches the public wording of a plan the attendee named, a venue policy lookup fetches the venue's two policy forms the organizer named and joins them into one PDF ([Bright-Data](Bright-Data.md)), or a hospital report arrives for an injury claim: staff file its PDF (`submit_medical_record`), or the scripted claims run renders the report Claude wrote for the drawn case as a 2-page PDF (`file_clinic_report`). The module enqueues the job `document_read` through `queue_document_read` for a policy, and from `submit_medical_record` and `file_clinic_report` for a hospital report. A plan lookup and a venue policy lookup run the same steps on each PDF they fetch before they keep it, to read what it prints about itself ([Bright-Data](Bright-Data.md)).
+
+**Input.** The PDF from blob storage, its SHA-256, its kind (`venue_policy`, `insurance_card`, `health_plan` or `hospital_report`) and its source: `upload`, `plan_lookup` with the address it came from, or `policy_lookup` with the liability form's address. A hospital report's job names its `medical_record` row and its page count.
 
 **In Elastic.**
 
@@ -273,9 +275,9 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 3. A `data.parseJson` step picks the JSON schema of that kind, and one `ai.agent` step calls the Elastic Agent Builder agent `bandit-document-reader` with it. The agent's only tool is the Elastic ES|QL tool `bandit.document_pages`, limited to this document's pages. Every term it returns quotes its clause and page, and a policy's answer also lists its clauses.
 4. `save_terms` (`elasticsearch.index`) writes the answer, with the kind and the reader's version, as one document to `bandit-document-terms`.
 
-**Output.** `bandit-workers` reads the answer back and checks it in Rust: every quote and every clause must appear word for word on its page. It writes each clause of a policy to `bandit-policy-clauses`. The venue's terms go to the module through `apply_document_terms`, which runs `validate_policy_terms`, and the organizer confirms them with `confirm_policy_terms`. The card's insurer, member id and copays go on the attendee's `medical_card`. The hospital report's record goes through `validate_record` and is priced by code, as today.
+**Output.** `bandit-workers` reads the answer back and checks it in Rust: every quote and every clause must appear word for word on its page. It writes each clause of a policy to `bandit-policy-clauses`. The venue's terms go to the module through `apply_document_terms`, which runs `validate_policy_terms`, and the organizer confirms them with `confirm_policy_terms`. The card's insurer, member id and copays go on the attendee's `medical_card`. The hospital report's answer and its page texts go to the module through `apply_hospital_report`, which runs `check_report_read` again, then `validate_record`, and code prices every line against the policy's fee schedule, as today. A hospital report is not a policy: it gets no `policy_document` row, and none of its text goes to `bandit-policy-clauses`.
 
-**Can change** every limit, deductible, minimum payout, service window, fee schedule cap and exclusion that the insurance Decision Engine is held to, once the organizer confirms them, and which clauses Claude can cite. **Cannot** set a term that code rejects (a quote that is not on its page, a deductible above its limit), move money, or decide a claim. Detail: [Part five](#part-five-reading-every-insurance-document-next-to-build).
+**Can change** every limit, deductible, minimum payout, service window, fee schedule cap and exclusion that the insurance Decision Engine is held to, once the organizer confirms them, which clauses Claude can cite, and the billed lines a claim is priced from. **Cannot** set a term that code rejects (a quote that is not on its page, a deductible above its limit), move money, or decide a claim. Detail: [Part five](#part-five-reading-every-insurance-document).
 
 #### Validate the claim copy and find the policy clauses that bear on it
 
@@ -665,7 +667,7 @@ The 30 past claims are synthetic, written by the team in `crates/claims-elastic/
 
 An empty narrative is dropped so the embedding cannot fail the write, and a processor error marks the document invalid with `pipeline_error`. The worker turns the result into the `elastic_validation` check: an invalid copy fails it, which routes the claim to the organizer with the errors listed, and Elastic never refuses a claim.
 
-**The search today.** After the write, `similar_claims` runs one `semantic` query on `narrative`, with the copy's own narrative as the query text. It keeps decided claims only, skips this claim and every live claim from the last 24 h, so precedents are always from earlier events, then collapses on `claim_id` and takes the top 3. The design replaces it with the policy clause search of [Part five](#part-five-reading-every-insurance-document-next-to-build).
+**The search today.** After the write, `similar_claims` runs one `semantic` query on `narrative`, with the copy's own narrative as the query text. It keeps decided claims only, skips this claim and every live claim from the last 24 h, so precedents are always from earlier events, then collapses on `claim_id` and takes the top 3. The design replaces it with the policy clause search of [Part five](#part-five-reading-every-insurance-document).
 
 ### Part four: Elastic Kibana, what the team shows
 
@@ -726,9 +728,11 @@ The radio and photos, recap suggestions and (Insurance.md) claims evidence dashb
 
 Elastic Kibana Graph is not used: it is unavailable on Serverless.
 
-### Part five: reading every insurance document (next to build)
+### Part five: reading every insurance document
 
-[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's insurance card, and each hospital report. Elastic reads them into terms and clauses. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
+[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's insurance card, and each hospital report. Elastic reads them into terms and clauses, and a hospital report into its record. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
+
+The `venue_policy`, `health_plan` and `hospital_report` kinds are built. The `insurance_card` kind is next to build.
 
 The question this diagram answers: how one insurance PDF becomes checked terms and searchable clauses.
 
@@ -738,7 +742,7 @@ flowchart TB
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
 
-  PDF["PDF in blob storage<br/>venue_policy, insurance_card, health_plan or hospital_report;<br/>uploaded, or fetched by a plan lookup"]:::stdb
+  PDF["PDF in blob storage<br/>venue_policy, insurance_card, health_plan or hospital_report;<br/>uploaded, fetched by a plan lookup, or rendered by the scripted claims run"]:::stdb
   DR["bandit-workers, job document_read<br/>splits the pages; a scan is transcribed word for word"]:::rust
   EX["bandit-documents-extract<br/>attachment, then semantic_text"]:::ext
   DOCS["bandit-documents<br/>one page each"]:::ext
@@ -750,7 +754,7 @@ flowchart TB
   CL["bandit-policy-clauses<br/>one clause each"]:::ext
   PT["policy_term rows<br/>validate_policy_terms, then confirm_policy_terms"]:::stdb
   MC["the attendee's medical_card<br/>insurer, member id, copays"]:::stdb
-  MR["medical_record and claim_line<br/>validate_record, priced by code"]:::stdb
+  MR["medical_record and claim_line<br/>apply_hospital_report: check_report_read, validate_record, priced by code"]:::stdb
 
   PDF -->|"bytes + SHA-256"| DR
   DR -->|"one page each, PUT _doc"| EX
@@ -765,7 +769,7 @@ flowchart TB
   CHK -->|"policy clauses, _bulk"| CL
   CHK -->|"venue terms, apply_document_terms"| PT
   CHK -->|"card fields"| MC
-  CHK -->|"hospital report record"| MR
+  CHK -->|"hospital report record + page texts, apply_hospital_report"| MR
 ```
 
 **`bandit-documents-extract`** is the default pipeline of `bandit-documents`:
@@ -791,11 +795,11 @@ What each kind's schema asks for:
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
 | `health_plan` | a plan's Summary of Benefits and Coverage: insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services. What it prints about itself, each copied exactly with its page: the kind of document (`sbc` or `other`), the insurer, the plan and the plan year; a plan lookup keeps the PDF only when these match what the attendee typed | every row of its benefits table and its excluded services |
 | `coverage_form` | one coverage form a venue policy lookup fetched, maybe inside a longer PDF such as a specimen policy; read only to check it, never filed: which form it is (`liability_form`, `property_form` or `other`), its form number with its edition and its title, each copied exactly with its page, and the pages where the form starts and ends | none |
-| `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
+| `hospital_report` | the record, with a quote and page behind every fact: document kind (`first_aid_record`, `urgent_care_record`, `emergency_record`, `other`); patient (name, date of birth); provider (name, address); encounter (date of service, time, reason for visit, history of present illness); each diagnosis (ICD-10-CM code, description); each service line (CPT or HCPCS code, description, date, units, charge as printed); invoice number; total billed as printed. The patient, the provider, the encounter, each diagnosis, each service line, the invoice number and the total each carry `quote`, the printed line or row copied word for word, and `page`. Code's checks (`check_report_read`, in the worker and again in the module): every quote is on its page word for word; the patient's name, the encounter date, each diagnosis code, each service's code, date and printed charge, the invoice number and the total are inside their quotes; the reason for visit and the history are printed word for word in the report; code parses every amount (`$385.00` to 38500 cents). A diagnosis or service line that fails is dropped with a reason, a patient or encounter that fails rejects the read, and any other field that fails is left empty, with a line in `dropped`. Then `validate_record` runs, and code prices every line | none |
 
 **The clause search.** `claim_verify` and Claude's `search_policy` run one hybrid search on `bandit-policy-clauses`, filtered with `terms` on `document_hash` to the venue's confirmed policy and this attendee's card: a keyword `match` on `text.words` and a `semantic` query on `text`, fused with RRF and reranked by `.jina-reranker-v3`. They take the top 5: clause id, policy, section, page, text and score. `read_clause` is an `ids` query. A query that holds the claimant's name is refused before it is sent.
 
-**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses` once the claim is decided.
+**Privacy.** The venue's policy is the venue's own contract. An attendee's card and hospital report are their insurance and medical data: they are kept under their file's SHA-256 with no name in the document id, read only with the workers' own Elastic API key, shown on no dashboard, and deleted from `bandit-documents`, `bandit-document-terms` and `bandit-policy-clauses` once the claim is decided (next to build).
 
 ### Vision.md: the raw radio log and photos
 

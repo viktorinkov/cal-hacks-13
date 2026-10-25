@@ -5,7 +5,7 @@
 //! claim can be re-run by hand: the evidence pack hash, the corroboration
 //! checks, the coverage arithmetic, the route and the ledger postings.
 //!
-//! Claude reads the documents, investigates each claim and decides it; this
+//! The Evidence Engine reads the documents, Claude investigates each claim and decides it; this
 //! crate decides money and coverage, and holds Claude's decision to the
 //! limits a person set (see `decision`).
 
@@ -26,6 +26,7 @@ pub mod pack;
 pub mod payloads;
 pub mod policy;
 pub mod printed;
+pub mod report;
 pub mod rules;
 pub mod schemas;
 pub mod time;
