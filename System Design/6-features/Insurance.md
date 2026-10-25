@@ -1,6 +1,6 @@
 # Insurance
 
-Insurance turns an incident into a paid, refused or routed insurance claim, built for Hyphenate's "autonomous systems for finance" track. When an attendee broke or took something, it can also turn the incident into a charge that the attendee sees on their tap page (next to build). Three parts share the work, and each does what only it can do:
+Insurance resolves the money after an incident: who is paid, how much, from which policy, and who pays it back. It turns each incident into a claim that is paid, refused or sent to the organizer, posts every movement on a double-entry ledger, and reconciles what the venue's insurer pays back. It is built for Hyphenate's "autonomous systems for finance" track. When an attendee broke or took something, it can also turn the incident into a charge that the attendee sees on their tap page (next to build). Three parts share the work, and each does what only it can do:
 
 - **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own health insurance card and the hospital report. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
