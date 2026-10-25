@@ -1,6 +1,6 @@
-// The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it is only
-// the band setup: sign in, claim the band by pressing it, name, socials, the medical history and insurance
-// PDFs (or the plan's name), the Capital One wallet, then a thank-you.
+// The band's tap link, /t/<band code> (the first stickers say /t/BANDIT-0n). During the event it shows
+// band setup and the merch shop: sign in, claim the band by pressing it, name, socials, medical history,
+// insurance PDFs (or the plan's name) and the Capital One wallet.
 // When the host ends the event, or once the attendee leaves early, the same page turns into the recap.
 // After a fall or a call for help, the top of the page asks what happened and asks the venue to pay, then
 // shows how each claim is going until it lands in the wallet.
@@ -502,9 +502,10 @@ function render() {
     if (ended) {
       return mount('app', top, claims(), charges(), recap(conn, render), wallet(ended));
     }
-    // Setup first, then shopping. The shop includes the wallet balance and activity.
+    // A returning attendee can shop while finishing optional setup. The shop includes the wallet.
     const steps = setup();
-    return mount('app', top, claims(), charges(), steps, step === 'done' ? merch(conn) : wallet(ended));
+    const canShop = step === 'done' || (step !== 'wallet' && !!conn.db.myWallet.iter().next().value);
+    return mount('app', top, claims(), charges(), steps, canShop ? merch(conn) : wallet(ended));
   }
   if (mb && mb.bandId !== bandId && mb.status === 'claimed') {
     return mount('app', top, h('h2', {}, `Band ${code}`), h('p', {}, `You wear band ${bandCode(mb.bandId)}.`), h('a', { href: `/t/${bandCode(mb.bandId)}` }, 'Open your band'));

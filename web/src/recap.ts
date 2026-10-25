@@ -407,7 +407,7 @@ export function merch(conn: DbConnection) {
             t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `size-${t.templateId}` },
               ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
             h('label', {}, 'Shipping address (recipient and full mailing address)',
-              h('textarea', { name: `shipping-${shopper}-${t.templateId}`, rows: 4, required: true, maxlength: 1000, autocomplete: 'shipping street-address', placeholder: 'Recipient name\nStreet address and apartment\nCity, state, postal code\nCountry' })),
+              h('textarea', { name: `shipping-${shopper}-${t.templateId}`, rows: 4, required: true, maxlength: 1000, placeholder: 'Recipient name\nStreet address and apartment\nCity, state, postal code\nCountry' })),
             h('button', { disabled: !hasWallet || undefined }, `Buy ${money(t.priceCents)}`))));
     })),
     orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
