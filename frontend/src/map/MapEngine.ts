@@ -21,7 +21,8 @@ import { CLASS_LANE, CLASS_NEAR, CrowdLayer } from './layers/crowdLayer'
 import { DensityLayer } from './layers/densityLayer'
 import { BAND_Z, BEACON_TOP, MarksLayer, type ActiveRoute } from './layers/marksLayer'
 import { StageLayer } from './layers/stageLayer'
-import { HallMesh } from './hallMesh'
+import { chosenModel, type ChosenModel } from '@/venue/chosenModel'
+import { HallMesh, PALACE_HALL } from './hallMesh'
 import { VenueLayer } from './layers/venueLayer'
 import { mapPalette } from './palette'
 import {
@@ -57,6 +58,9 @@ export class MapEngine {
   private venue: Venue | null = null
   private venueLayer: VenueLayer | null = null
   private hall: HallMesh | null = null
+  /** A chosen venue that is not the Palace: only its model is drawn, nothing traced on the Palace. */
+  private modelOnly: ChosenModel | null = null
+  private hallKey = PALACE_HALL.venueId
   private stage: StageLayer | null = null
   private crowd: CrowdLayer | null = null
   private density: DensityLayer | null = null
@@ -164,7 +168,8 @@ export class MapEngine {
 
   fit(animate = true): void {
     if (!this.venue) return
-    const t = fitCamera(this.venue.width, this.venue.height, 9, this.target.yaw, this.target.tilt, this.openArea())
+    const size = this.modelOnly ?? this.venue
+    const t = fitCamera(size.width, size.height, 9, this.target.yaw, this.target.tilt, this.openArea())
     this.setTarget(t, animate)
     this.userMoved = false
   }
@@ -313,6 +318,27 @@ export class MapEngine {
     this.fit(false)
   }
 
+  /** Draw the chosen venue's model in place of the Palace, or bring the Palace back. */
+  private swapHall(model: ChosenModel | null, key: string): void {
+    if (!this.host) return
+    this.hallKey = key
+    this.modelOnly = model
+    this.hall?.destroy()
+    const source = model ? { url: model.url, venueId: model.venueId, fit: 'bounds' as const } : PALACE_HALL
+    this.hall = new HallMesh(
+      this.host,
+      () => {
+        this.camDirty = true
+      },
+      source,
+    )
+    this.hall.resize(this.host.clientWidth, this.host.clientHeight)
+    this.root.visible = !model
+    if (useUi.getState().hover) useUi.getState().setHover(null)
+    this.userMoved = false
+    this.fit(false)
+  }
+
   private tick(dtRaw: number): void {
     if (!this.app) return
     const dt = Math.min(0.1, dtRaw)
@@ -333,6 +359,20 @@ export class MapEngine {
       this.lastLayers = layerKey
       this.camDirty = true
     }
+    // A chosen venue other than the Palace replaces the event floor: its model alone, no zones,
+    // crowd, bands or incidents, which are all placed on the Palace's traced plan.
+    const wanted = this.venue.venueId === PALACE_HALL.venueId ? chosenModel() : null
+    const key = wanted ? `${wanted.venueId}|${wanted.url}` : PALACE_HALL.venueId
+    if (key !== this.hallKey) this.swapHall(wanted, key)
+    if (this.modelOnly) {
+      const on = this.hall?.showing(this.modelOnly.venueId) ?? false
+      if (this.hall) this.hall.canvas.style.visibility = on ? 'visible' : 'hidden'
+      if (on) this.hall?.render(this.cam)
+      this.placeAnchors()
+      this.camDirty = false
+      return
+    }
+
     const venueLayer = this.venueLayer
     // people go after every structure they stand in front of, tested at their own place across the view
     const bucketOf = (rx: number, ry: number) => venueLayer.bucketOf(rx, ry)
@@ -644,7 +684,7 @@ export class MapEngine {
       let handle: 'move' | 'resize' | undefined
       const editingBooth = booth.editing && this.venue?.venueId === 'main-stage'
       const editingRing = ring.editing && this.venue?.venueId === 'calhacks'
-      if ((editingBooth || editingRing) && e.button === 0 && !e.shiftKey && !e.altKey) {
+      if ((editingBooth || editingRing) && !this.modelOnly && e.button === 0 && !e.shiftKey && !e.altKey) {
         const ground = unproject(this.cam, l.x, l.y)
         handle = (editingRing ? demoRingHandle(ground.x, ground.y, ring) : boothHandle(ground.x, ground.y, booth)) ?? undefined
       }
@@ -780,6 +820,7 @@ export class MapEngine {
   }
 
   private hitTest(l: { x: number; y: number }): HoverInfo | null {
+    if (this.modelOnly) return null
     const world = useWorld.getState()
     // incidents: beacon base or top
     for (const inc of Object.values(world.incidents)) {

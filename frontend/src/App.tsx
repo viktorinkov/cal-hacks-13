@@ -9,6 +9,7 @@ import { CostsPage } from '@/components/desk/CostsPage'
 import { GraphPage } from '@/components/desk/GraphPage'
 import { MerchPage } from '@/components/desk/MerchPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
+import { VenuePage } from '@/components/desk/VenuePage'
 import { JoinPage } from '@/components/join/JoinPage'
 import { RegisterPage } from '@/components/join/RegisterPage'
 import { Button } from '@/components/ui/button'
@@ -70,6 +71,7 @@ function Pages() {
   if (path === '/merch') return <MerchPage />
   if (path === '/graph') return <GraphPage />
   if (path === '/costs') return <CostsPage />
+  if (path === '/venue') return <VenuePage />
   return <Boot />
 }
 

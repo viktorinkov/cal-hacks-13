@@ -5,6 +5,7 @@ import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
 import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
+import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -521,6 +522,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
         if (!played && newToken) window.localStorage.setItem(key, newToken)
         wireTables(next.db)
         subscribeAttendeeViews(next)
+        subscribeVenueSetup(next)
         next
           .subscriptionBuilder()
           .onApplied(() => {
@@ -571,6 +573,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .onDisconnect((_ctx, error) => {
         conn = null
         apiSession = null
+        dropVenueSetup()
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
         noteDisconnect('Connection lost.')
       })
