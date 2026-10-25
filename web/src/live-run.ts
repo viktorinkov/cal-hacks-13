@@ -280,19 +280,18 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
     list.length === 0
       ? h('p', { class: 'muted' }, r && r.phase.tag !== 'Idle' ? 'None yet. The first one happens about a minute after the doors open.' : 'None.')
       : searchable('incidents', h('table', {},
-        h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'What'), h('th', {}, 'Status'), h('th', {}, 'Claim'), h('th', {}, '')),
+        h('tr', {}, h('th', {}, 'Incident'), h('th', {}, 'Status'), h('th', {}, '')),
         list.map(m => {
           const c = claims.get(m.claimId);
           const waiting = canRun && c?.status.tag === 'Routed';
           return h('tr', {},
             h('td', {}, `${time(m.openedAt)} #${m.incidentId} ${m.kind}`, h('br'), `${m.person || ''}${m.place ? `${m.person ? ' at ' : ''}${m.place}` : ''}`),
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
-              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : ''),
-            h('td', {},
-              h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show'),
-              waiting && [' ', h('button', {
+              m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
+              waiting && [h('br'), h('button', {
                 onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]));
+              }, 'Approve and teach a rule')]),
+            h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
         }))));
 }
 
