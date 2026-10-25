@@ -1,0 +1,11 @@
+#!/bin/sh
+# Session start in a BandIt cloud thread: run the environment's bandit-creds, which turns
+# /mnt/project-files/bandit-cloud.env into the Maincloud owner login, the VM deploy key and the repo's .env.
+# The setup script also hooks it into .bashrc, but agent shells never run that. Elsewhere this does nothing.
+[ -x /usr/local/bin/bandit-creds ] || exit 0
+cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+/usr/local/bin/bandit-creds >/dev/null 2>&1
+if grep -q spacetimedb_token "$HOME/.config/spacetime/cli.toml" 2>/dev/null; then
+  echo "Maincloud owner login and BandIt keys are loaded."
+fi
+exit 0

@@ -16,6 +16,18 @@
       "Bash(cp * /mnt/project-files/*)",
       "Bash(git config user.name *)",
       "Bash(git config user.email *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git merge *)",
+      "Bash(git push origin vik-*)",
+      "Bash(git push -u origin vik-*)",
+      "Bash(git push origin HEAD:vik-*)",
+      "Bash(git push origin claude/*)",
+      "Bash(git push -u origin claude/*)",
       "Bash(scripts/*)",
       "Bash(E2E_TARGET=* scripts/*)",
       "Bash(ENV_FILE=* scripts/*)",
@@ -37,7 +49,11 @@
     "deny": [
       "Bash(git push --force*)",
       "Bash(git push -f*)",
-      "Bash(git push origin +*)"
+      "Bash(git push origin +*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git push * +*)"
     ]
   },
   "hooks": {
@@ -48,6 +64,11 @@
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/git-identity",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bandit-creds",
+            "timeout": 20
           }
         ]
       }
