@@ -17,6 +17,9 @@ pub struct BoardMerchOrder {
     pub failure: String,
     pub nessie_purchase_id: String,
     pub created_at: __sdk::Timestamp,
+    pub line: String,
+    pub photo_url: String,
+    pub node_id: u64,
 }
 
 impl __sdk::InModule for BoardMerchOrder {
@@ -37,6 +40,9 @@ pub struct BoardMerchOrderCols {
     pub failure: __sdk::__query_builder::Col<BoardMerchOrder, String>,
     pub nessie_purchase_id: __sdk::__query_builder::Col<BoardMerchOrder, String>,
     pub created_at: __sdk::__query_builder::Col<BoardMerchOrder, __sdk::Timestamp>,
+    pub line: __sdk::__query_builder::Col<BoardMerchOrder, String>,
+    pub photo_url: __sdk::__query_builder::Col<BoardMerchOrder, String>,
+    pub node_id: __sdk::__query_builder::Col<BoardMerchOrder, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for BoardMerchOrder {
@@ -53,6 +59,9 @@ impl __sdk::__query_builder::HasCols for BoardMerchOrder {
             failure: __sdk::__query_builder::Col::new(table_name, "failure"),
             nessie_purchase_id: __sdk::__query_builder::Col::new(table_name, "nessie_purchase_id"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            line: __sdk::__query_builder::Col::new(table_name, "line"),
+            photo_url: __sdk::__query_builder::Col::new(table_name, "photo_url"),
+            node_id: __sdk::__query_builder::Col::new(table_name, "node_id"),
         }
     }
 }

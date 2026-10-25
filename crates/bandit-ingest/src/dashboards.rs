@@ -71,23 +71,31 @@ fn pipeline(cfg: &Config, run_id: &str) -> Value {
     })
 }
 
+/// Tier words the agent also gives as tags; the tag cloud leaves them out, since the tier chart shows them.
+const TIER_TAGS: &str = "\"sponsor\", \"partner\", \"anchor\", \"platinum\", \"gold\", \"golden-bear\", \"silver\", \"bronze\"";
+
 fn event(cfg: &Config, run_id: &str) -> Value {
     let run = format!("WHERE run_id == \"{run_id}\"");
     let pages = format!("FROM bandit-raw-pages | {run}");
     let decisions = format!("FROM bandit-organizer-decisions | {run} | WHERE decision_kind == \"organization\"");
+    let (y0, y1, y2, y3, y4) = (0, 4, 12, 28, 44);
     json!({
         "title": format!("BandIt · {} · sponsors and prizes", cfg.event.name),
         "description": "The event's sponsors, prizes and companies as Bright Data scraped them and Elastic organized them.",
         "panels": [
-            metric((0, 0, 12, 8), "Prize cash", format!("{pages} | WHERE record_kind == \"prize\" | STATS usd = SUM(fields.cash_usd)"), "usd"),
-            metric((12, 0, 12, 8), "Prizes", format!("{pages} | WHERE record_kind == \"prize\" | STATS prizes = COUNT()"), "prizes"),
-            metric((24, 0, 12, 8), "Sponsors and partners", format!("{decisions} | STATS organizations = COUNT()"), "organizations"),
-            metric((36, 0, 12, 8), "Company profiles (LinkedIn, Crunchbase)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | STATS profiles = COUNT()"), "profiles"),
-            bar((0, 8, 24, 16), "Prize cash by sponsor", format!("{pages} | WHERE record_kind == \"prize\" | EVAL sponsor = CASE(role_text == \"\" OR role_text IS NULL, \"{}\", role_text) | STATS cash = SUM(fields.cash_usd) BY sponsor | SORT cash DESC | LIMIT 25", cfg.event.name), "sponsor", "cash"),
-            pie((24, 8, 24, 16), "Sponsors by category (assigned by the agent)", format!("{decisions} | STATS n = COUNT() BY category"), "category", "n"),
-            bar((0, 24, 24, 14), "Sponsors by tier", format!("{pages} | WHERE record_kind == \"organization_candidate\" AND tier_text IS NOT NULL AND tier_text != \"\" | STATS n = COUNT() BY tier_text"), "tier_text", "n"),
-            tags((24, 24, 24, 14), "What the sponsors work on", format!("{decisions} | MV_EXPAND tags | WHERE tags IS NOT NULL | STATS n = COUNT() BY tags"), "tags", "n"),
-            table((0, 38, 48, 16), "Companies (LinkedIn and Crunchbase via Bright Data)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | EVAL source = MV_FIRST(SPLIT(source_key, \":\")) | STATS founded = MAX(fields.founded_year) BY name, domain, source, industry = fields.industry, headquarters = fields.headquarters, size = fields.company_size | SORT name | LIMIT 200"), &["name", "domain", "source", "industry", "headquarters", "size"], &["founded"]),
+            markdown((0, y0, 48, 4), format!(
+                "What the scrape found about **{}**, run `{run_id}`: Bright Data fetched the event pages and the companies' LinkedIn and Crunchbase profiles, and Elastic merged them into one record per sponsor. The `bandit-organizer` agent gave each sponsor its category and tags.",
+                cfg.event.name
+            )),
+            metric((0, y1, 12, 8), "Prize cash", format!("{pages} | WHERE record_kind == \"prize\" | STATS usd = SUM(fields.cash_usd)"), "usd"),
+            metric((12, y1, 12, 8), "Prizes", format!("{pages} | WHERE record_kind == \"prize\" | STATS prizes = COUNT()"), "prizes"),
+            metric((24, y1, 12, 8), "Sponsors and partners", format!("{decisions} | STATS organizations = COUNT()"), "organizations"),
+            metric((36, y1, 12, 8), "Company profiles (LinkedIn, Crunchbase)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | STATS profiles = COUNT()"), "profiles"),
+            bar((0, y2, 24, 16), "Prize cash by sponsor", format!("{pages} | WHERE record_kind == \"prize\" | EVAL sponsor = CASE(role_text == \"\" OR role_text IS NULL, \"{}\", role_text) | STATS cash = SUM(fields.cash_usd) BY sponsor | WHERE cash > 0 | SORT cash DESC | LIMIT 25", cfg.event.name), "sponsor", "cash"),
+            pie((24, y2, 24, 16), "Sponsors by category (assigned by the agent)", format!("{decisions} | STATS n = COUNT() BY category"), "category", "n"),
+            bar((0, y3, 24, 16), "Sponsors by tier, where the page names one", format!("{pages} | WHERE record_kind == \"organization_candidate\" AND tier_text IS NOT NULL AND tier_text != \"\" | EVAL tier = TO_LOWER(tier_text) | WHERE tier != \"sponsor\" | STATS n = COUNT() BY tier | SORT n DESC"), "tier", "n"),
+            tags((24, y3, 24, 16), "What the sponsors work on", format!("{decisions} | MV_EXPAND tags | WHERE tags IS NOT NULL AND tags NOT IN ({TIER_TAGS}) | STATS n = COUNT() BY tags | SORT n DESC | LIMIT 40"), "tags", "n"),
+            table((0, y4, 48, 16), "Companies (LinkedIn and Crunchbase via Bright Data)", format!("FROM bandit-raw-orgs | {run} | WHERE record_kind == \"company_facts\" | EVAL source = MV_FIRST(SPLIT(source_key, \":\")) | STATS profiles = COUNT(), year = MAX(fields.founded_year) BY name, domain, source, industry = fields.industry, headquarters = fields.headquarters, size = fields.company_size | EVAL founded = CASE(year > 0, TO_STRING(year), \"\") | SORT name | LIMIT 200"), &["name", "domain", "source", "industry", "headquarters", "size", "founded"], &["profiles"]),
         ]
     })
 }

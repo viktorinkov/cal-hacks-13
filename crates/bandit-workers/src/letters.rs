@@ -81,7 +81,7 @@ pub async fn run_recovery(ctx: &Ctx, job: &JobIn, p: RecoveryPayload) -> Result<
 /// Stores a letter as a UTF-8 text blob and registers it with the module.
 async fn store(ctx: &Ctx, text: &str) -> Result<String, JobError> {
     let blob = ctx.blobs.put(text.as_bytes()).map_err(|e| JobError::msg(format!("storing a letter: {e}")))?;
-    ctx.sink.register_letter(&blob).await?;
+    ctx.sink.register_text(&blob, "letter").await?;
     Ok(blob.sha256)
 }
 

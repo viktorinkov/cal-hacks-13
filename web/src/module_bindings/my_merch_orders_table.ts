@@ -22,4 +22,5 @@ export default __t.row({
   nessiePurchaseId: __t.string().name("nessie_purchase_id"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  line: __t.string(),
 });

@@ -49,6 +49,44 @@
         "y": 368,
         "w": 838,
         "h": 486
+      },
+      "checks": {
+        "SpacetimeDB": {
+          "x": 314,
+          "y": 893,
+          "w": 54,
+          "h": 56
+        },
+        "Elastic": {
+          "x": 314,
+          "y": 966,
+          "w": 54,
+          "h": 56
+        },
+        "Bright Data": {
+          "x": 314,
+          "y": 1040,
+          "w": 54,
+          "h": 56
+        },
+        "Capital One": {
+          "x": 314,
+          "y": 1113,
+          "w": 54,
+          "h": 56
+        },
+        "Hyphenate": {
+          "x": 314,
+          "y": 1186,
+          "w": 54,
+          "h": 56
+        },
+        "Anthropic": {
+          "x": 314,
+          "y": 1259,
+          "w": 54,
+          "h": 56
+        }
       }
     },
     "tee.png": {
@@ -88,6 +126,666 @@
         "y": 509,
         "w": 928,
         "h": 608
+      }
+    },
+    "mug_anthropic.png": {
+      "title": "Anthropic mug",
+      "kind": "mug",
+      "sponsors": [
+        "Anthropic"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 282,
+        "y": 423,
+        "w": 405,
+        "h": 289
+      }
+    },
+    "mug_bright_data.png": {
+      "title": "Bright Data mug",
+      "kind": "mug",
+      "sponsors": [
+        "Bright Data"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 231,
+        "y": 410,
+        "w": 437,
+        "h": 297
+      }
+    },
+    "mug_capital_one.png": {
+      "title": "Capital One mug",
+      "kind": "mug",
+      "sponsors": [
+        "Capital One"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 284,
+        "y": 424,
+        "w": 388,
+        "h": 263
+      }
+    },
+    "mug_hyphenate.png": {
+      "title": "Hyphenate mug",
+      "kind": "mug",
+      "sponsors": [
+        "Hyphenate"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 285,
+        "y": 417,
+        "w": 362,
+        "h": 279
+      }
+    },
+    "mug_meta.png": {
+      "title": "Meta mug",
+      "kind": "mug",
+      "sponsors": [
+        "Meta"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 313,
+        "y": 438,
+        "w": 360,
+        "h": 235
+      }
+    },
+    "mug_spacetimedb.png": {
+      "title": "SpacetimeDB mug",
+      "kind": "mug",
+      "sponsors": [
+        "SpacetimeDB"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 283,
+        "y": 442,
+        "w": 388,
+        "h": 252
+      }
+    },
+    "mug_visa.png": {
+      "title": "Visa mug",
+      "kind": "mug",
+      "sponsors": [
+        "Visa"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 248,
+        "y": 415,
+        "w": 419,
+        "h": 282
+      }
+    },
+    "tee_a16z.png": {
+      "title": "a16z tee",
+      "kind": "tee",
+      "sponsors": [
+        "a16z"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 359,
+        "y": 424,
+        "w": 307,
+        "h": 175
+      }
+    },
+    "tee_annapurna_labs.png": {
+      "title": "Annapurna Labs tee",
+      "kind": "tee",
+      "sponsors": [
+        "Annapurna Labs"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 328,
+        "y": 354,
+        "w": 367,
+        "h": 208
+      }
+    },
+    "tee_anthropic.png": {
+      "title": "Anthropic tee",
+      "kind": "tee",
+      "sponsors": [
+        "Anthropic"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 336,
+        "y": 380,
+        "w": 353,
+        "h": 205
+      }
+    },
+    "tee_apify.png": {
+      "title": "Apify tee",
+      "kind": "tee",
+      "sponsors": [
+        "Apify"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 337,
+        "y": 387,
+        "w": 351,
+        "h": 177
+      }
+    },
+    "tee_armadin.png": {
+      "title": "Armadin tee",
+      "kind": "tee",
+      "sponsors": [
+        "Armadin"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 345,
+        "y": 393,
+        "w": 335,
+        "h": 203
+      }
+    },
+    "tee_atlassian.png": {
+      "title": "Atlassian tee",
+      "kind": "tee",
+      "sponsors": [
+        "Atlassian"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 346,
+        "y": 414,
+        "w": 332,
+        "h": 197
+      }
+    },
+    "tee_bitdeer.png": {
+      "title": "Bitdeer tee",
+      "kind": "tee",
+      "sponsors": [
+        "Bitdeer"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 333,
+        "y": 377,
+        "w": 360,
+        "h": 209
+      }
+    },
+    "tee_bright_data.png": {
+      "title": "Bright Data tee",
+      "kind": "tee",
+      "sponsors": [
+        "Bright Data"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 333,
+        "y": 403,
+        "w": 358,
+        "h": 203
+      }
+    },
+    "tee_capital_one.png": {
+      "title": "Capital One tee",
+      "kind": "tee",
+      "sponsors": [
+        "Capital One"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 347,
+        "y": 363,
+        "w": 330,
+        "h": 195
+      }
+    },
+    "tee_cartesia.png": {
+      "title": "Cartesia tee",
+      "kind": "tee",
+      "sponsors": [
+        "Cartesia"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 341,
+        "y": 404,
+        "w": 342,
+        "h": 213
+      }
+    },
+    "tee_coinbase.png": {
+      "title": "Coinbase tee",
+      "kind": "tee",
+      "sponsors": [
+        "Coinbase"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 342,
+        "y": 385,
+        "w": 339,
+        "h": 203
+      }
+    },
+    "tee_context.png": {
+      "title": "Context tee",
+      "kind": "tee",
+      "sponsors": [
+        "Context"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 329,
+        "y": 401,
+        "w": 365,
+        "h": 217
+      }
+    },
+    "tee_convex.png": {
+      "title": "Convex tee",
+      "kind": "tee",
+      "sponsors": [
+        "Convex"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 322,
+        "y": 401,
+        "w": 380,
+        "h": 233
+      }
+    },
+    "tee_creao_ai.png": {
+      "title": "Creao AI tee",
+      "kind": "tee",
+      "sponsors": [
+        "Creao AI"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 339,
+        "y": 436,
+        "w": 346,
+        "h": 202
+      }
+    },
+    "tee_crs_credit.png": {
+      "title": "CRS Credit tee",
+      "kind": "tee",
+      "sponsors": [
+        "CRS Credit"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 337,
+        "y": 388,
+        "w": 351,
+        "h": 183
+      }
+    },
+    "tee_decagon.png": {
+      "title": "Decagon tee",
+      "kind": "tee",
+      "sponsors": [
+        "Decagon"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 329,
+        "y": 403,
+        "w": 365,
+        "h": 216
+      }
+    },
+    "tee_elastic.png": {
+      "title": "Elastic tee",
+      "kind": "tee",
+      "sponsors": [
+        "Elastic"
+      ],
+      "width": 2048,
+      "height": 2048,
+      "photo_area": {
+        "x": 700,
+        "y": 761,
+        "w": 652,
+        "h": 382
+      }
+    },
+    "tee_engramme_ai.png": {
+      "title": "Engramme AI tee",
+      "kind": "tee",
+      "sponsors": [
+        "Engramme AI"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 329,
+        "y": 417,
+        "w": 366,
+        "h": 205
+      }
+    },
+    "tee_factory.png": {
+      "title": "Factory tee",
+      "kind": "tee",
+      "sponsors": [
+        "Factory"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 338,
+        "y": 418,
+        "w": 348,
+        "h": 199
+      }
+    },
+    "tee_fetch_ai.png": {
+      "title": "Fetch.ai tee",
+      "kind": "tee",
+      "sponsors": [
+        "Fetch.ai"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 359,
+        "y": 395,
+        "w": 306,
+        "h": 195
+      }
+    },
+    "tee_figma.png": {
+      "title": "Figma tee",
+      "kind": "tee",
+      "sponsors": [
+        "Figma"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 344,
+        "y": 381,
+        "w": 336,
+        "h": 214
+      }
+    },
+    "tee_fung_institute.png": {
+      "title": "Fung Institute tee",
+      "kind": "tee",
+      "sponsors": [
+        "Fung Institute for Engineering Leadership"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 343,
+        "y": 351,
+        "w": 338,
+        "h": 177
+      }
+    },
+    "tee_greptile.png": {
+      "title": "Greptile tee",
+      "kind": "tee",
+      "sponsors": [
+        "Greptile"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 337,
+        "y": 390,
+        "w": 351,
+        "h": 205
+      }
+    },
+    "tee_hyphenate.png": {
+      "title": "Hyphenate tee",
+      "kind": "tee",
+      "sponsors": [
+        "Hyphenate"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 326,
+        "y": 391,
+        "w": 372,
+        "h": 162
+      }
+    },
+    "tee_listen_labs.png": {
+      "title": "Listen Labs tee",
+      "kind": "tee",
+      "sponsors": [
+        "Listen Labs"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 343,
+        "y": 404,
+        "w": 338,
+        "h": 182
+      }
+    },
+    "tee_meta.png": {
+      "title": "Meta tee",
+      "kind": "tee",
+      "sponsors": [
+        "Meta"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 347,
+        "y": 393,
+        "w": 330,
+        "h": 197
+      }
+    },
+    "tee_microsoft.png": {
+      "title": "Microsoft tee",
+      "kind": "tee",
+      "sponsors": [
+        "Microsoft"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 333,
+        "y": 417,
+        "w": 358,
+        "h": 206
+      }
+    },
+    "tee_moonpay.png": {
+      "title": "MoonPay tee",
+      "kind": "tee",
+      "sponsors": [
+        "MoonPay"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 343,
+        "y": 387,
+        "w": 338,
+        "h": 169
+      }
+    },
+    "tee_moss.png": {
+      "title": "Moss tee",
+      "kind": "tee",
+      "sponsors": [
+        "Moss"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 333,
+        "y": 433,
+        "w": 358,
+        "h": 210
+      }
+    },
+    "tee_notability.png": {
+      "title": "Notability tee",
+      "kind": "tee",
+      "sponsors": [
+        "Notability"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 331,
+        "y": 386,
+        "w": 362,
+        "h": 203
+      }
+    },
+    "tee_runpod.png": {
+      "title": "Runpod tee",
+      "kind": "tee",
+      "sponsors": [
+        "Runpod"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 352,
+        "y": 353,
+        "w": 322,
+        "h": 177
+      }
+    },
+    "tee_savvy.png": {
+      "title": "Savvy tee",
+      "kind": "tee",
+      "sponsors": [
+        "Savvy"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 332,
+        "y": 402,
+        "w": 360,
+        "h": 196
+      }
+    },
+    "tee_scale_ai.png": {
+      "title": "Scale AI tee",
+      "kind": "tee",
+      "sponsors": [
+        "Scale AI"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 329,
+        "y": 416,
+        "w": 366,
+        "h": 203
+      }
+    },
+    "tee_spacex_ai.png": {
+      "title": "SpaceX AI tee",
+      "kind": "tee",
+      "sponsors": [
+        "SpaceXAI"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 349,
+        "y": 406,
+        "w": 326,
+        "h": 205
+      }
+    },
+    "tee_supercell.png": {
+      "title": "Supercell tee",
+      "kind": "tee",
+      "sponsors": [
+        "Supercell"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 347,
+        "y": 391,
+        "w": 330,
+        "h": 199
+      }
+    },
+    "tee_visa.png": {
+      "title": "Visa tee",
+      "kind": "tee",
+      "sponsors": [
+        "Visa"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 357,
+        "y": 425,
+        "w": 314,
+        "h": 186
+      }
+    },
+    "tee_y_combinator.png": {
+      "title": "Y Combinator tee",
+      "kind": "tee",
+      "sponsors": [
+        "Y Combinator"
+      ],
+      "width": 1024,
+      "height": 1024,
+      "photo_area": {
+        "x": 317,
+        "y": 402,
+        "w": 392,
+        "h": 233
       }
     }
   }

@@ -8,6 +8,13 @@
 </head>
 <body>
 <p id="error" class="error"></p>
+<main id="head"></main>
+<!-- The Live tab's 3D venue: the /live page, kept outside the redrawn parts so it never reloads. -->
+<section id="live3d" hidden>
+  <p class="muted">The crowd, incidents and decisions as they happen. Start a run, close the doors or place our band from the bar at the top.
+    <button type="button" onclick="this.closest('section').querySelector('iframe').requestFullscreen()">Full screen</button></p>
+  <iframe title="Live venue in 3D" allow="fullscreen"></iframe>
+</section>
 <main id="app"><p class="muted">Connecting to SpacetimeDB…</p></main>
 <script type="module" src="/js/organizer.js"></script>
 </body>

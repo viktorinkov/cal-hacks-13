@@ -25,4 +25,8 @@ export default __t.row({
   photoH: __t.u32().name("photo_h"),
   photoId: __t.u64().name("photo_id"),
   photoUrl: __t.string().name("photo_url"),
+  line: __t.string(),
+  reason: __t.string(),
+  friends: __t.array(__t.string()),
+  ticks: __t.array(__t.string()),
 });

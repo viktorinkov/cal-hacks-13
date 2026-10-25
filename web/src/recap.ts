@@ -1,16 +1,22 @@
 // The recap the tap link shows once the host ends the event, top to bottom: where you were and when
 // (live from SpacetimeDB), the people and booths you spent time with (ranked by Elastic through
-// bandit-api), your photos with the people in them and tap-to-share, then merch made from them, paid
-// from the Nessie wallet.
+// bandit-api) and who else was there, your photos with the people in them and tap-to-share, then merch
+// made from them, paid from the Nessie wallet.
 
 import { act, api, apiSession, date, field, h, handleLinks, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
 import type { MerchSuggestion, MyPhoto } from './module_bindings/types';
 
+type Person = { node_id: number; name: string; photo_url: string; handles: Record<string, string> };
+
+/** Someone you spent time with, and how you met. */
+type Suggested = Person & { minutes: number; met_zone_name: string; met_at: string; shared_booths: string[]; photos_together: number };
+
 export type Recap = {
   display_name: string;
-  suggested_people: { node_id: number; name: string; photo_url: string; handles: Record<string, string> }[];
+  suggested_people: Suggested[];
   suggested_booths: { booth_id: number; name: string; zone_name: string }[];
+  shared_visits: { person: Person; zone_name: string; started_at: string; overlap_minutes: number }[];
 };
 
 let data: Recap | undefined;
@@ -110,16 +116,44 @@ function spaceTime(conn: DbConnection) {
   ];
 }
 
+function socials(p: Person) {
+  const handles = Object.entries(p.handles).map(([platform, handle]) => ({ platform, handle }));
+  return h('div', {}, handles.length ? handleLinks(handles) : h('span', { class: 'muted' }, 'no socials shared'));
+}
+
+const and = (xs: string[]) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs.join('');
+
+/** "Met at Stage at 09:40 PM · 25 min together · You both visited A and B · 2 photos together", leaving out what is empty. */
+function howYouMet(p: Suggested) {
+  const min = Math.round(p.minutes), n = p.photos_together;
+  return [
+    p.met_at && `Met${p.met_zone_name ? ` at ${p.met_zone_name}` : ''} at ${clock(Date.parse(p.met_at))}`,
+    min > 0 && `${min} min together`,
+    p.shared_booths.length > 0 && `You both visited ${and(p.shared_booths)}`,
+    n > 0 && `${n} photo${n > 1 ? 's' : ''} together`,
+  ].filter(Boolean).join(' · ');
+}
+
 function people() {
   if (!data) return h('p', { class: 'muted' }, 'Loading…');
   if (!data.suggested_people.length) return h('p', { class: 'muted' }, 'Nobody stayed close to you long enough to count.');
-  return h('ul', { class: 'cards' }, data.suggested_people.map(p => {
-    const handles = Object.entries(p.handles).map(([platform, handle]) => ({ platform, handle }));
-    return h('li', {},
-      p.photo_url && h('img', { class: 'face', src: p.photo_url }),
-      h('b', {}, p.name),
-      h('div', {}, handles.length ? handleLinks(handles) : h('span', { class: 'muted' }, 'no socials shared')));
-  }));
+  return h('ul', { class: 'cards' }, data.suggested_people.map(p => h('li', {},
+    p.photo_url && h('img', { class: 'face', src: p.photo_url }),
+    h('b', {}, p.name),
+    h('div', { class: 'muted' }, howYouMet(p)),
+    socials(p))));
+}
+
+/** The people who were in the same place as you, other than the ones you spent time with. */
+function alsoThere() {
+  if (!data) return h('p', { class: 'muted' }, 'Loading…');
+  const known = new Set(data.suggested_people.map(p => p.node_id));
+  const others = data.shared_visits.filter(v => !known.has(v.person.node_id));
+  if (!others.length) return h('p', { class: 'muted' }, 'Nobody else was in the same place as you for long.');
+  return h('ul', { class: 'cards' }, others.map(v => h('li', {},
+    h('b', {}, v.person.name),
+    ` at ${v.zone_name} for ${Math.max(1, Math.round(v.overlap_minutes))} min from ${clock(Date.parse(v.started_at))}`,
+    socials(v.person))));
 }
 
 function booths() {
@@ -167,28 +201,73 @@ function photos(conn: DbConnection, event: string) {
       h('button', { onclick: () => act(() => share(p, event)) }, 'Share')))));
 }
 
-/** The template image with the photo cover-cropped into its green photo box, scaled by CSS. */
-function mockup(t: MerchSuggestion) {
-  const canvas = h('canvas', { class: 'mockup', width: t.width, height: t.height }) as HTMLCanvasElement;
-  const ctx = canvas.getContext('2d')!;
-  const base = new Image();
+type Box = { x: number; y: number; w: number; h: number };
+let boxes: Promise<Record<string, Record<string, Box>>> | undefined;
+
+/** The check boxes printed on each template, by sponsor and keyed by image url, from assets/merch/templates.json. */
+function checkBoxes() {
+  return boxes ??= fetch('/assets/merch/templates.json')
+    .then(r => r.json())
+    .then(d => Object.fromEntries(Object.entries(d.templates as Record<string, { checks?: Record<string, Box> }>)
+      .map(([name, t]) => [`/assets/merch/${name}`, t.checks ?? {}])))
+    .catch(() => ({} as Record<string, Record<string, Box>>));
+}
+
+const picture = (src: string) => new Promise<HTMLImageElement>((ok, fail) => {
   const img = new Image();
-  let loaded = 0;
-  const draw = () => {
-    if (++loaded < 2) return;
+  img.onload = () => ok(img);
+  img.onerror = fail;
+  img.src = src;
+});
+
+/**
+ * The template image with the photo cover-cropped into its green photo box, the printed line in a strip
+ * along the bottom of the photo, and a tick in the box of each sponsor whose booth you visited. Scaled by CSS.
+ */
+export function mockup(t: MerchSuggestion) {
+  const canvas = h('canvas', { class: 'mockup', width: t.width, height: t.height }) as HTMLCanvasElement;
+  Promise.all([picture(t.imageUrl), picture(t.photoUrl), checkBoxes()]).then(([base, img, checks]) => {
+    const ctx = canvas.getContext('2d')!;
     ctx.drawImage(base, 0, 0, t.width, t.height);
-    const sc = Math.max(t.photoW / img.width, t.photoH / img.height);
+    // The photo covers 2 px past the box, so no green shows at its antialiased edge.
+    const x = t.photoX - 2, y = t.photoY - 2, w = t.photoW + 4, ph = t.photoH + 4;
+    const sc = Math.max(w / img.width, ph / img.height);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(t.photoX, t.photoY, t.photoW, t.photoH);
+    ctx.rect(x, y, w, ph);
     ctx.clip();
-    ctx.drawImage(img, t.photoX + (t.photoW - img.width * sc) / 2, t.photoY + (t.photoH - img.height * sc) / 2, img.width * sc, img.height * sc);
+    ctx.drawImage(img, x + (w - img.width * sc) / 2, y + (ph - img.height * sc) / 2, img.width * sc, img.height * sc);
+    if (t.line) {
+      const strip = Math.round(t.photoH * 0.17);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(t.photoX, t.photoY + t.photoH - strip, t.photoW, strip);
+      let size = Math.round(strip * 0.55);
+      ctx.font = `bold ${size}px system-ui, sans-serif`;
+      const fit = t.photoW * 0.92;
+      if (ctx.measureText(t.line).width > fit) {
+        size = Math.floor(size * fit / ctx.measureText(t.line).width);
+        ctx.font = `bold ${size}px system-ui, sans-serif`;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.line, t.photoX + t.photoW / 2, t.photoY + t.photoH - strip / 2);
+    }
     ctx.restore();
-  };
-  base.onload = draw;
-  img.onload = draw;
-  base.src = t.imageUrl;
-  img.src = t.photoUrl;
+    for (const sponsor of t.ticks) {
+      const b = checks[t.imageUrl]?.[sponsor];
+      if (!b) continue;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = b.w * 0.16;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(b.x + b.w * 0.2, b.y + b.h * 0.52);
+      ctx.lineTo(b.x + b.w * 0.42, b.y + b.h * 0.76);
+      ctx.lineTo(b.x + b.w * 0.86, b.y + b.h * 0.2);
+      ctx.stroke();
+    }
+  }).catch(() => {});
   return canvas;
 }
 
@@ -220,18 +299,21 @@ function merch(conn: DbConnection) {
     balance(conn),
     !picks.length && h('p', { class: 'muted' }, 'Merch appears once a photographer takes a photo of you.'),
     h('div', { class: 'merch' }, picks.map(t => {
-      const key = `${t.templateId}:${t.photoId}`;
+      const key = `${t.templateId}:${t.photoId}:${t.line}:${t.ticks.join()}`;
       if (!mockups.has(key)) mockups.set(key, mockup(t));
       return h('figure', {}, mockups.get(key)!,
         h('figcaption', {},
           h('b', {}, t.title), ` · ${money(t.priceCents)}`,
+          t.reason && h('div', {}, `Picked for you: ${t.reason}`),
+          t.friends.length > 0 && h('div', { class: 'muted' }, `In the photo with ${and(t.friends)}`),
+          t.ticks.length > 0 && h('div', { class: 'muted' }, `Booths you visited: ${and(t.ticks)}`),
           h('form', { onsubmit: (e: Event) => buy(e, t) },
             t.kind === 'tee' && h('label', {}, 'Size', h('select', { name: `size-${t.templateId}` },
               ['S', 'M', 'L', 'XL'].map(x => h('option', { value: x, selected: x === 'M' || undefined }, x)))),
             h('button', { disabled: !hasWallet || undefined }, `Buy ${money(t.priceCents)}`))));
     })),
     orders.length > 0 && [h('h4', {}, 'Your orders'), h('ul', {}, orders.map(o => h('li', {},
-      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · receipt ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
+      `${titles.get(o.templateId) ?? 'Merch'}${o.size ? ` (${o.size})` : ''}${o.line ? ` "${o.line}"` : ''}, ${money(o.amountCents)}: ${o.status}${o.failure ? `, ${o.failure}` : ''}${o.nessiePurchaseId ? ` · receipt ${o.nessiePurchaseId.slice(0, 8)}` : ''}`)))],
     movements(conn),
   ];
 }
@@ -247,6 +329,7 @@ export function recap(conn: DbConnection, rerender: () => void) {
     h('p', {}, `Thanks for coming, ${me?.displayName ?? ''}. Here is your night.`),
     h('section', {}, h('h3', {}, 'Where you were'), spaceTime(conn)),
     h('section', {}, h('h3', {}, 'People you spent time with'), people()),
+    h('section', {}, h('h3', {}, 'Also there with you'), alsoThere()),
     h('section', {}, h('h3', {}, 'Booths you spent time at'), booths()),
     h('section', {}, h('h3', {}, 'Your photos'), photos(conn, event)),
     h('section', {}, h('h3', {}, 'Make it merch'), merch(conn)),

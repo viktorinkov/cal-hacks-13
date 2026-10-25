@@ -17,7 +17,7 @@ pub fn fall(app: &App, test_bands: &TestBands, band: u8, station: u8, witnesses:
     check_bands(&[band])?;
     check_bands(witnesses)?;
     let db = app.db()?;
-    if let Some(open) = db.db.incident().iter().find(|i| i.subject_band == band && !i.resolved && i.kind != IncidentKind::Property) {
+    if let Some(open) = db.db.incident().iter().find(|i| i.subject_band == u32::from(band) && !i.resolved && i.kind != IncidentKind::Property) {
         bail!("band {band} already has open incident {}; resolve it first", open.id);
     }
     if witnesses.contains(&band) {
@@ -32,7 +32,7 @@ pub fn fall(app: &App, test_bands: &TestBands, band: u8, station: u8, witnesses:
     moment.extend(witnesses.iter().map(|w| (*w, Pose { state: S_CIRCLE, ..Pose::at(witness_station) })));
     test_bands.place(&moment);
     sleep_ms(2000);
-    let incident = until(5.0, || db.db.incident().iter().find(|i| i.id > before && i.subject_band == band))
+    let incident = until(5.0, || db.db.incident().iter().find(|i| i.id > before && i.subject_band == u32::from(band)))
         .with_context(|| format!("the safety watch opened no incident for band {band}; run setup (it starts the watch)"))?;
     until(3.0, || {
         let n = db.db.incident_band().iter().filter(|r| r.incident_id == incident.id && r.role == "witness").count();
@@ -47,7 +47,7 @@ pub fn fall(app: &App, test_bands: &TestBands, band: u8, station: u8, witnesses:
 pub fn print_incident(app: &App, id: u64) -> Result<()> {
     let db = app.db()?;
     let i = app.incident(id)?;
-    let who = match db.db.band_owner().band_id().find(&i.subject_band) {
+    let who = match u8::try_from(i.subject_band).ok().and_then(|b| db.db.band_owner().band_id().find(&b)) {
         Some(o) => format!(" ({})", app.person(o.owner)),
         None => String::new(),
     };
@@ -62,7 +62,7 @@ pub fn print_incident(app: &App, id: u64) -> Result<()> {
         i.opened_by
     );
     if let Some(s) = db.db.incident_snapshot().incident_id().find(&i.id) {
-        let list = |v: &[u8]| if v.is_empty() { "none".to_string() } else { v.iter().map(u8::to_string).collect::<Vec<_>>().join(",") };
+        let list = |v: &[u32]| if v.is_empty() { "none".to_string() } else { v.iter().map(u32::to_string).collect::<Vec<_>>().join(",") };
         println!(
             "  snapshot  bands present {}, light circle {}, neigh mean {:.1}",
             list(&s.bands_present),
@@ -94,10 +94,17 @@ pub fn treat(app: &App, incident: u64, note: &str) -> Result<()> {
     Ok(())
 }
 
-/// Resolves the incident as `actor` and returns the claim it opened, if any.
+/// Resolves the incident as `actor` and returns its claim, if any. Property
+/// claims open on resolve; for an injury the organizer files the wearer's
+/// claim in their words, with the record to come as a PDF the run files.
 pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Result<Option<Claim>> {
     let conn = app.actor(actor)?;
     call!(conn, resolve_incident_then(incident, resolution.to_string()))?;
+    let i = app.incident(incident)?;
+    if i.kind != IncidentKind::Property {
+        let ops = app.actor("ops")?;
+        call!(ops, file_claim_for_wearer_then(incident, wearer_statement(app, &i), "pdf".to_string()))?;
+    }
     let db = app.db()?;
     let claim = until(4.0, || db.db.claim().incident_id().find(&incident).filter(|c| c.pack_version > 0));
     let who = app.person(spacetimedb_sdk::DbContext::identity(&*conn));
@@ -117,6 +124,15 @@ pub fn resolve(app: &App, incident: u64, resolution: &str, actor: &str) -> Resul
     Ok(claim)
 }
 
+/// One line in the attendee's words about the scene, for the claim filed for them.
+fn wearer_statement(app: &App, i: &Incident) -> String {
+    let zone = app.zone_name(i.zone_id);
+    match i.kind {
+        IncidentKind::Sos => format!("I got hurt in the {zone} area and pressed my band for help; the medic treated me there."),
+        _ => format!("I fell in the {zone} area and got hurt; the medic treated me there."),
+    }
+}
+
 /// The organizer logs damaged equipment; with `camera` the vision stub
 /// confirms it from a frame first. Resolves the incident and returns the claim.
 pub fn property(app: &App, zone_name: &str, note: &str, cost_cents: u64, camera: bool) -> Result<Option<Claim>> {
@@ -130,7 +146,7 @@ pub fn property(app: &App, zone_name: &str, note: &str, cost_cents: u64, camera:
             .context("the property incident did not appear")?;
     say!(app, "incident {}  property  {}  opened {} by the organizer: {note}", incident.id, zone.name, app.hms(incident.opened_at));
     if camera {
-        vision_stub(app, &incident, &zone, note)?;
+        vision_stub(app, &incident, &zone, note, "a floor speaker on its side in the pit, cabinet cracked, nobody under it")?;
     }
     call!(
         ops,
@@ -140,8 +156,9 @@ pub fn property(app: &App, zone_name: &str, note: &str, cost_cents: u64, camera:
     resolve(app, incident.id, "area cleared, equipment sent for repair", "ops")
 }
 
-/// Plays the vision service: a frame in the blob store, the property event and a confirmed assessment.
-fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str) -> Result<()> {
+/// Plays the vision service: a frame in the blob store, the property event and a confirmed assessment of
+/// what the camera `saw`.
+pub fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str, saw: &str) -> Result<()> {
     let db = app.db()?;
     let cam = db.db.camera().iter().find(|c| c.zone_id == zone.id).with_context(|| format!("no camera covers {}", zone.name))?;
     let captured = Timestamp::from_micros_since_unix_epoch(now_micros() - 4_000_000);
@@ -161,7 +178,7 @@ fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str) -> Resul
             incident.id,
             cam.id,
             "fallen_object".into(),
-            "a speaker lies on its side below the stage".into(),
+            saw.to_string(),
             0.9,
             vec![blob.sha256.clone()]
         )
@@ -173,8 +190,8 @@ fn vision_stub(app: &App, incident: &Incident, zone: &Zone, note: &str) -> Resul
             "staff_button".into(),
             true,
             0.92,
-            "a floor speaker on its side in the pit, cabinet cracked, nobody under it".into(),
-            "rope off the area and remove the speaker".into(),
+            saw.to_string(),
+            "rope off the area and remove the equipment".into(),
             format!("Camera {} on {} confirms what the floor manager reported: {note}", cam.name, zone.name),
             cam.id,
             vec![blob.sha256.clone()],

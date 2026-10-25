@@ -17,13 +17,13 @@ pub struct IncidentInfo {
     /// The zone the incident was opened in; 0 when unzoned.
     pub zone_id: u64,
     /// The subject band; 0 for property incidents.
-    pub band_id: u8,
+    pub band_id: u32,
 }
 
 /// The subject band's report as frozen at incident open.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SubjectBand {
-    pub band_id: u8,
+    pub band_id: u32,
     pub state: u8,
     pub flags: u8,
     pub neigh: u8,
@@ -37,18 +37,18 @@ pub struct SnapshotInfo {
     pub snapshot_id: u64,
     pub taken_at: Micros,
     /// Online bands in the incident zone at open, ascending.
-    pub bands_present: Vec<u8>,
+    pub bands_present: Vec<u32>,
     /// Mean neighbour count of those bands: how crowded it was.
     pub neigh_mean: f32,
     /// Bands showing the light circle (state 4) at open, ascending.
-    pub circle_bands: Vec<u8>,
+    pub circle_bands: Vec<u32>,
     pub subject: Option<SubjectBand>,
 }
 
 /// A light-circle band recorded while the incident was open.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Witness {
-    pub band_id: u8,
+    pub band_id: u32,
     /// The witness band's zone when first seen in the circle; 0 when unzoned.
     pub zone_id: u64,
     /// Signal from the subject band as the witness heard it; 0 when unknown.
@@ -366,7 +366,7 @@ mod tests {
         micros_at(2026, 10, 24, h, m, s, PDT)
     }
 
-    fn witness(band_id: u8, rssi: i8, s: i64) -> Witness {
+    fn witness(band_id: u32, rssi: i8, s: i64) -> Witness {
         Witness { band_id, zone_id: 102, rssi, first_seen_at: at(22, 14, s), last_seen_at: at(22, 20, 0) }
     }
 

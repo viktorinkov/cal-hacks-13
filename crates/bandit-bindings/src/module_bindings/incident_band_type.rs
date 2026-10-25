@@ -9,7 +9,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub struct IncidentBand {
     pub id: u64,
     pub incident_id: u64,
-    pub band_id: u8,
+    pub band_id: u32,
     pub role: String,
     pub zone_id: u64,
     pub rssi: i8,
@@ -27,7 +27,7 @@ impl __sdk::InModule for IncidentBand {
 pub struct IncidentBandCols {
     pub id: __sdk::__query_builder::Col<IncidentBand, u64>,
     pub incident_id: __sdk::__query_builder::Col<IncidentBand, u64>,
-    pub band_id: __sdk::__query_builder::Col<IncidentBand, u8>,
+    pub band_id: __sdk::__query_builder::Col<IncidentBand, u32>,
     pub role: __sdk::__query_builder::Col<IncidentBand, String>,
     pub zone_id: __sdk::__query_builder::Col<IncidentBand, u64>,
     pub rssi: __sdk::__query_builder::Col<IncidentBand, i8>,

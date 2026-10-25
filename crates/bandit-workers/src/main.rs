@@ -9,6 +9,7 @@
 //!                                           the reducer calls instead of making them
 //! ```
 
+mod clinic;
 mod extract;
 mod jobs;
 mod letters;
@@ -17,9 +18,11 @@ mod merch;
 mod model;
 mod nessie;
 mod payout;
+mod photo;
 mod prompts;
 mod review;
 mod runner;
+mod shop;
 mod sink;
 #[cfg(test)]
 mod testdata;

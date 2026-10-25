@@ -2,7 +2,8 @@
 # Runs as root on the Debian VM: installs Chromium (for the medical record PDFs), Caddy, Rust and Bun,
 # checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, sets up the Python the
 # venue setup runs pipeline/venue_model.py with (Playwright drives Bright Data's browser), then (re)starts
-# bandit-api, bandit-indexer and bandit-workers under systemd behind Caddy on https://$BANDIT_HOST.
+# bandit-api, bandit-indexer, bandit-workers and the live run's floor staff under systemd behind Caddy on
+# https://$BANDIT_HOST.
 # scripts/deploy-vm copies /opt/bandit/.env and /var/lib/bandit/identities first, then runs this.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -37,9 +38,10 @@ CARGO_PROFILE_DEV_DEBUG=0 cargo build -q -p bandit-api -p bandit-indexer -p band
 var/venv/bin/pip install -q playwright requests
 
 install -m 644 deploy/bandit@.service /etc/systemd/system/bandit@.service
+install -m 644 deploy/bandit-live.service /etc/systemd/system/bandit-live.service
 systemctl daemon-reload
-systemctl enable -q bandit@api bandit@indexer bandit@workers
-systemctl restart bandit@api bandit@indexer bandit@workers
+systemctl enable -q bandit@api bandit@indexer bandit@workers bandit-live
+systemctl restart bandit@api bandit@indexer bandit@workers bandit-live
 
 printf '%s, www.%s {\n\treverse_proxy 127.0.0.1:8080\n}\n' "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
