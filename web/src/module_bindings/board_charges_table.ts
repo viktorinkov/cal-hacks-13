@@ -37,4 +37,6 @@ export default __t.row({
   decidedAt: __t.option(__t.timestamp()).name("decided_at"),
   paidAt: __t.option(__t.timestamp()).name("paid_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  insurerCents: __t.u64().name("insurer_cents"),
+  refundCents: __t.u64().name("refund_cents"),
 });

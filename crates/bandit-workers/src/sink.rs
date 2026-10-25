@@ -22,7 +22,7 @@ pub enum Finish {
     ClaimPayout { customer_id: String, account_id: String, deposit_id: String },
     WalletOpened { customer_id: String, account_id: String },
     MerchPaid { merchant_id: String, purchase_id: String },
-    ChargePaid { customer_id: String, account_id: String, purchase_id: String },
+    ChargePaid { customer_id: String, account_id: String, purchase_id: String, refund_customer_id: String, refund_account_id: String, refund_deposit_id: String },
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
     ClinicReport { record_json: String, file_hash: String },
@@ -147,8 +147,8 @@ impl Sink {
             }
             Finish::WalletOpened { customer_id, account_id } => reduce!(conn, record_wallet_then(job_id, customer_id, account_id)),
             Finish::MerchPaid { merchant_id, purchase_id } => reduce!(conn, settle_merch_order_then(job_id, merchant_id, purchase_id)),
-            Finish::ChargePaid { customer_id, account_id, purchase_id } => {
-                reduce!(conn, record_charge_payment_then(job_id, customer_id, account_id, purchase_id))
+            Finish::ChargePaid { customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id } => {
+                reduce!(conn, record_charge_payment_then(job_id, customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id))
             }
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
@@ -223,9 +223,13 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
         }
         Finish::WalletOpened { customer_id, account_id } => ("record_wallet", json!({"customer_id": customer_id, "account_id": account_id})),
         Finish::MerchPaid { merchant_id, purchase_id } => ("settle_merch_order", json!({"merchant_id": merchant_id, "purchase_id": purchase_id})),
-        Finish::ChargePaid { customer_id, account_id, purchase_id } => {
-            ("record_charge_payment", json!({"customer_id": customer_id, "account_id": account_id, "purchase_id": purchase_id}))
-        }
+        Finish::ChargePaid { customer_id, account_id, purchase_id, refund_customer_id, refund_account_id, refund_deposit_id } => (
+            "record_charge_payment",
+            json!({
+                "customer_id": customer_id, "account_id": account_id, "purchase_id": purchase_id,
+                "refund_customer_id": refund_customer_id, "refund_account_id": refund_account_id, "refund_deposit_id": refund_deposit_id
+            }),
+        ),
         Finish::MedicalCard { card_json } => ("apply_medical_extract", json!({"card_json": parse_or_text(card_json), "call": call})),
         Finish::ClinicReport { record_json, file_hash } => {
             ("file_clinic_report", json!({"record_json": parse_or_text(record_json), "file_hash": file_hash, "call": call}))
