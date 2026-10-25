@@ -121,6 +121,8 @@ export type LiveView = {
   onFrame(f: (now: number) => void): void;
   /** The point of the floor under a click, in model metres (x east, z south), if it is inside the hall. */
   floorAt(e: MouseEvent): { x: number; z: number } | undefined;
+  /** The ray from the camera through the pointer, for picking what is under it. */
+  rayAt(e: MouseEvent): THREE.Ray;
   /** Turns the camera to look down at a spot of the floor from close by. */
   lookAt(x: number, z: number): void;
 };
@@ -136,11 +138,15 @@ function lookAt(x: number, z: number) {
   controls.update();
 }
 
-function floorAt(e: MouseEvent) {
+function rayAt(e: MouseEvent): THREE.Ray {
   const r = renderer.domElement.getBoundingClientRect();
   const ray = new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-  const p = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  return ray.ray;
+}
+
+function floorAt(e: MouseEvent) {
+  const p = rayAt(e).intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
   if (!p || !model) return undefined;
   const box = new THREE.Box3().setFromObject(model);
   return p.x >= box.min.x && p.x <= box.max.x && p.z >= box.min.z && p.z <= box.max.z ? { x: p.x, z: p.z } : undefined;
@@ -151,7 +157,7 @@ export function venueView(c: DbConnection): LiveView {
   if (!view) makeView();
   if (chosenUrl() !== loadedUrl) load(chosenUrl());
   showLive(true);
-  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, lookAt };
+  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, rayAt, lookAt };
 }
 
 // --- The picker -------------------------------------------------------------------------------
