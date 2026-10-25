@@ -187,6 +187,8 @@ pub mod ledger_entry_table;
 pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
+pub mod live_pause_table;
+pub mod live_pause_type;
 pub mod live_phase_type;
 pub mod live_plan_table;
 pub mod live_plan_type;
@@ -257,6 +259,7 @@ pub mod organization_table;
 pub mod organization_type;
 pub mod owner_table;
 pub mod owner_type;
+pub mod pause_live_run_reducer;
 pub mod people_link_table;
 pub mod people_link_type;
 pub mod person_card_type;
@@ -296,6 +299,7 @@ pub mod request_recovery_letter_reducer;
 pub mod rerun_shopping_agent_reducer;
 pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
+pub mod resume_live_run_reducer;
 pub mod retry_claim_payout_reducer;
 pub mod revoke_role_reducer;
 pub mod schedule_slot_in_type;
@@ -571,6 +575,8 @@ pub use ledger_entry_table::*;
 pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
+pub use live_pause_table::*;
+pub use live_pause_type::LivePause;
 pub use live_phase_type::LivePhase;
 pub use live_plan_table::*;
 pub use live_plan_type::LivePlan;
@@ -641,6 +647,7 @@ pub use organization_table::*;
 pub use organization_type::Organization;
 pub use owner_table::*;
 pub use owner_type::Owner;
+pub use pause_live_run_reducer::pause_live_run;
 pub use people_link_table::*;
 pub use people_link_type::PeopleLink;
 pub use person_card_type::PersonCard;
@@ -680,6 +687,7 @@ pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use rerun_shopping_agent_reducer::rerun_shopping_agent;
 pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
+pub use resume_live_run_reducer::resume_live_run;
 pub use retry_claim_payout_reducer::retry_claim_payout;
 pub use revoke_role_reducer::revoke_role;
 pub use schedule_slot_in_type::ScheduleSlotIn;
@@ -954,6 +962,7 @@ pub enum Reducer {
         band_id: u32,
         note: String,
     },
+    PauseLiveRun,
     PlaceBand {
         band_id: u32,
         x_m: f32,
@@ -1057,6 +1066,7 @@ pub enum Reducer {
         incident_id: u64,
         resolution: String,
     },
+    ResumeLiveRun,
     RetryClaimPayout {
         claim_id: u64,
     },
@@ -1274,6 +1284,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::OpenApiSession { .. } => "open_api_session",
             Reducer::OpenClaim { .. } => "open_claim",
             Reducer::OpenIncident { .. } => "open_incident",
+            Reducer::PauseLiveRun => "pause_live_run",
             Reducer::PlaceBand { .. } => "place_band",
             Reducer::PlaceBooth { .. } => "place_booth",
             Reducer::RecordClaimPayout { .. } => "record_claim_payout",
@@ -1297,6 +1308,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::RerunShoppingAgent => "rerun_shopping_agent",
             Reducer::ResetBridge => "reset_bridge",
             Reducer::ResolveIncident { .. } => "resolve_incident",
+            Reducer::ResumeLiveRun => "resume_live_run",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
@@ -1635,6 +1647,9 @@ impl __sdk::Reducer for Reducer {
                 band_id: band_id.clone(),
                 note: note.clone(),
             }),
+            Reducer::PauseLiveRun => {
+                __sats::bsatn::to_vec(&pause_live_run_reducer::PauseLiveRunArgs {})
+            }
             Reducer::PlaceBand {
                 band_id,
                 x_m,
@@ -1828,6 +1843,9 @@ impl __sdk::Reducer for Reducer {
                 incident_id: incident_id.clone(),
                 resolution: resolution.clone(),
             }),
+            Reducer::ResumeLiveRun => {
+                __sats::bsatn::to_vec(&resume_live_run_reducer::ResumeLiveRunArgs {})
+            }
             Reducer::RetryClaimPayout { claim_id } => {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),
@@ -2197,6 +2215,7 @@ pub struct DbUpdate {
     job_reaper_timer: __sdk::TableUpdate<JobReaperTimer>,
     ledger_entry: __sdk::TableUpdate<LedgerEntry>,
     link: __sdk::TableUpdate<Link>,
+    live_pause: __sdk::TableUpdate<LivePause>,
     live_plan: __sdk::TableUpdate<LivePlan>,
     live_run: __sdk::TableUpdate<LiveRun>,
     live_run_timer: __sdk::TableUpdate<LiveRunTimer>,
@@ -2501,6 +2520,9 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "link" => db_update
                     .link
                     .append(link_table::parse_table_update(table_update)?),
+                "live_pause" => db_update
+                    .live_pause
+                    .append(live_pause_table::parse_table_update(table_update)?),
                 "live_plan" => db_update
                     .live_plan
                     .append(live_plan_table::parse_table_update(table_update)?),
@@ -2884,6 +2906,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.link = cache
             .apply_diff_to_table::<Link>("link", &self.link)
             .with_updates_by_pk(|row| &row.key);
+        diff.live_pause = cache
+            .apply_diff_to_table::<LivePause>("live_pause", &self.live_pause)
+            .with_updates_by_pk(|row| &row.id);
         diff.live_plan = cache
             .apply_diff_to_table::<LivePlan>("live_plan", &self.live_plan)
             .with_updates_by_pk(|row| &row.incident_id);
@@ -3351,6 +3376,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "live_pause" => db_update
+                    .live_pause
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "live_plan" => db_update
                     .live_plan
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
@@ -3802,6 +3830,9 @@ impl __sdk::DbUpdate for DbUpdate {
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "live_pause" => db_update
+                    .live_pause
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "live_plan" => db_update
                     .live_plan
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
@@ -4105,6 +4136,7 @@ pub struct AppliedDiff<'r> {
     job_reaper_timer: __sdk::TableAppliedDiff<'r, JobReaperTimer>,
     ledger_entry: __sdk::TableAppliedDiff<'r, LedgerEntry>,
     link: __sdk::TableAppliedDiff<'r, Link>,
+    live_pause: __sdk::TableAppliedDiff<'r, LivePause>,
     live_plan: __sdk::TableAppliedDiff<'r, LivePlan>,
     live_run: __sdk::TableAppliedDiff<'r, LiveRun>,
     live_run_timer: __sdk::TableAppliedDiff<'r, LiveRunTimer>,
@@ -4444,6 +4476,7 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
             event,
         );
         callbacks.invoke_table_row_callbacks::<Link>("link", &self.link, event);
+        callbacks.invoke_table_row_callbacks::<LivePause>("live_pause", &self.live_pause, event);
         callbacks.invoke_table_row_callbacks::<LivePlan>("live_plan", &self.live_plan, event);
         callbacks.invoke_table_row_callbacks::<LiveRun>("live_run", &self.live_run, event);
         callbacks.invoke_table_row_callbacks::<LiveRunTimer>(
@@ -5394,6 +5427,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         job_reaper_timer_table::register_table(client_cache);
         ledger_entry_table::register_table(client_cache);
         link_table::register_table(client_cache);
+        live_pause_table::register_table(client_cache);
         live_plan_table::register_table(client_cache);
         live_run_table::register_table(client_cache);
         live_run_timer_table::register_table(client_cache);
@@ -5536,6 +5570,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
         "job_reaper_timer",
         "ledger_entry",
         "link",
+        "live_pause",
         "live_plan",
         "live_run",
         "live_run_timer",

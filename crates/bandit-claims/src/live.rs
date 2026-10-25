@@ -1,9 +1,10 @@
 //! `bandit-claims live`: the floor staff while the live run is on. The module decides who falls, where and
 //! when; this plays the people who answer it. The medic reaches each person, notes what they found and
-//! resolves the incident; the clinic files its record on the claim made out to the person who fell; the
-//! camera confirms broken equipment and the organizer logs the repair cost. A claim left waiting for the
-//! organizer is decided after `--approve-after` seconds so the run keeps moving: approved with a learned rule,
-//! or refused when the claims agent found the injury happened away from the event.
+//! resolves the incident; the person who fell files their claim (staff file it for them) and the hospital
+//! report follows on its own; the camera confirms broken equipment and the organizer logs the repair cost.
+//! A claim left waiting for the organizer is decided after `--approve-after` seconds so the run keeps
+//! moving: approved with a learned rule, or refused when the claims agent found the injury happened away
+//! from the event. While the run is paused, the floor staff wait too.
 //!
 //! Each incident's plan comes from `live_plan`. An incident with no plan, such as a fall on a presenter's own
 //! band, is treated as a sprain at first aid.
@@ -14,8 +15,6 @@ use anyhow::Result;
 use bandit_bindings::*;
 use spacetimedb_sdk::Table;
 use std::collections::HashSet;
-use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
 
 /// What the owner connection mirrors for the run: everything the flow commands read, but not the crowd's bands.
 const LIVE_TABLES: &[&str] = &[
@@ -35,6 +34,7 @@ const LIVE_TABLES: &[&str] = &[
     "insurance_settings",
     "live_run",
     "live_plan",
+    "live_pause",
     "incident_marker",
 ];
 
@@ -65,40 +65,20 @@ fn treat_secs(id: u64) -> i64 {
     10 + (id * 5 % 6) as i64
 }
 
-/// The record reaches the claim this long after the incident is resolved. Rendering it runs in its own
-/// process, given this long before it is stopped, so a slow render never holds up the medic.
-const RECORD_SECS: i64 = 8;
-const RENDER_LIMIT: Duration = Duration::from_secs(120);
+/// The person files their claim this long after the medic resolves the incident; the hospital report then
+/// arrives on its own, drawn by the module's seeded generator.
+const FILE_SECS: i64 = 8;
 /// The camera's assessment and the organizer's cost note for broken equipment.
 const CAMERA_SECS: i64 = 6;
 const COST_SECS: i64 = 16;
 
 pub fn run(app: &App, approve_after: u64) -> Result<()> {
     let db = app.db_with(LIVE_TABLES)?;
-    // Taken now: after a rebuild the running process's own path reads as deleted, while this one is the new build.
-    let exe = std::env::current_exe()?;
     say!(app, "live       watching the run on {} at {}", app.database, app.uri);
     // Steps already taken this process, so a step that failed once is not retried every half second.
     let mut done: HashSet<(u64, &'static str)> = HashSet::new();
-    let mut records: Vec<(u64, Child, Instant)> = Vec::new();
     let mut phase = None;
     loop {
-        records.retain_mut(|(claim, child, started)| match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    say!(app, "live       claim {claim}: filing the record failed ({status})");
-                }
-                false
-            }
-            Ok(None) if started.elapsed() > RENDER_LIMIT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                say!(app, "live       claim {claim}: the record took too long to render; stopped it");
-                false
-            }
-            Ok(None) => true,
-            Err(_) => false,
-        });
         let Some(r) = db.db.live_run().id().find(&0) else {
             sleep_ms(1000);
             continue;
@@ -107,14 +87,15 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
             say!(app, "live       {:?}, {} people, step {}", r.phase, r.crowd, r.step);
             phase = Some(r.phase);
         }
-        if r.phase == LivePhase::Idle {
+        // Paused, the floor staff wait with everyone else.
+        if r.phase == LivePhase::Idle || db.db.live_pause().id().find(&0).is_some() {
             sleep_ms(1000);
             continue;
         }
         let markers: Vec<IncidentMarker> = db.db.incident_marker().iter().filter(|m| m.opened_at >= r.started_at).collect();
         for m in markers {
             let plan = db.db.live_plan().incident_id().find(&m.incident_id).unwrap_or_else(|| default_plan(&m));
-            if let Err(e) = floor(app, &exe, &m, &plan, &mut done, &mut records) {
+            if let Err(e) = floor(app, &m, &plan, &mut done) {
                 say!(app, "live       incident {}: {e:#}", m.incident_id);
             }
         }
@@ -138,14 +119,7 @@ pub fn run(app: &App, approve_after: u64) -> Result<()> {
 }
 
 /// The next step on one incident, when its time has come.
-fn floor(
-    app: &App,
-    exe: &std::path::Path,
-    m: &IncidentMarker,
-    plan: &LivePlan,
-    done: &mut HashSet<(u64, &'static str)>,
-    records: &mut Vec<(u64, Child, Instant)>,
-) -> Result<()> {
+fn floor(app: &App, m: &IncidentMarker, plan: &LivePlan, done: &mut HashSet<(u64, &'static str)>) -> Result<()> {
     let id = m.incident_id;
     let i = app.incident(id)?;
     if plan.camera || i.kind == IncidentKind::Property {
@@ -166,20 +140,28 @@ fn floor(
         }
         return Ok(());
     }
-    if plan.record.is_empty() {
+    // An injury the medic noted becomes a claim: the person files it in their own words, and staff file it
+    // for them here since the crowd has no phones. Which hospital report comes back is the module's seeded draw.
+    if plan.record.is_empty() || app.db()?.db.claim().incident_id().find(&id).is_some() {
         return Ok(());
     }
-    let Some(c) = app.db()?.db.claim().incident_id().find(&id) else { return Ok(()) };
-    let resolved_secs = i.resolved_at.map(since).unwrap_or(0);
-    if c.status == ClaimStatus::AwaitingRecord && resolved_secs >= RECORD_SECS && done.insert((id, "record")) {
-        // `attach-record --for-claimant` makes the record out to the claimant with an invoice of the claim's own.
-        let child = Command::new(exe)
-            .args(["attach-record", "--claim", &c.id.to_string(), "--template", &plan.record, "--for-claimant"])
-            .stdin(Stdio::null())
-            .spawn()?;
-        records.push((c.id, child, Instant::now()));
+    if i.resolved_at.map(since).unwrap_or(0) >= FILE_SECS && done.insert((id, "file")) {
+        let medic = app.actor("medic")?;
+        let statement = statement(&plan.record, &m.place);
+        call!(medic, file_claim_for_wearer_then(id, statement.clone(), "random".into()))?;
+        say!(app, "filed      incident {id}: {} filed a claim: {statement}", if m.person.is_empty() { "the wearer" } else { &m.person });
     }
     Ok(())
+}
+
+/// What the person writes when they file, matching what the medic saw.
+fn statement(record: &str, place: &str) -> String {
+    let place = if place.is_empty() { "the venue" } else { place };
+    match record {
+        "urgent-care-wrist" => format!("The crowd surged at {place} and I fell onto my left wrist. It kept swelling after first aid, so I went to urgent care."),
+        "urgent-care-ankle-home" => format!("My right ankle gave way at {place} and swelled up. The medic splinted it and sent me to urgent care."),
+        _ => format!("I slipped on a spilled drink at {place} and landed on my right wrist. The medic iced and wrapped it at first aid."),
+    }
 }
 
 /// Broken equipment: the camera confirms it, the organizer logs the repair cost and resolves it.

@@ -852,6 +852,13 @@ export const Link = __t.object("Link", {
 });
 export type Link = __Infer<typeof Link>;
 
+export const LivePause = __t.object("LivePause", {
+  id: __t.u8(),
+  pausedAt: __t.timestamp(),
+  pausedBy: __t.identity(),
+});
+export type LivePause = __Infer<typeof LivePause>;
+
 // The tagged union or sum type for the algebraic type `LivePhase`.
 export const LivePhase = __t.enum("LivePhase", {
   Idle: __t.unit(),
