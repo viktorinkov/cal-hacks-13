@@ -60,6 +60,7 @@ These were the Claude project's instructions from Viktor, adapted for one agent.
 ### Shipping and Git
 
 - Shipping means merging into vik-e2e and pushing. The VM deploys each new vik-e2e commit within about 15 to 75 seconds. Check status.txt.
+- Aim for one new deployment about every 15 minutes during active work: commit and push in small batches rather than holding changes.
 - Publish a Maincloud module change (`E2E_TARGET=maincloud scripts/e2e-publish`) before you push the commit that needs it. The services on the VM call the new reducers as soon as they deploy.
 - Only vik-e2e publishes the module. Keep band1t.vip serving during wipes and redeploys.
 - Each feature gets its own `vik-<feature>` branch, merged into vik-e2e with `git merge -m "merge <what it brings>" <branch>`. Push often.
