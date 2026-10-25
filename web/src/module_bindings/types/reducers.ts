@@ -122,7 +122,6 @@ import SubmitRuleProposalReducer from "../submit_rule_proposal_reducer";
 import SubmitVisionAssessmentReducer from "../submit_vision_assessment_reducer";
 import UnplaceBandReducer from "../unplace_band_reducer";
 import UpdateProfileReducer from "../update_profile_reducer";
-import UpsertAttendeePolicyReducer from "../upsert_attendee_policy_reducer";
 import UpsertCameraReducer from "../upsert_camera_reducer";
 import UpsertCoverageRuleReducer from "../upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "../upsert_insurance_policy_reducer";
@@ -245,7 +244,6 @@ export type SubmitRuleProposalParams = __Infer<typeof SubmitRuleProposalReducer>
 export type SubmitVisionAssessmentParams = __Infer<typeof SubmitVisionAssessmentReducer>;
 export type UnplaceBandParams = __Infer<typeof UnplaceBandReducer>;
 export type UpdateProfileParams = __Infer<typeof UpdateProfileReducer>;
-export type UpsertAttendeePolicyParams = __Infer<typeof UpsertAttendeePolicyReducer>;
 export type UpsertCameraParams = __Infer<typeof UpsertCameraReducer>;
 export type UpsertCoverageRuleParams = __Infer<typeof UpsertCoverageRuleReducer>;
 export type UpsertInsurancePolicyParams = __Infer<typeof UpsertInsurancePolicyReducer>;

@@ -5,14 +5,14 @@
 //! the evidence and the checks by name) and opens the evidence itself with
 //! tools, one source at a time: the band, the light circle, the security
 //! cameras, the staff notes, the hospital report, the person security named,
-//! the check details, and the clauses of the venue's and the attendee's own
-//! policies (the Evidence Engine's semantic search with Claude's own query, and
-//! one clause in full). It then decides pay, refuse or ask the organizer, and
-//! recommends a charge or none when someone was named. Every tool call is
-//! reported to the module as a step of the decision history while the
-//! investigation runs; code validates the decision here (one more try on a
-//! rejected answer) and again in the module, which holds it to the limits in
-//! `bandit_insurance::decision::guard`.
+//! the check details, and the clauses of the venue's policy and, for an injury,
+//! the attendee's health plan (the Evidence Engine's semantic search with
+//! Claude's own query, and one clause in full). It then decides pay, refuse or
+//! ask the organizer, and recommends a charge or none when someone was named.
+//! Every tool call is reported to the module as a step of the decision history
+//! while the investigation runs; code validates the decision here (one more try
+//! on a rejected answer) and again in the module, which holds it to the limits
+//! in `bandit_insurance::decision::guard`.
 
 use bandit_bindings::ModelCallIn;
 use bandit_insurance::decision::{AgentDecision, Choice, EvidenceSource, Investigation, Step, validate_review};
@@ -56,7 +56,7 @@ const READABLE: [(EvidenceSource, &[Source]); 8] = [
 /// The Evidence Engine's policy clauses. Tests use a fake.
 pub trait PolicyClauses: Sync {
     /// The clauses of one policy closest in meaning to `query`: `venue`, or
-    /// `attendee` with the attendee's document.
+    /// `attendee` with the attendee's health plan document.
     fn search(&self, query: &str, policy: &str, document_hash: Option<&str>) -> impl Future<Output = anyhow::Result<Vec<ClauseHit>>> + Send;
     /// One clause in full; `None` when there is no such clause.
     fn read(&self, clause_id: &str) -> impl Future<Output = anyhow::Result<Option<ClauseHit>>> + Send;
@@ -120,9 +120,9 @@ fn tools(request: MessageRequest) -> MessageRequest {
             "Read every fact of one evidence source: band (the subject band's reports and where it had been), light_circle \
              (the bands that lit up around the person), camera (security camera sightings), medic (the staff notes: the \
              medic's, or security's report and its cost note), hospital_report (the report's facts, its itemized bill as the \
-             fee schedule decided it, and its own words), zone, policy (the policy on this claim: the venue's, or for a theft \
-             or a breakage the attendee's own), or responsible (the person security named as having broken or taken it, and \
-             code's checks of their band).",
+             fee schedule decided it, and its own words), zone, policy (the venue's cover on this claim: its medical payments \
+             cover for an injury, its property policy for property, a theft or a breakage), or responsible (the person security \
+             named as having broken or taken it, and code's checks of their band).",
             object(json!({"source": {"type": "string", "enum": readable}, "reason": reason}), &["source", "reason"]),
         )
         .tool(
@@ -132,12 +132,12 @@ fn tools(request: MessageRequest) -> MessageRequest {
         )
         .tool(
             "search_policy",
-            "Evidence Engine semantic search: the clauses of the venue's policy (venue) or of the attendee's own policy \
-             (attendee) closest in meaning to your query, each with its id, section, page and text. Write the query in the \
-             policy's terms, never with a person's name.",
+            "Evidence Engine semantic search: the clauses of the venue's policy (venue) or, for an injury, of the attendee's \
+             health plan (attendee) closest in meaning to your query, each with its id, section, page and text. Write the query \
+             in the policy's terms, never with a person's name.",
             object(
                 json!({
-                    "query": {"type": "string", "description": "for example: injury that began before the event; property left unattended in a public place"},
+                    "query": {"type": "string", "description": "for example: injury that began before the event; theft of property of others in the insured's care"},
                     "policy": {"type": "string", "enum": ["venue", "attendee"]},
                     "reason": reason
                 }),
@@ -192,7 +192,7 @@ fn name_parts(p: &ReviewPayload) -> Vec<String> {
 
 /// The claim's own policy document for `policy`: the venue's confirmed policy
 /// PDF (none for the seeded policy, whose clauses are all the venue's), the
-/// attendee's document when on file.
+/// attendee's health plan document when on file.
 fn document_of<'a>(p: &'a ReviewPayload, policy: &str) -> Option<&'a str> {
     match policy {
         "attendee" => Some(p.attendee_policy_hash.trim()).filter(|h| !h.is_empty()),
@@ -200,7 +200,7 @@ fn document_of<'a>(p: &'a ReviewPayload, policy: &str) -> Option<&'a str> {
     }
 }
 
-/// True when a clause belongs to a policy on this claim: the venue's, or this attendee's own document.
+/// True when a clause belongs to a policy on this claim: the venue's, or this attendee's health plan.
 fn on_this_claim(c: &ClauseHit, p: &ReviewPayload) -> bool {
     match c.policy.as_str() {
         "venue" => document_of(p, "venue").is_none_or(|h| c.document_hash == h),
@@ -210,7 +210,7 @@ fn on_this_claim(c: &ClauseHit, p: &ReviewPayload) -> bool {
 }
 
 fn whose(policy: &str) -> &'static str {
-    if policy == "attendee" { "the attendee's own policy" } else { "the venue's policy" }
+    if policy == "attendee" { "the attendee's health plan" } else { "the venue's policy" }
 }
 
 fn line_of(c: &ClauseHit, score: bool, max: usize) -> String {
@@ -290,10 +290,14 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
                 return error("the query names a person; the policies hold no names, so describe what happened in the policy's terms".into());
             }
             let document = document_of(p, policy);
-            if policy == "attendee" && document.is_none() {
-                let text = "No policy of the attendee's own is on file for this claim, so there are no attendee clauses to search.".to_string();
-                let s = step("Evidence Engine", "search_policy", "No attendee policy on file to search".into(), reason, vec![]);
-                return Ran { text, is_error: false, step: s, read: Some(EvidenceSource::PolicyClauses), clauses: vec![] };
+            if policy == "attendee" && (document.is_none() || !prompts::is_injury(p)) {
+                let (text, summary) = if prompts::is_injury(p) {
+                    ("No health plan of the attendee's is on file for this claim, so there are no attendee clauses to search.", "No health plan on file to search")
+                } else {
+                    ("The attendee's health plan answers injuries only. This claim is the venue's own loss: search policy venue.", "The attendee's health plan does not answer the venue's loss")
+                };
+                let s = step("Evidence Engine", "search_policy", summary.into(), reason, vec![]);
+                return Ran { text: text.into(), is_error: false, step: s, read: Some(EvidenceSource::PolicyClauses), clauses: vec![] };
             }
             match evidence.search(query, policy, document).await {
                 Ok(found) => {
@@ -438,8 +442,9 @@ mod tests {
     use crate::model::fake::FakeModel;
     use crate::testdata;
 
-    /// The Evidence Engine with one venue exclusion, the theft payload's
-    /// attendee clauses, and a clause of somebody else's policy.
+    /// The Evidence Engine with one venue exclusion for an injury, the venue's
+    /// property clauses on theft, an attendee's health plan clause, and a clause
+    /// of somebody else's plan.
     struct FakeEvidence;
 
     fn clause(id: &str, policy: &str, document_hash: &str, section: &str, text: &str) -> ClauseHit {
@@ -448,12 +453,14 @@ mod tests {
 
     impl PolicyClauses for FakeEvidence {
         async fn search(&self, query: &str, policy: &str, document_hash: Option<&str>) -> anyhow::Result<Vec<ClauseHit>> {
+            let theft = ["stolen", "theft", "recover"].iter().any(|w| query.contains(w));
             Ok(match (policy, document_hash) {
-                ("venue", _) => vec![clause("9f2c-c5", "venue", "9f2c", "exclusions", &format!("matched {query}: injury that began before the event"))],
-                ("attendee", Some(h)) => vec![
-                    clause("4b1e-c4", "attendee", h, "exclusions", "We do not pay for property left unattended in a public place."),
-                    clause("4b1e-c9", "attendee", h, "subrogation", "Your right to recover passes to us."),
+                ("venue", _) if theft => vec![
+                    clause("9f2c-c12", "venue", "9f2c", "exclusions", "We will not pay for loss by unexplained disappearance or shortage found upon taking inventory."),
+                    clause("9f2c-c14", "venue", "9f2c", "subrogation", "If we pay for a loss, the insured's right to recover from anyone who caused it passes to us."),
                 ],
+                ("venue", _) => vec![clause("9f2c-c5", "venue", "9f2c", "exclusions", &format!("matched {query}: injury that began before the event"))],
+                ("attendee", Some(h)) => vec![clause("4b1e-c4", "attendee", h, "other_insurance", "This plan pays after any medical payments coverage.")],
                 _ => vec![],
             })
         }
@@ -461,7 +468,7 @@ mod tests {
         async fn read(&self, clause_id: &str) -> anyhow::Result<Option<ClauseHit>> {
             Ok(match clause_id {
                 "9f2c-c5" => Some(clause("9f2c-c5", "venue", "9f2c", "exclusions", "We will not pay for bodily injury that began before the event.")),
-                "77aa-c1" => Some(clause("77aa-c1", "attendee", "77aa", "insuring_agreement", "Somebody else's policy.")),
+                "77aa-c1" => Some(clause("77aa-c1", "attendee", "77aa", "insuring_agreement", "Somebody else's health plan.")),
                 _ => None,
             })
         }
@@ -562,39 +569,43 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_theft_reads_the_attendees_policy_and_recommends_a_charge() {
+    async fn a_theft_from_the_venue_reads_its_property_policy_and_recommends_a_charge() {
         let p = testdata::theft_review_payload();
         let camera = p.facts.iter().find(|f| f.key == "vision_confirmed").unwrap().seq;
         let at_spot = p.facts.iter().find(|f| f.key == "band_at_spot").unwrap().seq;
         let answer = json!({
             "decision": "pay", "causation": "supported",
-            "summary": "The camera saw the laptop lifted from table 4 and the attendee's own policy covers theft; $949.00 is paid after the deductible.",
+            "summary": "The camera saw the sponsor's display laptop lifted from its booth, and the venue's property policy covers theft of property in its care; the insurer pays $799.00 and the venue carries its $500.00 deductible.",
             "findings": [
-                {"source": "camera", "stance": "supports", "detail": "a person lifts a laptop from the table", "fact_ids": [camera]},
+                {"source": "camera", "stance": "supports", "detail": "a person lifts a laptop from the booth table", "fact_ids": [camera]},
                 {"source": "responsible", "stance": "supports", "detail": "band 41 was at the spot", "fact_ids": [at_spot]}
             ],
             "trusted_source": "", "concerns": [], "innocent_explanations": [], "missing_evidence": [],
             "refusal_checks": [], "question": "", "cited_fact_ids": [camera],
-            "cited_clause_ids": ["4b1e-c2"],
-            "charge": {"recommend": true, "reason": "The camera and band 41 place the person named at table 4 when it was taken; the subrogation clause lets the insurer recover $1,199.00.",
-                       "fact_ids": [camera, at_spot], "clause_ids": ["4b1e-c9"]}
+            "cited_clause_ids": ["9f2c-c11"],
+            "charge": {"recommend": true, "reason": "The camera and band 41 place the person named at the booth when it was taken; the subrogation clause lets the insurer recover, so charge $1,299.00.",
+                       "fact_ids": [camera, at_spot], "clause_ids": ["9f2c-c14"]}
         });
         let model = FakeModel::new(vec![
             Ok(reads(&["camera", "policy", "responsible"])),
-            Ok(json!({"_tools": [tool("s1", "search_policy", json!({"query": "laptop stolen from a table at an event", "policy": "attendee", "reason": "what the attendee's cover says"}))]})),
+            Ok(json!({"_tools": [tool("s1", "search_policy", json!({"query": "laptop stolen from a sponsor's booth", "policy": "venue", "reason": "what the property policy says on theft"}))]})),
             Ok(answer),
         ]);
         let (done, live) = run_with(&model, &p).await;
         assert!(done.checked.is_ok(), "{:?}", done.checked);
-        assert_eq!(done.investigation.clauses_seen, ["4b1e-c4", "4b1e-c9"]);
+        assert_eq!(done.investigation.clauses_seen, ["9f2c-c12", "9f2c-c14"]);
         let summaries: Vec<&str> = live.iter().map(|s| s.summary.as_str()).collect();
+        assert_eq!(summaries[1], "Read the policy: 6 fact(s)");
         assert_eq!(summaries[2], "Read the attendee named: 6 fact(s)");
-        assert_eq!(summaries[3], "Searched the attendee's own policy for \"laptop stolen from a table at an event\": 2 clause(s) (exclusions, subrogation)");
+        assert_eq!(summaries[3], "Searched the venue's policy for \"laptop stolen from a sponsor's booth\": 2 clause(s) (exclusions, subrogation)");
         assert!(summaries.contains(&"Recommends charging the person named"), "{summaries:?}");
+        let policy = model.body(1)["messages"].as_array().unwrap()[2]["content"][1]["content"].as_str().unwrap().to_string();
+        assert!(policy.contains("policy/cover_kind = property") && policy.contains("after a $500.00 deductible the venue carries"), "{policy}");
         let responsible = model.body(1)["messages"].as_array().unwrap()[2]["content"][2]["content"].as_str().unwrap().to_string();
         assert!(responsible.contains("responsible_party/band_at_spot = yes") && responsible.contains("check responsible_at_spot: pass"), "{responsible}");
         let brief = model.text_of(0);
-        assert!(brief.contains("<charge>") && brief.contains("4b1e-c9 (attendee policy, subrogation"), "{brief}");
+        assert!(brief.contains("<charge>") && brief.contains("9f2c-c14 (venue policy, subrogation"), "{brief}");
+        assert!(!brief.contains("attendee policy"), "a theft from the venue has no attendee's policy: {brief}");
     }
 
     #[tokio::test]
@@ -603,10 +614,10 @@ mod tests {
         let camera = p.facts.iter().find(|f| f.key == "vision_confirmed").unwrap().seq;
         let ask = |charge: Value| {
             json!({
-                "decision": "ask_organizer", "causation": "unclear", "summary": "The camera saw the laptop taken, but was it left unattended?",
+                "decision": "ask_organizer", "causation": "unclear", "summary": "The camera saw the laptop taken, but was the sponsor's booth staffed?",
                 "findings": [{"source": "camera", "stance": "supports", "detail": "seen", "fact_ids": [camera]}], "trusted_source": "",
                 "concerns": [], "innocent_explanations": [], "missing_evidence": [], "refusal_checks": [],
-                "question": "Was the laptop left unattended?", "cited_fact_ids": [], "cited_clause_ids": [], "charge": charge
+                "question": "Was the sponsor's booth staffed when the laptop went?", "cited_fact_ids": [], "cited_clause_ids": [], "charge": charge
             })
         };
         let model = FakeModel::new(vec![
@@ -629,9 +640,9 @@ mod tests {
         assert!(ran.is_error && ran.text.contains("names a person"), "{}", ran.text);
 
         let theft = testdata::theft_review_payload();
-        let t = ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "laptop taken by patel", "policy": "attendee", "reason": "r"}) };
+        let t = ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "laptop taken by patel", "policy": "venue", "reason": "r"}) };
         assert!(run_tool(&t, &theft, &FakeEvidence, -420).await.is_error, "the person named is a name too");
-        let t = ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "the insurer's recovery from the person who caused a loss", "policy": "attendee", "reason": "r"}) };
+        let t = ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "the insurer's recovery from the person who caused a loss", "policy": "venue", "reason": "r"}) };
         let ran = run_tool(&t, &theft, &FakeEvidence, -420).await;
         assert!(!ran.is_error && ran.clauses.len() == 2, "{}", ran.text);
     }
@@ -642,16 +653,22 @@ mod tests {
         let read = |id: &str| ToolUse { id: "r".into(), name: "read_clause".into(), input: json!({"clause_id": id, "reason": "r"}) };
         let other = run_tool(&read("77aa-c1"), &p, &FakeEvidence, -420).await;
         assert!(other.is_error && other.text.contains("not in this claim's policies"), "{}", other.text);
-        let stored = run_tool(&read("4b1e-c2"), &p, &FakeEvidence, -420).await;
-        assert!(!stored.is_error && stored.text.contains("We cover personal property owned by you"), "a clause the brief lists, read from the claim: {}", stored.text);
+        let stored = run_tool(&read("9f2c-c11"), &p, &FakeEvidence, -420).await;
+        assert!(!stored.is_error && stored.text.contains("loss of covered property by theft"), "a clause the brief lists, read from the claim: {}", stored.text);
         let missing = run_tool(&read("0000-c1"), &p, &FakeEvidence, -420).await;
         assert!(missing.is_error && missing.text.contains("there is no clause 0000-c1"));
 
+        let search = |policy: &str| ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "urgent care", "policy": policy, "reason": "r"}) };
+        let venues_loss = run_tool(&search("attendee"), &p, &FakeEvidence, -420).await;
+        assert!(!venues_loss.is_error && venues_loss.text.contains("answers injuries only") && venues_loss.clauses.is_empty(), "{}", venues_loss.text);
+
         let mut injury = testdata::review_payload();
         injury.attendee_policy_hash.clear();
-        let t = ToolUse { id: "s".into(), name: "search_policy".into(), input: json!({"query": "urgent care", "policy": "attendee", "reason": "r"}) };
-        let none = run_tool(&t, &injury, &FakeEvidence, -420).await;
-        assert!(!none.is_error && none.text.contains("No policy of the attendee's own is on file"), "{}", none.text);
+        let none = run_tool(&search("attendee"), &injury, &FakeEvidence, -420).await;
+        assert!(!none.is_error && none.text.contains("No health plan of the attendee's is on file"), "{}", none.text);
+        injury.attendee_policy_hash = "4b1e".into();
+        let plan = run_tool(&search("attendee"), &injury, &FakeEvidence, -420).await;
+        assert_eq!((plan.clauses.as_slice(), plan.step.summary.as_str()), (&["4b1e-c4".to_string()][..], "Searched the attendee's health plan for \"urgent care\": 1 clause(s) (other insurance)"));
     }
 
     #[tokio::test]

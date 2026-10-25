@@ -9,7 +9,8 @@ import { searchable } from './table-search';
 import type { DbConnection } from './module_bindings';
 import type { BoardMerchOrder, Claim, IncidentMarker, LedgerEntry, MedicalRecord, MerchTemplate, VenueSpot } from './module_bindings/types';
 
-const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue', personal_property: 'Belongings' };
+/** Injuries are Medical; the venue's equipment broken or stolen is Venue, both on the venue's property policy. */
+const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue' };
 
 /** One claim's or one cost center's amounts, in cents. */
 export type Line = {
@@ -26,8 +27,8 @@ export type Line = {
   shortPaid: bigint;
   unrecovered: bigint;
   /** What the person responsible was charged (J5 less J5r), and the venue's part of it: the `recoveries` share of a
-   * charge on its own equipment. J5 credits the insurer's share to `insurer_payable`, and on a belonging the rest is
-   * the owner's deductible, which J7 returns to them. */
+   * charge on its own equipment, broken or stolen. J5 credits the insurer's share to `insurer_payable` and the rest,
+   * the venue's deductible, to `recoveries`. */
   charged: bigint;
   recovered: bigint;
 };
@@ -262,7 +263,7 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
       scroll(h('table', {},
         h('tr', {}, ['Venue', 'Deductibles', 'Short payments', 'Not recovered yet', 'Insurer', 'Attendees', 'Charged', 'Unpaid'].map(x => h('th', {}, x))),
         h('tr', {}, td(venueClaims), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
-          td(total.insurerPaid + total.insurerOwes), td((centers.get('Medical')?.notCovered ?? 0n) + (centers.get('Belongings')?.notCovered ?? 0n)),
+          td(total.insurerPaid + total.insurerOwes), td(centers.get('Medical')?.notCovered ?? 0n),
           td(total.charged), td(total.accrued))))),
     merch,
     booths,

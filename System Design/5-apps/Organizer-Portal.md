@@ -100,7 +100,7 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Attendee list | "<n> attendees", then a line that counts them: "<h> wearing hardware bands", with ", <m> without a band" when someone has none; every attendee by display name, with their band's code, which opens its tap link, its status ("online", "offline" or "not seen yet"), company, `findable` and socials | `board_attendees`, `band` | per attendee with a band, while the event has not ended: "Take the band back" (`release_band`), after the confirm "Take band <band code> back from <name>? They keep their profile and memories; the next person can claim the band." |
 | Live zones | the venue map and the zone table | the Live tab's tables | the low-visibility button |
 | Alerts | "Alerts", shown while a band on the map has a fall or SOS flag or an incident is open: "Fall on band <band code> (<name>) in <zone>: the bands around it show the light circle." ("SOS on band" for an SOS), and every open incident as "Incident <id>: <Kind> in <zone>, band <band code> (<name>), <Status>, opened <time>" with "open in Claims" | `band`, `open_incidents`, `board_attendees` | none |
-| Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note; a belongings claim on a policy the attendee named shows "Policy found online from its name", the limit and deductible the attendee typed, and "Open the policy wording" | the Claims queue's tables; Insurance.md: `attendee_policy`; Bright-Data.md: `plan_lookup` | `approve_claim`, `refuse_claim` |
+| Insurance.md: Waiting for your decision | for `ops`, the claims routed to the organizer, oldest first, each with its claimant, incident kind, zone, payout and status note | the Claims queue's tables | `approve_claim`, `refuse_claim` |
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
 Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A second line counts the roles: "<n> hackers, <n> booth staff, <n> organizers, <n> photographers, <n> speakers, <n> attendees who tapped a band." Every row shows the person's role in a Role column: hacker, booth staff, organizer, photographer or speaker for the crowd, attendee for someone who tapped a band, and organizer or photographer for staff who tapped one. A crowd attendee's row is also marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
@@ -314,16 +314,16 @@ The Costs tab shows the event's costs so far, from the incidents the event has c
 
 It sums the double-entry `ledger_entry` journals that the claims and charges post, read from `board_ledger`, with `claims_board` and `board_records` for each claim's cover and bill. So every claim number agrees with the Settlements tab, and the tab keeps no totals of its own. Merch comes from the paid orders in `board_merch_orders`, the merch subledger, with each product's kind and booths from `merch_template` ([Merch](../6-features/Merch.md#merch-on-the-costs-tab)).
 
-Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), property cover goes to Venue (the venue's own equipment), and personal property cover goes to Belongings (an attendee's stolen or broken belonging, paid from their own policy). A claim counts once, in one cost center.
+Each claim's cover picks its cost center. Medical payments cover goes to Medical (falls and SOS calls), and property cover goes to Venue (the venue's broken equipment and what is stolen from the venue). A claim counts once, in one cost center.
 
-The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible: the insurer's share goes to `insurer_payable` and the deductible to `recoveries`. J6 charge payment is its cash application, and J7 returns an owner's deductible to their wallet.
+The journals map onto the controller's work as in Hyphenate's track. J1 reserve is the accrual, J3 claimant payment is the payment run, and J2 receivable with J4 reconciliation is cash application. J5 charge is a receivable from the person responsible: the insurer's share goes to `insurer_payable` and the venue's deductible to `recoveries`. J6 charge payment is its cash application.
 
 "Net cost" is one row, the bottom line:
 
 | Column | From |
 |---|---|
 | Claims | what the claims cost the venue, the Venue column of "Who pays" |
-| Recovered | the venue's part of the charges: the `recoveries` balance on Venue claims, the deductible it carried; the insurer's share sits in `insurer_payable`, and a Belongings deductible goes back to the owner |
+| Recovered | the venue's part of the charges: the `recoveries` balance, the venue's deductible share; the insurer's share sits in `insurer_payable` |
 | Merch margin | the Margin total of "Merch" |
 | Net cost | Claims less Recovered less Merch margin |
 
@@ -340,7 +340,7 @@ The journals map onto the controller's work as in Hyphenate's track. J1 reserve 
 | Venue | the `claims_expense` balance, which is accrued plus paid, less what the insurer owes and paid |
 | Not covered | what a decided claim's bill asked beyond its payout, and a refused claim's whole bill |
 
-"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical and Belongings did not cover; the people responsible, for what they were charged (the `attendee_receivable` debits of J5 less J5r); and what is unpaid.
+"Who pays" is one row by party: the venue, split into deductibles, short payments (the J4 difference) and reserves not recovered yet; the insurer; attendees, for what Medical did not cover; the people responsible, for what they were charged (the `attendee_receivable` debits of J5 less J5r); and what is unpaid.
 
 "Merch" has one row per product that sold and a total row: its orders, sales, print cost, what it owes the booths and the event's margin.
 

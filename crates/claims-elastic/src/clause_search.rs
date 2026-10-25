@@ -1,8 +1,9 @@
-//! The policy clause search: the clauses of the venue's policy and of the
-//! attendee's own policy that bear on a claim, from `<prefix>-policy-clauses`.
+//! The policy clause search: the clauses of the venue's policy and, for an
+//! injury, of the attendee's health plan that bear on a claim, from
+//! `<prefix>-policy-clauses`.
 //!
 //! One `semantic` query on `text` (embedded by Elastic with
-//! `.jina-embeddings-v5-text-small`), filtered to the claim's two policies and,
+//! `.jina-embeddings-v5-text-small`), filtered to the claim's policies and,
 //! when given, to the sections that can decide its kind of incident. The
 //! search fails soft: a missing index or no hits is an empty list.
 
@@ -21,18 +22,16 @@ pub const CLAUSE_SECTIONS: [&str; 8] =
 ///
 /// | Kind | The policy and cover | Sections |
 /// |---|---|---|
-/// | `fall`, `sos` | the venue's medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (staff, pre-existing, off premises), conditions (service window), other insurance |
-/// | `property` | the venue's property policy | insuring agreement, limits and deductible, exclusions, subrogation |
-/// | `theft` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions (such as property left unattended), theft, subrogation |
-/// | `breakage` | the attendee's own personal property cover; the venue's exclusion of guests' property | insuring agreement, limits and deductible, exclusions, subrogation |
+/// | `fall`, `sos` | the venue's medical payments cover; the attendee's health plan | insuring agreement, limits, schedule of benefits, exclusions (staff, pre-existing, off premises), conditions (service window), other insurance |
+/// | `property`, `breakage` | the venue's property policy | insuring agreement, limits and deductible, exclusions, subrogation |
+/// | `theft` | the venue's property policy, theft as a cause of loss | insuring agreement, the theft clause, conditions, exclusions, limits and deductible, subrogation |
 ///
 /// An unknown kind searches every section.
 pub fn sections_for_kind(kind: &str) -> &'static [&'static str] {
     match kind {
         "sos" | "fall" => &["insuring_agreement", "limits", "schedule_of_benefits", "exclusions", "conditions", "other_insurance"],
-        "property" => &["insuring_agreement", "limits", "exclusions", "subrogation"],
-        "theft" => &["insuring_agreement", "limits", "exclusions", "theft", "subrogation"],
-        "breakage" => &["insuring_agreement", "limits", "exclusions", "subrogation"],
+        "property" | "breakage" => &["insuring_agreement", "limits", "exclusions", "subrogation"],
+        "theft" => &["insuring_agreement", "theft", "conditions", "exclusions", "limits", "subrogation"],
         _ => &CLAUSE_SECTIONS,
     }
 }
@@ -106,10 +105,10 @@ impl ClaimsIndex {
         format!("{prefix}-policy-clauses")
     }
 
-    /// The clauses of a claim's two policies closest in meaning to `query`, best
+    /// The clauses of a claim's policies closest in meaning to `query`, best
     /// first, at most `k`: the venue's (`policy` `venue`, and its document when
     /// `venue_hash` is given) and, only when `attendee_hash` is given, the
-    /// attendee's own (`policy` `attendee` with that `document_hash`). With
+    /// attendee's health plan (`policy` `attendee` with that `document_hash`). With
     /// `sections` the clauses are limited to those sections
     /// ([`sections_for_kind`]). A missing index, a blank query or no hits is an
     /// empty list.
@@ -130,7 +129,7 @@ impl ClaimsIndex {
 
     /// The clauses of one policy closest in meaning to `query`, best first, at
     /// most `k`: `venue` (its document when `document_hash` is given), or
-    /// `attendee`, which needs the attendee's document. Fails soft like
+    /// `attendee`, which needs the attendee's health plan document. Fails soft like
     /// [`ClaimsIndex::search_clauses`].
     pub async fn search_policy_clauses(&self, query: &str, policy: &str, document_hash: Option<&str>, sections: &[&str], k: usize) -> Result<Vec<ClauseHit>> {
         let hash = document_hash.filter(|h| !h.trim().is_empty());
@@ -212,24 +211,30 @@ mod tests {
             assert!(!sections.is_empty() && sections.len() < CLAUSE_SECTIONS.len(), "{kind}");
             assert!(sections.iter().all(|s| CLAUSE_SECTIONS.contains(s)), "{kind}");
         }
-        assert!(sections_for_kind("theft").contains(&"theft") && sections_for_kind("theft").contains(&"subrogation"));
+        let theft = sections_for_kind("theft");
+        for s in ["theft", "conditions", "exclusions", "limits", "subrogation"] {
+            assert!(theft.contains(&s), "theft searches {s}");
+        }
+        assert!(!theft.contains(&"other_insurance") && !theft.contains(&"schedule_of_benefits"));
         assert!(sections_for_kind("fall").contains(&"other_insurance"));
-        assert!(sections_for_kind("breakage").contains(&"exclusions") && sections_for_kind("breakage").contains(&"subrogation"));
+        assert_eq!(sections_for_kind("breakage"), sections_for_kind("property"), "breakage is answered like property");
         assert_eq!(sections_for_kind("slip"), CLAUSE_SECTIONS);
     }
 
     #[test]
     fn the_search_is_filtered_to_the_claims_policies() {
         let policies = vec![policy_filter("venue", None), policy_filter("attendee", Some("ab12"))];
-        let body = search_body("theft of merchandise from a booth", policies, &["theft", "subrogation"], 5);
+        let body = search_body("injury that began before the event", policies, &["exclusions", "other_insurance"], 5);
         assert_eq!(body["size"], 20);
-        assert_eq!(body["query"]["bool"]["must"]["semantic"], json!({ "field": "text", "query": "theft of merchandise from a booth" }));
+        assert_eq!(body["query"]["bool"]["must"]["semantic"], json!({ "field": "text", "query": "injury that began before the event" }));
         let filter = &body["query"]["bool"]["filter"];
         let should = &filter[0]["bool"]["should"];
         assert_eq!(filter[0]["bool"]["minimum_should_match"], 1);
         assert_eq!(should[0], json!({ "bool": { "filter": [{ "term": { "policy": "venue" } }] } }));
         assert_eq!(should[1], json!({ "bool": { "filter": [{ "term": { "policy": "attendee" } }, { "term": { "document_hash": "ab12" } }] } }));
-        assert_eq!(filter[1], json!({ "terms": { "section": ["theft", "subrogation"] } }));
+        assert_eq!(filter[1], json!({ "terms": { "section": ["exclusions", "other_insurance"] } }));
+        let theft = search_body("theft of merchandise from a booth", vec![policy_filter("venue", None)], sections_for_kind("theft"), 5);
+        assert_eq!(theft["query"]["bool"]["filter"][0]["bool"]["should"].as_array().unwrap().len(), 1, "a theft searches the venue's policy only");
         let any = search_body("q", vec![policy_filter("venue", Some(" "))], &[], 3);
         assert_eq!(any["query"]["bool"]["filter"].as_array().unwrap().len(), 1, "no section filter");
         assert_eq!(any["query"]["bool"]["filter"][0]["bool"]["should"][0]["bool"]["filter"].as_array().unwrap().len(), 1, "a blank hash filters nothing");

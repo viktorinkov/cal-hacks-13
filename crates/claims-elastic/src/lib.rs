@@ -3,8 +3,9 @@
 //! SpacetimeDB holds every claim and decides every action. This crate keeps a
 //! one-way, de-identified copy of each claim pack in the `bandit-claims` index,
 //! which the `bandit-claims-validate` ingest pipeline checks on the way in, and
-//! searches the clauses of the venue's and the attendee's policies that bear on
-//! a claim ([`ClaimsIndex::search_clauses`], in `clause_search.rs`). Only codes,
+//! searches the clauses of the venue's policy (and, for an injury, of the
+//! attendee's health plan) that bear on a claim ([`ClaimsIndex::search_clauses`],
+//! in `clause_search.rs`). Only codes,
 //! amounts, zones, times and a narrative built by [`narrative_for`] go into the
 //! copy; never names or free text a person typed.
 
@@ -40,21 +41,18 @@ pub const INFERENCE_ID: &str = ".jina-embeddings-v5-text-small";
 /// Outcomes a decided claim can carry. Open claims have an empty outcome.
 pub const OUTCOMES: [&str; 3] = ["auto_settled", "approved", "refused"];
 /// Every incident kind, and the cover that answers it: an injury from the
-/// venue's medical payments cover, the venue's own broken equipment from its
-/// property cover, and an attendee's own belonging, stolen or broken by
-/// someone else, from the attendee's own policy (the venue's policy excludes
-/// guests' property).
+/// venue's medical payments cover; the venue's own property, broken
+/// (`property`) or stolen (`theft`), from its property policy. `breakage`, kept
+/// from an earlier design, is answered like `property`.
 pub const KIND_COVERS: [(&str, &str); 5] = [
     ("sos", "medical_payments"),
     ("fall", "medical_payments"),
     ("property", "property"),
-    ("theft", "personal_property"),
-    ("breakage", "personal_property"),
+    ("theft", "property"),
+    ("breakage", "property"),
 ];
-/// The kinds that are a loss of property, whose copy must carry the loss staff logged.
+/// The kinds that are a loss of the venue's property, whose copy must carry the loss staff logged.
 pub const LOSS_KINDS: [&str; 3] = ["property", "theft", "breakage"];
-/// The kinds that are an attendee's own belonging, whose copy must also carry the kind of item.
-pub const BELONGING_KINDS: [&str; 2] = ["theft", "breakage"];
 /// The kinds of item a claim copy can name, each with the words that map to it.
 /// The copy carries only these generic words, never what staff typed.
 pub const ITEM_KINDS: [(&str, &[&str]); 16] = [
@@ -71,7 +69,8 @@ pub const ITEM_KINDS: [(&str, &[&str]); 16] = [
     ("jacket", &["jacket", "coat", "hoodie", "sweater"]),
     ("charger", &["charger", "cable", "powerbank"]),
     ("speaker", &["speaker", "speakers", "subwoofer", "amp", "amplifier"]),
-    ("screen", &["screen", "monitor", "display", "tv", "projector"]),
+    // Not "display": a sponsor's display laptop is a laptop.
+    ("screen", &["screen", "monitor", "tv", "projector"]),
     ("light", &["light", "lights", "lamp", "spotlight"]),
     ("merch", &["merch", "merchandise", "swag"]),
 ];
@@ -105,7 +104,7 @@ pub struct ClaimDoc {
     pub venue: String,
     /// One of [`KIND_COVERS`]: `sos`, `fall`, `property`, `theft` or `breakage`.
     pub incident_kind: String,
-    /// `medical_payments`, `property` or `personal_property`.
+    /// `medical_payments` or `property`.
     pub cover_kind: String,
     pub zone_id: i64,
     pub zone_name: String,
@@ -130,7 +129,7 @@ pub struct ClaimDoc {
     /// The kind of item broken or stolen, one of [`ITEM_KINDS`] or `other`;
     /// empty for an injury.
     pub item_kind: String,
-    /// Security named the person who broke or took it, at the spot.
+    /// Staff named the attendee who broke or took it, at the spot.
     pub responsible_named: bool,
     /// Empty while open, then one of [`OUTCOMES`].
     pub outcome: String,
@@ -174,7 +173,7 @@ pub struct NarrativeParts<'a> {
     pub item: Option<&'a str>,
     /// The loss staff logged for a property, theft or breakage claim, in cents.
     pub loss_cents: Option<u64>,
-    /// Security named the person who broke or took it, at the spot (every kind but an injury).
+    /// Staff named the attendee who broke or took it, at the spot (every kind but an injury).
     pub responsible_named: bool,
     /// Cost text, for example "first aid only" or "repair estimate attached".
     pub cost: Option<&'a str>,
@@ -188,8 +187,8 @@ pub struct NarrativeParts<'a> {
 /// - "Fall in zone Main stage left at 22:10 during a headline set; 3
 ///   light-circle witnesses in the same zone; medic note within 12 minutes;
 ///   right wrist sprain S63.501A; first aid only."
-/// - "Theft in zone Hacking floor at 21:10: an attendee's own laptop stolen;
-///   staff note within 4 minutes; value $1,199.00 logged by staff; a person
+/// - "Theft in zone Sponsor booths at 21:10: venue property stolen (laptop);
+///   staff note within 4 minutes; loss $1,299.00 logged by staff; a person
 ///   named at the spot."
 ///
 /// The narrative is also the query text of the policy clause search, so each
@@ -213,17 +212,18 @@ pub fn narrative_for(p: &NarrativeParts) -> String {
     let named = if p.responsible_named { "a person named at the spot" } else { "no one named" }.to_string();
     let mut parts = Vec::new();
     match p.incident_kind {
-        "property" => {
-            parts.push(format!("Property damage {at}: the venue's {} broken", item("equipment")));
+        kind @ ("property" | "breakage") => {
+            let head = if kind == "property" { "Property damage" } else { "Breakage" };
+            parts.push(format!("{head} {at}: the venue's {} broken", item("equipment")));
             parts.extend([note("staff"), loss("repair cost"), named]);
         }
         "theft" => {
-            parts.push(format!("Theft {at}: an attendee's own {} stolen", item("belonging")));
-            parts.extend([note("staff"), loss("value"), named]);
-        }
-        "breakage" => {
-            parts.push(format!("Breakage {at}: an attendee's own {} broken by another person", item("belonging")));
-            parts.extend([note("staff"), loss("value"), named]);
+            let what = match item("") {
+                "" => String::new(),
+                kind => format!(" ({kind})"),
+            };
+            parts.push(format!("Theft {at}: venue property stolen{what}"));
+            parts.extend([note("staff"), loss("loss"), named]);
         }
         kind => {
             let head = match kind {
@@ -442,7 +442,6 @@ fn pipeline_body() -> Value {
                 "required": ["claim_id", "pack_version", "incident_kind", "cover_kind", "incident_at", "narrative"],
                 "covers": covers,
                 "losses": LOSS_KINDS,
-                "needs_item": BELONGING_KINDS,
                 "cents": ["billed_cents", "covered_cents", "payout_cents", "cost_cents"],
                 "skew_ms": 60000
             }
@@ -554,18 +553,18 @@ mod tests {
     fn theft_and_breakage_narratives() {
         let theft = narrative_for(&NarrativeParts {
             incident_kind: "theft",
-            zone_name: "Hacking floor",
+            zone_name: "Sponsor booths",
             local_time: "21:10",
             minutes_to_staff_note: Some(4),
             item: Some("laptop"),
-            loss_cents: Some(119_900),
+            loss_cents: Some(129_900),
             responsible_named: true,
             ..Default::default()
         });
         assert_eq!(
             theft,
-            "Theft in zone Hacking floor at 21:10: an attendee's own laptop stolen; staff note within 4 minutes; \
-             value $1,199.00 logged by staff; a person named at the spot."
+            "Theft in zone Sponsor booths at 21:10: venue property stolen (laptop); staff note within 4 minutes; \
+             loss $1,299.00 logged by staff; a person named at the spot."
         );
         let breakage = narrative_for(&NarrativeParts {
             incident_kind: "breakage",
@@ -578,18 +577,20 @@ mod tests {
         });
         assert_eq!(
             breakage,
-            "Breakage in zone Food court at 02:30: an attendee's own belonging broken by another person; \
-             no staff note; value $850.00 logged by staff; no one named; no second source."
+            "Breakage in zone Food court at 02:30: the venue's equipment broken; \
+             no staff note; repair cost $850.00 logged by staff; no one named; no second source."
         );
-        let unpriced = narrative_for(&NarrativeParts { incident_kind: "theft", zone_name: "Gate", local_time: "20:00", ..Default::default() });
-        assert!(unpriced.contains("own belonging stolen; no staff note; no cost logged; "), "{unpriced}");
+        let unpriced = narrative_for(&NarrativeParts { incident_kind: "theft", zone_name: "Gate", local_time: "20:00", item: Some("other"), ..Default::default() });
+        assert_eq!(unpriced, "Theft in zone Gate at 20:00: venue property stolen; no staff note; no cost logged; no one named.");
     }
 
     #[test]
     fn item_kinds_are_generic_words() {
-        assert_eq!(item_kind_of("Dana's MacBook Pro taken from table 4"), "laptop");
-        assert_eq!(item_kind_of("cracked iPhone screen, dropped by another guest"), "phone");
+        assert_eq!(item_kind_of("Theft from the venue at booth 3 a sponsor's display laptop is gone from its table"), "laptop");
+        assert_eq!(item_kind_of("the sponsor's iPhone taken from the booth"), "phone");
         assert_eq!(item_kind_of("speaker knocked off its stand"), "speaker");
+        assert_eq!(item_kind_of("a venue monitor knocked off a table"), "screen");
+        assert_eq!(item_kind_of("four hoodies gone from the merch table"), "merch");
         assert_eq!(item_kind_of("a blue thing with stickers"), "other");
         assert_eq!(item_kind_of("  "), "");
         for (kind, words) in ITEM_KINDS {
@@ -612,8 +613,8 @@ mod tests {
             assert_eq!(params["covers"][kind], cover);
         }
         assert_eq!(params["losses"], json!(["property", "theft", "breakage"]));
-        assert_eq!(params["needs_item"], json!(["theft", "breakage"]));
-        assert_eq!((params["covers"]["theft"].clone(), params["covers"]["breakage"].clone()), (json!("personal_property"), json!("personal_property")));
+        assert!(params.get("needs_item").is_none(), "no kind is an attendee's own belonging");
+        assert_eq!((params["covers"]["theft"].clone(), params["covers"]["breakage"].clone()), (json!("property"), json!("property")));
         assert!(params["cents"].as_array().unwrap().contains(&json!("cost_cents")));
     }
 
@@ -625,9 +626,10 @@ mod tests {
             pack_version: 2,
             source: "live".into(),
             incident_kind: "theft".into(),
+            cover_kind: "property".into(),
             diagnosis_codes: vec!["S63.501A".into()],
             billed_cents: 18000,
-            cost_cents: 119_900,
+            cost_cents: 129_900,
             item_kind: "laptop".into(),
             responsible_named: true,
             ..Default::default()
@@ -635,7 +637,7 @@ mod tests {
         let v = serde_json::to_value(&doc).unwrap();
         assert_eq!(v["doc_id"], "claim-12-v2");
         assert_eq!(v["diagnosis_codes"], json!(["S63.501A"]));
-        assert_eq!((v["cost_cents"].clone(), v["responsible_named"].clone()), (json!(119_900), json!(true)));
+        assert_eq!((v["cost_cents"].clone(), v["responsible_named"].clone()), (json!(129_900), json!(true)));
         assert_eq!(v["outcome"], "");
         let mapped = mappings();
         for key in v.as_object().unwrap().keys() {

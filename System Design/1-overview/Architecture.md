@@ -51,7 +51,7 @@ Every connection in the system. Names match the component docs.
 1. **Safety never waits.** Density colours, SOS, fall detection and the light circle run on the bands themselves. The module adds the incident record, the staff screens and the commands organizers send, but the bands stay useful if the venue laptop, the network or the cloud is gone.
 2. **One source of truth.** The SpacetimeDB module `band1t` holds all live state. Every change is a reducer call, so it happens completely or not at all, and every screen sees the same committed state through subscriptions.
 3. **Copies flow one way.** Any other store holds only files or a copy of committed rows. Results come back as SpacetimeDB ids, and acting on them is again a reducer call.
-4. **Slow and external work goes through a queue.** AI and bank work are `job` rows claimed by `bandit-workers`. Code decides money, coverage, safety and access; the Anthropic Claude API reads documents, makes judgments and writes words.
+4. **Slow and outside work goes through a queue.** A feature's slow or outside work, such as reading a PDF, deciding a claim or paying, is a `job` row that `bandit-workers` leases. [Queues](#queues) names every queue and every job kind. Code decides money, coverage, safety and access; the Anthropic Claude API reads documents, makes judgments and writes words.
 5. **Every feature can be deleted.** Core components are enough for the safety features. Each optional feature owns its tables, reducers and jobs, so removing its doc and code removes it cleanly.
 6. **The module and services are Rust.** The module, every service and every shared library are Rust. Only the two browser apps are TypeScript.
 
@@ -300,6 +300,110 @@ sequenceDiagram
   G-)B: command (sent 3 times)
   BR->>M: command_sent after the gateway's ack
 ```
+
+### Queues
+
+Band1t has four queues, and all four live in the `band1t` module. Every screen and service sees a queue change at the same moment, through its subscription. Taking a row off a queue is a reducer call, so it happens completely or not at all.
+
+| Queue | Rows | Put on by | Taken off by | How a row leaves |
+|---|---|---|---|---|
+| The job queue | `job` rows, read through the view `worker_jobs` | feature reducers, through `jobs::enqueue`; never a client | `bandit-workers` | `claim_job` leases the job for 60 s, and the feature's result reducer finishes it |
+| The command queue | `command` rows with `pending = true` | the Commands and Settings reducers, `claim_band`, `social_tick` when it completes a band claim, and `resolve_incident` | `band1t-bridge` | the bridge writes the command to the gateway, then calls `command_sent` |
+| The organizer's queue | `claim` rows in `Routed`, `rule_proposal` rows in `proposed`, `charge` rows in `proposed` | the guard's `route`, `submit_rule_proposal`, `name_responsible_band` | the organizer, on the organizer portal | `approve_claim` or `refuse_claim`; `approve_rule_proposal` or `reject_rule_proposal`; `approve_charge` or `waive_charge` |
+| The timers | one schedule table per timer | the reducer that starts each timer | the module itself | the timer calls its reducer at a fixed interval |
+
+The question this diagram answers: which queue sits between which parts.
+
+```mermaid
+flowchart LR
+  subgraph Module["band1t module"]
+    Features["feature reducers"]
+    Job[("job queue: job, worker_jobs")]
+    Cmd[("command queue: command, pending")]
+    Org[("organizer's queue: claim Routed, rule_proposal proposed, charge proposed")]
+    Timers[("timers: schedule tables")]
+  end
+  Features -->|"jobs::enqueue"| Job
+  Job -->|claim_job| Workers["bandit-workers"]
+  Workers -->|asks| Claude["Anthropic Claude API"]
+  Workers -->|reads, checks| Elastic["Elastic (Evidence Engine)"]
+  Workers -->|scrapes| BrightData["Bright Data"]
+  Workers -->|pays| Nessie["Capital One Nessie"]
+  Workers -->|result reducer| Features
+  Portal["organizer portal"] -->|send_command, set_low_vis| Cmd
+  Cmd -->|subscription| Bridge["band1t-bridge"]
+  Bridge -->|cmd line| Gateway["gateway"]
+  Bridge -->|command_sent| Cmd
+  Features -->|route| Org
+  Org -->|subscription| Portal
+  Portal -->|approve_claim| Features
+  Timers -->|every interval| Features
+```
+
+#### The job queue
+
+A feature's slow or outside work is a `job` row: reading a PDF, deciding a claim, finding a venue, paying. Three services call outside services directly instead: `bandit-ingest` (Bright Data, Elastic), `bandit-indexer` (Elastic) and `bandit-api` (Elastic, for the recap). One process, `bandit-workers`, takes jobs off the queue. It subscribes to `worker_jobs`, which shows every `Queued` and `Leased` job to the `worker` role.
+
+- **Lease.** `claim_job` gives a job to one worker for 60 s. The worker calls `extend_job_lease` every 30 s while the job runs.
+- **Result.** The worker hands the result to the feature's result reducer. That reducer checks that the caller still holds the lease, applies the result and marks the job `Done` in one transaction.
+- **Retry.** A failed attempt (`fail_job`) or an expired lease goes back to `Queued` after 5 s times the attempts so far. `job_reaper` finds expired leases every 10 s.
+- **Dead.** After 3 attempts the job is `Dead`, and the feature's fallback runs.
+- **Load.** One worker runs at most 4 jobs at once.
+
+These are the 18 job kinds in the code (`KIND` constants in `spacetimedb/server/src` and `crates/bandit-insurance`, handlers in `crates/bandit-workers`):
+
+| Job kind | Queued by | What the worker does | Outside service | Result reducer |
+|---|---|---|---|---|
+| `medical_extract` | `submit_medical_document`, when an attendee uploads a medical PDF | reads the PDF into the fields of their medical card | Anthropic Claude API | `apply_medical_extract` |
+| `clinic_report` | `file_claim` and `file_claim_for_wearer`, when an injury claim is filed | writes the hospital's report for the case code drew | Anthropic Claude API | `file_clinic_report` |
+| `document_read` | `submit_policy_document`, `finish_plan_lookup` and `finish_venue_policy_lookup` | reads the terms and clauses of a policy PDF with the Elastic Workflow `bandit-read-document` | Elastic | `apply_document_terms` |
+| `claim_record_extract` | `submit_medical_record`, when staff file a hospital report PDF | reads the report into bill lines | Anthropic Claude API | `apply_medical_record` |
+| `claim_verify` | the claim's evidence pack is built: when a claim opens with nothing to wait for, or when its hospital report is read (`apply_medical_record`, `file_clinic_report`) | validates the de-identified claim and finds the policy clauses that bear on it | Elastic | `submit_claim_checks` |
+| `claim_review` | `submit_claim_checks` | investigates the claim with tools and decides pay, refuse or ask the organizer; each step goes to `report_claim_step` | Anthropic Claude API, with Elastic for the clauses | `submit_claim_review` |
+| `claim_payout` | a pay that the guard lets through, `approve_claim`, `retry_claim_payout` | deposits the payout into the claimant's account | Capital One Nessie | `record_claim_payout` |
+| `claim_draft` | `record_claim_payout`, once the payout is in; a property claim queues it when it is paid | drafts the claim's letters | Anthropic Claude API | `attach_claim_letters` |
+| `recovery_letter` | `request_recovery_letter` (the organizer) | drafts the letter to the person responsible | Anthropic Claude API | `attach_recovery_letter` |
+| `rule_proposal` | `approve_claim`, once 3 approved claims of one shape agree | counts those claims' copies in `bandit-claims` with the Elastic Workflow `bandit-propose-rule` and its agent `bandit-rule-proposer`, which proposes the payment rule they share | Elastic | `submit_rule_proposal` |
+| `charge_payment` | `pay_charge`, when the charged attendee pays | pays the charge from their wallet to the venue | Capital One Nessie | `record_charge_payment` |
+| `wallet_open` | `connect_wallet`, at the wallet step of setup | opens the attendee's wallet with $200 | Capital One Nessie | `record_wallet` |
+| `merch_purchase` | `buy_merch` and `buy_merch_as` | records the order as a purchase from the wallet | Capital One Nessie | `settle_merch_order` |
+| `merch_picks` | `leave_event` and `leave_early`, when an attendee leaves; the end of the event (`end_event`, or the live run's end); `rerun_shopping_agent` | picks the three products the attendee would most want | Anthropic Claude API | `submit_merch_picks` |
+| `photo_features` | `register_photo` | counts the people in an event photo and writes a caption | Anthropic Claude API | `submit_photo_features` |
+| `venue_setup` | `start_venue_setup` (the organizer) | finds the venue and its 3D map from the event's name; Claude picks with `venue_find` and `venue_map` | Bright Data, with the Anthropic Claude API | `report_venue_setup_step` for each step, then `finish_venue_setup` |
+| `plan_lookup` | `look_up_plan` (the attendee) | finds the PDF of the insurance plan the attendee named; Claude picks with `plan_find` and checks with `plan_check` | Bright Data, with the Anthropic Claude API | `finish_plan_lookup` |
+| `venue_policy_lookup` | `look_up_venue_policy` (the organizer) | finds the venue's two policy forms by their form numbers; Claude picks with `venue_policy_find` and checks with `venue_policy_check` | Bright Data, with the Anthropic Claude API | `finish_venue_policy_lookup` |
+
+#### The command queue
+
+A `command` row is one command for the bands, such as `state`, `exit`, `clear` or `lowvis`. It waits with `pending = true` until `band1t-bridge` takes it.
+
+- `band1t-bridge` subscribes to `SELECT * FROM command WHERE pending = true` and writes each new row to the gateway as one line.
+- It waits up to 400 ms for the gateway's answer, then calls `command_sent`, which sets `pending = false`, `sent_at` and any error.
+- A command older than 30 s when the bridge sees it is not sent. `command_sent` records it as expired.
+- The gateway broadcasts each command 3 times. Bands send no answer, so `sent_at` means the gateway took the command.
+
+#### The organizer's queue
+
+This is the human in the loop. Code and Claude settle what they can, and everything else waits here for the organizer, on the organizer portal.
+
+| Row | Gets here when | The organizer decides with |
+|---|---|---|
+| `claim` in `Routed` | the guard does not let Claude's decision through, or Claude asks the organizer | `approve_claim` or `refuse_claim` |
+| `rule_proposal` in `proposed` | the Evidence Engine's agent has proposed a payment rule (`submit_rule_proposal`) | `approve_rule_proposal`, which writes a `settlement_rule`, or `reject_rule_proposal` |
+| `charge` in `proposed` | staff named the band responsible for damage (`name_responsible_band`) | `approve_charge` or `waive_charge` |
+
+#### The timers
+
+SpacetimeDB runs each timer from its own schedule table. Each run is one transaction, and only the module itself can call a timer's reducer.
+
+| Schedule table | Reducer | Every | Started by |
+|---|---|---|---|
+| `incident_watch_timer` | `watch_bands` | 500 ms | `start_safety_watch` |
+| `sweep_timer` | `sweep` | 1 s | `init` |
+| `social_tick_timer` | `social_tick` | 1 s | the first `claim_band`, or `start_crowd` |
+| `live_run_timer` | `live_tick` | 1 s | `start_live_run` |
+| `crowd_timer` | `crowd_tick` | 2 s | `start_crowd` |
+| `job_reaper_timer` | `job_reaper` | 10 s | `start_job_reaper` |
 
 ### Data ownership
 
