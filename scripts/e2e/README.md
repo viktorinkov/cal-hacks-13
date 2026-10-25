@@ -38,6 +38,8 @@ Pages, on http://127.0.0.1:8097:
 
 ## Populate the finance dashboard
 
+Starting the event from the dev portal also schedules purchases by generated attendees. The first attempt is after 30 seconds, then purchases by about 30% of the crowd are spread over the run: about 300 shoppers with 1,000 people. Each shopper buys once per run. The run opens only the selected shoppers' wallets and uses normal photo tags, shipping checkout and payment workers. Costs updates as orders become paid; Pause stops new orders while payments already processing can finish. Starting another run preserves earlier sales.
+
 After the event's test attendees have visited Sponsor row and their wallets have opened, run:
 
 ```sh

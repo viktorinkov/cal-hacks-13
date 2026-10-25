@@ -109,6 +109,8 @@ Test-Bands.md: the line under the heading counts the crowd and the test bands to
 
 The Live tab's 3D view names the floor from the `venue_spot` rows: the areas, the exit doors, every sponsor over its tables and the named places. A name that would cover another hides until the camera comes closer, and close up a sponsor's name climbs a line or two so neighbouring tables all show theirs.
 
+The event run also schedules purchases by about 30% of its generated attendees, spread over its duration, using their tagged event photos, wallets and the normal payment flow. Its status table shows purchases created during this run: processing, paid with their sales total, and failed. The Costs tab keeps the event's cumulative totals and updates when each payment completes. Pause and evacuation stop new purchases; restarting a run retains earlier orders ([Merch](../6-features/Merch.md)).
+
 Each exit door shows its exit marker ([Hardware](../4-devices/Hardware.md)): a post and a ring on the floor glowing its exit colour, and under the door's name "exit marker <station id>, <colour>". The colour is the one the station marker reports in `station`, else its zone's `exit_colour`, else blue.
 
 Resting the pointer on a person in the 3D view shows their name, role, band code, company and their band's light.
