@@ -42,6 +42,9 @@ code { background: #eee; padding: 1px 4px; border-radius: 3px; }
 .venue-map canvas { width: 100%; display: block; background: #fff; }
 .venue-3d { position: relative; }
 .venue-3d canvas { width: 100%; display: block; }
+tr.linked { cursor: pointer; }
+tr.linked:hover td { background: #f3f6ff; }
+.venue-tip { position: absolute; z-index: 2; max-width: 300px; padding: 6px 8px; background: #fff; border: 1px solid #999; font-size: 13px; pointer-events: none; }
 .venue-names { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .venue-name { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; font-size: 11px; line-height: 1.3; color: #dfe5ee; text-shadow: 0 0 3px #000, 0 0 5px #000; }
 .venue-name.area { font-size: 13px; font-weight: 600; color: #fff; }

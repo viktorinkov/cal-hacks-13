@@ -1,29 +1,45 @@
 // The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
 // resume, end the event), and on the Live tab the crowd, the incidents and the medic in the venue's 3D view from
-// the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. The module
-// runs everything; this page only shows it.
+// the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. Clicking a
+// person opens them beside the view; hovering a person, an incident or a zone's circle on the floor says what it
+// is. The module runs everything; this page only shows it.
 
 import * as THREE from 'three';
 import { act, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
-import { Crowd } from './crowd-3d';
+import { Crowd, isDown } from './crowd-3d';
 import { Incidents } from './incidents-3d';
+import { ZoneCircles, zoneWords } from './zones-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
 import { dragBar, dragged } from './resize';
 import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
-import type { Charge, IncidentMarker, LiveRun } from './module_bindings/types';
+import type { Band, Charge, Claim, IncidentMarker, LiveRun } from './module_bindings/types';
 
 const START = { crowd: 1000, minutes: 12, pace: 8 };
 /** Test bands, which need no radio. */
 const TEST_BANDS = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99];
 const HISTORY_ROWS = 60;
+/** A click moves the pointer less than this; more is a drag of the camera. */
+const CLICK_PX = 5;
+/** An incident is picked this far off the pointer's ray per metre from the camera, as a person is. */
+const PICK_RADIANS = 0.006;
+const LIGHTS = ['Calm around them', 'Busy around them', 'Very busy around them'];
 
 let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
 let incidentPins: Incidents;
+let zones: ZoneCircles;
+/** What the portal does with a person clicked in the view, and the band of the person it has open. */
+let pick: Picking | undefined;
+let tip: HTMLElement;
+/** The incident the camera flew to; the decision history shows only its rows. */
+let focus: bigint | undefined;
+/** A dark ring on the floor under the opened person. */
+const mark = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.15, 40).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.DoubleSide, depthWrite: false }));
 /** A band to put on the floor: from the panel, with the name typed there, or one already placed. */
 type Placing = { bandId: number; label: string; fromPanel: boolean };
 /** The band being dragged, with the tag that follows the pointer. */
@@ -70,13 +86,38 @@ function setUp(c: DbConnection) {
     t.onDelete(sync);
   }
   sync();
+  zones = new ZoneCircles(v.layer);
+  mark.renderOrder = 3;
+  v.layer.add(mark);
+  tip = h('div', { class: 'venue-tip', hidden: true });
+  v.view.append(tip);
   v.onFrame(now => {
     crowd.frame(now);
     incidentPins.frame(now);
     // Our bands' tags: the name typed when the band was placed, over its code.
     const ours = crowd.ours();
     v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
+    zones.update(conn, now);
+    const at = pick?.selected ? crowd.where(pick.selected) : undefined;
+    mark.visible = !!at;
+    if (at) mark.position.set(at.x, 0.06, at.z);
   });
+  let down: { x: number; y: number } | undefined;
+  v.canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+  v.canvas.addEventListener('pointerup', e => {
+    if (dragging || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_PX) return;
+    const ray = v!.rayAt(e);
+    const b = crowd.pick(ray);
+    if (b) return openBand(b);
+    const incident = incidentAt(ray);
+    if (incident) focusOn(incident);
+  });
+  let moved: PointerEvent | undefined;
+  v.canvas.addEventListener('pointermove', e => {
+    if (!moved) requestAnimationFrame(() => { hover(moved!); moved = undefined; });
+    moved = e;
+  });
+  v.canvas.addEventListener('pointerleave', () => { tip.hidden = true; zones.hover(undefined); });
   dropPin.visible = false;
   v.layer.add(dropPin);
   window.addEventListener('pointermove', moveDrag);
@@ -140,6 +181,98 @@ function drop(e: PointerEvent) {
 /** A band to drag onto the floor, blue like our bands in the 3D view. */
 function marker(text: Node | string, take: () => Placing, title: string) {
   return h('span', { class: 'chip blue drag-band', title, onpointerdown: (e: PointerEvent) => startDrag(e, take()) }, '● ', text);
+}
+
+// --- Hovering and clicking ---------------------------------------------------------------------
+
+/** A person clicked: they open beside the view and the camera flies to them; someone down also focuses their incident. */
+function openBand(b: Band) {
+  tip.hidden = true;
+  pick?.open(b.id);
+  const at = crowd.where(b.id) ?? { x: b.xM, z: b.yM };
+  const incident = isDown(b) ? [...conn.db.incidentMarker.iter()].find(m => m.bandId === b.id && m.status !== 'resolved') : undefined;
+  if (incident) focus = incident.incidentId;
+  v!.lookAt(at.x, at.z);
+}
+
+/** The camera flies to an incident and the decision history shows only its rows. */
+function focusOn(m: IncidentMarker) {
+  tip.hidden = true;
+  focus = m.incidentId;
+  v!.lookAt(m.xM, m.yM);
+}
+
+function focusOnId(id: bigint) {
+  const m = conn.db.incidentMarker.incidentId.find(id);
+  if (m) focusOn(m);
+  else focus = id;
+}
+
+/** Back to the whole hall and every decision. */
+function showAll() {
+  focus = undefined;
+  v!.overview();
+}
+
+/** What is under the pointer, nearest first: a person, an incident's ring, then a zone's circle. */
+function hover(e: PointerEvent) {
+  tip.hidden = true;
+  v!.canvas.style.cursor = '';
+  if (e.buttons || dragging) return zones.hover(undefined);
+  const ray = v!.rayAt(e);
+  const b = crowd.pick(ray);
+  const incident = b ? undefined : incidentAt(ray);
+  const floor = ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  const circle = b || incident || !floor ? undefined : zones.at(floor.x, floor.z);
+  zones.hover(circle);
+  const [title, lines] = b ? personWords(b) : incident ? incidentWords(incident) : circle ? zoneWords(conn, circle) : ['', []];
+  if (!title) return;
+  if (b) v!.canvas.style.cursor = 'pointer';
+  tip.replaceChildren(h('b', {}, title), ...lines.map(l => h('div', {}, l)));
+  tip.hidden = false;
+  const r = v!.view.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  tip.style.left = `${x + 14 + tip.offsetWidth > r.width ? Math.max(0, x - 14 - tip.offsetWidth) : x + 14}px`;
+  tip.style.top = `${y + 14 + tip.offsetHeight > r.height ? Math.max(0, y - 14 - tip.offsetHeight) : y + 14}px`;
+}
+
+function personWords(b: Band): [string, string[]] {
+  const a = [...conn.db.boardAttendees.iter()].find(x => x.bandId === b.id);
+  const light = b.fall ? 'Fell' : isDown(b) ? 'Pressed SOS' : b.state === 4 ? 'In the light circle around someone down' : LIGHTS[Math.min(b.state, 2)];
+  return [a ? a.displayName || '(no name yet)' : 'Nobody wears this band', [
+    `Band ${bandCode(b.id)}${a?.organization ? `, ${a.organization}` : ''}`,
+    `${light}.`,
+    pick ? 'Click to open them and fly to them.' : '',
+  ].filter(Boolean)];
+}
+
+/** The incident on the floor whose ring the ray passes, or a few pixels from it when it is far away. */
+function incidentAt(ray: THREE.Ray): IncidentMarker | undefined {
+  const at = new THREE.Vector3();
+  let best: IncidentMarker | undefined;
+  let score = 1;
+  for (const m of incidentPins.shown()) {
+    at.set(m.xM, 1, m.yM);
+    const along = at.clone().sub(ray.origin).dot(ray.direction);
+    if (along <= 0) continue;
+    const reach = Math.max(2.5, along * PICK_RADIANS);
+    const off = ray.distanceSqToPoint(at) / (reach * reach);
+    if (off < score) {
+      score = off;
+      best = m;
+    }
+  }
+  return best;
+}
+
+function incidentWords(m: IncidentMarker): [string, string[]] {
+  return [`Incident ${m.incidentId}: ${m.kind}`, [
+    'Click to fly to it and show its decisions.',
+    [m.person, m.place && `at ${m.place}`].filter(Boolean).join(' '),
+    m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
+    m.claimId ? `Claim: ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}` : '',
+  ].filter(Boolean)];
 }
 
 function run(): LiveRun | undefined {
@@ -265,24 +398,43 @@ function placeBands() {
       h('button', { class: 'link', onclick: () => act(() => conn.reducers.unplaceBand({ bandId: p.bandId })) }, 'Remove')))));
 }
 
-/** A decision about a charge rather than the claim: staff naming who did it, the recommendation, the
- *  organizer's approve or waive, the attendee's dispute and their payment. */
+/** The organizer approves a claim waiting for them, and teaches the Decision Engine a rule for similar claims unless it is complicated. */
+function approveButton(c: Claim) {
+  return h('button', {
+    onclick: (e: Event) => {
+      e.stopPropagation();
+      act(() => conn.reducers.approveClaim({ claimId: c.id, amountSeenCents: c.payoutCents, packHashSeen: c.packHash, requestedCeilingCents: undefined, learn: !complicated(c) }));
+    },
+  }, complicated(c) ? 'Approve' : 'Approve and teach a rule');
+}
 
-function history() {
+/** Every decision, newest first; a click on a row of an incident flies to it and shows only its rows. The newest
+ *  row of each claim waiting for the organizer carries the approve button. */
+function history(canRun: boolean) {
   const all = [...conn.db.decision.iter()];
   const words = searchWords('decisions');
-  const hits = words.length ? all.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : all;
+  const mine = focus === undefined ? all : all.filter(d => d.incidentId === focus);
+  const hits = words.length ? mine.filter(d => matches(`${time(d.at)} ${d.incidentId || ''} ${d.who} ${d.actor} ${d.what} ${d.why}`, words)) : mine;
   const rows = hits.sort((a, b) => Number(b.id - a.id)).slice(0, HISTORY_ROWS);
+  const claims = new Map([...conn.db.claimsBoard.iter()].map(c => [c.id, c]));
+  const waiting = new Set<bigint>();
+  const focused = focus !== undefined ? conn.db.incidentMarker.incidentId.find(focus) : undefined;
   return h('section', {},
-    h('h4', {}, 'Decision history'),
+    h('h4', {}, focus === undefined ? 'Decision history' : `Decision history of incident #${focus}${focused ? `: ${focused.kind}${focused.person ? `, ${focused.person}` : ''}` : ''}`),
+    focus !== undefined && h('p', {}, h('button', { onclick: showAll }, 'Show all decisions and the whole hall')),
     all.length === 0
       ? h('p', { class: 'muted' }, 'Nothing decided yet.')
       : searchable('decisions', h('table', {},
         h('tr', {}, h('th', {}, 'Time'), h('th', {}, 'Who'), h('th', {}, 'Decided')),
-        rows.map(d => h('tr', {},
-          h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
-          h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
-          h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)])))), rows.length < all.length));
+        rows.map(d => {
+          const c = d.claimId ? claims.get(d.claimId) : undefined;
+          const approve = canRun && c?.status.tag === 'Routed' && !waiting.has(c.id);
+          if (approve) waiting.add(c!.id);
+          return h('tr', d.incidentId ? { class: 'linked', title: 'Show this incident on the map', onclick: () => focusOnId(d.incidentId) } : {},
+            h('td', {}, time(d.at), d.incidentId ? [h('br'), `#${d.incidentId}`] : ''),
+            h('td', {}, d.who === d.actor ? d.who : `${d.who} (${d.actor})`),
+            h('td', {}, d.what, d.why && [h('br'), h('span', { class: 'muted' }, d.why)], approve && [h('br'), approveButton(c!)]));
+        })), rows.length < mine.length));
 }
 
 /** The run's state and its controls, for the portal's top bar. */
@@ -311,10 +463,8 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
               charges.has(m.incidentId) && [h('br'), chargeWords(charges.get(m.incidentId))],
-              waiting && [h('br'), h('button', {
-                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: !complicated(c!) })),
-              }, complicated(c!) ? 'Approve' : 'Approve and teach a rule')]),
-            h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
+              waiting && [h('br'), approveButton(c!)]),
+            h('td', {}, h('button', { class: 'link', onclick: () => focusOn(m) }, 'Show')));
         }))));
 }
 
@@ -330,6 +480,8 @@ const LEGEND: [string, string][] = [
   ['#ffb020', 'Amber ring: the medic is responding'],
   ['#34d399', 'Green ring: resolved; it fades out 20 s later'],
   ['#2fe08a', 'White figure with a green ring and a cross: the medic, walking in from the nearest door'],
+  ['#2fd27a', 'Circle on the floor: a zone, coloured by how crowded it is now (green, amber, red). Hover it for its risk'],
+  ['#111111', 'Dark ring: the person open beside the view. Click anyone to open them'],
 ];
 
 function legend() {
@@ -354,9 +506,14 @@ function sideBar(side: 'left' | 'right') {
     180, () => innerWidth - width(other) - MIN_VIEW);
 }
 
-/** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the decisions and our
- * bands on the right. The bars between them and under the view resize them. */
-export function liveRunSection(c: DbConnection, canRun: boolean) {
+/** A person clicked in the 3D view opens with `open`; `selected` is the band of the person open now, or 0, and
+ *  `panel` shows them at the top of the right side. */
+export type Picking = { open(bandId: number): void; selected: number; panel: HTMLElement | null };
+
+/** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the opened person, the
+ * decisions and our bands on the right. The bars between them and under the view resize them. */
+export function liveRunSection(c: DbConnection, canRun: boolean, picking?: Picking) {
+  pick = picking;
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
@@ -368,7 +525,8 @@ export function liveRunSection(c: DbConnection, canRun: boolean) {
   return h('div', { class: 'live', style: sides },
     h('div', {}, incidents(r, canRun), legend()),
     sideBar('left'),
-    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240), v!.note)),
+    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240),
+      h('p', {}, h('button', { onclick: showAll }, 'Whole hall')), v!.note)),
     sideBar('right'),
-    h('div', {}, history(), canRun && placeBands()));
+    h('div', {}, picking?.panel, history(canRun), canRun && placeBands()));
 }
