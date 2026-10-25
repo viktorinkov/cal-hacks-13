@@ -19,6 +19,7 @@ import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
 import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
+import { matches, redrawOnSearch, searchWords, searchable } from '../table-search';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
 import type { AttendeeOut, BoardMerchPick, BoardWallet, Claim, MerchTemplate, ViewablePerson } from '../module_bindings/types';
@@ -231,14 +232,16 @@ function attendees() {
   const all = [...conn.db.boardAttendees.iter()].sort((a, b) => Number(a.crowd) - Number(b.crowd) || a.displayName.localeCompare(b.displayName));
   const kind = (a: (typeof all)[number]) => a.crowd || a.bandId >= 100 ? 'crowd' : a.bandId >= 90 ? 'test' : a.bandId > 0 ? 'hardware' : 'none';
   const count = (k: string) => all.filter(a => kind(a) === k).length;
-  const people = all.filter(a => !a.crowd).length;
-  const shown = all.slice(0, people + CROWD_ROWS);
+  const words = searchWords('attendees');
+  const hits = words.length ? all.filter(a => matches([a.displayName, a.crowd ? 'crowd' : '', a.bandId ? bandCode(a.bandId) : '', bandStatus(a.bandId), a.organization,
+    a.findable ? 'yes' : 'no', ...a.handles.map(x => `${x.platform} ${x.handle}`), time(a.createdAt)].join(' '), words)) : all;
+  const shown = hits.slice(0, hits.filter(a => !a.crowd).length + CROWD_ROWS);
   const ended = conn.db.eventState.id.find(0)?.ended ?? false;
   return h('section', {},
     h('h3', {}, `${all.length} attendees`),
     h('p', { class: 'muted' }, `${count('crowd')} in the crowd, ${count('test')} wearing test bands, ${count('hardware')} wearing hardware bands${count('none') ? `, ${count('none')} without a band` : ''}.`),
-    all.length > shown.length && h('p', { class: 'muted' }, `Showing the first ${CROWD_ROWS} crowd attendees, by name.`),
-    h('table', {},
+    hits.length > shown.length && h('p', { class: 'muted' }, `Showing the first ${CROWD_ROWS} crowd attendees, by name.`),
+    searchable('attendees', h('table', {},
       h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Band'), h('th', {}, 'Band status'), h('th', {}, 'Company'), h('th', {}, 'Findable'), h('th', {}, 'Socials'), h('th', {}, 'Joined')),
       shown.map(a => h('tr', {},
         h('td', {}, a.displayName || '(no name yet)', a.crowd && h('span', { class: 'muted' }, ' crowd')),
@@ -246,7 +249,7 @@ function attendees() {
         h('td', { class: a.bandId && alive(a.bandId) ? 'pass' : 'muted' }, bandStatus(a.bandId),
           a.bandId > 0 && a.bandId < 100 && !ended && h('div', {}, h('button', { class: 'link', onclick: () => takeBack(a.bandId, a.displayName) }, 'Take the band back'))),
         h('td', {}, a.organization), h('td', {}, a.findable ? 'yes' : 'no'),
-        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))));
+        h('td', {}, a.handles.map(x => `${x.platform} ${x.handle}`).join(', ')), h('td', {}, time(a.createdAt))))), shown.length < all.length));
 }
 
 // --- People (Live tab) ----------------------------------------------------------------------
@@ -292,10 +295,8 @@ function everyone(): Person[] {
 
 /** Every word of the search appears in the person's name, kind, band code, company or handles. */
 function found(p: Person, words: string[]): boolean {
-  if (!words.length) return true;
-  const text = [p.name, p.kind, p.bandId ? code(p.bandId) : '', p.att?.organization ?? '', ...(p.att?.handles.map(x => x.handle) ?? [])]
-    .join(' ').toLowerCase();
-  return words.every(w => text.includes(w));
+  return matches([p.name, p.kind, p.bandId ? code(p.bandId) : '', p.att?.organization ?? '', ...(p.att?.handles.map(x => x.handle) ?? [])]
+    .join(' '), words);
 }
 
 /** The injury claims a person filed, or staff filed as them. */
@@ -787,14 +788,14 @@ function claimList() {
   return h('section', {},
     h('h3', {}, 'All claims and who pays them'),
     !claims.length && h('p', { class: 'muted' }, 'No claims yet. An attendee files one from their band page after an injury, or staff file it for them above.'),
-    claims.length > 0 && h('table', {},
+    claims.length > 0 && searchable('claims', h('table', {},
       h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Claimant'), h('th', {}, 'What'), h('th', {}, 'Cost'), h('th', {}, 'Paid out'), h('th', {}, 'Insurer pays back'), h('th', {}, 'Venue carries'), h('th', {}, 'Status'), h('th', {}, 'Waiting for')),
       claims.map(c => h('tr', { class: c.status.tag === 'Routed' && decides(c) ? 'alert' : '' },
         h('td', {}, h('button', { class: 'link', onclick: () => showClaim(c.id) }, `#${c.id}`)),
         h('td', {}, c.claimantName || '(none)'), h('td', {}, `${c.incidentKind} in ${c.zoneName}`),
         h('td', {}, money(c.costCents)), h('td', {}, money(c.payoutCents)), h('td', {}, money(c.recoverableCents)), h('td', {}, money(c.venueCostCents)),
         h('td', {}, statusOf(c), h('div', { class: 'muted' }, c.statusNote)),
-        h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : '')))));
+        h('td', {}, c.status.tag === 'Routed' ? `${c.routedToName}${decides(c) ? ', you' : ''}` : ''))))));
 }
 
 async function fileRecord(claimId: bigint, form: HTMLFormElement) {
@@ -1136,7 +1137,7 @@ function merchPicks() {
     h('h3', {}, `Shopping agent picks (${new Set(picks.map(p => p.attendeeName)).size} attendees)`),
     !picks.length && h('p', { class: 'muted' }, ended ? 'Picking now. Each attendee in a photo gets three picks.' : 'The shopping agent picks for everyone in a photo once the event ends.'),
     can('ops') && ended && h('button', { onclick: () => act(() => conn.reducers.rerunShoppingAgent({})) }, 'Run the shopping agent again'),
-    picks.length > 0 && h('table', {},
+    picks.length > 0 && searchable('picks', h('table', {},
       h('tr', {}, h('th', {}, 'Attendee'), h('th', {}, '#'), h('th', {}, 'Product'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Why')),
       picks.map(p => {
         const t = titles.get(p.templateId);
@@ -1146,7 +1147,7 @@ function merchPicks() {
           h('td', {}, thumb(p.photoUrl, 'photo', `pick ${p.id}`)),
           h('td', {}, p.line || h('span', { class: 'muted' }, 'none')),
           h('td', {}, p.reason));
-      })));
+      }))));
 }
 
 /** Buying as an attendee, the shopping agent's picks, every attendee's order and the loaded templates. */
@@ -1162,7 +1163,7 @@ function merchTab() {
       h('h3', {}, `Orders: ${orders.length}, of which ${paid.length} paid for ${money(paid.reduce((s, o) => s + o.amountCents, 0n))}`),
       !can('ops') && h('p', { class: 'muted' }, 'Orders show for the organizer.'),
       can('ops') && !orders.length && h('p', { class: 'muted' }, 'No orders yet. Attendees buy merch from their recap once the event ends.'),
-      orders.length > 0 && h('table', {},
+      orders.length > 0 && searchable('orders', h('table', {},
         h('tr', {}, h('th', {}, 'Order'), h('th', {}, 'Attendee'), h('th', {}, 'Item'), h('th', {}, 'Photo'), h('th', {}, 'Printed line'), h('th', {}, 'Size'), h('th', {}, 'Amount'), h('th', {}, 'Status'), h('th', {}, 'Nessie purchase'), h('th', {}, 'Ordered')),
         orders.map(o => h('tr', {},
           h('td', {}, `#${o.id}`), h('td', {}, o.attendeeName || '(no name yet)'), h('td', {}, o.title),
@@ -1170,7 +1171,7 @@ function merchTab() {
           h('td', {}, money(o.amountCents)),
           h('td', { class: o.status === 'paid' ? 'pass' : o.status === 'failed' ? 'fail' : '' }, o.status, o.failure && h('div', { class: 'muted' }, o.failure)),
           h('td', {}, o.nessiePurchaseId ? h('code', {}, o.nessiePurchaseId) : h('span', { class: 'muted' }, 'not yet')),
-          h('td', {}, date(o.createdAt)))))),
+          h('td', {}, date(o.createdAt))))))),
     h('section', {},
       h('h3', {}, `Templates (${templates.length})`),
       !templates.length && h('p', { class: 'muted' }, 'None loaded. scripts/merch-setup loads assets/merch/templates.json after the event import.'),
@@ -1278,6 +1279,7 @@ async function main() {
   if (cfg.auth_client_id && !idToken()) return mount('app', signInScreen());
   if (cfg.auth_client_id && new URLSearchParams(location.search).has('as')) history.replaceState(null, '', location.pathname + location.hash);
   conn = await connect(QUERIES, render);
+  redrawOnSearch(render);
   serveViewers(conn);
   openFromHash();
   render();
