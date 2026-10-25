@@ -36,6 +36,7 @@ pub fn core_rule(r: &CoverageRuleRow) -> bandit_insurance::coverage::CoverageRul
         per_claim_limit_cents: r.per_claim_limit_cents,
         aggregate_limit_cents: r.aggregate_limit_cents,
         deductible_cents: r.deductible_cents,
+        minimum_payout_cents: r.minimum_payout_cents,
         service_window_days: r.service_window_days,
         active: r.active,
     }
@@ -228,7 +229,7 @@ pub fn record_checks(ctx: &ReducerContext, claim: &Claim, input: &EvidenceInput)
     if let Ok(record) = serde_json::from_str::<bandit_insurance::medical::ExtractedRecord>(&rec.record_json) {
         let valid = bandit_insurance::medical::ValidRecord { record, dropped: rec.dropped.clone() };
         checks.extend(bandit_insurance::medical::record_checks(&valid, &claim.claimant_name, &incident_date, window));
-        let lines = bandit_insurance::fee_schedule::cover_lines(&valid, &incident_date, window);
+        let lines = bandit_insurance::fee_schedule::cover_lines(&valid, &incident_date, window, &super::documents::fee_schedule_for(ctx, claim.policy_id));
         checks.push(bandit_insurance::fee_schedule::lines_check(&lines));
     }
     checks.push(duplicate_check(ctx, claim, &rec));
@@ -256,9 +257,12 @@ fn duplicate_check(ctx: &ReducerContext, claim: &Claim, rec: &MedicalRecord) -> 
     Check::pass("record_duplicate", "no other claim has this file, invoice, or patient, date and total")
 }
 
-/// Medical-payments cover excludes the venue's own staff.
+/// Medical-payments cover excludes the venue's own staff, unless the confirmed policy has no staff exclusion.
 fn claimant_check(ctx: &ReducerContext, claim: &Claim) -> Option<Check> {
     if cover_of(claim) != CoverKind::MedicalPayments {
+        return None;
+    }
+    if ctx.db.insurance_policy().id().find(claim.policy_id).is_some_and(|p| !p.staff_excluded) {
         return None;
     }
     let claimant = claim.claimant?;

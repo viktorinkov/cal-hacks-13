@@ -205,6 +205,7 @@ fn retry_or_bury(ctx: &ReducerContext, job: Job, error: String) {
             ..job
         });
         crate::insurance::on_job_dead(ctx, &dead);
+        crate::insurance::documents::on_job_dead(ctx, &dead);
         crate::merch::on_job_dead(ctx, &dead);
         crate::venue::setup::on_job_dead(ctx, &dead);
     } else {

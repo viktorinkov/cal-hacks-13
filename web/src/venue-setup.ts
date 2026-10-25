@@ -2,14 +2,16 @@
 // event's site, its venue and any public 3D map of it, then saves the venue's model; each step shows here
 // as it happens. The organizer picks the venue the portal shows. The Cal Hacks 13.0 model at the Palace of
 // Fine Arts ships with the app and is the default. The Live tab shows the same 3D view with the hall cut open
-// and the crowd in it.
+// and the crowd in it. The organizer also uploads the venue's insurance policy here: each term read from it
+// shows with its quote and page, and once confirmed it sets the claims' limits.
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { act, date, field, h, time } from './lib';
+import { act, date, field, h, money, time } from './lib';
 import type { DbConnection } from './module_bindings';
-import type { VenueSetup } from './module_bindings/types';
+import type { PolicyDocument, PolicyTerm, VenueSetup } from './module_bindings/types';
+import { VenueNames, type Spot } from './venue-names';
 
 /** Setup 0: the venue that ships with the app. */
 const DEFAULT_SETUP = 0n;
@@ -28,13 +30,18 @@ let conn: DbConnection;
 
 // --- The 3D view ------------------------------------------------------------------------------
 
-/** On the Live tab everything above this height is cut away, so the mezzanine (its underside is at 4.25 m) and the roof do not hide the crowd. */
+/** On the Live tab everything of the model above this height is cut away, so the mezzanine (its underside is at
+ * 4.25 m) and the roof do not hide the crowd. Only the model is cut, so the incidents' beams rise above it. */
 const CUT_M = 4.1;
+/** The cut, far above the model off the Live tab. */
+const cut = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e9);
 
 /** The view and the picker live across redraws, so the model stays loaded and an open dropdown stays open. */
 let view: HTMLElement | undefined;
 let viewNote: HTMLElement;
 let loadedUrl = '';
+/** The model in the view once it has loaded, so the floor's names show only over the model they belong to. */
+let shownUrl = '';
 let load: (url: string) => void;
 let renderer: THREE.WebGLRenderer;
 let camera: THREE.PerspectiveCamera;
@@ -43,6 +50,11 @@ let controls: OrbitControls;
 /** What the Live tab adds: the crowd and the incidents, shown only there. */
 const liveLayer = new THREE.Group();
 const frames: ((now: number) => void)[] = [];
+/** The Live tab's view height in pixels once the bar under it is dragged; until then most of the window's height. */
+let liveHeight = 0;
+/** The Live tab's names on the floor and tags over our bands. */
+const names = new VenueNames();
+let spotsAsked = false;
 
 function makeView() {
   view = h('div', { class: 'venue-3d' });
@@ -50,7 +62,8 @@ function makeView() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  view.append(renderer.domElement);
+  renderer.localClippingEnabled = true;
+  view.append(renderer.domElement, names.box);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#c8effd');
@@ -74,9 +87,14 @@ function makeView() {
       // Cut open, the walls show their inner faces from above.
       model.traverse(o => {
         const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.side = THREE.DoubleSide;
+        if (!mesh.isMesh) return;
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+          m.side = THREE.DoubleSide;
+          m.clippingPlanes = [cut];
+        }
       });
       scene.add(model);
+      shownUrl = url;
       // Frame the model whatever its size: the camera, its range and the sun scale with it.
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
@@ -99,7 +117,7 @@ function makeView() {
     if (!view!.isConnected) return;
     const w = view!.clientWidth;
     // On the Live tab the venue fills most of the window's height, so it is easy to explore.
-    const hgt = liveLayer.visible ? Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
+    const hgt = liveLayer.visible ? liveHeight || Math.max(360, Math.round(innerHeight * 0.8)) : Math.round(w * 9 / 16);
     // three floors the canvas size; a rounded one never matched at 1.5× on an odd width and resized it every frame.
     if (w && (renderer.domElement.width !== Math.floor(w * renderer.getPixelRatio()) || camera.aspect !== w / hgt)) {
       renderer.setSize(w, hgt);
@@ -109,6 +127,8 @@ function makeView() {
     controls.update();
     const now = performance.now();
     for (const f of frames) f(now);
+    // The spots are the default model's, so another venue's model shows only our bands' tags.
+    names.draw(camera, controls.target, liveLayer.visible && shownUrl === DEFAULT.modelUrl, liveLayer.visible);
     renderer.render(scene, camera);
   });
 }
@@ -119,6 +139,9 @@ export type LiveView = {
   note: HTMLElement;
   layer: THREE.Group;
   canvas: HTMLCanvasElement;
+  camera: THREE.PerspectiveCamera;
+  /** The names on the floor and the tags over our bands. */
+  names: VenueNames;
   /** Runs every frame while the view shows. */
   onFrame(f: (now: number) => void): void;
   /** The point of the floor under a click, in model metres (x east, z south), if it is inside the hall. */
@@ -137,7 +160,7 @@ function showLive(on: boolean) {
     controls.update();
   }
   liveLayer.visible = on;
-  renderer.clippingPlanes = on ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT_M)] : [];
+  cut.constant = on ? CUT_M : 1e9;
 }
 
 function lookAt(x: number, z: number) {
@@ -156,12 +179,33 @@ function floorAt(e: MouseEvent) {
   return p.x >= box.min.x && p.x <= box.max.x && p.z >= box.min.z && p.z <= box.max.z ? { x: p.x, z: p.z } : undefined;
 }
 
+/** Sets the Live tab's view height, in pixels. */
+export function setLiveHeight(px: number) {
+  liveHeight = px;
+}
+
 export function venueView(c: DbConnection): LiveView {
   conn = c;
   if (!view) makeView();
   if (chosenUrl() !== loadedUrl) load(chosenUrl());
   showLive(true);
-  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, lookAt };
+  if (!spotsAsked) {
+    spotsAsked = true;
+    spots().then(s => names.setSpots(s));
+  }
+  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, camera, names, onFrame: f => frames.push(f), floorAt, lookAt };
+}
+
+/** The floor's named spots: the `venue_spot` rows, or the venue's spots file when there are none. */
+async function spots(): Promise<Spot[]> {
+  const rows = [...conn.db.venueSpot.iter()];
+  if (rows.length) return rows.map(s => ({ kind: s.kind, name: s.name, x: s.xM, z: s.yM }));
+  try {
+    const file: Spot[] = await (await fetch('/venue/spots.json')).json();
+    return file.map(s => ({ kind: s.kind, name: s.name, x: s.x, z: s.z }));
+  } catch {
+    return [];
+  }
 }
 
 // --- The picker -------------------------------------------------------------------------------
@@ -264,6 +308,155 @@ function run(s: VenueSetup) {
     h('p', { class: 'muted' }, `Started ${date(s.createdAt)}`));
 }
 
+// --- The insurance policy ---------------------------------------------------------------------
+
+const DOC_STATUS: Record<string, string> = { reading: 'Reading', read: 'Read, waiting for you to confirm', confirmed: 'In use for the event', failed: 'Failed' };
+
+const TERM_WORDS: Record<string, string> = {
+  insurer_name: 'Insurer',
+  policy_number: 'Policy number',
+  fnol_contact: 'Claims reporting contact',
+  period_start: 'Policy period starts',
+  period_end: 'Policy period ends',
+  other_insurance: 'Other insurance',
+  per_claim_limit: 'Per-claim limit',
+  aggregate_limit: 'Aggregate limit',
+  deductible: 'Deductible',
+  minimum_payout: 'Minimum payout',
+  service_window_days: 'Service window',
+};
+
+const EXCLUSION_WORDS: Record<string, string> = {
+  staff: 'Employees and volunteers of the venue',
+  pre_existing: 'An injury that began before the event',
+  off_premises: 'An injury away from the premises',
+  care_custody_control: "Property in the venue's care, custody or control",
+  other: 'Other exclusion',
+};
+
+const OTHER_INSURANCE_WORDS: Record<string, string> = {
+  primary: "primary: the venue's policy pays first",
+  excess: "excess: the venue's policy pays what the attendee's own insurance leaves",
+};
+
+/** A fee cap's read value is the description the policy printed, then the cap. */
+function feeRead(t: PolicyTerm): [string, string] {
+  const at = t.readValue.lastIndexOf(' ');
+  return at < 0 ? ['', t.readValue] : [t.readValue.slice(0, at), t.readValue.slice(at + 1)];
+}
+
+function termLabel(t: PolicyTerm) {
+  if (t.name === 'exclusion') return EXCLUSION_WORDS[t.code] ?? t.code;
+  if (t.name === 'fee_cap') return `${t.code} ${feeRead(t)[0]}`.trim();
+  return TERM_WORDS[t.name] ?? t.name;
+}
+
+const TERM_GROUPS: [string, (t: PolicyTerm) => boolean][] = [
+  ['Policy', t => !t.coverKind && t.name !== 'exclusion'],
+  ['Medical payments', t => t.coverKind === 'medical_payments' && t.name !== 'fee_cap'],
+  ['Property', t => t.coverKind === 'property'],
+  ['Schedule of benefits', t => t.name === 'fee_cap'],
+  ['Exclusions', t => t.name === 'exclusion'],
+];
+
+/** The venue's policy documents, newest first. */
+function policyDocs(): PolicyDocument[] {
+  return [...conn.db.boardPolicyDocuments.iter()].filter(d => d.kind === 'venue_policy').sort((a, b) => Number(b.id - a.id));
+}
+
+async function uploadPolicy(form: HTMLFormElement) {
+  const input = form.querySelector('input[type=file]') as HTMLInputElement;
+  const bytes = await input.files?.[0]?.arrayBuffer();
+  if (!bytes) throw new Error('choose the policy PDF');
+  const res = await fetch('/api/blobs?purpose=policy', { method: 'POST', headers: { 'content-type': 'application/pdf' }, body: bytes });
+  const blob = await res.json();
+  if (!res.ok) throw new Error(blob.error);
+  await conn.reducers.submitPolicyDocument({ fileHash: blob.hash, pageCount: blob.pages });
+  input.value = '';
+}
+
+function policyDoc(d: PolicyDocument) {
+  const cls = d.status === 'confirmed' ? 'pass' : d.status === 'failed' ? 'fail' : '';
+  return h('li', {},
+    h('a', { href: `/blobs/${d.fileHash}`, target: '_blank', rel: 'noreferrer' }, `Policy PDF, ${d.pageCount} pages`),
+    `, uploaded ${date(d.uploadedAt)} `, h('span', { class: cls }, `· ${DOC_STATUS[d.status] ?? d.status}`),
+    d.status !== 'reading' && d.status !== 'failed' && `. ${d.clauseCount} clauses checked word for word on their pages`,
+    d.confirmedAt && `. Confirmed ${date(d.confirmedAt)}`,
+    d.error && h('p', { class: 'fail' }, d.error),
+    d.dropped.length > 0 && h('details', {}, h('summary', {}, `Dropped (${d.dropped.length})`), h('ul', {}, d.dropped.map(x => h('li', {}, x)))));
+}
+
+function termRow(t: PolicyTerm) {
+  const cls = t.status === 'read' ? 'pass' : t.status === 'flagged' ? 'fail' : 'muted';
+  return h('tr', {},
+    h('td', {}, termLabel(t)),
+    h('td', {}, t.shown),
+    h('td', {}, t.name === 'fee_cap' ? feeRead(t)[1] : t.readValue),
+    h('td', { class: 'muted' }, t.quote),
+    h('td', {}, t.page || ''),
+    h('td', { class: cls }, t.status),
+    h('td', {}, t.problem));
+}
+
+function termsTable(d: PolicyDocument) {
+  const terms = [...conn.db.boardPolicyTerms.iter()].filter(t => t.documentId === d.id).sort((a, b) => Number(a.id - b.id));
+  const flagged = terms.filter(t => t.status === 'flagged').length;
+  return [
+    h('h4', {}, `Terms read from the policy uploaded ${date(d.uploadedAt)}`),
+    h('p', { class: 'muted' }, `${terms.length} terms, ${flagged} flagged. "read": read from the policy and checked. "flagged": a check failed, so the default stays. "default": the policy does not state it.`),
+    h('table', {},
+      h('tr', {}, ['Term', 'In effect', 'Read from the policy', 'Quote', 'Page', 'Status', 'Problem'].map(c => h('th', {}, c))),
+      TERM_GROUPS.map(([group, inGroup]) => {
+        const rows = terms.filter(inGroup);
+        return rows.length > 0 && [h('tr', {}, h('th', { colspan: 7 }, group)), rows.map(termRow)];
+      })),
+    d.status === 'read' && h('p', {}, h('button', { onclick: () => act(() => conn.reducers.confirmPolicyTerms({ documentId: d.id })) }, 'Use these terms for the event')),
+  ];
+}
+
+/** The policy claims take now: the newest confirmed venue policy's, else the newest policy row. */
+function inEffect() {
+  const confirmed = policyDocs().filter(d => d.status === 'confirmed' && d.confirmedAt)
+    .sort((a, b) => Number(b.confirmedAt!.microsSinceUnixEpoch - a.confirmedAt!.microsSinceUnixEpoch))[0];
+  const policies = [...conn.db.boardPolicies.iter()];
+  const p = policies.find(x => confirmed && x.id === confirmed.policyId) ?? policies.sort((a, b) => Number(b.id - a.id))[0];
+  if (!p) return h('p', { class: 'muted' }, 'No policy in effect yet.');
+  const day = (ms: number) => new Date(ms).toLocaleDateString('en-CA');
+  // The period's end is stored as the midnight after its last day.
+  const period = p.periodChecked
+    ? `${day(p.periodStart.toDate().getTime())} to ${day(p.periodEnd.toDate().getTime() - 1)}`
+    : 'not stated, so not checked';
+  const covers = [...conn.db.boardCovers.iter()].filter(c => c.policyId === p.id).sort((a, b) => a.coverKind.localeCompare(b.coverKind));
+  const codes = [...conn.db.boardFeeSchedule.iter()].filter(l => l.policyId === p.id).length;
+  return [
+    h('h4', {}, 'In effect now'),
+    h('p', {}, h('b', {}, `Policy ${p.policyNumber}`), ` with ${p.insurerName}. Period ${period}. Other insurance: ${OTHER_INSURANCE_WORDS[p.otherInsurance] ?? p.otherInsurance}.`,
+      ` Claims reported to ${p.fnolContact}.`, p.staffExcluded && ' Employees and volunteers are excluded.'),
+    h('table', {},
+      h('tr', {}, ['Cover', 'Per-claim limit', 'Aggregate limit', 'Deductible', 'Minimum payout', 'Service window'].map(c => h('th', {}, c))),
+      covers.map(c => h('tr', {},
+        h('td', {}, c.coverKind === 'medical_payments' ? 'Medical payments' : c.coverKind === 'property' ? 'Property' : c.coverKind),
+        h('td', {}, money(c.perClaimLimitCents)), h('td', {}, money(c.aggregateLimitCents)), h('td', {}, money(c.deductibleCents)),
+        h('td', {}, money(c.minimumPayoutCents)), h('td', {}, c.serviceWindowDays ? `${c.serviceWindowDays} days` : 'none')))),
+    h('p', {}, 'Schedule of benefits: ', codes ? `${codes} codes from the policy` : 'default schedule, 21 codes', '.'),
+  ];
+}
+
+/** Shown to the organizer only. */
+function policySection() {
+  const docs = policyDocs();
+  const shownDoc = docs.find(d => d.status === 'read' || d.status === 'confirmed');
+  return h('section', {},
+    h('h3', {}, 'Insurance policy'),
+    h('p', { class: 'muted' }, "Upload the venue's insurance policy PDF. Each term is read from the policy with its quote and page, then checked. Until you confirm the terms, claims use the defaults."),
+    h('form', { onsubmit: (e: Event) => { e.preventDefault(); act(() => uploadPolicy(e.target as HTMLFormElement)); } },
+      h('input', { type: 'file', name: 'policy-pdf', accept: 'application/pdf' }), ' ',
+      h('button', {}, 'Upload and read')),
+    docs.length > 0 && [h('h4', {}, `Uploaded (${docs.length})`), h('ul', {}, docs.map(policyDoc))],
+    shownDoc && termsTable(shownDoc),
+    inEffect());
+}
+
 export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   conn = c;
   if (!view) makeView();
@@ -273,6 +466,7 @@ export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   return [
     shown(),
     startForm(canSetUp),
+    canSetUp && policySection(),
     runs.length > 0 && h('section', {}, h('h3', {}, `Setups (${runs.length})`), runs.map(run)),
   ];
 }

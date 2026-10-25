@@ -106,7 +106,12 @@ export class Crowd {
 
   /** The module's time now, in ms since the epoch: frozen while the run is paused. */
   private clock(): number {
-    return this.pausedAt ?? Date.now() + this.skew;
+    return this.pausedAt ?? this.moduleNow();
+  }
+
+  /** The module's time now, in ms since the epoch, going on while the run is paused. */
+  moduleNow(): number {
+    return Date.now() + this.skew;
   }
 
   /** On its way along a walk from the module: the walk places it, not its band's last report. */
@@ -204,6 +209,11 @@ export class Crowd {
   where(id: number): { x: number; z: number } | undefined {
     const w = this.walkers.get(id);
     return w?.shown ? { x: w.x, z: w.z } : undefined;
+  }
+
+  /** Our bands on the floor, where they stand now. */
+  ours(): { id: number; x: number; z: number; down: boolean }[] {
+    return this.list.filter(w => w.shown && isOurs(w.band.id)).map(w => ({ id: w.band.id, x: w.x, z: w.z, down: isDown(w.band) }));
   }
 
   /** How many crowd bands and how many of our bands are on the floor. */

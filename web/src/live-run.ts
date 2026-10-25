@@ -1,15 +1,17 @@
 // The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
-// resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
+// resume, end the event), and on the Live tab the crowd, the incidents and the medic in the venue's 3D view from
 // the Venue setup tab, our bands dragged from the panel onto the floor, and the decision history. The module
 // runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, bandById, h, money, time } from './lib';
+import { act, bandById, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
+import { Incidents } from './incidents-3d';
 import { present } from './venue-map';
 import { matches, searchWords, searchable } from './table-search';
-import { venueView, type LiveView } from './venue-setup';
+import { dragBar, dragged } from './resize';
+import { setLiveHeight, venueView, type LiveView } from './venue-setup';
 import type { DbConnection } from './module_bindings';
 import type { IncidentMarker, LiveRun } from './module_bindings/types';
 
@@ -21,6 +23,7 @@ const HISTORY_ROWS = 60;
 let conn: DbConnection;
 let v: LiveView | undefined;
 let crowd: Crowd;
+let incidentPins: Incidents;
 /** A band to put on the floor: from the panel, with the name typed there, or one already placed. */
 type Placing = { bandId: number; label: string; fromPanel: boolean };
 /** The band being dragged, with the tag that follows the pointer. */
@@ -33,10 +36,6 @@ const pinColour = new THREE.MeshBasicMaterial({ color: '#3d8bff', side: THREE.Do
 const dropPin = new THREE.Group().add(
   new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3.8, 12).translate(0, 1.9, 0), pinColour),
   new THREE.Mesh(new THREE.RingGeometry(1.6, 2.6, 32).rotateX(-Math.PI / 2).translate(0, 0.05, 0), pinColour));
-/** A red pole over each open incident. */
-const poles = new Map<bigint, THREE.Mesh>();
-const poleShape = new THREE.CylinderGeometry(0.35, 0.35, 3.6, 12).translate(0, 1.8, 0);
-const poleColour = new THREE.MeshBasicMaterial({ color: '#e00020' });
 
 function setUp(c: DbConnection) {
   conn = c;
@@ -56,7 +55,22 @@ function setUp(c: DbConnection) {
   conn.db.livePause.onInsert(pause);
   conn.db.livePause.onDelete(pause);
   pause();
-  v.onFrame(now => crowd.frame(now));
+  // This run's incidents, as they open, change and resolve.
+  incidentPins = new Incidents(v, () => crowd.moduleNow());
+  const sync = () => incidentPins.sync(markers(run()));
+  for (const t of [conn.db.incidentMarker, conn.db.liveRun]) {
+    t.onInsert(sync);
+    t.onUpdate(sync);
+    t.onDelete(sync);
+  }
+  sync();
+  v.onFrame(now => {
+    crowd.frame(now);
+    incidentPins.frame(now);
+    // Our bands' tags: the name typed when the band was placed, over its code.
+    const ours = crowd.ours();
+    v!.names.setBands(ours.map(b => ({ ...b, name: conn.db.bandPlace.bandId.find(b.id)?.label ?? '', code: bandCode(b.id) })));
+  });
   dropPin.visible = false;
   v.layer.add(dropPin);
   window.addEventListener('pointermove', moveDrag);
@@ -134,20 +148,6 @@ function going(r: LiveRun | undefined): boolean {
 function markers(r: LiveRun | undefined): IncidentMarker[] {
   if (!r) return [];
   return [...conn.db.incidentMarker.iter()].filter(m => m.openedAt.microsSinceUnixEpoch >= r.startedAt.microsSinceUnixEpoch);
-}
-
-function syncPoles(open: IncidentMarker[]) {
-  const keep = new Set(open.map(m => m.incidentId));
-  for (const [id, pole] of poles) if (!keep.has(id)) { pole.removeFromParent(); poles.delete(id); }
-  for (const m of open) {
-    let pole = poles.get(m.incidentId);
-    if (!pole) {
-      pole = new THREE.Mesh(poleShape, poleColour);
-      poles.set(m.incidentId, pole);
-      v!.layer.add(pole);
-    }
-    pole.position.set(m.xM, 0, m.yM);
-  }
 }
 
 function phaseWords(r: LiveRun | undefined): string {
@@ -289,8 +289,8 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
               waiting && [h('br'), h('button', {
-                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]),
+                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: !complicated(c!) })),
+              }, complicated(c!) ? 'Approve' : 'Approve and teach a rule')]),
             h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
         }))));
 }
@@ -303,7 +303,10 @@ const LEGEND: [string, string][] = [
   ['#ff1030', 'SOS or a fall: red strobe; someone who fell lies down'],
   ['#2f6bff', 'The light circle around them: blue pulse'],
   ['#3d8bff', 'Our hardware and test bands'],
-  ['#e00020', 'Pole: an open incident'],
+  ['#ff2f45', 'Ring and beam: an open incident, with a tag saying who, where and how far the claim is'],
+  ['#ffb020', 'Amber ring: the medic is responding'],
+  ['#34d399', 'Green ring: resolved; it fades out 20 s later'],
+  ['#2fe08a', 'White figure with a green ring and a cross: the medic, walking in from the nearest door'],
 ];
 
 function legend() {
@@ -314,16 +317,35 @@ function legend() {
       h('td', {}, meaning)))));
 }
 
+/** The side panels' widths until their bars are dragged. */
+const SIDES = { left: 300, right: 340 };
+/** The 3D view keeps at least this much of the window's width between the side panels. */
+const MIN_VIEW = 320;
+
+/** The bar between a side panel and the 3D view, which drags the panel wider or narrower. */
+function sideBar(side: 'left' | 'right') {
+  const other = side === 'left' ? 'right' : 'left';
+  const width = (s: 'left' | 'right') => dragged(`live ${s}`) ?? SIDES[s];
+  return dragBar(`live ${side}`, 'x', side === 'left' ? 1 : -1, () => width(side),
+    px => (document.querySelector('.live') as HTMLElement | null)?.style.setProperty(`--${side}`, `${px}px`),
+    180, () => innerWidth - width(other) - MIN_VIEW);
+}
+
 /** The Live tab: the incidents and the legend on the left, the 3D view in the middle, the decisions and our
- * bands on the right. */
+ * bands on the right. The bars between them and under the view resize them. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
-  syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
-  return h('div', { class: 'live' },
+  incidentPins.sync(markers(r));
+  const height = dragged('live height');
+  if (height) setLiveHeight(height);
+  const sides = (['left', 'right'] as const).map(s => `--${s}: ${dragged(`live ${s}`) ?? SIDES[s]}px`).join('; ');
+  return h('div', { class: 'live', style: sides },
     h('div', {}, incidents(r, canRun), legend()),
-    h('div', {}, h('section', {}, v!.view, v!.note)),
+    sideBar('left'),
+    h('div', {}, h('section', {}, v!.view, dragBar('live height', 'y', 1, () => v!.canvas.clientHeight, setLiveHeight, 240), v!.note)),
+    sideBar('right'),
     h('div', {}, history(), canRun && placeBands()));
 }

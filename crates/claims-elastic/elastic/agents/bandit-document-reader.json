@@ -1,0 +1,11 @@
+{
+  "id": "bandit-document-reader",
+  "name": "BandIt document reader",
+  "description": "Reads one insurance PDF for BandIt into the terms and clauses it states, each quoted word for word with its page. Started by the bandit-read-document workflow.",
+  "labels": ["bandit"],
+  "access_control": { "access_mode": "public" },
+  "configuration": {
+    "tools": [{ "tool_ids": ["bandit.document_pages"] }],
+    "enable_elastic_capabilities": false
+  }
+}
