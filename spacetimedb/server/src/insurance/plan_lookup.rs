@@ -5,11 +5,13 @@
 //! card's insurer and plan; a policy for the attendee's belongings becomes their own policy, with the
 //! limit and deductible they typed, because no public form holds a policyholder's own numbers.
 
+use super::documents::{DocumentIn, queue_document_read};
 use crate::jobs::{self, *};
 use crate::medical::{self, *};
 use crate::roles::*;
 use crate::social::tables::*;
 use crate::view_as::viewed;
+use bandit_insurance::policy::{ATTENDEE_POLICY, HEALTH_PLAN};
 use serde::{Deserialize, Serialize};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
@@ -216,6 +218,18 @@ pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupR
     };
     if found.kind == HEALTH {
         land_health_plan(ctx, &found);
+    }
+    // The Evidence Engine reads the found PDF like an upload; a document it can't take still leaves the lookup found.
+    let read = DocumentIn {
+        kind: if found.kind == HEALTH { HEALTH_PLAN } else { ATTENDEE_POLICY }.into(),
+        attendee: Some(found.attendee),
+        file_hash: found.file_hash.clone(),
+        page_count: found.page_count,
+        source: KIND_PLAN_LOOKUP.into(),
+        source_url: found.source_url.clone(),
+    };
+    if let Err(e) = queue_document_read(ctx, read) {
+        log::warn!("plan lookup {}: not read: {e}", found.id);
     }
     ctx.db.plan_lookup().id().update(found);
     jobs::finish(ctx, job, FOUND);

@@ -2,6 +2,7 @@
 //! or nothing, the medical card gets a found health plan, and a lookup that keeps failing ends failed.
 
 use super::*;
+use crate::insurance::documents::*;
 use crate::jobs::*;
 use crate::tables::*;
 use spacetimedb::test_utils::{TestAuth, TestContext};
@@ -86,6 +87,8 @@ fn a_found_health_plan_lands_on_the_medical_card() {
     let card = w.t.db.medical_card().attendee().find(id("alex")).unwrap();
     assert_eq!((card.insurer.as_str(), card.plan.as_str()), ("Blue Shield of California", "Silver 70 PPO 2500/55"));
     assert_eq!(w.t.db.job().id().find(job.id).unwrap().status, JobStatus::Done);
+    let doc = w.t.db.policy_document().iter().next().expect("the found plan goes to the reading");
+    assert_eq!((doc.kind.as_str(), doc.attendee, doc.source.as_str(), doc.page_count), (HEALTH_PLAN, Some(id("alex")), KIND_PLAN_LOOKUP, 8));
 }
 
 #[test]
