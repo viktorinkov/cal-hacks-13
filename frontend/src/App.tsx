@@ -76,9 +76,10 @@ function Pages() {
 function Shell() {
   const { path } = useRoute()
   if (path === '/callback') return <SignInCallback />
+  const attendeePage = path === '/join' || path === '/register'
   return (
     <Connected>
-      {path === '/organizer' || window.location.hostname === 'band1t.vip' ? (
+      {path === '/organizer' || (window.location.hostname === 'band1t.vip' && !attendeePage) ? (
         <OrganizerGate>
           <Pages />
         </OrganizerGate>
