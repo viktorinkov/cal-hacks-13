@@ -191,6 +191,24 @@ When the `merch_purchase` job fails 3 times, the order becomes `failed` with the
 
 The organizer portal's Merch tab shows the loaded templates, each with its image, title, kind, price, photo area and sponsor booths, and, for `ops`, every order from `board_merch_orders`, newest first, with the totals paid ([Organizer-Portal](../5-apps/Organizer-Portal.md)). It has no controls: the attendee buys from the recap, and the worker settles the order.
 
+### Merch on the Costs tab
+
+The Costs tab counts merch from the paid orders, the merch subledger ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)). Orders still `paying` and `failed` orders count nothing.
+
+Each paid order splits its price three ways:
+
+| Part | Amount |
+|---|---|
+| Print cost | what the print shop bills for the product: a tee 800 cents, a mug 500, a poster 300 |
+| Event fee | 10% of the price of a sponsor product, rounded down to the cent; a plain product has none |
+| Owed to the booths | a sponsor product's price less its print cost and the event fee; a plain product owes nothing |
+
+A product that names several sponsors splits its price, print cost and fee evenly between their booths, and the cents left over go to the booth with the lowest id. The booth crawl poster's 1500 cents are 250 to each of its six booths.
+
+The event's margin on a product is its sales less the print cost and what it owes the booths: the whole margin of a plain product, and the event fee of a sponsor product.
+
+The booth settlement is one line per sponsor booth with sales or incidents: its share of the sales, the print cost and the fee, what the event owes it, and the incidents at its table with their loss and what the people responsible were charged. An incident is at a booth when the nearest spot to where it happened is that booth's sponsor table, the same spot that names its place on the Live tab.
+
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
@@ -241,5 +259,6 @@ The organizer portal's Merch tab shows the loaded templates, each with its image
 | Checkout is one tap: `buy_merch` checks the wallet, writes the order and holds its amount in one transaction, and a worker records the purchase on Capital One Nessie afterwards | No confirm screen and no payment row; the module's own balance makes the check exact, and a second tap cannot spend the same money |
 | Merch is bought only from the recap after the event, by the signed-in attendee; no counter and no band press | Nothing is paid at the venue, and the SpacetimeDB SpacetimeAuth sign-in proves who is buying on any device |
 | A failed purchase fails the order and frees its money; there is no cancel and no refund | Buying again is a new order, and the flow ends at a paid order |
-| Printing and shipping are out of scope | The flow ends at a paid order |
+| Printing and shipping are out of scope; the Costs tab counts a print cost per kind | The flow ends at a paid order, and the event's books still need what each product costs to make |
+| Each sponsor booth is owed its products' sales less the print cost and a 10% event fee, split evenly between the booths a product names | The event sells every product from one shop and settles with each booth after the event, as a cashless event settles with its vendors |
 | Merch is deleted together with Social.md or Capital-One-Nessie.md | Every suggestion starts from a visit and a photo, and every order is paid from the wallet |
