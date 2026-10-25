@@ -1,6 +1,6 @@
 # Diagram review, 25 October 2026
 
-SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The current verified canonical Plus revision has 29 frames. It clarifies service boundaries, separates finance flows and depicts people making room after band alerts. API readback, independent saved-result review and native browser checks passed; earlier revisions remain saved historical checkpoints.
+SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The current verified canonical Plus revision has 32 frames. It clarifies service boundaries, separates finance flows and depicts people making room after band alerts. API readback, independent saved-result review and native browser checks passed; earlier revisions remain saved historical checkpoints.
 
 ## What each sponsor contribution means
 
@@ -14,7 +14,7 @@ SpacetimeDB and Elastic are the primary presentation priorities. This review com
 
 ## Board organization
 
-The published, verified reader/finance board has 29 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. The earlier reduction retained Interest suggestions, Buy a memory and Exit guidance in prose and saved their drawings. This new consolidation adds separate supplied product journeys for fire evacuation, photo matching and photo merchandise; their technical details remain in the existing engine diagrams. Hardware and vision detail stays on the main board.
+The published, verified readability board has 32 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. The earlier reduction retained Interest suggestions, Buy a memory and Exit guidance in prose and saved their drawings. This new consolidation adds separate supplied product journeys for fire evacuation, photo matching and photo merchandise; their technical details remain in the existing engine diagrams. Hardware and vision detail stays on the main board.
 
 | Diagram | Question or responsibility |
 |---|---|
@@ -25,7 +25,8 @@ The published, verified reader/finance board has 29 diagrams, listed by title be
 | Elastic claim investigation | How an Elastic agent requests scoped evidence and policy clauses before returning a cited recommendation that the worker validates. |
 | Find public sources | How separate policy and venue jobs share source discovery and link validation, then branch into checked policy PDFs or interactive venue-map capture. |
 | Capital One Nessie | How account, purchase and injury-deposit API operations work. |
-| Jobs | Who queues, claims, executes and records work. |
+| Server job lifecycle | Who saves a job, calls external services, validates the result and checks the live lease before applying it. |
+| Band command queue | How pending commands reach the USB gateway and its reply becomes a recorded outcome. This is separate from proof of band delivery. |
 | Prepare the event | How the organizer starts a server import, Bright Data supplies public records, Elastic organizes names, and code validates and applies the event atomically. |
 | Find people again | How typed reconnection uses recorded meeting and place evidence. |
 | Memories engine | How capture context becomes candidate tags, sharing and communities built from encounters and visits; minutes remain inside their parent cards. |
@@ -44,7 +45,9 @@ The published, verified reader/finance board has 29 diagrams, listed by title be
 | Band data flow | What band telemetry contains and where it goes. |
 | Band wiring | How hardware components are connected. |
 | Exit markers and gateway | How stations, exit-color swatches and the gateway relate. |
-| Band firmware | What local band behavior is intended to do. |
+| Band incident alarms | How the SOS button and fall sequence drive the ring and motor, with own incidents taking priority. |
+| Band helper signals | How the caller’s heard list selects three helpers and the selected band copies its signal. |
+| Band exit colors | How station signals, the switching margin and operating modes select a stable exit color. |
 | Live camera evidence | How flashes and radio state produce located evidence. |
 | Venue reconstruction | How a phone walk produces a calibrated venue model. |
 
@@ -54,9 +57,13 @@ The canonical style uses large original artwork/logos, soft fills and dark text.
 
 ## Diagram errors corrected
 
+The 32-frame readability revision explains subscription rows and access conditions, places the live-lease guard at result application, and separates server jobs from the band-command lifecycle. Three compact firmware diagrams preserve the approved incident, helper and exit behavior with distinct fills and unchanged signal colors. These are presentation corrections; runtime and hardware code are unchanged.
+
+The subscriptions cards distinguish personal effective-identity rows, recorded medical grants, staff role filters, service event rows, all open worker jobs, anonymous graph links and public floor/command queries. The current React application also uses broad floor and staff subscriptions; the diagram does not promise minimum data for every page. Job leases are checked when results are applied, while external calls remain worker-owned. The command lifecycle records the gateway reply and does not claim a confirmed radio delivery to the band.
+
 The reader/finance revision separates SpacetimeDB’s live-update mechanism from its audience subscriptions, shows Claude as an external configured provider, and consolidates policy discovery and public venue-map acquisition while keeping their job branches distinct. Settlement refers to three dedicated finance diagrams instead of repeating charge, insurer-receipt and cost flows. Make space for help replaces the scripted crowd presentation with people noticing band alerts and making room; the original scripted source is retained as history and is not evidence of automatic physical movement.
 
-Charge payment remains attendee-initiated after organizer approval; insurer payment remains an organizer-recorded receipt, not an automated collection. Event cost totals distinguish venue claim costs, recovery credits and merch earnings from insurer balances and actual cash receipts. Firmware behavior is unchanged by the palette correction; its width split remains a later presentation refinement.
+Charge payment remains attendee-initiated after organizer approval; insurer payment remains an organizer-recorded receipt, not an automated collection. Event cost totals distinguish venue claim costs, recovery credits and merch earnings from insurer balances and actual cash receipts. The later readability revision splits firmware into incident alarms, helper selection and exit colors while preserving every approved behavior and signal meaning.
 
 The purpose-focused revision replaces broad provider overviews with specific claim-investigation and policy-discovery flows, and separates event import from public venue-map capture. Existing Routes and clear space content is partitioned into Medic route display and Crowd clearance, with original artwork retained. Three context labels now name their actual role: search and model tasks in Architecture, candidate ranking in Find people again, and photo analysis in Memories engine. Claim-specific Evidence Engine wording remains. Finance formulas and firmware colors are unchanged.
 
@@ -102,7 +109,7 @@ The 21-frame revision with the allocation inset passed native rendering, geometr
 
 The [prior grouped 24-frame public checkpoint](https://excalidraw.com/#json=p0Gilq4ytTdJY3VKU_r-r,Xq8vDszi13_7kLdKju8n0Q) remains verified and recoverable, along with commit `daf0d74` and the pre-cut editable checkpoint. The [prior 21-frame generator snapshot before the allocation inset](https://excalidraw.com/#json=PIWdtEXRGfKzdy5HzX407,XSCCTxDLfUE4u1RGSecLqQ) also passed exact readback verification for all 1,550 elements and 40 assets. The canonical Plus board remains the shared working board. The separate claims Plus scene is historical, not a competing current board. Editable checkpoints and Git preserve saved versions, not every browser edit.
 
-The [current allocation checkpoint](https://excalidraw.com/#json=uav7aeS1XhZXosyIEQVoi,PYVd5M9WtmWod1yIAwgk5Q) passed exact public readback for all 1,574 elements and 40 assets. Canonical Plus verification is stored in `.builds/diagram-history/20261025T111217Z-before-policy-allocation/apply/verification.json`.
+The [saved allocation checkpoint](https://excalidraw.com/#json=uav7aeS1XhZXosyIEQVoi,PYVd5M9WtmWod1yIAwgk5Q) passed exact public readback for all 1,574 elements and 40 assets. Canonical Plus verification is stored in `.builds/diagram-history/20261025T111217Z-before-policy-allocation/apply/verification.json`.
 
 The subsequent product-flow consolidation passed independent source and native-export review and exact canonical Plus readback: 1,728 active elements, 24 frames, 214 images and 45 assets, with the user’s station-position adjustment preserved and zero errors. The reviewed generator source is `471cd6fae0887675c10524bdd490e17ffb0938de2e8f9f525b4b23dd095ad276`; the saved live-content hash is `5491c810297b389fc883f4a2e8da5f87a85b8baafdf38671c2c0072a04aa05ec`. Proof is `.builds/diagram-history/20261025-before-product-flows/apply/verification.json`. Earlier 21-frame readbacks above describe historical revisions, not the current frame count.
 
@@ -110,6 +117,10 @@ The preceding purpose-focused revision passed independent source and native-expo
 
 The 26-frame board remains a historical reviewed checkpoint. Its provider, discovery, SpacetimeDB and crowd-presentation refinements are included in the 29-frame revision.
 
-The next presentation corrections will explain the rows and access conditions returned by subscriptions, place the Jobs live-lease guard at result application rather than the external API call, and split the wide firmware layout. These are separate diagram corrections; they do not change runtime behavior or require a new product decision.
+The 29-frame reader/finance revision passed exact API readback, independent saved-result review and native browser checks: 1,887 active elements, 29 frames, 212 images and 45 assets. Reviewed source SHA-256 is `f831eed6f938830edbf2e597d98968c1eefb6bd3b2fbf80557cbe9f4306c7caf`; saved live-content SHA-256 is `0bd044e1ee56c41fd4cb5c651a66d04291889160d1cd51d9377902b7a76139bf`. Proof is `.builds/diagram-history/20261025-before-reader-finance/apply-v2/independent-final-verification.json` and the adjacent `native-verification.json`. Asset records, historical elements and the user’s station-position adjustment are preserved. The firmware split, subscription explanations and Jobs guard correction were completed in the following readability revision.
 
-The 29-frame reader/finance revision passed exact API readback, independent saved-result review and native browser checks: 1,887 active elements, 29 frames, 212 images and 45 assets. Reviewed source SHA-256 is `f831eed6f938830edbf2e597d98968c1eefb6bd3b2fbf80557cbe9f4306c7caf`; saved live-content SHA-256 is `0bd044e1ee56c41fd4cb5c651a66d04291889160d1cd51d9377902b7a76139bf`. Proof is `.builds/diagram-history/20261025-before-reader-finance/apply-v2/independent-final-verification.json` and the adjacent `native-verification.json`. Asset records, historical elements and the user’s station-position adjustment are preserved. The firmware split, subscription explanations and Jobs guard correction remain separate follow-up work.
+Initial readability source verification: `dd722a01d3abd2e202f68ab533c74db223d011382549ab17d9d5bd44e2f4c645`; 1,956 active elements, 32 frames, 213 images and 44 assets. Saved Plus SHA-256 `e64693e7135db2409fbe0e764911519a591e539512689c13644175abb2e8413a`; exact readback proof `.builds/diagram-history/20261025-before-runtime-readability/apply/verification.json`. All five excerpts and six refreshed native exports passed source and visual review.
+
+The final source `b25147f002daf9784e69630354c503964d72090aa822c2a2c9dec982bb40202b` repairs only 16 subscription text widths and their centered horizontal positions after explicit Excalifont loading. All counts, wording, cards, references and assets remain unchanged. Exact saved Plus SHA-256 `b6874544a2267eea995a7cf5af3697b3431401b6405a4d74c867683c25be079e` passed independent verification at `.builds/diagram-history/20261025-before-subscription-metrics/apply/independent-final-verification.json`.
+
+Final online visual verification passed for all six changed layouts, including all 16 corrected subscription labels: `.builds/diagram-history/20261025-before-subscription-metrics/apply/native-verification.json`.

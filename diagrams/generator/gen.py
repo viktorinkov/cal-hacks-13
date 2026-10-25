@@ -211,31 +211,13 @@ def spacetimedb(y0):
 
 
 def jobs(y0):
-    S.begin_frame("Jobs", 0, y0, 3050, 1540)
-    action = B(60, 180, "feature action", "web", w=560, h=260, wordmark=USER, mark_h=100)
-    queue = SV(840, 180, STDB, "queued job", kind="stdb", w=560, h=260)
-    worker = B(1620, 180, "server worker", "rust", w=560, h=260, wordmark=RUST, mark_h=100)
-    lease = B(2400, 180, "live lease", "stdb", w=560, h=260, wordmark=CLOCK, mark_h=100)
-    services = B(2400, 760, "external API call", "ext", w=560, h=280, icons={0: ELASTIC, 1: BRIGHT, 2: CAPONE})
-    check = B(1620, 760, "validate response", "rust", w=560, h=280, wordmark=SHIELD, mark_h=100)
-    result = SV(840, 760, STDB, "result reducer", kind="stdb", w=560, h=280)
-    clients = B(60, 760, "updated feature view", "web", w=560, h=280, wordmark=MONITOR, mark_h=100)
-    retry = B(2400, 1270, "retry policy", "note", w=560, h=200, wordmark=CLOCK, mark_h=80)
-    H(action, queue, "queues work")
-    H(queue, worker, "live job row")
-    H(worker, lease, "claims job")
-    V(lease, services, "must be current", x=lease.right - 110)
-    D(worker, "r", .8, services, "l", .3, "calls API")
-    H(services, check, "returns data")
-    H(check, result, "submits result")
-    H(result, clients, "pushes rows")
-    R(lease, "b", result, "r", [(lease.x + 90, S.oy + 520), (result.right + 100, S.oy + 520), (result.right + 100, result.y + 75)],
-      label="checked again", seg=1, fa=90/lease.w, fb=.27)
-    V(services, retry, "error or timeout")
-    R(retry, "b", queue, "b", [(retry.cx, S.oy + 1510), (S.ox + 20, S.oy + 1510),
-      (S.ox + 20, S.oy + 540), (queue.cx, S.oy + 540)],
-      label="eligible retry", seg=1)
-    return S.end_frame()
+    return _import_acquisition_frame(y0, "server-job-lifecycle-source.excalidraw",
+                                     "queue_jobs_", frame_id="frame425", reserve_ids=52)
+
+
+def band_commands(y0):
+    return _import_acquisition_frame(y0, "band-command-queue-source.excalidraw",
+                                     "queue_commands_")
 
 
 def prepare_event(y0):
@@ -1266,76 +1248,38 @@ def band_wiring(y0):
 
 
 def band_firmware(y0):
-    S.begin_frame("22 · Band firmware", 0, y0, 4000, 2660)
+    """Import the three reviewed firmware questions with stable native identities."""
+    import copy
+    import random
 
-    def cell(x, y, text, kind="device", w=600, h=220, art=None):
-        kw = {"wordmark": art, "mark_h": 130} if art else {}
-        return B(x, y, text, kind, w=w, h=h, **kw)
+    source_names = (
+        'band-incident-alarms-source.excalidraw',
+        'band-helper-signals-source.excalidraw',
+        'band-exit-colors-source.excalidraw',
+    )
+    offset = y0
+    existing_ids = {element['id'] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(e for e in source['elements'] if e['type'] == 'frame')
+        assert not existing_ids.intersection(e['id'] for e in source['elements']), filename
+        for original in source['elements']:
+            element = copy.deepcopy(original)
+            element['y'] += offset - frame['y']
+            S.elements.append(element)
+            existing_ids.add(element['id'])
+        for file_id, record in source.get('files', {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]['dataURL'] == record['dataURL']
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame['height'] + GAP
 
-    def component(x, y, w, h, label, art=None):
-        first = len(S.elements)
-        parent = Z(x, y, w, h, label, "device", art)
-        parent.el.update(backgroundColor="#ffe8cc", strokeColor="#b5bfca")
-        parent.el.setdefault("customData", {})["diagramComponent"] = True
-        for element in S.elements[first:]:
-            if element["type"] == "text":
-                element["strokeColor"] = "#1e1e1e"
-        return parent
-
-    def prop(parent, x, y, w, label, h=140, fill="#f5f7ff"):
-        child = B(x, y, label, "stdb", w=w, h=h)
-        child.el.update(backgroundColor=fill, strokeColor="#c0cbe4", strokeWidth=1)
-        child.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
-        return child
-
-    firmware = component(40, 80, 3920, 430, "ESP32-C3 · band firmware", WATCH)
-    prop(firmware, 90, 290, 1080, "Non-blocking main loop")
-    prop(firmware, 1370, 290, 1200, "Own SOS or fall first")
-    prop(firmware, 2770, 290, 1100, "No internet needed")
-
-    Z(40, 560, 3920, 780, "own incident — overrides helper and exit colors", "device")
-    button = component(90, 640, 1260, 340, "SOS button", WATCH)
-    prop(button, 130, 850, 1180, "Hold 3 s", h=90)
-    ring = component(2290, 640, 760, 650, "12-LED ring")
-    orange = prop(ring, 2370, 840, 600, "Orange SOS", fill="#fff4e6")
-    red = prop(ring, 2370, 1110, 600, "Red fall", fill="#ffe3e3")
-    motor = component(3210, 880, 650, 390, "Motor")
-    prop(motor, 3250, 1090, 570, "Full bands only", h=110)
-    freefall = cell(90, 1070, "Free fall", "note", w=540)
-    impact = cell(810, 1070, "Impact", "note", w=540)
-    stillness = cell(1530, 1070, "Stillness", "note", w=540)
-    H(button, orange, "raises SOS")
-    H(freefall, impact, "then")
-    H(impact, stillness, "then")
-    H(stillness, red, "raises fall")
-    D(orange, "r", .5, motor, "l", .25, "vibrates")
-    D(red, "r", .5, motor, "l", .75, "vibrates")
-
-    Z(40, 1400, 3920, 440, "nearby caller — when this band has no own incident", "device")
-    heard = cell(90, 1460, "Caller’s\nheard list", w=660, h=340, art=RADIO)
-    helpers = cell(1130, 1530, "Select 3\nnearest helpers", "rust", w=740)
-    selected = cell(2210, 1530, "This band\nis selected", "note", w=660)
-    copy = cell(3210, 1530, "Copy caller’s\nSOS color", w=650)
-    H(heard, helpers, "ranks peers")
-    H(helpers, selected, "checks")
-    H(selected, copy, "yes")
-
-    Z(40, 1900, 3920, 700, "exit guidance — when no incident color is active", "device")
-    station = cell(90, 2110, "Station beacon\nid + color + signal", w=600, h=340, art=RADIO)
-    nearest = cell(1030, 2190, "Nearest station", "rust", w=650)
-    margin = cell(1990, 2190, "Switch at\n2 dB margin", "note", w=650)
-    exitcolor = cell(3150, 2190, "Show nearest\nstation color", w=710)
-    idle = cell(2770, 1990, "Idle", "note", w=280, h=120)
-    crowd = cell(2770, 2200, "Crowd", "note", w=280, h=120)
-    lowvis = cell(2770, 2390, "Low\nvisibility", "note", w=280, h=120)
-    H(station, nearest, "compares signal")
-    H(nearest, margin, "changes only")
-    R(margin, "b", exitcolor, "b", [S.P(2315, 2560), S.P(3505, 2560)],
-      "keeps color stable", seg=1)
-    D(idle, "r", .5, exitcolor, "t", .25, "")
-    H(crowd, exitcolor)
-    D(lowvis, "r", .5, exitcolor, "b", .25, "")
-    return S.end_frame()
+    # Reserve the exact old numeric slots and draws; two added frame IDs are named.
+    S.n += 88
+    for _ in range(176):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
 
 
 
@@ -1344,7 +1288,7 @@ def band_firmware(y0):
 
 
 FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
-          nessie, jobs, prepare_event, find_people, photo_memories,
+          nessie, jobs, band_commands, prepare_event, find_people, photo_memories,
           settle_claim, policy_amounts, approve_rule, review_charge, record_insurer_payment, event_operating_costs, respond_incident,
           routes_space, fire_evacuation, photo_product_flow, merch_product_flow, hardware, band_wiring, exit_markers_gateway,
           band_firmware, vision, venue_reconstruction)
