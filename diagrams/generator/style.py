@@ -269,7 +269,8 @@ def _style_frame(frame, children, target_y):
         labels = _bound_text(card, by_id)
         label = labels[0]
         usable_width = card["width"] * (0.62 if card["type"] == "diamond" else 1) - 64
-        _, text_height = _text(label, BODY_SIZE, width=usable_width, align="center")
+        text_size = (label.get("customData") or {}).get("diagramTextSize", BODY_SIZE)
+        _, text_height = _text(label, text_size, width=usable_width, align="center")
         label["strokeColor"] = "#1e1e1e"
         images = sorted(card_images[card["id"]], key=lambda im: (im["x"], im["y"]))
         image_height = 0

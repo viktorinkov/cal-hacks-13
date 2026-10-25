@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="600" viewBox="0 0 1440 600" role="img" aria-labelledby="title desc">
+  <title id="title">Project thumbnail pending</title>
+  <desc id="desc">Placeholder for the Band1t project thumbnail.</desc>
+  <rect x="2" y="2" width="1436" height="596" rx="24" fill="#f3f5f7" stroke="#ccd5df" stroke-width="2"/>
+  <text x="720" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="44" font-weight="600" fill="#263747">Project thumbnail pending</text>
+  <text x="720" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#516578">Band1t</text>
+</svg>
