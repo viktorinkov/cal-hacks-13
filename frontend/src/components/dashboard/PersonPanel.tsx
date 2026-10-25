@@ -74,7 +74,7 @@ function SelectedPerson({ bandId }: { bandId: number }) {
       </div>
       {person?.crowd && canOperate && (
         <div className="mt-4">
-          <h3 className="text-[13px] font-medium text-ink">Choose this bot&apos;s action</h3>
+          <h3 className="text-[13px] font-medium text-ink">Stage an action</h3>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button type="button" disabled={!!reason || busy != null} onClick={() => void act('injury')} className="rounded-[4px] border border-line-strong px-3 py-2 text-[13px] text-ink disabled:text-ink-muted">{busy === 'injury' ? 'Starting…' : 'Gets injured'}</button>
             <button type="button" disabled={!!reason || busy != null} onClick={() => void act('theft')} className="rounded-[4px] border border-line-strong px-3 py-2 text-[13px] text-ink disabled:text-ink-muted">{busy === 'theft' ? 'Starting…' : 'Steals equipment'}</button>

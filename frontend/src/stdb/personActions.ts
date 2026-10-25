@@ -18,7 +18,7 @@ export function personActionUnavailable(person: RunAttendee, run: RunState): str
 
 export async function stagePersonAction(bandId: number, action: CrowdAction): Promise<void> {
   const session = useSession.getState()
-  if (!session.owner && !session.roles.includes('ops')) throw new Error('Only an organizer can choose a bot action.')
+  if (!session.owner && !session.roles.includes('ops')) throw new Error('Only an organizer can stage an action.')
   const run = useRun.getState()
   const person = run.attendees.find((item) => item.bandId === bandId)
   if (!person) throw new Error('This band has no named attendee.')
