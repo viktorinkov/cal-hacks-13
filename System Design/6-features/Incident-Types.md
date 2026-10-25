@@ -9,17 +9,17 @@ This file lists the types in one place. The claim flow they share, the charges a
 | Type (`incident_kind`) | What happened | Who claims | Which policy pays | Who can be charged |
 |---|---|---|---|---|
 | `fall`, `sos` | an attendee is hurt | the attendee | the venue's policy, medical payments cover | nobody |
-| `property` | venue or sponsor equipment is broken | the venue | the venue's policy, property cover, above its deductible | the attendee who broke it, when staff named them |
-| `theft` | venue or sponsor property is taken, such as merch or a laptop from a booth | the venue | the venue's policy, property cover, where its theft clause covers the loss | the attendee who took it, when staff named them |
-| `belongings` | an attendee's own things are lost, stolen or broken | the attendee | the attendee's own policy, personal property cover; the venue's policy excludes property in its care | the attendee who took or broke it, when staff named them |
+| `property` | the venue's own equipment is broken | the venue | the venue's policy, property cover, above its deductible | the attendee who broke it, when staff named them |
+| `theft` | an attendee's belonging is stolen | the attendee | the attendee's own policy, personal property cover; the venue's policy excludes guests' property | the attendee who took it, when staff named them |
+| `breakage` | an attendee's belonging is broken by someone else | the attendee | the attendee's own policy, personal property cover; the venue's policy excludes guests' property | the attendee who broke it, when staff named them |
 
 ## The attendee's own policy
 
 Each attendee can have their own policy on file, an `attendee_policy` row: the insurer, the policy number, the personal property cover's per-claim limit, its yearly limit and its deductible, and the policy document it was read from.
 
-A `belongings` claim pays from it: the item's value up to the per-claim limit, less the deductible, which the attendee carries. BandIt pays it into the attendee's wallet and collects it from their insurer.
+A `theft` or `breakage` claim pays from it: the item's value up to the per-claim limit, less the deductible, which the attendee carries. BandIt pays it into the attendee's wallet and collects it from their insurer.
 
-With no policy on file the claim goes to the organizer with the venue's exclusion clause, and the tap page gives the attendee the incident record for their own insurer.
+With no policy on file the claim goes to the organizer with the venue's exclusion of guests' property, and the tap page gives the attendee the incident record for their own insurer.
 
 The crowd of the live run has no documents. Each crowd attendee's policy terms are drawn once from a generator seeded with their identity, so the same attendee always has the same policy.
 
@@ -29,10 +29,9 @@ The crowd of the live run has no documents. Each crowd attendee's policy terms a
 |---|---|---|---|---|
 | `fall`, `sos` | the band | the band | the light circle and the medic's note, or the security cameras | the hospital report |
 | `property` | the security cameras or staff, with a cost note for the repair | the staff report | the security cameras | the bands at the spot, the attendee named |
-| `theft` | staff, with the item and its value | the staff report | the security cameras | the bands at the spot, the attendee named |
-| `belongings` | staff, for the attendee, with the item and its value | the staff report | the security cameras | the attendee's own policy, the bands at the spot, the attendee named |
+| `theft`, `breakage` | staff, for the attendee, at their band, with the item and its value | the staff report | the security cameras | the attendee's own policy, the bands at the spot, the attendee named |
 
-Resolving a `property`, `theft` or `belongings` incident with a cost note opens its claim.
+Resolving a `property`, `theft` or `breakage` incident with a cost note opens its claim.
 
 ## The person responsible
 
@@ -48,8 +47,8 @@ The Evidence Engine handles each type explicitly. Its de-identified claim copy c
 |---|---|
 | `fall`, `sos` | the venue's medical payments clause, its exclusions, its service window, the other-insurance clause |
 | `property` | the venue's property clause, its deductible, the subrogation clause |
-| `theft` | the venue's theft clause and its conditions, the subrogation clause |
-| `belongings` | the venue's exclusion of property in its care; the attendee policy's personal property clause and its deductible |
+| `theft` | the venue's exclusion of guests' property; the attendee policy's theft clause and its deductible |
+| `breakage` | the venue's exclusion of guests' property; the attendee policy's accidental damage clause and its deductible |
 
 ## The live run
 
