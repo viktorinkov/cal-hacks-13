@@ -22,6 +22,7 @@ pub mod approval_type;
 pub mod approve_charge_reducer;
 pub mod approve_claim_reducer;
 pub mod approve_rule_proposal_reducer;
+pub mod approve_rule_scope_review_reducer;
 pub mod assign_medic_reducer;
 pub mod attach_claim_letters_reducer;
 pub mod attach_recovery_letter_reducer;
@@ -373,6 +374,7 @@ pub mod reset_bridge_reducer;
 pub mod resolve_incident_reducer;
 pub mod resume_live_run_reducer;
 pub mod retry_claim_payout_reducer;
+pub mod review_rule_scopes_reducer;
 pub mod revoke_role_reducer;
 pub mod rule_proposal_table;
 pub mod rule_proposal_type;
@@ -499,6 +501,7 @@ pub use approval_type::Approval;
 pub use approve_charge_reducer::approve_charge;
 pub use approve_claim_reducer::approve_claim;
 pub use approve_rule_proposal_reducer::approve_rule_proposal;
+pub use approve_rule_scope_review_reducer::approve_rule_scope_review;
 pub use assign_medic_reducer::assign_medic;
 pub use attach_claim_letters_reducer::attach_claim_letters;
 pub use attach_recovery_letter_reducer::attach_recovery_letter;
@@ -850,6 +853,7 @@ pub use reset_bridge_reducer::reset_bridge;
 pub use resolve_incident_reducer::resolve_incident;
 pub use resume_live_run_reducer::resume_live_run;
 pub use retry_claim_payout_reducer::retry_claim_payout;
+pub use review_rule_scopes_reducer::review_rule_scopes;
 pub use revoke_role_reducer::revoke_role;
 pub use rule_proposal_table::*;
 pub use rule_proposal_type::RuleProposal;
@@ -1009,6 +1013,11 @@ pub enum Reducer {
     ApproveRuleProposal {
         proposal_id: u64,
         ceiling_seen_cents: u64,
+    },
+    ApproveRuleScopeReview {
+        proposal_id: u64,
+        ceiling_seen_cents: u64,
+        scope_seen: String,
     },
     AssignMedic {
         incident_id: u64,
@@ -1348,6 +1357,7 @@ pub enum Reducer {
     RetryClaimPayout {
         claim_id: u64,
     },
+    ReviewRuleScopes,
     RevokeRole {
         identity: __sdk::Identity,
         role: String,
@@ -1545,6 +1555,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApproveCharge { .. } => "approve_charge",
             Reducer::ApproveClaim { .. } => "approve_claim",
             Reducer::ApproveRuleProposal { .. } => "approve_rule_proposal",
+            Reducer::ApproveRuleScopeReview { .. } => "approve_rule_scope_review",
             Reducer::AssignMedic { .. } => "assign_medic",
             Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
             Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
@@ -1631,6 +1642,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ResolveIncident { .. } => "resolve_incident",
             Reducer::ResumeLiveRun => "resume_live_run",
             Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
+            Reducer::ReviewRuleScopes => "review_rule_scopes",
             Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
             Reducer::SetExit { .. } => "set_exit",
@@ -1750,6 +1762,17 @@ impl __sdk::Reducer for Reducer {
                 proposal_id: proposal_id.clone(),
                 ceiling_seen_cents: ceiling_seen_cents.clone(),
             }),
+            Reducer::ApproveRuleScopeReview {
+                proposal_id,
+                ceiling_seen_cents,
+                scope_seen,
+            } => __sats::bsatn::to_vec(
+                &approve_rule_scope_review_reducer::ApproveRuleScopeReviewArgs {
+                    proposal_id: proposal_id.clone(),
+                    ceiling_seen_cents: ceiling_seen_cents.clone(),
+                    scope_seen: scope_seen.clone(),
+                },
+            ),
             Reducer::AssignMedic { incident_id } => {
                 __sats::bsatn::to_vec(&assign_medic_reducer::AssignMedicArgs {
                     incident_id: incident_id.clone(),
@@ -2358,6 +2381,9 @@ impl __sdk::Reducer for Reducer {
                 __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
                     claim_id: claim_id.clone(),
                 })
+            }
+            Reducer::ReviewRuleScopes => {
+                __sats::bsatn::to_vec(&review_rule_scopes_reducer::ReviewRuleScopesArgs {})
             }
             Reducer::RevokeRole { identity, role } => {
                 __sats::bsatn::to_vec(&revoke_role_reducer::RevokeRoleArgs {

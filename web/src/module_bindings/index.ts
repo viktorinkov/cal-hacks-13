@@ -125,6 +125,7 @@ import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
 import ResumeLiveRunReducer from "./resume_live_run_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
+import ReviewRuleScopesReducer from "./review_rule_scopes_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
 import SetExitReducer from "./set_exit_reducer";
@@ -1399,6 +1400,7 @@ const reducersSchema = __reducers(
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
   __reducerSchema("resume_live_run", ResumeLiveRunReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
+  __reducerSchema("review_rule_scopes", ReviewRuleScopesReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),
   __reducerSchema("set_exit", SetExitReducer),
