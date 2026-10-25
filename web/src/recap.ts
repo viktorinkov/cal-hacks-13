@@ -27,10 +27,10 @@ let loadedFor = 0;
 let loading = false;
 let session = '';
 
-/** When the attendee walked out early, else when the host ended the event; the night is drawn up to then. */
-function endedAt(conn: DbConnection): number {
+/** When the attendee walked out early, else when the host ended the event, else `running`; the night is drawn up to then. */
+function endedAt(conn: DbConnection, running = Date.now()): number {
   const left = conn.db.myDeparture.iter().next().value?.leftAt;
-  return (left ?? conn.db.eventState.id.find(0)?.endedAt)?.toDate().getTime() ?? Date.now();
+  return (left ?? conn.db.eventState.id.find(0)?.endedAt)?.toDate().getTime() ?? running;
 }
 
 /**
@@ -38,7 +38,8 @@ function endedAt(conn: DbConnection): number {
  * again every 5 s until it answers.
  */
 async function load(conn: DbConnection, rerender: () => void) {
-  const end = endedAt(conn);
+  // While the event runs (the organizer's View as), one answer serves until it ends.
+  const end = endedAt(conn, 0);
   if (loadedFor !== end) {
     data = undefined;
     loadedFor = end;
