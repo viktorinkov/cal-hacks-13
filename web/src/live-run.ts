@@ -4,7 +4,7 @@
 // runs everything; this page only shows it.
 
 import * as THREE from 'three';
-import { act, h, money, time } from './lib';
+import { act, complicated, h, money, time } from './lib';
 import { bandCode } from './band-code';
 import { Crowd } from './crowd-3d';
 import { present } from './venue-map';
@@ -289,8 +289,8 @@ function incidents(r: LiveRun | undefined, canRun: boolean) {
             h('td', {}, m.status === 'responding' && m.medic ? `${m.medic} responding` : m.status,
               m.claimId ? [h('br'), `claim ${m.claimStatus}${m.payoutCents && m.claimStatus !== 'refused' ? `, ${money(m.payoutCents)}` : ''}`] : '',
               waiting && [h('br'), h('button', {
-                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: true })),
-              }, 'Approve and teach a rule')]),
+                onclick: () => act(() => conn.reducers.approveClaim({ claimId: c!.id, amountSeenCents: c!.payoutCents, packHashSeen: c!.packHash, requestedCeilingCents: undefined, learn: !complicated(c!) })),
+              }, complicated(c!) ? 'Approve' : 'Approve and teach a rule')]),
             h('td', {}, h('button', { class: 'link', onclick: () => v!.lookAt(m.xM, m.yM) }, 'Show')));
         }))));
 }

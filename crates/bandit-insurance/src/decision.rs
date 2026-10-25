@@ -6,9 +6,8 @@
 //!
 //! - Claude never sets an amount. The fee schedule and the policy limits did.
 //! - A claim with a complication, a gap or mismatch in the policies (no cover
-//!   for the incident, a bill over the policy's limit, a billed service the
-//!   fee schedule does not list), always goes to the organizer, who decides
-//!   it one by one (`complications`).
+//!   for the incident, a bill over the policy's limit), always goes to the
+//!   organizer, who decides it one by one (`complications`).
 //! - Claude pays only claims whose checks all passed, whose evidence is
 //!   corroborated, and that fall inside the authority an organizer's approval
 //!   gave the Decision Engine (a learned rule and its ceiling). Any other pay
@@ -409,7 +408,7 @@ pub fn guard(d: &AgentDecision, input: &GuardInput) -> Guarded {
     let route = |reason: String, guardrail: String| Guarded { decision: Decision::Route { reason }, decided_by: "code", guardrail };
     let payout = format_cents(input.amounts.payout_cents);
 
-    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts, checks: input.checks });
+    let found = complications(&ClaimState { has_cover: input.has_cover, amounts: input.amounts });
     if !found.is_empty() {
         let head = match d.decision {
             Choice::Pay => format!("Claude would pay {payout}"),
@@ -668,19 +667,18 @@ mod tests {
     #[test]
     fn a_gap_in_the_policy_goes_to_the_organizer_whatever_claude_decided() {
         let rule = rule();
-        let unlisted = vec![Check::fail("record_lines", "5 covered, 1 reduced, 1 excluded; not on the schedule: 90715")];
         let route = |g: Guarded| match g.decision {
             Decision::Route { reason } => reason,
             other => panic!("{other:?}"),
         };
-        assert_eq!(
-            route(guard(&pay(), &input(&unlisted, Some(&rule)))),
-            "Complication: the policy's fee schedule does not list 90715. Claude would pay $180.00"
+        let (checks, capped) = (failing(), Amounts { cost_cents: 720_000, payout_cents: 500_000, recoverable_cents: 500_000, venue_cost_cents: 0 });
+        let mut fake = refuse_at_home();
+        fake.refusal_checks = vec!["witness_zone".into()];
+        assert!(
+            route(guard(&fake, &GuardInput { amounts: capped, ..input(&checks, Some(&rule)) }))
+                .starts_with("Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude recommends refusing")
         );
-        let mut refuse = refuse_at_home();
-        refuse.refusal_checks = vec!["record_lines".into()];
-        assert!(route(guard(&refuse, &input(&unlisted, Some(&rule)))).starts_with("Complication: the policy's fee schedule does not list 90715. Claude recommends refusing"));
-        let (checks, capped) = (passing(), Amounts { cost_cents: 720_000, payout_cents: 500_000, recoverable_cents: 500_000, venue_cost_cents: 0 });
+        let checks = passing();
         assert_eq!(
             route(guard(&pay(), &GuardInput { amounts: capped, ..input(&checks, Some(&rule)) })),
             "Complication: the covered cost $7,200.00 is over the policy's limit, which pays at most $5,000.00. Claude would pay $5,000.00"
