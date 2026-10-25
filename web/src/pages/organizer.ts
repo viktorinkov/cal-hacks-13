@@ -16,7 +16,7 @@ import { evidenceTrail } from '../evidence-trail';
 import { graphTab, showPhotoInGraph } from '../graph';
 import { present } from '../venue-map';
 import { venueSetupTab } from '../venue-setup';
-import { liveRunSection } from '../live-run';
+import { liveRunSection, runBar } from '../live-run';
 import { screens, serveViewers, viewUrl } from '../view-as';
 import { mockup } from '../recap';
 import type { DbConnection } from '../module_bindings';
@@ -143,7 +143,8 @@ function header() {
       signedInEmail() && [`Signed in as ${signedInEmail()} `, h('button', { class: 'link', onclick: signOut }, 'Sign out')]),
     h('p', { class: 'muted' }, `Staff role: ${roleList.length ? roleList.join(', ') : 'none'}`),
     roles().has('medic') && h('p', {}, 'Tap a band with this phone to open the wearer\'s medical card.'),
-    ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap. Start or reopen it on the Live tab.'),
+    ended && h('p', {}, h('b', {}, `The event ended at ${date(state?.endedAt)}. `), 'Every tap link now shows the recap.'),
+    can(...STAFF_ROLES) && runBar(conn, can('ops')),
     h('nav', {}, tabs().map(([key, label]) => h('a', { href: `#${key}`, class: key === tab ? 'on' : '', onclick: () => { tab = key; render(); } }, label))),
   ];
 }

@@ -1,6 +1,7 @@
-// The live run on the organizer's Live tab: one set of controls (start, pause, resume, end the event), the
-// crowd and the open incidents in the venue's 3D view from the Venue setup tab, placing our bands with a
-// click on the floor, and the decision history. The module runs everything; this page only shows it.
+// The live run in the organizer portal: one set of controls in the top bar on every tab (start, pause,
+// resume, end the event), and on the Live tab the crowd and the open incidents in the venue's 3D view from
+// the Venue setup tab, placing our bands with a click on the floor, and the decision history. The module
+// runs everything; this page only shows it.
 
 import * as THREE from 'three';
 import { act, h, time } from './lib';
@@ -84,7 +85,8 @@ function syncPoles(open: IncidentMarker[]) {
 function status(r: LiveRun | undefined, list: IncidentMarker[]): string {
   if (!r || r.phase.tag === 'Idle') return 'No run yet.';
   const paused = conn.db.livePause.id.find(0);
-  const people = crowd.counts().crowd;
+  const now = Date.now();
+  const people = [...conn.db.band.iter()].filter(b => b.id >= 100 && present(b, now)).length;
   const open = list.filter(m => m.status !== 'resolved').length;
   const count = (s: string) => list.filter(m => m.claimStatus === s).length;
   const paid = list.filter(m => m.claimStatus.startsWith('paid')).length;
@@ -184,19 +186,22 @@ function history() {
           h('td', {}, d.why)))));
 }
 
-/** The Live tab's run section. */
+/** The run's state and its controls, for the portal's top bar. */
+export function runBar(c: DbConnection, canRun: boolean) {
+  conn = c;
+  const r = run();
+  return [h('p', {}, h('b', {}, 'Event run: '), status(r, markers(r))), canRun && controls(r)];
+}
+
+/** The Live tab's run section: the 3D view, placing our bands and the decision history. */
 export function liveRunSection(c: DbConnection, canRun: boolean) {
   if (!v) setUp(c);
   else venueView(c);
   crowd.recheck();
   const r = run();
-  const list = markers(r);
-  syncPoles(going(r) ? list.filter(m => m.status !== 'resolved') : []);
+  syncPoles(going(r) ? markers(r).filter(m => m.status !== 'resolved') : []);
   return [
     h('section', {},
-      h('h3', {}, 'Event run'),
-      h('p', {}, status(r, list)),
-      canRun && controls(r),
       v!.view, v!.note,
       h('p', { class: 'muted' }, 'Green, amber and red people are calm, busy and very busy spots; a red person lying down fell or pressed SOS, and a red pole marks each open incident. Our bands are blue.'),
       canRun && placeBands()),
