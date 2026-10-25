@@ -904,10 +904,15 @@ fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
     assert_eq!(c.status, ClaimStatus::Routed);
     let charge = w.t.db.charge().id().find(charge.id).unwrap();
     assert_eq!(charge.recommendation, "charge");
-    // A stale amount fails closed, then the organizer approves what they see.
+    // The charge waits for the claim; a stale amount fails closed; then the organizer approves what they see.
+    assert!(w.try_as("ops", |ctx| approve_charge(ctx, charge.id, 240_000, c.pack_hash.clone())).unwrap_err().contains("waits for claim"));
+    w.as_("ops", |ctx| approve_claim(ctx, c.id, c.payout_cents, c.pack_hash.clone(), None, false));
+    assert_eq!(w.claim(c.id).status, ClaimStatus::Settled);
     assert!(w.try_as("ops", |ctx| approve_charge(ctx, charge.id, 1, c.pack_hash.clone())).is_err());
     w.as_("ops", |ctx| approve_charge(ctx, charge.id, 240_000, c.pack_hash.clone()));
-    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "approved");
+    let charge = w.t.db.charge().id().find(charge.id).unwrap();
+    // $1,900 repays the insurer, the $500 deductible repays the venue.
+    assert_eq!((charge.status.as_str(), charge.insurer_cents, charge.refund_cents), ("approved", 190_000, 0));
     let mine = crate::insurance::charges::my_charges(&w.view("Jordan Alvarez"));
     assert_eq!((mine.len(), mine[0].amount_cents, mine[0].status.as_str()), (1, 240_000, "approved"));
     assert!(mine[0].why.contains("a security camera saw it"), "{}", mine[0].why);
@@ -922,7 +927,7 @@ fn a_guest_who_knocked_over_a_speaker_is_charged_and_pays() {
     let p: ChargePaymentPayload = serde_json::from_str(&job.payload).unwrap();
     assert_eq!((p.amount_cents, p.account_id.as_str()), (240_000, "acct-Jordan Alvarez"));
     w.as_("worker", |ctx| claim_job(ctx, job.id));
-    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "cust".into(), "acct".into(), "purchase-1".into()));
+    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "cust".into(), "acct".into(), "purchase-1".into(), String::new(), String::new(), String::new()));
     assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "paid");
     assert_eq!(crate::wallet::my_wallet(&w.view("Jordan Alvarez")).unwrap().balance_cents, 80_000);
     let journals: Vec<String> = w.ledger(claim.id).into_iter().map(|e| e.0).collect();
@@ -973,6 +978,22 @@ fn a_broken_laptop_is_paid_from_the_owners_own_policy() {
     assert_eq!(w.t.db.attendee_policy().holder().find(id("Maya Chen")).unwrap().used_cents, 94_900);
     let charge = w.t.db.charge().incident_id().find(incident.id).unwrap();
     assert_eq!((charge.attendee_name.as_str(), charge.amount_cents), ("Jordan Alvarez", 119_900));
+    // Jordan's charge repays Maya's insurer $949.00 and gives Maya her $250.00 deductible back.
+    let c = w.claim(c.id);
+    w.as_("ops", |ctx| approve_charge(ctx, charge.id, 119_900, c.pack_hash.clone()));
+    let charge = w.t.db.charge().id().find(charge.id).unwrap();
+    assert_eq!((charge.insurer_cents, charge.refund_cents), (94_900, 25_000));
+    wallet_with(&w, "Jordan Alvarez", 200_000);
+    w.as_("Jordan Alvarez", |ctx| pay_charge(ctx, charge.id));
+    let job = w.t.db.job().iter().find(|j| j.kind == KIND_CHARGE_PAYMENT && j.subject_id == charge.id).unwrap();
+    let p: ChargePaymentPayload = serde_json::from_str(&job.payload).unwrap();
+    assert_eq!((p.refund_name.as_str(), p.refund_cents), ("Maya Chen", 25_000));
+    w.as_("worker", |ctx| claim_job(ctx, job.id));
+    w.as_("worker", |ctx| record_charge_payment(ctx, job.id, "c1".into(), "a1".into(), "p1".into(), "c2".into(), "a2".into(), "d2".into()));
+    assert_eq!(w.t.db.charge().id().find(charge.id).unwrap().status, "paid");
+    assert!(w.t.db.wallet_entry().identity().filter(id("Maya Chen")).any(|e| e.kind == "refund" && e.amount_cents == 25_000));
+    let journals: Vec<String> = w.ledger(c.id).into_iter().map(|e| e.0).collect();
+    assert!(journals.contains(&"J7 deductible returned".to_string()), "{journals:?}");
 }
 
 #[test]

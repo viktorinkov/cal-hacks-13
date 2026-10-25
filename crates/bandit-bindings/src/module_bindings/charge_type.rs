@@ -33,6 +33,8 @@ pub struct Charge {
     pub decided_at: Option<__sdk::Timestamp>,
     pub paid_at: Option<__sdk::Timestamp>,
     pub updated_at: __sdk::Timestamp,
+    pub insurer_cents: u64,
+    pub refund_cents: u64,
 }
 
 impl __sdk::InModule for Charge {
@@ -69,6 +71,8 @@ pub struct ChargeCols {
     pub decided_at: __sdk::__query_builder::Col<Charge, Option<__sdk::Timestamp>>,
     pub paid_at: __sdk::__query_builder::Col<Charge, Option<__sdk::Timestamp>>,
     pub updated_at: __sdk::__query_builder::Col<Charge, __sdk::Timestamp>,
+    pub insurer_cents: __sdk::__query_builder::Col<Charge, u64>,
+    pub refund_cents: __sdk::__query_builder::Col<Charge, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for Charge {
@@ -104,6 +108,8 @@ impl __sdk::__query_builder::HasCols for Charge {
             decided_at: __sdk::__query_builder::Col::new(table_name, "decided_at"),
             paid_at: __sdk::__query_builder::Col::new(table_name, "paid_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            insurer_cents: __sdk::__query_builder::Col::new(table_name, "insurer_cents"),
+            refund_cents: __sdk::__query_builder::Col::new(table_name, "refund_cents"),
         }
     }
 }

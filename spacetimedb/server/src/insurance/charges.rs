@@ -72,6 +72,12 @@ pub struct Charge {
     pub decided_at: Option<Timestamp>,
     pub paid_at: Option<Timestamp>,
     pub updated_at: Timestamp,
+    /// The insurer's share, set on approval: what it paid on the claim, which the charge repays.
+    #[default(0)]
+    pub insurer_cents: u64,
+    /// The owner's deductible the charge returns to them, set on approval; 0 for the venue's own claim.
+    #[default(0)]
+    pub refund_cents: u64,
 }
 
 fn charge_by_id(ctx: &ReducerContext, charge_id: u64) -> Result<Charge, String> {
@@ -168,6 +174,8 @@ pub fn name_responsible_band(ctx: &ReducerContext, incident_id: u64, band_id: u3
         decided_at: None,
         paid_at: None,
         updated_at: ctx.timestamp,
+        insurer_cents: 0,
+        refund_cents: 0,
     });
     let actor = if charge.named_by_role == "medic" { "medic" } else { "organizer" };
     let passed: Vec<&str> = checks.iter().filter(|c| c.result == CheckResult::Pass).map(|c| c.name.as_str()).collect();
@@ -252,8 +260,10 @@ fn organizer_check(ctx: &ReducerContext) -> Result<String, String> {
     Ok(ctx.db.staff_role().identity().filter(ctx.sender()).find(|r| r.role == "ops").map(|r| r.label).filter(|l| !l.is_empty()).unwrap_or_else(|| "Organizer".into()))
 }
 
-/// The organizer approves the charge they were shown; it fails closed when the amount or the pack is no
-/// longer current, and needs the band's checks to have passed.
+/// The organizer approves the charge they were shown, once the claim is decided; it fails closed when the
+/// amount or the pack is no longer current, and needs the band's checks to have passed. The charge splits
+/// into the insurer's share (what it paid on the claim) and the rest: the venue's deductible on its own
+/// claim, or, on an attendee's own claim, their deductible, which goes back to them when the charge is paid.
 #[spacetimedb::reducer]
 pub fn approve_charge(ctx: &ReducerContext, charge_id: u64, amount_seen_cents: u64, pack_hash_seen: String) -> Result<(), String> {
     let by = organizer_check(ctx)?;
@@ -265,14 +275,20 @@ pub fn approve_charge(ctx: &ReducerContext, charge_id: u64, amount_seen_cents: u
     if claim.cost_cents == 0 {
         return Err("the claim has no cost logged yet".into());
     }
+    let paid = matches!(claim.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled);
+    if !paid && claim.status != ClaimStatus::Refused {
+        return Err(format!("the charge waits for claim {} to be decided", claim.id));
+    }
     if amount_seen_cents != claim.cost_cents || amount_seen_cents != c.amount_cents || pack_hash_seen != claim.pack_hash {
         return Err(format!("stale: the charge is now {} on pack {}", format_cents(claim.cost_cents), bandit_insurance::pack::short_sha(&claim.pack_hash)));
     }
     if !c.checks_passed {
         return Err("a check of the named band failed; waive it or name the band again".into());
     }
-    post(ctx, claim.id, bandit_insurance::ledger::charge_approved(c.amount_cents), "approve_charge")?;
-    let c = save(ctx, Charge { status: APPROVED.into(), approved_by_name: by.clone(), decided_at: Some(ctx.timestamp), ..c });
+    let insurer_cents = if paid { claim.recoverable_cents.min(c.amount_cents) } else { 0 };
+    let refund_cents = if super::evidence::cover_of(&claim).is_attendee_policy() && claim.claimant.is_some() { c.amount_cents - insurer_cents } else { 0 };
+    post(ctx, claim.id, bandit_insurance::ledger::charge_approved(c.amount_cents, insurer_cents), "approve_charge")?;
+    let c = save(ctx, Charge { status: APPROVED.into(), approved_by_name: by.clone(), decided_at: Some(ctx.timestamp), insurer_cents, refund_cents, ..c });
     crate::live::record(
         ctx,
         c.incident_id,
@@ -280,7 +296,13 @@ pub fn approve_charge(ctx: &ReducerContext, charge_id: u64, amount_seen_cents: u
         "organizer",
         &by,
         format!("Approved a {} charge to {}", format_cents(c.amount_cents), c.attendee_name),
-        format!("the whole loss of claim {}; it shows on their tap page to pay or dispute", claim.id),
+        format!(
+            "the whole loss of claim {}: {} repays the insurer, {} {}; it shows on their tap page to pay or dispute",
+            claim.id,
+            format_cents(c.insurer_cents),
+            format_cents(c.amount_cents - c.insurer_cents),
+            if c.refund_cents > 0 { "goes back to the owner" } else { "repays the venue" }
+        ),
     );
     Ok(())
 }
@@ -297,8 +319,8 @@ pub fn waive_charge(ctx: &ReducerContext, charge_id: u64, reason: String) -> Res
         return Err("waiving a charge needs a reason".into());
     }
     let posted = ctx.db.ledger_entry().claim_id().filter(c.claim_id).any(|e| e.journal == "J5 charge");
-    if posted {
-        post(ctx, c.claim_id, bandit_insurance::ledger::charge_waived(c.amount_cents), "waive_charge")?;
+    if posted && c.status == APPROVED {
+        post(ctx, c.claim_id, bandit_insurance::ledger::charge_waived(c.amount_cents, c.insurer_cents), "waive_charge")?;
     }
     let c = save(ctx, Charge { status: WAIVED.into(), waive_reason: reason.trim().into(), decided_at: Some(ctx.timestamp), ..c });
     crate::live::record(ctx, c.incident_id, c.claim_id, "organizer", &by, format!("Waived the charge to {}", c.attendee_name), c.waive_reason.clone());
@@ -329,15 +351,50 @@ pub fn pay_charge(ctx: &ReducerContext, charge_id: u64) -> Result<(), String> {
         amount_cents: c.amount_cents,
         merchant_name: settings(ctx).venue_name,
         memo: format!("BandIt charge {} for incident {}", c.id, c.incident_id),
+        refund_to: String::new(),
+        refund_name: String::new(),
+        refund_customer_id: String::new(),
+        refund_account_id: String::new(),
+        refund_cents: 0,
+        refund_memo: String::new(),
+    };
+    let payload = match owner_of(ctx, &c).filter(|_| c.refund_cents > 0) {
+        Some(owner) => {
+            let account = ctx.db.claimant_account().identity().find(owner);
+            ChargePaymentPayload {
+                refund_to: owner.to_hex().to_string(),
+                refund_name: super::people::display_name(ctx, owner),
+                refund_customer_id: account.as_ref().map(|a| a.customer_id.clone()).unwrap_or_default(),
+                refund_account_id: account.as_ref().map(|a| a.account_id.clone()).unwrap_or_default(),
+                refund_cents: c.refund_cents,
+                refund_memo: format!("BandIt charge {} returns your deductible", c.id),
+                ..payload
+            }
+        }
+        None => payload,
     };
     jobs::enqueue(ctx, KIND_CHARGE_PAYMENT, serde_json::to_string(&payload).unwrap(), "charge", c.id);
     save(ctx, Charge { status: PAYING.into(), ..c });
     Ok(())
 }
 
-/// The worker's Nessie purchase for a charge.
+/// The owner whose claim the charge repays: the claimant of an attendee's own claim.
+fn owner_of(ctx: &ReducerContext, c: &Charge) -> Option<Identity> {
+    ctx.db.claim().id().find(c.claim_id).and_then(|k| k.claimant)
+}
+
+/// The worker's Nessie purchase for a charge, and the deposit that returns the owner's deductible.
 #[spacetimedb::reducer]
-pub fn record_charge_payment(ctx: &ReducerContext, job_id: u64, customer_id: String, account_id: String, purchase_id: String) -> Result<(), String> {
+pub fn record_charge_payment(
+    ctx: &ReducerContext,
+    job_id: u64,
+    customer_id: String,
+    account_id: String,
+    purchase_id: String,
+    refund_customer_id: String,
+    refund_account_id: String,
+    refund_deposit_id: String,
+) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
     let job = jobs::leased_by_caller(ctx, job_id)?;
     let c = charge_by_id(ctx, job.subject_id)?;
@@ -350,6 +407,13 @@ pub fn record_charge_payment(ctx: &ReducerContext, job_id: u64, customer_id: Str
     }
     crate::wallet::add_entry(ctx, c.attendee, "charge", -(c.amount_cents as i64), format!("BandIt charge {} for incident {}", c.id, c.incident_id), purchase_id.clone());
     post(ctx, c.claim_id, bandit_insurance::ledger::charge_paid(c.amount_cents), "record_charge_payment")?;
+    if let Some(owner) = owner_of(ctx, &c).filter(|_| c.refund_cents > 0 && !refund_deposit_id.is_empty()) {
+        if ctx.db.claimant_account().identity().find(owner).is_none() {
+            ctx.db.claimant_account().insert(ClaimantAccount { identity: owner, customer_id: refund_customer_id, account_id: refund_account_id, created_at: ctx.timestamp });
+        }
+        crate::wallet::add_entry(ctx, owner, "refund", c.refund_cents as i64, format!("Your deductible back from charge {}", c.id), refund_deposit_id);
+        post(ctx, c.claim_id, bandit_insurance::ledger::deductible_returned(c.refund_cents), "record_charge_payment")?;
+    }
     let c = save(ctx, Charge { status: PAID.into(), payment_reference: format!("Nessie purchase {purchase_id}"), paid_at: Some(ctx.timestamp), ..c });
     crate::live::record(ctx, c.incident_id, c.claim_id, "wallet", "Capital One", format!("{} paid the {} charge", c.attendee_name, format_cents(c.amount_cents)), c.payment_reference.clone());
     Ok(())
@@ -369,9 +433,7 @@ pub fn dispute_charge(ctx: &ReducerContext, charge_id: u64, text: String) -> Res
     if text.is_empty() {
         return Err("say why in your own words".into());
     }
-    if ctx.db.ledger_entry().claim_id().filter(c.claim_id).any(|e| e.journal == "J5 charge") {
-        post(ctx, c.claim_id, bandit_insurance::ledger::charge_waived(c.amount_cents), "dispute_charge")?;
-    }
+    post(ctx, c.claim_id, bandit_insurance::ledger::charge_waived(c.amount_cents, c.insurer_cents), "dispute_charge")?;
     let c = save(ctx, Charge { status: DISPUTED.into(), dispute_text: text.clone(), ..c });
     crate::live::record(ctx, c.incident_id, c.claim_id, "attendee", &c.attendee_name, "Disputed the charge".into(), text);
     Ok(())

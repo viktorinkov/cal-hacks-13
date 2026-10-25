@@ -301,6 +301,8 @@ export const Charge = __t.object("Charge", {
   decidedAt: __t.option(__t.timestamp()),
   paidAt: __t.option(__t.timestamp()),
   updatedAt: __t.timestamp(),
+  insurerCents: __t.u64(),
+  refundCents: __t.u64(),
 });
 export type Charge = __Infer<typeof Charge>;
 
