@@ -600,7 +600,7 @@ fn review_payload(ctx: &ReducerContext, claim: &Claim) -> ReviewPayload {
     }
 }
 
-/// A step of Claude's investigation, while it runs: what it read and what the
+/// A step of the Decision Engine's investigation, while it runs: what it read and what the
 /// Evidence Engine found, for the decision history.
 #[spacetimedb::reducer]
 pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what: String, why: String) -> Result<(), String> {
@@ -609,7 +609,7 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
     if job.kind != KIND_REVIEW {
         return Err(format!("job {job_id} is not a claim investigation"));
     }
-    if !["Claude", "Evidence Engine"].contains(&actor.as_str()) {
+    if !["Decision Engine", "Evidence Engine", "Claude"].contains(&actor.as_str()) {
         return Err(format!("{actor:?} does not investigate claims"));
     }
     let claim = claim_by_id(ctx, job.subject_id)?;
@@ -617,15 +617,17 @@ pub fn report_claim_step(ctx: &ReducerContext, job_id: u64, actor: String, what:
         return Ok(());
     }
     let cut = |s: String, n: usize| if s.chars().count() > n { s.chars().take(n).collect::<String>() + "…" } else { s };
-    crate::live::record(ctx, claim.incident_id, claim.id, &actor, &actor, cut(what, 200), cut(why, 600));
+    // Keep agent progress distinct from the Decision Engine's code and rule actions.
+    let who = if actor == "Decision Engine" { "Investigator" } else { actor.as_str() };
+    crate::live::record(ctx, claim.incident_id, claim.id, &actor, who, cut(what, 200), cut(why, 600));
     Ok(())
 }
 
-/// Claude's investigation and decision. Code validates the decision again,
-/// then holds it to its limits (`decision::guard`): Claude pays inside the
+/// The agent's investigation and decision. Code validates the decision again,
+/// then holds it to its limits (`decision::guard`): the agent pays inside the
 /// authority an approved rule gives and refuses on failed checks; anything else,
 /// and every claim with a gap or mismatch in the policies, goes to the organizer. An invalid decision is set aside and the claim is
-/// decided as if Claude were unavailable.
+/// decided as if the agent were unavailable.
 #[spacetimedb::reducer]
 pub fn submit_claim_review(ctx: &ReducerContext, job_id: u64, review_json: String, call: ModelCallIn) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
@@ -905,7 +907,7 @@ fn paid(ctx: &ReducerContext, claim: Claim, reference: String, outcome: &str) ->
     post(ctx, claim.id, bandit_insurance::ledger::claimant_payment(claim.payout_cents), outcome)?;
     let note = match claim.decided_by.as_str() {
         "rule" => format!("settled automatically under rule v{}", claim.settlement_rule_version),
-        "claude" => format!("paid on Claude's decision, inside the authority of rule v{}", claim.settlement_rule_version),
+        "claude" => format!("paid on the Decision Engine's decision, inside the authority of rule v{}", claim.settlement_rule_version),
         _ => format!("approved by {}", claim.routed_to_name),
     };
     let claim = save(

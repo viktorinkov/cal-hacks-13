@@ -443,7 +443,7 @@ fn three_alike_approvals_make_a_rule_that_pays_the_fourth_on_its_own() {
     claude_proposes(&w, "worker", &proposal, &ids, 18_000);
     let p = w.t.db.rule_proposal().id().find(proposal.id).unwrap();
     assert_eq!((p.status.as_str(), p.ceiling_cents, p.proposed_by), ("proposed", 18_000, id("worker")));
-    assert!(w.t.db.decision().iter().any(|d| d.actor == "Claude" && d.what.starts_with("Proposed a rule: Pay first-aid wrist sprains")));
+    assert!(w.t.db.decision().iter().any(|d| d.actor == "Decision Engine" && d.what.starts_with("Proposed a rule: Pay first-aid wrist sprains")));
 
     assert!(w.try_as("worker", |ctx| approve_rule_proposal(ctx, p.id, 18_000)).is_err(), "the worker that proposed it cannot approve it");
     assert!(w.try_as("medic", |ctx| approve_rule_proposal(ctx, p.id, 18_000)).is_err());
@@ -462,7 +462,7 @@ fn three_alike_approvals_make_a_rule_that_pays_the_fourth_on_its_own() {
     assert_eq!((c.decided_by.as_str(), c.settlement_rule_version), ("claude", 1));
     let history = w.history(c.id);
     assert!(history.contains(&("Claude".into(), "Read the light circle: 2 fact(s)".into())), "{history:?}");
-    assert!(history.iter().any(|(a, w)| a == "Decision Engine" && w == "Paid on Claude's decision: $180.00 to Jordan Alvarez"), "{history:?}");
+    assert!(history.iter().any(|(a, w)| a == "Decision Engine" && w == "Paid on the Decision Engine's decision: $180.00 to Jordan Alvarez"), "{history:?}");
     assert_eq!(c.payout_reference, format!("Nessie deposit dep-{}", c.id));
     let account = w.t.db.claimant_account().identity().find(id("Jordan Alvarez")).unwrap();
     assert_eq!(account.account_id, "acct-1");
@@ -635,11 +635,11 @@ fn a_decision_that_breaks_the_rules_is_set_aside() {
     assert_eq!((c.status, c.review_verdict.as_str()), (ClaimStatus::Routed, "invalid"), "{}", c.status_note);
     let review = w.t.db.claim_review().claim_id().filter(c.id).last().unwrap();
     assert!(review.rejected.iter().any(|r| r.starts_with("pay without reading the light circle")), "{:?}", review.rejected);
-    assert!(w.history(c.id).iter().any(|(a, w)| a == "Decision Engine" && w == "Set Claude's decision aside"));
+    assert!(w.history(c.id).iter().any(|(a, w)| a == "Decision Engine" && w == "Set the agent's decision aside"));
 }
 
 #[test]
-fn only_claude_and_the_evidence_engine_report_investigation_steps() {
+fn only_authorized_investigation_roles_report_steps() {
     let w = World::new();
     approve_larger_fall(&w);
     w.advance(3600);
@@ -647,10 +647,19 @@ fn only_claude_and_the_evidence_engine_report_investigation_steps() {
     w.file_record(claim.id, FIRST_AID, 1);
     w.verify(claim.id);
     let job = w.lease(KIND_REVIEW, claim.id);
-    let spoof = w.try_as("worker", |ctx| report_claim_step(ctx, job.id, "organizer".into(), "Approved".into(), String::new()));
-    assert!(spoof.unwrap_err().contains("does not investigate claims"));
-    w.as_("worker", |ctx| report_claim_step(ctx, job.id, "Evidence Engine".into(), "Past fall claims: 12 approved".into(), "base rates".into()));
-    assert!(w.history(claim.id).contains(&("Evidence Engine".into(), "Past fall claims: 12 approved".into())));
+    for actor in ["organizer", "wallet", "unknown"] {
+        let spoof = w.try_as("worker", |ctx| report_claim_step(ctx, job.id, actor.into(), "Approved".into(), String::new()));
+        assert!(spoof.unwrap_err().contains("does not investigate claims"));
+    }
+    assert!(w.try_as("medic", |ctx| report_claim_step(ctx, job.id, "Decision Engine".into(), "Read evidence".into(), String::new())).is_err());
+    w.as_("worker", |ctx| report_claim_step(ctx, job.id, "Decision Engine".into(), "Read the band report".into(), "check the incident time".into()));
+    assert!(w.history(claim.id).contains(&("Decision Engine".into(), "Read the band report".into())));
+    assert!(w.t.db.decision().iter().any(|d| d.claim_id == claim.id && d.actor == "Decision Engine" && d.who == "Investigator" && d.what == "Read the band report"));
+    w.as_("worker", |ctx| report_claim_step(ctx, job.id, "Evidence Engine".into(), "Policy search: 2 clauses".into(), "coverage terms".into()));
+    assert!(w.history(claim.id).contains(&("Evidence Engine".into(), "Policy search: 2 clauses".into())));
+    // Existing in-flight workers can still finish after the module is published.
+    w.as_("worker", |ctx| report_claim_step(ctx, job.id, "Claude".into(), "Read the light circle".into(), String::new()));
+    assert!(w.history(claim.id).contains(&("Claude".into(), "Read the light circle".into())));
 }
 
 #[test]

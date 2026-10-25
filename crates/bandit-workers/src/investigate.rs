@@ -1,18 +1,22 @@
-//! `claim_review`: Claude investigates the claim and decides it.
+//! `claim_review`: Elastic Agent Builder chooses evidence reads and recommends a decision.
 //!
-//! Claude gets a brief (the claim, the amounts code fixed, the policy, the
+//! The agent gets a brief (the claim, the amounts code fixed, the policy, the
 //! clauses the Evidence Engine found, the charge staff proposed, an index of
 //! the evidence and the checks by name) and opens the evidence itself with
 //! tools, one source at a time: the band, the light circle, the security
 //! cameras, the staff notes, the hospital report, the person security named,
 //! the check details, and the clauses of the venue's policy and, for an injury,
 //! the attendee's health plan (the Evidence Engine's semantic search with
-//! Claude's own query, and one clause in full). It then decides pay, refuse or
+//! the agent's own query, and one clause in full). It then recommends pay, refuse or
 //! ask the organizer, and recommends a charge or none when someone was named.
 //! Every tool call is reported to the module as a step of the decision history
 //! while the investigation runs; code validates the decision here (one more try
 //! on a rejected answer) and again in the module, which holds it to the limits
-//! in `bandit_insurance::decision::guard`.
+//! in `bandit_insurance::decision::guard`. The worker controls the bounded loop
+//! and executes claim-scoped tools. The agent has no general database tools,
+//! public tool endpoint, settlement authority or cross-claim conversation.
+
+use std::time::{Duration, Instant};
 
 use bandit_bindings::ModelCallIn;
 use bandit_insurance::decision::{AgentDecision, Choice, EvidenceSource, Investigation, Step, validate_review};
@@ -20,20 +24,24 @@ use bandit_insurance::money::format_cents;
 use bandit_insurance::payloads::{ClauseRef, ReviewPayload};
 use bandit_insurance::schemas::agent_decision_schema;
 use bandit_insurance::{Fact, Source};
-use claims_elastic::ClauseHit;
+use claims_elastic::{ClauseHit, Kibana, investigator, tasks};
 use claude_client::{Effort, MessageRequest, ToolUse};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::jobs::{Ctx, JobError, JobIn};
-use crate::model::Model;
+use crate::model::{Answer, Failed, Model, Turn, new_call, truncate};
 use crate::prompts;
 use crate::sink::Finish;
 
-/// Thinking at high effort counts toward the cap, so leave room.
+/// The existing request carrier's output budget; model routing belongs to Elastic.
 const MAX_TOKENS: u32 = 32_000;
-/// Turns Claude may spend calling tools before it must decide.
+/// Turns the agent may spend requesting tools before it must decide.
 const TOOL_TURNS: usize = 8;
+const TOOLS_PER_TURN: usize = 16;
+const POLL_EVERY: Duration = Duration::from_secs(2);
+const WORKFLOW_LIMIT: Duration = Duration::from_secs(180);
 /// Tries at a valid decision after the first.
 const RETRIES: usize = 1;
 /// Clauses a policy search returns.
@@ -78,8 +86,9 @@ impl PolicyClauses for Elastic<'_> {
 }
 
 pub async fn run(ctx: &Ctx, job: &JobIn, p: ReviewPayload) -> Result<(), JobError> {
+    let agent = Investigator { kibana: ctx.investigator().await?, job_id: job.id, attempt: job.attempts };
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Step>();
-    let work = async move { investigate(&ctx.claude, &Elastic(ctx), &p, ctx.tz_offset_minutes, &tx).await };
+    let work = async move { investigate(&agent, &Elastic(ctx), &p, ctx.tz_offset_minutes, &tx).await };
     let report = async {
         while let Some(step) = rx.recv().await {
             if let Err(e) = ctx.sink.claim_step(job.id, &step).await {
@@ -103,6 +112,162 @@ pub struct Done {
     pub investigation: Investigation,
     pub checked: Result<AgentDecision, Vec<String>>,
     pub calls: Vec<ModelCallIn>,
+}
+
+/// Uses the existing transcript carrier only; no Anthropic request is sent.
+/// A fresh private workflow execution receives this job's transcript each turn.
+struct Investigator<'a> {
+    kibana: &'a Kibana,
+    job_id: u64,
+    attempt: u8,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentTurn {
+    tool_calls: Vec<RequestedTool>,
+    decision: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RequestedTool {
+    id: String,
+    name: String,
+    input: Value,
+}
+
+/// Each allowed request keeps its own argument schema; the agent cannot name
+/// another operation, policy document, claim or payment destination.
+fn turn_schema(body: &Value) -> Value {
+    let tools: Vec<Value> = body["tools"].as_array().into_iter().flatten().map(|tool| json!({
+        "type": "object", "additionalProperties": false,
+        "properties": {
+            "id": {"type": "string", "minLength": 1, "maxLength": 80},
+            "name": {"type": "string", "enum": [tool["name"]]},
+            "input": tool["input_schema"]
+        },
+        "required": ["id", "name", "input"]
+    })).collect();
+    json!({
+        "type": "object", "additionalProperties": false,
+        "properties": {
+            "tool_calls": {"type": "array", "maxItems": if body["tool_choice"]["type"] == "none" { 0 } else { TOOLS_PER_TURN },
+                "items": {"anyOf": tools}},
+            "decision": {"anyOf": [agent_decision_schema(), {"type": "null"}]}
+        },
+        "required": ["tool_calls", "decision"]
+    })
+}
+
+/// Validate the bridge at runtime too. Schema conformance alone is not an
+/// authorization check, and rejected requests never reach an evidence handler.
+fn agent_turn(answer: &Value, body: &Value) -> anyhow::Result<(Vec<Value>, Vec<ToolUse>, Option<Value>)> {
+    if answer.as_object().is_none_or(|object| object.len() != 2 || !object.contains_key("tool_calls") || !object.contains_key("decision")) {
+        anyhow::bail!("investigator must return exactly tool_calls and decision");
+    }
+    let answer: AgentTurn = serde_json::from_value(answer.clone())?;
+    if !answer.tool_calls.is_empty() && answer.decision.is_some() {
+        anyhow::bail!("investigator returned both a decision and tool requests");
+    }
+    if answer.tool_calls.is_empty() {
+        let decision = answer.decision.filter(Value::is_object).ok_or_else(|| anyhow::anyhow!("investigator returned neither tools nor a decision"))?;
+        return Ok((vec![json!({"type": "text", "text": decision.to_string()})], vec![], Some(decision)));
+    }
+    if body["tool_choice"]["type"] == "none" || answer.tool_calls.len() > TOOLS_PER_TURN {
+        anyhow::bail!("investigator exceeded the tool request limit");
+    }
+    let mut ids: std::collections::HashSet<String> = body["messages"].as_array().into_iter().flatten()
+        .flat_map(|message| message["content"].as_array().into_iter().flatten())
+        .filter(|block| block["type"] == "tool_use")
+        .filter_map(|block| block["id"].as_str().map(str::to_string))
+        .collect();
+    let mut tools = Vec::new();
+    for requested in answer.tool_calls {
+        if requested.id.is_empty() || requested.id.len() > 80 || !ids.insert(requested.id.clone()) {
+            anyhow::bail!("investigator tool ids must be unique and 1 to 80 bytes");
+        }
+        let allowed = body["tools"].as_array().into_iter().flatten()
+            .find(|tool| tool["name"].as_str() == Some(requested.name.as_str()))
+            .ok_or_else(|| anyhow::anyhow!("investigator requested an unknown tool"))?;
+        let props = allowed["input_schema"]["properties"].as_object().ok_or_else(|| anyhow::anyhow!("tool has no argument schema"))?;
+        let input = requested.input.as_object().ok_or_else(|| anyhow::anyhow!("tool arguments must be an object"))?;
+        for (key, value) in input {
+            let schema = props.get(key).ok_or_else(|| anyhow::anyhow!("tool has an unknown argument"))?;
+            if !value.is_string() || schema.get("enum").and_then(Value::as_array).is_some_and(|choices| !choices.contains(value)) {
+                anyhow::bail!("tool has an invalid argument");
+            }
+        }
+        for required in allowed["input_schema"]["required"].as_array().into_iter().flatten() {
+            if !input.contains_key(required.as_str().unwrap_or_default()) {
+                anyhow::bail!("tool is missing a required argument");
+            }
+        }
+        tools.push(ToolUse { id: requested.id, name: requested.name, input: requested.input });
+    }
+    let content = tools.iter().map(|tool| json!({"type": "tool_use", "id": tool.id, "name": tool.name, "input": tool.input})).collect();
+    Ok((content, tools, None))
+}
+
+fn record_execution(call: &mut ModelCallIn, execution: &str, done: &Value) {
+    call.stop_reason = done["status"].as_str().unwrap_or_default().into();
+    if let Some(output) = investigator::reported_output(done) {
+        let metadata = tasks::metadata(output);
+        call.model_used = tasks::model(&metadata);
+        (call.input_tokens, call.output_tokens) = tasks::tokens(&metadata);
+        call.response = truncate(&json!({"execution_id": execution, "metadata": metadata, "output": output}).to_string(), 20_000);
+    }
+}
+
+impl Model for Investigator<'_> {
+    async fn ask(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Answer, Failed> {
+        let turn = self.turn(kind, effort, request).await?;
+        match turn.json {
+            Some(json) => Ok(Answer { json, call: turn.call }),
+            None => {
+                let mut call = turn.call;
+                call.status = "error".into();
+                call.error = "investigator returned tool requests instead of a decision".into();
+                Err(Failed { error: call.error.clone(), call })
+            }
+        }
+    }
+
+    async fn turn(&self, kind: &str, _effort: Effort, request: MessageRequest) -> Result<Turn, Failed> {
+        let body = request.body("");
+        let task = json!({
+            "job_id": self.job_id, "attempt": self.attempt,
+            "instructions": body["system"], "tools": body["tools"],
+            "tool_choice": body["tool_choice"], "transcript": body["messages"]
+        });
+        let inputs = json!({"task": task.to_string(), "schema": turn_schema(&body).to_string()});
+        let mut call = new_call(kind);
+        call.model_requested = format!("elastic-agent:{}", investigator::AGENT);
+        call.request_hash = claude_client::request_hash(&inputs);
+        let started = Instant::now();
+        let result = async {
+            let execution = self.kibana.run_workflow(investigator::WORKFLOW, inputs).await?;
+            call.response = json!({"execution_id": execution}).to_string();
+            let done = self.kibana.wait_for(&execution, POLL_EVERY, WORKFLOW_LIMIT).await?;
+            record_execution(&mut call, &execution, &done);
+            let output = investigator::output(&done)?;
+            let answer = investigator::answer(output)?;
+            agent_turn(&answer, &body)
+        }.await;
+        call.latency_ms = started.elapsed().as_millis().min(u32::MAX as u128) as u32;
+        match result {
+            Ok((content, tool_uses, json)) => {
+                call.status = "ok".into();
+                call.stop_reason = "completed".into();
+                Ok(Turn { content, tool_uses, json, call })
+            }
+            Err(error) => {
+                call.status = "error".into();
+                call.error = format!("{error:#}");
+                Err(Failed { error: call.error.clone(), call })
+            }
+        }
+    }
 }
 
 fn facts_of<'a>(p: &'a ReviewPayload, source: EvidenceSource) -> Vec<&'a Fact> {
@@ -204,7 +369,7 @@ fn document_of<'a>(p: &'a ReviewPayload, policy: &str) -> Option<&'a str> {
 fn on_this_claim(c: &ClauseHit, p: &ReviewPayload) -> bool {
     match c.policy.as_str() {
         "venue" => document_of(p, "venue").is_none_or(|h| c.document_hash == h),
-        "attendee" => document_of(p, "attendee").is_some_and(|h| c.document_hash == h),
+        "attendee" => prompts::is_injury(p) && document_of(p, "attendee").is_some_and(|h| c.document_hash == h),
         _ => false,
     }
 }
@@ -238,7 +403,7 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
     let error = |text: String| Ran {
         text: text.clone(),
         is_error: true,
-        step: step("Claude", &t.name, format!("{} failed", t.name), &text, vec![]),
+        step: step("Decision Engine", &t.name, format!("{} failed", t.name), &text, vec![]),
         read: None,
         clauses: vec![],
     };
@@ -265,7 +430,7 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
                 0 => format!("Read {}: nothing on file", source.label()),
                 n => format!("Read {}: {n} fact(s)", source.label()),
             };
-            Ran { text: prompts::tool_block(source.as_str(), lines), is_error: false, step: step("Claude", "read_evidence", summary, reason, ids), read: Some(source), clauses: vec![] }
+            Ran { text: prompts::tool_block(source.as_str(), lines), is_error: false, step: step("Decision Engine", "read_evidence", summary, reason, ids), read: Some(source), clauses: vec![] }
         }
         "read_checks" => {
             let failed: Vec<&str> = p.checks.iter().filter(|c| c.result == bandit_insurance::CheckResult::Fail).map(|c| c.name.as_str()).collect();
@@ -275,7 +440,7 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
                 format!("Read the checks: {} failed ({})", failed.len(), failed.join(", "))
             };
             let lines = p.checks.iter().map(|c| format!("{} (reader {})", c.line(), c.reader.as_str()));
-            Ran { text: prompts::tool_block("checks", lines), is_error: false, step: step("Claude", "read_checks", summary, reason, vec![]), read: Some(EvidenceSource::Checks), clauses: vec![] }
+            Ran { text: prompts::tool_block("checks", lines), is_error: false, step: step("Decision Engine", "read_checks", summary, reason, vec![]), read: Some(EvidenceSource::Checks), clauses: vec![] }
         }
         "search_policy" => {
             let (query, policy) = (str_input(t, "query"), str_input(t, "policy"));
@@ -348,7 +513,7 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
             Ran {
                 text: prompts::tool_block("clause", [line_of(&clause, false, usize::MAX)]),
                 is_error: false,
-                step: step("Claude", "read_clause", summary, reason, vec![]),
+                step: step("Decision Engine", "read_clause", summary, reason, vec![]),
                 read: Some(EvidenceSource::PolicyClauses),
                 clauses: vec![clause.clause_id],
             }
@@ -357,7 +522,7 @@ async fn run_tool<E: PolicyClauses>(t: &ToolUse, p: &ReviewPayload, evidence: &E
     }
 }
 
-/// Runs the investigation: tool turns until Claude answers, at most
+/// Runs the investigation: tool turns until the agent answers, at most
 /// `TOOL_TURNS` of them, then validation with `RETRIES` more tries. Each step
 /// goes to `steps` as it happens. A failed call is a `JobError` with every call made.
 pub async fn investigate<M: Model, E: PolicyClauses>(model: &M, evidence: &E, p: &ReviewPayload, tz: i32, steps: &UnboundedSender<Step>) -> Result<Done, JobError> {
@@ -415,21 +580,21 @@ pub async fn investigate<M: Model, E: PolicyClauses>(model: &M, evidence: &E, p:
         }
         if let Ok(d) = &checked {
             for f in &d.findings {
-                emit(step("Claude", "weigh", f.headline(), &f.detail, f.fact_ids.clone()), &mut all_steps);
+                emit(step("Decision Engine", "weigh", f.headline(), &f.detail, f.fact_ids.clone()), &mut all_steps);
             }
             if !d.trusted_source.trim().is_empty() {
-                emit(step("Claude", "weigh", "Weighed the sources that disagree".into(), d.trusted_source.trim(), vec![]), &mut all_steps);
+                emit(step("Decision Engine", "weigh", "Weighed the sources that disagree".into(), d.trusted_source.trim(), vec![]), &mut all_steps);
             }
             if let Some(c) = &d.charge {
                 let summary = if c.recommend { "Recommends charging the person named" } else { "Recommends no charge" };
-                emit(step("Claude", "recommend", summary.into(), c.reason.trim(), c.fact_ids.clone()), &mut all_steps);
+                emit(step("Decision Engine", "recommend", summary.into(), c.reason.trim(), c.fact_ids.clone()), &mut all_steps);
             }
             let summary = match d.decision {
                 Choice::Pay => format!("Decided to pay {}", format_cents(p.amounts.payout_cents)),
                 Choice::Refuse => "Decided to refuse".to_string(),
                 Choice::AskOrganizer => "Decided to ask the organizer".to_string(),
             };
-            emit(step("Claude", "decide", summary, &d.summary, d.cited_fact_ids.clone()), &mut all_steps);
+            emit(step("Decision Engine", "decide", summary, &d.summary, d.cited_fact_ids.clone()), &mut all_steps);
         }
         let investigation = Investigation { decision: answer, steps: all_steps, sources_read: read, clauses_seen: seen };
         return Ok(Done { investigation, checked, calls });
@@ -441,6 +606,67 @@ mod tests {
     use super::*;
     use crate::model::fake::FakeModel;
     use crate::testdata;
+
+    #[test]
+    fn failed_investigation_preserves_reported_usage_without_accepting_an_answer() {
+        let execution = json!({"status": "failed", "stepExecutions": [{
+            "stepId": "investigate", "status": "failed", "error": "connection ended",
+            "output": {"metadata": {"usage": {"connectorId": "configured-model", "inputTokens": 24, "outputTokens": 7}}}
+        }]});
+        let mut call = new_call(KIND);
+        record_execution(&mut call, "execution-1", &execution);
+        assert_eq!(call.stop_reason, "failed");
+        assert_eq!(call.model_used, "elastic-connector:configured-model");
+        assert_eq!((call.input_tokens, call.output_tokens), (24, 7));
+        assert!(call.response.contains("execution-1"));
+        assert!(investigator::output(&execution).is_err());
+    }
+
+    #[test]
+    fn bridge_accepts_only_known_read_tools_with_exact_arguments() {
+        let body = tools(MessageRequest::new()).body("");
+        let requested = |name: &str, input: Value| json!({"tool_calls": [{"id": "read-1", "name": name, "input": input}], "decision": null});
+        let valid = requested("read_evidence", json!({"source": "band", "reason": "check incident timing"}));
+        let (content, calls, decision) = agent_turn(&valid, &body).unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "read_evidence");
+        assert_eq!(content[0]["type"], "tool_use");
+        assert!(decision.is_none());
+        for invalid in [
+            requested("settle_claim", json!({"amount_cents": 100})),
+            requested("read_evidence", json!({"source": "other_claim", "reason": "r"})),
+            requested("read_evidence", json!({"source": "band", "reason": "r", "claim_id": "elsewhere"})),
+            requested("read_evidence", json!({"source": "band"})),
+            requested("search_policy", json!({"policy": "venue", "query": 3, "reason": "r"})),
+        ] {
+            assert!(agent_turn(&invalid, &body).is_err(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn bridge_rejects_ambiguous_duplicate_and_excess_requests() {
+        let body = tools(MessageRequest::new()).body("");
+        let request = json!({"id": "same", "name": "read_checks", "input": {"reason": "r"}});
+        for invalid in [
+            json!({"tool_calls": [], "decision": null}),
+            json!({"tool_calls": [request]}),
+            json!({"tool_calls": [request], "decision": {"decision": "pay"}}),
+            json!({"tool_calls": [request, request], "decision": null}),
+            json!({"tool_calls": [], "decision": {}, "sources_read": ["band"]}),
+            json!({"tool_calls": vec![request.clone(); TOOLS_PER_TURN + 1], "decision": null}),
+        ] {
+            assert!(agent_turn(&invalid, &body).is_err(), "{invalid}");
+        }
+        let no_tools = tools(MessageRequest::new()).tool_choice_none().body("");
+        assert!(agent_turn(&json!({"tool_calls": [request], "decision": null}), &no_tools).is_err());
+        assert_eq!(turn_schema(&no_tools)["properties"]["tool_calls"]["maxItems"], 0);
+        let (_, calls, decision) = agent_turn(&json!({"tool_calls": [], "decision": {"decision": "ask_organizer"}}), &no_tools).unwrap();
+        assert!(calls.is_empty());
+        assert_eq!(decision.unwrap()["decision"], "ask_organizer");
+        let earlier = vec![json!({"type": "tool_use", "id": "same", "name": "read_checks", "input": {"reason": "r"}})];
+        let repeated = tools(MessageRequest::new()).next_turn(&earlier).tool_result("same", "checks", false).body("");
+        assert!(agent_turn(&json!({"tool_calls": [request], "decision": null}), &repeated).is_err());
+    }
 
     /// The Evidence Engine with one venue exclusion for an injury, the venue's
     /// property clauses on theft, an attendee's health plan clause, and a clause
@@ -506,7 +732,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn claude_reads_the_evidence_then_decides() {
+    async fn agent_reads_the_evidence_then_decides() {
         let mut p = testdata::review_payload();
         p.checks.retain(|c| c.result != bandit_insurance::CheckResult::Fail);
         let mut answer = pay(&p);
@@ -529,7 +755,7 @@ mod tests {
         assert_eq!(summaries[5], "The light circle supports the claim");
         assert_eq!(summaries[6], "Decided to pay $895.00");
         assert_eq!(live, done.investigation.steps, "every step was reported live");
-        assert_eq!((live[3].actor.as_str(), live[4].actor.as_str()), ("Evidence Engine", "Claude"));
+        assert_eq!((live[3].actor.as_str(), live[4].actor.as_str()), ("Evidence Engine", "Decision Engine"));
 
         let body = model.body(1);
         let messages = body["messages"].as_array().unwrap();

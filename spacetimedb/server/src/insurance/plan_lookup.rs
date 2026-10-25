@@ -1,7 +1,7 @@
 //! Plan lookup: an attendee names their health insurer and plan instead of uploading its PDF. A
-//! worker searches for the plan's public document through Bright Data, Claude picks it among the
-//! results and reads what it prints, and the worker keeps the PDF only when the printed insurer and
-//! plan match what the attendee typed. Here the PDF lands like an upload and fills the medical
+//! worker searches for the plan's public document through Bright Data, and the Evidence Engine
+//! selects a source and reads what its PDF prints. The worker keeps the PDF only when its printed
+//! insurer and plan match what the attendee typed. Here the PDF lands like an upload and fills the medical
 //! card's insurer and plan, with the chunk of the PDF the check cites. A plan another lookup already
 //! found is linked at once, with no search.
 
@@ -16,7 +16,13 @@ use bandit_insurance::printed::same_plan_name;
 use bandit_insurance::time::civil_from_days;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
-pub const KIND_PLAN_LOOKUP: &str = "plan_lookup";
+pub const KIND_ATTENDEE_POLICY_LOOKUP: &str = "attendee_policy_lookup";
+/// Jobs already queued before the attendee lookup received its explicit name.
+const LEGACY_KIND_PLAN_LOOKUP: &str = "plan_lookup";
+
+fn is_lookup_kind(kind: &str) -> bool {
+    matches!(kind, KIND_ATTENDEE_POLICY_LOOKUP | LEGACY_KIND_PLAN_LOOKUP)
+}
 /// What the attendee names: their health plan.
 pub const HEALTH: &str = "health";
 
@@ -208,7 +214,7 @@ pub fn look_up_plan(ctx: &ReducerContext, insurer: String, plan: String, state: 
     }
     let row = ctx.db.plan_lookup().insert(typed);
     let payload = serde_json::to_string(&LookupPayload { lookup_id: row.id, kind, insurer, plan, state }).map_err(|e| e.to_string())?;
-    let job_id = jobs::enqueue(ctx, KIND_PLAN_LOOKUP, payload, "plan_lookup", row.id);
+    let job_id = jobs::enqueue(ctx, KIND_ATTENDEE_POLICY_LOOKUP, payload, "plan_lookup", row.id);
     ctx.db.plan_lookup().id().update(PlanLookup { job_id, ..row });
     Ok(())
 }
@@ -222,6 +228,9 @@ fn is_hash(h: &str) -> bool {
 pub fn finish_plan_lookup(ctx: &ReducerContext, job_id: u64, result: PlanLookupResult, call: Option<ModelCallIn>) -> Result<(), String> {
     require_role(ctx, &["worker"])?;
     let job = jobs::leased_by_caller(ctx, job_id)?;
+    if !is_lookup_kind(&job.kind) {
+        return Err("not an attendee policy lookup job".into());
+    }
     if let Some(call) = &call {
         jobs::record_call(ctx, job_id, call);
     }
@@ -287,7 +296,7 @@ fn land(ctx: &ReducerContext, found: &PlanLookup) {
         attendee: Some(found.attendee),
         file_hash: found.file_hash.clone(),
         page_count: found.page_count,
-        source: KIND_PLAN_LOOKUP.into(),
+        source: KIND_ATTENDEE_POLICY_LOOKUP.into(),
         source_url: found.source_url.clone(),
     };
     if let Err(e) = queue_document_read(ctx, read) {
@@ -317,7 +326,7 @@ fn land_health_plan(ctx: &ReducerContext, l: &PlanLookup) {
 
 /// A lookup job gave up after its last attempt.
 pub fn on_job_dead(ctx: &ReducerContext, job: &Job) {
-    if job.kind != KIND_PLAN_LOOKUP {
+    if !is_lookup_kind(&job.kind) {
         return;
     }
     if let Some(l) = ctx.db.plan_lookup().id().find(job.subject_id).filter(|l| l.status == SEARCHING) {

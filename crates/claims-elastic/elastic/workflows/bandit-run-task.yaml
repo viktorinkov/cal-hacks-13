@@ -1,0 +1,39 @@
+version: "1"
+name: bandit-run-task
+description: Runs one bounded Band1t text task with a strict answer schema. The worker validates the answer and submits it to SpacetimeDB; this workflow never writes business state or indexes the supplied text.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: task
+        type: string
+        required: true
+        description: The job stage, including the correction suffix on a second attempt.
+      - name: system
+        type: string
+        required: true
+        description: The task instructions.
+      - name: prompt
+        type: string
+        required: true
+        description: Only the evidence supplied for this task.
+      - name: schema
+        type: string
+        required: true
+        description: The JSON schema of the expected answer.
+steps:
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+
+  - name: answer
+    type: ai.prompt
+    with:
+      systemPrompt: "{{ inputs.system }}"
+      prompt: |
+        Task: {{ inputs.task }}
+
+        {{ inputs.prompt }}
+      schema: "${{ steps.schema.output }}"
+      temperature: 0

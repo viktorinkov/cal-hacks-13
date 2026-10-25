@@ -1,19 +1,15 @@
-//! Claude calls: every call, success or failure, becomes a `ModelCallIn` for
+//! Model execution records: every call, success or failure, becomes a `ModelCallIn` for
 //! the module's audit table, and answers code rejects get one more try. A
 //! tool loop calls [`Model::turn`] once per turn.
 
 use std::future::Future;
-use std::time::Instant;
 
 use bandit_bindings::ModelCallIn;
-use claude_client::{CallOutcome, ClaudeClient, ClaudeError, Effort, MessageRequest, ToolUse};
+use claude_client::{Effort, MessageRequest, ToolUse};
 use serde_json::Value;
 
 use crate::jobs::JobError;
 use crate::prompts;
-
-/// Longest response text kept in a call record.
-const MAX_RESPONSE_CHARS: usize = 20_000;
 
 /// A structured answer and the record of the call that produced it.
 pub struct Answer {
@@ -21,7 +17,7 @@ pub struct Answer {
     pub call: ModelCallIn,
 }
 
-/// One turn of a tool loop: Claude's blocks, the tools it called, its
+/// One turn of a tool loop: response blocks, the tools it called, its
 /// structured answer once it stops calling tools, and the call record.
 pub struct Turn {
     pub content: Vec<Value>,
@@ -36,59 +32,13 @@ pub struct Failed {
     pub call: ModelCallIn,
 }
 
-/// Something that answers a Claude request with JSON. Tests use a fake.
+/// An executor that answers a structured request. Tests use a fake.
 pub trait Model: Sync {
-    /// Sends `request` with `effort` and the refusal fallback; `kind` labels the call record.
+    /// Sends a structured request; `kind` labels the call record. Each executor records the settings it actually supports.
     fn ask(&self, kind: &str, effort: Effort, request: MessageRequest) -> impl Future<Output = Result<Answer, Failed>> + Send;
 
     /// Sends one turn of a tool loop; a turn that only calls tools is not a failure.
     fn turn(&self, kind: &str, effort: Effort, request: MessageRequest) -> impl Future<Output = Result<Turn, Failed>> + Send;
-}
-
-/// The real model behind `claude-client`.
-#[derive(Clone, Debug)]
-pub struct Claude {
-    pub client: ClaudeClient,
-}
-
-impl Model for Claude {
-    async fn ask(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Answer, Failed> {
-        let turn = self.turn(kind, effort, request).await?;
-        match turn.json {
-            Some(json) => Ok(Answer { json, call: turn.call }),
-            None => {
-                let mut call = turn.call;
-                call.status = "error".into();
-                call.error = "no structured output".into();
-                Err(Failed { error: call.error.clone(), call })
-            }
-        }
-    }
-
-    async fn turn(&self, kind: &str, effort: Effort, request: MessageRequest) -> Result<Turn, Failed> {
-        let request = request.effort(effort).refusal_fallback(true);
-        let started = Instant::now();
-        let mut call = new_call(kind);
-        call.model_requested = self.client.model().to_string();
-        call.effort = effort.as_str().to_string();
-        call.request_hash = self.client.request_hash(&request);
-        match self.client.call(&request).await {
-            Ok(outcome) => {
-                fill(&mut call, &outcome);
-                call.status = "ok".into();
-                Ok(Turn { content: outcome.content, tool_uses: outcome.tool_uses, json: outcome.json, call })
-            }
-            Err(e) => {
-                call.status = if matches!(e, ClaudeError::Refused { .. }) { "refusal" } else { "error" }.into();
-                call.error = e.to_string();
-                match e.outcome() {
-                    Some(outcome) => fill(&mut call, outcome),
-                    None => call.latency_ms = started.elapsed().as_millis().min(u32::MAX as u128) as u32,
-                }
-                Err(Failed { error: e.to_string(), call })
-            }
-        }
-    }
 }
 
 /// An empty call record of `kind`.
@@ -107,15 +57,6 @@ pub fn new_call(kind: &str) -> ModelCallIn {
         response: String::new(),
         error: String::new(),
     }
-}
-
-fn fill(call: &mut ModelCallIn, o: &CallOutcome) {
-    call.model_used = o.model.clone();
-    call.stop_reason = o.stop_reason.clone().unwrap_or_default();
-    call.input_tokens = o.input_tokens.min(u32::MAX as u64) as u32;
-    call.output_tokens = o.output_tokens.min(u32::MAX as u64) as u32;
-    call.latency_ms = o.latency_ms.min(u32::MAX as u64) as u32;
-    call.response = truncate(&o.text, MAX_RESPONSE_CHARS);
 }
 
 /// The first `max` characters of `s`.

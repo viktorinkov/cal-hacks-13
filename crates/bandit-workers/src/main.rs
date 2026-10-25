@@ -1,7 +1,8 @@
 //! `bandit-workers`: leases jobs from the BandIt SpacetimeDB module (insurance
-//! claims, rule proposals and policy documents, wallets, merch purchases, charge payments, venue setup and plan lookups), does the external work (Claude,
-//! Elastic, Nessie, Bright Data) and hands each result to the module's reducer for that job. Claude makes the judgment calls and
-//! writes the words; code decides money.
+//! claims, rule proposals and policy documents, wallets, merch purchases, charge
+//! payments, venue setup and plan lookups), does the external work through Elastic,
+//! Nessie and Bright Data, then hands each result to the module's result reducer.
+//! Models extract and interpret evidence; code decides money.
 //!
 //! ```text
 //! bandit-workers                            run the job loop
@@ -13,6 +14,8 @@ mod brightdata;
 mod charge;
 mod clinic;
 mod document;
+mod elastic;
+mod elastic_image;
 mod investigate;
 mod jobs;
 mod letters;
@@ -41,10 +44,8 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use bandit_common::Config;
 use claims_elastic::{ClaimsIndex, Kibana};
-use claude_client::ClaudeClient;
 
 use crate::jobs::{Ctx, JobIn};
-use crate::model::Claude;
 use crate::nessie::Nessie;
 use crate::sink::Sink;
 
@@ -66,7 +67,6 @@ fn runtime() -> Result<tokio::runtime::Runtime> {
 }
 
 fn context(config: &Config, sink: Sink) -> Result<Ctx> {
-    let client = ClaudeClient::from_env().context("setting up the Claude client")?;
     let env = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
     let prefix = env("ELASTIC_INDEX_PREFIX").unwrap_or_else(|| claims_elastic::DEFAULT_PREFIX.into());
     let elastic = match (&config.elasticsearch_url, &config.elasticsearch_api_key) {
@@ -82,13 +82,15 @@ fn context(config: &Config, sink: Sink) -> Result<Ctx> {
         _ => None,
     };
     Ok(Ctx {
-        claude: Claude { client },
         blobs: config.blob_store(),
         elastic,
         elastic_ready: tokio::sync::OnceCell::new(),
         kibana,
         reader_ready: tokio::sync::OnceCell::new(),
         proposer_ready: tokio::sync::OnceCell::new(),
+        tasks_ready: tokio::sync::OnceCell::new(),
+        investigator_ready: tokio::sync::OnceCell::new(),
+        image_ready: tokio::sync::OnceCell::new(),
         nessie,
         data_dir: config.data_dir.clone(),
         tz_offset_minutes: bandit_insurance::config::Config::default().tz_offset_minutes,

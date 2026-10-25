@@ -12,7 +12,7 @@ Pausing and evacuating stop new purchases. Resuming shifts the purchase schedule
 
 The run starts at most one wallet selection and one checkout per second, with at most ten wallet openings pending. Short runs and slow payment workers can finish below the 30% target; only completed wallet payments count as sales.
 
-When the event ends, a shopping agent (Claude, through the `merch_picks` job in `bandit-workers`) picks three templates for each attendee who is in a photo: the products of the booths they spent time at, each with one of their photos, the ones with the people they met first, and a short line printed under it such as "with Jordan & Maya". Until it answers, the view ranks templates by the minutes at their booths. The tap page places the photo straight into the photo area, prints the line and ticks the booth crawl poster's box for each sponsor booth the attendee visited. One tap buys it from the attendee's BandIt wallet.
+When the event ends, a shopping task (Elastic Workflows, through the `merch_picks` job in `bandit-workers`) picks three templates for each attendee who is in a photo: the products of the booths they spent time at, each with one of their photos, the ones with the people they met first, and a short line printed under it such as "with Jordan & Maya". Until it answers, the view ranks templates by the minutes at their booths. The tap page places the photo straight into the photo area, prints the line and ticks the booth crawl poster's box for each sponsor booth the attendee visited. One tap buys it from the attendee's BandIt wallet.
 
 No image is generated during the event and nothing is rendered on any server. Any event loads its own templates; Cal Hacks 13.0 is the first event it runs at. The whole feature is optional and far from the safety loop.
 
@@ -126,9 +126,13 @@ Each row also carries the line printed under the photo (the people the caller me
 
 When the organizer presses "Event ended", `end_event` enqueues one `merch_picks` job for each non-crowd attendee with a photo tag who has not left yet. An attendee who leaves early gets their job the moment they walk out (`departure.left_at` is set, [Tap-Page](../5-apps/Tap-Page.md)), so their picks are ready while the event goes on without them. The payload is the attendee's night as the bands measured it: the zones and minutes, the booths in each zone, the people they met and for how long, each photo with its zone, its caption, the people the bands put in it and which of those they met, and every template with its sponsors and price.
 
-`bandit-workers` sends it to Claude, which picks three different templates, a photo for each and a line of at most 36 characters, with one sentence on why. The worker checks every template and photo id against the payload and asks once more with the problems listed when an answer is wrong. `submit_merch_picks` checks them again (a known template, once each, a photo the attendee is tagged in) and stores them in `merch_pick`.
+`bandit-workers` sends this one attendee's JSON to the Elastic Workflow `bandit-run-task`. Its bounded `ai.prompt` step picks three different templates, a photo for each and a line of at most 36 characters, with one sentence on why. The input contains photo captions and tags, not image pixels; the task has no search across other attendees and no purchasing tools.
 
-Once an attendee has picks, `my_merch_suggestions` returns those, in Claude's order, with the reason shown as "Picked for you". `buy_merch` copies the pick's line onto the order. The organizer's Merch tab shows every attendee's picks and can run the agent again.
+The prompt ranks the supplied choices using captions, sponsor names and measured interests. Elastic runs that bounded task with a JSON schema for the answer and an execution visible in Kibana; this is personalization over the supplied choices, with no retrieval step. This task needs neither visual understanding nor an agent that chooses its own tools, so it uses `ai.prompt` rather than a direct Claude call or an Agent Builder tool loop. The worker checks every template and photo id against the payload and asks once more with the problems listed when an answer is wrong.
+
+`submit_merch_picks` checks the picks again (a known template, once each, a photo the attendee is tagged in) and stores them in `merch_pick`. Prices, balances and purchases remain in the module and the payment worker; the workflow only suggests products. Failed workflow calls and rejected answers keep their call records, and the worker never falls back to a direct Claude call.
+
+Once an attendee has picks, `my_merch_suggestions` returns those, in the workflow's order, with the reason shown as "Picked for you". `buy_merch` copies the pick's line onto the order. The organizer's Merch tab shows every attendee's picks and can run the agent again.
 
 ### The preview
 

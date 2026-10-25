@@ -98,7 +98,7 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
                     (
                         "Decision Engine",
                         format!("rule v{}", c.settlement_rule_version),
-                        format!("Paid on Claude's decision: {} to {}", format_cents(c.payout_cents), person(c)),
+                        format!("Paid on the Decision Engine's decision: {} to {}", format_cents(c.payout_cents), person(c)),
                         format!("every check passed and {} is inside the {ceiling} authority rule v{} gives; {paying}", format_cents(c.payout_cents), c.settlement_rule_version),
                     )
                 }
@@ -122,7 +122,7 @@ pub fn on_claim_saved(ctx: &ReducerContext, before: Option<&Claim>, c: &Claim) {
             let actor = if c.decided_by == "approver" { "organizer" } else { "Decision Engine" };
             let who = match c.decided_by.as_str() {
                 "approver" => c.routed_to_name.clone(),
-                "claude" => "Claude".into(),
+                "claude" => "Decision Engine".into(),
                 _ => "code".into(),
             };
             (actor, who, format!("Refused {}'s claim", person(c)), c.refusal_reason.clone())
@@ -167,9 +167,9 @@ pub fn checks_done(ctx: &ReducerContext, c: &Claim, failed: &[String], clauses: 
     record(ctx, c.incident_id, c.id, "Evidence Engine", "Evidence Engine", what, format!("{clauses} clauses of {policies} bear on this {} claim", c.incident_kind));
 }
 
-/// Code set Claude's decision aside: it failed validation even after one more try.
+/// Code set the agent's decision aside: it failed validation even after one more try.
 pub fn set_aside(ctx: &ReducerContext, c: &Claim, problems: &[String]) {
-    record(ctx, c.incident_id, c.id, "Decision Engine", "code", "Set Claude's decision aside".into(), problems.join("; "));
+    record(ctx, c.incident_id, c.id, "Decision Engine", "code", "Set the agent's decision aside".into(), problems.join("; "));
 }
 
 /// The organizer's approval, and what the precedent it keeps counts toward.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs as root on the Debian VM: installs Chromium (for the medical record PDFs), Caddy, Rust and Bun,
+# Runs as root on the Debian VM: installs Chromium (for medical record PDFs), Poppler (for page images), Caddy, Rust and Bun,
 # checks out $BANDIT_BRANCH into /opt/bandit, builds the pages and the services, sets up the Python the
 # venue setup runs pipeline/venue_model.py with (Playwright drives Bright Data's browser), then (re)starts
 # bandit-api, bandit-indexer, bandit-workers and the live run's floor staff under systemd behind Caddy on
@@ -14,7 +14,8 @@ flock 9
 
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl git build-essential pkg-config libssl-dev unzip \
-  chromium fonts-liberation caddy python3-venv > /dev/null
+  chromium fonts-liberation poppler-utils caddy python3-venv > /dev/null
+command -v pdftoppm > /dev/null
 printf '#!/bin/sh\nexec chromium --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/chrome
 chmod +x /usr/local/bin/chrome
 [ -x /root/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --default-toolchain 1.97.1
