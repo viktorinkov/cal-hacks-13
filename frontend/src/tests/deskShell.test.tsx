@@ -37,7 +37,7 @@ describe('shared desk header', () => {
     const nav = screen.getByRole('navigation', { name: 'Desk' })
     const before = within(nav).getAllByRole('button').map((item) => item.textContent)
     const user = userEvent.setup()
-    for (const label of ['Payments', 'Cameras', 'Staff', 'View as', 'Live']) {
+    for (const label of ['Payments', 'Cameras', 'Staff', 'View as', 'Map']) {
       await user.click(within(nav).getByRole('button', { name: label }))
       expect(screen.getByRole('banner')).toBe(header)
       expect(screen.getAllByRole('navigation', { name: 'Desk' })).toHaveLength(1)

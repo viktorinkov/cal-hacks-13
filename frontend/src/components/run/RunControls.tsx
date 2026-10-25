@@ -4,17 +4,22 @@ import {
   RUN_DEFAULTS,
   RUN_LIMITS,
   clock,
+  endEventRun,
   endRun,
   evacuateRun,
   pauseRun,
+  restartCrowd,
   resumeRun,
+  setRunLowVis,
   startRun,
+  stopCrowdNow,
   useRun,
   type RunSummary,
 } from '@/stdb/runOps'
+import { useSession } from '@/stdb/session'
 import { Refusal, Section, TwoStep, field, pill } from './parts'
 
-const RUN_KEYS = ['start', 'pause', 'resume', 'evacuate', 'end']
+const RUN_KEYS = ['start', 'pause', 'resume', 'evacuate', 'end', 'end-event', 'reopen', 'crowd', 'lowvis']
 
 /** The run's state, word for word as the dev portal's run table. */
 export function RunStatus({ summary }: { summary: RunSummary }) {
@@ -93,6 +98,7 @@ function StartForm() {
 
 function LiveControls({ summary }: { summary: RunSummary }) {
   const busy = useRun((s) => s.busy)
+  const lowVis = useRun((s) => s.lowVis)
   const running = summary.phase === 'running'
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -123,14 +129,53 @@ function LiveControls({ summary }: { summary: RunSummary }) {
       ))}
       {running && (
         <TwoStep
-          label="End the event"
-          question="End the event? The doors close, everyone walks out, and then every tap link switches to the recap."
+          label="End the run"
+          question="End the run? The doors close, everyone walks out, and then every tap link switches to the recap."
           confirm="End it"
           working="Ending…"
           cancel="Keep it open"
           busy={busy === 'end'}
           disabled={busy != null}
           onConfirm={endRun}
+        />
+      )}
+      <button type="button" disabled={busy != null} aria-pressed={lowVis} className={pill} onClick={() => void setRunLowVis(!lowVis)}>
+        {busy === 'lowvis' ? 'Switching…' : lowVis ? 'Bring the lights up' : 'Dim the hall'}
+      </button>
+    </div>
+  )
+}
+
+/** The crowd's backend ticker, and the event's own end when no run is live. */
+function EventExtras({ summary }: { summary: RunSummary }) {
+  const busy = useRun((s) => s.busy)
+  const ended = useSession((s) => s.eventEnded)
+  const crowd = summary.crowd || RUN_DEFAULTS.crowd
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button type="button" disabled={busy != null} className={pill} onClick={() => void restartCrowd(crowd)}>
+        {busy === 'crowd' ? 'Working…' : 'Restart the crowd'}
+      </button>
+      <TwoStep
+        label="Stop the crowd"
+        question="Stop the crowd? Everyone freezes where they stand until you restart it."
+        confirm="Stop it"
+        working="Stopping…"
+        cancel="Keep it moving"
+        busy={busy === 'crowd'}
+        disabled={busy != null}
+        onConfirm={stopCrowdNow}
+      />
+      {!ended && (
+        <TwoStep
+          label="End the event"
+          question="End the event? Every band's page switches to the recap."
+          confirm="End it"
+          working="Ending…"
+          cancel="Keep it open"
+          busy={busy === 'end-event'}
+          disabled={busy != null}
+          onConfirm={endEventRun}
         />
       )}
     </div>
@@ -146,10 +191,11 @@ export function RunControls({ summary, ops }: { summary: RunSummary; ops: boolea
         <div className="min-w-0">
           {!ops ? (
             <p className="text-[14px] leading-6 text-ink-dim">Only organizers can start, pause, evacuate or end the run.</p>
-          ) : summary.live ? (
-            <LiveControls summary={summary} />
           ) : (
-            <StartForm />
+            <div className="grid gap-6">
+              {summary.live ? <LiveControls summary={summary} /> : <StartForm />}
+              <EventExtras summary={summary} />
+            </div>
           )}
           {ops && <Refusal keys={RUN_KEYS} className="mt-4" />}
         </div>

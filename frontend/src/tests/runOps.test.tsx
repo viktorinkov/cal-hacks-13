@@ -55,6 +55,10 @@ function reducers() {
     resumeLiveRun: ok(),
     evacuateLiveRun: ok(),
     endLiveRun: ok(),
+    endEvent: ok(),
+    reopenEvent: ok(),
+    startCrowd: ok(),
+    stopCrowd: ok(),
     approveClaim: ok(),
     giveBand: ok(),
     placeBand: ok(),
@@ -359,7 +363,11 @@ describe('run page', () => {
     page()
     const run = within(screen.getByRole('region', { name: 'Event run' }))
     expect(run.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    expect(run.getByRole('button', { name: 'End the run' })).toBeInTheDocument()
     expect(run.getByRole('button', { name: 'End the event' })).toBeInTheDocument()
+    expect(run.getByRole('button', { name: 'Dim the hall' })).toBeInTheDocument()
+    expect(run.getByRole('button', { name: 'Restart the crowd' })).toBeInTheDocument()
+    expect(run.getByRole('button', { name: 'Stop the crowd' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Approve claim 7' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Remove band 92 from the map' })).toBeInTheDocument()
 
@@ -368,13 +376,23 @@ describe('run page', () => {
     expect(calls.evacuateLiveRun).not.toHaveBeenCalled()
     await user.click(run.getByRole('button', { name: 'Evacuate now' }))
     expect(calls.evacuateLiveRun).toHaveBeenCalledWith({ on: true })
+
+    await user.click(run.getByRole('button', { name: 'Dim the hall' }))
+    expect(calls.setLowVis).toHaveBeenCalledWith({ on: true })
+    await user.click(run.getByRole('button', { name: 'Restart the crowd' }))
+    expect(calls.startCrowd).toHaveBeenCalledWith({ size: 1000 })
+    await user.click(run.getByRole('button', { name: 'Stop the crowd' }))
+    await user.click(run.getByRole('button', { name: 'Stop it' }))
+    expect(calls.stopCrowd).toHaveBeenCalledWith({})
   })
 
-  it('shows the start form once the run has ended', () => {
+  it('shows the start form once the run has ended', async () => {
     useSession.setState({ phase: 'live', owner: true, roles: [] })
     const db = tables()
     db.liveRun.rows[0] = { ...db.liveRun.rows[0], phase: { tag: 'Ended' }, endedAt: ts(NOW) }
-    attachLink(fakeConnection(db).conn)
+    const { conn, calls } = fakeConnection(db)
+    attachLink(conn)
+    const user = userEvent.setup()
     page()
     const run = within(screen.getByRole('region', { name: 'Event run' }))
     expect(run.getByRole('button', { name: 'Start the event' })).toBeInTheDocument()
@@ -382,5 +400,21 @@ describe('run page', () => {
     expect(run.getByLabelText('Minutes')).toHaveValue(12)
     expect(run.getByRole('checkbox', { name: /start fresh/i })).toBeChecked()
     expect(run.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+
+    await user.click(run.getByRole('button', { name: 'End the event' }))
+    await user.click(run.getByRole('button', { name: 'End it' }))
+    expect(calls.endEvent).toHaveBeenCalledWith({})
+  })
+
+  it('reopens an ended event from the banner', async () => {
+    useSession.setState({ phase: 'live', owner: true, roles: [], eventEnded: true, eventEndedAt: NOW })
+    const { conn, calls } = fakeConnection()
+    attachLink(conn)
+    const user = userEvent.setup()
+    page()
+    const banner = within(screen.getByRole('region', { name: 'Event ended' }))
+    expect(banner.getByText(/The event ended at/)).toBeInTheDocument()
+    await user.click(banner.getByRole('button', { name: 'Reopen the event' }))
+    expect(calls.reopenEvent).toHaveBeenCalledWith({})
   })
 })

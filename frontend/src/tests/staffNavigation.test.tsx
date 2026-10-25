@@ -38,6 +38,6 @@ describe('owner desk navigation', () => {
     render(<RouteProvider><DeskTabs /></RouteProvider>)
     expect(screen.queryByRole('button', { name: 'Staff' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View as' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Live' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument()
   })
 })

@@ -145,7 +145,7 @@ describe('the desk tabs', () => {
   it('list Payments after Settlements and Proposed rules', () => {
     render(<RouteProvider><DeskTabs /></RouteProvider>)
     const tabs = within(screen.getByRole('navigation', { name: 'Desk' })).getAllByRole('button').map((button) => button.textContent)
-    expect(tabs.slice(0, 5)).toEqual(['Live', 'Attendees', 'Settlements', 'Proposed rules', 'Payments'])
+    expect(tabs.slice(0, 5)).toEqual(['Map', 'Attendees', 'Settlements', 'Proposed rules', 'Payments'])
   })
 })
 
