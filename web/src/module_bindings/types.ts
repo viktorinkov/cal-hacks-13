@@ -448,6 +448,7 @@ export const CoverageRuleRow = __t.object("CoverageRuleRow", {
   serviceWindowDays: __t.u32(),
   active: __t.bool(),
   updatedAt: __t.timestamp(),
+  minimumPayoutCents: __t.u64(),
 });
 export type CoverageRuleRow = __Infer<typeof CoverageRuleRow>;
 
@@ -614,6 +615,15 @@ export const Fact = __t.object("Fact", {
 });
 export type Fact = __Infer<typeof Fact>;
 
+export const FeeScheduleLine = __t.object("FeeScheduleLine", {
+  id: __t.u64(),
+  policyId: __t.u64(),
+  code: __t.string(),
+  description: __t.string(),
+  capCents: __t.u64(),
+});
+export type FeeScheduleLine = __Infer<typeof FeeScheduleLine>;
+
 export const Gateway = __t.object("Gateway", {
   id: __t.u8(),
   mac: __t.string(),
@@ -777,6 +787,9 @@ export const InsurancePolicy = __t.object("InsurancePolicy", {
   medicalUsedCents: __t.u64(),
   propertyUsedCents: __t.u64(),
   updatedAt: __t.timestamp(),
+  otherInsurance: __t.string(),
+  staffExcluded: __t.bool(),
+  periodChecked: __t.bool(),
 });
 export type InsurancePolicy = __Infer<typeof InsurancePolicy>;
 
@@ -1355,6 +1368,45 @@ export const PlanArea = __t.object("PlanArea", {
   y1M: __t.f32(),
 });
 export type PlanArea = __Infer<typeof PlanArea>;
+
+export const PolicyDocument = __t.object("PolicyDocument", {
+  id: __t.u64(),
+  kind: __t.string(),
+  attendee: __t.option(__t.identity()),
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  status: __t.string(),
+  jobId: __t.u64(),
+  clauseCount: __t.u32(),
+  dropped: __t.array(__t.string()),
+  error: __t.string(),
+  policyId: __t.u64(),
+  source: __t.string(),
+  sourceUrl: __t.string(),
+  uploadedBy: __t.identity(),
+  uploadedAt: __t.timestamp(),
+  readAt: __t.option(__t.timestamp()),
+  confirmedBy: __t.identity(),
+  confirmedAt: __t.option(__t.timestamp()),
+});
+export type PolicyDocument = __Infer<typeof PolicyDocument>;
+
+export const PolicyTerm = __t.object("PolicyTerm", {
+  id: __t.u64(),
+  documentId: __t.u64(),
+  coverKind: __t.string(),
+  name: __t.string(),
+  code: __t.string(),
+  value: __t.string(),
+  shown: __t.string(),
+  readValue: __t.string(),
+  quote: __t.string(),
+  page: __t.u32(),
+  clauseId: __t.string(),
+  status: __t.string(),
+  problem: __t.string(),
+});
+export type PolicyTerm = __Infer<typeof PolicyTerm>;
 
 export const PrecedentIn = __t.object("PrecedentIn", {
   reference: __t.string(),

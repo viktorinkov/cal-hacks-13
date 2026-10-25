@@ -161,6 +161,30 @@ pub fn board_policies(ctx: &ViewContext) -> RawQuery<InsurancePolicy> {
     staff_query(ctx, "insurance_policy")
 }
 
+/// Each policy's covers: limits, deductible, minimum payout and service window.
+#[spacetimedb::view(accessor = board_covers, public)]
+pub fn board_covers(ctx: &ViewContext) -> RawQuery<CoverageRuleRow> {
+    staff_query(ctx, "coverage_rule")
+}
+
+/// Uploaded insurance PDFs and how far their reading got.
+#[spacetimedb::view(accessor = board_policy_documents, public)]
+pub fn board_policy_documents(ctx: &ViewContext) -> RawQuery<PolicyDocument> {
+    staff_query(ctx, "policy_document")
+}
+
+/// Every term read from a venue policy, with its quote, page and checks.
+#[spacetimedb::view(accessor = board_policy_terms, public)]
+pub fn board_policy_terms(ctx: &ViewContext) -> RawQuery<PolicyTerm> {
+    staff_query(ctx, "policy_term")
+}
+
+/// The confirmed policies' schedules of benefits.
+#[spacetimedb::view(accessor = board_fee_schedule, public)]
+pub fn board_fee_schedule(ctx: &ViewContext) -> RawQuery<FeeScheduleLine> {
+    staff_query(ctx, "fee_schedule_line")
+}
+
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct MyClaim {
     pub id: u64,

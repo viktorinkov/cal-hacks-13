@@ -17,6 +17,7 @@ pub struct CoverageRuleRow {
     pub service_window_days: u32,
     pub active: bool,
     pub updated_at: __sdk::Timestamp,
+    pub minimum_payout_cents: u64,
 }
 
 impl __sdk::InModule for CoverageRuleRow {
@@ -37,6 +38,7 @@ pub struct CoverageRuleRowCols {
     pub service_window_days: __sdk::__query_builder::Col<CoverageRuleRow, u32>,
     pub active: __sdk::__query_builder::Col<CoverageRuleRow, bool>,
     pub updated_at: __sdk::__query_builder::Col<CoverageRuleRow, __sdk::Timestamp>,
+    pub minimum_payout_cents: __sdk::__query_builder::Col<CoverageRuleRow, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for CoverageRuleRow {
@@ -62,6 +64,10 @@ impl __sdk::__query_builder::HasCols for CoverageRuleRow {
             ),
             active: __sdk::__query_builder::Col::new(table_name, "active"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            minimum_payout_cents: __sdk::__query_builder::Col::new(
+                table_name,
+                "minimum_payout_cents",
+            ),
         }
     }
 }
