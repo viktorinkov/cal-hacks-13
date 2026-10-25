@@ -14,6 +14,7 @@ Responsibilities:
 - Hold the one band control on the page: the low-visibility button (`set_low_vis`).
 - Run incidents in the incident desk: a medic takes one ("Take it"), staff add notes with a cost, and staff resolve it.
 - Show where each booth stands.
+- Let staff find anyone in the Live tab's "People" list and act as them: file a claim, buy merch, take the band back and open their medical card; the owner also opens their pages.
 - Give the organizer (`ops`) the attendee list with band status and "Take the band back" (`release_band`), and the "Event ended" button (`end_event`). Once the event has ended, the button becomes "Reopen the event" (`reopen_event`).
 - Insurance.md: give the organizer "Waiting for your decision", the claims no learned rule settled, to decide after the event.
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
@@ -74,7 +75,7 @@ The header reads "<venue> organizer portal", then "Signed in as <email>" with "S
 
 The no-role screen. A signed-in person with no staff role sees no tabs. The page reads "This account has no staff role", then "The organizer portal is for the event's organizer and medics. To get access, send this code to the organizer:", and their full identity code.
 
-The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, and "Zones" with the low-visibility button and the zone table), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
+The tabs are the same on every device, in this order: Live ("Alerts", "Venue" with the venue map, "Zones" with the low-visibility button and the zone table, and "People", the list of everyone), Attendees (the attendee list) and Claims (the incident desk, "Open incidents", on top). Optional tabs, in their place in that order:
 
 - Insurance.md: "Waiting for your decision" and the claims queue sit in the Claims tab, under the incident desk.
 - Social.md: the Event graph tab, then the Photos tab, after Claims (see Event graph and Photos tab below).
@@ -100,6 +101,24 @@ The organizer (`ops`) runs the event from the organizer portal's attendee list, 
 | Event ended | one button, with a confirm tap; afterwards the time the event ended and a "Reopen the event" button | `event_state` | `end_event`, `reopen_event` |
 
 Test-Bands.md: the line under the heading counts the crowd and the test bands too: "<c> in the crowd, <t> wearing test bands, <h> wearing hardware bands, <m> without a band." A crowd attendee's row is marked "crowd", and "Take the band back" never shows for one. The list shows everyone who tapped a band and the first 200 of the crowd by name, with the note "Showing the first 200 crowd attendees, by name."
+
+### People on the Live tab
+
+At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee from `board_attendees` and, for the owner, the staff from `view_as_people`. Those who tapped a band come first, then the staff, then the crowd, each by name.
+
+The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
+
+"Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
+
+| Action | For | Calls |
+|---|---|---|
+| "Their pages": "Their band page now", "Medical card" and "Recap and merch" for an attendee with a band, the portal for an organizer or medic, the photo page for a photographer; the page shows in the View as frame under the person, read-only, until "Hide their page" | the owner | `view_as` |
+| "File a claim as <name>": "What happened" picks a short story in their words, "Hospital report" picks "Matches", "Doesn't match" or "Random" | `ops` and `medic`, for an attendee with a band | for their injury that has no claim yet, `file_claim_for_wearer`; otherwise `open_incident` for a fall or SOS on their band where it is now, `resolve_incident` with "treated on site", then `file_claim_for_wearer` |
+| "Their claims": each claim with its status and payout, opening it on the Settlements tab | staff | none |
+| "Buy merch as <name>": the shop of the Merch tab's "Buy as an attendee", or "No wallet, so no merch." | `ops` | `buy_merch_as` |
+| "Take band <band code> back", with the attendee list's confirm | bands 1 to 99, until the event ends | `release_band` |
+| "Tap band <band code> for <name>'s medical card", then the card | `medic`, bands 1 to 99 | `request_medical_card` |
+| Test-Bands.md: "Walk to" each zone, "Press" and "Fall here" | test bands 90 to 99, in test mode | the Bands tab's `/api/dev` calls |
 
 When the organizer presses "Event ended", `end_event` sets `event_state.ended`. Every open tap page turns into the recap live, and from then on bands cannot be released ([Tap-Page](Tap-Page.md)). "Reopen the event" runs `reopen_event`, which clears it, to run the event flow again.
 
