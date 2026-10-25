@@ -1,6 +1,6 @@
 # Diagram review, 25 October 2026
 
-SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the 24-frame board's editing, visual review, publication and Plus synchronization.
+SpacetimeDB and Elastic are the primary presentation priorities. This review compares the diagrams with fetched code, the approved hardware drawing, prior decisions, and saved official sponsor research. The reviewed runtime includes the Elastic migration `b3c2ae5` and the rule-scope repair deployed in `5029dca`; organizer import is included in deployed `ec63ce0`. Import 1 completed on its first attempt (job 852 Done), with exactly one import run and existing IDs, zone mappings and financial/rule state preserved. Natural-language friend search `517c63d` deployed at 10:31:21 UTC and passed authenticated production-browser checks. These delivery states are separate from the board's editing, visual review, publication and Plus synchronization. The 21-frame reduction is now published and readback-verified on the canonical Plus board; the prior 24-frame source remains a saved checkpoint.
 
 ## What each sponsor contribution means
 
@@ -14,22 +14,33 @@ SpacetimeDB and Elastic are the primary presentation priorities. This review com
 
 ## Board organization
 
-The board has 24 frames because each answers a distinct question. The single Architecture frame incorporates the former Band1t, Architecture and Vultr overviews. Dedicated sponsor frames explain actual API or database responsibilities; feature frames refer to those named engines and services without repeating their internals. Elastic evidence and Elastic execution are separate because retrieval/ranking and bounded workflow execution have different contracts. Hardware and vision detail stays on the same board.
+The current verified board has 21 diagrams, listed by title below. The single Architecture diagram incorporates hosting; sponsor diagrams explain actual API and database responsibilities while feature journeys refer to them without repeating internals. Interest suggestions, Buy a memory and Exit guidance move to existing Devpost prose; their feature facts remain in force and their prior drawings remain in the saved 24-frame checkpoint. Hardware and vision detail stays on the main board.
 
-| Frames | Question or responsibility |
+| Diagram | Question or responsibility |
 |---|---|
-| 01 Architecture | How devices, services and externally hosted platforms connect. |
-| 02 SpacetimeDB | How committed writes reach tailored audience subscriptions, and where the subscription limits remain. |
-| 03 Elastic evidence; 04 Elastic execution | How scoped retrieval, ranking and cited precedents differ from checked workflow/model execution. |
-| 05 Bright Data; 06 Capital One Nessie | How source acquisition and financial API operations work. |
-| 07 Jobs; 08 Prepare the event | Who queues, claims, executes and records work; how the organizer starts server-side event preparation. |
-| 09 Find people again; 10 Interest suggestions | How typed reconnection uses meeting/place evidence, and how automatic suggestions separately use saved interests. |
-| 11 Photos and Memories | How capture context, count and caption become candidate tags, sharing and portal graph communities. |
-| 12 Settle a claim; 13 Policy amounts; 14 Approve a reusable rule | Who decides and pays, how code derives amounts, and how precedents can become explicitly approved authority. |
-| 15 Buy a memory | How a suggestion becomes a selected item and purchase. |
-| 16 Respond to an incident; 17 Routes and clear space; 18 Exit guidance | How response, movement and exit behavior differ. |
-| 19 Band data flow; 20 Band wiring; 21 Exit markers and gateway; 22 Band firmware | What is transmitted, how devices are connected, and what local firmware is intended to do. |
-| 23 Live camera evidence; 24 Venue reconstruction | How live flashes and radio state produce located evidence, versus how a phone walk produces a calibrated venue model. |
+| Architecture | How devices, services and externally hosted platforms connect. |
+| SpacetimeDB | How committed writes reach tailored audience subscriptions and where subscription limits remain. |
+| Elastic evidence | How scoped retrieval, ranking and cited precedents work. |
+| Elastic execution | How checked workflows and model execution return validated results. |
+| Bright Data | How workers acquire event, policy and venue source material. |
+| Capital One Nessie | How account, purchase and injury-deposit API operations work. |
+| Jobs | Who queues, claims, executes and records work. |
+| Prepare the event | How the organizer starts server-side event preparation. |
+| Find people again | How typed reconnection uses recorded meeting and place evidence. |
+| Photos and Memories | How capture context becomes candidate tags, sharing and communities built from encounters and visits; minutes remain inside their parent cards. |
+| Settle a claim | Who recommends, authorizes and pays. |
+| Policy amounts | How code derives medical and property amounts. |
+| Approve a reusable rule | How precedents become explicitly approved, code-guarded authority. |
+| Respond to an incident | How incident response reaches the appropriate people. |
+| Routes and clear space | How routes and nearby bands support response. |
+| Band data flow | What band telemetry contains and where it goes. |
+| Band wiring | How hardware components are connected. |
+| Exit markers and gateway | How stations, exit-color swatches and the gateway relate. |
+| Band firmware | What local band behavior is intended to do. |
+| Live camera evidence | How flashes and radio state produce located evidence. |
+| Venue reconstruction | How a phone walk produces a calibrated venue model. |
+
+The rule diagram removes historical repair detail and a repeated individual-decision lane. The approval guards are unchanged; the repair and its verification remain in this audit. Retiring a presentation diagram does not remove the corresponding product behavior.
 
 The canonical style uses large original artwork/logos, soft fills and dark text. Each main actor, component or object remains a visible outer card; its descriptive properties become small filled rectangles inside it. Actual actors and workflow/calculation stages may stand alone with arrows, while related formula inputs and conditions stay within their calculation group. Descriptive properties do not become artificial process steps. A short label may use several lines for one concept. App screenshots are excluded. Imported hardware source remains unchanged; editable checkpoints precede major rewrites.
 
@@ -69,4 +80,6 @@ Typed friend search and automatic interest suggestions are separate. The search 
 
 The Elastic migration passed workspace and server tests and live text/image workflow probes. Typed friend search passed production authentication, evidence filtering, Elastic-ranking and browser checks; these establish the checked behavior, not comparative ranking quality. Medical-history and insurance-card transcription fixtures preserved their printed lines, with private workflow access and upload cleanup verified. These probes do not establish clinical interpretation accuracy, photo identity precision, comparative ranking quality or full investigation-to-settlement parity. Do not advertise unmeasured performance or an unrun answer-key score.
 
-The grouped 24-frame revision passed native Excalidraw rendering, geometry, label, asset and excerpt checks. The [canonical Plus board](https://app.excalidraw.com/s/8CxNdcrvsHz/65Xc8JRcGo5) was read back and verified: 1,695 active elements, 24 frames, 238 image instances and 42 active assets, with the user's station x-position adjustment of +1.171875 preserved. Descriptive properties sit inside their parent cards and related formula inputs remain within calculation groups. The [matching public checkpoint](https://excalidraw.com/#json=p0Gilq4ytTdJY3VKU_r-r,Xq8vDszi13_7kLdKju8n0Q) was downloaded and verified against source `cf3c2042cb40e737ec5d9dd9c02f9a39ec03fb96ebf56ba3d389c15cc842817a`: all 1,695 elements and 42 assets match. Editable checkpoints and public URLs are recorded by the share script; Git preserves committed versions. The separate claims Plus scene is historical, not the current full board.
+The reduced 21-frame revision passed native Excalidraw rendering, geometry, label, asset and all four excerpt checks. The [canonical Plus board](https://app.excalidraw.com/s/8CxNdcrvsHz/65Xc8JRcGo5) was read back and verified: 1,550 active elements, 21 frames, 208 image instances and 40 active assets, with zero orphans and the user's station x-position adjustment of +1.171875 preserved. The source hash is `a11eaca309beb9f0a6a794a1df8aa633728c2a34d86539c4ea74e4bd834a448f`. All prior 1,695 active elements were retired. The 21 canonical SVGs and 16 aliases match the reduced render; six retired SVGs remain unchanged as historical compatibility files.
+
+The [prior grouped 24-frame public checkpoint](https://excalidraw.com/#json=p0Gilq4ytTdJY3VKU_r-r,Xq8vDszi13_7kLdKju8n0Q) remains verified and recoverable, along with commit `daf0d74` and the pre-cut editable checkpoint. The [saved 21-frame generator snapshot](https://excalidraw.com/#json=PIWdtEXRGfKzdy5HzX407,XSCCTxDLfUE4u1RGSecLqQ) also passed exact readback verification for all 1,550 elements and 40 assets. The canonical Plus board remains the shared working board. The separate claims Plus scene is historical, not a competing current board. Editable checkpoints and Git preserve saved versions, not every browser edit.

@@ -270,29 +270,6 @@ def prepare_event(y0):
     return S.end_frame()
 
 
-def buy_memory(y0):
-    S.begin_frame("Buy a memory", 0, y0, 3280, 1450)
-    photos = B(60, 180, "photo metadata", "note", w=580, h=240, wordmark=IMAGE, mark_h=100)
-    visits = B(60, 610, "booth visits", "note", w=580, h=240, wordmark=WALK, mark_h=100)
-    catalogue = B(60, 1040, "product catalogue", "note", w=580, h=240,
-                  wordmark=str(LOGOS.parent.parent / "assets/merch/tee.png"), mark_h=140)
-    engine = SV(900, 610, ELASTIC, "shopping workflow", w=580, h=240)
-    picks = B(1740, 610, "up to three picks", "stdb", w=580, h=240, wordmark=STORE, mark_h=100)
-    person = B(2580, 180, "attendee", "web", w=580, h=240, wordmark=USER, mark_h=100)
-    choose = B(2580, 610, "chosen item", "web", w=580, h=240, wordmark=STORE, mark_h=100)
-    shipping = B(2580, 1040, "checkout details", "web", w=580, h=240, wordmark=FILE, mark_h=100)
-    wallet = SV(1740, 1040, CAPONE, "Nessie purchase", w=580, h=240)
-    paid = B(900, 1040, "paid order", "good", w=580, h=240, wordmark=FILE, mark_h=100)
-    D(photos, "r", .5, engine, "l", .2, "memories")
-    H(visits, engine, "interests")
-    D(catalogue, "r", .5, engine, "l", .8, "eligible products")
-    H(engine, picks, "suggests")
-    H(picks, choose, "shows choices")
-    V(person, choose, "chooses")
-    V(choose, shipping, "adds details")
-    H(shipping, wallet, "attendee pays")
-    H(wallet, paid, "confirms payment")
-    return S.end_frame()
 
 
 def respond_incident(y0):
@@ -579,30 +556,6 @@ def find_people(y0):
     return S.end_frame()
 
 
-def interest_suggestions(y0):
-    S.begin_frame("Interest suggestions", 0, y0, 3420, 1390)
-    evidence = _social_component(60, 390, 650, 780, "recap evidence", "stdb", STDB)
-    _social_property(evidence, 100, 610, 570, "people you met", h=110)
-    _social_property(evidence, 100, 770, 570, "same-zone overlaps", h=110)
-    _social_property(evidence, 100, 930, 570, "booth interests", h=110)
-    open_recap = B(900, 190, "open your recap", "web", w=560, h=250,
-                   wordmark=PHONE, mark_h=100)
-    api = B(900, 650, "recap suggestions", "rust", w=560, h=250,
-            wordmark=RUST, mark_h=100)
-    engine = SV(1740, 650, ELASTIC, "Evidence Engine", w=600, h=250)
-    recap = _social_component(2640, 430, 710, 650, "your recap", "web", PHONE)
-    _social_property(recap, 2680, 650, 630, "People you spent time with", h=145)
-    _social_property(recap, 2680, 855, 630, "Also there with you", h=145)
-
-    V(open_recap, api, "opens")
-    H(evidence, api, "recap evidence")
-    H(api, engine, "interests + eligible IDs", y=api.y + 65)
-    H(engine, api, "ranked IDs", y=api.bottom - 65)
-    R(api, "r", recap, "l", [(S.ox + 1560, api.y + 25),
-                                 (S.ox + 1560, S.oy + 520),
-                                 (S.ox + 2540, S.oy + 520)],
-      label="returns separate lists", seg=2, fa=.1, fb=90/recap.h)
-    return S.end_frame()
 
 
 def photo_memories(y0):
@@ -626,8 +579,8 @@ def photo_memories(y0):
     graph = B(1660, 1280, "portal event graph", "web", w=600, h=280,
               wordmark=GRAPH3D, mark_h=120)
     relations = _social_component(2500, 1160, 600, 440, "event relationships", "stdb", STDB)
-    _social_property(relations, 2540, 1360, 520, "encounters", h=80)
-    _social_property(relations, 2540, 1470, 520, "booth visits", h=80)
+    _social_property(relations, 2540, 1360, 520, "encounters with minutes", h=80)
+    _social_property(relations, 2540, 1470, 520, "booth visits with minutes", h=80)
 
     H(photo, worker, "uploads photo")
     H(worker, engine, "reads photo", y=worker.y + 70)
@@ -647,7 +600,7 @@ def photo_memories(y0):
       label="caption", seg=1, fb=.8)
     D(recap, "b", .25, share, "t", .75, "phone share sheet")
     V(tags, graph, "photo-person links")
-    H(relations, graph, "minutes together")
+    H(relations, graph, "encounters + visits")
     H(graph, memories, "groups communities")
     return S.end_frame()
 
@@ -761,38 +714,29 @@ def _claim_property(parent, x, y, w, text, h=90):
 
 
 def approve_rule(y0):
-    """Rule scope is nested data, while actors and approval are actual steps."""
-    S.begin_frame("Approve a reusable rule", 0, y0, 3600, 1360)
-    precedents = B(60, 370, "at least 3\napproved simple claims", "note", w=450, h=240,
-                   wordmark=FILE, mark_h=96)
-    proposal = SV(650, 350, ELASTIC, "Decision Engine\nproposes from precedents", w=480, h=280)
-    scope = _claim_component(1270, 100, 920, 780, "proposed rule · code-enforced scope", "stdb", STDB)
-    _claim_property(scope, 1310, 300, 400, "incident kind")
-    _claim_property(scope, 1750, 300, 400, "cover kind")
-    _claim_property(scope, 1310, 430, 400, "all event zones")
-    _claim_property(scope, 1750, 430, 400, "corroboration\nrequired")
-    _claim_property(scope, 1310, 560, 840, "ceiling = highest cited payout")
-    _claim_property(scope, 1310, 690, 840, "ceiling ≤ policy per-claim limit")
-    organizer = B(2330, 350, "organizer\nreviews scope + ceiling", "web", w=480, h=280,
+    """Simple precedents become explicitly approved, code-bounded authority."""
+    S.begin_frame("Approve a reusable rule", 0, y0, 3700, 980)
+    precedents = _claim_component(60, 150, 560, 680, "approved precedents", "device", FILE)
+    _claim_property(precedents, 100, 350, 480, "at least 3 approved\nsimple claims", h=100)
+    _claim_property(precedents, 100, 500, 480, "same incident kind\nand cover kind", h=100)
+    _claim_property(precedents, 100, 650, 480, "complicated claims\nnever teach a rule", h=100)
+    proposal = SV(760, 350, ELASTIC, "Decision Engine\nproposes from precedents", w=480, h=280)
+    scope = _claim_component(1380, 100, 920, 780, "proposed rule · code-enforced scope", "stdb", STDB)
+    _claim_property(scope, 1420, 300, 400, "incident kind")
+    _claim_property(scope, 1860, 300, 400, "cover kind")
+    _claim_property(scope, 1420, 430, 400, "all event zones")
+    _claim_property(scope, 1860, 430, 400, "corroboration\nrequired")
+    _claim_property(scope, 1420, 560, 840, "ceiling = highest cited payout")
+    _claim_property(scope, 1420, 690, 840, "ceiling ≤ policy per-claim limit")
+    organizer = B(2440, 350, "organizer\nreviews scope + ceiling", "web", w=480, h=280,
                   wordmark=USER, mark_h=96)
-    rule = SV(2950, 350, STDB, "approved rule version\nfuture guarded authority", kind="stdb", w=560, h=280)
+    rule = SV(3060, 350, STDB, "approved rule version\nfuture guarded authority", kind="stdb", w=560, h=280)
     H(precedents, proposal, "cites claims")
     H(proposal, scope, "validated proposal")
     H(scope, organizer, "shown for approval")
     H(organizer, rule, "approves")
-
-    complicated = B(60, 1050, "complicated claim", "note", w=450, h=220,
-                    wordmark=FILE, mark_h=96)
-    individual = B(650, 1050, "organizer\nindividual decision", "web", w=480, h=220,
-                   wordmark=USER, mark_h=96)
-    legacy = B(1270, 1050, "older narrower wording", "note", w=480, h=220,
-               wordmark=FILE, mark_h=96)
-    review = B(1890, 1050, "explicit scope review", "web", w=480, h=220,
-               wordmark=USER, mark_h=96)
-    H(complicated, individual, "never teaches a rule")
-    H(legacy, review, "withholds authority")
-    R(review, "r", organizer, "b", [S.P(2570, 1160)], "reviews displayed scope", seg=1)
     return S.end_frame()
+
 
 
 
@@ -882,12 +826,21 @@ def exit_markers_gateway(y0):
     prop(station, 540, 720, 390, "Station IDs\n101–105")
     prop(station, 970, 720, 390, "One per exit")
     prop(station, 540, 850, 820, "Modes\nbreathe · chase · strobe · off")
-    for x, y, label in (
-        (540, 980, "101 · blue"), (970, 980, "102 · magenta"),
-        (540, 1100, "103 · cyan"), (970, 1100, "104 · white"),
-        (540, 1220, "105 · orange"), (970, 1220, "Exit color\nsaved in flash"),
+    for x, y, label, color in (
+        (540, 980, "101 · blue", "#0000ff"),
+        (970, 980, "102 · magenta", "#ff00ff"),
+        (540, 1100, "103 · cyan", "#00ffff"),
+        (970, 1100, "104 · white", "#ffffff"),
+        (540, 1220, "105 · orange", "#ffa500"),
+        (970, 1220, "Exit color\nsaved in flash", None),
     ):
-        prop(station, x, y, 390, label)
+        field = prop(station, x, y, 390, label)
+        if color:
+            S.base("rectangle", S.ox + x + 20, S.oy + y + 29, 42, 42,
+                   backgroundColor=color, strokeColor="#495057", strokeWidth=2,
+                   roughness=0, roundness={"type": 3},
+                   customData={"diagramParentComponent": field.id,
+                               "diagramSignalColor": label.split(" · ")[1]})
     prop(station, 540, 1340, 820, "Beacon sends station ID + exit color")
     prop(station, 540, 1460, 390, "Beacon rate\n5 Hz")
     prop(station, 970, 1460, 390, "Radio power\n21 dBm")
@@ -1265,49 +1218,23 @@ def band_firmware(y0):
 
 
 
-def exit_guidance(y0):
-    S.begin_frame("Exit guidance", 0, y0, 3380, 2040)
-    picture(60, 80, HERE / "doors.png", 1680)
-    marker = card(2380, 80, "exit marker", RADIO, "device", w=560)
-    band = card(1980, 560, "band", WATCH, "device", w=560)
-    door = card(2780, 560, "nearest exit", PIN, "device", w=560)
-    D(marker, "b", 0.25, band, "t", 0.5, "sets zone")
-    D(marker, "b", 0.75, door, "t", 0.5, "marks door")
-    H(band, door, "follows color")
-
-    Z(40, 1040, 3300, 960, "scripted closing", "stdb")
-    close = card(80, 1150, "close_doors", CLOCK, "stdb", w=500)
-    head = card(840, 1150, "head_for_exits", WALK, "stdb", w=500)
-    out = card(1600, 1150, "walk_team", WALK, "stdb", w=500)
-    exit_ = card(2360, 1150, "exit", PIN, "device", w=500)
-    stays = card(840, 1520, "unresolved SOS or fall", HEART, "bad", w=500)
-    wait = card(1600, 1520, "closing phase ends", CLOCK, "stdb", w=500)
-    medic = card(2360, 1520, "medic", USER, "web", w=500)
-    H(close, head, "sends crowd")
-    H(head, out, "routes crowd")
-    H(out, exit_, "reaches exit")
-    D(close, "b", 0.5, stays, "l", 0.5, "keeps still")
-    H(stays, wait, "delays ≤120 s")
-    R(medic, "b", stays, "b", [(medic.cx, S.oy + 1900), (stays.cx, S.oy + 1900)],
-      "resolves incident", seg=1)
-    return S.end_frame()
 
 
 
 
 FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
-          nessie, jobs, prepare_event, find_people, interest_suggestions, photo_memories,
-          settle_claim, policy_amounts, approve_rule, buy_memory, respond_incident,
-          routes_space, exit_guidance, hardware, band_wiring, exit_markers_gateway,
+          nessie, jobs, prepare_event, find_people, photo_memories,
+          settle_claim, policy_amounts, approve_rule, respond_incident,
+          routes_space, hardware, band_wiring, exit_markers_gateway,
           band_firmware, vision, venue_reconstruction)
 
 ALIASES = {
     "overview": ("architecture",), "vultr": ("architecture",),
     "queues": ("jobs",), "pipeline": ("prepare_event",),
     "evidence": ("elastic_evidence",), "claude_jobs": ("elastic_execution",),
-    "social": ("find_people", "photo_memories"), "interests": ("interest_suggestions",),
+    "social": ("find_people", "photo_memories"),
     "insurance": ("settle_claim", "policy_amounts", "approve_rule"),
-    "merch": ("buy_memory",), "medic": ("respond_incident", "routes_space", "exit_guidance"),
+    "medic": ("respond_incident", "routes_space"),
     "views": ("spacetimedb",),
 }
 requested = sys.argv[2:]

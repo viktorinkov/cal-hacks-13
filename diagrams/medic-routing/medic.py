@@ -1,12 +1,11 @@
 """Build the medic excerpt from the canonical board generator.
 
-The excerpt contains Respond to an incident, Routes and clear space, and
-Exit guidance. The floor pictures remain standalone algorithm illustrations.
+The excerpt contains Respond to an incident and Routes and clear space.
+The floor route drawing remains a standalone algorithm illustration.
 
 Refresh their source data from this directory when floor geometry changes:
     for t in "Table 51" "Table 121" "Table 201"; do node path.mts "$t"; done > paths.jsonl
     python3 render.py paths.jsonl floor-paths.png -92 -12 -50 2 18
-    LS=30 python3 render.py /dev/null doors.png -112 102 -54 47 9
     python3 medic.py medic-routing.excalidraw
 
 path.mts calls web/src/floor-path.ts, the same route calculation as the Live tab.
