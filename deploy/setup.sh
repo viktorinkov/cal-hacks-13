@@ -54,3 +54,4 @@ printf '%s, www.%s {\n\thandle_path /deploy/* {\n\t\troot * /srv/bandit-deploy\n
   "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
+printf '%s %s deployed at %s\n' "$BANDIT_BRANCH" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > /srv/bandit-deploy/status.txt
