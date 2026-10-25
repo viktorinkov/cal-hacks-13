@@ -65,7 +65,9 @@ systemctl enable -q --now bandit-autodeploy.timer
 # /deploy/ shows the last deploy. dev.$BANDIT_HOST keeps the plain pages for testing.
 # The first line names the main host, which deploy/autodeploy.sh reads back.
 # /organizer and the other desk routes are the command center. /portal keeps the previous organizer page.
-install -d -m 755 /srv/bandit-deploy
+install -d -m 755 /srv/bandit-deploy /srv/bandit-portal
+cp -f web/organizer.html /srv/bandit-portal/index.html
+chmod 644 /srv/bandit-portal/index.html
 cat > /etc/caddy/Caddyfile <<CADDY
 $BANDIT_HOST, www.$BANDIT_HOST {
 	handle_path /deploy/* {
@@ -86,8 +88,8 @@ $BANDIT_HOST, www.$BANDIT_HOST {
 	}
 	@portal path /portal /portal/
 	handle @portal {
-		root * $APP/web
-		try_files {path} /organizer.html
+		root * /srv/bandit-portal
+		try_files {path} /index.html
 		file_server
 	}
 	handle {
