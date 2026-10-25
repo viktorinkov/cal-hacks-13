@@ -1,6 +1,6 @@
 # Elastic
 
-The Evidence Engine is Elastic's part of BandIt: one Elastic Cloud Serverless project that organizes and validates data and ranks it by meaning. It answers the Elastic track, "Best use of the Elastic Agent Builder on a Serverless instance": an Elastic Agent Builder agent runs inside an Elastic Workflow, every text field is searched by meaning, an ingest pipeline checks every claim copy, and Elastic Kibana shows each step. Its biggest job is insurance: it reads every insurance document, each a PDF, into the terms and the clauses that the insurance Decision Engine is held to, and finds the clauses for each kind of incident: an injury, broken property, a theft, or an attendee's own things (next to build).
+The Evidence Engine is Elastic's part of BandIt: one Elastic Cloud Serverless project that organizes and validates data and ranks it by meaning. It answers the Elastic track, "Best use of the Elastic Agent Builder on a Serverless instance": an Elastic Agent Builder agent runs inside an Elastic Workflow, every text field is searched by meaning, an ingest pipeline checks every claim copy, and Elastic Kibana shows each step. Its biggest job is insurance: it reads every insurance document, each a PDF, into the terms and the clauses that the insurance Decision Engine is held to, and finds the clauses for each of the five incident types: a fall or an SOS, the venue's broken equipment, and an attendee's belonging stolen or broken ([Incident-Types](../6-features/Incident-Types.md), next to build).
 
 BandIt's design rule: SpacetimeDB owns live and exact state, The Evidence Engine validates and organizes data and ranks it by meaning, and the Anthropic Claude API makes the judgments. For a claim, the judgment and the decision belong to the insurance Decision Engine: the Anthropic Claude API plus Rust code in the module.
 
@@ -30,7 +30,7 @@ Responsibilities:
 - Keep two logs of each import run for Elastic Kibana: `bandit-organizer-decisions`, one document per decision with its reason, and `bandit-pipeline-events`, one document per step of the run.
 - Keep a one-way copy of booths and of findable attendees' interests in two indices: `bandit-booths` and `bandit-people`.
 - Order the recap's suggestions. `GET /api/recap` in `bandit-api` builds the caller's recap from SpacetimeDB rows and puts its suggested people and booths in order of meaning. `bandit-api` holds the Elastic key; browsers never talk to Elastic.
-- Insurance.md: read every insurance document, each a PDF: the venue's policy, the attendee's insurance card and the hospital report. The pages go to `bandit-documents` through the pipeline `bandit-documents-extract`, the workflow `bandit-read-document` reads them into terms that quote their clause and page, and every clause of the two policies goes to `bandit-policy-clauses` (next to build).
+- Insurance.md: read every insurance document, each a PDF: the venue's policy, the attendee's own policy, the attendee's insurance card and the hospital report. The pages go to `bandit-documents` through the pipeline `bandit-documents-extract`, the workflow `bandit-read-document` reads them into terms that quote their clause and page, and every clause of the two policies goes to `bandit-policy-clauses` (next to build).
 - Insurance.md: hold the index `bandit-claims` and its ingest pipeline `bandit-claims-validate`, validate each de-identified claim copy, and find the clauses of the venue's and this attendee's policy that bear on it (next to build). Today's code ranks the copy against decided past claims instead.
 - Vision.md: hold Leo's raw radio log and photo records in `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway` and `bandit-raw-photos`, for after the event.
 - Give the team its Elastic Kibana views: the Elastic Workflows execution view of `bandit-organize`, the `bandit-organizer` agent's tool calls in Elastic Agent Builder, and the two dashboards `bandit-ingest` installs for each event: "BandIt · Cal Hacks 13.0 · scrape pipeline" and "BandIt · Cal Hacks 13.0 · sponsors and prizes" for Cal Hacks 13.0. Vision.md: the "BandIt band radio and photos" dashboard. The "BandIt recap suggestions" dashboard. Insurance.md: the "BandIt claims evidence" dashboard.
@@ -76,7 +76,7 @@ Non-responsibilities:
 | Vision.md: Elastic Bulk API, raw radio and photos | in | Leo's `feed.py` and `photos.py` on the venue laptop ([Vision](../4-devices/Vision.md)) | one document per gateway line and per photo, with a document id from its content, so a second upload adds nothing | HTTPS, from the laptop's `.env` keys |
 | Insurance.md: `bandit-claims`, through the pipeline `bandit-claims-validate` | in | `bandit-workers`: job `claim_verify`, the seed when it first creates the index, and job `claim_draft` | one de-identified document per pack version (`claim-<id>-v<n>`); the 30 seeded past claims (`history-01` to `history-30`); the outcome and payout once a claim is paid | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: `bandit-documents`, through the pipeline `bandit-documents-extract` (next to build) | in | `bandit-workers`: job `document_read` | one document per page of an insurance PDF (`<sha256>-p<n>`), with the page's bytes for the `attachment` processor | HTTPS, `ELASTICSEARCH_API_KEY` |
-| Insurance.md: Elastic Workflows API, `bandit-read-document` (next to build) | in | `bandit-workers`: job `document_read` | start one execution per document with its SHA-256 and kind (`venue_policy`, `insurance_card`, `hospital_report`); poll it every 5 s; read back the terms and clauses from `bandit-document-terms` | HTTPS to Elastic Kibana, `KIBANA_API_KEY` |
+| Insurance.md: Elastic Workflows API, `bandit-read-document` (next to build) | in | `bandit-workers`: job `document_read` | start one execution per document with its SHA-256 and kind (`venue_policy`, `attendee_policy`, `insurance_card`, `hospital_report`); poll it every 5 s; read back the terms and clauses from `bandit-document-terms` | HTTPS to Elastic Kibana, `KIBANA_API_KEY` |
 | Insurance.md: `bandit-policy-clauses` (next to build) | in | `bandit-workers`: job `document_read` | one document per clause of the venue's policy or an attendee's card, once code found its text word for word on its page | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: policy clause search (next to build) | out | `bandit-workers`: job `claim_verify`, and Claude's tools `search_policy` and `read_clause` in job `claim_review` | a `semantic` query on `bandit-policy-clauses` `text`, filtered to the venue's policy and this attendee's card; each clause's id, policy, section, page, text and score, written through `submit_claim_checks` or handed to Claude | HTTPS, `ELASTICSEARCH_API_KEY` |
 | Insurance.md: precedent search (today; the clause search replaces it) | out | `bandit-workers` | one semantic query on `narrative` per claim copy; the top 3 decided past claims, written through `submit_claim_checks` | HTTPS, `ELASTICSEARCH_API_KEY` |
@@ -195,9 +195,9 @@ One row per index. "Names" means names of people; company and booth names are pu
 | `bandit-people` | one findable attendee: attendee id, graph node id, company name and `interests` | `bandit-indexer`, `_bulk` index and delete, id = attendee id | `bandit-api`: an `ids` query for the caller's own `interests`, then `semantic` on `interests`, filtered to the candidate node ids; the recap suggestions dashboard | none: ids and a company name |
 | `bandit-recap-rankings` | one attendee's latest recap ranking, id = attendee id: the places their interests name, the people and booths in Elastic's order, the first person's and booth's scores, and the booth that minutes alone put first | `bandit-api`, `PUT _doc` from `log_ranking`, after each ranked recap | only the recap suggestions dashboard (Elastic ES\|QL) | the attendee and the people on their recap, by display name |
 | `bandit-claims` | one de-identified claim pack version (`claim-<id>-v<n>`), or one of 30 seeded past claims (`history-01` to `history-30`) | `bandit-workers`: job `claim_verify` (`PUT _doc` through `bandit-claims-validate`), the seed when it first creates the index (`_bulk`), job `claim_draft` (`_update` with the outcome) | `bandit-workers`: the `narrative` is the query text of the policy clause search (next to build), and today the text it ranks past claims by (`semantic`); the claims evidence dashboard (Elastic ES\|QL) | none |
-| `bandit-documents` (next to build) | one page of one insurance PDF, id `<sha256>-p<n>`: `document_hash`, `kind` (`venue_policy`, `insurance_card`, `hospital_report`), `page`, `text` | `bandit-workers`: job `document_read`, `PUT _doc` through `bandit-documents-extract` | the agent's tool `bandit.document_pages` (Elastic ES\|QL); `bandit-workers`, to check each quote word for word; never a dashboard | an attendee's, on their card and hospital report; deleted once the claim is decided |
+| `bandit-documents` (next to build) | one page of one insurance PDF, id `<sha256>-p<n>`: `document_hash`, `kind` (`venue_policy`, `attendee_policy`, `insurance_card`, `hospital_report`), `page`, `text` | `bandit-workers`: job `document_read`, `PUT _doc` through `bandit-documents-extract` | the agent's tool `bandit.document_pages` (Elastic ES\|QL); `bandit-workers`, to check each quote word for word; never a dashboard | an attendee's, on their card and hospital report; deleted once the claim is decided |
 | `bandit-document-terms` (next to build) | what `bandit-read-document` read from one document, id = its SHA-256: the terms with their quotes and pages, and the clauses | the workflow's last step, `save_terms` (`elasticsearch.index`) | `bandit-workers`, `_doc` by id | as `bandit-documents`, and deleted with it |
-| `bandit-policy-clauses` (next to build) | one clause of the venue's policy or an attendee's insurance card, id `<sha256>-c<n>`: `clause_id`, `policy` (`venue`, `attendee`), `document_hash`, `section`, `page`, `text` | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page | `bandit-workers`: `semantic` on `text`, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause` | none in the venue's; an attendee's clauses are deleted with the claim |
+| `bandit-policy-clauses` (next to build) | one clause of the venue's policy, an attendee's own policy or their insurance card, id `<sha256>-c<n>`: `clause_id`, `policy` (`venue`, `attendee`), `document_hash`, `section`, `page`, `text` | `bandit-workers`: job `document_read`, `_bulk`, after it finds each clause word for word on its page | `bandit-workers`: `semantic` on `text`, filtered with `terms` on the claim's two `document_hash` values, for `claim_verify` and Claude's `search_policy`; `ids` for `read_clause` | none in the venue's; an attendee's clauses are deleted with the claim |
 | `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway`, `bandit-raw-photos` | one gateway line, heard list or photo record | `feed.py` and `photos.py` on the venue laptop, `_bulk` | only the band radio and photos dashboard (Elastic ES\|QL), after the event | none |
 
 Every `semantic_text` field names the inference endpoint `.jina-embeddings-v5-text-small` on the Elastic Inference Service: `text` in the three import raw indices, `description`, `interests` and `narrative`, and `text` in `bandit-documents` and `bandit-policy-clauses` (next to build). Elastic embeds a document's text when it is written and the query text when it is searched, so no BandIt process computes a vector.
@@ -244,9 +244,9 @@ Each job says what starts it, what it gets, what Elastic does, what comes out an
 
 #### Read every insurance document (next to build)
 
-**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their insurance card in band setup, or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read`.
+**Trigger.** A PDF arrives: the organizer uploads the venue's policy when the event is set up (`submit_policy_document`), an attendee uploads their own policy or their insurance card, or a hospital report is written for a claim or filed by staff. The module enqueues the job `document_read`.
 
-**Input.** The PDF from blob storage, its SHA-256 and its kind: `venue_policy`, `insurance_card` or `hospital_report`.
+**Input.** The PDF from blob storage, its SHA-256 and its kind: `venue_policy`, `attendee_policy`, `insurance_card` or `hospital_report`.
 
 **In Elastic.**
 
@@ -346,18 +346,22 @@ sequenceDiagram
 
 **The attendee's own words stay out of Elastic.** The `claimant_statement`, the attendee's own words from `file_claim`, goes to `claim_review` only, because `claim_doc` builds the Elastic copy from fixed fields and a fixed template.
 
-### Insurance.md: each kind of incident, and the clauses The Evidence Engine finds for it (next to build)
+### Insurance.md: each incident type, and the clauses The Evidence Engine finds for it (next to build)
 
-A venue's policy covers each kind of incident under a different cover, with its own exclusions. The clause search is filtered to the sections that can decide that kind, so Claude reads the right part of the right policy.
+[Incident-Types](../6-features/Incident-Types.md) lists the five incident types. Each one is paid by a different policy and cover, so The Evidence Engine handles each type explicitly:
 
-| Kind | The policy and cover searched | The sections it searches | What Claude asks `search_policy`, for example | What can come of it |
+- The de-identified claim document carries the type, the cover, the kind of item (`laptop`, `phone`, `speaker`), its value and whether a person was named at the spot. It never carries a name.
+- `bandit-claims-validate` knows the five types and refuses nothing: a `theft` or a `breakage` with no item or no value fails validation.
+- The clause search is filtered to the policy and cover that pay that type, so Claude reads the right part of the right policy.
+
+| Type | The policy and cover searched | The sections it searches | What Claude asks `search_policy`, for example | What can come of it |
 |---|---|---|---|---|
-| Injury: `sos`, `fall` | the venue's policy, medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (`staff`, `pre_existing`, `off_premises`), conditions (service window), other insurance | "injury that began before the event", "treatment more than 30 days after the incident", "which policy pays first for urgent care" | a payout to the attendee |
-| Property damage: `property` | the venue's policy, property cover | insuring agreement, limits, deductible, exclusions, the subrogation clause | "equipment damaged by a guest", "the insured's right to recover from the person who caused a loss" | a payout to the repair vendor, and a charge to the attendee staff named |
-| Theft: `theft` | the venue's policy, property cover | the theft clause, its conditions and exclusions (such as a loss with no sign of theft), the subrogation clause | "theft of merchandise from a booth", "loss discovered only by an inventory count" | a payout to the venue when the theft clause covers it, and a charge to the attendee staff named |
-| An attendee's own things | the venue's policy | the exclusion for property in the venue's care, custody or control, and the liability cover | "personal property of a guest left at a booth" | the organizer decides; the attendee gets the incident record for their own home or renters insurance |
+| `fall`, `sos` | the venue's policy, medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (`staff`, `pre_existing`, `off_premises`), conditions (service window), other insurance | "injury that began before the event", "treatment more than 30 days after the incident", "which policy pays first for urgent care" | a payout into the attendee's wallet |
+| `property` | the venue's policy, property cover | insuring agreement, limits, deductible, exclusions, subrogation | "equipment damaged by a guest", "the insurer's right to recover from the person who caused a loss" | a payout for the repair, and a charge to the person security named |
+| `theft` | the attendee's own policy, personal property cover; the venue's exclusion of guests' property | insuring agreement, limits, deductible, exclusions (such as property left unattended), subrogation | "laptop stolen from a table at an event", "property left unattended in a public place" | a payout into the attendee's wallet at once, collected from their insurer, and a charge to the person security named |
+| `breakage` | the attendee's own policy, personal property cover; the venue's exclusion of guests' property | insuring agreement, limits, deductible, exclusions, subrogation | "phone broken by another person", "accidental damage away from home" | the same as `theft` |
 
-Each charge to an attendee rests on a clause The Evidence Engine found, and the attendee sees that clause on their tap page next to the charge ([Insurance](../6-features/Insurance.md#charges-to-an-attendee-next-to-build)).
+For a charge, the organizer sees the subrogation clause of the policy that paid next to the person security named ([Insurance](../6-features/Insurance.md#charges-to-an-attendee-next-to-build)).
 
 ### Why Elastic and not SpacetimeDB
 
@@ -672,7 +676,7 @@ Elastic Kibana Graph is not used: it is unavailable on Serverless.
 
 ### Part five: reading every insurance document (next to build)
 
-[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's insurance card, and each hospital report. Elastic reads them into terms and clauses. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
+[Insurance](../6-features/Insurance.md) sends every insurance PDF here: the venue's policy at setup, each attendee's own policy and insurance card, and each hospital report. Elastic reads them into terms and clauses. Code checks every term and clause, and the organizer confirms the venue's terms before they set any money.
 
 The question this diagram answers: how one insurance PDF becomes checked terms and searchable clauses.
 
@@ -682,7 +686,7 @@ flowchart TB
   classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
   classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
 
-  PDF["PDF in blob storage<br/>venue_policy, insurance_card or hospital_report"]:::stdb
+  PDF["PDF in blob storage<br/>venue_policy, attendee_policy, insurance_card or hospital_report"]:::stdb
   DR["bandit-workers, job document_read<br/>splits the pages; a scan is transcribed word for word"]:::rust
   EX["bandit-documents-extract<br/>attachment, then semantic_text"]:::ext
   DOCS["bandit-documents<br/>one page each"]:::ext
@@ -732,6 +736,7 @@ What each kind's schema asks for:
 | Kind | Terms | Clauses |
 |---|---|---|
 | `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `care_custody_control`, `other`); the theft clause and its conditions; other insurance (`primary` or `excess`); the subrogation clause | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, theft, other insurance, subrogation |
+| `attendee_policy` | insurer, policy number; the personal property cover's per-claim limit, yearly limit and deductible; its exclusions | every clause, with its section: insuring agreement, limits, exclusions, conditions, subrogation |
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
 | `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
 
