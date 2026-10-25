@@ -1,11 +1,13 @@
 // The Costs tab: the event's costs so far from the incidents it covered, summed from the claims' double-entry
 // journals, so every number agrees with the Settlements tab and nothing keeps totals of its own. Each claim's
-// cover picks its cost center. J1 reserve is the accrual, J3 the payment run, J2 and J4 cash application.
+// cover picks its cost center. J1 reserve is the accrual, J3 the payment run, J2 and J4 cash application, J5
+// and J6 a charge to the person responsible. Merch comes from the paid orders, the merch subledger: each
+// sponsor booth is owed its products' sales less the print cost and the event's fee.
 
 import { date, h, money } from './lib';
 import { searchable } from './table-search';
 import type { DbConnection } from './module_bindings';
-import type { Claim, LedgerEntry, MedicalRecord } from './module_bindings/types';
+import type { BoardMerchOrder, Claim, IncidentMarker, LedgerEntry, MedicalRecord, MerchTemplate, VenueSpot } from './module_bindings/types';
 
 const COST_CENTERS: Record<string, string> = { medical_payments: 'Medical', property: 'Venue', personal_property: 'Belongings' };
 
@@ -23,11 +25,15 @@ export type Line = {
   deductibles: bigint;
   shortPaid: bigint;
   unrecovered: bigint;
+  /** What the person responsible was charged (J5 less J5r), and the venue's part of it: on its own equipment, up to
+   * what it carried itself. The rest repays the insurer, and a belonging's charge goes to its owner and their insurer. */
+  charged: bigint;
+  recovered: bigint;
 };
 
 const zero = (): Line => ({
   claims: 0, billed: 0n, accrued: 0n, paid: 0n, insurerOwes: 0n, insurerPaid: 0n, venueCost: 0n, notCovered: 0n,
-  deductibles: 0n, shortPaid: 0n, unrecovered: 0n,
+  deductibles: 0n, shortPaid: 0n, unrecovered: 0n, charged: 0n, recovered: 0n,
 });
 
 function add(a: Line, b: Line): Line {
@@ -58,6 +64,9 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
   const venueCost = balance('claims_expense');
   // Approval posts J2, which leaves the deductible on the venue's books.
   const deductibles = decided ? c.venueCostCents : 0n;
+  const notCovered = c.status.tag === 'Refused' ? bill : decided && bill > c.payoutCents ? bill - c.payoutCents : 0n;
+  const charged = -balance('recoveries');
+  const carried = venueCost + notCovered;
   return {
     claims: 1,
     billed: bill,
@@ -66,10 +75,12 @@ export function claimLine(c: Claim, ledger: LedgerEntry[], records: MedicalRecor
     insurerOwes: balance('insurer_receivable'),
     insurerPaid: sum('J4', 'cash', 'debitCents'),
     venueCost,
-    notCovered: c.status.tag === 'Refused' ? bill : decided && bill > c.payoutCents ? bill - c.payoutCents : 0n,
+    notCovered,
     deductibles,
     shortPaid,
     unrecovered: venueCost - deductibles - shortPaid,
+    charged,
+    recovered: c.coverKind === 'property' ? (charged < carried ? charged : carried) : 0n,
   };
 }
 
@@ -80,6 +91,74 @@ export function rollUp(claims: Claim[], ledger: LedgerEntry[], records: MedicalR
   for (const { claim, line } of lines) centers.set(costCenter(claim), add(centers.get(costCenter(claim)) ?? zero(), line));
   const total = [...centers.values()].reduce(add, zero());
   return { lines, centers, total };
+}
+
+/** What the print shop bills for each kind of product, in cents. */
+const PRINT_COST: Record<string, bigint> = { tee: 800n, mug: 500n, poster: 300n };
+/** The event's fee on a sponsor product's sales, in percent. */
+const EVENT_FEE_PERCENT = 10n;
+
+/** One product's or one booth's merch, in cents: the sales, the print cost, the event's fee and what the booths are owed. */
+export type Merch = { orders: number; sales: bigint; print: bigint; fee: bigint; owed: bigint };
+
+const noMerch = (): Merch => ({ orders: 0, sales: 0n, print: 0n, fee: 0n, owed: 0n });
+
+function addMerch(m: Merch, n: Merch) {
+  m.orders += n.orders;
+  m.sales += n.sales;
+  m.print += n.print;
+  m.fee += n.fee;
+  m.owed += n.owed;
+}
+
+/** Splits an amount evenly over `n` booths; the cents left over go to the first. */
+function shares(cents: bigint, n: number): bigint[] {
+  const each = cents / BigInt(n);
+  return Array.from({ length: n }, (_, i) => (i === 0 ? cents - each * BigInt(n - 1) : each));
+}
+
+/** What the event keeps: the sales less the print cost and what it owes the booths. */
+export const margin = (m: Merch) => m.sales - m.print - m.owed;
+
+/** The paid orders by product and by sponsor booth. A plain product owes no booth and pays no fee, so the event
+ * keeps its sales less the print cost. A product that names several sponsors splits evenly between their booths. */
+export function merchBooks(orders: BoardMerchOrder[], templates: MerchTemplate[]) {
+  const products = new Map<bigint, { template: MerchTemplate; merch: Merch }>();
+  const booths = new Map<bigint, Merch>();
+  const total = noMerch();
+  for (const o of orders.filter(o => o.status === 'paid')) {
+    const t = templates.find(t => t.id === o.templateId);
+    if (!t) continue;
+    const ids = [...t.boothIds].sort((a, b) => Number(a - b));
+    const sales = o.amountCents;
+    const print = PRINT_COST[t.kind] ?? 0n;
+    const fee = ids.length ? (sales * EVENT_FEE_PERCENT) / 100n : 0n;
+    const order = { orders: 1, sales, print, fee, owed: ids.length ? sales - print - fee : 0n };
+    const product = products.get(t.id) ?? { template: t, merch: noMerch() };
+    addMerch(product.merch, order);
+    addMerch(total, order);
+    products.set(t.id, product);
+    if (!ids.length) continue;
+    const [s, p, f] = [shares(sales, ids.length), shares(print, ids.length), shares(fee, ids.length)];
+    ids.forEach((id, i) => {
+      const b = booths.get(id) ?? noMerch();
+      addMerch(b, { orders: 1, sales: s[i], print: p[i], fee: f[i], owed: s[i] - p[i] - f[i] });
+      booths.set(id, b);
+    });
+  }
+  return { products, booths, total };
+}
+
+/** The booth at the spot nearest to where an incident happened, when that spot is its sponsor table; the Live tab
+ * names the incident's place from the same spot. 0 when it is no sponsor table. */
+export function boothAt(m: IncidentMarker, spots: VenueSpot[]): bigint {
+  let best: VenueSpot | undefined;
+  let far = Infinity;
+  for (const s of spots.filter(s => s.kind !== 'area')) {
+    const d = (s.xM - m.xM) ** 2 + (s.yM - m.yM) ** 2;
+    if (d < far) [best, far] = [s, d];
+  }
+  return best?.kind === 'sponsor_table' ? best.boothId : 0n;
 }
 
 /** Debits, credits and the balance of every account, over every journal. */
@@ -113,17 +192,65 @@ function entryLines(lines: LedgerEntry[]) {
   return lines.map(l => l.debitCents ? `Dr ${l.account} ${money(l.debitCents)}` : `Cr ${l.account} ${money(l.creditCents)}`).join(', ');
 }
 
+/** The merch sold, per product, and the booth settlement: what the event owes each sponsor booth, with the
+ * incidents at its table, their loss and what the people responsible were charged. */
+function merchSections(conn: DbConnection, lines: { claim: Claim; line: Line }[]) {
+  const { products, booths, total } = merchBooks([...conn.db.boardMerchOrders.iter()], [...conn.db.merchTemplate.iter()]);
+  const spots = [...conn.db.venueSpot.iter()];
+  const byClaim = new Map(lines.map(l => [l.claim.id, l.line]));
+  const losses = new Map<bigint, { incidents: number; loss: bigint; charged: bigint }>();
+  for (const m of conn.db.incidentMarker.iter()) {
+    const booth = boothAt(m, spots);
+    if (!booth) continue;
+    const at = losses.get(booth) ?? { incidents: 0, loss: 0n, charged: 0n };
+    const line = byClaim.get(m.claimId);
+    losses.set(booth, { incidents: at.incidents + 1, loss: at.loss + (line?.billed ?? 0n), charged: at.charged + (line?.charged ?? 0n) });
+  }
+  const ids = [...new Set([...booths.keys(), ...losses.keys()])];
+  const name = (id: bigint) => conn.db.booth.id.find(id)?.name ?? `booth ${id}`;
+  const rows = ids.map(id => ({ id, merch: booths.get(id) ?? noMerch(), at: losses.get(id) ?? { incidents: 0, loss: 0n, charged: 0n } }))
+    .sort((a, b) => name(a.id).localeCompare(name(b.id)));
+  const sum = (f: (r: (typeof rows)[number]) => bigint) => rows.reduce((s, r) => s + f(r), 0n);
+  const boothCells = (sales: bigint, print: bigint, fee: bigint, owed: bigint, incidents: number, loss: bigint, charged: bigint, tag = 'td') =>
+    [td(sales, tag), td(print, tag), td(fee, tag), td(owed, tag), h(tag, {}, incidents), td(loss, tag), td(charged, tag)];
+  const merchCells = (m: Merch, tag = 'td') => [h(tag, {}, m.orders), td(m.sales, tag), td(m.print, tag), td(m.owed, tag), td(margin(m), tag)];
+  return {
+    merch: products.size > 0 && h('section', {},
+      h('h3', {}, 'Merch'),
+      scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Product'), h('th', {}, 'Orders'), h('th', {}, 'Sales'), h('th', {}, 'Print cost'), h('th', {}, 'Booths'), h('th', {}, 'Margin')),
+        [...products.values()].sort((a, b) => a.template.title.localeCompare(b.template.title))
+          .map(({ template: t, merch: m }) => h('tr', {}, h('td', {}, t.title), merchCells(m))),
+        h('tr', {}, h('th', {}, 'Total'), merchCells(total, 'th'))))),
+    booths: rows.length > 0 && h('section', {},
+      h('h3', {}, 'Booths'),
+      searchable('cost-booths', scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Booth'), ['Sales', 'Print cost', 'Fee', 'Owed to booth', 'Incidents', 'Loss', 'Charged'].map(x => h('th', {}, x))),
+        rows.map(r => h('tr', {}, h('td', {}, name(r.id)), boothCells(r.merch.sales, r.merch.print, r.merch.fee, r.merch.owed, r.at.incidents, r.at.loss, r.at.charged))),
+        h('tr', {}, h('th', {}, 'Total'), boothCells(sum(r => r.merch.sales), sum(r => r.merch.print), sum(r => r.merch.fee), sum(r => r.merch.owed),
+          rows.reduce((s, r) => s + r.at.incidents, 0), sum(r => r.at.loss), sum(r => r.at.charged), 'th')))))),
+    margin: margin(total),
+  };
+}
+
 export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
   const claims = [...conn.db.claimsBoard.iter()].sort((a, b) => Number(a.id - b.id));
-  if (!claims.length) return h('section', {}, h('h3', {}, 'Costs'), h('p', { class: 'muted' }, 'No claims yet.'));
   const ledger = [...conn.db.boardLedger.iter()];
   const { lines, centers, total } = rollUp(claims, ledger, [...conn.db.boardRecords.iter()]);
+  const { merch, booths, margin: merchMargin } = merchSections(conn, lines);
+  if (!claims.length && !merch && !booths) return h('section', {}, h('h3', {}, 'Costs'), h('p', { class: 'muted' }, 'No claims yet.'));
+  if (!claims.length) return [merch, booths];
   const tb = trialBalance(ledger);
   const journals = new Map<bigint, LedgerEntry[]>();
   for (const l of [...ledger].sort((a, b) => Number(a.id - b.id))) journals.set(l.journalId, [...(journals.get(l.journalId) ?? []), l]);
   const entries = [...journals.values()].sort((a, b) => Number(b[0].journalId - a[0].journalId));
-  const venueUncovered = centers.get('Venue')?.notCovered ?? 0n;
+  const venueClaims = total.venueCost + (centers.get('Venue')?.notCovered ?? 0n);
   return [
+    h('section', {},
+      h('h3', {}, 'Net cost'),
+      scroll(h('table', {},
+        h('tr', {}, h('th', {}, 'Claims'), h('th', {}, 'Recovered'), h('th', {}, 'Merch margin'), h('th', {}, 'Net cost')),
+        h('tr', {}, td(venueClaims), td(total.recovered), td(merchMargin), td(venueClaims - total.recovered - merchMargin, 'th'))))),
     h('section', {},
       h('h3', {}, 'Cost centers'),
       scroll(h('table', {},
@@ -133,17 +260,21 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
     h('section', {},
       h('h3', {}, 'Who pays'),
       scroll(h('table', {},
-        h('tr', {}, h('th', {}, 'Venue'), h('th', {}, 'Deductibles'), h('th', {}, 'Short payments'), h('th', {}, 'Not recovered yet'), h('th', {}, 'Insurer'), h('th', {}, 'Attendees'), h('th', {}, 'Unpaid')),
-        h('tr', {}, td(total.venueCost + venueUncovered), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
-          td(total.insurerPaid + total.insurerOwes), td((centers.get('Medical')?.notCovered ?? 0n) + (centers.get('Belongings')?.notCovered ?? 0n)), td(total.accrued))))),
+        h('tr', {}, ['Venue', 'Deductibles', 'Short payments', 'Not recovered yet', 'Insurer', 'Attendees', 'Charged', 'Unpaid'].map(x => h('th', {}, x))),
+        h('tr', {}, td(venueClaims), td(total.deductibles), td(total.shortPaid), td(total.unrecovered),
+          td(total.insurerPaid + total.insurerOwes), td((centers.get('Medical')?.notCovered ?? 0n) + (centers.get('Belongings')?.notCovered ?? 0n)),
+          td(total.charged), td(total.accrued))))),
+    merch,
+    booths,
     h('section', {},
       h('h3', {}, `Claims (${claims.length})`),
       searchable('cost-claims', scroll(h('table', {},
-        h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Cost center'), h('th', {}, 'Claimant'), h('th', {}, 'Billed'), h('th', {}, 'Paid'), h('th', {}, 'Insurer'), h('th', {}, 'Venue'), h('th', {}, 'Not covered'), h('th', {}, 'Status')),
+        h('tr', {}, ['Claim', 'Cost center', 'Claimant', 'Billed', 'Paid', 'Insurer', 'Venue', 'Not covered', 'Charged', 'Status'].map(x => h('th', {}, x))),
         lines.map(({ claim: c, line }) => h('tr', {},
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(c.id) }, `#${c.id}`)),
           h('td', {}, costCenter(c)), h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '')),
-          td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), h('td', {}, status(c)))))))),
+          td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), td(line.charged),
+          h('td', {}, status(c)))))))),
     ledger.length > 0 && h('section', {},
       h('h3', {}, 'Trial balance'),
       scroll(h('table', {},
