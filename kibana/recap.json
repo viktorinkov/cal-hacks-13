@@ -11,7 +11,7 @@
         "x": 0,
         "y": 0,
         "w": 16,
-        "h": 11
+        "h": 14
       },
       "type": "markdown",
       "config": {
@@ -23,7 +23,7 @@
         "x": 16,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -46,7 +46,7 @@
         "x": 24,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -69,7 +69,7 @@
         "x": 32,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -92,12 +92,12 @@
         "x": 40,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
         "type": "metric",
-        "title": "Recaps where meaning changed the first booth",
+        "title": "First booth changed by meaning",
         "data_source": {
           "type": "esql",
           "query": "FROM bandit-recap-rankings | WHERE reordered == true | STATS recaps = COUNT()"
@@ -113,7 +113,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 11,
+        "y": 14,
         "w": 48,
         "h": 16
       },
@@ -152,7 +152,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 27,
+        "y": 30,
         "w": 24,
         "h": 14
       },
@@ -182,7 +182,7 @@
     {
       "grid": {
         "x": 24,
-        "y": 27,
+        "y": 30,
         "w": 24,
         "h": 14
       },
@@ -212,7 +212,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 41,
+        "y": 44,
         "w": 48,
         "h": 14
       },

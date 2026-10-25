@@ -11,11 +11,11 @@
         "x": 0,
         "y": 0,
         "w": 16,
-        "h": 11
+        "h": 14
       },
       "type": "markdown",
       "config": {
-        "content": "## Band radio and photos\n\nThe recorders on the venue laptop write every line the gateway hears, with an id from its content, so a second upload adds nothing.\n\n- `bandit-raw-radio`: each beacon from a band or a station marker, with its zone and its SOS, fall and button flags\n- `bandit-raw-heard`: each band's list of the bands and station markers it heard, with their signal strength\n- `bandit-raw-photos`: each photo's camera, time and place, never the image\n\nKept for after the event. The live screen reads SpacetimeDB, never these."
+        "content": "## Band radio and photos\n\nThe recorders on the venue laptop write every line the gateway hears, with an id from its content, so a second upload adds nothing.\n\n- `bandit-raw-radio`: each beacon from a band or a station marker, with its zone and its SOS, fall and button flags\n- `bandit-raw-heard`: each band's list of the bands and station markers it heard, with their signal strength\n- `bandit-raw-gateway`: the gateway's own lines: boot, info, acks and errors\n- `bandit-raw-photos`: each photo's camera, time and place, never the image\n\nKept for after the event. The live screen reads SpacetimeDB, never these."
       }
     },
     {
@@ -23,7 +23,7 @@
         "x": 16,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -46,7 +46,7 @@
         "x": 24,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -69,7 +69,7 @@
         "x": 32,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -92,7 +92,7 @@
         "x": 40,
         "y": 0,
         "w": 8,
-        "h": 11
+        "h": 14
       },
       "type": "vis",
       "config": {
@@ -113,20 +113,20 @@
     {
       "grid": {
         "x": 0,
-        "y": 11,
+        "y": 14,
         "w": 48,
         "h": 14
       },
       "type": "vis",
       "config": {
         "type": "xy",
-        "title": "Beacons every 10 seconds, from bands and station markers",
+        "title": "Beacons every 10 seconds (UTC), from bands and station markers",
         "layers": [
           {
             "type": "bar_stacked",
             "data_source": {
               "type": "esql",
-              "query": "FROM bandit-raw-radio | STATS beacons = COUNT() BY time = BUCKET(@timestamp, 10 seconds), kind | SORT time"
+              "query": "FROM bandit-raw-radio | EVAL time = DATE_FORMAT(\"yyyy-MM-dd HH:mm:ss\", DATE_TRUNC(10 seconds, @timestamp)) | STATS beacons = COUNT() BY time, kind | SORT time"
             },
             "x": {
               "column": "time"
@@ -146,7 +146,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 25,
+        "y": 28,
         "w": 24,
         "h": 14
       },
@@ -179,14 +179,14 @@
     {
       "grid": {
         "x": 24,
-        "y": 25,
+        "y": 28,
         "w": 24,
         "h": 14
       },
       "type": "vis",
       "config": {
         "type": "xy",
-        "title": "Band beacons by zone",
+        "title": "Band beacons by zone (its station marker's number)",
         "layers": [
           {
             "type": "bar_horizontal",
@@ -209,7 +209,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 39,
+        "y": 42,
         "w": 24,
         "h": 12
       },
@@ -239,7 +239,7 @@
     {
       "grid": {
         "x": 24,
-        "y": 39,
+        "y": 42,
         "w": 24,
         "h": 12
       },
@@ -269,7 +269,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 51,
+        "y": 54,
         "w": 48,
         "h": 12
       },
@@ -305,7 +305,7 @@
     {
       "grid": {
         "x": 0,
-        "y": 63,
+        "y": 66,
         "w": 48,
         "h": 14
       },
