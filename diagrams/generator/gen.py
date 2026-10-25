@@ -338,85 +338,80 @@ def badge(box, n):
 def insurance(y0):
     S.begin_frame("7 · Insurance Decision Engine", 0, y0, 1000, 600)
     S.text(40, 28, "Insurance Decision Engine", fs=64)
-    C = [60, 840, 1600, 2360, 3120, 3900]
-    SH, LH = 150, 280  # source box height, report lane box height
-    lane = [250, 430, 610, 790, 1040]  # centre y of each evidence lane
+    C = [60, 820, 1580, 2340, 3100, 3900]
+    SH, LH = 190, 300  # evidence card height, bill lane card height
+    lane = [270, 490, 710, 930, 1190]  # centre y of each evidence lane
     mk = dict(fill=WHITE)
 
-    # 1. evidence, one lane per source
-    band = B(C[0], 0, "band", "device", w=400, h=SH, wordmark=WATCH, mark_h=70, cy=S.oy + lane[0], **mk)
-    circle = B(C[0], 0, "light circle", "device", w=400, h=SH, wordmark=RADIO, mark_h=70, cy=S.oy + lane[1], **mk)
-    medic = B(C[0], 0, "medic", "web", w=400, h=SH, wordmark=USER, mark_h=70, cy=S.oy + lane[2], **mk)
-    cam = B(C[0], 0, "security camera", "device", w=400, h=SH, wordmark=CAMERA, mark_h=70, cy=S.oy + lane[3], **mk)
-    report = B(C[0], 0, "hospital report", "note", w=400, h=SH + 30, wordmark=FILE, mark_h=90, cy=S.oy + lane[4], **mk)
+    def card(x, cy, label, kind, mark, mark_h=100, w=420, h=SH):
+        return B(x, 0, label, kind, w=w, h=h, wordmark=mark, mark_h=mark_h, cy=cy, **mk)
 
-    incident = B(C[1], 0, "incident\nSOS or fall", "stdb", w=460, h=SH, wordmark=STDB, mark_h=MARK_H[STDB],
-                 cy=S.oy + lane[0], **mk)
-    witness = B(C[1], 0, "witness_zone\n2+ bands in zone", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[1])
-    note = B(C[1], 0, "staff_note_time\nnote within 30 min", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[2])
-    vision = B(C[1], 0, "vision_time\nsame zone, 120 s", "rust", w=460, h=SH, icons={0: RUST}, cy=S.oy + lane[3])
-    extract = B(C[1], 0, "Claude reads bill\n(claim_record_extract)", "claude", w=460, h=LH, wordmark=CLAUDE,
-                mark_h=90, cy=S.oy + lane[4], **mk)
-    corro = B(C[2], 0, "corroborate\nnote + witnesses\nor camera\ncorroborated\nor disputed", "rust", w=460,
-              h=lane[3] - lane[1] + SH, wordmark=RUST, mark_h=80, cy=S.oy + lane[2])
-    checks = B(C[2], 0, "record_checks\ntotals, patient\ndate, injury code\nduplicate bill", "rust", w=460, h=LH,
-               wordmark=RUST, mark_h=70, cy=S.oy + lane[4])
-    price = B(C[3], 0, "cover_lines\nfee schedule\nbilled $1,308\npays $895", "rust", w=460, h=LH, wordmark=RUST,
-              mark_h=70, cy=S.oy + lane[4])
-    pack = B(C[4], lane[0] - SH / 2, "evidence pack\nnumbered facts\nSHA-256\nnew version\neach rebuild", "stdb",
-             w=460, h=lane[4] + LH / 2 - lane[0] + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
-
-    H(band, incident, "SOS or fall\nzone, time")
+    # 1. evidence: every source is its own card, checked on its own
+    band = card(C[0], lane[0], "band", "device", WATCH)
+    circle = card(C[0], lane[1], "light circle", "device", RADIO)
+    medic = card(C[0], lane[2], "medic", "web", USER)
+    cam = card(C[0], lane[3], "security camera", "device", CAMERA)
+    report = card(C[0], lane[4], "hospital report", "note", FILE, mark_h=130, h=LH - 60)
+    incident = card(C[1], lane[0], "incident\nSOS or fall", "stdb", STDB, mark_h=MARK_H[STDB], w=520)
+    witness = B(C[1], 0, "witnesses\n2+ bands, same zone", "rust", w=520, h=SH, wordmark=RUST, mark_h=60,
+                cy=lane[1])
+    note = B(C[1], 0, "medic note\nwithin 30 min", "rust", w=520, h=SH, wordmark=RUST, mark_h=60, cy=lane[2])
+    flash = B(C[1], 0, "camera flash\nsame zone, 2 min", "rust", w=520, h=SH, wordmark=RUST, mark_h=60, cy=lane[3])
+    extract = card(C[1], lane[4], "Claude reads bill\nlines + pages", "claude", CLAUDE, mark_h=120, w=520, h=LH)
+    checks = B(C[2], 0, "checks bill\ntotals, patient\ndate, injury code\nno duplicate", "rust", w=520, h=LH,
+               wordmark=RUST, mark_h=70, cy=lane[4])
+    price = B(C[3], 0, "prices bill\nfee schedule\n$1,308 billed\n$895 covered", "rust", w=520, h=LH,
+              wordmark=RUST, mark_h=70, cy=lane[4])
+    pack = B(C[4], lane[0] - SH / 2, "evidence pack\nnumbered facts\neach fact\nnames its source", "stdb",
+             w=520, h=lane[4] + LH / 2 - lane[0] + SH / 2, wordmark=STDB, mark_h=MARK_H[STDB], **mk)
+    H(band, incident, "SOS or fall")
     H(circle, witness, "witness bands")
-    H(medic, note, "staff note")
-    H(cam, vision, "camera sighting")
-    H(report, extract, "PDF\n(submit_medical_record)", y=S.oy + lane[4])
-    H(witness, corro, "witnesses", y=S.oy + lane[1])
-    H(note, corro, "note", y=S.oy + lane[2])
-    H(vision, corro, "camera", y=S.oy + lane[3])
-    H(extract, checks, "lines + pages")
+    H(medic, note, "note")
+    H(cam, flash, "flash")
+    H(report, extract, "PDF", y=S.oy + lane[4])
+    H(extract, checks, "bill lines")
     H(checks, price, "valid lines")
-    H(incident, pack, "incident facts", y=S.oy + lane[0])
-    H(corro, pack, "corroborated\nor disputed", y=S.oy + lane[2])
-    H(price, pack, "priced lines", y=S.oy + lane[4])
+    for box, label in ((incident, "incident"), (witness, "witnesses"), (note, "medic note"),
+                       (flash, "camera sighting"), (price, "priced bill")):
+        H(box, pack, label, y=box.cy)
 
-    # 2. past claims and Claude's review: the whole case fans in, the structured answer fans out
-    ee = B(C[5], 0, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=560, h=320,
-           wordmark=ELASTIC, mark_h=60, cy=S.oy + lane[2], **mk)
-    H(pack, ee, "claim, no names\n(claim_verify)", y=ee.cy)
-    r2 = 1330
-    CH, CG, CF = 76, 16, 24  # chip height, gap, font
-    ins = ["numbered facts", "code + Elastic checks", "amounts, priced lines", "hospital report history",
-           "top 3 past claims", "policy summary"]
-    outs = ["verdict: consistent,\nneeds_human, inconsistent", "causation: supported,\nunsupported, unclear",
-            "summary", "concerns + fact ids", "innocent explanations", "missing evidence", "cited fact ids"]
+    ee = B(C[5], 0, "30 past claims\ntop 3 + scores\n(Evidence Engine)", "ext", w=560, h=340,
+           wordmark=ELASTIC, mark_h=64, cy=lane[2], **mk)
+    H(pack, ee, "claim, no names", y=ee.cy)
 
-    def chips(x, w, labels, title_, kind):
-        hs = [CH + (26 if "\n" in s else 0) for s in labels]
-        zh = 70 + sum(hs) + CG * (len(hs) - 1) + 24
+    # 2. Claude reviews the whole case: every piece fans in, the answer fans out
+    r2 = lane[4] + LH / 2 + 220
+    CH, CG, CF = 80, 18, 26  # chip height, gap, font
+    ins = [("incident", WATCH), ("witness bands", RADIO), ("medic note", USER), ("camera sighting", CAMERA),
+           ("priced bill", FILE), ("top 3 past claims", GRAPH3D), ("policy", FILE)]
+    outs = ["verdict", "causation", "concerns", "innocent explanations", "missing evidence", "cited facts"]
+
+    def chips(x, w, items, title_, kind):
+        zh = 70 + len(items) * CH + CG * (len(items) - 1) + 24
         zone = Z(x, r2, w, zh, title_, kind)
-        y, boxes = r2 + 70, []
-        for s, h in zip(labels, hs):
-            boxes.append(S.box(x + 24, y, w - 48, s, kind, h=h, fs=CF, fill=WHITE))
-            y += h + CG
+        boxes = []
+        for i, it in enumerate(items):
+            label, icon = it if isinstance(it, tuple) else (it, None)
+            boxes.append(S.box(x + 24, r2 + 70 + i * (CH + CG), w - 48, label, kind, h=CH, fs=CF, fill=WHITE,
+                               icons={0: (icon, 40)} if icon else None))
         return zone, boxes
 
     zin, cin = chips(pack.cx - S.ox - 330, 660, ins, "whole case", "stdb")
-    zout, cout = chips(780, 640, outs, "answer (submit_claim_review)", "ext")
-    review = B(1700, r2, "Claude\n(claim_review)\nhigh effort", "claude", w=640, h=max(zin.h, zout.h),
-               wordmark=CLAUDE, mark_h=220, **mk)
-    vcheck = B(60, 0, "validate_review\ncited ids exist\n$ = code amounts\nconsistent:\nno concerns\none retry",
-               "rust", w=480, h=420, wordmark=RUST, mark_h=70, cy=review.cy - S.oy)
-    V(pack, zin, "pack + SHA-256", x=pack.cx)
-    R(ee, "b", cin[4], "r", [(ee.cx, cin[4].cy)], label="top 3 + scores\n(submit_claim_checks)", seg=0)
+    zout, cout = chips(800, 600, outs, "answer", "ext")
+    review = B(1660, r2, "Claude\nreviews the whole case", "claude", w=760, h=max(zin.h, zout.h),
+               wordmark=CLAUDE, mark_h=260, **mk)
+    vcheck = B(60, 0, "code checks answer\ncited facts exist\nno new amounts\none retry", "rust", w=500, h=380,
+               wordmark=RUST, mark_h=80, cy=review.cy - S.oy)
+    V(pack, zin, "evidence pack", x=pack.cx)
+    R(ee, "b", cin[5], "r", [(ee.cx, cin[5].cy)], label="top 3 + scores", seg=0)
     for i, c in enumerate(cin):
         S.link(c, "l", review, "r", fb=0.12 + 0.76 * i / (len(cin) - 1), color="#d97757")
     for i, c in enumerate(cout):
-        S.link(review, "l", c, "r", fa=0.1 + 0.8 * i / (len(cout) - 1), color="#d97757")
-    H(zout, vcheck, "checks answer", y=vcheck.cy)
+        S.link(review, "l", c, "r", fa=0.12 + 0.76 * i / (len(cout) - 1), color="#d97757")
+    H(zout, vcheck, "answer", y=vcheck.cy)
 
     # 3. code decides, in order
-    top = review.bottom - S.oy + 200
+    top = review.bottom - S.oy + 220
     DW, DH, G = 380, 240, 170
     X = [60 + i * (DW + G) for i in range(7)]
     d = dict(shape="diamond", h=DH)
@@ -426,47 +421,46 @@ def insurance(y0):
     second_d = B(X[3], top, "second\nsource", "rust", w=DW, **d)
     mass_d = B(X[4], top, "mass\noccurrence", "rust", w=DW, **d)
     rule_d = B(X[5], top, "rule\nmatch", "stdb", w=DW, **d)
-    settle = B(X[6], 0, "auto-settle\nrule vN", "good", w=360, cy=refuse_d.cy - S.oy)
-    payout = B(X[6] + 560, 0, "payout\nmin(cost, $5,000,\n$25,000 left)\ndouble-entry journals", "rust", w=520,
-               h=260, icons={0: RUST},
-               cy=refuse_d.cy - S.oy)
-    nessie = B(payout.right - S.ox + 260, 0, "deposit\n(wallet)", "ext", w=400, h=200, wordmark=CAPONE,
+    settle = B(X[6], 0, "auto-settle", "good", w=360, cy=refuse_d.cy - S.oy)
+    payout = B(X[6] + 560, 0, "payout\nup to $5,000\nevent limit $25,000\ndouble-entry journals", "rust", w=560,
+               h=280, wordmark=RUST, mark_h=60, cy=refuse_d.cy - S.oy)
+    nessie = B(payout.right - S.ox + 220, 0, "deposit\n(wallet)", "ext", w=400, h=220, wordmark=CAPONE,
                mark_h=MARK_H[CAPONE], cy=refuse_d.cy - S.oy, **mk)
     D(vcheck, "b", 0.3, refuse_d, "t", 0.5, "checked review")
     H(refuse_d, checks_d, "covered")
     H(checks_d, verdict_d, "all pass")
     H(verdict_d, second_d, "consistent")
-    H(second_d, mass_d, "corroborated")
+    H(second_d, mass_d, "agrees")
     H(mass_d, rule_d, "under 3")
     H(rule_d, settle, "under ceiling")
     H(settle, payout, "settles")
-    H(payout, nessie, "deposit\n(claim_payout)")
+    H(payout, nessie, "deposit")
 
     # 4. the organizer, the refusals and the learned rules
     low = top + DH + 220
-    refused = B(X[0], low, "refused\nreason listed", "bad", w=DW, h=200)
+    refused = B(X[0], low, "refused\nreason shown", "bad", w=DW, h=200)
     org = B(X[1], low, "organizer portal (/organizer, Claims)\nWaiting for your decision", "web",
             w=X[4] + DW - X[1], h=200, wordmark=MONITOR, mark_h=70, **mk)
     rules = B(X[5] - 30, low, "learned rules\nversion, approver", "stdb", w=DW + 60, h=200, wordmark=STDB,
               mark_h=MARK_H[STDB], **mk)
-    stale = B(X[6], low, "approver_check\norganizer only\namount + SHA seen", "rust", w=400, h=200, icons={0: RUST})
+    stale = B(X[6], low, "stale check\namount changed:\nfails", "rust", w=400, h=200, icons={0: RUST})
     letters = B(nessie.x - S.ox, low, "Claude\nnotice of loss\n(ACORD 3)", "claude", w=400, h=200,
                 icons={0: CLAUDE}, **mk)
     V(refuse_d, refused, "no cover, staff\ndisputed, $0")
     V(checks_d, org, "check failed", x=checks_d.cx)
-    V(verdict_d, org, "needs_human\ninconsistent", x=verdict_d.cx)
-    V(second_d, org, "uncorroborated", x=second_d.cx)
-    V(mass_d, org, "3+ in zone\nwithin 5 min", x=mass_d.cx)
+    V(verdict_d, org, "needs a person\ninconsistent", x=verdict_d.cx)
+    V(second_d, org, "no second source", x=second_d.cx)
+    V(mass_d, org, "3+ hurt, 1 zone\nwithin 5 min", x=mass_d.cx)
     V(rules, rule_d, "rule vN\nceiling", dashed=True, color="#2b8a3e", x=rule_d.cx)
     D(rule_d, "l", 0.75, org, "t", 0.97, "no rule")
     H(org, refused, "refuses")
     H(org, rules, "learns", dashed=True, color="#2b8a3e", y=rules.cy)
     R(org, "b", stale, "b", [(org.right - 120, org.bottom + 110), (stale.cx, org.bottom + 110)],
-      label="approves, amount + SHA seen", seg=1, fa=(org.w - 120) / org.w)
+      label="approves", seg=1, fa=(org.w - 120) / org.w)
     D(stale, "t", 0.5, payout, "b", 0.15, "unchanged")
-    V(nessie, letters, "paid\n(claim_draft)")
-    for box, n in ((extract, 1), (checks, 2), (price, 3), (corro, 4), (pack, 5), (ee, 6), (review, 7),
-                   (vcheck, 8), (refuse_d, 9), (org, 10), (payout, 11), (letters, 12)):
+    V(nessie, letters, "paid")
+    for box, n in ((extract, 1), (checks, 2), (price, 3), (pack, 4), (ee, 5), (review, 6), (vcheck, 7),
+                   (refuse_d, 8), (org, 9), (payout, 10), (letters, 11)):
         badge(box, n)
     return S.end_frame()
 
