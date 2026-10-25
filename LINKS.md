@@ -13,7 +13,7 @@
 | Kibana: Scrape pipeline | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-pipeline-calhacks-13 |
 | Kibana: Sponsors and prizes | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-event-calhacks-13 |
 | Kibana: Claims | https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/dashboards#/view/bandit-claims |
-| System design board (Excalidraw) | https://excalidraw.com/#json=Vh4w7e_wwyAdmJi6cJJmx,Xr10ULcN3noQQP-WJtSJVg |
+| System design board (Excalidraw) | https://excalidraw.com/#json=hL-fqDE78PmG7440h-5AU,bhlV1BVN9RXA641o1Z0LDA |
 | Code | https://github.com/viktorinkov/cal-hacks-13 |
 | Hackathon | https://cal-hacks-13-0.devpost.com |
 
