@@ -2,6 +2,7 @@ import argparse
 import base64
 import glob
 import gzip
+import hashlib
 import http.server
 import itertools
 import json
@@ -1039,10 +1040,10 @@ def draw_alignment(splat, a, path, cell=0.25):
     cv2.imwrite(path, img)
 
 
-def photo_time(path):
+def photo_time(path, tz='-07:00'):
     try:
-        from photos import read_photo
-        r = read_photo(path, timezone.utc)
+        from photos import parse_tz, read_photo
+        r = read_photo(path, parse_tz(tz))
         return r['cam'].astimezone(timezone.utc) if r else None
     except Exception:
         return None
@@ -1150,7 +1151,10 @@ def place_photo(rec, venue, depth, bands, photographer=None, max_m=15.0):
     return {'venue': {'x': round(float(cam_v[0]), 2), 'z': round(float(cam_v[1]), 2), 'height_m': round(float(cam_s[1] * s), 2),
                       'heading_deg': round(heading, 1)},
             'where': where, 'near': near, 'shows': shown, 'bands': sorted(out_bands, key=lambda b: (-b['in_view'], b['m'])),
-            'send_to': send, 'photographer': shooter}
+            'send_to': send, 'photographer': shooter,
+            'by': lm[by]['name'] if by is not None else None, 'by_m': round(float(dist[by]), 1) if by is not None else None,
+            'area': area['name'] if area else None, 'facing': ahead['name'] if ahead else None,
+            'facing_m': ahead['m'] if ahead else None}
 
 
 def place_cmd(args):
@@ -1184,6 +1188,68 @@ def place_cmd(args):
               open(os.path.join(WORK, 'places.json'), 'w'), indent=1)
     say(f'{len(out)} photos placed, {sum(1 for p in out if p["confident"])} surely enough to send -> '
         f'{os.path.join(WORK, "places.json")}')
+
+
+def export_cmd(args):
+    places = os.path.join(WORK, 'places.json')
+    if not os.path.exists(places):
+        sys.exit(f'no {places}: run "photo_place.py place" first')
+    data = json.load(open(places))
+    venue = Venue()
+    out = os.path.abspath(args.out)
+    photos_dir, scan_dir = os.path.join(out, 'photos'), os.path.join(out, 'scan')
+    os.makedirs(photos_dir, exist_ok=True)
+    os.makedirs(scan_dir, exist_ok=True)
+    located = {r['photo']: r for r in json.load(open(os.path.join(WORK, 'located', 'photos.json')))}
+    url = args.url.rstrip('/')
+
+    def images(path, name):
+        img = cv2.imread(path)
+        for suffix, side in (('', 1600), ('_thumb', 560)):
+            s = min(1.0, side / max(img.shape[:2]))
+            small = cv2.resize(img, None, fx=s, fy=s, interpolation=cv2.INTER_AREA) if s < 1 else img
+            cv2.imwrite(os.path.join(photos_dir, f'{name}{suffix}.jpg'), small, [cv2.IMWRITE_JPEG_QUALITY, 86])
+        with open(path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+    placed = []
+    for p in data['photos']:
+        rec = located.get(p['photo'], {})
+        def scan_xz(x, z):
+            return [round(float(v), 3) for v in venue.to_splat(np.array([[x, z]]))[0]]
+        placed.append({
+            'id': p['id'], 'sha256': images(p['photo'], p['id']),
+            'image': f'{url}/photos/{p["id"]}.jpg', 'thumb': f'{url}/photos/{p["id"]}_thumb.jpg',
+            'taken': p['taken'], 'size': p['size'], 'focal': p['focal_px'], 'c2w': p['c2w'], 'sure': p['confident'],
+            'points': p['inliers'], 'error': p['error_px'], 'by': p.get('by'), 'byM': p.get('by_m'), 'area': p.get('area'),
+            'facing': p.get('facing'), 'facingM': p.get('facing_m'), 'heading': p['venue']['heading_deg'],
+            'sendTo': p['send_to'], 'photographer': p['photographer'], 'testBands': p['test_bands'],
+            'bands': [{'band': b['band'], 'xz': scan_xz(b['x'], b['z']), 'r': round(b['r'] / venue.scale, 3), 'role': b['role']}
+                      for b in p['bands']],
+            'start': rec.get('start_view'),
+        })
+    placed_ids = {p['photo'] for p in data['photos']}
+    unplaced = []
+    for path, rec in located.items():
+        if path in placed_ids or not os.path.exists(path):
+            continue
+        name = os.path.splitext(os.path.basename(path))[0]
+        when = photo_time(path)
+        unplaced.append({'id': name, 'sha256': images(path, name), 'image': f'{url}/photos/{name}.jpg',
+                         'thumb': f'{url}/photos/{name}_thumb.jpg', 'taken': when.isoformat() if when else None,
+                         'size': rec.get('size')})
+    for name, src in (('hall.spz', SPLAT), ('hall-roofless.spz', os.path.join(WORK, 'view', 'hall_cut.spz'))):
+        dst = os.path.join(scan_dir, name)
+        if not os.path.exists(src):
+            sys.exit(f'{src} is missing: run "photo_place.py view" once to cut the roofless scan')
+        if not os.path.exists(dst) or os.path.getsize(dst) != os.path.getsize(src):
+            shutil.copyfile(src, dst)
+    matrix = np.array(json.load(open(SPLAT_META))['toMetresYUp_rowMajor']).reshape(4, 4)
+    json.dump({'scan': {'full': f'{url}/scan/hall.spz', 'roofless': f'{url}/scan/hall-roofless.spz',
+                        'matrix': [float(v) for v in matrix.T.flatten()], 'metre': round(1 / venue.scale, 5)},
+               'photos': sorted(placed, key=lambda p: p['taken'] or ''), 'unplaced': sorted(unplaced, key=lambda p: p['taken'] or '')},
+              open(os.path.join(out, 'places.json'), 'w'), indent=1)
+    say(f'{len(placed)} placed and {len(unplaced)} unplaced photos, and the scan, -> {out}')
 
 
 def view_cmd(args):
@@ -1303,6 +1369,9 @@ def main():
     pl.add_argument('--positions', help='ranging.py --positions file, band positions in venue metres')
     pl.add_argument('--test-bands', type=int, default=0, help='without band data: this many seeded test wearers per photo')
     pl.add_argument('--photographer', type=int, help="the photographer's band")
+    ex = sub.add_parser('export')
+    ex.add_argument('--out', required=True, help='folder the page serves, for example frontend/public/venue/place')
+    ex.add_argument('--url', default='/venue/place', help='where that folder is served from')
     v = sub.add_parser('view')
     v.add_argument('--port', type=int, default=8782)
     v.add_argument('--host', default='127.0.0.1')
@@ -1314,7 +1383,7 @@ def main():
         p.add_argument('--port', type=int, default=8781)
         p.add_argument('--chrome', default=CHROME)
     args = ap.parse_args()
-    {'map': build_map, 'locate': locate_cmd, 'align': align_cmd, 'place': place_cmd, 'view': view_cmd, 'test': test_cmd}[args.mode](args)
+    {'map': build_map, 'locate': locate_cmd, 'align': align_cmd, 'place': place_cmd, 'export': export_cmd, 'view': view_cmd, 'test': test_cmd}[args.mode](args)
 
 
 if __name__ == '__main__':
