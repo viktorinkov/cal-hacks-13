@@ -27,7 +27,7 @@ Non-responsibilities:
 - It does not write `band`, `zone_visit`, `encounter` or `event`; it only reads them ([SpacetimeDB](../2-data/SpacetimeDB.md), [Safety](Safety.md)).
 - It does not analyse images itself. People counts and captions come from the `photo_features` job in `bandit-workers`, where Claude reads the photo, through `submit_photo_features`. Claude counts people and never says who anyone is.
 - It does not scrape people. Nobody's social profile is scraped; a handle comes only from its owner.
-- Elastic.md: it does not rank by meaning. The order of the recap's people and booths comes from Elastic's `GET /recap/order` over a one-way copy of this file's findable rows ([Elastic](../7-integrations/Elastic.md)); the lists themselves come from this file's views.
+- Elastic.md: it does not rank by meaning. The order of the recap's people, people also there and booths comes from Elastic, through `GET /api/recap` in `bandit-api`, over a one-way copy of this file's findable rows ([Elastic](../7-integrations/Elastic.md)); the lists themselves come from this file's views.
 - It does not make merch; it supplies the visits and photos that [Merch](Merch.md) builds its suggestions from.
 
 ## Interfaces
@@ -45,7 +45,7 @@ Non-responsibilities:
 | Out | Tap page | Views keyed on the caller: `my_visits`, `my_encounters`, `my_shared_visits`, `my_graph`, `my_photos`, `my_share_links` | Subscription |
 | Out | The big screen on the organizer portal | View `event_graph`: the whole-event graph, people by display name | Subscription |
 | Out | Organizer portal, the Event graph and Photos tabs (staff: the owner, `ops`, `medic`) | View `board_photos`: every event photo with its zone, time and caption, and the graph node ids of the `findable` people tagged in it | Subscription |
-| Out | `bandit-api` | `share_link` rows and the rows a link selects, for the public share page; Elastic.md: `social_encounters` and `social_visits`, the recap candidates for `GET /recap/order` | Subscription (role `api`) |
+| Out | `bandit-api` | `share_link` rows and the rows a link selects, for the public share page; Elastic.md: `social_encounters`, `social_shared_visits` and `social_visits`, the recap candidates for `GET /api/recap` | Subscription (role `api`) |
 | Out | Elastic.md: `bandit-indexer` | the views `social_attendees`, `social_visits` and `social_encounters`, findable attendees only, into `bandit-memories` and `bandit-people`; never `social_handle` or photos | Subscription (role `indexer`) |
 | Out | `job` table | `bandit-workers`: job `photo_features` with the photo id, its blob hash, the zone, the zone's booths and the photographer's caption, from `register_photo` | a `job` row |
 | Out | [Merch](Merch.md) | `visit`, `photo` and `photo_tag` rows for the merch suggestions | Module tables |
@@ -301,7 +301,7 @@ The social part is not one table: it is a set of views keyed on the caller's ide
 | `my_photos` | Photos where the caller has a tag, with every other tagged `findable` person by display name and their `social_handle` rows |
 | `my_share_links` | The caller's links and what each exposes |
 
-The space-time view, "Where you were", is drawn on the tap page from `my_visits` (one bar per stay, zones down the side, time along the bottom) and `my_encounters` (a dot per person met). The people and booths go by minutes together, and the shared visits go in time order. Elastic.md: the recap orders them with `GET /recap/order`, closest to what the attendee was into first; the views never depend on Elastic.
+The space-time view, "Where you were", is drawn on the tap page from `my_visits` (one bar per stay, zones down the side, time along the bottom) and `my_encounters` (a dot per person met). The people go by minutes together, the people also there by minutes in the same place, and the booths by minutes. Elastic.md: `GET /api/recap` orders all three, closest to what the attendee was into first; the views never depend on Elastic.
 
 Three service views give the findable rows to `bandit-indexer` and `bandit-api` (roles `indexer` and `api`). A person who turns the findable switch off drops out of all three at once.
 
@@ -313,7 +313,7 @@ Three service views give the findable rows to `bandit-indexer` and `bandit-api` 
 
 `social_shared_visits` gives the shared visits, which are built only between findable attendees, to the service roles `indexer`, `worker` and `api`.
 
-**Interests.** At a venue, the booths someone stands at are what they are into. So each person under "People you spent time with" shows their interests: every booth their band stood at, from their visits that name a booth, with their minutes there.
+**Interests.** At a venue, the booths someone stands at are what they are into. So each person under "People you spent time with" and "Also there with you" shows their interests: every booth their band stood at, from their visits that name a booth, with their minutes there.
 
 A booth both of you stood at, at any time of the night, is a shared interest. Shared interests come first, highlighted, with your minutes next to theirs; the person's other booths follow, most minutes first. That is the reason the two of you connect, read straight off the venue.
 
@@ -325,6 +325,20 @@ A visit that names only a zone adds no interest, because one zone such as the sp
 | `minutes` | The person's minutes at the booth |
 | `your_minutes` | Your minutes at the booth, 0 when you never stood there |
 | `shared` | True when you both stood at the booth |
+
+**Also there with you.** These are the people you were near but never met: someone in your zone for at least 5 minutes, but never close for the 3 minutes that make a meeting. `GET /api/recap` builds the list in `bandit-api` from the `social_shared_visits` view: it groups the caller's shared visits by the other person and leaves out everyone with a met `social_encounter` with the caller, since they already have a card under "People you spent time with".
+
+Each person gets one card: their photo and name, each place you shared with its minutes and start (most minutes first), how many interests you share, their interests and their socials. Their interests read as one line, the booths you both stood at first and in bold, such as "Into: Elastic booth 12 min, Claude's Corner 8 min".
+
+The card's first line reads like "At Stage for 25 min from 9:40 PM · 2 shared interests". Elastic.md: the list comes ranked by how close each person's interests are to yours, so the person you should have talked to comes first; without Elastic it goes by your minutes together in the same place.
+
+| Also-there field | Meaning |
+|---|---|
+| `node_id`, `name`, `photo_url`, `handles` | The person, while they are `findable` |
+| `places` | Each shared visit with them: `zone_name`, `started_at` and `minutes`, most minutes first |
+| `minutes` | All your shared minutes with them, the order without Elastic |
+| `interests` | Their booths, as in the Interest table |
+| `score` | Elastic.md: the match to your interests, empty when unranked |
 
 
 ### Share links
@@ -375,7 +389,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 **Used by**
 
 - [Merch](Merch.md): visits, photos and tags for the merch suggestions. Merch needs this file.
-- [Elastic](../7-integrations/Elastic.md): `bandit-memories` and `bandit-people` are copies of this file's findable rows, read through its `social_*` views, and `GET /recap/order` orders its recap lists.
+- [Elastic](../7-integrations/Elastic.md): `bandit-memories` and `bandit-people` are copies of this file's findable rows, read through its `social_*` views, and `GET /api/recap` orders its recap lists with them.
 - [Tap-Page](../5-apps/Tap-Page.md): the socials step of setup, the recap's space-time view and its social part with its graph.
 - [Organizer-Portal](../5-apps/Organizer-Portal.md): the big-screen graph and the Photos tab.
 - [Test-Bands](../3-services/Test-Bands.md): its crowd attendees and test attendees go through the same visit, encounter and graph code.
@@ -384,7 +398,7 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 
 - Remove the visit, shared-visit and encounter steps of `social_tick` (its band-claim step stays) and the Social.md rows in the registry tables of [SpacetimeDB](../2-data/SpacetimeDB.md), the Social.md note on `display_name`, and the tables `visit`, `social_encounter`, `shared_visit`, `people_link`, `social_handle`, `photo`, `photo_tag`, `share_link`, and the views `my_shared_visits`, `my_graph`, `event_graph`, `board_photos`, `social_attendees`, `social_visits`, `social_encounters` and `social_shared_visits`.
 - Remove the Social.md row from the endpoint registry in [Rust-Backend](../3-services/Rust-Backend.md) (photo upload, share page) and the Social.md `photo` purpose of `POST /api/blobs`, the socials setup step, the photographer route, the recap's space-time view and its social part with its graph from [Tap-Page](../5-apps/Tap-Page.md), the `photographer` role row, the Event graph and Photos tabs from [Organizer-Portal](../5-apps/Organizer-Portal.md), the crowd (`start_crowd`, `stop_crowd`, `crowd_tick`, `crowd_member`, `crowd_group` and its crowd attendees) from [Test-Bands](../3-services/Test-Bands.md) and the crowd's lines in [Organizer-Portal](../5-apps/Organizer-Portal.md), steps 1a, 5 and 6a in [Flows](../1-overview/Flows.md), the memories row in the data ownership table of [Architecture](../1-overview/Architecture.md), and the Social.md row from the README components table.
-- Remove the `bandit-memories` and `bandit-people` indices and `GET /recap/order` from [Elastic](../7-integrations/Elastic.md), and the photo tagging consumer and `photo_features` job from [Vision](../4-devices/Vision.md).
+- Remove the `bandit-memories` and `bandit-people` indices and the recap ranking of `GET /api/recap` from [Elastic](../7-integrations/Elastic.md), and the photo tagging consumer and `photo_features` job from [Vision](../4-devices/Vision.md).
 - The profile claim stays with [Bright-Data](../7-integrations/Bright-Data.md); a claimed `person` row then has no handles attached.
 - Delete [Merch](Merch.md) too: every suggestion starts from a visit and a photo defined here.
 - `zone_visit` and `encounter` stay: `ingest_band` and `ingest_heard` write them from the bands either way.
@@ -408,8 +422,9 @@ A `share_link` is a token the attendee mints for one selection of their recap: t
 | Photo tags come from the bands' stays and Vision's people count only | The design uses the band firmware as it is |
 | The recap's social part is the attendee's own visits, people and photos; there is no written story | The project description asks for the night back, not a story; the views already give it |
 | The people graph lives in SpacetimeDB as the derived table `people_link`, written by `social_tick`; Elastic draws nothing on it | Every link is an exact fact the bands measured, it must reach every screen live, and `findable` must be enforced in the views; there are no links between people who never met |
-| Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and its shared visits from `my_shared_visits`; Elastic only orders the people and booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
+| Elastic.md: the recap's people come from `my_encounters`, its booths from `my_visits` and the people also there from `social_shared_visits`; Elastic only orders the people, the people also there and the booths | SpacetimeDB decides who and what is on the list; meaning only changes the order ([Elastic](../7-integrations/Elastic.md)) |
 | Each person you spent time with shows their interests: the booths their band stood at, the ones you both stood at first and highlighted, with both people's minutes | At a venue the booths someone stands at are what they are into, and a booth you share is the plainest reason two people connect; a zone-only visit names no booth, so it adds none |
+| "Also there with you" holds one card per person you shared a zone with for at least 5 minutes and never met, with their interests, ranked like the people you met | A shared zone alone is a weak reason to reach out; the booths you both stood at make it one, and anyone you met already has a card above |
 | `bandit-indexer` and `bandit-api` read the views `social_attendees`, `social_visits` and `social_encounters`, which return findable attendees only | `findable` is enforced once, in the module, before anything leaves it |
 | A shared visit is two `findable` attendees' visits to one zone that overlap for at least 300 s (`SHARED_VISIT_MIN_SECONDS`, starting value); it is a recap row, not a `people_link` kind | People you were in the same place with for a while belong in the recap next to the people you met, while the graph keeps only measured meetings and visits |
 | Shared booths and companies are shared nodes, never pairs of people | One link per person instead of one per pair, and the shared node is what forms the cluster |
