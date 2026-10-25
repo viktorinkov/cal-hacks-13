@@ -476,9 +476,9 @@ def insurance(y0):
       label="semantic search", seg=1)
     V(split, rchecks, "share per payer", x=rchecks.cx)
 
-    # 6. code holds Claude to its limits: a simple claim settles alone, any complication goes to the organizer
+    # 6. code holds Claude to its limits; a gap or mismatch in the policies goes to the organizer
     r3 = L(pack.bottom) + 330
-    guard = B(2360, 0, "guard\namounts from code\nsimple: settles alone\ncomplication: organizer", "rust",
+    guard = B(2360, 0, "guard\namounts from code\nrefuse alone: failed check\npay alone: rule ceiling\npolicy gap: organizer", "rust",
               w=760, h=330, wordmark=RUST, mark_h=70, cy=r3)
     refused = B(1300, 0, "refused\nreason shown", "bad", w=640, h=200, cy=r3)
     payout = B(3720, 0, "settles\npays attendee, repair vendor\ncharges responsible attendee\nup to $5,000 per claim\n"
@@ -493,20 +493,18 @@ def insurance(y0):
     H(guard, payout, "pays", y=S.oy + r3)
     H(payout, nessie, "payouts\ncharges", y=nessie.cy)
 
-    # 7. complications: each one the guard finds is its own card, and every one is listed for the organizer
+    # 7. complications: each gap or mismatch in the policies is its own card, decided one by one
     ct = r3 + 165 + 120
-    cw, chh, gap = 444, 190, 30
-    cards = (("sources disagree\nlight circle elsewhere", RADIO), ("evidence missing\none source only", CAMERA),
-             ("Claude vs checks\npay with failed check", CLAUDE), ("bill over limit\nabove $5,000 per claim", FILE),
-             ("above rule ceiling\nor no rule yet", SHIELD), ("both policies pay\nboth say second", HEART),
-             ("many hurt at once\n3 in 5 min, one zone", WALK), ("Claude asks\none question", CLAUDE),
-             ("charge disputed\nattendee says no", WALLET), ("theft, no culprit\nno band named", LOCK))
-    cz = Z(1240, ct, 5 * cw + 6 * gap, 70 + 2 * chh + gap + 30, "    complications", "rust")  # the label clears the step badge
+    cw, chh, gap = 540, 190, 24
+    cards = (("no policy covers it\nno cover for incident", SHIELD), ("bill over limit\nabove $5,000 per claim", FILE),
+             ("service not listed\nnot on fee schedule", FILE), ("policies disagree\nwho pays first", HEART),
+             ("clauses conflict\ncover vs exclusion", HAMMER))
+    cz = Z(1240, ct, 3 * cw + 4 * gap, 70 + 2 * chh + gap + 30, "    complications", "rust")  # the label clears the step badge
     for i, (label, icon) in enumerate(cards):
-        B(1240 + gap + (i % 5) * (cw + gap), ct + 70 + (i // 5) * (chh + gap), label, "note", w=cw, h=chh,
+        B(1240 + gap + (i % 3) * (cw + gap), ct + 70 + (i // 3) * (chh + gap), label, "note", w=cw, h=chh,
           wordmark=icon, mark_h=70, **mk)
 
-    # 8. the organizer decides every claim with a complication
+    # 8. the organizer decides complicated claims one by one, and whatever else the guard holds
     r4 = L(cz.bottom) + 130 + 300
     org = B(2200, 0, "Organizer decides\norganizer portal\n(/organizer, Claims)", "web", w=1080, h=600,
             wordmark=USER, mark_h=260, cy=r4)
@@ -517,8 +515,10 @@ def insurance(y0):
               cy=L(org.y) + org.h * 0.72, **mk)
     history = B(1240, L(org.bottom) + 160, "decision history\nClaude steps, code checks, organizer calls", "stdb",
                 w=3860, h=200, wordmark=STDB, mark_h=50, **mk)
-    V(guard, cz, "any complication", x=guard.cx)
-    V(cz, org, "listed", x=org.cx)
+    gx = (guard.x + cz.right) / 2
+    V(guard, cz, "policy gap", x=gx)
+    V(cz, org, "one by one", x=gx)
+    V(guard, org, "asks organizer", x=guard.right - 60)
     H(org, stale, "approves", y=org.cy)
     V(stale, payout, "unchanged", x=stale.cx)
     R(payout, "r", insurer, "l", [(payout.right + 110, payout.y + payout.h * 0.85), (payout.right + 110, insurer.cy)],
