@@ -19,7 +19,7 @@ Responsibilities:
 - Show a signed-in person with no staff role their identity code, so the module owner can grant them a role from the command line.
 - Merch.md: show the loaded merch templates and, for `ops`, every attendee's order, on the Merch tab.
 - Bright-Data.md: set up a venue from the event's name, and choose the venue the portal shows, on the Venue setup tab.
-- Elastic.md: link to the Elastic Kibana dashboards from the Kibana tab.
+- Elastic.md: explain Elastic's jobs and link to their Elastic Kibana views from the Kibana tab.
 - Social.md: draw the event graph in 3D for the big screen, with the event photos among the people in them, and list every event photo on the Photos tab.
 
 Not responsible for:
@@ -46,7 +46,7 @@ Not responsible for:
 | Medical-Card.md | both | organizer portal and module | in the incident desk, "Tap band <band code> for the medical card" calls `request_medical_card` with the incident's band, and the card comes from `medic_medical_cards`; the medical access log from `board_medical_access` (which medic read which band's card, when, for which incident) | SDK |
 | Vision.md (TBD -- LEO) | both | module and organizer portal | camera tile: `camera`, `camera_count`, `ground_alert`, `vision_assessment`; latest frame `blob_ref`; the security camera's count in the zone table | SDK and HTTPS |
 | Social.md | in | module to organizer portal | the Event graph and Photos tabs: the `event_graph` view (every link, with people by display name) and the staff view `board_photos` (every event photo with its zone, time, caption and the node ids of the `findable` people in it); the Photos tab names those people by display name from `board_attendees` | SDK |
-| Elastic.md | in | `bandit-api` to organizer portal | the Kibana tab's links to the Elastic Kibana dashboards | HTTPS |
+| Elastic.md | in | `bandit-api` to organizer portal | the Elastic Kibana URL for the Kibana tab's links | HTTPS |
 | Merch.md | in | module to organizer portal | the Merch tab: the public `merch_template` table and, for `ops`, the view `board_merch_orders` | SDK |
 | Test-Bands.md | both | module and `bandit-api` to organizer portal | the band id (test bands are 90 to 99, the crowd's bands from 100) for the map and the counts; the crowd attendees in `board_attendees`; the Bands tab's buttons call the dev routes `POST /api/dev/move/{band}/{station}`, `POST /api/dev/press/{band}`, `POST /api/dev/fall/{band}` and `POST /api/dev/property/{station}` | SDK and HTTPS ([Rust-Backend](../3-services/Rust-Backend.md)) |
 | Bright-Data.md | in | module to organizer portal | the booths and organisations the import loaded: the booths on the venue map, the organisations in the attendee list's Company column | SDK |
@@ -329,7 +329,14 @@ The default model loads from `/venue/venue.glb`, which `bandit-api` serves; a se
 
 ### Kibana tab (Elastic.md)
 
-Elastic.md: the Kibana tab is a list of links, each opening one Elastic Kibana dashboard in a new tab. They are "Scrape pipeline" and "Sponsors and prizes", the two event dashboards that `bandit-ingest` installs ([Elastic](../7-integrations/Elastic.md)), and, Insurance.md: "Claims", the claims evidence dashboard. Nothing on the tab reads Elastic or starts a run.
+Elastic.md: the Kibana tab explains what Elastic, the Evidence Engine, does, one job at a time in the order of the event, with links that open each job's Elastic Kibana views in a new tab ([Elastic](../7-integrations/Elastic.md)):
+
+- Before the event, organizing the scraped event data: the "Scrape pipeline" and "Sponsors and prizes" dashboards that `bandit-ingest` installs, the `bandit-organize` workflow runs and the `bandit-organizer` agent.
+- During the event, the bands' radio log and the photos: the "Band radio and photos" dashboard.
+- After the event, ordering the recap's suggestions: the "Recap suggestions" dashboard.
+- Insurance.md: claims, checking the evidence: the "Claims evidence" dashboard.
+
+Nothing on the tab reads Elastic or starts a run.
 
 Bright-Data.md: the event import is never started from the organizer portal; `bandit-ingest` runs it from the command line before the event. The one Bright Data run the portal starts is a venue setup ([Bright-Data](../7-integrations/Bright-Data.md)).
 
@@ -426,7 +433,7 @@ The page redraws at most every 500 ms, however many rows change, and at least on
 | The venue map draws `venue_plan`, one anonymous view of zone rectangles and booth spots | every screen draws the same plan, computed once, and the bands' spots are in the same metres |
 | Merch.md: the Merch tab shows orders to `ops` only, through `board_merch_orders` | an order names the attendee who placed it; the medic needs none of it |
 | Bright-Data.md: the Venue setup tab draws the shown venue in 3D and leaves the Live tab's venue map as it is | the venue map shows zones and bands from `venue_plan`; the 3D model is the venue's picture, and a new setup never moves a band |
-| Elastic.md: the Kibana tab holds links only | the live screen stays on SpacetimeDB, and Elastic Kibana shows what Elastic holds in its own window |
+| Elastic.md: the Kibana tab holds a note on each of Elastic's jobs and links only | the live screen stays on SpacetimeDB, and Elastic Kibana shows what Elastic holds in its own window |
 | Test-Bands.md: the Bands tab is shown in test mode only and calls the dev routes; scenarios also start from the `bandit-claims` command line | a tester runs a fall or a property claim from the laptop with one tap, and outside test mode the tab does not exist |
 | Social.md: the event graph names everyone on the big screen by display name: its links and names come from `event_graph`, and its photos and the people in them from `board_photos` as node ids | everyone at the venue sees who met whom; SpacetimeDB pushes the measured links and each new photo live |
 | Social.md: the event graph is 3D, with the event photos among the people they caught, and "Colour by" picks kind, memories or company; in memories a shared photo counts like 30 minutes together | everyone at the venue sees at a glance who spent the night together and where; a photo of a group is as strong a memory as time side by side |

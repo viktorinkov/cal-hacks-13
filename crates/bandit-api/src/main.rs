@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use spacetimedb_sdk::{DbContext, Identity, Table};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
@@ -69,6 +70,9 @@ async fn main() -> Result<()> {
             .context("set ELASTICSEARCH_API_KEY")?,
         &prefix,
     )?;
+    if let Err(e) = es.ensure_rankings().await {
+        eprintln!("rankings index not ready, rankings will not be logged: {e:#}");
+    }
     let database = config
         .spacetimedb_database
         .clone()
@@ -163,8 +167,16 @@ pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary
     let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
     let fallback = summary::visited_text(&rows, who);
     let attendee_id = who.to_hex().to_string();
+    let first_by_minutes = recap.suggested_booths.first().map(|b| b.name.clone());
     match app.es.rank(&attendee_id, &fallback, &people, &booths).await {
-        Ok(ranking) => summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths),
+        Ok(ranking) => {
+            summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths);
+            let at_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
+            let doc = summary::ranking_doc(&recap, &ranking.interests, first_by_minutes.as_deref(), at_ms);
+            if let Err(e) = app.es.log_ranking(&attendee_id, &doc).await {
+                eprintln!("ranking not logged: {e:#}");
+            }
+        }
         Err(e) => eprintln!("suggestions left unranked: {e:#}"),
     }
     Some(recap)

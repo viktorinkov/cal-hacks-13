@@ -1,0 +1,249 @@
+{
+  "title": "BandIt recap suggestions",
+  "description": "How Elastic orders each attendee's recap suggestions by meaning. SpacetimeDB decides who and what is on the list; Elastic decides only the order.",
+  "time_range": {
+    "from": "2026-10-01T00:00:00.000Z",
+    "to": "now+1d"
+  },
+  "panels": [
+    {
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 11
+      },
+      "type": "markdown",
+      "config": {
+        "content": "## Recap suggestions\n\nEach recap suggests the people the attendee hung out with and the booths where they spent time. SpacetimeDB decides who and what is on the list; Elastic only orders it by meaning.\n\n- The query is the attendee's interests text: the zones and booths where they spent the most minutes\n- It is matched (`semantic`) against each person's interests and each booth's description (`semantic_text`)\n- `bandit-indexer` copies booths and findable attendees from SpacetimeDB; `bandit-api` keeps each attendee's latest ranking in `bandit-recap-rankings`"
+      }
+    },
+    {
+      "grid": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Booths it ranks",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-booths | STATS booths = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "booths"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Attendees it ranks",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-people | STATS people = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "people"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 32,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Recaps ranked",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-recap-rankings | STATS recaps = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "recaps"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 40,
+        "y": 0,
+        "w": 8,
+        "h": 11
+      },
+      "type": "vis",
+      "config": {
+        "type": "metric",
+        "title": "Recaps where meaning changed the first booth",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-recap-rankings | WHERE reordered == true | STATS recaps = COUNT()"
+        },
+        "metrics": [
+          {
+            "type": "primary",
+            "column": "recaps"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 11,
+        "w": 48,
+        "h": 16
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "Each attendee's latest ranking: the first booth by meaning next to the first by minutes",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-recap-rankings | EVAL spent_most_time_at = MV_CONCAT(top_spots, \", \") | STATS score = MAX(first_booth_score) BY attendee, spent_most_time_at, first_booth, first_booth_by_minutes, first_person | SORT score DESC | LIMIT 200"
+        },
+        "rows": [
+          {
+            "column": "attendee"
+          },
+          {
+            "column": "spent_most_time_at"
+          },
+          {
+            "column": "first_booth"
+          },
+          {
+            "column": "first_booth_by_minutes"
+          },
+          {
+            "column": "first_person"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "score"
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "Booths suggested first most often",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-recap-rankings | WHERE first_booth IS NOT NULL | STATS recaps = COUNT() BY first_booth | SORT recaps DESC | LIMIT 15"
+            },
+            "x": {
+              "column": "first_booth"
+            },
+            "y": [
+              {
+                "column": "recaps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 24,
+        "y": 27,
+        "w": 24,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "xy",
+        "title": "People suggested first most often",
+        "layers": [
+          {
+            "type": "bar_horizontal",
+            "data_source": {
+              "type": "esql",
+              "query": "FROM bandit-recap-rankings | WHERE first_person IS NOT NULL | STATS recaps = COUNT() BY first_person | SORT recaps DESC | LIMIT 15"
+            },
+            "x": {
+              "column": "first_person"
+            },
+            "y": [
+              {
+                "column": "recaps"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "grid": {
+        "x": 0,
+        "y": 41,
+        "w": 48,
+        "h": 14
+      },
+      "type": "vis",
+      "config": {
+        "type": "data_table",
+        "title": "The booths it ranks, copied from SpacetimeDB",
+        "data_source": {
+          "type": "esql",
+          "query": "FROM bandit-booths | STATS docs = COUNT() BY booth = name.keyword, zone = zone_name, organization = org_name.keyword, tier = sponsor_tier | SORT zone, booth | LIMIT 200"
+        },
+        "rows": [
+          {
+            "column": "booth"
+          },
+          {
+            "column": "zone"
+          },
+          {
+            "column": "organization"
+          },
+          {
+            "column": "tier"
+          }
+        ],
+        "metrics": [
+          {
+            "column": "docs"
+          }
+        ]
+      }
+    }
+  ]
+}

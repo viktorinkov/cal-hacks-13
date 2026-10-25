@@ -1,5 +1,6 @@
-//! bandit-api's Elastic side: it ranks the recap's suggestions by meaning.
-//! The indices and their fields are written by bandit-indexer.
+//! bandit-api's Elastic side: it ranks the recap's suggestions by meaning, and keeps each attendee's
+//! latest ranking in `<prefix>-recap-rankings` for the Kibana recap dashboard.
+//! The people and booths indices and their fields are written by bandit-indexer.
 
 use anyhow::{Result, bail};
 use reqwest::{Client, Method};
@@ -16,11 +17,16 @@ pub struct Elastic {
     prefix: String,
 }
 
-/// Candidate ids with their scores, best first, as Elastic ranked them.
+/// Candidate ids with their scores, best first, as Elastic ranked them, and the interests text
+/// they were ranked by.
 pub struct Ranking {
     pub people: Vec<(u64, f64)>,
     pub booths: Vec<(u64, f64)>,
+    pub interests: String,
 }
+
+/// The index of each attendee's latest ranked recap, read only by Kibana.
+const RANKINGS: &str = "recap-rankings";
 
 impl Elastic {
     pub fn new(url: &str, api_key: &str, prefix: &str) -> Result<Self> {
@@ -32,13 +38,10 @@ impl Elastic {
         })
     }
 
-    async fn search(&self, index: &str, body: &Value) -> Result<Value> {
+    async fn call(&self, method: Method, path: &str, body: &Value) -> Result<Value> {
         let response = self
             .http
-            .request(
-                Method::POST,
-                format!("{}/{}-{index}/_search", self.url, self.prefix),
-            )
+            .request(method, format!("{}/{}-{path}", self.url, self.prefix))
             .header("Authorization", format!("ApiKey {}", self.api_key))
             .json(body)
             .send()
@@ -46,9 +49,36 @@ impl Elastic {
         let status = response.status();
         let found: Value = response.json().await?;
         if !status.is_success() {
-            bail!("search on {index} answered {status}: {found}");
+            bail!("{path} answered {status}: {found}");
         }
         Ok(found)
+    }
+
+    async fn search(&self, index: &str, body: &Value) -> Result<Value> {
+        self.call(Method::POST, &format!("{index}/_search"), body).await
+    }
+
+    /// Creates the rankings index with its mapping when it is missing.
+    pub async fn ensure_rankings(&self) -> Result<()> {
+        let exists = self
+            .http
+            .head(format!("{}/{}-{RANKINGS}", self.url, self.prefix))
+            .header("Authorization", format!("ApiKey {}", self.api_key))
+            .send()
+            .await?;
+        if exists.status().is_success() {
+            return Ok(());
+        }
+        self.call(Method::PUT, RANKINGS, &json!({ "mappings": rankings_mapping() }))
+            .await
+            .map(|_| ())
+    }
+
+    /// Writes an attendee's latest ranking over their previous one.
+    pub async fn log_ranking(&self, attendee_id: &str, doc: &Value) -> Result<()> {
+        self.call(Method::PUT, &format!("{RANKINGS}/_doc/{attendee_id}"), doc)
+            .await
+            .map(|_| ())
     }
 
     /// Ranks the candidate people (node ids) and booths (booth ids) by how well they match the
@@ -75,8 +105,30 @@ impl Elastic {
         Ok(Ranking {
             people: scores(&people, "node_id"),
             booths: scores(&booths, "booth_id"),
+            interests: interests.to_string(),
         })
     }
+}
+
+/// One document per attendee: who, the places their interests text names, and the order Elastic
+/// chose next to the booth that minutes alone put first.
+pub fn rankings_mapping() -> Value {
+    let keyword = json!({ "type": "keyword" });
+    let float = json!({ "type": "float" });
+    json!({ "properties": {
+        "@timestamp": { "type": "date" },
+        "attendee": keyword,
+        "top_spots": keyword,
+        "people": keyword,
+        "booths": keyword,
+        "first_person": keyword,
+        "first_person_score": float,
+        "first_booth": keyword,
+        "first_booth_zone": keyword,
+        "first_booth_score": float,
+        "first_booth_by_minutes": keyword,
+        "reordered": { "type": "boolean" },
+    }})
 }
 
 /// The attendee's own people document, which holds their interests.
