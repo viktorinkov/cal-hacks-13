@@ -8,11 +8,13 @@
 //! - Hackers come in teams of 1 to 4 with a home table on the hacking floor. A team leaves its table for a
 //!   sponsor booth that matches its members' interests, food, the main stage or the entrance, then returns.
 //! - Each sponsor booth has staff who stay at it, with the odd food break.
+//! - Everyone working the event wears a band too, except the medics: organizers walk the floor from the
+//!   check-in, photographers go wherever the people are, and the event's speakers keep to the stage.
 //! - Teams walk from spot to spot along the venue floor's aisles, one behind the other, at walking speed
 //!   (`walks.rs`), and stay a while where they arrive. In a live run they walk in through the doors when the
 //!   doors open and out through the nearest door when they close.
 //! - Teammates at the same spot are close on every tick. Strangers at the same spot sometimes start talking
-//!   and stay close until one of them moves on; booth staff talk to visitors more often.
+//!   and stay close until one of them moves on; everyone working the event talks to people more often.
 //! - One `crowd_tick` every 2 s sends the teams that are due on their way, puts every walker at their place
 //!   along their walk, recounts every band's neighbours and writes only the bands that changed, in one
 //!   transaction. Where everyone goes and how long they stay comes from a generator seeded with the live
@@ -29,7 +31,7 @@ use crate::tables::*;
 use crate::tables::micros;
 use crate::safety::{self, incident, incident_band, S_NEAR_SOS};
 use crate::venue::floor::{Floor, P};
-use crate::venue::{booth, organization, venue_spot, zone, Booth, Organization, VenueSpot, Zone};
+use crate::venue::{booth, organization, person, venue_spot, zone, Booth, Organization, Person, VenueSpot, Zone};
 use crate::departure::{departure, Departure};
 use spacetimedb::rand::rngs::StdRng;
 use spacetimedb::rand::{Rng, SeedableRng};
@@ -53,6 +55,9 @@ const CHAT_CHANCE: f64 = 0.004;
 const STAFF_CHAT_CHANCE: f64 = 0.05;
 /// One attendee in ten staffs a sponsor's booth, at most this many per booth.
 const STAFF_PER_BOOTH: usize = 2;
+/// One attendee in this many is an organizer, and one in this many a photographer; at least one of each.
+const PER_ORGANIZER: usize = 100;
+const PER_PHOTOGRAPHER: usize = 250;
 /// The crowd's closed stays are deleted after an hour, so the tables stay small; the links they made stay.
 const KEEP_STAYS_MICROS: i64 = 3_600_000_000;
 const PRUNE_EVERY_TICKS: u64 = 30;
@@ -420,12 +425,44 @@ fn at_booth(venue: &Venue, interests: &[String], rng: &mut impl Rng) -> Option<S
     Some((b.station, b.id, b.visitor.0, b.visitor.1, (2.0, 5.0)))
 }
 
+/// The same spot for another stay.
+fn staying(spot: Option<Spot>, minutes: (f32, f32)) -> Option<Spot> {
+    spot.map(|(station, booth, x, y, _)| (station, booth, x, y, minutes))
+}
+
 fn next_spot(g: &CrowdGroup, interests: &[String], venue: &Venue, groups: &[CrowdGroup], rng: &mut impl Rng) -> Spot {
-    let home: Spot = (g.home_station, g.staff_booth, g.home_x_m, g.home_y_m, if g.staff_booth != 0 { (15.0, 40.0) } else { (6.0, 15.0) });
+    let role = role_of(g);
+    let stay = match role {
+        BOOTH_STAFF => (15.0, 40.0),
+        ORGANIZER => (3.0, 8.0),
+        PHOTOGRAPHER => (1.0, 4.0),
+        SPEAKER => (10.0, 20.0),
+        _ => (6.0, 15.0),
+    };
+    let home: Spot = (g.home_station, g.staff_booth, g.home_x_m, g.home_y_m, stay);
     let at_home = g.station == g.home_station && g.booth_id == g.staff_booth && g.x_m == g.home_x_m && g.y_m == g.home_y_m;
-    if g.staff_booth != 0 {
+    match role {
         // Staff mind their booth, with a food break now and then.
-        return if at_home && rng.gen_bool(0.3) { in_zone(venue, "food", (4.0, 8.0), rng).unwrap_or(home) } else { home };
+        BOOTH_STAFF => return if at_home && rng.gen_bool(0.3) { in_zone(venue, "food", (4.0, 8.0), rng).unwrap_or(home) } else { home },
+        // Organizers leave the check-in to look in on the floor, a booth, the stage or food, then come back.
+        ORGANIZER if at_home => {
+            let to = ["floor", "booth", "stage", "food"][rng.gen_range(0..4)];
+            let spot = if to == "booth" { at_booth(venue, interests, rng) } else { in_zone(venue, to, (2.0, 5.0), rng) };
+            return staying(spot, (2.0, 5.0)).unwrap_or(home);
+        }
+        // Photographers go wherever the people are, never for long.
+        PHOTOGRAPHER => {
+            let to = ["floor", "floor", "booth", "stage", "food"][rng.gen_range(0..5)];
+            let spot = if to == "booth" { at_booth(venue, interests, rng) } else { in_zone(venue, to, stay, rng) };
+            return staying(spot, stay).unwrap_or(home);
+        }
+        // Speakers keep to the stage and visit a booth or food in between.
+        SPEAKER if at_home => {
+            let spot = if rng.gen_bool(0.5) { at_booth(venue, interests, rng) } else { in_zone(venue, "food", (3.0, 8.0), rng) };
+            return staying(spot, (3.0, 8.0)).unwrap_or(home);
+        }
+        ORGANIZER | SPEAKER => return home,
+        _ => {}
     }
     if !at_home {
         // From a booth people often try the next one; otherwise back to the table.
@@ -440,7 +477,7 @@ fn next_spot(g: &CrowdGroup, interests: &[String], venue: &Venue, groups: &[Crow
         in_zone(venue, "stage", (5.0, 12.0), rng)
     } else if roll < 0.90 {
         // Another team's table, to see friends.
-        let others: Vec<&CrowdGroup> = groups.iter().filter(|o| o.staff_booth == 0 && o.id != g.id).collect();
+        let others: Vec<&CrowdGroup> = groups.iter().filter(|o| role_of(o) == HACKER && o.id != g.id).collect();
         (!others.is_empty()).then(|| {
             let o = others[rng.gen_range(0..others.len())];
             (o.home_station, 0, o.home_x_m + 1.5, o.home_y_m, (3.0, 6.0))
@@ -587,30 +624,35 @@ fn interests(pool: &[(String, u32)], rng: &mut impl Rng) -> Vec<String> {
     out
 }
 
-/// One attendee of the crowd and their band, generated from the seed and the band id.
-fn add_member(ctx: &ReducerContext, band_id: u32, g: &CrowdGroup, organization_id: u64, pool: &[(String, u32)]) {
+/// One attendee of the crowd and their band, generated from the seed and the band id. A speaker is the
+/// event's own speaker, by the name and photo of their profile, with no made-up socials.
+fn add_member(ctx: &ReducerContext, band_id: u32, g: &CrowdGroup, organization_id: u64, pool: &[(String, u32)], speaker: Option<&Person>) {
     let mut rng = rng_for(band_id);
     let first = FIRST_NAMES[rng.gen_range(0..FIRST_NAMES.len())];
     let last = LAST_NAMES[rng.gen_range(0..LAST_NAMES.len())];
     let who = crowd_identity(band_id);
+    let photo = format!("https://i.pravatar.cc/300?img={}", rng.gen_range(1..=70));
     let a = ctx.db.attendee().insert(Attendee {
         identity: who,
         node_id: 0,
-        display_name: format!("{first} {last}"),
-        photo_url: format!("https://i.pravatar.cc/300?img={}", rng.gen_range(1..=70)),
+        display_name: speaker.map(|p| p.display_name.clone()).unwrap_or(format!("{first} {last}")),
+        photo_url: speaker.map(|p| p.headshot_url.clone()).filter(|u| !u.is_empty()).unwrap_or(photo),
         findable: true,
-        person_id: 0,
+        person_id: speaker.map(|p| p.id).unwrap_or(0),
         organization_id,
         crowd: true,
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
     });
     let ig = handle(first, last, &mut rng);
-    if rng.gen_bool(0.3) {
-        ctx.db.social_handle().insert(SocialHandle { id: 0, owner: who, platform: "threads".into(), handle: ig.clone(), updated_at: ctx.timestamp });
+    let threads = rng.gen_bool(0.3);
+    if speaker.is_none() {
+        if threads {
+            ctx.db.social_handle().insert(SocialHandle { id: 0, owner: who, platform: "threads".into(), handle: ig.clone(), updated_at: ctx.timestamp });
+        }
+        ctx.db.social_handle().insert(SocialHandle { id: 0, owner: who, platform: "instagram".into(), handle: ig, updated_at: ctx.timestamp });
     }
-    ctx.db.social_handle().insert(SocialHandle { id: 0, owner: who, platform: "instagram".into(), handle: ig, updated_at: ctx.timestamp });
-    let spread = if g.staff_booth != 0 { 0.6 } else { 0.9 };
+    let spread = if role_of(g) == HACKER { 0.9 } else { 0.6 };
     ctx.db.crowd_member().insert(CrowdMember {
         band_id,
         identity: who,
@@ -654,14 +696,29 @@ pub fn start(ctx: &ReducerContext, size: u16, pace: f32) -> Result<(), String> {
     let staff_booths: Vec<&BoothSpot> =
         staffed.iter().flat_map(|b| std::iter::repeat_n(*b, STAFF_PER_BOOTH)).take(size as usize / 10).collect();
 
+    // Everyone working the event wears a band too, except the medics: organizers at the check-in, photographers
+    // on the floor and the event's speakers at the stage.
+    let organizers = (size as usize).div_ceil(PER_ORGANIZER);
+    let photographers = (size as usize).div_ceil(PER_PHOTOGRAPHER);
+    let mut speakers: Vec<Person> = ctx.db.person().iter().filter(|p| p.kind == SPEAKER).collect();
+    speakers.sort_by_key(|p| p.id);
+
     let mut groups: Vec<CrowdGroup> = Vec::new();
     let mut band_id = FIRST_CROWD_BAND;
     let last = FIRST_CROWD_BAND + u32::from(size);
-    let mut add_group = |staff: Option<&BoothSpot>, rng: &mut StdRng| -> CrowdGroup {
+    // A group of `role` with its home: a booth's staff spot, a spot in a zone of that kind, else a hacker table.
+    let mut add_group = |role: &str, staff: Option<&BoothSpot>, rng: &mut StdRng| -> CrowdGroup {
         let id = groups.len() as u16 + 1;
-        let (home_station, home_booth, (hx, hy)) = match staff {
-            Some(b) => (b.station, b.id, b.staff),
-            None => {
+        let area = match role {
+            ORGANIZER => venue.zone_of_kind("entrance"),
+            PHOTOGRAPHER => Some(venue.floor()),
+            SPEAKER => venue.zone_of_kind("stage"),
+            _ => None,
+        };
+        let (home_station, home_booth, (hx, hy)) = match (staff, area) {
+            (Some(b), _) => (b.station, b.id, b.staff),
+            (None, Some((z, r))) => (z.station_id, 0, venue.point_in(z.station_id, r, rng)),
+            (None, None) => {
                 let (station, at) = venue.home(id as usize, rng);
                 (station, 0, at)
             }
@@ -677,6 +734,7 @@ pub fn start(ctx: &ReducerContext, size: u16, pace: f32) -> Result<(), String> {
             x_m: hx,
             y_m: hy,
             next_move_at: ctx.timestamp,
+            role: role.into(),
         };
         groups.push(g.clone());
         g
@@ -685,15 +743,27 @@ pub fn start(ctx: &ReducerContext, size: u16, pace: f32) -> Result<(), String> {
         if band_id >= last {
             break;
         }
-        let g = add_group(Some(b), &mut rng);
-        add_member(ctx, band_id, &g, b.organization_id, &pool);
+        let g = add_group(BOOTH_STAFF, Some(b), &mut rng);
+        add_member(ctx, band_id, &g, b.organization_id, &pool, None);
+        band_id += 1;
+    }
+    let working: Vec<(&str, Option<&Person>)> = std::iter::repeat_n((ORGANIZER, None), organizers)
+        .chain(std::iter::repeat_n((PHOTOGRAPHER, None), photographers))
+        .chain(speakers.iter().map(|p| (SPEAKER, Some(p))))
+        .collect();
+    for (role, speaker) in working {
+        if band_id >= last {
+            break;
+        }
+        let g = add_group(role, None, &mut rng);
+        add_member(ctx, band_id, &g, speaker.map(|p| p.organization_id).unwrap_or(0), &pool, speaker);
         band_id += 1;
     }
     while band_id < last {
         let team = [1, 2, 2, 3, 3, 3, 4, 4, 4][rng.gen_range(0..9)].min(last - band_id);
-        let g = add_group(None, &mut rng);
+        let g = add_group(HACKER, None, &mut rng);
         for _ in 0..team {
-            add_member(ctx, band_id, &g, 0, &pool);
+            add_member(ctx, band_id, &g, 0, &pool, None);
             band_id += 1;
         }
     }
@@ -703,7 +773,7 @@ pub fn start(ctx: &ReducerContext, size: u16, pace: f32) -> Result<(), String> {
     let members: Vec<CrowdMember> = ctx.db.crowd_member().iter().collect();
     for g in &mut groups {
         let interests: Vec<String> = members.iter().filter(|m| m.group_id == g.id).flat_map(|m| m.interests.clone()).collect();
-        if g.staff_booth == 0 && rng.gen_bool(0.35) {
+        if role_of(g) == HACKER && rng.gen_bool(0.35) {
             let (station, booth_id, x, y, _) = next_spot(g, &interests, &venue, &[], &mut rng);
             (g.station, g.booth_id, g.x_m, g.y_m) = (station, booth_id, x, y);
         }
@@ -963,7 +1033,8 @@ fn together(ctx: &ReducerContext, a: u32, b: u32, secs: u32) -> Encounter {
     }
 }
 
-/// How many strangers an attendee talks to over the event: 2 to 10 for hackers, four times that for staff.
+/// How many strangers an attendee talks to over the event: 2 to 10 for hackers, four times that for everyone
+/// working the event.
 fn sociability(band_id: u32, staff: bool) -> u32 {
     let n = StdRng::seed_from_u64(SEED ^ 0x50C1A1 ^ band_id as u64).gen_range(2..=10);
     if staff { n * 4 } else { n }
@@ -1196,12 +1267,12 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         bands.insert(row.id, row);
     }
 
-    // Strangers at the same spot start talking; booth staff talk to their visitors more often. Everyone
+    // Strangers at the same spot start talking; everyone working the event talks to people more often. Everyone
     // talks to only so many strangers.
     let mut counts: HashMap<u32, u32> = HashMap::new();
     let same_spot = |i: usize, j: usize| spots[i].0 == spots[j].0 && spots[i].1 == spots[j].1;
     for i in 0..members.len() {
-        let staff = group_of[&members[i].group_id].staff_booth != 0;
+        let staff = role_of(group_of[&members[i].group_id]) != HACKER;
         if members[i].chat != 0 || !inside[i] || !rng.gen_bool(if staff { STAFF_CHAT_CHANCE } else { CHAT_CHANCE }) {
             continue;
         }
@@ -1215,7 +1286,7 @@ pub fn crowd_tick(ctx: &ReducerContext, _timer: CrowdTimer) -> Result<(), String
         }
         let j = candidates[rng.gen_range(0..candidates.len())];
         let (a, b) = (members[i].band_id, members[j].band_id);
-        let other_staff = group_of[&members[j].group_id].staff_booth != 0;
+        let other_staff = role_of(group_of[&members[j].group_id]) != HACKER;
         if close_count(ctx, &mut counts, a) >= sociability(a, staff) + 3 || close_count(ctx, &mut counts, b) >= sociability(b, other_staff) + 3 {
             continue;
         }

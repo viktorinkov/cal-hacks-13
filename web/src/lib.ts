@@ -313,6 +313,20 @@ export function isLoss(kind: string): boolean {
   return ['property', 'theft', 'breakage'].includes(kind.toLowerCase());
 }
 
+const ROLE_WORDS: Record<string, string> = {
+  hacker: 'hacker',
+  booth_staff: 'booth staff',
+  organizer: 'organizer',
+  photographer: 'photographer',
+  speaker: 'speaker',
+  attendee: 'attendee',
+};
+
+/** What someone does at the event (`booth_staff`), in words. */
+export function roleWords(role: string): string {
+  return ROLE_WORDS[role] ?? role.replace(/_/g, ' ');
+}
+
 export function capital(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

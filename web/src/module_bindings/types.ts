@@ -66,6 +66,7 @@ export const AttendeeOut = __t.object("AttendeeOut", {
     return __t.array(HandleOut);
   },
   createdAt: __t.timestamp(),
+  role: __t.string(),
 });
 export type AttendeeOut = __Infer<typeof AttendeeOut>;
 
