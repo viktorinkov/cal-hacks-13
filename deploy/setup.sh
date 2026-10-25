@@ -36,6 +36,15 @@ git fetch -q origin "$BANDIT_BRANCH"
 git reset -q --hard FETCH_HEAD
 echo "building $(git log --oneline -1)"
 (cd web && bun install --silent && bun run --silent build > /dev/null)
+# Eddie's command center (frontend/) is served at /cc/ on the main host. A failed build keeps the last one up.
+if [ -f frontend/package.json ]; then
+  if (cd frontend && bun install --silent && bun run --silent build:host > /dev/null); then
+    rm -rf /srv/bandit-desk.new && cp -r frontend/dist /srv/bandit-desk.new
+    rm -rf /srv/bandit-desk && mv /srv/bandit-desk.new /srv/bandit-desk
+  else
+    echo "command center build failed, keeping the last one"
+  fi
+fi
 CARGO_PROFILE_DEV_DEBUG=0 cargo build -q -p bandit-api -p bandit-indexer -p bandit-workers -p bandit-claims
 [ -x var/venv/bin/python3 ] || python3 -m venv var/venv
 var/venv/bin/pip install -q playwright requests
@@ -48,10 +57,36 @@ systemctl enable -q bandit@api bandit@indexer bandit@workers bandit-live
 systemctl restart bandit@api bandit@indexer bandit@workers bandit-live
 systemctl enable -q --now bandit-autodeploy.timer
 
-# /deploy/ shows deploy/autodeploy.sh's last deploy (status.txt) and its log.
+# /deploy/ shows deploy/autodeploy.sh's last deploy (status.txt) and its log. dev.$BANDIT_HOST keeps the
+# plain pages for testing. The first line names the main host, which deploy/autodeploy.sh reads back.
 install -d -m 755 /srv/bandit-deploy
-printf '%s, www.%s {\n\thandle_path /deploy/* {\n\t\troot * /srv/bandit-deploy\n\t\tfile_server\n\t}\n\thandle {\n\t\treverse_proxy 127.0.0.1:8080\n\t}\n}\n' \
-  "$BANDIT_HOST" "$BANDIT_HOST" > /etc/caddy/Caddyfile
+cat > /etc/caddy/Caddyfile <<CADDY
+$BANDIT_HOST, www.$BANDIT_HOST {
+	handle_path /deploy/* {
+		root * /srv/bandit-deploy
+		file_server
+	}
+	redir /cc /cc/
+	handle_path /cc/* {
+		root * /srv/bandit-desk
+		try_files {path} /index.html
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}
+
+dev.$BANDIT_HOST {
+	handle_path /deploy/* {
+		root * /srv/bandit-deploy
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}
+CADDY
 if command -v ufw > /dev/null; then ufw allow 80/tcp > /dev/null && ufw allow 443/tcp > /dev/null; fi
 systemctl reload-or-restart caddy
 printf '%s %s deployed at %s\n' "$BANDIT_BRANCH" "$(git rev-parse HEAD)" "$(date -u +%FT%TZ)" > /srv/bandit-deploy/status.txt
