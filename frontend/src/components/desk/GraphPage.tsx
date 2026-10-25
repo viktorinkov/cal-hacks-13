@@ -202,8 +202,6 @@ export function GraphPage() {
   return (
     <DeskFrame
       motif="graph"
-      title={linkCount ? `${linkCount.toLocaleString('en-US')} meetings in the room.` : 'No meetings drawn yet.'}
-      sentence="People, booths and companies linked by where they stood."
       figures={
         <>
           <Figure lead label="Links" value={linkCount.toLocaleString('en-US')} note={linkCount > links.length ? `${links.length.toLocaleString('en-US')} drawn` : 'in the graph'} />

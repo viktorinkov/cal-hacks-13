@@ -8,7 +8,7 @@ function plain(value: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-/** Posted money: the ledger and the billed lines. Settlements is where a claim is decided. */
+/** Posted money: the ledger and the billed lines. */
 export function CostsPage() {
   const ledger = useCatalog((s) => s.ledger)
   const bills = useCatalog((s) => s.bills)
@@ -21,8 +21,6 @@ export function CostsPage() {
   return (
     <DeskFrame
       motif="costs"
-      title={empty ? 'No costs posted yet.' : `${formatCents(Math.max(debits, billed))} on the books.`}
-      sentence="Ledger postings and billed lines from the live host. A claim is still decided on Settlements."
       figures={
         <>
           <Figure lead label="Debits" value={formatCents(debits)} note="posted" />

@@ -45,6 +45,44 @@ export interface VenueStepView {
   at: number
 }
 
+/** The configured event whose public sources the Bright Data import already knows. */
+export const IMPORT_EVENT = { slug: 'calhacks-13', name: 'Cal Hacks 13.0' }
+
+export interface ImportCount {
+  section: string
+  inserted: number
+  updated: number
+}
+
+/** One `event_import` row: a Bright Data import of the configured event, including its venue. */
+export interface EventImportView {
+  id: string
+  eventSlug: string
+  eventName: string
+  runId: string
+  status: string
+  error: string
+  venueId: string
+  counts: ImportCount[]
+  createdAt: number
+  updatedAt: number
+}
+
+export interface EventImportStepView {
+  id: string
+  importId: string
+  step: string
+  detail: string
+  at: number
+}
+
+/** Cal Hacks is the one event with a configured import. Other names only start the 3D search. */
+export function importSlugFor(eventName: string): string | null {
+  const compact = eventName.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (compact === 'calhacks13' || compact === 'calhacks130') return IMPORT_EVENT.slug
+  return null
+}
+
 interface VenueSetupState {
   /** Each table is its own subscription, so one that never answers does not hold the others. */
   setupsReady: boolean
@@ -53,6 +91,8 @@ interface VenueSetupState {
   error: string | null
   setups: VenueSetupView[]
   steps: VenueStepView[]
+  imports: EventImportView[]
+  importSteps: EventImportStepView[]
   chosenId: string
   starting: boolean
   startError: string | null
@@ -151,7 +191,42 @@ function read(next: DbConnection) {
     }))
     .sort((a, b) => a.at - b.at || Number(a.id) - Number(b.id))
   const chosen = rowsOf(db.chosenVenue).find((row) => count(row.id) === 0)
-  useVenueSetup.setState({ setups, steps, chosenId: chosen ? String(chosen.setupId ?? DEFAULT_SETUP_ID) : DEFAULT_SETUP_ID })
+  const imports: EventImportView[] = rowsOf(db.eventImport)
+    .map((row) => ({
+      id: String(row.id ?? ''),
+      eventSlug: text(row.eventSlug),
+      eventName: text(row.eventName),
+      runId: text(row.runId),
+      status: text(row.status),
+      error: text(row.error),
+      venueId: String(row.venueId ?? ''),
+      counts: Array.isArray(row.counts)
+        ? row.counts.flatMap((item) => {
+            if (!item || typeof item !== 'object') return []
+            const countRow = item as { section?: unknown; inserted?: unknown; updated?: unknown }
+            return [{ section: text(countRow.section), inserted: count(countRow.inserted), updated: count(countRow.updated) }]
+          })
+        : [],
+      createdAt: millisOf(row.createdAt),
+      updatedAt: millisOf(row.updatedAt),
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt || Number(b.id) - Number(a.id))
+  const importSteps: EventImportStepView[] = rowsOf(db.eventImportStep)
+    .map((row) => ({
+      id: String(row.id ?? ''),
+      importId: String(row.importId ?? ''),
+      step: text(row.step),
+      detail: text(row.detail),
+      at: millisOf(row.at),
+    }))
+    .sort((a, b) => a.at - b.at || Number(a.id) - Number(b.id))
+  useVenueSetup.setState({
+    setups,
+    steps,
+    imports,
+    importSteps,
+    chosenId: chosen ? String(chosen.setupId ?? DEFAULT_SETUP_ID) : DEFAULT_SETUP_ID,
+  })
 }
 
 function watch(next: DbConnection, table: unknown) {
@@ -170,6 +245,8 @@ export function subscribeVenueSetup(next: DbConnection) {
   watch(next, db.venueSetup)
   watch(next, db.venueSetupStep)
   watch(next, db.chosenVenue)
+  watch(next, db.eventImport)
+  watch(next, db.eventImportStep)
   const views = [
     ['venue_setup', 'setupsReady'],
     ['venue_setup_step', 'stepsReady'],
@@ -189,6 +266,18 @@ export function subscribeVenueSetup(next: DbConnection) {
       })
       .subscribe(`SELECT * FROM ${view}`)
   }
+  for (const view of ['event_import', 'event_import_step'] as const) {
+    next
+      .subscriptionBuilder()
+      .onApplied(() => {
+        if (conn !== next) return
+        read(next)
+      })
+      .onError(() => {
+        // An older host has no event import tables. The 3D search still runs.
+      })
+      .subscribe(`SELECT * FROM ${view}`)
+  }
 }
 
 export function dropVenueSetup() {
@@ -197,6 +286,7 @@ export function dropVenueSetup() {
 
 type VenueReducers = {
   startVenueSetup(args: { eventName: string }): Promise<unknown>
+  startEventImport(args: { eventSlug: string }): Promise<unknown>
   chooseVenue(args: { setupId: bigint }): Promise<unknown>
 }
 
@@ -211,6 +301,13 @@ function startRefusal(message: string): string {
   return message
 }
 
+function importRefusal(message: string): string {
+  if (/already being imported/i.test(message)) return ''
+  if (/no configured import/i.test(message)) return 'This event has no configured import.'
+  if (/role|permission|not allowed|unauthori[sz]ed|ops/i.test(message)) return 'Only an organizer signed in to the desk can import the event.'
+  return message
+}
+
 export const useVenueSetup = create<VenueSetupState>((set) => ({
   setupsReady: false,
   stepsReady: false,
@@ -218,6 +315,8 @@ export const useVenueSetup = create<VenueSetupState>((set) => ({
   error: null,
   setups: [],
   steps: [],
+  imports: [],
+  importSteps: [],
   chosenId: DEFAULT_SETUP_ID,
   starting: false,
   startError: null,
@@ -234,15 +333,28 @@ export const useVenueSetup = create<VenueSetupState>((set) => ({
       return false
     }
     set({ starting: true, startError: null })
+    const slug = importSlugFor(name)
+    const problems: string[] = []
+    let started = false
     try {
       await reducers().startVenueSetup({ eventName: name })
-      return true
+      started = true
     } catch (error) {
-      set({ startError: startRefusal(messageOf(error)) })
-      return false
-    } finally {
-      set({ starting: false })
+      problems.push(startRefusal(messageOf(error)))
     }
+    if (slug) {
+      try {
+        await reducers().startEventImport({ eventSlug: slug })
+        started = true
+      } catch (error) {
+        const reason = importRefusal(messageOf(error))
+        if (reason) problems.push(reason)
+        else started = true
+      }
+    }
+    if (problems.length) set({ startError: problems.join(' ') })
+    set({ starting: false })
+    return started
   },
   choose: async (setupId) => {
     set({ choosing: true, chooseError: null })

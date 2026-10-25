@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { OPERATOR } from '@/mock/MockBackend'
+import { useOperatorName } from '@/stdb/operatorName'
 import { cn } from '@/lib/utils'
 import { DeskTabs } from './DeskTabs'
 
@@ -17,6 +17,7 @@ const MARK = {
 export type DeskMotif = keyof typeof MARK
 
 export function DeskFrame({ motif, title, sentence, figures, children }: { motif: DeskMotif; title?: string; sentence?: string; figures?: ReactNode; children: ReactNode }) {
+  const operator = useOperatorName()
   return (
     <div data-motif={motif} className="desk-night h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1360px] px-5 py-6 md:px-10 md:py-8">
@@ -25,7 +26,7 @@ export function DeskFrame({ motif, title, sentence, figures, children }: { motif
             <span className="font-display text-[30px] leading-none text-ink">BandIt</span>
             <DeskTabs />
           </div>
-          <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
+          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </header>
         {(title || sentence) && (
           <div className="desk-head mt-8">

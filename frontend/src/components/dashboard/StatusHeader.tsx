@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { DeskTabs } from '@/components/desk/DeskTabs'
 import { useVenuePlan, type VenuePlan } from '@/map/venuePlan'
-import { OPERATOR } from '@/mock/MockBackend'
+import { useOperatorName } from '@/stdb/operatorName'
 import { selectVenuePlan } from '@/services/runtime'
 import { useServerNow } from '@/hooks/useServerNow'
 import { clock, elapsed } from '@/lib/format'
@@ -35,6 +35,8 @@ export function StatusHeader() {
   const now = useServerNow(2)
   const tz = venue?.timeZone
 
+  const operator = useOperatorName()
+
   const h = useMemo(() => {
     const zoneList = Object.values(zones)
     return headline({
@@ -65,7 +67,7 @@ export function StatusHeader() {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-display text-[30px] leading-none tracking-[-0.01em] text-ink">BandIt</span>
           <VenueSelect />
-          <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
+          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </div>
         <DeskTabs />
       </div>

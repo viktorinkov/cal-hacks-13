@@ -38,8 +38,6 @@ export function BandsPage() {
   return (
     <DeskFrame
       motif="bands"
-      title={alerts ? `${alerts} band${alerts === 1 ? '' : 's'} asking for help.` : `${online.toLocaleString('en-US')} bands online.`}
-      sentence="The roster from the live database. A band stays on the list even when this map is not drawing a pin for it."
       figures={
         <>
           <Figure lead label="Online" value={online.toLocaleString('en-US')} note={`of ${bands.length.toLocaleString('en-US')}`} />

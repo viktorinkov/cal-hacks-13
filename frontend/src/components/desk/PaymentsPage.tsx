@@ -6,8 +6,8 @@ import { NightChart } from '@/components/payments/NightChart'
 import { formatCents } from '@/cover/money'
 import { cn } from '@/lib/utils'
 import {
-  applyFilter, bandLabel, binsOf, boothRanking, clock, deskPayments, figuresOf, filterCounts, findingOf, MISSING, pinnedWallet, searchPayments,
-  STATUS_LABEL, STATUS_ORDER, titleOf, type Filter, type Payment, type PinnedWallet,
+  applyFilter, bandLabel, binsOf, boothRanking, clock, deskPayments, figuresOf, filterCounts, MISSING, pinnedWallet, searchPayments,
+  STATUS_LABEL, STATUS_ORDER, type Filter, type Payment, type PinnedWallet,
 } from '@/payments/model'
 import { useDeskData, usePaymentsFixture } from '@/payments/live'
 import type { DeskData } from '@/payments/rows'
@@ -304,8 +304,6 @@ export function PaymentsPage() {
   const fixture = usePaymentsFixture()
   const desk = useDeskData()
   const states = useBlockStates(fixture)
-  const staffError = useSession((s) => s.staffError)
-  const error = useSession((s) => s.error)
   const [openId, setOpenId] = useState<string | null>(null)
   const payments = useMemo(() => deskPayments(desk), [desk])
   const figures = figuresOf(payments, desk.wallets)
@@ -315,22 +313,11 @@ export function PaymentsPage() {
   const ready = states.payments === 'ready'
   const registered = desk.people.filter((person) => person.bandId != null).length
   const chip = fixture ? <SourceChip tag="sim" /> : undefined
-
-  const title = ready ? titleOf(figures, payments.length)
-    : states.payments === 'refused' ? 'Payments are staff only.'
-    : states.payments === 'error' ? 'Payments can’t load right now.'
-    : 'Tonight’s payments are on their way.'
-  const sentence = ready ? findingOf(figures, payments)
-    : states.payments === 'refused' ? `This sign-in can’t see payments.${staffError ? ` ${staffError}` : ' Sign in with a staff account.'}`
-    : states.payments === 'error' ? `Couldn’t reach the host.${error ? ` ${error}` : ''}`
-    : 'Waiting for the host to send charges and merch orders.'
   const value = (text: string, state: BlockState = states.payments) => (state === 'ready' ? text : state === 'loading' ? <Pending /> : <span className="text-ink-muted">{MISSING}</span>)
 
   return (
     <DeskFrame
       motif="payments"
-      title={title}
-      sentence={sentence}
       figures={
         <>
           <Figure lead label="Through the bands" chip={chip} value={value(formatCents(figures.throughCents))}

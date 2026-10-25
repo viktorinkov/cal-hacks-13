@@ -12,8 +12,6 @@ export function MerchPage() {
   return (
     <DeskFrame
       motif="merch"
-      title={merch.length ? `${merch.length} pieces in the case.` : 'The merch case is empty.'}
-      sentence="What the event is selling, with the price kept in cents. Orders shown here are the ones this sign-in can see."
       figures={
         <>
           <Figure lead label="Pieces" value={String(merch.length)} note="in the case" />

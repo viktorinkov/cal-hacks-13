@@ -24,17 +24,9 @@ export function AttendeesPage() {
     if (!q) return rows
     return rows.filter((person) => `${person.displayName} ${person.organization} ${person.title} ${person.role}`.toLowerCase().includes(q))
   }, [guests, query])
-  const title = people.length
-    ? `${people.length.toLocaleString('en-US')} people have joined.`
-    : guests.length
-      ? `${guests.length.toLocaleString('en-US')} people on the import.`
-      : 'No one on the list yet.'
-
   return (
     <DeskFrame
       motif="attendees"
-      title={title}
-      sentence="Who joined is listed first, with the wristband they claimed. The import is everyone the event already knew."
       figures={
         <>
           <Figure lead label="Joined" value={people.length.toLocaleString('en-US')} note="claimed a place" />

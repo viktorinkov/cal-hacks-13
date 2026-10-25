@@ -13,8 +13,6 @@ export function PhotosPage() {
   return (
     <DeskFrame
       motif="photos"
-      title={photos.length ? `${photos.length.toLocaleString('en-US')} photographs.` : 'No photographs yet.'}
-      sentence="Frames from the event. A name under a picture is someone the desk already knows."
       figures={
         <>
           <Figure lead label="Frames" value={photos.length.toLocaleString('en-US')} note="in the album" />
@@ -24,12 +22,11 @@ export function PhotosPage() {
         </>
       }
     >
-      <button type="button" onClick={() => go('/photo')} className="mb-6 rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5">
-        Add frames
-      </button>
-      {photos.length === 0 ? (
-        <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>
-      ) : (
+      <div className={photos.length === 0 ? 'mb-8 flex items-baseline justify-between gap-4' : 'mb-8 flex justify-end'}>
+        {photos.length === 0 && <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>}
+        <button type="button" onClick={() => go('/photo')} className="text-[14px] text-ink">Add frames</button>
+      </div>
+      {photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4">
           {photos.map((photo) => (
             <li key={photo.id}>

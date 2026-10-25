@@ -135,6 +135,7 @@ import SetZoneStationReducer from "./set_zone_station_reducer";
 import SettleMerchOrderReducer from "./settle_merch_order_reducer";
 import SleepBandsReducer from "./sleep_bands_reducer";
 import StartCrowdReducer from "./start_crowd_reducer";
+import StartEventImportReducer from "./start_event_import_reducer";
 import StartFindReducer from "./start_find_reducer";
 import StartJobReaperReducer from "./start_job_reaper_reducer";
 import StartLiveRunReducer from "./start_live_run_reducer";
@@ -210,6 +211,8 @@ import DecisionRow from "./decision_table";
 import DepartureRow from "./departure_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
+import EventImportRow from "./event_import_table";
+import EventImportStepRow from "./event_import_step_table";
 import EventGraphRow from "./event_graph_table";
 import EventStateRow from "./event_state_table";
 import GatewayRow from "./gateway_table";
@@ -433,6 +436,34 @@ const tablesSchema = __schema({
       { name: 'event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EventRow),
+  eventImport: __table({
+    name: 'event_import',
+    indexes: [
+      { accessor: 'id', name: 'event_import_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'status', name: 'event_import_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'event_import_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, EventImportRow),
+  eventImportStep: __table({
+    name: 'event_import_step',
+    indexes: [
+      { accessor: 'id', name: 'event_import_step_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'import_id', name: 'event_import_step_import_id_idx_btree', algorithm: 'btree', columns: [
+        'importId',
+      ] },
+    ],
+    constraints: [
+      { name: 'event_import_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, EventImportStepRow),
   eventState: __table({
     name: 'event_state',
     indexes: [
@@ -1375,6 +1406,7 @@ const reducersSchema = __reducers(
   __reducerSchema("settle_merch_order", SettleMerchOrderReducer),
   __reducerSchema("sleep_bands", SleepBandsReducer),
   __reducerSchema("start_crowd", StartCrowdReducer),
+  __reducerSchema("start_event_import", StartEventImportReducer),
   __reducerSchema("start_find", StartFindReducer),
   __reducerSchema("start_job_reaper", StartJobReaperReducer),
   __reducerSchema("start_live_run", StartLiveRunReducer),

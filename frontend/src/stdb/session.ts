@@ -109,6 +109,8 @@ interface SessionState {
   staff: boolean
   owner: boolean
   roles: string[]
+  /** The staff name stored for this sign-in, when the database has one. */
+  roleLabel: string
   me: string
   insurer: string
   claims: BoardClaim[]
@@ -282,7 +284,10 @@ function readCard(value: unknown, bandId: number, name: string): MedicalCardView
 function publish() {
   if (!conn) return
   const db = conn.db as unknown as Record<string, unknown>
-  const roles = rowsOf(db.myRoles).map((row) => text(row.role)).filter(Boolean)
+  const roleRows = rowsOf(db.myRoles)
+  const roles = roleRows.map((row) => text(row.role)).filter(Boolean)
+  const opsLabel = roleRows.find((row) => text(row.role) === 'ops' && text(row.label))
+  const roleLabel = text(opsLabel?.label) || roleRows.map((row) => text(row.label)).find((label) => label) || ''
   const owner = rowsOf(db.myOwner).length > 0
   const staff = owner || roles.some((role) => role === 'ops' || role === 'medic')
   const me = hexOf((conn as unknown as { identity?: unknown }).identity)
@@ -366,6 +371,7 @@ function publish() {
     staff,
     owner,
     roles,
+    roleLabel,
     me,
     insurer: policy ? text(policy.insurerName) || 'the insurer' : 'the insurer',
     claims,
@@ -710,6 +716,7 @@ export const useSession = create<SessionState>((set, get) => ({
   staff: false,
   owner: false,
   roles: [],
+  roleLabel: '',
   me: '',
   insurer: 'the insurer',
   claims: [],

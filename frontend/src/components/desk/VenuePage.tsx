@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/stdb/session'
-import { DEFAULT_SETUP_ID, useVenueSetup } from '@/stdb/venueSetup'
+import { DEFAULT_SETUP_ID, importSlugFor, useVenueSetup } from '@/stdb/venueSetup'
 import { ModelView } from '@/venue/ModelView'
 import { palaceRun } from '@/venue/palaceRun'
 import { RunStrip } from '@/venue/RunStrip'
@@ -16,7 +16,6 @@ import {
   buildRun,
   clock,
   detailParts,
-  findingOf,
   footprint,
   frameAt,
   megabytes,
@@ -115,8 +114,13 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
   const ready = useVenueSetup((s) => s.setupsReady)
   const error = useVenueSetup((s) => s.error)
   const chosenId = useVenueSetup((s) => s.chosenId)
+  const imports = useVenueSetup((s) => s.imports) ?? []
+  const importSteps = useVenueSetup((s) => s.importSteps) ?? []
   const [name, setName] = useState('')
   const live = phase === 'live'
+  const importsThis = importSlugFor(name) !== null
+  const latestImport = imports[0]
+  const latestStep = latestImport ? importSteps.filter((step) => step.importId === latestImport.id).at(-1) : undefined
   const count = runs.filter((run) => !run.replay).length
 
   const submit = async (event: FormEvent) => {
@@ -156,7 +160,19 @@ function Toolbar({ runs, selected, onSelect, onStarted }: { runs: Run[]; selecte
           </p>
         ) : (
           <p id="venue-event-help" className="mt-2 text-[13px] text-ink-dim">
-            {live ? "Searches the web, reads the event's pages and saves its venue's public 3D map. Takes a few minutes." : 'Connecting to the desk.'}
+            {live
+              ? importsThis
+                ? "Starts the Bright Data import of this event's venue, zones, sponsors and schedule, and searches for its public 3D map. Takes a few minutes."
+                : "Searches the web, reads the event's pages and saves its venue's public 3D map. Takes a few minutes."
+              : 'Connecting to the desk.'}
+          </p>
+        )}
+        {latestImport && (
+          <p className="mt-2 text-[13px] text-ink-dim">
+            {latestImport.status === 'running' ? 'Importing' : latestImport.status === 'ready' ? 'Imported' : latestImport.status === 'failed' ? 'Import failed' : latestImport.status}{' '}
+            {latestImport.eventName || 'the event'}
+            {latestStep ? ` · ${latestStep.step}${latestStep.detail ? `: ${latestStep.detail}` : ''}` : ''}
+            {latestImport.error ? ` · ${latestImport.error}` : ''}
           </p>
         )}
       </form>
@@ -489,7 +505,7 @@ export function VenuePage() {
     : `Started ${when(run.start)} · ${clock(frame.span)}${frame.finished ? ' in all' : ' so far'}`
 
   return (
-    <DeskFrame motif="venue" title="Venue setup" sentence={findingOf(frame, run.setup.eventName)}>
+    <DeskFrame motif="venue">
       <Toolbar runs={runs} selected={run.setup.id} onSelect={select} onStarted={() => setFollow(true)} />
 
       <section aria-labelledby="venue-run" className="mt-12">

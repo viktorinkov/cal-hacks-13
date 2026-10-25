@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { DeskTabs } from '@/components/desk/DeskTabs'
-import { OPERATOR } from '@/mock/MockBackend'
+import { useOperatorName } from '@/stdb/operatorName'
 import { BandTapDialog } from '@/components/cover/BandTapDialog'
-import { boardHeadline, boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
+import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
 import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
-import { SPACETIME_DB, useSession } from '@/stdb/session'
+import { useSession } from '@/stdb/session'
 
 /**
  * Claims desk. The rows are the database's claims board. A routed claim still needs
@@ -16,9 +16,7 @@ import { SPACETIME_DB, useSession } from '@/stdb/session'
 export function ClaimsDesk() {
   const { go } = useRoute()
   const phase = useSession((state) => state.phase)
-  const error = useSession((state) => state.error)
   const actionError = useSession((state) => state.actionError)
-  const staff = useSession((state) => state.staff)
   const owner = useSession((state) => state.owner)
   const me = useSession((state) => state.me)
   const roles = useSession((state) => state.roles)
@@ -30,21 +28,12 @@ export function ClaimsDesk() {
   const refuse = useSession((state) => state.refuse)
   const ordered = useMemo(() => sortBoard(claims), [claims])
   const summary = useMemo(() => boardSummary(claims), [claims])
-  const headline = boardHeadline(summary, insurer)
   const [selectedId, setSelectedId] = useState('')
   const [narrow, setNarrow] = useState(false)
   const [tapBand, setTapBand] = useState<number | null>(null)
   const docketRef = useRef<HTMLElement>(null)
   const selected = ordered.find((claim) => claim.id === selectedId) ?? ordered[0]
-  const title = phase === 'error' ? 'The database did not connect.' : phase === 'live' ? (staff || claims.length > 0 ? headline.title : 'The board is for the ops desk.') : 'Opening the claims board.'
-  const sentence =
-    phase === 'error'
-      ? (error ?? 'The connection failed.')
-      : phase === 'live'
-        ? staff || claims.length > 0
-          ? headline.sentence
-          : 'This connection is not staff, so the board stays empty. Play as the ops desk if the test identities are on.'
-        : `Connecting to ${SPACETIME_DB}.`
+  const operator = useOperatorName()
 
   useEffect(() => {
     if (!narrow || !window.matchMedia('(max-width: 767px)').matches) return
@@ -64,21 +53,14 @@ export function ClaimsDesk() {
             <span className="font-display text-[30px] leading-none text-ink">BandIt</span>
             <DeskTabs />
           </div>
-          <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
+          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </header>
 
-        <div className="desk-head mt-8">
-          <p className="desk-mark" aria-hidden="true">Tent</p>
-          <h1 className="font-display tracking-[-0.02em] text-ink" aria-live="polite">
-            {title}
-          </h1>
-          <p className="mt-3 max-w-[46ch] text-[15px] leading-6 text-ink-dim">{sentence}</p>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
-            <ActorSelect actors={actors} />
-            <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
-              Wristbands
-            </button>
-          </div>
+        <div className="mt-8 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
+          <ActorSelect actors={actors} />
+          <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
+            Wristbands
+          </button>
         </div>
 
         <div className="desk-figures mt-8 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4">
