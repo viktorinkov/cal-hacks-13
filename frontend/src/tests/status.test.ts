@@ -172,7 +172,7 @@ describe('headline', () => {
     expect(h.sentence).toMatch(/not live/)
   })
 
-  it('does not invent a busiest location or repeat counts in the quiet headline', () => {
+  it('does not invent a busiest location or repeat counts in the idle headline', () => {
     expect(headline({ ...base, incidents: [] }).sentence).toBe('')
   })
 

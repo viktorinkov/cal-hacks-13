@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { bandDigits, bandLabel } from '@/payments/model'
+import { bandCode } from '@/lib/bandCode'
+import { bandLabel } from '@/payments/model'
 import { WEARER_LIMIT, placeRunBand, placeableBands, unplaceRunBand, useRun, wearerMatches, type Wearer } from '@/stdb/runOps'
 import { Refusal, Section, field, link, pill } from './parts'
 
@@ -46,8 +47,8 @@ function WearerPicker({ wearer, onWearer }: { wearer: Wearer | null; onWearer: (
         {matches.slice(0, WEARER_LIMIT).map((person) => (
           <li key={person.nodeId}>
             <button type="button" className="text-left text-[14px] text-ink hover:text-champagne" onClick={() => onWearer({ nodeId: person.nodeId, name: person.displayName })}>
-              {person.displayName || 'No name yet'}
-              <span className="text-[13px] text-ink-dim">{`${person.bandId ? `, band ${bandDigits(person.bandId)}` : ''}${person.organization ? `, ${person.organization}` : ''}`}</span>
+              {person.displayName || 'Unnamed'}
+              <span className="text-[13px] text-ink-dim">{`${person.bandId ? `, band ${bandCode(person.bandId)}` : ''}${person.organization ? `, ${person.organization}` : ''}`}</span>
             </button>
           </li>
         ))}
@@ -97,7 +98,7 @@ function PlaceForm({ now }: { now: number }) {
           Band
           <select value={bandId || ''} onChange={(event) => setPicked(Number(event.target.value))} className={`${field} mt-1 w-full font-mono`}>
             {choices.map((id) => (
-              <option key={id} value={id}>{bandDigits(id)}</option>
+              <option key={id} value={id}>{bandCode(id)}</option>
             ))}
           </select>
         </label>
@@ -122,7 +123,7 @@ function PlaceForm({ now }: { now: number }) {
           <input type="number" inputMode="decimal" step="0.1" value={y} onChange={(event) => setY(event.target.value)} className={`${field} mt-1 w-full tabular-nums`} />
         </label>
         <button type="submit" disabled={busy != null || !bandId} className={`${pill} col-span-2 justify-self-start md:col-span-1`}>
-          {busy === 'place' ? 'Placing…' : `Place band ${bandDigits(bandId)}`}
+          {busy === 'place' ? 'Placing…' : `Place band ${bandCode(bandId)}`}
         </button>
       </div>
       <Refusal keys={['place']} />
@@ -149,7 +150,7 @@ export function BandPlacement({ now, ops }: { now: number; ops: boolean }) {
                   <span className="tabular-nums text-ink-dim">{` at ${row.xM.toFixed(1)}, ${row.yM.toFixed(1)} m`}</span>
                 </p>
                 {ops && (
-                  <button type="button" aria-label={`Remove band ${bandDigits(row.bandId)} from the map`} disabled={busy != null} className={link} onClick={() => void unplaceRunBand(row.bandId)}>
+                  <button type="button" aria-label={`Remove band ${bandCode(row.bandId)} from the map`} disabled={busy != null} className={link} onClick={() => void unplaceRunBand(row.bandId)}>
                     {busy === `unplace:${row.bandId}` ? 'Removing…' : 'Remove'}
                   </button>
                 )}

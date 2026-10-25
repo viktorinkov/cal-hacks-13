@@ -64,7 +64,7 @@ describe('the band page after the night', () => {
     expect(screen.getByText('Encore')).toBeInTheDocument()
     expect(screen.getByText('Threads @ada')).toBeInTheDocument()
     expect(screen.getByText('The night ended at', { exact: false })).toBeInTheDocument()
-    expect(screen.getByLabelText('Band 07 wallet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Band QY1G-XHXT wallet')).toBeInTheDocument()
   })
 
   it('keeps signup off a band until the night is known, then opens the recap', () => {

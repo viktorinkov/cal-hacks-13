@@ -215,7 +215,7 @@ export function GraphPage() {
         <div ref={stage} className="absolute inset-0" />
         {!ready && (
           <p className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-ink-dim">
-            {failed ? 'This browser could not start the 3D view.' : linkCount ? 'Laying out the graph…' : 'The graph has not arrived from the live host yet.'}
+            {failed ? 'This browser could not start the 3D view.' : linkCount ? 'Laying out the graph…' : 'No graph data yet.'}
           </p>
         )}
         <div className="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">

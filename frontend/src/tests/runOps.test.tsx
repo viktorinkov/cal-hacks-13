@@ -59,6 +59,7 @@ function reducers() {
     reopenEvent: ok(),
     startCrowd: ok(),
     stopCrowd: ok(),
+    wakeCrowd: ok(),
     approveClaim: ok(),
     giveBand: ok(),
     placeBand: ok(),
@@ -273,6 +274,9 @@ describe('run reducers', () => {
     expect(await startRun({ crowd: 1000, minutes: 12, pace: 8, fresh: true })).toBe(true)
     expect(calls.startLiveRun).toHaveBeenCalledWith({ crowdSize: 1000, minutes: 12, pace: 8, fresh: true, seed: 0n })
 
+    expect(await startRun({ crowd: 1000, minutes: 12, pace: 8, fresh: true, seed: 42n })).toBe(true)
+    expect(calls.startLiveRun).toHaveBeenLastCalledWith({ crowdSize: 1000, minutes: 12, pace: 8, fresh: true, seed: 42n })
+
     await pauseRun()
     await resumeRun()
     await endRun()
@@ -352,7 +356,7 @@ describe('run page', () => {
     // The run is still there to read.
     expect(screen.getByText(/^Running: started /)).toBeInTheDocument()
     expect(screen.getByText('1 paid, 1 waiting for the organizer, 1 refused')).toBeInTheDocument()
-    expect(screen.getByText('Band 92')).toBeInTheDocument()
+    expect(screen.getByText('Band 5AW3-H10C')).toBeInTheDocument()
   })
 
   it('offers an organizer the run controls, and evacuates after one confirmation', async () => {
@@ -366,10 +370,11 @@ describe('run page', () => {
     expect(run.getByRole('button', { name: 'End the run' })).toBeInTheDocument()
     expect(run.getByRole('button', { name: 'End the event' })).toBeInTheDocument()
     expect(run.getByRole('button', { name: 'Dim the hall' })).toBeInTheDocument()
+    expect(run.getByRole('button', { name: 'Resume the crowd' })).toBeInTheDocument()
     expect(run.getByRole('button', { name: 'Restart the crowd' })).toBeInTheDocument()
     expect(run.getByRole('button', { name: 'Stop the crowd' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Approve claim 7' }).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Remove band 92 from the map' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove band 5AW3-H10C from the map' })).toBeInTheDocument()
 
     await user.click(run.getByRole('button', { name: 'Evacuate' }))
     expect(run.getByText(/nobody comes back in until you call it off/)).toBeInTheDocument()
@@ -379,7 +384,10 @@ describe('run page', () => {
 
     await user.click(run.getByRole('button', { name: 'Dim the hall' }))
     expect(calls.setLowVis).toHaveBeenCalledWith({ on: true })
+    await user.click(run.getByRole('button', { name: 'Resume the crowd' }))
+    expect(calls.wakeCrowd).toHaveBeenCalledWith({})
     await user.click(run.getByRole('button', { name: 'Restart the crowd' }))
+    await user.click(run.getByRole('button', { name: 'Restart it' }))
     expect(calls.startCrowd).toHaveBeenCalledWith({ size: 1000 })
     await user.click(run.getByRole('button', { name: 'Stop the crowd' }))
     await user.click(run.getByRole('button', { name: 'Stop it' }))

@@ -310,7 +310,7 @@ export function PhotographerPage() {
             </button>
           ) : (
             <p className="frames-empty">
-              {needle ? 'No frames match that.' : 'Nothing has landed on the photos page yet.'}
+              {needle ? 'No frames match that.' : 'No photos yet.'}
             </p>
           )
         )}

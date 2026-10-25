@@ -73,15 +73,15 @@ describe('full View As screens', () => {
     window.history.replaceState(null, '', personViewUrl(person, 'wallet'))
     useSession.setState({ owner: false, myBand: null, wallet: { accountId: 'target-account', balanceCents: 20000 } })
     render(<RouteProvider><ViewedScreen /></RouteProvider>)
-    expect(screen.getByLabelText('Band 1200 wallet')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Band 07 wallet')).toBeNull()
+    expect(screen.getByLabelText('Band PDEV-9BGH wallet')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Band QY1G-XHXT wallet')).toBeNull()
   })
 
   it('keeps a departed crowd attendee’s wallet and merch visible', () => {
     window.history.replaceState(null, '', personViewUrl(person, 'wallet'))
     useSession.setState({ owner: false, eventEnded: true, myBand: null, wallet: { accountId: 'target-account', balanceCents: 20000 } })
     render(<RouteProvider><ViewedScreen /></RouteProvider>)
-    expect(screen.getByLabelText('Band 1200 wallet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Band PDEV-9BGH wallet')).toBeInTheDocument()
   })
 
   it('opens a photographer’s saved frames with upload controls disabled', () => {

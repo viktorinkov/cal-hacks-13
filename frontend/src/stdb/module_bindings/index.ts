@@ -43,6 +43,7 @@ import ApplyMedicalExtractReducer from "./apply_medical_extract_reducer";
 import ApproveChargeReducer from "./approve_charge_reducer";
 import ApproveClaimReducer from "./approve_claim_reducer";
 import ApproveRuleProposalReducer from "./approve_rule_proposal_reducer";
+import ApproveRuleScopeReviewReducer from "./approve_rule_scope_review_reducer";
 import AssignMedicReducer from "./assign_medic_reducer";
 import AttachClaimLettersReducer from "./attach_claim_letters_reducer";
 import AttachRecoveryLetterReducer from "./attach_recovery_letter_reducer";
@@ -70,6 +71,7 @@ import FailJobReducer from "./fail_job_reducer";
 import FileClaimReducer from "./file_claim_reducer";
 import FileClaimForWearerReducer from "./file_claim_for_wearer_reducer";
 import FileClinicReportReducer from "./file_clinic_report_reducer";
+import FinishEventImportReducer from "./finish_event_import_reducer";
 import FinishPlanLookupReducer from "./finish_plan_lookup_reducer";
 import FinishVenuePolicyLookupReducer from "./finish_venue_policy_lookup_reducer";
 import FinishVenueSetupReducer from "./finish_venue_setup_reducer";
@@ -82,6 +84,7 @@ import ImportEventReducer from "./import_event_reducer";
 import IngestBandReducer from "./ingest_band_reducer";
 import IngestHeardReducer from "./ingest_heard_reducer";
 import IngestStationReducer from "./ingest_station_reducer";
+import JoinOrganizerReducer from "./join_organizer_reducer";
 import LeaveEarlyReducer from "./leave_early_reducer";
 import LeaveEventReducer from "./leave_event_reducer";
 import LoadMerchTemplatesReducer from "./load_merch_templates_reducer";
@@ -112,6 +115,7 @@ import RemoveSocialHandleReducer from "./remove_social_handle_reducer";
 import RemoveStaffReducer from "./remove_staff_reducer";
 import ReopenEventReducer from "./reopen_event_reducer";
 import ReportClaimStepReducer from "./report_claim_step_reducer";
+import ReportEventImportStepReducer from "./report_event_import_step_reducer";
 import ReportPropertyEventReducer from "./report_property_event_reducer";
 import ReportTestBandReducer from "./report_test_band_reducer";
 import ReportVenueSetupStepReducer from "./report_venue_setup_step_reducer";
@@ -122,6 +126,7 @@ import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
 import ResumeLiveRunReducer from "./resume_live_run_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
+import ReviewRuleScopesReducer from "./review_rule_scopes_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
 import SetExitReducer from "./set_exit_reducer";
@@ -160,6 +165,7 @@ import UpsertCoverageRuleReducer from "./upsert_coverage_rule_reducer";
 import UpsertInsurancePolicyReducer from "./upsert_insurance_policy_reducer";
 import ViewAsReducer from "./view_as_reducer";
 import WaiveChargeReducer from "./waive_charge_reducer";
+import WakeCrowdReducer from "./wake_crowd_reducer";
 
 // Import all procedure arg schemas
 
@@ -212,9 +218,9 @@ import DecisionRow from "./decision_table";
 import DepartureRow from "./departure_table";
 import EncounterRow from "./encounter_table";
 import EventRow from "./event_table";
+import EventGraphRow from "./event_graph_table";
 import EventImportRow from "./event_import_table";
 import EventImportStepRow from "./event_import_step_table";
-import EventGraphRow from "./event_graph_table";
 import EventStateRow from "./event_state_table";
 import GatewayRow from "./gateway_table";
 import ImportRunRow from "./import_run_table";
@@ -1315,6 +1321,7 @@ const reducersSchema = __reducers(
   __reducerSchema("approve_charge", ApproveChargeReducer),
   __reducerSchema("approve_claim", ApproveClaimReducer),
   __reducerSchema("approve_rule_proposal", ApproveRuleProposalReducer),
+  __reducerSchema("approve_rule_scope_review", ApproveRuleScopeReviewReducer),
   __reducerSchema("assign_medic", AssignMedicReducer),
   __reducerSchema("attach_claim_letters", AttachClaimLettersReducer),
   __reducerSchema("attach_recovery_letter", AttachRecoveryLetterReducer),
@@ -1342,6 +1349,7 @@ const reducersSchema = __reducers(
   __reducerSchema("file_claim", FileClaimReducer),
   __reducerSchema("file_claim_for_wearer", FileClaimForWearerReducer),
   __reducerSchema("file_clinic_report", FileClinicReportReducer),
+  __reducerSchema("finish_event_import", FinishEventImportReducer),
   __reducerSchema("finish_plan_lookup", FinishPlanLookupReducer),
   __reducerSchema("finish_venue_policy_lookup", FinishVenuePolicyLookupReducer),
   __reducerSchema("finish_venue_setup", FinishVenueSetupReducer),
@@ -1354,6 +1362,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_band", IngestBandReducer),
   __reducerSchema("ingest_heard", IngestHeardReducer),
   __reducerSchema("ingest_station", IngestStationReducer),
+  __reducerSchema("join_organizer", JoinOrganizerReducer),
   __reducerSchema("leave_early", LeaveEarlyReducer),
   __reducerSchema("leave_event", LeaveEventReducer),
   __reducerSchema("load_merch_templates", LoadMerchTemplatesReducer),
@@ -1384,6 +1393,7 @@ const reducersSchema = __reducers(
   __reducerSchema("remove_staff", RemoveStaffReducer),
   __reducerSchema("reopen_event", ReopenEventReducer),
   __reducerSchema("report_claim_step", ReportClaimStepReducer),
+  __reducerSchema("report_event_import_step", ReportEventImportStepReducer),
   __reducerSchema("report_property_event", ReportPropertyEventReducer),
   __reducerSchema("report_test_band", ReportTestBandReducer),
   __reducerSchema("report_venue_setup_step", ReportVenueSetupStepReducer),
@@ -1394,6 +1404,7 @@ const reducersSchema = __reducers(
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
   __reducerSchema("resume_live_run", ResumeLiveRunReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
+  __reducerSchema("review_rule_scopes", ReviewRuleScopesReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),
   __reducerSchema("set_exit", SetExitReducer),
@@ -1432,6 +1443,7 @@ const reducersSchema = __reducers(
   __reducerSchema("upsert_insurance_policy", UpsertInsurancePolicyReducer),
   __reducerSchema("view_as", ViewAsReducer),
   __reducerSchema("waive_charge", WaiveChargeReducer),
+  __reducerSchema("wake_crowd", WakeCrowdReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
@@ -1446,6 +1458,10 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "chosen_venue": Omit<typeof tablesSchema.schemaType.tables["chosenVenue"], "accessorName"> & { readonly accessorName: "chosen_venue" };
     /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
     readonly "crowd_walk": Omit<typeof tablesSchema.schemaType.tables["crowdWalk"], "accessorName"> & { readonly accessorName: "crowd_walk" };
+    /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+    readonly "event_import": Omit<typeof tablesSchema.schemaType.tables["eventImport"], "accessorName"> & { readonly accessorName: "event_import" };
+    /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+    readonly "event_import_step": Omit<typeof tablesSchema.schemaType.tables["eventImportStep"], "accessorName"> & { readonly accessorName: "event_import_step" };
     /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
     readonly "event_state": Omit<typeof tablesSchema.schemaType.tables["eventState"], "accessorName"> & { readonly accessorName: "event_state" };
     /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1644,6 +1660,8 @@ const tableAccessorAliases = {
   "band_place": "bandPlace",
   "chosen_venue": "chosenVenue",
   "crowd_walk": "crowdWalk",
+  "event_import": "eventImport",
+  "event_import_step": "eventImportStep",
   "event_state": "eventState",
   "import_run": "importRun",
   "incident_marker": "incidentMarker",
@@ -1758,6 +1776,10 @@ export type DbView = __DbViewBase & {
   readonly "chosen_venue": __DbViewBase["chosenVenue"];
   /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
   readonly "crowd_walk": __DbViewBase["crowdWalk"];
+  /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+  readonly "event_import": __DbViewBase["eventImport"];
+  /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+  readonly "event_import_step": __DbViewBase["eventImportStep"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __DbViewBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */
@@ -1944,6 +1966,10 @@ export type Tables = __TablesBase & {
   readonly "chosen_venue": __TablesBase["chosenVenue"];
   /** @deprecated Use `crowdWalk` instead. This alias will be removed in the next major version. */
   readonly "crowd_walk": __TablesBase["crowdWalk"];
+  /** @deprecated Use `eventImport` instead. This alias will be removed in the next major version. */
+  readonly "event_import": __TablesBase["eventImport"];
+  /** @deprecated Use `eventImportStep` instead. This alias will be removed in the next major version. */
+  readonly "event_import_step": __TablesBase["eventImportStep"];
   /** @deprecated Use `eventState` instead. This alias will be removed in the next major version. */
   readonly "event_state": __TablesBase["eventState"];
   /** @deprecated Use `importRun` instead. This alias will be removed in the next major version. */

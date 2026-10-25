@@ -7,6 +7,7 @@ import { useRoute } from '@/cover/route'
 import { personActionUnavailable, stagePersonAction, type CrowdAction } from '@/stdb/personActions'
 import { useRun } from '@/stdb/runOps'
 import { useSession } from '@/stdb/session'
+import { bandCode } from '@/lib/bandCode'
 import { useDesk } from '@/stdb/deskOps'
 import { useUi } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
@@ -33,7 +34,7 @@ function SelectedPerson({ bandId }: { bandId: number }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const person = run.attendees.find((item) => item.bandId === bandId)
-  const name = person?.displayName || device?.wearerLabel || `Band ${bandId}`
+  const name = person?.displayName || device?.wearerLabel || `Band ${bandCode(bandId)}`
   const band = run.bands.find((item) => item.id === bandId)
   const place = run.zones.find((zone) => zone.stationId === band?.zone)?.name
   const canOperate = owner || roles.includes('ops')
@@ -67,7 +68,7 @@ function SelectedPerson({ bandId }: { bandId: number }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-medium text-ink">{name}</h2>
-          <p className="mt-1 text-[12px] text-ink-dim">Band {bandId}{place ? ` · ${place}` : ''}</p>
+          <p className="mt-1 text-[12px] text-ink-dim">Band {bandCode(bandId)}{place ? ` · ${place}` : ''}</p>
         </div>
         <button type="button" aria-label="Close person panel" className="p-1 text-ink-muted hover:text-ink" onClick={() => select({ kind: 'none' })}><X size={16} /></button>
       </div>

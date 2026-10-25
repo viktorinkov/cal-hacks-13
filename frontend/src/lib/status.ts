@@ -286,13 +286,13 @@ export function headline(args: {
     }
     if (args.venueId === 'calhacks') {
       return {
-        title: 'You are on it.',
+        title: 'Acknowledged.',
         sentence: `Open the path from the entrance to ${where} when you are ready. Nothing is sent to the wristbands.${more}`,
         tone: 'caution',
       }
     }
     return {
-      title: 'You are on it.',
+      title: 'Acknowledged.',
       sentence: `Review the path for First Aid to ${where}, then send it to the bands.${more}`,
       tone: 'caution',
     }
@@ -315,7 +315,7 @@ export function headline(args: {
     return { title: 'Resolved.', sentence: `${recent.displayId} closed. Every band is back to ready.`, tone: 'ok' }
   }
   return {
-    title: 'All quiet.',
+    title: 'No open incidents.',
     sentence: '',
     tone: 'ok',
   }

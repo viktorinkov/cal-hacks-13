@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand'
 import { formatCents, parseDollars } from '@/cover/money'
+import { bandFromCode } from '@/lib/bandCode'
 import { bandLabel } from '@/payments/model'
 import type { DbConnection } from './module_bindings'
 import { linkDb, linkReducers, messageOf, millisOf, num, onLink, rowsOf, someOf, subscribeEach, tag, text, watchTables } from './link'
@@ -902,12 +903,15 @@ export function insurerCents(value: string): number | null {
   return parseDollars(value)
 }
 
-/** A band as staff type it: 7, 07, Band 07 or BANDIT-07. */
+/** A band as staff type it: 7, 07, Band 07, BANDIT-07 or its tag code like K3QX-9A7M. */
 export function parseBandNumber(value: string): number | null {
-  const match = /^(?:bandit-|band\s*)?(\d{1,9})$/i.exec(value.trim())
-  if (!match) return null
-  const id = Number(match[1])
-  return Number.isInteger(id) && id > 0 && id <= 0xffffffff ? id : null
+  const q = value.trim()
+  const match = /^(?:bandit-|band\s*)?(\d{1,9})$/i.exec(q)
+  if (match) {
+    const id = Number(match[1])
+    return Number.isInteger(id) && id > 0 && id <= 0xffffffff ? id : null
+  }
+  return bandFromCode(q.replace(/^band\s+/i, '')) || null
 }
 
 export async function recordInsurerPayment(claimId: string, dollars: string, reference: string): Promise<void> {

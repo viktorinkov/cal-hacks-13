@@ -1,4 +1,5 @@
 import { formatCents } from '@/cover/money'
+import { bandCode, bandFromCode } from '@/lib/bandCode'
 import type { Charge, DeskData, MerchOrder, MyCharge, Night, Person, Template, Wallet, WalletData, WalletEntry } from './rows'
 
 export type Source = 'merch' | 'charge' | 'wallet'
@@ -111,8 +112,9 @@ export function bandDigits(bandId: number): string {
   return String(bandId).padStart(2, '0') // taste-skill-ignore: the strap's own band number
 }
 
+/** The band's tag code, for example `Band K3QX-9A7M`. */
 export function bandLabel(bandId: number | null): string {
-  return bandId == null ? 'No band' : `Band ${bandDigits(bandId)}`
+  return bandId == null ? 'No band' : `Band ${bandCode(bandId)}`
 }
 
 export function plural(word: string, count: number): string {
@@ -335,12 +337,16 @@ export function applyFilter(payments: Payment[], filter: Filter): Payment[] {
   return filter === 'all' ? payments : payments.filter((payment) => payment.status === filter)
 }
 
-/** "07", "7", "band 7", "Band 07", "#7" → 7. Longer digit runs are references, not bands. taste-skill-ignore: band numbers */
+/** "07", "7", "band 7", "Band 07", "#7" → 7, and a tag code like "K3QX-9A7M" or "Band K3QX-9A7M" → its band. */
 export function parseBand(query: string): number | null {
-  const match = /^(?:band\s*|b\s*|#\s*)?(\d{1,3})$/i.exec(query.trim())
-  if (!match) return null
-  const n = Number(match[1])
-  return n > 0 && n < 256 ? n : null
+  const q = query.trim()
+  const match = /^(?:band\s*|b\s*|#\s*)?(\d{1,3})$/i.exec(q)
+  if (match) {
+    const n = Number(match[1])
+    return n > 0 && n < 256 ? n : null
+  }
+  const id = bandFromCode(q.replace(/^band\s+/i, ''))
+  return id > 0 && id < 256 ? id : null
 }
 
 export function searchPayments(payments: Payment[], query: string): Payment[] {

@@ -161,7 +161,7 @@ function Shopper({ wallet }: { wallet: AttendeeWallet }) {
                   <p>{photo.caption || 'Event photo'}</p>
                   <p className="text-[13px] text-ink-dim">{`${photo.zoneName}, ${stamp(photo.takenAt)}${photo.read ? `, ${photo.peopleCount} people counted` : ''}`}</p>
                   <p className="text-[13px] text-ink-dim">
-                    {`With ${photo.nodeIds.filter((id) => id !== wallet.nodeId).map((id) => people.find((item) => item.nodeId === id)?.name ?? 'no name yet').join(', ') || 'nobody else tagged'}`}
+                    {`With ${photo.nodeIds.filter((id) => id !== wallet.nodeId).map((id) => people.find((item) => item.nodeId === id)?.name ?? 'unnamed').join(', ') || 'nobody else tagged'}`}
                   </p>
                 </div>
               </li>
@@ -323,7 +323,7 @@ function Picks({ ops }: { ops: boolean }) {
                 const template = byTemplate.get(pick.templateId)
                 return (
                   <tr key={pick.id}>
-                    <td className={td}>{pick.attendeeName || 'no name yet'}</td>
+                    <td className={td}>{pick.attendeeName || 'unnamed'}</td>
                     <td className={cn(td, 'tabular-nums')}>{pick.rank}</td>
                     <td className={td}>
                       {template ? (
@@ -384,7 +384,7 @@ function Orders({ ops }: { ops: boolean }) {
               {orders.map((order) => (
                 <tr key={order.id}>
                   <td className={cn(td, 'font-mono text-[13px]')}>{`#${order.id}`}</td>
-                  <td className={td}>{order.attendeeName || 'no name yet'}</td>
+                  <td className={td}>{order.attendeeName || 'unnamed'}</td>
                   <td className={td}>{order.title}</td>
                   <td className={td}>{order.photoUrl ? <Thumb src={order.photoUrl} alt="Photo" /> : null}</td>
                   <td className={cn(td, !order.line && 'text-ink-dim')}>{order.line || '—'}</td>

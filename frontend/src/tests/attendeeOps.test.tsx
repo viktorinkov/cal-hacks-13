@@ -296,7 +296,7 @@ describe('the medic tap', () => {
   it('shows a medic the incident, takes it, and shows the card only while it is open', async () => {
     const { db, reducers } = link({ myRoles: medic(), openIncidents: table([sosOn(94)]) })
     inRoute(<MedicTap bandId={94} />)
-    expect(screen.getByRole('heading', { name: 'Medic view: band 94' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Medic view: band AJMN-676X' })).toBeInTheDocument()
     expect(screen.getByText(/SOS incident 3, open/)).toBeInTheDocument()
     await waitFor(() => expect(reducers.requestMedicalCard).toHaveBeenCalledWith({ bandId: 94 }))
     expect(await screen.findByText('Opening the medical card…')).toBeInTheDocument()
@@ -310,7 +310,7 @@ describe('the medic tap', () => {
       await Promise.resolve()
     })
     expect(screen.getByText('You have it.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Medical card: Sam Lee, band 94 (not yet confirmed by the wearer)' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Medical card: Sam Lee, band AJMN-676X (not yet confirmed by the wearer)' })).toBeInTheDocument()
     expect(screen.getByText('Peanuts; Latex')).toBeInTheDocument()
 
     await act(async () => {
@@ -325,7 +325,7 @@ describe('the medic tap', () => {
     const { reducers } = link({ myRoles: medic(), openIncidents: table([sosOn(94)]) })
     reducers.requestMedicalCard.mockRejectedValueOnce(new Error('nobody wears band 94'))
     inRoute(<MedicTap bandId={94} />)
-    expect(await screen.findByText('Nobody wears band 94.')).toBeInTheDocument()
+    expect(await screen.findByText('Nobody wears band AJMN-676X.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Tap again' }))
     expect(reducers.requestMedicalCard).toHaveBeenCalledTimes(2)
   })

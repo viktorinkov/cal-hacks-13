@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { bandCode } from '@/lib/bandCode'
 import { useCatalog } from '@/stdb/catalog'
 import { leaveEarly, releaseBand, useSession } from '@/stdb/session'
 import { DeskFrame, Figure, when } from './DeskFrame'
@@ -23,7 +24,7 @@ export function AttendeesPage() {
     const q = query.trim().toLowerCase()
     const rows = [...attendees].sort((a, b) => Number(a.simulated) - Number(b.simulated) || a.displayName.localeCompare(b.displayName))
     if (!q) return rows
-    return rows.filter((person) => `${person.displayName} ${person.organization} ${person.bandId}`.toLowerCase().includes(q))
+    return rows.filter((person) => `${person.displayName} ${person.organization} ${person.bandId} ${bandCode(person.bandId)}`.toLowerCase().includes(q))
   }, [attendees, query])
   const imported = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -55,14 +56,14 @@ export function AttendeesPage() {
         {shown.map((person) => (
           <li key={person.nodeId || `${person.bandId}-${person.displayName}`} className="desk-row grid gap-2 py-3 md:grid-cols-[minmax(0,1.4fr)_6rem_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-baseline">
             <div className="min-w-0">
-              <p className="truncate text-[15px] text-ink">{person.displayName || 'No name yet'}</p>
+              <p className="truncate text-[15px] text-ink">{person.displayName || 'Unnamed'}</p>
               <p className="mt-1 truncate text-[13px] text-ink-dim">
                 {person.organization || 'No company'}
                 {person.simulated ? ' · test' : ''}
                 {person.handles.length ? ` · ${person.handles.map((item) => item.handle).join(', ')}` : ''}
               </p>
             </div>
-            <p className="font-mono text-[13px] text-ink">{person.bandId > 0 ? person.bandId : '—'}</p>
+            <p className="font-mono text-[13px] text-ink">{person.bandId > 0 ? bandCode(person.bandId) : '—'}</p>
             <p className="text-[13px] text-ink-dim">{left.get(person.nodeId)?.leftAt ? `Left${left.get(person.nodeId)?.door ? ` by ${left.get(person.nodeId)?.door}` : ''}` : left.get(person.nodeId) ? 'Walking out' : person.findable ? 'Findable' : 'Not findable'}</p>
             <p className="text-[13px] text-ink-muted">{when(person.createdAt)}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-[13px]">
@@ -109,7 +110,7 @@ export function AttendeesPage() {
           <ul className="mt-3 divide-y divide-line">
             {imported.slice(0, 400).map((person) => (
               <li key={person.id} className="desk-row grid gap-1 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-baseline">
-                <p className="truncate text-[15px] text-ink">{person.displayName || 'No name yet'}</p>
+                <p className="truncate text-[15px] text-ink">{person.displayName || 'Unnamed'}</p>
                 <p className="truncate text-[13px] text-ink-dim">{person.title || person.role || 'No title'}</p>
                 <p className="truncate text-[13px] text-ink-muted">{person.organization || 'No company'}</p>
               </li>
