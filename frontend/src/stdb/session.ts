@@ -8,6 +8,7 @@ import { Timestamp } from 'spacetimedb'
 import { sha256, uploadBlob, uploadPhoto, validateMedicalFile, type MedicalDocumentKind } from './uploads'
 import { dropVenueSetup, subscribeVenueSetup } from './venueSetup'
 import { attachLink, currentLink, dropLink } from './link'
+import { bindViewer, isViewing, protectViewerReducers, viewedIdentity } from './viewing'
 import { schedulePayments } from '@/payments/store'
 import {
   readNight,
@@ -668,7 +669,8 @@ function subscribeAttendeeViews(next: DbConnection) {
   }
 }
 
-function connect(token: string | undefined, played: boolean, host: HostConfig) {
+function connect(token: string | undefined, played: boolean, host: HostConfig, view = '') {
+  const staffViews = Boolean(token) || Boolean(view)
   const key = `bandit-token:${host.database}`
   // The socket this call handed to the side modules, so a replaced socket closing late leaves the new one alone.
   let linked: DbConnection | null = null
@@ -679,87 +681,93 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .withDatabaseName(host.database)
       .withToken(token)
       .onConnect((next, identity, newToken) => {
-        const slot = linkSlot()
-        const previous = slot.current
-        generation = (previous?.generation ?? 0) + 1
-        slot.current = { disconnect: () => next.disconnect(), generation }
-        if (previous && previous.generation !== generation) {
-          try {
-            previous.disconnect()
-          } catch {
-            // The replaced socket is already gone.
+        void (async () => {
+          if (view) {
+            protectViewerReducers(next.reducers)
+            await bindViewer(identity.toHexString(), view)
           }
-        }
-        conn = next
-        apiSession = null
-        claimRequests.clear()
-        useSession.setState({
-          phase: 'live', error: null, me: identity.toHexString(),
-          myBand: null, myBandReady: false,
-          medicalDocuments: [], medicalDocumentsReady: false,
-          medicalCard: null, medicalCardReady: false,
-          signupError: null, wallet: null, walletError: null,
-          walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false, photosReady: false,
-          walletViewErrors: {},
-          eventReady: false,
-          eventEnded: false, eventEndedAt: null, eventName: '',
-          visits: [], encounters: [], handles: [], sharedVisits: [], recapPhotos: [], departure: null,
-          visitsReady: false, encountersReady: false, handlesReady: false, sharedVisitsReady: false, departureReady: false,
-          recapViewErrors: {},
-          staffRequested: Boolean(token), staffQueries: {},
-        })
-        console.info('[stdb] connected', identity.toHexString())
-        if (!played && newToken) window.localStorage.setItem(key, newToken)
-        wireTables(next.db)
-        subscribeAttendeeViews(next)
-        subscribeVenueSetup(next)
-        next
-          .subscriptionBuilder()
-          .onApplied(() => {
-            console.info('[stdb] floor subscription applied')
-            if (conn === next) useSession.setState({ eventReady: true })
-            safePublish()
-            resolve()
-            if (conn === next && currentLink() !== next) {
-              linked = next
-              attachLink(next)
+          const slot = linkSlot()
+          const previous = slot.current
+          generation = (previous?.generation ?? 0) + 1
+          slot.current = { disconnect: () => next.disconnect(), generation }
+          if (previous && previous.generation !== generation) {
+            try {
+              previous.disconnect()
+            } catch {
+              // The replaced socket is already gone.
             }
-            // One query at a time. A view that never answers must not hold the rest of the desk.
-            const pending = [...(token ? STAFF_QUERIES : []), ...DESK_QUERIES]
-            const subscribeNext = () => {
-              const query = pending.shift()
-              if (!query) return
-              let moved = false
-              const go = () => {
-                if (moved) return
-                moved = true
-                subscribeNext()
+          }
+          conn = next
+          apiSession = null
+          claimRequests.clear()
+          useSession.setState({
+            phase: 'live', error: null, me: identity.toHexString(),
+            myBand: null, myBandReady: false,
+            medicalDocuments: [], medicalDocumentsReady: false,
+            medicalCard: null, medicalCardReady: false,
+            signupError: null, wallet: null, walletError: null,
+            walletEntriesReady: false, chargesReady: false, suggestionsReady: false, merchOrdersReady: false, photosReady: false,
+            walletViewErrors: {},
+            eventReady: false,
+            eventEnded: false, eventEndedAt: null, eventName: '',
+            visits: [], encounters: [], handles: [], sharedVisits: [], recapPhotos: [], departure: null,
+            visitsReady: false, encountersReady: false, handlesReady: false, sharedVisitsReady: false, departureReady: false,
+            recapViewErrors: {},
+            staffRequested: staffViews, staffQueries: {},
+          })
+          console.info('[stdb] connected', identity.toHexString())
+          if (!view && !played && newToken) window.localStorage.setItem(key, newToken)
+          wireTables(next.db)
+          subscribeAttendeeViews(next)
+          subscribeVenueSetup(next)
+          next
+            .subscriptionBuilder()
+            .onApplied(() => {
+              console.info('[stdb] floor subscription applied')
+              if (conn === next) useSession.setState({ eventReady: true })
+              safePublish()
+              resolve()
+              if (conn === next && currentLink() !== next) {
+                linked = next
+                attachLink(next)
               }
-              const timer = window.setTimeout(go, 4000)
-              next
-                .subscriptionBuilder()
-                .onApplied(() => {
-                  window.clearTimeout(timer)
-                  if (token) useSession.setState((state) => ({ staffViews: 'open', staffError: null, staffQueries: { ...state.staffQueries, [query]: 'open' } }))
-                  safePublish()
-                  go()
-                })
-                .onError((...args: unknown[]) => {
-                  window.clearTimeout(timer)
-                  const reason = messageOf(args[1] ?? args[0])
-                  console.warn('[stdb] query refused', query, reason)
-                  if (token) useSession.setState((state) => ({ staffError: reason || 'A staff view was refused.', staffQueries: { ...state.staffQueries, [query]: 'refused' } }))
-                  go()
-                })
-                .subscribe(query)
-            }
-            subscribeNext()
-          })
-          .onError(() => {
-            console.warn('[stdb] floor subscription refused')
-            reject(new Error('The floor subscription was refused.'))
-          })
-          .subscribe(FLOOR_QUERIES)
+              // One query at a time. A view that never answers must not hold the rest of the desk.
+              const pending = [...(staffViews ? STAFF_QUERIES : []), ...DESK_QUERIES]
+              const subscribeNext = () => {
+                const query = pending.shift()
+                if (!query) return
+                let moved = false
+                const go = () => {
+                  if (moved) return
+                  moved = true
+                  subscribeNext()
+                }
+                const timer = window.setTimeout(go, 4000)
+                next
+                  .subscriptionBuilder()
+                  .onApplied(() => {
+                    window.clearTimeout(timer)
+                    if (staffViews) useSession.setState((state) => ({ staffViews: 'open', staffError: null, staffQueries: { ...state.staffQueries, [query]: 'open' } }))
+                    safePublish()
+                    go()
+                  })
+                  .onError((...args: unknown[]) => {
+                    window.clearTimeout(timer)
+                    const reason = messageOf(args[1] ?? args[0])
+                    console.warn('[stdb] query refused', query, reason)
+                    if (staffViews) useSession.setState((state) => ({ staffError: reason || 'A staff view was refused.', staffQueries: { ...state.staffQueries, [query]: 'refused' } }))
+                    go()
+                  })
+                  .subscribe(query)
+              }
+              subscribeNext()
+            })
+            .onError(() => {
+              console.warn('[stdb] floor subscription refused')
+              reject(new Error('The floor subscription was refused.'))
+            })
+            .subscribe(FLOOR_QUERIES)
+        })().catch((error: unknown) => { next.disconnect(); reject(error) })
       })
       .onConnectError((_ctx, error) => {
         console.warn('[stdb] connect error', messageOf(error))
@@ -780,6 +788,11 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
 async function open() {
   useSession.setState({ phase: 'connecting', error: null })
   const host = await loadHostConfig()
+  if (isViewing()) {
+    try { await connect(undefined, true, host, viewedIdentity()) }
+    catch (error) { useSession.setState({ phase: 'error', error: messageOf(error) }) }
+    return
+  }
   const as = new URLSearchParams(window.location.search).get('as')
   const actors = await loadActors()
   useSession.setState({ actors })

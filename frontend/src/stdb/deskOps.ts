@@ -6,8 +6,6 @@
 import { create } from 'zustand'
 import { DbConnection } from './module_bindings'
 import { uploadDeskPdf } from './uploads'
-import { readNight, type RecapEncounter, type RecapPhoto, type RecapVisit } from '@/recap/night'
-import { loadHostConfig } from './host'
 
 export interface DeskIncident {
   id: string
@@ -161,11 +159,7 @@ export interface FiledClaim {
   recoveryHash: string
 }
 
-export interface ViewerNight {
-  visits: RecapVisit[]
-  encounters: RecapEncounter[]
-  photos: RecapPhoto[]
-}
+
 
 interface DeskState {
   ready: boolean
@@ -183,12 +177,8 @@ interface DeskState {
   policy: PolicyNow | null
   injuries: UnclaimedInjury[]
   filed: FiledClaim[]
-  viewerHex: string
-  viewedKey: string
-  viewerNight: ViewerNight
 }
 
-const EMPTY_NIGHT: ViewerNight = { visits: [], encounters: [], photos: [] }
 
 export const useDesk = create<DeskState>(() => ({
   ready: false,
@@ -206,14 +196,9 @@ export const useDesk = create<DeskState>(() => ({
   policy: null,
   injuries: [],
   filed: [],
-  viewerHex: '',
-  viewedKey: '',
-  viewerNight: EMPTY_NIGHT,
 }))
 
 let conn: DbConnection | null = null
-let viewer: DbConnection | null = null
-let viewerIdentity: unknown = null
 let pending = 0
 
 const EXTRA_QUERIES = [
@@ -507,11 +492,6 @@ function readOwner() {
   useDesk.setState({ incidents, notes, cards, staff, people, documents, terms, lookups, covers, policy, injuries, filed })
 }
 
-function readViewer() {
-  if (!viewer) return
-  const night = readNight(viewer.db as unknown as Record<string, unknown>)
-  useDesk.setState({ viewerNight: { visits: night.visits, encounters: night.encounters, photos: night.photos } })
-}
 
 function watch(table: unknown, read: () => void) {
   const t = table as { onInsert?: (cb: () => void) => void; onDelete?: (cb: () => void) => void; onUpdate?: (cb: () => void) => void } | undefined
@@ -567,16 +547,7 @@ export function attachDesk(next: DbConnection) {
 
 export function detachDesk() {
   conn = null
-  viewerIdentity = null
-  if (viewer) {
-    try {
-      viewer.disconnect()
-    } catch {
-      // The viewer socket is already gone.
-    }
-  }
-  viewer = null
-  useDesk.setState({ ready: false, viewerHex: '', viewedKey: '', viewerNight: EMPTY_NIGHT })
+  useDesk.setState({ ready: false })
 }
 
 async function call<T>(work: () => Promise<T>): Promise<T> {
@@ -709,53 +680,4 @@ export async function askRecoveryLetter(claimId: string, name: string, contact: 
   const counterpartyContact = contact.trim()
   if (!counterpartyName || !counterpartyContact) throw new Error('Name who was handling the equipment, and how to reach them.')
   await call(() => reducers().requestRecoveryLetter({ claimId: BigInt(claimId), counterpartyName, counterpartyContact }))
-}
-
-function subscribeViewer(next: DbConnection) {
-  const db = next.db as unknown as Record<string, unknown>
-  for (const name of ['myVisits', 'myEncounters', 'myPhotos']) watch(db[name], readViewer)
-  for (const query of ['SELECT * FROM my_visits', 'SELECT * FROM my_encounters', 'SELECT * FROM my_photos']) {
-    next
-      .subscriptionBuilder()
-      .onApplied(() => {
-        if (viewer === next) readViewer()
-      })
-      .onError(() => {
-        // An empty night still leaves the frame up.
-      })
-      .subscribe(query)
-  }
-}
-
-async function ensureViewer(): Promise<unknown> {
-  if (viewer && viewerIdentity) return viewerIdentity
-  const host = await loadHostConfig()
-  return new Promise((resolve, reject) => {
-    DbConnection.builder()
-      .withUri(host.spacetimeUrl)
-      .withDatabaseName(host.database)
-      .onConnect((next, identity) => {
-        viewer = next
-        viewerIdentity = identity
-        useDesk.setState({ viewerHex: identity.toHexString() })
-        subscribeViewer(next)
-        resolve(identity)
-      })
-      .onConnectError((_ctx, error) => {
-        reject(error instanceof Error ? error : new Error(messageOf(error)))
-      })
-      .build()
-  })
-}
-
-/** Points a fresh identity at this person. Their visits, encounters, and photos then arrive on that identity. */
-export async function viewAsPerson(person: ViewablePerson): Promise<void> {
-  const viewerId = await ensureViewer()
-  await call(() => reducers().viewAs({ viewer: viewerId, target: person.identity }))
-  useDesk.setState({ viewedKey: person.key, viewerNight: EMPTY_NIGHT })
-  window.setTimeout(readViewer, 400)
-}
-
-export function hideView(): void {
-  useDesk.setState({ viewedKey: '', viewerNight: EMPTY_NIGHT })
 }

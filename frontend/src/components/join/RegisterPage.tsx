@@ -13,7 +13,8 @@ import { blankRegistration, getSavedRegistration, saveRegistration, type Registr
 import { useRoute } from '@/cover/route'
 import { bandIdFromSearch, rememberBand } from '@/cover/tapLink'
 import { nightIsOver, nightKnown } from '@/recap/night'
-import { useIsMedic, useMedicOnBand } from '@/stdb/attendeeOps'
+import { useAttendee, useIsMedic, useMedicOnBand } from '@/stdb/attendeeOps'
+import { isViewing } from '@/stdb/viewing'
 import { useSession, type MedicalCardView } from '@/stdb/session'
 import { validateMedicalFile, type MedicalDocumentKind } from '@/stdb/uploads'
 
@@ -123,7 +124,7 @@ function UploadArea({ kind, title, note, disabled, onFiles, error }: {
   )
 }
 
-function MedicalReview({ card, confirming, blocked, onConfirm }: { card: MedicalCardView; confirming: boolean; blocked: boolean; onConfirm: () => void }) {
+export function MedicalReview({ card, confirming, blocked, onConfirm }: { card: MedicalCardView; confirming: boolean; blocked: boolean; onConfirm: () => void }) {
   const facts = [
     ['Blood type', card.bloodType], ['Allergies', card.allergies], ['Conditions', card.conditions], ['Medications', card.medications],
     ['Emergency contact', card.emergencyContact], ['Insurer', card.insurer], ['Plan', card.plan], ['Member ID', card.memberId],
@@ -155,9 +156,10 @@ function withMedicalCard(registration: Registration, card: MedicalCardView | nul
     emergencyPhone: registration.emergencyPhone }
 }
 
-function RegistrationForm({ band }: { band: MockBand }) {
+function RegistrationForm({ band }: { band: Pick<MockBand, 'deviceId' | 'label'> }) {
   const { go } = useRoute()
   const session = useSession()
+  const attendee = useAttendee((s) => s.attendee)
   const { myBand, medicalCard, medicalDocuments, myBandReady, claimBand } = session
   const [draft, setDraft] = useState(() => getSavedRegistration(band.deviceId) ?? blankRegistration(band.deviceId))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -189,7 +191,7 @@ function RegistrationForm({ band }: { band: MockBand }) {
     || documents.some((doc) => doc.kind === kind && doc.status === 'reading')
 
   useEffect(() => {
-    if (over || !connected || !myBandReady || attemptedClaim.current || owned || isMedic) return
+    if (isViewing() || over || !connected || !myBandReady || attemptedClaim.current || owned || isMedic) return
     attemptedClaim.current = true
     void claimBand(`BANDIT-${band.label}`).catch((error: unknown) => setClaimError(reason(error)))
   }, [over, connected, myBandReady, claimBand, band.label, owned, isMedic])
@@ -199,6 +201,10 @@ function RegistrationForm({ band }: { band: MockBand }) {
     savedHeading.current?.closest('[data-page]')?.scrollTo({ top: 0 })
     savedHeading.current?.focus({ preventScroll: true })
   }, [saved])
+
+  useEffect(() => {
+    if (isViewing() && attendee) setDraft((current) => ({ ...current, name: attendee.displayName }))
+  }, [attendee])
 
   const set = (key: keyof Registration) => (value: string) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -397,14 +403,14 @@ function WalletStatus() {
   return <p role="status" className="mt-4 break-words text-[13px] leading-5 text-ink-dim">{wallet ? `Wallet account ${wallet.accountId}` : error ? `Wallet pending: ${error} Your registration can still be saved.` : 'Your wallet account will appear here when it opens. It won’t hold up registration.'}</p>
 }
 
-export function RegisterPage() {
+export function RegisterPage({ viewBandId }: { viewBandId?: number } = {}) {
   const [lights, setLights] = useState(true)
   const { search } = useRoute()
-  const band = bandFromLocation(search)
+  const band = viewBandId != null && isViewing() ? { deviceId: `band-${viewBandId}`, label: String(viewBandId) } : bandFromLocation(search)
   const medic = useMedicOnBand(band ? Number(band.label) : null)
   const fromLink = bandIdFromSearch(search)
   useEffect(() => {
-    if (fromLink != null) rememberBand(fromLink)
+    if (!isViewing() && fromLink != null) rememberBand(fromLink)
   }, [fromLink])
   const known = useSession((s) => nightKnown(s.eventReady, s.departureReady, s.recapViewErrors.my_departure))
   const over = useSession((s) => nightIsOver(s.eventEnded, s.departure?.leftAt))

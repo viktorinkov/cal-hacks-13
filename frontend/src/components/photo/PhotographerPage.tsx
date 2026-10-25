@@ -1,3 +1,4 @@
+import { isViewing } from '@/stdb/viewing'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useRoute } from '@/cover/route'
 import { useCatalog } from '@/stdb/catalog'
@@ -42,7 +43,7 @@ export function PhotographerPage() {
   const desk = useCatalog((s) => s.photos)
   const input = useRef<HTMLInputElement>(null)
   const [frames, setFrames] = useState<LocalFrame[]>([])
-  const [tab, setTab] = useState<Tab>('waiting')
+  const [tab, setTab] = useState<Tab>(isViewing() ? 'desk' : 'waiting')
   const [query, setQuery] = useState('')
   const [notice, setNotice] = useState('')
   const [dragging, setDragging] = useState(false)

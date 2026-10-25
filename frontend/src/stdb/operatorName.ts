@@ -1,4 +1,5 @@
 import { useSession } from './session'
+import { isViewing } from './viewing'
 
 function claimsOf(token: string): Record<string, unknown> {
   const part = token.split('.')[1]
@@ -16,7 +17,7 @@ function text(value: unknown): string {
 
 /** The name on the email sign-in, or the email when the token has no name. */
 export function signedInPerson(): { name: string; email: string } {
-  if (typeof window === 'undefined') return { name: '', email: '' }
+  if (typeof window === 'undefined' || isViewing()) return { name: '', email: '' }
   const token = window.localStorage.getItem('bandit-id-token')
   if (!token) return { name: '', email: '' }
   const claims = claimsOf(token)
@@ -32,6 +33,7 @@ export function signedInPerson(): { name: string; email: string } {
 export function useOperatorName(): string {
   const actors = useSession((s) => s.actors)
   const roleLabel = useSession((s) => s.roleLabel)
+  if (isViewing()) return roleLabel
   const played = typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('as') ?? '')
   const actor = played ? actors.find((item) => item.name === played) : undefined
   if (actor?.label) return actor.label
