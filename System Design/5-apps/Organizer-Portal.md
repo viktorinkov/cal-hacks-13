@@ -115,7 +115,9 @@ At the bottom of the Live tab, "People (<n>)" lists everyone: every attendee fro
 
 The search box above the list matches every word typed against the name, what the person is (crowd, test band, hardware band, organizer, medic or photographer), the band code, the company and the socials. Each row shows the band code, the zone the band is in now, the band's status, the company, the number of claims, and "Open".
 
-"Open" shows the person above the list, with their band code, status, zone, company, socials and join time. Staff act as them from there.
+"Open" shows the person above the list, with their band code, status, zone, company, socials and join time, and "walking to <door>" or "left at <time> by <door>" once they leave early. Staff act as them from there.
+
+Under the zone table, "Left early (<n>)" lists everyone with a `departure` row while the event runs: the name, the door, when they set off, when they walked out (or "walking") and who sent them, with "Open" for the person.
 
 Every other place that picks a person uses the same search bar: the View as tab, the Merch tab's "Buy as an attendee" (over the attendees with a wallet, each with its balance) and the Settlements tab's "File a claim as someone" (over the attendees with a band). The bar lists its first 12 matches under it, each with what the person is and their band code. A click, or Enter for the first match, picks one.
 
@@ -124,7 +126,8 @@ Every other place that picks a person uses the same search bar: the View as tab,
 | "Their pages": "Their band page now", "Medical card" and "Recap and merch" for an attendee with a band, the portal for an organizer or medic, the photo page for a photographer; the page shows in the View as frame under the person, read-only, until "Hide their page" | the owner | `view_as` |
 | "File a claim as <name>": "What happened" picks a short story in their words, "Hospital report" picks "Matches", "Doesn't match" or "Random" | `ops` and `medic`, for an attendee with a band | for their injury that has no claim yet, `file_claim_for_wearer`; otherwise `open_incident` for a fall or SOS on their band where it is now, `resolve_incident` with "treated on site", then `file_claim_for_wearer` |
 | "Their claims": each claim with its status and payout, opening it on the Settlements tab | staff | none |
-| "Buy merch as <name>": the shop of the Merch tab's "Buy as an attendee", or "No wallet, so no merch." | `ops` | `buy_merch_as` |
+| "Buy merch as <name>": the shop of the Merch tab's "Buy as an attendee", or "No wallet, so no merch."; its buttons work once the event has ended or the person has left | `ops` | `buy_merch_as` |
+| "Leave early", with a confirm: the person leaves before the doors close, and their recap and merch open once they are out ([Tap-Page](Tap-Page.md)). Someone of the crowd walks alone to the nearest door; anyone else is out at once | `ops`, for an attendee who has not left, until the event ends | `leave_early` |
 | "Take band <band code> back", with the attendee list's confirm | bands 1 to 99, until the event ends | `release_band` |
 | "Tap band <band code> for <name>'s medical card", then the card | `medic`, bands 1 to 99 | `request_medical_card` |
 | Test-Bands.md: "Walk to" each zone, "Press" and "Fall here" | test bands 90 to 99, in test mode | the Bands tab's `/api/dev` calls |

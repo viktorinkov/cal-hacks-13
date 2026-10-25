@@ -214,11 +214,11 @@ The switch exists in the core even if Social.md is deleted; then it has no effec
 
 ### The thank-you screen
 
-When the last setup step is done, the page shows the thank-you screen: "You're all set", "Thanks, <name>. Enjoy <venue>." and "Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos." It shows nothing else: no band status, no zones and how busy they are, no exit colours or alerts, no wallet, no profile, no graph, no schedule and no photos.
+When the last setup step is done, the page shows the thank-you screen: "You're all set", "Thanks, <name>. Enjoy <venue>." and "Keep your band on. After the event, tap it again for your recap: where you went, who you spent time with, and your photos." Under it is one button, "Leave the event", for an attendee who goes home early (see Leaving early below). It shows nothing else: no band status, no zones and how busy they are, no exit colours or alerts, no wallet, no profile, no graph, no schedule and no photos.
 
 Insurance.md: above it, "Hurt at the event?" appears once an incident of the attendee's band is resolved, and "Your claim" once they filed one.
 
-Once setup is finished, every later tap on the band during the event opens the same screen, on any signed-in device; before that, a tap resumes setup at the first step not yet finished. The screen's one live input is `event_state`: when the event ends, it turns into the recap.
+Once setup is finished, every later tap on the band during the event opens the same screen, on any signed-in device; before that, a tap resumes setup at the first step not yet finished. The screen's live inputs are `event_state` and `my_departure`: when the event ends, or once the attendee has left, it turns into the recap.
 
 Safety guidance reaches the attendee only through the band: the ring's colour and, on full bands, vibration ([Safety](../6-features/Safety.md)). The phone repeats none of it.
 
@@ -231,12 +231,21 @@ flowchart LR
     Later["Later tap during the event"] -->|"setup finished"| Thanks
     Later -->|"a step not finished"| Setup
     Thanks -->|"end_event sets event_state.ended"| Recap["Recap"]
+    Thanks -->|"Leave the event, or the organizer's Leave early"| Recap
     After["Tap link after the event, signed in, any device"] -->|"same page"| Recap
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
     classDef device fill:#FFF3E0,stroke:#E65100,color:#1A1A1A
     class Setup,Thanks,Recap web
     class First,Later,After device
 ```
+
+### Leaving early
+
+An attendee who goes home before the doors close presses "Leave the event" and confirms. `leave_event` writes their `departure` row with `left_at` set to now, their band goes offline and its stays close. From that moment the event has ended for them alone: their tap page turns into the recap live, and the recap's merch section takes orders at once ([Merch](../6-features/Merch.md)).
+
+The organizer can do the same for them from the Live tab's person panel, with "Leave early" (`leave_early`), and the live run sends someone of the crowd home now and then ([Test-Bands](../3-services/Test-Bands.md)).
+
+Their recap is drawn up to `left_at` instead of the event's end. Everyone else's page stays on the thank-you screen until the event ends.
 
 ### After the event
 
@@ -339,6 +348,7 @@ Every call on the recap runs as the signed-in attendee. Other sections, each sep
 | Decision | Why |
 |---|---|
 | During the event the tap page is band setup, then a thank-you screen, and nothing else; the recap replaces it when the event ends | the band carries every safety cue on the wrist, and the night comes back in the recap, so the page has nothing to show in between |
+| An attendee who leaves early gets their recap and merch when they leave: one "Leave the event" button on the thank-you screen writes `departure.left_at`, and their page reads it like `event_state.ended` | their night is over, so nothing is gained by making them wait for everyone else; the organizer's "Leave early" writes the same row for someone without their phone at hand |
 | A later tap during the event resumes setup at the first step not yet finished (`resumeStep`), and opens the same thank-you screen once setup is finished | someone who closed the page halfway does not start over, and the thank-you keeps one meaning: you are set up |
 | Safety guidance reaches the attendee only through the band: the ring's colour and, on full bands, vibration; the phone shows none of it | the ring has no compass, so colour and vibration are the guidance, and they work with the phone in a pocket |
 | Every tag holds the one public `bandit-api` host; there is no second entry such as a QR code | there is one deployment, so one host always works, on judges' own phones |

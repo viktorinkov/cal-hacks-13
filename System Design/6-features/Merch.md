@@ -11,7 +11,7 @@ No image is generated during the event and nothing is rendered on any server. An
 Responsibilities:
 
 - Hold the templates (`merch_template`, loaded from `assets/merch/templates.json` with `load_merch_templates`), the orders (`merch_order`) and the Capital One Nessie merchant that BandIt merch is sold as (`merch_shop`).
-- Ask the shopping agent for each attendee's three picks when the event ends (`merch_picks` jobs, answered with `submit_merch_picks`), and suggest template and photo pairs through the view `my_merch_suggestions`.
+- Ask the shopping agent for each attendee's three picks when their night ends, at the event's end or when they leave early (`merch_picks` jobs, answered with `submit_merch_picks`), and suggest template and photo pairs through the view `my_merch_suggestions`.
 - Take an order and its payment in one call, `buy_merch`, and finish it with `settle_merch_order` once the purchase is on Capital One Nessie.
 - Show the organizer the templates and every order on the organizer portal's Merch tab, through the view `board_merch_orders` ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
 
@@ -113,7 +113,7 @@ Each row also carries the line printed under the photo (the people the caller me
 
 ### The shopping agent
 
-When the organizer presses "Event ended", `end_event` enqueues one `merch_picks` job for each non-crowd attendee with a photo tag. The payload is the attendee's night as the bands measured it: the zones and minutes, the booths in each zone, the people they met and for how long, each photo with its zone, its caption, the people the bands put in it and which of those they met, and every template with its sponsors and price.
+When the organizer presses "Event ended", `end_event` enqueues one `merch_picks` job for each non-crowd attendee with a photo tag who has not left yet. An attendee who leaves early gets their job the moment they walk out (`departure.left_at` is set, [Tap-Page](../5-apps/Tap-Page.md)), so their picks are ready while the event goes on without them. The payload is the attendee's night as the bands measured it: the zones and minutes, the booths in each zone, the people they met and for how long, each photo with its zone, its caption, the people the bands put in it and which of those they met, and every template with its sponsors and price.
 
 `bandit-workers` sends it to Claude, which picks three different templates, a photo for each and a line of at most 36 characters, with one sentence on why. The worker checks every template and photo id against the payload and asks once more with the problems listed when an answer is wrong. `submit_merch_picks` checks them again (a known template, once each, a photo the attendee is tagged in) and stores them in `merch_pick`.
 
@@ -151,7 +151,7 @@ sequenceDiagram
 ```
 
 1. **Suggest.** The recap subscribes to `my_merch_suggestions` and shows the three previews, each with its price, below the wallet balance from `my_wallet` at the top of the section. While `my_wallet` has no row, the top reads "Connect your Capital One wallet at band setup to buy merch." and every "Buy" button is disabled ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)).
-2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended (`event_state.ended` is set, otherwise "merch opens in your recap once the event ends"), that the size fits the kind, that the caller is tagged in the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price.
+2. **Buy.** The attendee picks one and, for a tee, a size, and taps "Buy". In one transaction, `buy_merch` checks that the event has ended for the caller (`event_state.ended` is set, or the caller's `departure.left_at` is, otherwise "merch opens in your recap once you leave or the event ends"), that the size fits the kind, that the caller is tagged in the photo, that the caller has a wallet (`claimant_account`), and that the wallet's spendable balance covers the price.
 
    It then writes a `merch_order` in status `paying`, with the template's price as `amount_cents`, and enqueues `merch_purchase`. From then on the order's amount is held: the spendable balance leaves it out, so a second tap cannot spend the same money.
 3. **Settle.** `bandit-workers` records the purchase on the attendee's wallet in Capital One Nessie and calls `settle_merch_order` ([Capital-One-Nessie](../7-integrations/Capital-One-Nessie.md)). The reducer rejects a stale lease, stores the merchant in `merch_shop` if it is not there yet, adds a `purchase` entry of minus the amount to `wallet_entry`, and sets the order `paid` with the Capital One Nessie purchase id.
@@ -232,7 +232,7 @@ The organizer portal's Merch tab shows the loaded templates, each with its image
 | The photo area is painted pure green (`#00FF00`) in each image, and its rectangle is written in `templates.json` | The team sees the area while drawing, and the page needs only a rectangle, with no image analysis |
 | The attendee's own photo goes straight into the photo area, scaled to cover it, drawn by the tap page | No server renders or stores anything; an order keeps the template and the photo |
 | Suggestions are the view `my_merch_suggestions`: the shopping agent's three picks once it has answered, else ranked by the caller's minutes at the template's booths, then by a photo taken at those booths, then plain templates before sponsor ones; top 3 | The agent reads the whole night (booths, minutes, the people in each photo) and writes the printed line; the ranking keeps the shop working before it answers or without it |
-| The shopping agent runs once, when the event ends, and code checks every id it returns | Nobody shops during the event, and a pick can only name a real product and a photo the attendee is in |
+| The shopping agent runs once for each attendee, when their night ends: when they leave early, else when the event ends; code checks every id it returns | Nobody shops during the event, and a pick can only name a real product and a photo the attendee is in |
 | A sponsor template names its sponsors in `templates.json`; the loader matches them to the imported organisations and stores their booths | The team knows sponsor names, not row ids, and the booth crawl poster names six sponsors at once; merch from the booth the attendee spent time at is the Visa shopping story |
 | A photo can be bought only by someone tagged in it; there is no merch consent switch | Tags exist only for `findable` attendees whose band was in the photo's zone, so the buyer is always in the photo |
 | Sizes and prices go by kind: a `tee` costs 2500 cents and comes in S, M, L and XL; a `mug` costs 1800 and a `poster` 1500, in one size | No size list to keep, and the same kind costs the same with or without a sponsor |
