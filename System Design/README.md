@@ -45,6 +45,7 @@ One word for one thing in every doc. Code names stay as the code spells them, in
 | policy terms | the limits, deductible, minimum payout, service window, fee schedule and exclusions read from the venue's policy, each quoting its clause | settings, config |
 | clause | one section of the wording of the venue's policy or the attendee's insurance card, as The Evidence Engine indexed it | rule, paragraph |
 | the guard | the code that holds Claude's decision to the policy terms and the checks | |
+| charge | what an attendee owes the venue for something they broke or took, which they see on their tap page | fine, bill |
 | wallet | the attendee's Capital One Nessie account in BandIt | account (alone) |
 | findable switch | the one consent switch at sign-up | privacy toggle, consent switch |
 

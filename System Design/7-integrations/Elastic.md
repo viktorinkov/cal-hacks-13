@@ -1,6 +1,6 @@
 # Elastic
 
-The Evidence Engine is Elastic's part of BandIt: one Elastic Cloud Serverless project that organizes and validates data and ranks it by meaning. It answers the Elastic track, "Best use of the Elastic Agent Builder on a Serverless instance": an Elastic Agent Builder agent runs inside an Elastic Workflow, every text field is searched by meaning, an ingest pipeline checks every claim copy, and Elastic Kibana shows each step. Its biggest job is insurance: it reads every insurance document, each a PDF, into the terms and the clauses that the insurance Decision Engine is held to (next to build).
+The Evidence Engine is Elastic's part of BandIt: one Elastic Cloud Serverless project that organizes and validates data and ranks it by meaning. It answers the Elastic track, "Best use of the Elastic Agent Builder on a Serverless instance": an Elastic Agent Builder agent runs inside an Elastic Workflow, every text field is searched by meaning, an ingest pipeline checks every claim copy, and Elastic Kibana shows each step. Its biggest job is insurance: it reads every insurance document, each a PDF, into the terms and the clauses that the insurance Decision Engine is held to, and finds the clauses for each kind of incident: an injury, broken property, a theft, or an attendee's own things (next to build).
 
 BandIt's design rule: SpacetimeDB owns live and exact state, The Evidence Engine validates and organizes data and ranks it by meaning, and the Anthropic Claude API makes the judgments. For a claim, the judgment and the decision belong to the insurance Decision Engine: the Anthropic Claude API plus Rust code in the module.
 
@@ -345,6 +345,19 @@ sequenceDiagram
 **What today's code does instead.** Today the copy is ranked against 30 seeded past claims and earlier events' decided claims (`similar_claims`, top 3). The results are stored as `claim_precedent` rows, shown as "Similar past claims (Elastic)", and given to Claude, whose first build also searched them (`search_past_claims`, `past_claim_stats`). The design drops past claims from the decision. Whether a claim is covered is written in the venue's contract, and what earlier approvals taught already lives in the organizer's learned rules. `claim_draft` still writes each paid claim's outcome back to its copy for the claims dashboard.
 
 **The attendee's own words stay out of Elastic.** The `claimant_statement`, the attendee's own words from `file_claim`, goes to `claim_review` only, because `claim_doc` builds the Elastic copy from fixed fields and a fixed template.
+
+### Insurance.md: each kind of incident, and the clauses The Evidence Engine finds for it (next to build)
+
+A venue's policy covers each kind of incident under a different cover, with its own exclusions. The clause search is filtered to the sections that can decide that kind, so Claude reads the right part of the right policy.
+
+| Kind | The policy and cover searched | The sections it searches | What Claude asks `search_policy`, for example | What can come of it |
+|---|---|---|---|---|
+| Injury: `sos`, `fall` | the venue's policy, medical payments cover; the attendee's insurance card | insuring agreement, limits, schedule of benefits, exclusions (`staff`, `pre_existing`, `off_premises`), conditions (service window), other insurance | "injury that began before the event", "treatment more than 30 days after the incident", "which policy pays first for urgent care" | a payout to the attendee |
+| Property damage: `property` | the venue's policy, property cover | insuring agreement, limits, deductible, exclusions, the subrogation clause | "equipment damaged by a guest", "the insured's right to recover from the person who caused a loss" | a payout to the repair vendor, and a charge to the attendee staff named |
+| Theft: `theft` | the venue's policy, property cover | the theft clause, its conditions and exclusions (such as a loss with no sign of theft), the subrogation clause | "theft of merchandise from a booth", "loss discovered only by an inventory count" | a payout to the venue when the theft clause covers it, and a charge to the attendee staff named |
+| An attendee's own things | the venue's policy | the exclusion for property in the venue's care, custody or control, and the liability cover | "personal property of a guest left at a booth" | the organizer decides; the attendee gets the incident record for their own home or renters insurance |
+
+Each charge to an attendee rests on a clause The Evidence Engine found, and the attendee sees that clause on their tap page next to the charge ([Insurance](../6-features/Insurance.md#charges-to-an-attendee-next-to-build)).
 
 ### Why Elastic and not SpacetimeDB
 
@@ -718,7 +731,7 @@ What each kind's schema asks for:
 
 | Kind | Terms | Clauses |
 |---|---|---|
-| `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `other`); other insurance (`primary` or `excess`) | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, other insurance |
+| `venue_policy` | insurer, policy number, period, FNOL contact; each cover with its incident kinds, per-claim and aggregate limits, deductible, minimum payout and service window; the schedule of benefits (code, description, cap); exclusions (`staff`, `pre_existing`, `off_premises`, `care_custody_control`, `other`); the theft clause and its conditions; other insurance (`primary` or `excess`); the subrogation clause | every clause, with its section: insuring agreement, limits, schedule of benefits, exclusions, conditions, theft, other insurance, subrogation |
 | `insurance_card` | insurer, plan, member name, member id, group number, the copays for urgent care and the emergency room | its coverage wording, such as the copays and what the plan pays first |
 | `hospital_report` | the fields `validate_record` checks today: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | none |
 

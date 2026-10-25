@@ -84,7 +84,7 @@ Prize: $8,000, $5,000 and $3,000. Source: Hyphenate's track doc (its starter pac
 > 3. Did we see something new? A company, problem or approach we haven't seen made autonomous before.
 > 4. The moment. When it catches what others missed, recovers from something going wrong, or defends a decision when questioned.
 
-**The seats BandIt fills.** The venue's claims desk: the claims adjuster who checks each medical-payments claim against the evidence, and the bill reviewer who prices each hospital report, both answering to the organizer, the venue's risk manager.
+**The seats BandIt fills.** The venue's claims desk: the claims adjuster who checks each medical-payments claim against the evidence, and the bill reviewer who prices each hospital report, both answering to the organizer, the venue's risk manager. In the design it also fills the seat that bills an attendee who broke or took something, with the charge, its evidence and the policy clause on the attendee's own tap page, where they can pay or dispute it (next to build).
 
 BandIt enters the insurance Decision Engine ([Insurance](../6-features/Insurance.md)).
 
