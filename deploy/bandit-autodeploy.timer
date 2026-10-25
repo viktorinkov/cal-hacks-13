@@ -1,0 +1,11 @@
+# Checks vik-e2e for a new commit to deploy 30 s after each check finishes.
+[Unit]
+Description=BandIt deploy check for vik-e2e
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

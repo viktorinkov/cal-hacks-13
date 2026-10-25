@@ -3,7 +3,7 @@
 Reads the venue map's named locations (hive.hackberkeley.org/venue-map, fetched through Bright Data) and the
 palace-interior floor layout, both on Viktor's Mac (gitignored), and writes web/venue/spots.json. The module's
 crowd sits teams at the hacker tables, sends visitors and staff to the sponsor tables, the stage, the food line
-and the doors, and the live page labels the hall with the rest.
+and the doors, and the live page names the sponsors at their tables and labels the hall with the rest.
 
     python3 pipeline/venue_spots.py \
         --locations var/venue-3d/brightdata/hive/locations.json \

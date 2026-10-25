@@ -1,12 +1,12 @@
 # Insurance
 
-Insurance resolves the money after an incident: who is paid, how much, from which policy, and who pays it back. It turns each incident into a claim that is paid, refused or sent to the organizer, posts every movement on a double-entry ledger, and reconciles what the venue's insurer pays back. It is built for Hyphenate's "autonomous systems for finance" track. When an attendee broke or took something, it can also turn the incident into a charge that the attendee sees on their tap page (next to build). Three parts share the work, and each does what only it can do:
+Insurance resolves the money after an incident: who is paid, how much, from which policy, and who pays it back. It turns each incident into a claim that is paid, refused or sent to the organizer, posts every movement on a double-entry ledger, and reconciles what the insurer pays back. It is built for Hyphenate's "autonomous systems for finance" track. Each of the five incident types has its own claimant and paying policy ([Incident-Types](Incident-Types.md)), and when security names who broke or took something, that person is charged (next to build). Three parts share the work, and each does what only it can do:
 
-- **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own health insurance card, health plan and policy for their belongings, and the hospital report. An attendee who names their plan instead of uploading it gets the plan's public wording through Bright Data, read the same way. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
+- **The Evidence Engine (Elastic)** reads every insurance document, each a PDF: the venue's policy, the attendee's own policy, their health insurance card or health plan, and the hospital report. An attendee who names their plan instead of uploading it gets the plan's public wording through Bright Data, read the same way. For each claim it validates the de-identified copy and finds what the venue's policy and the attendee's own policy say about this claim, clause by clause ([Elastic](../7-integrations/Elastic.md)).
 - **The insurance Decision Engine** is the Anthropic Claude API plus the Rust code that decides insurance claims. Claude investigates each claim with tools and decides: pay, refuse or ask the organizer. Code holds that decision to the venue's policy terms and to every check.
 - **The organizer** decides each claim that Claude or the guard sends them. Each approval can teach a rule, and the next claim of that shape is then paid with nobody involved.
 
-Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first.
+Both sides of a claim are insured. The venue's general liability policy pays the attendee's medical bills and the venue's broken equipment. The attendee's own health plan is the other insurance, and the venue's policy says which pays first. The attendee's own policy pays when their belongings are stolen or broken, because the venue's policy never does.
 
 Money moves on a double-entry ledger. A payout lands in the attendee's wallet, their Capital One Nessie API account.
 
@@ -84,20 +84,20 @@ BandIt has no connection to a hospital, so the hospital report comes back from a
 | A claim sent to a person | the organizer, `approve_claim` or `refuse_claim` | pays or refuses, and can teach a rule |
 | What the next similar claim does | the organizer's approval, as a `settlement_rule` version | the ceiling under which a pay goes through |
 | The wording of the letters | the Anthropic Claude API, `claim_draft` and `recovery_letter`; code checks every figure | words only |
-| Did an attendee break or take something? (next to build) | staff name the band; code checks it against the evidence; Claude recommends; the organizer approves | a charge the attendee sees, and can pay or dispute |
+| Who broke or took something? (next to build) | security names the band (`name_responsible`); code accepts only a band at the spot; the organizer approves or drops the charge | a charge collected from that person's wallet |
 
-## Kinds of incident, and which policy answers each (next to build)
+## Incident types, and which policy pays (next to build)
 
-The module knows three incident kinds today: `sos` and `fall`, which are injuries, and `property`, broken equipment. The design adds `theft`, and a report for an attendee's own things. Each kind has its own cover in the venue's policy, so The Evidence Engine searches different clauses for each, and the decision ends in a different place.
+[Incident-Types](Incident-Types.md) is the one place that lists the five incident types. In short:
 
-| Kind | What happened | How it opens | The evidence | The policy that answers it | Who is paid | Who can be charged |
-|---|---|---|---|---|---|---|
-| Injury: `sos`, `fall` | an attendee is hurt at the event: a fall, a crush, taken ill | the band's SOS or fall flag, or a medic's report; the attendee files the claim | the band, the light circle, the medic's notes, the security cameras, the hospital report, the attendee's own words | the venue's policy, medical payments cover, which pays whoever was at fault; the attendee's own health plan is the other insurance, and the venue's other-insurance clause says which pays first | the attendee, into their wallet | nobody |
-| Property damage: `property` | venue or sponsor equipment is broken | staff report it with a cost note; the claim opens when the incident resolves | the security cameras, staff notes with the repair cost, the bands in the zone at the time, and the attendee staff named, if any | the venue's policy, property cover, above its deductible | the repair vendor | the attendee who broke it, when staff named them and the evidence holds |
-| Theft: `theft` | venue or sponsor property is taken, such as merch or a laptop from a booth | staff report it with the item and its value | the security cameras, staff notes, the bands in the zone at the time, and the attendee staff named, if any | the venue's policy, property cover, only when its theft clause covers the loss; many policies exclude a loss with no sign of theft | the venue | the attendee who took it, on the same terms |
-| An attendee's own things lost, stolen or broken | an attendee's phone or bag goes missing or breaks | staff report it for the attendee | staff notes, the security cameras | usually not the venue's policy, which excludes property in the venue's care and pays only where the venue was at fault; the attendee's own home or renters insurance answers it | the attendee, only if the venue's clause covers it | nobody |
+| Type | Who claims | Which policy pays | Who is charged |
+|---|---|---|---|
+| `fall`, `sos`: an attendee is hurt | the attendee | the venue's policy, medical payments cover; the attendee's health plan is the other insurance | nobody |
+| `property`: the venue's own equipment is broken | the venue | the venue's policy, property cover; the venue carries the deductible | the attendee who broke it, when security names one |
+| `theft`: an attendee's belonging is stolen | the attendee | the attendee's own policy, personal property cover | the attendee who took it, when security names one |
+| `breakage`: an attendee's belonging is broken by someone else | the attendee | the attendee's own policy, personal property cover | the attendee who broke it, when security names one |
 
-The last kind never pays on its own. Claude finds the clause the venue's policy decides it by, the claim goes to the organizer with that clause, and the attendee's tap page gives them the incident record to file with their own insurer.
+The venue's policy never pays for an attendee's own belongings, because a general liability policy excludes guests' property. BandIt pays a theft or breakage claim into the attendee's wallet at once: the item's value up to the per-claim limit, less the deductible. It then collects that payout from the attendee's insurer, the same way it collects from the venue's. The Evidence Engine reads each attendee's own policy PDF into an `attendee_policy` row, as it reads the venue's policy.
 
 ## How the insurance Decision Engine decides
 
@@ -224,7 +224,7 @@ Today the limits are seeded and `FEE_SCHEDULE` is compiled into the code. The de
 | minimum payout | each cover's `minimum_payout_cents` | $0 |
 | service window | `service_window_days` | 365 days |
 | the cap of each billed code | the policy's schedule of benefits, one `fee_schedule_line` per code | the 21 codes of `FEE_SCHEDULE` |
-| which incident kinds a cover pays for | each cover's `incident_kinds` | medical payments: `sos`, `fall`; property: `property`, and `theft` where a theft clause covers it |
+| which incident kinds a cover pays for | each cover's `incident_kinds` | medical payments: `sos`, `fall`; property: `property`; the attendee's own personal property cover: `theft`, `breakage` |
 | the staff refusal | an exclusion of kind `staff` | on |
 | what Claude may cite for a refusal | exclusions of kind `pre_existing`, `off_premises` and `other`, found with `search_policy` and read with `read_clause` | none |
 | which insurance pays first | `other_insurance`: `primary` or `excess` | `primary` |
@@ -283,9 +283,9 @@ Every document in a claim is a PDF, and The Evidence Engine reads all of them th
 | Document | Who uploads it, when | What The Evidence Engine reads from it | Where it goes |
 |---|---|---|---|
 | The venue's insurance policy | the organizer, on the Venue setup tab, when the event is set up (`POST /api/blobs` purpose `policy`, then `submit_policy_document`) | insurer, policy number, period, FNOL contact; each cover with its incident kinds, limits, deductible, minimum payout and service window; the schedule of benefits (code and cap); exclusions; which insurance pays first | `policy_term` rows, then `insurance_policy`, `coverage_rule` and `fee_schedule_line` once confirmed; every clause into `bandit-policy-clauses` |
-| The attendee's own insurance: their health insurance card | the attendee, in band setup ("Your health insurance", [Medical-Card](Medical-Card.md)) | insurer, plan, member name, member id, group number, the copays printed on it for urgent care and the emergency room, and its coverage wording | the attendee's `medical_card`; its clauses into `bandit-policy-clauses`; a claim reads it when the attendee files |
-| The attendee's health plan: its Summary of Benefits and Coverage (`health_plan`) | found on the web when the attendee names their insurer and plan in band setup (`look_up_plan`, kind `health`, [Bright-Data](../7-integrations/Bright-Data.md)) | insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | an empty insurer and plan on the attendee's `medical_card`; its clauses into `bandit-policy-clauses` as the attendee's policy |
-| The attendee's own policy for their belongings (`attendee_policy`) | the attendee uploads it, or names their insurer and policy and it is found on the web (`look_up_plan`, kind `belongings`) | insurer, what personal property cover pays for, theft away from home, the limits for kinds of items, exclusions; from an uploaded declarations page also the personal property limit and deductible | the attendee's `attendee_policy` ([Incident-Types](Incident-Types.md)); its clauses into `bandit-policy-clauses` as the attendee's policy |
+| The attendee's own policy | the attendee, as a PDF; or the attendee names their insurer and policy in band setup and its public form is found on the web (`look_up_plan`, kind `belongings`, [Bright-Data](../7-integrations/Bright-Data.md)) | insurer, policy number, and the personal property cover's per-claim limit, yearly limit and deductible; a public form has no limit or deductible, so the attendee types both | `attendee_policy`; its clauses into `bandit-policy-clauses`; a theft or breakage claim reads it |
+| The attendee's health insurance card | the attendee, in band setup ("Your health insurance", [Medical-Card](Medical-Card.md)) | insurer, plan, member name, member id, group number, the copays printed on it for urgent care and the emergency room, and its coverage wording | the attendee's `medical_card`; its clauses into `bandit-policy-clauses`; a claim reads it when the attendee files |
+| The attendee's health plan: its Summary of Benefits and Coverage (`health_plan`) | found on the web when the attendee names their insurer and plan in band setup (`look_up_plan`, kind `health`) | insurer, plan, plan year, deductible, out-of-pocket limit, the copays and coinsurance for urgent care and the emergency room, excluded services | an empty insurer and plan on the attendee's `medical_card`; its clauses into `bandit-policy-clauses` as the attendee's policy |
 | The hospital report | written for the drawn case and rendered as a PDF, or filed by staff (`submit_medical_record`) | the same fields as today's record: document kind, patient, provider, encounter, diagnoses, services with their pages, invoice number and printed total | `medical_record` and `claim_line` |
 
 **An attendee's plan by name.** Most attendees know their insurer and plan but carry no PDF. They type the insurer, the plan and their state, and a plan lookup finds the plan's public document and fetches its PDF through Bright Data ([Bright-Data](../7-integrations/Bright-Data.md)). The module files it with `queue_document_read`, source `plan_lookup` and the address it came from, and from there it is read like an upload.
@@ -313,18 +313,13 @@ The hospital report and the card are the attendee's medical and insurance data. 
 
 ## Charges to an attendee (next to build)
 
-When an attendee broke or took something, the venue can charge them for it. A charge never goes through on its own, because a wrong charge hurts an attendee as much as a wrong refusal.
+A charge is what the person responsible owes. [Incident-Types](Incident-Types.md#charges) holds the rules; in short:
 
-1. Staff name the responsible attendee on the incident by tapping their band (`name_responsible_band(incident_id, band_id, note)`). With no named attendee there is no charge.
-2. Code checks the named band against the evidence: it was in the incident's zone at the time (`zone_visit`), and the security cameras' sighting, if there is one, agrees. Each comparison is a stored check, as on a claim.
-3. Claude reads the evidence and the venue's clauses for that kind of incident, including its subrogation clause, which says who may recover a loss from the person who caused it. It recommends a charge or none, citing the facts and clauses (`charge_recommendation`).
-4. Code sets the amount: the repair cost or the item's value from the staff's cost note, never more.
-5. The organizer approves the charge with `approve_charge`, which fails closed on a stale amount or pack, like `approve_claim`, or drops it with `waive_charge`.
-6. The attendee sees it on the tap page, under "Your charges": what happened, where and when, the evidence in plain words, the clause of the venue's policy, the amount and its status. "Pay from wallet" calls `pay_charge`, a Capital One Nessie API purchase from their wallet, as for merch. "Dispute" calls `dispute_charge` with their own words and sends the charge back to the organizer.
-
-A charge moves through `proposed`, `approved`, then `paid`, `disputed` or `waived`. Code never takes money from a wallet unless the attendee presses pay.
-
-On the ledger, an approved charge posts a balanced journal: debit `attendee_receivable`, credit `recoveries`. A payment moves it from `attendee_receivable` to `cash`. When the insurer already paid the loss, the venue's subrogation clause says what share of the payment goes back to the insurer.
+1. Security names the person responsible on the incident with `name_responsible`: the band, and how they know (the camera footage, a witness, the band itself). Code accepts only a band that SpacetimeDB had at the spot when it happened, within 10 m, and refuses the claimant's own band and a band nobody wears. The named person becomes two facts in the evidence pack.
+2. When the claim is paid, code proposes the charge: the whole loss, which is the repair cost or the item's value. No rule and no model charges a person.
+3. The organizer always decides a charge: approve or drop. Next to the evidence and the person named, they see the clause of the paying policy that lets its insurer recover a loss from the person who caused it, which The Evidence Engine found.
+4. An approved charge is collected from the person's wallet, as a purchase at the venue on their Capital One Nessie account. From it, the attendee who lost the item gets their deductible back into their wallet, and the rest repays the insurer (journal J5 recovery).
+5. Every attendee sees their own charges on the tap page: what for, how much, and whether the organizer approved it. Payouts, refunds and charges all show in the wallet's movements.
 
 ## Role in the system
 
@@ -543,7 +538,7 @@ A property claim skips `Paying`: settling it posts J3 to the repair vendor at on
 
 ### Ledger
 
-`ledger_entry` rows are double-entry: each journal has debits equal to credits, and posting rejects a journal that does not balance.
+`ledger_entry` rows are double-entry: each journal has debits equal to credits, and posting rejects a journal that does not balance. The organizer portal's Costs tab sums these journals into the event's costs so far ([Organizer-Portal](../5-apps/Organizer-Portal.md#costs-tab-insurancemd)).
 
 | Account | Kind |
 |---|---|
@@ -710,7 +705,8 @@ erDiagram
 | `policy_document` (next to build) | an uploaded policy PDF: the venue's policy or an attendee's insurance card | `owner` (`venue`, `attendee`), `file_hash`, `page_count`, `clause_count`, `status` (`reading`, `read`, `confirmed`, `failed`), `job_id`, `uploaded_by` |
 | `policy_term` (next to build) | one term read from the policy | `policy_document_id`, `cover_kind`, `name`, `value`, `clause_id`, `page`, `quote`, `status` (`read`, `flagged`, `confirmed`) |
 | `fee_schedule_line` (next to build) | one code of the policy's schedule of benefits | `policy_id`, `code`, `description`, `cap_cents` |
-| `charge` (next to build) | what one attendee owes for something they broke or took | `incident_id`, `attendee`, `band_id`, `named_by`, `amount_cents`, `clause_ids`, `recommendation`, `status` (`proposed`, `approved`, `disputed`, `paid`, `waived`), `dispute_text`, `approved_by`, `payment_reference` |
+| `attendee_policy` (next to build) | one attendee's own policy, read from their policy PDF | insurer, policy number, the personal property cover's per-claim limit, yearly limit and deductible |
+| `charge` (next to build) | what the person responsible owes for one claim | the incident and claim, the band named and how security knew, the amount, the organizer's decision, the collection's reference |
 
 `authority_limit` stays in the schema for the live database; nothing reads or writes it.
 
@@ -728,8 +724,7 @@ erDiagram
 | `report_claim_step` | `worker` | one step of Claude's investigation into `decision` |
 | `submit_claim_review` | `worker` | validates Claude's decision, then the guard lets it through or sends it to the organizer |
 | `submit_policy_document`, `apply_document_terms`, `confirm_policy_terms` (next to build) | `ops`; `worker`; `ops` | the venue's policy PDF, the terms read from it, the organizer's confirmation |
-| `name_responsible_band`, `approve_charge`, `waive_charge` (next to build) | `ops`, `medic` for naming; `ops` to approve or waive | a charge to the attendee who broke or took something |
-| `pay_charge`, `dispute_charge` (next to build) | the charged attendee | pays from their wallet, or disputes in their own words |
+| `name_responsible` (next to build) | security staff | names the band responsible for an incident, and how they know |
 | `approve_claim` | `ops` or the module owner | stale checks, `approval`, J2, rule version, payout |
 | `refuse_claim` | `ops` or the module owner | `approval`, J1r, `Refused` |
 | `record_claim_payout` | `worker` | the wallet's `payout` entry, J3, `Settled`, enqueues `claim_draft` |
@@ -785,8 +780,8 @@ Every job gets 3 attempts with a back-off of 5 s × attempts. A dead job calls `
 | An attendee may name their plan instead of uploading it, and Bright Data fetches the plan's public wording for the same reading (next to build) | attendees know their plan but rarely carry its PDF; a health plan's terms are the same for every member, while a belongings policy's limit and deductible are personal, so a pay that rests on typed numbers goes to the organizer |
 | The Evidence Engine matches a claim against the clauses of both policies, not against past claims (next to build) | a claim is covered or excluded by its contract's wording; how other claims ended says nothing about this one, and the organizer's learned rules already carry what earlier approvals taught |
 | Claude cites a clause for the decision, for each billed line and for which policy pays; code checks each clause belongs to a policy on this claim (next to build) | every call traces back to the contract, the way a finance reviewer checks it |
-| A charge to an attendee needs a band staff named, the evidence's checks, and the organizer's approval, and the attendee can dispute it (next to build) | a wrong charge hurts an attendee as much as a wrong refusal, so no charge rests on a model or on one person alone |
-| Each kind of incident (injury, property damage, theft, an attendee's own things) is answered by its own cover and clauses (next to build) | a venue's policy covers each kind differently, and the attendee's own insurance answers what the venue's does not |
+| A charge needs a person security named at the spot and the organizer's decision; no rule and no model charges a person (next to build) | a wrong charge hurts an attendee as much as a wrong refusal |
+| Each of the five incident types has its own claimant and paying policy, and the venue's policy never pays for an attendee's own belongings (next to build) | a general liability policy excludes guests' property, so a stolen laptop is a claim on the attendee's own policy |
 | An exclusion clause refuses only together with the failed check that tests it (next to build) | a wrong refusal hurts an injured attendee most, so it needs both the contract and evidence anyone can re-run |
 | The attendee files their own injury claim, in their own words; resolving the incident no longer opens it | the claim is the attendee's, and their account of what happened is evidence Claude compares with the report |
 | The hospital report's case comes from the module's seeded generator; the Anthropic Claude API only writes the report for it | BandIt has no hospital connection, a run can be played again exactly, and a model never picks an outcome |

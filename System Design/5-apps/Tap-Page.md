@@ -42,7 +42,7 @@ Not responsible for:
 | Bright-Data.md | both | tap page and module | the profile claim step in setup, "Are you one of these?", shown only when the name matches: the page lists the `person` rows (people scraped from the event pages, each with its title and its `organization`) that share a word of the typed display name and that `claimed_people` does not list; the attendee taps "This is me" and the page calls `claim_person`, which works only for an attendee who already owns a band; "None of these" goes on | SDK |
 | Elastic.md | out | tap page to `bandit-api` | `GET /api/recap` when the recap opens, with the `x-bandit-session` header: `bandit-api` builds the recap's people, the people also there and the booths from the `social_*` views, and returns the people and booths in Elastic's order. Without Elastic.md, both keep their minutes order. The page asks again every 5 s until it answers | HTTPS |
 | Insurance.md | both | tap page and module | "Hurt at the event?", above setup and the recap, for each resolved incident of the attendee's band with no claim yet (`my_incidents`): the attendee writes what happened and "File a claim" calls `file_claim`; then "Your claim" from `my_claims`, with its status in plain words up to "Paid $X into your wallet" | SDK |
-| Insurance.md (next to build) | both | tap page and module | "Your charges", for each charge the organizer approved against the attendee (`my_charges`): what happened, where and when, the evidence in plain words, the clause of the venue's policy and the amount; "Pay from wallet" calls `pay_charge`, "Dispute" calls `dispute_charge` with the attendee's own words | SDK |
+| Incident-Types.md, Insurance.md (next to build) | both | tap page and module | "Something stolen or broken?": the attendee says what it was, what it was worth and what happened, and the incident opens where their band is; their claims of every type with status and payout; "Your charges": what for, how much and whether the organizer approved it | SDK |
 | Merch.md | both | tap page and module | the merch section at the bottom of the recap, "Make it merch": suggestions from `my_merch_suggestions` with the reason they were picked, the preview that places the photo in the `merch_template`'s photo area, the one-tap "Buy" that calls `buy_merch` as the signed-in attendee, and "Your orders" from `my_merch_orders` | SDK |
 
 ## Design
@@ -284,7 +284,8 @@ Every call on the recap runs as the signed-in attendee. Other sections, each sep
 - Capital-One-Nessie.md: the wallet, inside "Make it merch": the balance line (`my_wallet`), "$X in your BandIt wallet" with "Capital One account" and the first 8 characters of its id, or "Connect your Capital One wallet at band setup to buy merch." without a wallet; then "Wallet activity", every opening, purchase and claim payout (`my_wallet_entries`), newest first. This is where the attendee spends and receives money. The recap has no button that connects the wallet, and "Buy" stays off without one.
 - Merch.md: the wallet's balance line opens the merch section, above the suggestions, and "Wallet activity" closes it, below "Your orders".
 - Insurance.md: "Hurt at the event?" and "Your claim" sit above the recap, as they sit above setup during the event.
-- Insurance.md: "Your charges" sits with them once the organizer approved a charge against the attendee for something they broke or took (next to build). Each charge reads like a receipt, for example: "Speaker broken at Main stage, 22:14. $2,400. Why: your band was in the zone and a security camera saw the speaker fall; the venue's policy, Property, section 4." The attendee can pay it from their wallet or dispute it in their own words, which sends it back to the organizer. Nothing is taken from the wallet unless the attendee presses "Pay from wallet".
+- Incident-Types.md: "Something stolen or broken?" sits with them, and every claim of every type shows its status and payout (next to build).
+- Insurance.md: "Your charges" lists what security named the attendee responsible for: what for, how much, and whether the organizer approved it. An approved charge is collected from the wallet, and payouts, refunds and charges all show in the wallet's movements (next to build).
 
 ### Platform notes
 
@@ -324,7 +325,7 @@ Every call on the recap runs as the signed-in attendee. Other sections, each sep
 - [Bright-Data](../7-integrations/Bright-Data.md): the profile claim step, "Are you one of these?".
 - [Merch](../6-features/Merch.md): the merch section at the bottom of the recap.
 - [Elastic](../7-integrations/Elastic.md): the order of the recap's people and booths.
-- [Insurance](../6-features/Insurance.md): "Hurt at the event?", "Your claim" and "Your charges" (next to build).
+- [Insurance](../6-features/Insurance.md) and [Incident-Types](../6-features/Incident-Types.md): "Hurt at the event?", "Your claim", and, next to build, "Something stolen or broken?" and "Your charges".
 - [Flows](../1-overview/Flows.md): the join and claim step and the recap step of the event.
 
 **If you delete this file**

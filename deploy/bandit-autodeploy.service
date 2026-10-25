@@ -1,0 +1,10 @@
+# Deploys vik-e2e when it moves on GitHub (deploy/autodeploy.sh). bandit-autodeploy.timer starts it every 30 s.
+[Unit]
+Description=BandIt deploy of vik-e2e
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+ExecStart=/opt/bandit/deploy/autodeploy.sh

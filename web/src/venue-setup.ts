@@ -1,7 +1,8 @@
 // The Venue tab of the organizer portal. The organizer types the event's name, and a worker finds the
 // event's site, its venue and any public 3D map of it, then saves the venue's model; each step shows here
 // as it happens. The organizer picks the venue the portal shows. The Cal Hacks 13.0 model at the Palace of
-// Fine Arts ships with the app and is the default.
+// Fine Arts ships with the app and is the default. The Live tab shows the same 3D view with the hall cut open
+// and the crowd in it.
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -27,16 +28,26 @@ let conn: DbConnection;
 
 // --- The 3D view ------------------------------------------------------------------------------
 
+/** On the Live tab everything above this height is cut away, so the mezzanine (its underside is at 4.25 m) and the roof do not hide the crowd. */
+const CUT_M = 4.1;
+
 /** The view and the picker live across redraws, so the model stays loaded and an open dropdown stays open. */
 let view: HTMLElement | undefined;
 let viewNote: HTMLElement;
 let loadedUrl = '';
 let load: (url: string) => void;
+let renderer: THREE.WebGLRenderer;
+let camera: THREE.PerspectiveCamera;
+let model: THREE.Object3D | undefined;
+let controls: OrbitControls;
+/** What the Live tab adds: the crowd and the incidents, shown only there. */
+const liveLayer = new THREE.Group();
+const frames: ((now: number) => void)[] = [];
 
 function makeView() {
   view = h('div', { class: 'venue-3d' });
   viewNote = h('p', { class: 'muted' });
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   view.append(renderer.domElement);
@@ -46,9 +57,10 @@ function makeView() {
   scene.add(new THREE.HemisphereLight('#ffffff', '#a7abb2', 1.6));
   const sun = new THREE.DirectionalLight('#fff8ee', 2.6);
   scene.add(sun);
-  const camera = new THREE.PerspectiveCamera(35, 16 / 9, 0.5, 2000);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  let model: THREE.Object3D | undefined;
+  liveLayer.visible = false;
+  scene.add(liveLayer);
+  camera = new THREE.PerspectiveCamera(35, 16 / 9, 0.5, 2000);
+  controls = new OrbitControls(camera, renderer.domElement);
   let asked = 0;
 
   load = (url: string) => {
@@ -59,6 +71,11 @@ function makeView() {
       if (mine !== asked) return;
       if (model) scene.remove(model);
       model = gltf.scene;
+      // Cut open, the walls show their inner faces from above.
+      model.traverse(o => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.side = THREE.DoubleSide;
+      });
       scene.add(model);
       // Frame the model whatever its size: the camera, its range and the sun scale with it.
       const box = new THREE.Box3().setFromObject(model);
@@ -88,8 +105,53 @@ function makeView() {
       camera.updateProjectionMatrix();
     }
     controls.update();
+    const now = performance.now();
+    for (const f of frames) f(now);
     renderer.render(scene, camera);
   });
+}
+
+/** The shared 3D view as the Live tab uses it: cut open at `CUT_M`, with its layer for the crowd shown. */
+export type LiveView = {
+  view: HTMLElement;
+  note: HTMLElement;
+  layer: THREE.Group;
+  canvas: HTMLCanvasElement;
+  /** Runs every frame while the view shows. */
+  onFrame(f: (now: number) => void): void;
+  /** The point of the floor under a click, in model metres (x east, z south), if it is inside the hall. */
+  floorAt(e: MouseEvent): { x: number; z: number } | undefined;
+  /** Turns the camera to look down at a spot of the floor from close by. */
+  lookAt(x: number, z: number): void;
+};
+
+function showLive(on: boolean) {
+  liveLayer.visible = on;
+  renderer.clippingPlanes = on ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT_M)] : [];
+}
+
+function lookAt(x: number, z: number) {
+  controls.target.set(x, 0, z);
+  camera.position.set(x, 35, z + 30);
+  controls.update();
+}
+
+function floorAt(e: MouseEvent) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const p = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  if (!p || !model) return undefined;
+  const box = new THREE.Box3().setFromObject(model);
+  return p.x >= box.min.x && p.x <= box.max.x && p.z >= box.min.z && p.z <= box.max.z ? { x: p.x, z: p.z } : undefined;
+}
+
+export function venueView(c: DbConnection): LiveView {
+  conn = c;
+  if (!view) makeView();
+  if (chosenUrl() !== loadedUrl) load(chosenUrl());
+  showLive(true);
+  return { view: view!, note: viewNote, layer: liveLayer, canvas: renderer.domElement, onFrame: f => frames.push(f), floorAt, lookAt };
 }
 
 // --- The picker -------------------------------------------------------------------------------
@@ -103,6 +165,15 @@ function label(s: VenueSetup) {
 
 function chosenId(): bigint {
   return conn.db.chosenVenue.id.find(0)?.setupId ?? DEFAULT_SETUP;
+}
+
+function chosen(): VenueSetup | undefined {
+  const id = chosenId();
+  return id === DEFAULT_SETUP ? undefined : conn.db.venueSetup.id.find(id) ?? undefined;
+}
+
+function chosenUrl(): string {
+  return chosen()?.modelUrl || DEFAULT.modelUrl;
 }
 
 /** Ready setups, newest first. */
@@ -132,10 +203,8 @@ function link(url: string, text = url) {
 }
 
 function shown() {
-  const id = chosenId();
-  const s = id === DEFAULT_SETUP ? undefined : conn.db.venueSetup.id.find(id);
-  const url = s?.modelUrl || DEFAULT.modelUrl;
-  if (url !== loadedUrl) load(url);
+  const s = chosen();
+  if (chosenUrl() !== loadedUrl) load(chosenUrl());
   const size = s && `${s.sizeX.toFixed(0)} × ${s.sizeY.toFixed(0)} × ${s.sizeZ.toFixed(0)} m`;
   return h('section', {},
     h('h3', {}, 'Venue'),
@@ -188,6 +257,7 @@ function run(s: VenueSetup) {
 export function venueSetupTab(c: DbConnection, canSetUp: boolean) {
   conn = c;
   if (!view) makeView();
+  showLive(false);
   updatePicker(canSetUp);
   const runs = [...conn.db.venueSetup.iter()].sort((a, b) => Number(b.id - a.id));
   return [

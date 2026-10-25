@@ -32,7 +32,7 @@ function render() {
     h('h2', {}, 'Add event photos'),
     people.length > 0 && !viewing() && h('p', {}, 'Play as ', h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
       h('option', { value: '' }, 'choose a person'), people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
-    h('p', { class: 'muted' }, `Identity ${short(conn.identity!)}: ${roles.length ? roles.join(', ') : 'no photographer role yet'}`),
+    h('p', { class: 'muted' }, `${viewing() ? '' : `Identity ${short(conn.identity!)}: `}${roles.length ? roles.join(', ') : 'no photographer role yet'}`),
     h('form', { onsubmit: (e: Event) => act(() => add(e)) },
       h('label', {}, 'Photo', h('input', { type: 'file', accept: 'image/*', required: true })),
       h('label', {}, 'Where it was taken', h('select', { name: 'zone' }, zones.map(z => h('option', { value: String(z.id) }, z.name)))),

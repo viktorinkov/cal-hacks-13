@@ -77,6 +77,7 @@ import LookUpPlanReducer from "./look_up_plan_reducer";
 import OpenApiSessionReducer from "./open_api_session_reducer";
 import OpenClaimReducer from "./open_claim_reducer";
 import OpenIncidentReducer from "./open_incident_reducer";
+import PauseLiveRunReducer from "./pause_live_run_reducer";
 import PlaceBandReducer from "./place_band_reducer";
 import PlaceBoothReducer from "./place_booth_reducer";
 import RecordClaimPayoutReducer from "./record_claim_payout_reducer";
@@ -100,6 +101,7 @@ import RequestRecoveryLetterReducer from "./request_recovery_letter_reducer";
 import RerunShoppingAgentReducer from "./rerun_shopping_agent_reducer";
 import ResetBridgeReducer from "./reset_bridge_reducer";
 import ResolveIncidentReducer from "./resolve_incident_reducer";
+import ResumeLiveRunReducer from "./resume_live_run_reducer";
 import RetryClaimPayoutReducer from "./retry_claim_payout_reducer";
 import RevokeRoleReducer from "./revoke_role_reducer";
 import SendCommandReducer from "./send_command_reducer";
@@ -181,6 +183,7 @@ import ImportRunRow from "./import_run_table";
 import IncidentBandsRow from "./incident_bands_table";
 import IncidentMarkerRow from "./incident_marker_table";
 import LinkRow from "./link_table";
+import LivePauseRow from "./live_pause_table";
 import LivePlanRow from "./live_plan_table";
 import LiveRunRow from "./live_run_table";
 import MedicMedicalCardsRow from "./medic_medical_cards_table";
@@ -434,6 +437,17 @@ const tablesSchema = __schema({
       { name: 'link_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, LinkRow),
+  livePause: __table({
+    name: 'live_pause',
+    indexes: [
+      { accessor: 'id', name: 'live_pause_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'live_pause_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, LivePauseRow),
   livePlan: __table({
     name: 'live_plan',
     indexes: [
@@ -1138,6 +1152,7 @@ const reducersSchema = __reducers(
   __reducerSchema("open_api_session", OpenApiSessionReducer),
   __reducerSchema("open_claim", OpenClaimReducer),
   __reducerSchema("open_incident", OpenIncidentReducer),
+  __reducerSchema("pause_live_run", PauseLiveRunReducer),
   __reducerSchema("place_band", PlaceBandReducer),
   __reducerSchema("place_booth", PlaceBoothReducer),
   __reducerSchema("record_claim_payout", RecordClaimPayoutReducer),
@@ -1161,6 +1176,7 @@ const reducersSchema = __reducers(
   __reducerSchema("rerun_shopping_agent", RerunShoppingAgentReducer),
   __reducerSchema("reset_bridge", ResetBridgeReducer),
   __reducerSchema("resolve_incident", ResolveIncidentReducer),
+  __reducerSchema("resume_live_run", ResumeLiveRunReducer),
   __reducerSchema("retry_claim_payout", RetryClaimPayoutReducer),
   __reducerSchema("revoke_role", RevokeRoleReducer),
   __reducerSchema("send_command", SendCommandReducer),
@@ -1213,6 +1229,8 @@ type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "ta
     readonly "import_run": Omit<typeof tablesSchema.schemaType.tables["importRun"], "accessorName"> & { readonly accessorName: "import_run" };
     /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
     readonly "incident_marker": Omit<typeof tablesSchema.schemaType.tables["incidentMarker"], "accessorName"> & { readonly accessorName: "incident_marker" };
+    /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+    readonly "live_pause": Omit<typeof tablesSchema.schemaType.tables["livePause"], "accessorName"> & { readonly accessorName: "live_pause" };
     /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
     readonly "live_plan": Omit<typeof tablesSchema.schemaType.tables["livePlan"], "accessorName"> & { readonly accessorName: "live_plan" };
     /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
@@ -1377,6 +1395,7 @@ const tableAccessorAliases = {
   "event_state": "eventState",
   "import_run": "importRun",
   "incident_marker": "incidentMarker",
+  "live_pause": "livePause",
   "live_plan": "livePlan",
   "live_run": "liveRun",
   "merch_template": "merchTemplate",
@@ -1477,6 +1496,8 @@ export type DbView = __DbViewBase & {
   readonly "import_run": __DbViewBase["importRun"];
   /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
   readonly "incident_marker": __DbViewBase["incidentMarker"];
+  /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+  readonly "live_pause": __DbViewBase["livePause"];
   /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
   readonly "live_plan": __DbViewBase["livePlan"];
   /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
@@ -1631,6 +1652,8 @@ export type Tables = __TablesBase & {
   readonly "import_run": __TablesBase["importRun"];
   /** @deprecated Use `incidentMarker` instead. This alias will be removed in the next major version. */
   readonly "incident_marker": __TablesBase["incidentMarker"];
+  /** @deprecated Use `livePause` instead. This alias will be removed in the next major version. */
+  readonly "live_pause": __TablesBase["livePause"];
   /** @deprecated Use `livePlan` instead. This alias will be removed in the next major version. */
   readonly "live_plan": __TablesBase["livePlan"];
   /** @deprecated Use `liveRun` instead. This alias will be removed in the next major version. */
