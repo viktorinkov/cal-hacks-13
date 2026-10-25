@@ -302,7 +302,11 @@ const MOVES: Record<string, string> = { opening: 'Wallet opened', payout: 'Paid 
 /** The wallet's movements, newest first: payouts in, charges and merch out. */
 export function movements(conn: DbConnection) {
   const entries = [...conn.db.myWalletEntries.iter()].sort((a, b) => Number(b.id - a.id));
-  const what = (kind: string, memo: string) => kind === 'purchase' ? memo.replace(/^BandIt merch: /, 'Merch: ') : MOVES[kind] ?? (memo || kind);
+  const what = (kind: string, memo: string) => {
+    if (kind === 'purchase') return memo.replace(/^BandIt merch: /, 'Merch: ');
+    const claim = kind === 'payout' && memo.match(/claim (\d+)/)?.[1];
+    return claim ? `Paid in for claim ${claim}` : MOVES[kind] ?? (memo || kind);
+  };
   return entries.length > 0 && [h('h4', {}, 'Wallet activity'), h('table', {}, entries.map(e => h('tr', {},
     h('td', {}, date(e.createdAt)), h('td', {}, what(e.kind, e.memo)),
     h('td', { class: e.amountCents < 0n ? '' : 'pass' }, `${e.amountCents < 0n ? 'out' : 'in'} ${money(e.amountCents < 0n ? -e.amountCents : e.amountCents)}`))))];

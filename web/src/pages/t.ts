@@ -369,7 +369,7 @@ function claims() {
       h('h3', {}, mine.length > 1 ? 'Your claims' : 'Your claim'),
       mine.map(c => h('div', {},
         h('p', { class: 'big' }, claimStatus(c.status.tag, c.payoutCents)),
-        h('p', { class: 'muted' }, `For ${KIND_WORDS[c.incidentKind] ?? 'an injury'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
+        h('p', { class: 'muted' }, `Claim ${c.id}, for ${KIND_WORDS[c.incidentKind] ?? 'an injury'} at the ${c.zoneName}, filed ${time(c.openedAt)}.`),
         c.statement && h('p', {}, `You said: "${c.statement}"`)))),
   ];
 }
