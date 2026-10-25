@@ -1,17 +1,18 @@
 import { useState } from 'react'
+import { useRoute } from '@/cover/route'
 import { useCatalog, type Photo } from '@/stdb/catalog'
 import { DeskFrame, Figure, when } from './DeskFrame'
 
 /** Event photographs, framed like the rest of the desk. People in a frame are named underneath. */
 export function PhotosPage() {
   const photos = useCatalog((s) => s.photos)
+  const { go } = useRoute()
   const [open, setOpen] = useState<Photo | null>(null)
   const named = photos.filter((photo) => photo.people.length > 0).length
 
   return (
     <DeskFrame
-      title={photos.length ? `${photos.length.toLocaleString('en-US')} photographs.` : 'No photographs yet.'}
-      sentence="Frames from the event. A name under a picture is someone the desk already knows."
+      motif="photos"
       figures={
         <>
           <Figure lead label="Frames" value={photos.length.toLocaleString('en-US')} note="in the album" />
@@ -21,13 +22,15 @@ export function PhotosPage() {
         </>
       }
     >
-      {photos.length === 0 ? (
-        <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>
-      ) : (
+      <div className={photos.length === 0 ? 'mb-8 flex items-baseline justify-between gap-4' : 'mb-8 flex justify-end'}>
+        {photos.length === 0 && <p className="text-[15px] text-ink-dim">Nothing has been taken yet.</p>}
+        <button type="button" onClick={() => go('/photo')} className="text-[14px] text-ink">Add frames</button>
+      </div>
+      {photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 xl:grid-cols-4">
           {photos.map((photo) => (
             <li key={photo.id}>
-              <button type="button" onClick={() => setOpen(photo)} className="block w-full text-left">
+              <button type="button" onClick={() => setOpen(photo)} className="desk-card block w-full text-left">
                 <span className="block aspect-[4/5] overflow-hidden bg-raised">
                   {photo.url && <img src={photo.url} alt={photo.caption || 'Event photograph'} className="h-full w-full object-cover" />}
                 </span>

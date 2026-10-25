@@ -7,11 +7,39 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
+import { MODEL_MARGIN } from '@/venue/chosenModel'
 import type { Camera } from './projection'
 
 /** Same origin shift the traced plan was built with, so meshes and labels share one floor. */
 const OX = 50.84 + 8
 const OY = 106.57 + 8
+
+/** The Palace's ceilings start above this height; its mezzanine tabletops at about 5.6 m stay. */
+const PALACE_ROOF_M = 7.6
+/** For any other venue, flat surfaces above this share of its height are roofs and slabs. */
+const ROOF_SHARE = 0.45
+
+/** What the hall draws: the Palace with its traced plan, or a chosen venue fitted by its box. */
+export interface HallSource {
+  url: string
+  venueId: string
+  fit: 'palace' | 'bounds'
+}
+
+export const PALACE_HALL: HallSource = { url: '/venue/venue.glb', venueId: 'calhacks', fit: 'palace' }
+
+/** A Palace model point (metres, y up) in plan space: x east, y south, h up. */
+export function palacePoint(x: number, y: number, z: number): { x: number; y: number; h: number } {
+  return { x: -z + OX, y: x + OY, h: y }
+}
+
+/**
+ * Any other venue's model point in plan space. Its exports are metres with y up, x east and z south,
+ * so the box's low corner lands at the margin and its floor at height 0.
+ */
+export function boundsPoint(x: number, y: number, z: number, min: { x: number; y: number; z: number }): { x: number; y: number; h: number } {
+  return { x: x - min.x + MODEL_MARGIN, y: z - min.z + MODEL_MARGIN, h: y - min.y }
+}
 
 interface Portrait {
   src: string
@@ -96,11 +124,11 @@ const LEFT_BOARD: Portrait[] = [
 
 const RIGHT_BOARD: Portrait[] = [
   { src: asset('/venue/people/luke.png'), name: 'Luke' },
-  { src: asset('/venue/people/edward.jpg'), name: 'Edward', focus: { x: 0.36, y: 0.34 } },
+  { src: asset('/venue/people/edward.jpg'), name: 'Edward', focus: { x: 0.46, y: 0.34 } },
 ]
 
 /** Drop only the high flat ceilings. Mezzanine tabletops sit around 5.6 m and have to stay. */
-function withoutRoofs(index: THREE.BufferAttribute | null, position: Float32Array): number[] {
+function withoutRoofs(index: THREE.BufferAttribute | null, position: Float32Array, roofM = PALACE_ROOF_M): number[] {
   const count = index ? index.count : position.length / 3
   const kept: number[] = []
   const at = (i: number) => {
@@ -120,7 +148,7 @@ function withoutRoofs(index: THREE.BufferAttribute | null, position: Float32Arra
     const ny = uz * vx - ux * vz
     const len = Math.hypot(uy * vz - uz * vy, ny, ux * vy - uy * vx) || 1
     const avgY = (a[1] + b[1] + c[1]) / 3
-    if (avgY > 7.6 && Math.abs(ny) / len > 0.65) continue
+    if (avgY > roofM && Math.abs(ny) / len > 0.65) continue
     kept.push(a[3], b[3], c[3])
   }
   return kept
@@ -174,12 +202,14 @@ export class HallMesh {
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 4000)
   private readonly onReady: () => void
+  readonly source: HallSource
   private ready = false
   private width = 1
   private height = 1
 
-  constructor(host: HTMLElement, onReady: () => void) {
+  constructor(host: HTMLElement, onReady: () => void, source: HallSource = PALACE_HALL) {
     this.onReady = onReady
+    this.source = source
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     this.renderer.setClearColor(0x000000, 0)
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
@@ -190,7 +220,8 @@ export class HallMesh {
     this.canvas.style.inset = '0'
     this.canvas.style.pointerEvents = 'none'
     this.canvas.setAttribute('aria-hidden', 'true')
-    host.appendChild(this.canvas)
+    // Under the map's own canvas, so a hall swapped in later never covers the zones and the crowd.
+    host.insertBefore(this.canvas, host.firstChild)
     this.camera.matrixAutoUpdate = false
     this.camera.matrixWorldAutoUpdate = false
     void this.load()
@@ -198,7 +229,7 @@ export class HallMesh {
 
   /** True once the hall is on screen for this venue. */
   showing(venueId: string | undefined): boolean {
-    return this.ready && venueId === 'calhacks'
+    return this.ready && venueId === this.source.venueId
   }
 
   resize(width: number, height: number): void {
@@ -228,9 +259,10 @@ export class HallMesh {
 
   private async load(): Promise<void> {
     try {
-      const gltf = await new GLTFLoader().loadAsync(asset('/venue/venue.glb'))
+      const palace = this.source.fit === 'palace'
+      const gltf = await new GLTFLoader().loadAsync(palace ? asset(this.source.url) : this.source.url)
       if (!this.canvas.isConnected) return
-      this.scene.add(this.bake(gltf.scene))
+      this.scene.add(palace ? this.bake(gltf.scene) : this.bakeBounds(gltf.scene))
       this.ready = true
       this.onReady()
     } catch (err) {
@@ -253,9 +285,10 @@ export class HallMesh {
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
         palaceZ += v.z
-        next[i * 3] = -v.z + OX
-        next[i * 3 + 1] = v.y
-        next[i * 3 + 2] = v.x + OY
+        const p = palacePoint(v.x, v.y, v.z)
+        next[i * 3] = p.x
+        next[i * 3 + 1] = p.h
+        next[i * 3 + 2] = p.y
       }
       // The two pale screens flank the stage. The loader renames the second, so match the
       // original node name. Higher palace Z is the audience's left.
@@ -292,6 +325,61 @@ export class HallMesh {
       })
       group.add(new THREE.Mesh(geom, made.length === 1 ? made[0] : made))
       if (isStairRun(boardName, next)) group.add(stairOutline(geom))
+    })
+    return group
+  }
+
+  /**
+   * Any other venue: no traced plan, so the model is placed by its own box, its roofs and upper slabs
+   * are dropped so the floor shows from above, and its colours are kept with the Palace's lift for
+   * near-black paint.
+   */
+  private bakeBounds(root: THREE.Object3D): THREE.Group {
+    root.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(root)
+    const roofM = Math.max(2.6, (box.max.y - box.min.y) * ROOF_SHARE)
+    const group = new THREE.Group()
+    const v = new THREE.Vector3()
+    root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh
+      if (!mesh.isMesh) return
+      const geom = mesh.geometry.clone()
+      const pos = geom.getAttribute('position')
+      const next = new Float32Array(pos.count * 3)
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld)
+        const p = boundsPoint(v.x, v.y, v.z, box.min)
+        next[i * 3] = p.x
+        next[i * 3 + 1] = p.h
+        next[i * 3 + 2] = p.y
+      }
+      geom.setAttribute('position', new THREE.BufferAttribute(next, 3))
+      geom.setIndex(withoutRoofs(geom.getIndex(), next, roofM))
+      geom.deleteAttribute('normal')
+      geom.computeVertexNormals()
+      geom.computeBoundingSphere()
+      const source = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      const made = source.map((material) => {
+        const colored = material as THREE.MeshStandardMaterial
+        const hasMap = Boolean(colored.map)
+        const color = colored.color instanceof THREE.Color ? colored.color.clone() : new THREE.Color(0xffffff)
+        if (hasMap) color.set(0xffffff)
+        else if (color.r + color.g + color.b < 0.45) {
+          color.r = 0.24 + color.r * 0.35
+          color.g = 0.25 + color.g * 0.35
+          color.b = 0.28 + color.b * 0.35
+        }
+        const basic = new THREE.MeshBasicMaterial({
+          color,
+          map: colored.map ?? null,
+          transparent: hasMap && colored.transparent,
+          depthWrite: true,
+          side: THREE.DoubleSide,
+        })
+        if (basic.map) basic.map.colorSpace = THREE.SRGBColorSpace
+        return basic
+      })
+      group.add(new THREE.Mesh(geom, made.length === 1 ? made[0] : made))
     })
     return group
   }

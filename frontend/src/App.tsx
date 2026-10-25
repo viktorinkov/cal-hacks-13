@@ -6,14 +6,19 @@ import { CommandCenter } from '@/components/dashboard/CommandCenter'
 import { AttendeesPage } from '@/components/desk/AttendeesPage'
 import { BandsPage } from '@/components/desk/BandsPage'
 import { CostsPage } from '@/components/desk/CostsPage'
+import { RulesPage } from '@/components/desk/RulesPage'
 import { GraphPage } from '@/components/desk/GraphPage'
 import { KibanaPage } from '@/components/desk/KibanaPage'
 import { MerchPage } from '@/components/desk/MerchPage'
+import { PaymentsPage } from '@/components/desk/PaymentsPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
 import { RunPage } from '@/components/desk/RunPage'
 import { TestBandsPage } from '@/components/desk/TestBandsPage'
+import { PhotographerPage } from '@/components/photo/PhotographerPage'
+import { VenuePage } from '@/components/desk/VenuePage'
 import { JoinPage } from '@/components/join/JoinPage'
 import { RegisterPage } from '@/components/join/RegisterPage'
+import { WalletPage } from '@/components/wallet/WalletPage'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -66,15 +71,20 @@ function Pages() {
   const { path } = useRoute()
   if (path === '/join') return <JoinPage />
   if (path === '/register') return <RegisterPage />
+  if (path === '/wallet') return <WalletPage />
+  if (path === '/payments') return <PaymentsPage />
   if (path === '/claims') return <ClaimsDesk />
+  if (path === '/rules') return <RulesPage />
   if (path === '/attendees') return <AttendeesPage />
   if (path === '/run') return <RunPage />
   if (path === '/bands') return <BandsPage />
   if (path === '/test-bands') return <TestBandsPage />
   if (path === '/photos') return <PhotosPage />
+  if (path === '/photo') return <PhotographerPage />
   if (path === '/merch') return <MerchPage />
   if (path === '/graph') return <GraphPage />
   if (path === '/costs') return <CostsPage />
+  if (path === '/venue') return <VenuePage />
   if (path === '/kibana') return <KibanaPage />
   return <Boot />
 }
@@ -82,7 +92,7 @@ function Pages() {
 function Shell() {
   const { path } = useRoute()
   if (path === '/callback') return <SignInCallback />
-  const attendeePage = path === '/join' || path === '/register'
+  const attendeePage = path === '/join' || path === '/register' || path === '/wallet'
   return (
     <Connected>
       {path === '/organizer' || (window.location.hostname === 'band1t.vip' && !attendeePage) ? (

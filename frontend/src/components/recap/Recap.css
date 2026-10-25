@@ -1,0 +1,23 @@
+/* The night, on the same flat surfaces as the wallet. Champagne is where the band stood. */
+.recap .wallet-section + .wallet-section { margin-top: 40px; }
+.recap .wallet-section h2 { font-size: 16px; font-weight: 500; line-height: 1.5; }
+.recap-chart { display: block; width: 100%; height: auto; margin-top: 16px; }
+.recap-chart text { fill: var(--color-ink-dim); font-size: 13px; font-family: inherit; }
+.recap-chart .tick { font-size: 12px; fill: var(--color-ink-muted); }
+.recap-chart .grid { stroke: var(--color-line-strong); }
+.recap-chart .stay { fill: var(--color-champagne); }
+.recap-chart .met { fill: var(--color-section-food, #ff9fbf); }
+
+.recap-person { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 14px; align-items: start; }
+.recap-face { width: 48px; height: 48px; border-radius: 999px; object-fit: cover; background: var(--signup-raised, #151518); }
+.recap-initial { display: grid; place-items: center; color: var(--color-champagne); font-size: 18px; }
+
+.recap-interests { margin-top: 10px; }
+.recap-interests li { display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem; gap: 8px; padding-block: 6px; border-top: 1px solid var(--signup-rule, var(--color-line)); font-size: 13px; color: var(--color-ink-dim); }
+.recap-interests li.is-shared { color: var(--color-ink); font-weight: 500; }
+
+.recap-search { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.recap-search .signup-input { flex: 1 1 16rem; }
+
+.recap-photo { display: grid; gap: 10px; }
+.recap-photo img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 12px; background: var(--signup-raised, #151518); }

@@ -8,7 +8,7 @@ function plain(value: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-/** Posted money: the ledger and the billed lines. Settlements is where a claim is decided. */
+/** Posted money: the ledger and the billed lines. */
 export function CostsPage() {
   const ledger = useCatalog((s) => s.ledger)
   const bills = useCatalog((s) => s.bills)
@@ -20,8 +20,7 @@ export function CostsPage() {
 
   return (
     <DeskFrame
-      title={empty ? 'No costs posted yet.' : `${formatCents(Math.max(debits, billed))} on the books.`}
-      sentence="Ledger postings and billed lines from the live host. A claim is still decided on Settlements."
+      motif="costs"
       figures={
         <>
           <Figure lead label="Debits" value={formatCents(debits)} note="posted" />
@@ -40,7 +39,7 @@ export function CostsPage() {
               <h2 className="text-[13px] text-ink-dim">Ledger</h2>
               <ul className="mt-3 divide-y divide-line">
                 {ledger.map((line) => (
-                  <li key={line.id} className="grid gap-1 py-3 md:grid-cols-[minmax(7.5rem,12rem)_minmax(0,1fr)_7rem_7rem] md:items-baseline">
+                  <li key={line.id} className="desk-row grid gap-1 py-3 md:grid-cols-[minmax(7.5rem,12rem)_minmax(0,1fr)_7rem_7rem] md:items-baseline">
                     <span className="text-[13px] leading-5 text-ink-dim">{plain(line.journal) || 'Entry'}</span>
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] text-ink">{plain(line.account) || line.memo || `Claim ${line.claimId}`}</span>
@@ -58,7 +57,7 @@ export function CostsPage() {
               <h2 className="text-[13px] text-ink-dim">Billed lines</h2>
               <ul className="mt-3 divide-y divide-line">
                 {bills.map((line) => (
-                  <li key={line.id} className="grid gap-1 py-3 md:grid-cols-[minmax(0,1fr)_7rem_7rem_6rem]">
+                  <li key={line.id} className="desk-row grid gap-1 py-3 md:grid-cols-[minmax(0,1fr)_7rem_7rem_6rem]">
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] text-ink">{plain(line.description) || `Claim ${line.claimId}`}</span>
                       <span className="mt-1 block text-[13px] text-ink-muted">Claim {line.claimId}</span>

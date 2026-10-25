@@ -175,4 +175,20 @@ describe('headline', () => {
   it('labels simulated head counts', () => {
     expect(headline({ ...base, incidents: [] }).sentence).toMatch(/simulated/)
   })
+
+  it('keeps the hall path closed until the operator opens it', () => {
+    const reported = headline({ ...base, venueId: 'calhacks', incidents: [{ ...inc, isSimulated: false }] })
+    expect(reported.sentence).toMatch(/Nearby wristbands are already red/)
+    expect(reported.sentence).not.toMatch(/path is clearing/)
+    const held = headline({ ...base, venueId: 'calhacks', incidents: [{ ...inc, isSimulated: false, status: 'acknowledged' }] })
+    expect(held.sentence).toMatch(/Open the path from the entrance/)
+    const open = headline({
+      ...base,
+      venueId: 'calhacks',
+      incidents: [{ ...inc, isSimulated: false, status: 'responding' }],
+      commands: [{ ...command('acknowledged'), commandId: 'demo-path' }],
+    })
+    expect(open.title).toBe('A path is open.')
+    expect(open.sentence).toMatch(/yellow path/)
+  })
 })

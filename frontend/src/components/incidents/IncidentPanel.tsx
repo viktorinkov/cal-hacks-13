@@ -9,7 +9,9 @@ import { clock, elapsed } from '@/lib/format'
 import { incidentStatusText, incidentTitle, localizationText, observationText, simBandsFor, type Tone } from '@/lib/status'
 import { cn } from '@/lib/utils'
 import { mapController } from '@/map/controller'
-import { acknowledgeIncident, approveGuidance, cancelGuidance, pendingKey, previewGuidance } from '@/services/operatorCommands'
+import { scriptedIncidentId, useHallDemo } from '@/booth/hallDemo'
+import { DeskIncidentActions } from '@/components/incidents/DeskIncidentActions'
+import { acknowledgeIncident, approveGuidance, cancelGuidance, isModuleIncident, pendingKey, previewGuidance } from '@/services/operatorCommands'
 import { isLive, useConnection } from '@/stores/connection'
 import { useMapStats } from '@/stores/frames'
 import { useUi } from '@/stores/ui'
@@ -60,6 +62,7 @@ export function IncidentPanel() {
   const expanded = useUi((s) => s.incidentOpen)
   const setExpanded = useUi((s) => s.setIncidentOpen)
   const linkUp = useConnection(isLive)
+  const rehearsal = useHallDemo((s) => s.scripted)
   const near = useMapStats((s) => s.nearIncident)
   const simulatedBands = useWorld((s) => s.scenario?.simulatedBands)
   const now = useServerNow(1)
@@ -89,12 +92,15 @@ export function IncidentPanel() {
   const status = inc?.status
   const hasLocation = !!inc?.location
   useEffect(() => {
-    if (!incId || status !== 'acknowledged' || !hasLocation || cmds.length > 0) return
+    if (!incId || isModuleIncident(incId) || status !== 'acknowledged' || !hasLocation || cmds.length > 0) return
     const t = setTimeout(() => void previewGuidance(incId), 500)
     return () => clearTimeout(t)
   }, [incId, status, hasLocation, cmds.length])
 
   if (!inc) return null
+  const local = rehearsal && inc.incidentId === scriptedIncidentId()
+  const onDesk = isModuleIncident(inc.incidentId)
+  const canAct = onDesk || linkUp || local
   const tz = venue?.timeZone
   const zoneName = venue?.zones.find((z) => z.zoneId === inc.candidateZone)?.name ?? 'Unknown zone'
   const reporter = inc.reportedByDeviceId ? devices[inc.reportedByDeviceId] : undefined
@@ -263,15 +269,20 @@ export function IncidentPanel() {
         </div>
       </div>
 
-      {inc.status !== 'resolved' && (
+      {inc.status !== 'resolved' && onDesk && (
         <div className="flex flex-col gap-2 border-t border-dashed border-line-strong px-4 py-3">
-          {!linkUp && <p className="text-[12px] text-caution">Not connected. Actions are paused until the link is back.</p>}
+          <DeskIncidentActions incident={inc} />
+        </div>
+      )}
+      {inc.status !== 'resolved' && !onDesk && (
+        <div className="flex flex-col gap-2 border-t border-dashed border-line-strong px-4 py-3">
+          {!canAct && <p className="text-[12px] text-caution">Not connected. Actions are paused until the link is back.</p>}
           {inc.status === 'reported' && (
             <>
               <Button
                 size="lg"
                 className="h-11 text-[14px] font-semibold hover:bg-champagne-hover"
-                disabled={!linkUp || busy(pendingKey.ack(inc.incidentId))}
+                disabled={!canAct || busy(pendingKey.ack(inc.incidentId))}
                 onClick={() => void acknowledgeIncident(inc.incidentId)}
               >
                 {busy(pendingKey.ack(inc.incidentId)) ? (
@@ -285,7 +296,7 @@ export function IncidentPanel() {
               <Button
                 variant="outline"
                 className="h-10 bg-transparent text-[14px]"
-                disabled={!linkUp}
+                disabled={!canAct}
                 onClick={() => {
                   setFalseAlarm(true)
                   setResolveOpen(true)
@@ -300,7 +311,7 @@ export function IncidentPanel() {
               <Button
                 size="lg"
                 className="h-11 text-[14px] font-semibold hover:bg-champagne-hover"
-                disabled={!linkUp || busy(pendingKey.approve(draft.commandId))}
+                disabled={!canAct || busy(pendingKey.approve(draft.commandId))}
                 onClick={() => void approveGuidance(draft.commandId)}
               >
                 {busy(pendingKey.approve(draft.commandId)) ? (
@@ -308,32 +319,34 @@ export function IncidentPanel() {
                     <Loader2 className="animate-spin" /> Waiting for the backend…
                   </>
                 ) : (
-                  `Clear the path · signal ${draftCrowd ? `~${draft.targets.length + draftCrowd.signalled}` : draft.targets.length} bands`
+                  draft.commandId === 'demo-path'
+                    ? 'Clear the path'
+                    : `Clear the path · signal ${draftCrowd ? `~${draft.targets.length + draftCrowd.signalled}` : draft.targets.length} bands`
                 )}
               </Button>
-              <Button variant="outline" className="h-10 bg-transparent text-[14px]" disabled={!linkUp} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
+              <Button variant="outline" className="h-10 bg-transparent text-[14px]" disabled={!canAct} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
                 Resolve without a path
               </Button>
             </>
           )}
           {inc.status === 'acknowledged' && !draft && (
-            <Button variant="outline" className="h-10 bg-transparent text-[14px]" disabled={!linkUp} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
+            <Button variant="outline" className="h-10 bg-transparent text-[14px]" disabled={!canAct} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
               Resolve
             </Button>
           )}
           {inc.status === 'responding' && (
             <>
-              <Button size="lg" className="h-11 text-[14px] font-semibold hover:bg-champagne-hover" disabled={!linkUp} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
+              <Button size="lg" className="h-11 text-[14px] font-semibold hover:bg-champagne-hover" disabled={!canAct} onClick={() => { setFalseAlarm(false); setResolveOpen(true) }}>
                 Resolve
               </Button>
               {active && (
                 <Button
                   variant="outline"
                   className="h-10 bg-transparent text-[14px]"
-                  disabled={!linkUp || busy(pendingKey.cancel(active.commandId))}
+                  disabled={!canAct || busy(pendingKey.cancel(active.commandId))}
                   onClick={() => void cancelGuidance(active.commandId)}
                 >
-                  {busy(pendingKey.cancel(active.commandId)) ? 'Stopping…' : 'Stop signals'}
+                  {busy(pendingKey.cancel(active.commandId)) ? 'Stopping…' : active.commandId === 'demo-path' ? 'Close the path' : 'Stop signals'}
                 </Button>
               )}
             </>

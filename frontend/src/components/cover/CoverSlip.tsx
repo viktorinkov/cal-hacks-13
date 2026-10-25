@@ -12,6 +12,11 @@ export function BandMark() {
   )
 }
 
+function shippingLine(registration: Registration) {
+  const place = [registration.city, registration.region, registration.postalCode].filter(Boolean).join(' ')
+  return [registration.street, registration.unit, place, registration.country].filter(Boolean).join(', ')
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <>
@@ -46,6 +51,7 @@ export function CoverSlip({ registration, bandLabel }: { registration: Registrat
         <Fact label="Conditions" value={registration.conditions} />
         <Fact label="Medications" value={registration.medications} />
         <Fact label="Emergency" value={[registration.emergencyName, registration.emergencyPhone].filter(Boolean).join(', ')} />
+        {registration.street && <Fact label="Ships to" value={shippingLine(registration)} />}
         <Fact label="Carrier" value={registration.carrier} />
         <Fact label="Member" value={registration.memberId} />
       </dl>

@@ -113,7 +113,7 @@ function ModeChip({ mode }: { mode: 'simulation' | 'live' | 'hybrid' }) {
   return (
     <span
       className="inline-flex h-7 items-center gap-2 overflow-hidden whitespace-nowrap rounded-[3px] bg-[rgba(184,166,255,0.1)] pr-2.5 text-[12px] font-semibold text-[#d9d0ff] shadow-[inset_0_0_0_1px_rgba(184,166,255,0.55)]"
-      title={mode === 'hybrid' ? 'Bands and incidents are live; the crowd is simulated' : 'Everything on this screen is simulated'}
+      title={mode === 'hybrid' ? 'Bands and incidents are live; the crowd is walking locally' : 'Everything on this screen is simulated'}
     >
       <span aria-hidden className="nc-sim-bar h-full w-3" />
       {mode === 'hybrid' ? 'Live bands · simulated crowd' : 'Simulation'}

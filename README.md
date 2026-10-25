@@ -46,3 +46,10 @@ In your final summary, from the information about where you hung out it, let's s
 Imagine after the event getting shirts and cups with you and the memories with your friends. 
 
 Instead of having to buy merch at the event, and not being able to get more because your hands got full, you can now, just get what you like most in the end. This is how we reimagine shopping using agents.
+
+## Repository
+
+- [`frontend/`](frontend/README.md): the BandIt Safety Command Center (React, PixiJS 8). `cd frontend && npm install && npm run dev` runs the full demo in simulation mode, no hardware or backend needed.
+- [`docs/BACKEND_INTEGRATION.md`](docs/BACKEND_INTEGRATION.md): the REST and WebSocket contract the frontend expects from the Rust backend.
+
+The MVP covers the safety workflow only: SOS and fall incidents, camera evidence, responder corridors and staff-approved band guidance. The social, insurance and merchandise ideas above are out of scope for it.

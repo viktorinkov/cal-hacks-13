@@ -108,15 +108,16 @@ describe('attendee session', () => {
     expect(conn.reducers.connectWallet).not.toHaveBeenCalled()
   })
 
-  it('keeps a pending physical claim pending and blocks document upload', async () => {
+  it('finishes a tap that is still waiting and does not ask for a button press', async () => {
     const store = await started()
     const conn = harness.conn as ReturnType<typeof connection>
     conn.db.myBand.rows = [{ bandId: 5, status: 'waiting_for_press', expiresAt: { toDate: () => new Date(Date.now() + 8000) } }]
     apply('my_band')
     await store.getState().claimBand('BANDIT-05')
-    expect(conn.reducers.claimBand).not.toHaveBeenCalled()
-    await expect(store.getState().submitMedicalDocument(new File(['%PDF'], 'history.pdf', { type: 'application/pdf' }), 'history')).rejects.toThrow(/Press the button/)
-    expect(conn.reducers.openApiSession).not.toHaveBeenCalled()
+    expect(conn.reducers.claimBand).toHaveBeenCalledExactlyOnceWith({ token: 'BANDIT-05' })
+    const file = new File(['%PDF'], 'history.pdf', { type: 'application/pdf' })
+    await expect(store.getState().submitMedicalDocument(file, 'history')).rejects.toThrow(/could not be verified/)
+    expect(conn.reducers.openApiSession).toHaveBeenCalledOnce()
   })
 
   it('edits an owned band without re-claiming, and does not fail registration when wallet creation fails', async () => {
@@ -174,5 +175,22 @@ describe('attendee session', () => {
     expect(store.getState().medicalCard).toMatchObject({ bandId: 5, insurerPhone: '555-0100', status: 'extracted' })
     await store.getState().confirmMedicalCard()
     expect(conn.reducers.confirmMedicalCard).toHaveBeenCalledWith({})
+  })
+
+  it('subscribes the night, and end_event is what closes it', async () => {
+    const session = await import('@/stdb/session')
+    session.startSession()
+    await vi.waitFor(() => expect(harness.subscriptions.map(({ query }) => query)).toEqual(expect.arrayContaining(['SELECT * FROM my_visits'])))
+    const floor = harness.subscriptions.find((item) => Array.isArray(item.query))
+    expect(floor?.query).toEqual(expect.arrayContaining(['SELECT * FROM event_state']))
+    expect(harness.subscriptions.map((item) => item.query)).toEqual(expect.arrayContaining([
+      'SELECT * FROM my_visits', 'SELECT * FROM my_encounters', 'SELECT * FROM my_handles',
+      'SELECT * FROM my_shared_visits', 'SELECT * FROM my_departure',
+    ]))
+    const conn = harness.conn as ReturnType<typeof connection>
+    const endEvent = vi.fn().mockResolvedValue(undefined)
+    Object.assign(conn.reducers, { endEvent })
+    await session.endEvent()
+    expect(endEvent).toHaveBeenCalledExactlyOnceWith({})
   })
 })

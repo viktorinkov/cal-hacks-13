@@ -5,10 +5,11 @@
  */
 import { Graphics, Matrix, Sprite } from 'pixi.js'
 import type { CameraObservation, Device, GuidanceCommand, Incident, LedPattern, Vec2, Venue, ZoneState } from '@/contracts/domain'
+import { floorZ } from '@/booth/hallRoute'
 import type { ElevationAt } from '@/lib/elevation'
-import { Path } from '@/lib/geometry'
+import { newProjectResult, Path, type ProjectResult } from '@/lib/geometry'
 import { px } from '@/lib/tokens'
-import { dashedPath, groundCircle, groundDisc, pathLine, projectPoly } from '../draw'
+import { dashedPath, dashedPathZ, groundCircle, groundDisc, pathLine, pathLineZ, projectPoly } from '../draw'
 import { groundMatrix, project, type Camera, type ScreenPoint } from '../projection'
 import { haloTexture } from '../textures'
 import { CONGESTION_TINT } from '../palette'
@@ -41,7 +42,7 @@ export interface MarksInput {
   stale: boolean
   laneArrows: { x: number; y: number; nx: number; ny: number; i: number }[]
   /** The live booth on the concert plan, or the demo ring on CalHacks. */
-  booth?: { x: number; y: number; r: number; live: boolean; editing: boolean; demo?: boolean; lost?: boolean }
+  booth?: { x: number; y: number; r: number; live: boolean; editing: boolean; demo?: boolean; lost?: boolean; alert?: boolean }
 }
 
 const LED_PIXELS = 12
@@ -57,7 +58,8 @@ export class MarksLayer {
   readonly halo: Sprite
   private readonly venue: Venue
   private readonly corridors: { id: string; path: Path }[]
-  private extra: { id: string; path: Path } | null = null
+  private extra: { id: string; path: Path; z: number[] | null } | null = null
+  private readonly hit: ProjectResult = newProjectResult()
   private readonly a: ScreenPoint = { x: 0, y: 0, depth: 0 }
   private readonly b: ScreenPoint = { x: 0, y: 0, depth: 0 }
   private haloAlpha = 0
@@ -73,13 +75,31 @@ export class MarksLayer {
     this.glow.blendMode = 'add'
   }
 
-  /** First Aid's walk to the live booth. Rebuilt when the circle moves. */
-  setBoothPath(points: Vec2[] | null, id = 'COR-BOOTH'): void {
+  /** First Aid's walk to the live booth, or the hall route. Rebuilt when the circle moves. `z` is the floor height at each point. */
+  setBoothPath(points: Vec2[] | null, id = 'COR-BOOTH', z: number[] | null = null): void {
     if (!points) {
       this.extra = null
       return
     }
-    this.extra = { id, path: new Path(points) }
+    this.extra = { id, path: new Path(points), z }
+  }
+
+  /** Floor height along a routed path, a little above the surface so the line is not buried in it. */
+  private zAlong(path: Path): ((s: number) => number) | null {
+    const extra = this.extra
+    if (!extra || extra.path !== path || !extra.z || extra.z.length !== path.points.length) return null
+    const z = extra.z
+    const cum = path.cumulative
+    return (s: number) => {
+      const t = Math.max(0, Math.min(path.length, s))
+      let k = 0
+      while (k < cum.length - 2 && cum[k + 1]! < t) k++
+      const span = (cum[k + 1] ?? t) - (cum[k] ?? 0) || 1
+      const f = (t - (cum[k] ?? 0)) / span
+      const z0 = z[k] ?? 0
+      const z1 = z[Math.min(k + 1, z.length - 1)] ?? z0
+      return z0 + (z1 - z0) * f + 0.08
+    }
   }
 
   corridorPath(id: string | undefined): Path | null {
@@ -107,13 +127,21 @@ export class MarksLayer {
     const booth = m.booth
     if (!booth) return
     const g = this.over
-    const color = booth.lost ? px.grey : booth.demo ? px.champagne : booth.live ? px.green : px.grey
-    groundDisc(g, m.cam, booth.x, booth.y, booth.r, 48)
-    g.fill({ color, alpha: booth.lost ? 0.08 : booth.demo ? 0.1 : booth.live ? 0.16 : 0.08 })
-    groundCircle(g, m.cam, booth.x, booth.y, booth.r, 64)
-    g.stroke({ width: booth.editing ? 2.4 : 1.75, color, alpha: booth.live ? 0.95 : 0.7 })
+    const alerting = !!booth.alert
+    const flick = alerting && m.animate ? 0.5 + 0.5 * Math.sin(m.time * 8) : 1
+    const color = alerting ? px.red : booth.lost ? px.grey : booth.demo ? px.champagne : booth.live ? px.green : px.grey
+    const z = booth.demo ? floorZ(booth.x, booth.y) : 0
+    groundDisc(g, m.cam, booth.x, booth.y, booth.r, 48, z)
+    g.fill({ color, alpha: alerting ? 0.08 + 0.2 * flick : booth.lost ? 0.08 : booth.demo ? 0.1 : booth.live ? 0.16 : 0.08 })
+    if (alerting) {
+      groundCircle(g, m.cam, booth.x, booth.y, booth.r + 0.85, 72, 1, 0, z)
+      g.stroke({ width: 10, color: px.red, alpha: 0.28 * flick })
+    }
+    groundCircle(g, m.cam, booth.x, booth.y, booth.r, 64, 1, 0, z)
+    g.stroke({ width: alerting ? 2.8 : booth.editing ? 2.4 : 1.75, color, alpha: alerting ? 0.4 + 0.6 * flick : booth.live ? 0.95 : 0.7 })
     if (booth.editing) {
-      groundDisc(g, m.cam, booth.x, booth.y, 0.7, 16)
+      const handle = Math.max(1.15, 14 / Math.max(m.cam.scale, 1))
+      groundDisc(g, m.cam, booth.x, booth.y, handle, 20, z)
       g.fill({ color: px.champagne, alpha: 0.95 })
     }
   }
@@ -211,36 +239,45 @@ export class MarksLayer {
     }
     const s = cam.scale
     for (const r of preview) {
+      const tone = this.pathColors(r.command.commandId)
       const len = r.path.length
-      this.lane(g, cam, r.path, len, 0.08)
-      this.glowLine(cam, r.path, len, 0.55)
-      dashedPath(o, cam, r.path, 0, len, 0.06, 1.4, 1.0, m.animate ? -time * 1.5 : 0)
-      o.stroke({ width: Math.max(3.5, 0.3 * s), color: PATH_CORE, alpha: 0.95, cap: 'round' })
-      this.startMark(o, cam, r.path)
+      const zAt = this.zAlong(r.path)
+      this.lane(g, cam, r.path, len, 0.1, tone.wash, zAt)
+      this.glowLine(cam, r.path, len, 0.55, tone.wash, zAt)
+      if (zAt) dashedPathZ(o, cam, r.path, 0, len, zAt, 1.4, 1.0, m.animate ? -time * 1.5 : 0)
+      else dashedPath(o, cam, r.path, 0, len, 0.06, 1.4, 1.0, m.animate ? -time * 1.5 : 0)
+      o.stroke({ width: Math.max(3.5, 0.3 * s), color: tone.core, alpha: 0.95, cap: 'round' })
+      this.startMark(o, cam, r.path, tone.wash, zAt)
     }
     for (const r of live) {
+      const tone = this.pathColors(r.command.commandId)
       const rev = r.reveal
-      this.lane(g, cam, r.path, rev, 0.16)
+      const zAt = this.zAlong(r.path)
+      this.lane(g, cam, r.path, rev, tone.wash === px.aside ? 0.28 : 0.16, tone.wash, zAt)
       const breathe = m.animate ? 0.85 + 0.15 * Math.sin(time * 2.2) : 1
-      this.glowLine(cam, r.path, rev, breathe)
+      this.glowLine(cam, r.path, rev, breathe, tone.wash, zAt)
       // a dark edge under the core keeps it legible over the pale crowd
-      pathLine(o, cam, r.path, rev, 0.06)
+      if (zAt) pathLineZ(o, cam, r.path, rev, zAt)
+      else pathLine(o, cam, r.path, rev, 0.06)
       o.stroke({ width: Math.max(7, 0.5 * s), color: 0x14120e, alpha: 0.55, cap: 'round', join: 'round' })
-      pathLine(o, cam, r.path, rev, 0.06)
-      o.stroke({ width: Math.max(4.5, 0.32 * s), color: PATH_CORE, alpha: 1, cap: 'round', join: 'round' })
+      if (zAt) pathLineZ(o, cam, r.path, rev, zAt)
+      else pathLine(o, cam, r.path, rev, 0.06)
+      o.stroke({ width: Math.max(4.5, 0.32 * s), color: tone.core, alpha: 1, cap: 'round', join: 'round' })
       // survey ticks every 2.5 m
       for (let t = 2.5; t < Math.min(rev, r.path.length - 2); t += 2.5) {
         const p = r.path.at(t)
-        project(cam, p.x - p.uy * 0.6, p.y + p.ux * 0.6, 0.06, this.a)
-        project(cam, p.x + p.uy * 0.6, p.y - p.ux * 0.6, 0.06, this.b)
+        const tz = zAt ? zAt(t) : 0.06
+        project(cam, p.x - p.uy * 0.6, p.y + p.ux * 0.6, tz, this.a)
+        project(cam, p.x + p.uy * 0.6, p.y - p.ux * 0.6, tz, this.b)
         o.moveTo(this.a.x, this.a.y).lineTo(this.b.x, this.b.y)
       }
-      o.stroke({ width: 1, color: px.champagne, alpha: 0.8 })
+      o.stroke({ width: 1, color: tone.wash, alpha: 0.8 })
       // bright dashes flowing from First Aid toward the person
-      dashedPath(o, cam, r.path, 0, Math.max(0, rev - 0.5), 0.08, 1.1, 3.9, m.animate ? time * 4 : 0)
+      if (zAt) dashedPathZ(o, cam, r.path, 0, Math.max(0, rev - 0.5), zAt, 1.1, 3.9, m.animate ? time * 4 : 0)
+      else dashedPath(o, cam, r.path, 0, Math.max(0, rev - 0.5), 0.08, 1.1, 3.9, m.animate ? time * 4 : 0)
       o.stroke({ width: Math.max(2.5, 0.18 * s), color: 0xffffff, alpha: 0.95, cap: 'round' })
-      this.startMark(o, cam, r.path)
-      // step-aside arrows on people in the lane
+      this.startMark(o, cam, r.path, tone.wash, zAt)
+      // step-aside arrows on people in the lane, on the same floor as the path
       const AL = Math.max(1.1, 14 / s)
       for (const ar of m.laneArrows) {
         const nudge = m.animate ? (0.5 + 0.5 * Math.sin(time * 4 + ar.i * 0.7)) * 0.25 : 0
@@ -249,25 +286,36 @@ export class MarksLayer {
         const tx = bx + ar.nx * AL
         const ty = by + ar.ny * AL
         const hl = AL * 0.38
-        project(cam, bx, by, 0.1, this.a)
-        project(cam, tx, ty, 0.1, this.b)
+        let az = 0.1
+        if (zAt) {
+          r.path.project(ar.x, ar.y, this.hit)
+          az = zAt(this.hit.along)
+        }
+        project(cam, bx, by, az, this.a)
+        project(cam, tx, ty, az, this.b)
         o.moveTo(this.a.x, this.a.y).lineTo(this.b.x, this.b.y)
-        const l = project(cam, tx - ar.nx * hl - ar.ny * hl * 0.7, ty - ar.ny * hl + ar.nx * hl * 0.7, 0.1, { x: 0, y: 0, depth: 0 })
-        const rr = project(cam, tx - ar.nx * hl + ar.ny * hl * 0.7, ty - ar.ny * hl - ar.nx * hl * 0.7, 0.1, { x: 0, y: 0, depth: 0 })
+        const l = project(cam, tx - ar.nx * hl - ar.ny * hl * 0.7, ty - ar.ny * hl + ar.nx * hl * 0.7, az, { x: 0, y: 0, depth: 0 })
+        const rr = project(cam, tx - ar.nx * hl + ar.ny * hl * 0.7, ty - ar.ny * hl - ar.nx * hl * 0.7, az, { x: 0, y: 0, depth: 0 })
         o.moveTo(l.x, l.y).lineTo(this.b.x, this.b.y).lineTo(rr.x, rr.y)
       }
       if (m.laneArrows.length) o.stroke({ width: 1.4, color: px.aside, alpha: 0.95, cap: 'round', join: 'round' })
     }
   }
 
-  private lane(g: Graphics, cam: Camera, path: Path, to: number, alpha: number): void {
+  private pathColors(commandId: string | undefined): { wash: number; core: number } {
+    if (commandId === 'demo-path') return { wash: px.aside, core: 0xffe3a3 }
+    return { wash: px.champagne, core: PATH_CORE }
+  }
+
+  private lane(g: Graphics, cam: Camera, path: Path, to: number, alpha: number, color = px.champagne, zAt: ((s: number) => number) | null = null): void {
     if (to <= 0.1) return
-    pathLine(g, cam, path, to, 0.02)
-    g.stroke({ width: Math.max(4, 3 * cam.scale), color: px.champagne, alpha, cap: 'round', join: 'round' })
+    if (zAt) pathLineZ(g, cam, path, to, zAt)
+    else pathLine(g, cam, path, to, 0.02)
+    g.stroke({ width: Math.max(4, 3 * cam.scale), color, alpha, cap: 'round', join: 'round' })
   }
 
   /** Soft light around the path: wide and faint, then narrower and brighter. */
-  private glowLine(cam: Camera, path: Path, to: number, level: number): void {
+  private glowLine(cam: Camera, path: Path, to: number, level: number, color = px.champagne, zAt: ((s: number) => number) | null = null): void {
     if (to <= 0.1) return
     const g = this.glow
     const s = cam.scale
@@ -276,15 +324,17 @@ export class MarksLayer {
       [Math.max(15, 1.2 * s), 0.14],
       [Math.max(8, 0.65 * s), 0.26],
     ] as const) {
-      pathLine(g, cam, path, to, 0.06)
-      g.stroke({ width: w, color: px.champagne, alpha: a * level, cap: 'round', join: 'round' })
+      if (zAt) pathLineZ(g, cam, path, to, zAt)
+      else pathLine(g, cam, path, to, 0.06)
+      g.stroke({ width: w, color, alpha: a * level, cap: 'round', join: 'round' })
     }
   }
 
-  private startMark(o: Graphics, cam: Camera, path: Path): void {
+  private startMark(o: Graphics, cam: Camera, path: Path, color = px.champagne, zAt: ((s: number) => number) | null = null): void {
     const p = path.points[0]
-    project(cam, p.x, p.y, 0, this.a)
-    o.circle(this.a.x, this.a.y, Math.max(5, 0.6 * cam.scale)).stroke({ width: 1.4, color: px.champagne, alpha: 1 })
+    if (!p) return
+    project(cam, p.x, p.y, zAt ? zAt(0) : 0, this.a)
+    o.circle(this.a.x, this.a.y, Math.max(5, 0.6 * cam.scale)).stroke({ width: 1.4, color, alpha: 1 })
   }
 
   // ---------------------------------------------------------------- incidents
@@ -299,6 +349,7 @@ export class MarksLayer {
       for (const inc of m.incidents) {
         if (inc.status === 'resolved' || !inc.location) continue
         const { x, y } = inc.location
+        const z = this.venue.venueId === 'calhacks' ? floorZ(x, y) : 0
         const confirmed = inc.localizationStatus === 'visually_confirmed'
         const focus = inc.incidentId === m.focusIncidentId
         if (focus || !haloAt) {
@@ -308,20 +359,20 @@ export class MarksLayer {
         const rot = m.animate ? time * 0.12 : 0
         // uncertainty of the estimate, distinct from the 4 m area
         if (!confirmed && inc.locationRadiusM) {
-          groundCircle(g, cam, x, y, inc.locationRadiusM, 48, 0.35, -rot)
+          groundCircle(g, cam, x, y, inc.locationRadiusM, 48, 0.35, -rot, z)
           g.stroke({ width: 1, color: px.red, alpha: 0.55 })
         }
         // the 4 m area around the person
-        groundCircle(g, cam, x, y, 4, 28, 0.55, rot)
+        groundCircle(g, cam, x, y, 4, 28, 0.55, rot, z)
         g.stroke({ width: 1.6, color: px.red, alpha: confirmed ? 1 : 0.7 })
         if (inc.status === 'reported' && m.animate) {
           const pr = (time % 2.4) / 2.4
-          groundCircle(g, cam, x, y, 4 * (0.35 + 1.05 * pr), 40)
+          groundCircle(g, cam, x, y, 4 * (0.35 + 1.05 * pr), 40, 1, 0, z)
           g.stroke({ width: 1.6, color: px.red, alpha: 0.8 * (1 - pr) })
         }
         // beacon: a light column rising from the spot
-        project(cam, x, y, 0, this.a)
-        project(cam, x, y, BEACON_TOP, this.b)
+        project(cam, x, y, z, this.a)
+        project(cam, x, y, z + BEACON_TOP, this.b)
         const flick = m.animate && inc.status === 'reported' ? 0.65 + 0.35 * Math.sin(time * 8) : 1
         o.moveTo(this.a.x, this.a.y).lineTo(this.b.x, this.b.y).stroke({ width: 6, color: px.red, alpha: 0.18 * flick })
         o.moveTo(this.a.x, this.a.y).lineTo(this.b.x, this.b.y).stroke({ width: 1.6, color: px.red, alpha: 0.95 })

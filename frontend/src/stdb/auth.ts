@@ -62,7 +62,7 @@ export async function beginSignIn(): Promise<void> {
 }
 
 /** Finish the redirect from the email sign-in and keep the id token for the database connection. */
-export async function finishSignIn(): Promise<void> {
+export async function finishSignIn(): Promise<string> {
   const host = await loadHostConfig()
   const query = new URLSearchParams(window.location.search)
   const pending = JSON.parse(window.sessionStorage.getItem(PENDING) ?? '{}') as Partial<PendingSignIn>
@@ -87,4 +87,6 @@ export async function finishSignIn(): Promise<void> {
   }
   window.localStorage.setItem(ID_TOKEN, row.id_token)
   window.sessionStorage.removeItem(PENDING)
+  const back = typeof pending.back === 'string' ? pending.back : ''
+  return back.startsWith('/') && !back.startsWith('//') ? back : '/organizer'
 }

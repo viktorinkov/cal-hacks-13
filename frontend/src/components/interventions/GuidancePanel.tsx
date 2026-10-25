@@ -68,14 +68,22 @@ export function GuidancePanel({
     <section aria-labelledby="path-h" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h3 id="path-h" className="text-[13px] font-medium text-ink">
-          {preview ? 'Path for First Aid, preview' : 'Path for First Aid'}
+          {command.commandId === 'demo-path'
+            ? preview
+              ? 'Path from the entrance, preview'
+              : 'Path from the entrance'
+            : preview
+              ? 'Path for First Aid, preview'
+              : 'Path for First Aid'}
         </h3>
         <span className={cn('text-[12px] tabular-nums', preview ? 'text-ink-muted' : 'text-ink-dim')}>
-          {preview
-            ? 'Not sent'
-            : command.deliveryStatus === 'delivered'
-              ? `${acked} of ${command.targets.length}${which} confirmed`
-              : `${acked} of ${command.targets.length}${which} confirmed so far`}
+          {command.commandId === 'demo-path'
+            ? 'Nothing sent to bands'
+            : preview
+              ? 'Not sent'
+              : command.deliveryStatus === 'delivered'
+                ? `${acked} of ${command.targets.length}${which} confirmed`
+                : `${acked} of ${command.targets.length}${which} confirmed so far`}
         </span>
       </div>
 
@@ -148,13 +156,23 @@ export function GuidancePanel({
 
       <div className="flex flex-col gap-1 text-[12px] text-ink-muted">
         {anyHaptic && <span>Full bands on the path also vibrate once. Lite bands show light only.</span>}
-        {untargeted.length > 0 && (
+        {command.commandId !== 'demo-path' && untargeted.length > 0 && (
           <span>
             {untargeted.map((d) => `band-${d.label}`).join(', ')} {untargeted.length === 1 ? 'has' : 'have'} no position and {untargeted.length === 1 ? 'is' : 'are'} not included.
           </span>
         )}
-        {!preview && command.approvalStatus === 'approved' && <span>Signals stop when you resolve, or in {elapsed(Math.max(0, command.expiresAt - now))}.</span>}
-        {preview && <span>Nothing changes on any band until you send it.</span>}
+        {command.commandId === 'demo-path' ? (
+          preview ? (
+            <span>Opening this lights a yellow path from the entrance. People on it step aside. Nothing is sent to a wristband.</span>
+          ) : (
+            <span>People on the yellow path are stepping aside. Wristbands are not signalled from here.</span>
+          )
+        ) : (
+          <>
+            {!preview && command.approvalStatus === 'approved' && <span>Signals stop when you resolve, or in {elapsed(Math.max(0, command.expiresAt - now))}.</span>}
+            {preview && <span>Nothing changes on any band until you send it.</span>}
+          </>
+        )}
       </div>
 
       {failed.length > 0 && command.approvalStatus === 'approved' && (

@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import type { FloorBand } from '@/stdb/floor'
 import type { Device, GuidanceCommand, Incident, LedPattern, Vec2 } from '@/contracts/domain'
+import { routeToRing } from '@/booth/hallRoute'
 import { calhacksVenue } from '@/mock/calhacks'
 import { boothHandle } from './circle'
 
 /**
  * The clear patch on the CalHacks floor where the hardware demo stands.
- * Simulated people stay outside it. A real SOS opens a path from the entrance.
+ * Simulated people stay outside it. A distress turns the ring red.
+ * The operator opens the path from the entrance.
  */
 export interface DemoRing {
   x: number
@@ -79,8 +81,8 @@ export function saveDemoRing(): void {
   write(useDemoRing.getState())
 }
 
-export function demoRingHandle(x: number, y: number, ring: Pick<DemoRing, 'x' | 'y' | 'r'>): 'move' | 'resize' | null {
-  return boothHandle(x, y, ring)
+export function demoRingHandle(x: number, y: number, ring: Pick<DemoRing, 'x' | 'y' | 'r'>, pxPerM?: number): 'move' | 'resize' | null {
+  return boothHandle(x, y, ring, pxPerM)
 }
 
 /** South entrance, the bottom of the hall. */
@@ -88,14 +90,14 @@ export function demoEntrance(): Vec2 {
   return calhacksVenue.zones.find((zone) => zone.zoneId === 'entrance')?.labelAt ?? { x: 42, y: 196 }
 }
 
-/** From the entrance to the rim of the ring, so the line stops where the hardware is standing. */
+/** The walk from the entrance to the rim of the ring, along the floor and up the stairs when the ring is on the deck. */
+export function demoRoute(ring: Pick<DemoRing, 'x' | 'y' | 'r'>): { points: Vec2[]; z: number[] } {
+  return routeToRing(demoEntrance(), ring)
+}
+
+/** Plan of {@link demoRoute}. The line stops where the hardware is standing. */
 export function demoPath(ring: Pick<DemoRing, 'x' | 'y' | 'r'>): Vec2[] {
-  const from = demoEntrance()
-  const dx = ring.x - from.x
-  const dy = ring.y - from.y
-  const len = Math.hypot(dx, dy) || 1
-  const trim = Math.min(ring.r, Math.max(0, len - 1))
-  return [from, { x: ring.x - (dx / len) * trim, y: ring.y - (dy / len) * trim }]
+  return demoRoute(ring).points
 }
 
 export function isHardware(band: FloorBand): boolean {
@@ -119,12 +121,25 @@ export function shownHardware(bands: FloorBand[]): FloorBand[] {
   return bands.filter((band) => isHardware(band) && (band.online || bandLights(band))).sort((a, b) => a.id - b.id)
 }
 
+function zoneNear(at: Vec2): string | undefined {
+  let bestId: string | undefined
+  let best = Infinity
+  for (const zone of calhacksVenue.zones) {
+    const d = (zone.labelAt.x - at.x) ** 2 + (zone.labelAt.y - at.y) ** 2
+    if (d < best) {
+      best = d
+      bestId = zone.zoneId
+    }
+  }
+  return bestId
+}
+
 function idOf(reportedByDeviceId: string | null): number {
   const match = reportedByDeviceId?.match(/(\d+)$/)
   return match ? Number(match[1]) : 0
 }
 
-/** A hardware SOS or fall is in progress, so the entrance path should be open. */
+/** A hardware SOS or fall is in progress, so the ring is in distress. */
 export function demoIsActive(bands: FloorBand[], incidents: Pick<Incident, 'status' | 'source' | 'isSimulated' | 'reportedByDeviceId'>[]): boolean {
   if (bands.some((band) => isHardware(band) && band.online && bandLights(band))) return true
   return incidents.some((incident) => {
@@ -187,7 +202,7 @@ export function demoDevices(bands: FloorBand[], ring: Pick<DemoRing, 'x' | 'y' |
     sosActive: band.sos || band.state === S_SOS,
     location: at,
     locationSource: 'manually_assigned',
-    zoneId: 'demo',
+    zoneId: zoneNear(at) ?? 'demo',
     hapticsSupported: band.hasMotor,
     imuSupported: band.hasMpu,
     pendingCommandIds: [],
@@ -210,6 +225,7 @@ function raisedIncident(item: LaidBand, now: number): Incident | null {
     location: item.at,
     locationRadiusM: 1.5,
     localizationStatus: 'estimated',
+    candidateZone: zoneNear(item.at),
     cameraObservations: [],
     timeline: [{ at: item.band.lastSeen ?? now, source: 'device', text: sos ? `SOS on band ${item.band.id}` : `Fall on band ${item.band.id}` }],
     guidanceCommandIds: [],
@@ -263,6 +279,7 @@ export function withDemoIncidents(open: Incident[], bands: FloorBand[], ring: Pi
       location: item.at,
       locationRadiusM: 1.5,
       localizationStatus: 'estimated',
+      candidateZone: zoneNear(item.at),
       cameraObservations: [],
       timeline: [{ at: item.band.lastSeen ?? Date.now(), source: 'device', text: sos ? `SOS on band ${item.band.id}` : `Fall on band ${item.band.id}` }],
       guidanceCommandIds: [],

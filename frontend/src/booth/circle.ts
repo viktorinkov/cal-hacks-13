@@ -61,10 +61,17 @@ export function saveBooth(): void {
   write(useBooth.getState())
 }
 
-/** Centre handle, or the rim, when the operator is dragging the booth. */
-export function boothHandle(x: number, y: number, circle: Pick<BoothCircle, 'x' | 'y' | 'r'>): 'move' | 'resize' | null {
+/**
+ * Centre moves the circle, the rim resizes it.
+ * The grab is at least ~18px on screen, so a fitted view of the hall is still draggable.
+ * `pxPerM` is the camera's pixels per metre. When the circle is only a few dozen pixels
+ * across, the whole disc moves and the rim is not a separate handle.
+ */
+export function boothHandle(x: number, y: number, circle: Pick<BoothCircle, 'x' | 'y' | 'r'>, pxPerM = 8): 'move' | 'resize' | null {
   const d = Math.hypot(x - circle.x, y - circle.y)
-  if (d <= Math.min(1.6, circle.r * 0.45)) return 'move'
-  if (Math.abs(d - circle.r) <= Math.max(0.7, circle.r * 0.16)) return 'resize'
+  const slop = Math.max(1.4, 18 / Math.max(pxPerM, 0.5))
+  const rimIsSeparate = circle.r * pxPerM > 64
+  if (rimIsSeparate && Math.abs(d - circle.r) <= slop && d > circle.r * 0.42) return 'resize'
+  if (d <= circle.r + slop) return 'move'
   return null
 }

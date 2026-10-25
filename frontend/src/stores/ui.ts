@@ -16,7 +16,7 @@ export type LayerKey =
   | 'baseline'
 
 export const LAYERS: { key: LayerKey; label: string; hint: string }[] = [
-  { key: 'people', label: 'People', hint: 'Simulated attendees' },
+  { key: 'people', label: 'People', hint: 'People from the venue, walking on the plan' },
   { key: 'trails', label: 'Movement trails', hint: 'Where people walked in the last few seconds' },
   { key: 'heatmap', label: 'Density', hint: 'Reddish amber where people mass, columns where packed' },
   { key: 'zones', label: 'Zone status', hint: 'Caution and critical zones outlined' },

@@ -14,6 +14,12 @@ export interface Registration {
   medications: string
   emergencyName: string
   emergencyPhone: string
+  street: string
+  unit: string
+  city: string
+  region: string
+  postalCode: string
+  country: string
   carrier: string
   memberId: string
   groupId: string
@@ -32,6 +38,12 @@ type StoredRegistration = Pick<Registration,
   | 'email'
   | 'emergencyName'
   | 'emergencyPhone'
+  | 'street'
+  | 'unit'
+  | 'city'
+  | 'region'
+  | 'postalCode'
+  | 'country'
   | 'cardBrand'
   | 'last4'
   | 'exp'
@@ -50,6 +62,12 @@ const SEEDS: readonly Registration[] = [
     medications: 'None',
     emergencyName: 'Sam Ito',
     emergencyPhone: '415-555-0148',
+    street: '',
+    unit: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
     carrier: 'Northline',
     memberId: 'NL-44002',
     groupId: 'NL-MAIN',
@@ -67,6 +85,12 @@ const SEEDS: readonly Registration[] = [
     medications: 'Albuterol inhaler',
     emergencyName: 'Priya Shah',
     emergencyPhone: '415-555-0174',
+    street: '',
+    unit: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
     carrier: 'Northline',
     memberId: 'NL-44004',
     groupId: 'NL-MAIN',
@@ -84,6 +108,12 @@ const SEEDS: readonly Registration[] = [
     medications: 'None',
     emergencyName: 'Elena Vasquez',
     emergencyPhone: '415-555-0190',
+    street: '',
+    unit: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
     carrier: 'Northline',
     memberId: 'NL-44005',
     groupId: 'NL-MAIN',
@@ -101,6 +131,12 @@ const SEEDS: readonly Registration[] = [
     medications: 'None',
     emergencyName: 'Chris Dalton',
     emergencyPhone: '415-555-0116',
+    street: '',
+    unit: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
     carrier: 'Northline',
     memberId: 'NL-44006',
     groupId: 'NL-MAIN',
@@ -139,6 +175,12 @@ function storedRegistration(value: unknown): StoredRegistration | null {
     email: stringField('email'),
     emergencyName: stringField('emergencyName'),
     emergencyPhone: stringField('emergencyPhone'),
+    street: stringField('street'),
+    unit: stringField('unit'),
+    city: stringField('city'),
+    region: stringField('region'),
+    postalCode: stringField('postalCode'),
+    country: stringField('country'),
     cardBrand: stringField('cardBrand'),
     last4: stringField('last4'),
     exp: stringField('exp'),
@@ -217,6 +259,12 @@ export function blankRegistration(bandId: string): Registration {
     medications: '',
     emergencyName: '',
     emergencyPhone: '',
+    street: '',
+    unit: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
     carrier: '',
     memberId: '',
     groupId: '',

@@ -5,7 +5,8 @@
  */
 import { Application, Container } from 'pixi.js'
 import { boothHandle, moveBooth, resizeBooth, saveBooth, useBooth } from '@/booth/circle'
-import { DEMO_LANE, demoCommand, demoDevices as layDemoDevices, demoIsActive, demoPath, demoRingHandle, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, useHardware, withDemoIncidents } from '@/booth/demoRing'
+import { DEMO_LANE, demoDevices as layDemoDevices, demoIsActive, demoRingHandle, demoRoute, moveDemoRing, resizeDemoRing, saveDemoRing, useDemoRing, withDemoIncidents } from '@/booth/demoRing'
+import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
 import { demoReveal } from '@/mock/calhacksCrowd'
 import { presentCalhacks } from '@/stdb/floor'
 import type { Device, GuidanceCommand, Incident, LedPattern, Vec2, Venue } from '@/contracts/domain'
@@ -17,11 +18,12 @@ import { useSession } from '@/stdb/session'
 import { baselineFrames, frames, useMapStats } from '@/stores/frames'
 import { useUi, type HoverInfo } from '@/stores/ui'
 import { useWorld } from '@/stores/world'
-import { CLASS_LANE, CLASS_NEAR, CrowdLayer } from './layers/crowdLayer'
+import { CLASS_LANE, CLASS_NEAR, CrowdLayer, raisedCovers } from './layers/crowdLayer'
 import { DensityLayer } from './layers/densityLayer'
 import { BAND_Z, BEACON_TOP, MarksLayer, type ActiveRoute } from './layers/marksLayer'
 import { StageLayer } from './layers/stageLayer'
-import { HallMesh } from './hallMesh'
+import { chosenModel, type ChosenModel } from '@/venue/chosenModel'
+import { HallMesh, PALACE_HALL } from './hallMesh'
 import { VenueLayer } from './layers/venueLayer'
 import { mapPalette } from './palette'
 import {
@@ -40,6 +42,8 @@ import {
 } from './projection'
 
 const NEAR_RADIUS = 4
+/** Metres past the demo ring that turn red while an SOS is up. */
+const RING_HALO = 2.8
 const LANE_HALF = 1.5
 const REVEAL_SPEED = 40
 
@@ -57,6 +61,9 @@ export class MapEngine {
   private venue: Venue | null = null
   private venueLayer: VenueLayer | null = null
   private hall: HallMesh | null = null
+  /** A chosen venue that is not the Palace: only its model is drawn, nothing traced on the Palace. */
+  private modelOnly: ChosenModel | null = null
+  private hallKey = PALACE_HALL.venueId
   private stage: StageLayer | null = null
   private crowd: CrowdLayer | null = null
   private density: DensityLayer | null = null
@@ -164,7 +171,8 @@ export class MapEngine {
 
   fit(animate = true): void {
     if (!this.venue) return
-    const t = fitCamera(this.venue.width, this.venue.height, 9, this.target.yaw, this.target.tilt, this.openArea())
+    const size = this.modelOnly ?? this.venue
+    const t = fitCamera(size.width, size.height, 9, this.target.yaw, this.target.tilt, this.openArea())
     this.setTarget(t, animate)
     this.userMoved = false
   }
@@ -302,14 +310,35 @@ export class MapEngine {
       })
     this.stage = new StageLayer(venue.stages[0], towers)
     // one crowd bucket in front of each structure, plus one behind them all
-    this.crowd = new CrowdLayer(venue.width, venue.height, this.venueLayer.count + 1, this.elevation)
+    this.crowd = new CrowdLayer(venue.width, venue.height, this.venueLayer.count + 1, this.elevation, raisedCovers(venue))
     this.density = new DensityLayer(venue, this.elevation)
     this.marks = new MarksLayer(venue, this.elevation)
     const { venueLayer, stage, crowd, density, marks } = this
-    this.root.addChild(venueLayer.root, density.heat, crowd.trails, marks.zoneG, marks.halo, marks.under, density.flow)
+    this.root.addChild(venueLayer.root, density.heat, crowd.trails, crowd.cover, marks.zoneG, marks.halo, marks.under, density.flow)
     this.root.addChild(crowd.slices[0])
     for (let k = 0; k < venueLayer.count; k++) this.root.addChild(venueLayer.solids[k], crowd.slices[k + 1])
     this.root.addChild(stage.wall, density.heatUpper, crowd.ghosts, density.columns, stage.beams, marks.glow, marks.over)
+    this.fit(false)
+  }
+
+  /** Draw the chosen venue's model in place of the Palace, or bring the Palace back. */
+  private swapHall(model: ChosenModel | null, key: string): void {
+    if (!this.host) return
+    this.hallKey = key
+    this.modelOnly = model
+    this.hall?.destroy()
+    const source = model ? { url: model.url, venueId: model.venueId, fit: 'bounds' as const } : PALACE_HALL
+    this.hall = new HallMesh(
+      this.host,
+      () => {
+        this.camDirty = true
+      },
+      source,
+    )
+    this.hall.resize(this.host.clientWidth, this.host.clientHeight)
+    this.root.visible = !model
+    if (useUi.getState().hover) useUi.getState().setHover(null)
+    this.userMoved = false
     this.fit(false)
   }
 
@@ -333,6 +362,20 @@ export class MapEngine {
       this.lastLayers = layerKey
       this.camDirty = true
     }
+    // A chosen venue other than the Palace replaces the event floor: its model alone, no zones,
+    // crowd, bands or incidents, which are all placed on the Palace's traced plan.
+    const wanted = this.venue.venueId === PALACE_HALL.venueId ? chosenModel() : null
+    const key = wanted ? `${wanted.venueId}|${wanted.url}` : PALACE_HALL.venueId
+    if (key !== this.hallKey) this.swapHall(wanted, key)
+    if (this.modelOnly) {
+      const on = this.hall?.showing(this.modelOnly.venueId) ?? false
+      if (this.hall) this.hall.canvas.style.visibility = on ? 'visible' : 'hidden'
+      if (on) this.hall?.render(this.cam)
+      this.placeAnchors()
+      this.camDirty = false
+      return
+    }
+
     const venueLayer = this.venueLayer
     // people go after every structure they stand in front of, tested at their own place across the view
     const bucketOf = (rx: number, ry: number) => venueLayer.bucketOf(rx, ry)
@@ -349,7 +392,8 @@ export class MapEngine {
     // incidents, routes, classification
     const incidents = Object.values(world.incidents)
     const open = incidents.filter((i) => i.status !== 'resolved')
-    const shown = this.venue.venueId === 'calhacks' ? withDemoIncidents(open, useHardware.getState().bands, useDemoRing.getState()) : open
+    const floorBands = this.venue.venueId === 'calhacks' ? bandsOnFloor() : []
+    const shown = this.venue.venueId === 'calhacks' ? withDemoIncidents(open, floorBands, useDemoRing.getState()) : open
     const focus = ui.selection.kind === 'incident' ? ui.selection.id : (shown[0]?.incidentId ?? null)
     const routes = this.routes(world.commands, dt)
     this.classify(n, shown, routes, latest?.kinds)
@@ -378,6 +422,7 @@ export class MapEngine {
       count: n,
       kinds: latest?.kinds,
       poses: latest?.pose,
+      heights: latest?.heights,
       classes: this.classes,
       showPeople: layers.people,
       showTrails: layers.trails,
@@ -421,7 +466,13 @@ export class MapEngine {
           this.venue.venueId === 'main-stage'
             ? { ...useBooth.getState(), live: useSession.getState().phase === 'live' }
             : this.venue.venueId === 'calhacks'
-              ? { ...useDemoRing.getState(), live: useSession.getState().phase === 'live', lost: useSession.getState().phase === 'error', demo: true }
+              ? {
+                  ...useDemoRing.getState(),
+                  live: useSession.getState().phase === 'live',
+                  lost: useSession.getState().phase === 'error',
+                  demo: true,
+                  alert: demoIsActive(floorBands, incidents),
+                }
               : undefined,
       },
       dt,
@@ -439,10 +490,15 @@ export class MapEngine {
     const marks = this.marks
     if (!marks) return out
     const booth = useBooth.getState()
+    const hall = useHallDemo.getState()
+    const alerting = this.venue?.venueId === 'calhacks' && demoIsActive(bandsOnFloor(), Object.values(useWorld.getState().incidents))
+    const showPath = alerting && (hall.pathOpen || (hall.scripted && hall.acknowledged))
     if (this.venue?.venueId === 'main-stage') marks.setBoothPath([{ x: 10.3, y: 56 }, { x: booth.x, y: booth.y }])
-    else if (this.venue?.venueId === 'calhacks' && demoIsActive(useHardware.getState().bands, Object.values(useWorld.getState().incidents))) {
-      marks.setBoothPath(demoPath(useDemoRing.getState()), 'COR-DEMO')
-    } else marks.setBoothPath(null)
+    else if (showPath) {
+      const route = demoRoute(useDemoRing.getState())
+      marks.setBoothPath(route.points, 'COR-DEMO', route.z)
+    }
+    else marks.setBoothPath(null)
     const seen = new Set<string>()
     for (const c of Object.values(commands)) {
       const path = marks.corridorPath(c.corridorId)
@@ -450,6 +506,13 @@ export class MapEngine {
       if (c.approvalStatus === 'pending_approval') out.push({ path, command: c, mode: 'preview', reveal: path.length })
       else if (c.approvalStatus === 'approved' && c.deliveryStatus !== 'cancelled') {
         seen.add(c.commandId)
+        if (c.commandId === 'demo-path') {
+          const r = this.reveal.get(c.commandId) ?? { at: demoReveal() }
+          r.at = this.reducedMotion ? path.length : Math.min(path.length, Math.max(r.at, demoReveal()) + REVEAL_SPEED * dt)
+          this.reveal.set(c.commandId, r)
+          out.push({ path, command: c, mode: 'active', reveal: r.at })
+          continue
+        }
         const r = this.reveal.get(c.commandId) ?? { at: 0 }
         r.at = this.reducedMotion ? path.length : Math.min(path.length, r.at + REVEAL_SPEED * dt)
         this.reveal.set(c.commandId, r)
@@ -457,10 +520,6 @@ export class MapEngine {
       }
     }
     for (const k of [...this.reveal.keys()]) if (!seen.has(k)) this.reveal.delete(k)
-    if (this.venue?.venueId === 'calhacks') {
-      const path = marks.corridorPath('COR-DEMO')
-      if (path) out.push({ path, command: demoCommand(Math.round(path.length)), mode: 'active', reveal: demoReveal() })
-    }
     return out
   }
 
@@ -470,6 +529,9 @@ export class MapEngine {
     const near = open.filter((i) => i.location).map((i) => i.location!)
     const active = routes.filter((r) => r.mode === 'active')
     const r2 = NEAR_RADIUS * NEAR_RADIUS
+    const ringAlert = this.venue?.venueId === 'calhacks' && demoIsActive(bandsOnFloor(), open)
+    const ring = ringAlert ? useDemoRing.getState() : null
+    const halo = ring ? (ring.r + RING_HALO) * (ring.r + RING_HALO) : 0
     for (let i = 0; i < n; i++) {
       cls[i] = 0
       if (kinds && kinds[i] !== EntityKind.SimAttendee) continue
@@ -483,6 +545,11 @@ export class MapEngine {
           c = CLASS_NEAR
           break
         }
+      }
+      if (!c && ring) {
+        const dx = x - ring.x
+        const dy = y - ring.y
+        if (dx * dx + dy * dy <= halo) c = CLASS_NEAR
       }
       if (!c) {
         for (const r of active) {
@@ -518,12 +585,12 @@ export class MapEngine {
   }
 
   /**
-   * CalHacks keeps band ids in the roster. The floor draws a page of characters instead of a pin
-   * per id. The concert demo still shows its bands.
+   * CalHacks draws database people as figures. Wristband icons stay with the few hardware bands
+   * in the ring, never one pin per row. The concert demo still shows its bands.
    */
   private demoDevices(): Record<string, Device> {
     const devices: Record<string, Device> = {}
-    for (const device of layDemoDevices(useHardware.getState().bands, useDemoRing.getState())) devices[device.deviceId] = device
+    for (const device of layDemoDevices(bandsOnFloor(), useDemoRing.getState())) devices[device.deviceId] = device
     return devices
   }
 
@@ -644,9 +711,10 @@ export class MapEngine {
       let handle: 'move' | 'resize' | undefined
       const editingBooth = booth.editing && this.venue?.venueId === 'main-stage'
       const editingRing = ring.editing && this.venue?.venueId === 'calhacks'
-      if ((editingBooth || editingRing) && e.button === 0 && !e.shiftKey && !e.altKey) {
+      if ((editingBooth || editingRing) && !this.modelOnly && e.button === 0 && !e.shiftKey && !e.altKey) {
         const ground = unproject(this.cam, l.x, l.y)
-        handle = (editingRing ? demoRingHandle(ground.x, ground.y, ring) : boothHandle(ground.x, ground.y, booth)) ?? undefined
+        const pxPerM = this.cam.scale * Math.max(0.35, Math.cos(this.cam.tilt))
+        handle = (editingRing ? demoRingHandle(ground.x, ground.y, ring, pxPerM) : boothHandle(ground.x, ground.y, booth, pxPerM)) ?? undefined
       }
       this.drag = { x: l.x, y: l.y, moved: false, button: e.shiftKey || e.altKey ? 2 : e.button, id: e.pointerId, booth: handle }
       cv.setPointerCapture(e.pointerId)
@@ -780,6 +848,7 @@ export class MapEngine {
   }
 
   private hitTest(l: { x: number; y: number }): HoverInfo | null {
+    if (this.modelOnly) return null
     const world = useWorld.getState()
     // incidents: beacon base or top
     for (const inc of Object.values(world.incidents)) {
@@ -831,7 +900,20 @@ export class MapEngine {
     if (!hit && !cur) return
     if (hit && cur && hit.kind === cur.kind && hit.id === cur.id && Math.abs(hit.x - cur.x) < 6 && Math.abs(hit.y - cur.y) < 6) return
     useUi.getState().setHover(hit)
-    if (this.app) this.app.canvas.style.cursor = hit ? 'pointer' : 'grab'
+    if (!this.app) return
+    const ring = useDemoRing.getState()
+    const booth = useBooth.getState()
+    const editingRing = ring.editing && this.venue?.venueId === 'calhacks'
+    const editingBooth = booth.editing && this.venue?.venueId === 'main-stage'
+    let cursor = hit ? 'pointer' : 'grab'
+    if ((editingRing || editingBooth) && this.hoverPoint) {
+      const ground = unproject(this.cam, this.hoverPoint.x, this.hoverPoint.y)
+      const pxPerM = this.cam.scale * Math.max(0.35, Math.cos(this.cam.tilt))
+      const which = editingRing ? demoRingHandle(ground.x, ground.y, ring, pxPerM) : boothHandle(ground.x, ground.y, booth, pxPerM)
+      if (which === 'move') cursor = 'move'
+      else if (which === 'resize') cursor = 'ew-resize'
+    }
+    this.app.canvas.style.cursor = cursor
   }
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { boothHandle } from '@/booth/circle'
 import { incidentAt, spotInBooth, deviceFromBand } from '@/booth/place'
 import { MockBackend } from '@/mock/MockBackend'
 import { CrowdSim } from '@/mock/sim/crowd'
@@ -65,6 +66,15 @@ describe('live booth', () => {
     const command = backend.preview({ incidentId: inc!.incidentId })
     expect(command.corridorId).toBe('COR-BOOTH')
     expect(command.preview.corridorName).toBe('First Aid to the live booth')
+  })
+
+  it('grabs the whole circle when the hall is fitted, and the rim only when zoomed in', () => {
+    const circle = { x: 64, y: 150, r: 5 }
+    expect(boothHandle(66, 150, circle, 3)).toBe('move')
+    expect(boothHandle(64, 156, circle, 3)).toBe('move')
+    expect(boothHandle(80, 150, circle, 3)).toBeNull()
+    expect(boothHandle(69, 150, circle, 24)).toBe('resize')
+    expect(boothHandle(64, 150, circle, 24)).toBe('move')
   })
 
   it('keeps simulated people outside the live circle', () => {

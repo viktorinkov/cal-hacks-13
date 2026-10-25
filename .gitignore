@@ -1,0 +1,9 @@
+# local secrets: never commit
+.env
+.env.*
+!.env.example
+
+# installed deps, other checkouts, and the home-page image venv
+node_modules
+.worktrees
+.taste-skill/home/venv

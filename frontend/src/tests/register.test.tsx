@@ -41,6 +41,8 @@ beforeEach(() => {
   useSession.setState({
     ...initialSession,
     phase: 'live',
+    eventReady: true,
+    departureReady: true,
     myBand: { bandId: 5, status: 'claimed', expiresAt: null },
     myBandReady: true,
     medicalDocuments: [],
@@ -73,6 +75,10 @@ async function fillPersonAndPayment(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Email', { exact: true }), 'alex@example.test')
   await user.type(screen.getByLabelText('Emergency contact', { exact: true }), 'Sam Guest')
   await user.type(screen.getByLabelText('Emergency phone', { exact: true }), '415-555-0123')
+  await user.type(screen.getByLabelText('Street', { exact: true }), '1 Market St')
+  await user.type(screen.getByLabelText('City', { exact: true }), 'San Francisco')
+  await user.type(screen.getByLabelText('State', { exact: true }), 'CA')
+  await user.type(screen.getByLabelText('ZIP', { exact: true }), '94107')
   await user.type(screen.getByLabelText('Last four', { exact: true }), '4242')
   await user.type(screen.getByLabelText('Expiry', { exact: true }), '12/28')
 }
@@ -84,7 +90,8 @@ describe('band signup', () => {
       window.history.replaceState(null, '', path)
       renderRegistration()
 
-      expect(screen.getByRole('heading', { name: 'Tap your band to start.' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Your wristband opens this page.' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
       expect(claimBand).not.toHaveBeenCalled()
     },
@@ -100,6 +107,13 @@ describe('band signup', () => {
     expect(screen.queryByLabelText('Blood type', { exact: true })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Member id', { exact: true })).not.toBeInTheDocument()
     expect(claimBand).not.toHaveBeenCalled()
+  })
+
+  it('opens the wallet from the header', async () => {
+    renderRegistration()
+
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Night' })).getByRole('button', { name: 'Wallet' }))
+    expect(window.location.pathname).toBe('/wallet')
   })
 
   it('prefills typed details from an actual save for this band', () => {
@@ -144,23 +158,20 @@ describe('band signup', () => {
     expect(claimBand).not.toHaveBeenCalled()
   })
 
-  it('keeps uploads and saving locked until the physical band confirms ownership', () => {
+  it('connects a tapped band without a press or a claim button', async () => {
     useSession.setState({
       myBand: { bandId: 5, status: 'waiting_for_press', expiresAt: Date.now() + 60_000 },
       medicalCard: { ...extractedCard, status: 'confirmed' },
     })
     renderRegistration()
 
-    expect(screen.getByText(/Press the button on your band to make it yours/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Insurance card/)).toBeDisabled()
-    expect(screen.getByLabelText(/Medical history/)).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Save this band' })).toBeDisabled()
-    expect(claimBand).not.toHaveBeenCalled()
-
-    act(() => useSession.setState({ myBand: { bandId: 5, status: 'claimed', expiresAt: null } }))
+    expect(screen.queryByText(/Press the button/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try claiming again' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Connected · ready for your details/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Insurance card/)).toBeEnabled()
     expect(screen.getByLabelText(/Medical history/)).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Save this band' })).toBeEnabled()
+    await waitFor(() => expect(claimBand).toHaveBeenCalledExactlyOnceWith('BANDIT-05'))
   })
 
   it('rejects an invalid type and oversized file before any upload action', async () => {
@@ -252,7 +263,10 @@ describe('band signup', () => {
     expect(await screen.findByRole('heading', { name: 'Saved on band 05.' })).toBeInTheDocument()
     expect(registerBand).toHaveBeenCalledExactlyOnceWith('BANDIT-05', 'Alex Guest')
     expect(screen.getByText('MEMBER-123')).toBeInTheDocument()
-    expect(getSavedRegistration('band-05')).toMatchObject({ name: 'Alex Guest', last4: '4242', memberId: '' })
+    expect(getSavedRegistration('band-05')).toMatchObject({
+      name: 'Alex Guest', last4: '4242', memberId: '',
+      street: '1 Market St', city: 'San Francisco', region: 'CA', postalCode: '94107', country: 'United States',
+    })
   })
 
   it('requires confirmation and valid typed fields before saving', async () => {
@@ -264,6 +278,8 @@ describe('band signup', () => {
     act(() => useSession.setState({ medicalCard: { ...extractedCard, status: 'confirmed' } }))
     await user.click(screen.getByRole('button', { name: 'Save this band' }))
     expect(screen.getByLabelText('Name', { exact: true })).toHaveAccessibleDescription('Name the person wearing it.')
+    expect(screen.getByLabelText('Street', { exact: true })).toHaveAccessibleDescription('Give a street address.')
+    expect(screen.getByLabelText('ZIP', { exact: true })).toHaveAccessibleDescription('Use a ZIP code, like 94107.')
     expect(screen.getByLabelText('Last four', { exact: true })).toHaveAccessibleDescription('Last four is four digits.')
     expect(registerBand).not.toHaveBeenCalled()
     expect(getSavedRegistration('band-05')).toBeNull()

@@ -10,62 +10,79 @@ function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContex
 }
 
 /**
- * A standing person, shaped like an i: a slim stem with a sphere of about the same width on top.
- * Fills stay near white so the crowd tint colors them. The head is shaded so it reads as a ball.
- * The outline is painted first and the fills cover the join, so the stroke follows the outer
- * silhouette and does not cut across the neck. Anchored at the bottom.
+ * A standing person in the shape of a lowercase i: a small soft ball above a rounded stem.
+ * A gap keeps the dot a circle. Drawn at double size so the curves stay smooth when scaled.
+ * Fills stay light so the crowd tint colors them. Anchored at the bottom.
  */
 export function personTexture(): Texture {
-  const w = 56
-  const h = 76
+  const w = 104
+  const h = 200
   const [cv, g] = canvas(w, h)
   const edge = 2.4
-  // Same width as the head, but the sides stay straight so the stem is an i, not an oval.
-  const body = { x: 15, y: 27, w: 26, h: 44, r: 8 }
-  const head = { x: 28, y: 18, r: 13 }
+  // Between the large dot and the pinhead: a bit narrower than the stem, sitting just above it.
+  const body = { x: 34, y: 72, w: 36, h: 112, r: 16 }
+  const head = { x: 52, y: 44, r: 17 }
 
-  const capsule = (extra: number) => {
+  const stem = (extra: number) => {
     g.beginPath()
     g.roundRect(body.x - extra, body.y - extra, body.w + extra * 2, body.h + extra * 2, body.r + extra)
     g.fill()
   }
-  const sphere = (extra: number) => {
+  const dot = (extra: number) => {
     g.beginPath()
     g.arc(head.x, head.y, head.r + extra, 0, Math.PI * 2)
     g.fill()
   }
 
-  g.fillStyle = '#24262b'
-  capsule(edge)
-  sphere(edge)
+  g.fillStyle = '#4a4e56'
+  stem(edge)
+  dot(edge)
 
   const barrel = g.createLinearGradient(body.x, 0, body.x + body.w, 0)
-  barrel.addColorStop(0, '#cfcfcf')
-  barrel.addColorStop(0.42, '#ffffff')
-  barrel.addColorStop(1, '#c2c2c2')
+  barrel.addColorStop(0, '#d2d2d2')
+  barrel.addColorStop(0.45, '#f7f7f7')
+  barrel.addColorStop(1, '#cccccc')
   g.fillStyle = barrel
-  capsule(0)
+  stem(0)
 
-  const ball = g.createRadialGradient(head.x - 3, head.y - 5, 1, head.x + 1, head.y + 2, head.r)
+  const ball = g.createRadialGradient(head.x - 4, head.y - 5, 1, head.x + 1, head.y + 2, head.r)
   ball.addColorStop(0, '#ffffff')
-  ball.addColorStop(0.38, '#f2f2f2')
-  ball.addColorStop(0.72, '#c0c0c0')
-  ball.addColorStop(1, '#8e8e8e')
+  ball.addColorStop(0.42, '#f4f4f4')
+  ball.addColorStop(0.78, '#d8d8d8')
+  ball.addColorStop(1, '#c2c2c2')
   g.fillStyle = ball
-  sphere(0)
+  dot(0)
 
   return Texture.from(cv)
 }
 
-export function dotTexture(size = 16, radius = 6): Texture {
-  const [cv, g] = canvas(size, size)
-  const gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius)
-  gr.addColorStop(0, 'rgba(255,255,255,1)')
-  gr.addColorStop(0.7, 'rgba(255,255,255,1)')
-  gr.addColorStop(1, 'rgba(255,255,255,0)')
-  g.fillStyle = gr
+/**
+ * A comet for a walking trail. Bright at the right-hand head, thin and gone by the left.
+ * The head is the anchor, so rotated along the step the tail hangs behind the feet.
+ */
+export function trailTexture(): Texture {
+  const w = 128
+  const h = 32
+  const [cv, g] = canvas(w, h)
+  const mid = h / 2
+  const tail = g.createLinearGradient(w * 0.9, mid, 0, mid)
+  tail.addColorStop(0, 'rgba(255,255,255,1)')
+  tail.addColorStop(0.14, 'rgba(255,255,255,0.75)')
+  tail.addColorStop(0.42, 'rgba(255,255,255,0.22)')
+  tail.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = tail
   g.beginPath()
-  g.arc(size / 2, size / 2, radius, 0, Math.PI * 2)
+  g.moveTo(w * 0.9, mid)
+  g.quadraticCurveTo(w * 0.5, h * 0.26, 2, mid)
+  g.quadraticCurveTo(w * 0.5, h * 0.74, w * 0.9, mid)
+  g.fill()
+  const head = g.createRadialGradient(w * 0.86, mid, 0, w * 0.86, mid, h * 0.3)
+  head.addColorStop(0, 'rgba(255,255,255,1)')
+  head.addColorStop(0.45, 'rgba(255,255,255,0.65)')
+  head.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = head
+  g.beginPath()
+  g.arc(w * 0.86, mid, h * 0.3, 0, Math.PI * 2)
   g.fill()
   return Texture.from(cv)
 }

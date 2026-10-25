@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Button } from '@/components/ui/button'
 import { DeskTabs } from '@/components/desk/DeskTabs'
-import { OPERATOR } from '@/mock/MockBackend'
+import { useOperatorName } from '@/stdb/operatorName'
 import { BandTapDialog } from '@/components/cover/BandTapDialog'
-import { boardHeadline, boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
+import { boardSummary, checkTone, sortBoard, statusLabel, type BoardClaim } from '@/cover/liveClaims'
 import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
-import { SPACETIME_DB, useSession } from '@/stdb/session'
 import { ClaimExtras } from '@/components/claims/ClaimExtras'
+import { ClaimFiling } from '@/components/claims/ClaimFiling'
+import { useSession } from '@/stdb/session'
 
 /**
  * Claims desk. The rows are the database's claims board. A routed claim still needs
@@ -17,9 +18,7 @@ import { ClaimExtras } from '@/components/claims/ClaimExtras'
 export function ClaimsDesk() {
   const { go } = useRoute()
   const phase = useSession((state) => state.phase)
-  const error = useSession((state) => state.error)
   const actionError = useSession((state) => state.actionError)
-  const staff = useSession((state) => state.staff)
   const owner = useSession((state) => state.owner)
   const me = useSession((state) => state.me)
   const roles = useSession((state) => state.roles)
@@ -31,21 +30,12 @@ export function ClaimsDesk() {
   const refuse = useSession((state) => state.refuse)
   const ordered = useMemo(() => sortBoard(claims), [claims])
   const summary = useMemo(() => boardSummary(claims), [claims])
-  const headline = boardHeadline(summary, insurer)
   const [selectedId, setSelectedId] = useState('')
   const [narrow, setNarrow] = useState(false)
   const [tapBand, setTapBand] = useState<number | null>(null)
   const docketRef = useRef<HTMLElement>(null)
   const selected = ordered.find((claim) => claim.id === selectedId) ?? ordered[0]
-  const title = phase === 'error' ? 'The database did not connect.' : phase === 'live' ? (staff || claims.length > 0 ? headline.title : 'The board is for the ops desk.') : 'Opening the claims board.'
-  const sentence =
-    phase === 'error'
-      ? (error ?? 'The connection failed.')
-      : phase === 'live'
-        ? staff || claims.length > 0
-          ? headline.sentence
-          : 'This connection is not staff, so the board stays empty. Play as the ops desk if the test identities are on.'
-        : `Connecting to ${SPACETIME_DB}.`
+  const operator = useOperatorName()
 
   useEffect(() => {
     if (!narrow || !window.matchMedia('(max-width: 767px)').matches) return
@@ -58,30 +48,24 @@ export function ClaimsDesk() {
   }
 
   return (
-    <div data-page className="h-full overflow-y-auto bg-ground text-ink">
+    <div data-page data-motif="claims" className="desk-night h-full overflow-y-auto bg-ground text-ink">
       <div className="mx-auto w-full max-w-[1360px] px-5 py-6 md:px-10 md:py-8">
         <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="font-display text-[30px] leading-none text-ink">BandIt</span>
             <DeskTabs />
           </div>
-          <span className="text-[13px] text-ink-muted">· operator {OPERATOR}</span>
+          {operator && <span className="text-[13px] text-ink-muted">· operator {operator}</span>}
         </header>
 
-        <div className="mt-8 max-w-[40rem]">
-          <h1 className="font-display text-[32px] leading-[1.05] tracking-[-0.02em] text-ink md:text-[40px]" aria-live="polite">
-            {title}
-          </h1>
-          <p className="mt-3 max-w-[46ch] text-[15px] leading-6 text-ink-dim">{sentence}</p>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
-            <ActorSelect actors={actors} />
-            <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
-              Wristbands
-            </button>
-          </div>
+        <div className="mt-8 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[13px] text-ink-dim">
+          <ActorSelect actors={actors} />
+          <button type="button" onClick={() => go('/join')} className="hover:text-champagne">
+            Wristbands
+          </button>
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4 md:gap-0 md:divide-x md:divide-line">
+        <div className="desk-figures mt-8 grid grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-4">
           <Figure label="Needs a person" value={String(summary.waiting)} note={summary.detections === 0 ? 'nothing routed' : `of ${summary.detections} claims`} lead />
           <Figure label="Unfiled" value={formatCents(summary.unfiledCents)} note="still on the board" />
           <Figure label="Filed" value={formatCents(summary.filedCents)} note={`with ${insurer}`} />
@@ -111,7 +95,8 @@ export function ClaimsDesk() {
           </div>
 
           {selected && (
-            <Docket
+            <div>
+              <Docket
               claim={selected}
               narrow={narrow}
               busy={busy}
@@ -122,6 +107,8 @@ export function ClaimsDesk() {
               onRefuse={(reason) => void refuse(selected.id, reason)}
               onRead={(bandId) => setTapBand(bandId)}
             />
+              <ClaimFiling claimId={selected.id} />
+            </div>
           )}
         </div>
       </div>
@@ -186,7 +173,7 @@ function ClaimRow({ claim, selected, onChoose }: { claim: BoardClaim; selected: 
       type="button"
       aria-pressed={selected}
       onClick={onChoose}
-      className="grid w-full grid-cols-[4.75rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-3 text-left"
+      className="desk-row grid w-full grid-cols-[4.75rem_minmax(0,1fr)_auto] items-baseline gap-x-3 py-3 text-left"
     >
       <span className="relative font-mono text-[13px] text-ink">
         {claim.id}
@@ -228,7 +215,7 @@ function Docket({
   const steps = claim.checks.length > 0 ? claim.checks : [{ name: 'Board', result: statusLabel(claim.status), detail: claim.statusNote, reader: '' }]
   const shown = steps.slice(0, 4)
   return (
-    <section ref={docketRef} aria-label="Reconciliation" className={cn('scroll-mt-4 bg-raised px-5 py-5', !narrow && 'hidden md:block')}>
+    <section ref={docketRef} aria-label="Reconciliation" className={cn('desk-card scroll-mt-4 px-5 py-5', !narrow && 'hidden md:block')}>
       <button type="button" onClick={onBack} className="mb-4 text-[14px] text-ink-dim md:hidden">
         All claims
       </button>

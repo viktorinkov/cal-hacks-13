@@ -1,8 +1,9 @@
 import type { Device, Incident, SectionKind, Venue, VenueZone, WorldSnapshot, ZoneState } from '@/contracts/domain'
 import { rect } from '@/lib/geometry'
 import { CALHACKS_CAPACITY, calhacksHome, calhacksVenue } from '@/mock/calhacks'
-import { bindCrowdCast, crowdOccupancy, crowdSize, startCalhacksCrowd } from '@/mock/calhacksCrowd'
-import { isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
+import { bindCrowdCast, crowdIsSeeded, crowdOccupancy, crowdSize, startCalhacksCrowd } from '@/mock/calhacksCrowd'
+import { HARDWARE_ID_MAX, demoDevices, isHardware, layoutDemo, mergeHardwareAlerts, shownHardware, useDemoRing } from '@/booth/demoRing'
+import { applyHallDemo, overlayScripted, scriptedBands } from '@/booth/hallDemo'
 import { setLiveBands } from '@/booth/place'
 import { currentPlan } from '@/map/venuePlan'
 import { resetServerTime, setClockRate } from '@/stores/clock'
@@ -12,9 +13,9 @@ import { useWorld } from '@/stores/world'
 
 /**
  * The live floor. SpacetimeDB stores a zone as a point and an area, and a band as the station it
- * last reported. On the CalHacks plan the ids stay in that room's roster and off the map. The square
- * projection remains for tests. While that plan is selected, the in-browser simulator does not
- * paint over it.
+ * last reported. On the CalHacks plan the crowd rows seed the people, and a position tick that
+ * does not change who is present does not rebuild the hall. Wristband icons are only the hardware
+ * in the ring. The square projection remains for tests.
  */
 
 export interface FloorZone {
@@ -55,6 +56,8 @@ export interface FloorIncident {
   bandId: number
   openedAt: number | null
   resolved: boolean
+  /** `open`, `responding`, or `resolved`, from the incident row. */
+  status: string
 }
 
 export interface FloorInput {
@@ -70,6 +73,26 @@ let seq = 0
 let lastInput: FloorInput | null = null
 let venueKey = ''
 let venueCache: Venue | null = null
+/** Who is on the floor, ignoring coordinates. A crowd tick that only moves people does not rebuild the map. */
+let floorStamp = ''
+
+function stampOf(input: FloorInput): string {
+  let crowd = 0
+  let hash = 2166136261
+  let hardware = ''
+  for (const band of input.bands) {
+    if (band.id > HARDWARE_ID_MAX) {
+      crowd += 1
+      hash ^= band.id
+      hash = Math.imul(hash, 16777619)
+      continue
+    }
+    hardware += `${band.id}:${band.online ? 1 : 0}:${band.sos ? 1 : 0}:${band.fall ? 1 : 0}:${band.state}:${band.zone};`
+  }
+  let incidents = ''
+  for (const incident of input.incidents) incidents += `${incident.id}:${incident.status}:${incident.kind};`
+  return `${input.zones.length}:${input.venueName}:${crowd}:${hash >>> 0}:${hardware}:${incidents}`
+}
 
 export function isFloorLive(): boolean {
   return currentPlan() === 'calhacks'
@@ -96,22 +119,33 @@ function tag(value: unknown): string {
   return text(value).toLowerCase()
 }
 
+function standing(incident: FloorIncident): Incident['status'] {
+  if (incident.resolved || incident.status === 'resolved') return 'resolved'
+  if (incident.status === 'responding') return 'responding'
+  return 'reported'
+}
+
 function finite(value: unknown): number | null {
   if (value == null) return null
   const n = num(value)
   return Number.isFinite(n) ? n : null
 }
 
+/** Beacon flag bits, the same ones `ingest_band` copies onto the public `band` row. */
+const F_SOS = 1
+const F_FALL = 2
+
 /** One `band` row. `id` is a u32. `x_m` and `y_m` are optional in older rows. */
 export function bandFromRow(row: Record<string, unknown>, wearer: string | null): FloorBand {
   const xM = finite(row.xM)
   const yM = finite(row.yM)
+  const flags = num(row.flags)
   return {
     id: num(row.id),
     zone: num(row.zone),
     online: row.online === true,
-    sos: row.sos === true,
-    fall: row.fall === true,
+    sos: row.sos === true || (flags & F_SOS) !== 0,
+    fall: row.fall === true || (flags & F_FALL) !== 0,
     lastSeen: millis(row.lastSeen),
     hasMotor: row.hasMotor === true,
     hasMpu: row.hasMpu === true,
@@ -265,7 +299,7 @@ export function projectFloor(input: FloorInput): WorldSnapshot | null {
       displayId: `INC-${incident.id}`,
       reportedByDeviceId: incident.bandId ? `band-${incident.bandId}` : null,
       reportedAt: incident.openedAt ?? now,
-      status: incident.resolved ? 'resolved' : 'reported',
+      status: standing(incident),
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zone.id,
@@ -303,7 +337,7 @@ export function projectFloor(input: FloorInput): WorldSnapshot | null {
   }
 }
 
-/** Bands and incidents from the database. Ids stay in the roster; the floor draws one page of characters. */
+/** Bands and incidents from the database. Crowd rows seed the people on the floor. Wristband icons stay with the hardware in the ring. */
 export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   const now = input?.now ?? Date.now()
   const byStation = new Map((input?.zones ?? []).map((zone) => [zone.stationId, zone]))
@@ -311,6 +345,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   const grouped = new Map<string, FloorBand[]>()
   const capacity = new Map<string, number>()
   for (const band of input?.bands ?? []) {
+    if (band.id > HARDWARE_ID_MAX) continue
     const source = byStation.get(band.zone)
     if (!source) continue
     const home = calhacksHome(source.name)
@@ -347,6 +382,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   }
 
   const wandering = crowdOccupancy()
+  const seeded = crowdIsSeeded()
   const zones: ZoneState[] = calhacksVenue.zones.map((zone) => {
     const bands = grouped.get(zone.zoneId) ?? []
     const room = capacity.get(zone.zoneId) || CALHACKS_CAPACITY[zone.zoneId] || 1
@@ -373,6 +409,8 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
   const ring = useDemoRing.getState()
   const laid = layoutDemo(input?.bands ?? [], ring)
   for (const incident of input?.incidents ?? []) {
+    // The crowd roster starts at 100. Those rows are the local people, not operator incidents.
+    if (incident.bandId > HARDWARE_ID_MAX) continue
     const source = byId.get(incident.zoneId) ?? byStation.get(incident.stationId)
     const home = calhacksHome(source?.name ?? '')
     const place = calhacksVenue.zones.find((zone) => zone.zoneId === home)
@@ -385,7 +423,7 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       displayId: `INC-${incident.id}`,
       reportedByDeviceId: incident.bandId ? `band-${incident.bandId}` : null,
       reportedAt: incident.openedAt ?? now,
-      status: incident.resolved ? 'resolved' : 'reported',
+      status: standing(incident),
       source: kind === 'sos' ? 'manual_sos' : kind === 'fall' ? 'imu_suspicion' : kind === 'property' ? 'camera_suspicion' : 'staff',
       radioStatus: 'received',
       candidateZone: place?.zoneId,
@@ -397,25 +435,52 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
       isSimulated: false,
     })
   }
-  const reported = mergeHardwareAlerts(incidents, input?.bands ?? [], ring, now)
+  const overlaid = overlayScripted(input?.bands ?? [])
+  const reported = mergeHardwareAlerts(incidents, overlaid, ring, now)
+  const guided = applyHallDemo(reported, [])
+  for (const device of demoDevices(scriptedBands(), ring)) {
+    const index = devices.findIndex((item) => item.deviceId === device.deviceId)
+    if (index >= 0) {
+      devices[index] = {
+        ...devices[index],
+        currentPattern: device.currentPattern,
+        sosActive: device.sosActive,
+        connectionStatus: 'connected',
+        location: device.location,
+        wearerLabel: 'Demo',
+      }
+      continue
+    }
+    devices.push(device)
+  }
 
   seq += 1
   return {
     timestamp: now,
     seq,
-    mode: wandering ? (input ? 'hybrid' : 'simulation') : input ? 'live' : 'simulation',
+    mode: seeded ? 'live' : wandering ? (input ? 'hybrid' : 'simulation') : input ? 'live' : 'simulation',
     venue: calhacksVenue,
     zones,
     devices,
-    incidents: reported,
+    incidents: guided.incidents,
     observations: [],
-    commands: [],
+    commands: guided.commands,
     sources: [
       ...(input
         ? [{ sourceId: 'spacetimedb', kind: 'backend' as const, label: 'SpacetimeDB', status: 'ok' as const, lastUpdateAt: now, isSimulated: false, detail: `${shownHardware(input.bands).length} live in the demo · ${input.venueName}` }]
         : []),
       ...(wandering
-        ? [{ sourceId: 'crowd', kind: 'crowd' as const, label: 'Crowd', status: 'ok' as const, lastUpdateAt: now, isSimulated: true, detail: `${crowdSize().toLocaleString('en-US')} simulated attendees` }]
+        ? [{
+            sourceId: 'crowd',
+            kind: 'crowd' as const,
+            label: 'Crowd',
+            status: 'ok' as const,
+            lastUpdateAt: now,
+            isSimulated: !crowdIsSeeded(),
+            detail: crowdIsSeeded()
+              ? `${crowdSize().toLocaleString('en-US')} people seeded from the venue`
+              : `${crowdSize().toLocaleString('en-US')} simulated attendees`,
+          }]
         : []),
     ],
   }
@@ -423,15 +488,18 @@ export function placeOnCalhacks(input: FloorInput | null): WorldSnapshot {
 
 /** Shows the CalHacks plan, with live bands once a subscription has arrived. */
 export function presentCalhacks(): void {
+  const world = useWorld.getState()
+  // A hot-reloaded copy of this module has no rows yet. It must not wipe the floor the live socket is drawing.
+  if (!lastInput && world.venue?.venueId === 'calhacks' && (Object.keys(world.devices).length > 0 || Object.keys(world.incidents).length > 0)) return
   resetServerTime(Date.now())
   setClockRate(1)
-  if (useWorld.getState().venue?.venueId !== 'calhacks') {
+  if (world.venue?.venueId !== 'calhacks') {
     frames.clear()
     baselineFrames.clear()
   }
   startCalhacksCrowd()
-  useWorld.getState().applySnapshot(placeOnCalhacks(lastInput))
   bindCrowdCast(lastInput?.bands ?? [])
+  useWorld.getState().applySnapshot(placeOnCalhacks(lastInput))
 }
 
 /** Reads the subscribed tables and, once a venue plan is there, makes it the map. */
@@ -462,6 +530,7 @@ export function syncFloor(db: Record<string, unknown>): boolean {
     bandId: num(row.subjectBand),
     openedAt: millis(row.openedAt),
     resolved: row.resolved === true,
+    status: tag(row.status),
   }))
   setLiveBands(bands)
   if (zones.length === 0) return false
@@ -473,7 +542,10 @@ export function syncFloor(db: Record<string, unknown>): boolean {
     incidents,
   }
   if (currentPlan() !== 'calhacks') return false
-  presentCalhacks()
+  const nextStamp = stampOf(lastInput)
+  const changed = nextStamp !== floorStamp
+  floorStamp = nextStamp
+  if (changed) presentCalhacks()
   const at = Date.now()
   useConnection.setState({
     connection: { phase: 'open', attempt: 1, lastMessageAt: at, nextRetryAt: null },

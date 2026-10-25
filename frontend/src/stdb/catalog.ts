@@ -48,6 +48,8 @@ export interface Photo {
   zoneName: string
   caption: string
   people: string[]
+  /** Graph nodes of the people the bands put in the frame. */
+  nodeIds: string[]
 }
 
 export interface MerchPiece {
@@ -105,6 +107,69 @@ export interface BillLine {
   outcome: string
 }
 
+export interface RuleProposal {
+  id: string
+  incidentKind: string
+  coverKind: string
+  status: string
+  ceilingCents: number
+  limitCents: number
+  claimIds: string[]
+  rule: string
+  summary: string
+  decidedByName: string
+  reason: string
+  ruleVersion: number
+  createdAt: number
+}
+
+export interface PaymentRule {
+  id: string
+  incidentKind: string
+  coverKind: string
+  requiresCorroborated: boolean
+  ceilingCents: number
+  approverName: string
+  approverRole: string
+  version: number
+  status: string
+  createdAt: number
+  proposalId: string
+}
+
+export interface Precedent {
+  id: string
+  claimId: string
+  incidentKind: string
+  coverKind: string
+  decision: string
+  payoutCents: number
+  claimantName: string
+  zoneName: string
+  complications: string
+  reason: string
+  decidedByName: string
+  proposalId: string
+  decidedAt: number
+}
+
+export interface VenuePolicyBrief {
+  policyNumber: string
+  insurerName: string
+  medicalUsedCents: number
+  propertyUsedCents: number
+}
+
+export interface DepartureRow {
+  nodeId: string
+  name: string
+  bandId: number
+  door: string
+  askedAt: number
+  leftAt: number
+  by: string
+}
+
 export interface Catalog {
   attendees: Attendee[]
   guests: Guest[]
@@ -119,6 +184,14 @@ export interface Catalog {
   companies: Named[]
   ledger: LedgerLine[]
   bills: BillLine[]
+  proposals: RuleProposal[]
+  paymentRules: PaymentRule[]
+  precedents: Precedent[]
+  policy: VenuePolicyBrief | null
+  departures: DepartureRow[]
+  lowVis: boolean
+  eventEnded: boolean
+  eventEndedAt: number
 }
 
 const EMPTY: Catalog = {
@@ -135,6 +208,14 @@ const EMPTY: Catalog = {
   companies: [],
   ledger: [],
   bills: [],
+  proposals: [],
+  paymentRules: [],
+  precedents: [],
+  policy: null,
+  departures: [],
+  lowVis: false,
+  eventEnded: false,
+  eventEndedAt: 0,
 }
 
 export const useCatalog = create<Catalog>(() => EMPTY)
@@ -162,6 +243,11 @@ function idOf(value: unknown): string {
 }
 
 function millis(value: unknown): number {
+  if (value && typeof value === 'object' && 'tag' in value) {
+    const tagged = value as { tag?: unknown; value?: unknown }
+    if (tagged.tag === 'none' || tagged.tag === 'None') return 0
+    if (tagged.tag === 'some' || tagged.tag === 'Some') return millis(tagged.value)
+  }
   if (value && typeof value === 'object' && 'toDate' in value) {
     const fn = (value as { toDate: unknown }).toDate
     if (typeof fn === 'function') {
@@ -184,12 +270,34 @@ function handles(value: unknown): Handle[] {
   })
 }
 
+/** The crowd demo's stick-figure illustration, also stored once as a blob. */
+const PLACEHOLDER_BLOB = '/blobs/57ffcb4537f3a613394b721542274643dc36758944c1a5bd64d487169be8238a'
+
+/** The crowd demo files this illustration for every generated group. The album shows the event frames instead. */
+function isPlaceholder(url: string): boolean {
+  return url.endsWith('/sponsor-row.jpg') || url === PLACEHOLDER_BLOB
+}
+
+function idList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.map(idOf).filter((id) => id !== '')
+}
+
 function people(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object') return []
     const name = text((item as { name?: unknown }).name)
     return name ? [name] : []
+  })
+}
+
+function personNodes(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const id = idOf((item as { nodeId?: unknown }).nodeId)
+    return id ? [id] : []
   })
 }
 
@@ -220,6 +328,7 @@ export function readCatalog(db: unknown): Catalog {
     zoneName: text(row.zoneName),
     caption: text(row.caption),
     people: people(row.people),
+    nodeIds: personNodes(row.people),
   }))
   const social = rowsOf(tables.socialPhotos).map((row) => ({
     id: idOf(row.id),
@@ -228,6 +337,20 @@ export function readCatalog(db: unknown): Catalog {
     zoneName: zoneById.get(idOf(row.zoneId)) ?? '',
     caption: text(row.caption),
     people: [],
+    nodeIds: [],
+  }))
+  const named = new Map(attendees.map((attendee) => [attendee.nodeId, attendee.displayName]))
+  const board = rowsOf(tables.boardPhotos).map((row) => ({
+    id: idOf(row.id),
+    url: text(row.url),
+    takenAt: millis(row.takenAt),
+    zoneName: text(row.zoneName),
+    caption: text(row.caption),
+    people: idList(row.nodeIds).flatMap((id) => {
+      const name = named.get(id)
+      return name ? [name] : []
+    }),
+    nodeIds: idList(row.nodeIds),
   }))
   const seen = new Set(social.map((photo) => photo.id))
   const links: GraphLink[] = []
@@ -268,7 +391,9 @@ export function readCatalog(db: unknown): Catalog {
       lastSeen: millis(row.lastSeen),
     })),
     zones,
-    photos: social.length > 0 ? social : myPhotos.filter((photo) => !seen.has(photo.id)),
+    photos: (board.length > 0 ? board : social.length > 0 ? social : myPhotos.filter((photo) => !seen.has(photo.id)))
+      .filter((photo) => !isPlaceholder(photo.url))
+      .sort((a, b) => b.takenAt - a.takenAt),
     merch: rowsOf(tables.merchTemplate).map((row) => ({
       id: idOf(row.id),
       name: text(row.name),
@@ -309,6 +434,71 @@ export function readCatalog(db: unknown): Catalog {
       coveredCents: num(row.coveredCents),
       outcome: text(row.outcome),
     })),
+    proposals: rowsOf(tables.boardRuleProposals).map((row) => ({
+      id: idOf(row.id),
+      incidentKind: text(row.incidentKind),
+      coverKind: text(row.coverKind),
+      status: text(row.status),
+      ceilingCents: num(row.ceilingCents),
+      limitCents: num(row.limitCents),
+      claimIds: idList(row.claimIds),
+      rule: text(row.rule),
+      summary: text(row.summary),
+      decidedByName: text(row.decidedByName),
+      reason: text(row.reason),
+      ruleVersion: num(row.ruleVersion),
+      createdAt: millis(row.createdAt),
+    })),
+    paymentRules: rowsOf(tables.boardRules).map((row) => ({
+      id: idOf(row.id),
+      incidentKind: text(row.incidentKind),
+      coverKind: text(row.coverKind),
+      requiresCorroborated: row.requiresCorroborated === true,
+      ceilingCents: num(row.ceilingCents),
+      approverName: text(row.approverName),
+      approverRole: text(row.approverRole),
+      version: num(row.version),
+      status: text(row.status),
+      createdAt: millis(row.createdAt),
+      proposalId: idOf(row.proposalId),
+    })),
+    precedents: rowsOf(tables.boardOrganizerPrecedents).map((row) => ({
+      id: idOf(row.id),
+      claimId: idOf(row.claimId),
+      incidentKind: text(row.incidentKind),
+      coverKind: text(row.coverKind),
+      decision: text(row.decision),
+      payoutCents: num(row.payoutCents),
+      claimantName: text(row.claimantName),
+      zoneName: text(row.zoneName),
+      complications: text(row.complications),
+      reason: text(row.reason),
+      decidedByName: text(row.decidedByName),
+      proposalId: idOf(row.proposalId),
+      decidedAt: millis(row.decidedAt),
+    })),
+    policy: (() => {
+      const row = rowsOf(tables.boardPolicies)[0]
+      if (!row) return null
+      return {
+        policyNumber: text(row.policyNumber),
+        insurerName: text(row.insurerName),
+        medicalUsedCents: num(row.medicalUsedCents),
+        propertyUsedCents: num(row.propertyUsedCents),
+      }
+    })(),
+    departures: rowsOf(tables.departure).map((row) => ({
+      nodeId: idOf(row.nodeId),
+      name: text(row.name),
+      bandId: num(row.bandId),
+      door: text(row.door),
+      askedAt: millis(row.askedAt),
+      leftAt: millis(row.leftAt),
+      by: text(row.by),
+    })),
+    lowVis: rowsOf(tables.settings)[0]?.lowVis === true,
+    eventEnded: rowsOf(tables.eventState)[0]?.ended === true,
+    eventEndedAt: millis(rowsOf(tables.eventState)[0]?.endedAt),
   }
 }
 

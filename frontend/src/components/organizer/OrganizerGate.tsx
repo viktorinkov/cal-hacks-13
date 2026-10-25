@@ -17,6 +17,8 @@ function GateCopy({ children }: { children: ReactNode }) {
 
 /** Email sign-in, the same client the live organizer portal uses. A `?as=` test identity skips it. */
 export function OrganizerGate({ children }: { children: ReactNode }) {
+  const { path } = useRoute()
+  const photographer = path === '/photo'
   const [host, setHost] = useState<HostConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const as = new URLSearchParams(window.location.search).get('as')
@@ -36,7 +38,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
       <GateCopy>
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
         <p className="text-[15px] text-ink-dim" role="status">
-          Opening the organizer…
+          {photographer ? 'Opening the photographer…' : 'Opening the organizer…'}
         </p>
       </GateCopy>
     )
@@ -47,9 +49,11 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     return (
       <GateCopy>
         <span className="font-display text-[34px] leading-none text-ink">BandIt</span>
-        <h1 className="font-display text-[28px] leading-none text-ink">Organizer</h1>
+        <h1 className="font-display text-[28px] leading-none text-ink">{photographer ? 'Photographer' : 'Organizer'}</h1>
         <p className="text-[15px] leading-relaxed text-ink-dim">
-          Sign in with your staff email. This desk uses the same database as the live organizer portal.
+          {photographer
+            ? 'Sign in with your staff email. Frames you file land on the organizer photos page.'
+            : 'Sign in with your staff email. This desk uses the same database as the live organizer portal.'}
         </p>
         {error && <p className="text-[13px] text-ink">{error}</p>}
         <button
@@ -72,14 +76,15 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
           </p>
         )}
         {!here && (
-          <button type="button" className={gateButton} onClick={() => window.location.assign('/organizer?as=ops')}>
-            Continue as ops
+          <button type="button" className={gateButton} onClick={() => window.location.assign(photographer ? '/photo?as=photographer' : '/organizer?as=ops')}>
+            {photographer ? 'Continue as photographer' : 'Continue as ops'}
           </button>
         )}
       </GateCopy>
     )
   }
 
+  if (photographer) return children
   return <JoinOrganizerGate>{children}</JoinOrganizerGate>
 }
 
@@ -90,8 +95,10 @@ export function SignInCallback() {
   useEffect(() => {
     let cancel = false
     void finishSignIn()
-      .then(() => {
-        if (!cancel) go('/organizer')
+      .then((back) => {
+        if (cancel) return
+        window.history.replaceState(null, '', back)
+        window.dispatchEvent(new PopStateEvent('popstate'))
       })
       .catch((reason: unknown) => {
         if (!cancel) setError(reason instanceof Error ? reason.message : 'Sign-in did not complete.')
@@ -99,7 +106,7 @@ export function SignInCallback() {
     return () => {
       cancel = true
     }
-  }, [go])
+  }, [])
 
   return (
     <GateCopy>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { IncidentPanel } from '@/components/incidents/IncidentPanel'
 import { DemoDock } from '@/components/simulation/DemoDock'
+import { HallDemoDock } from './HallDemoDock'
+import { PurchaseFeed } from './PurchaseFeed'
 import { useIncidentFocus } from '@/hooks/useIncidentFocus'
 import { VenueMap } from '@/map/VenueMap'
 import { useUi } from '@/stores/ui'
@@ -45,6 +47,7 @@ function useInset(side: 'left' | 'right' | 'top' | 'bottom', ref: React.RefObjec
  */
 export function CommandCenter() {
   const mode = useWorld((s) => s.mode)
+  const venueId = useWorld((s) => s.venue?.venueId)
   const sideOpen = useUi((s) => s.sidePanelOpen)
   const incidentShown = useWorld((s) => Object.values(s.incidents).length > 0)
   const announcement = useIncidentFocus()
@@ -65,7 +68,7 @@ export function CommandCenter() {
   const bottomRef = useRef<HTMLDivElement>(null)
   // the open panel (or, folded, the toolbar at the left edge) bounds the open map area
   useInset('left', sideOpen ? leftRef : toolbarRef)
-  useInset('right', rightRef, incidentShown)
+  useInset('right', rightRef, incidentShown || venueId === 'calhacks')
   useInset('top', topRef)
   useInset('bottom', bottomRef)
 
@@ -99,13 +102,15 @@ export function CommandCenter() {
         </div>
 
         {/* the incident sits in the bottom right corner and grows upward */}
-        <div ref={rightRef} className="col-start-3 row-span-2 row-start-2 flex min-h-0 flex-col items-end justify-end">
+        <div ref={rightRef} className="col-start-3 row-span-2 row-start-2 flex min-h-0 flex-col items-end justify-end gap-3">
           {incidentShown && <IncidentPanel />}
+          <HallDemoDock />
         </div>
 
         <div ref={bottomRef} className="col-span-2 col-start-1 row-start-3 flex min-w-0 items-end gap-4">
           <DemoDock />
           <PressureTimeline />
+          <PurchaseFeed />
         </div>
       </div>
 

@@ -1,20 +1,25 @@
 /**
- * Simulated attendees on the CalHacks floor. The crowd fills the hall. Only the current page of
- * band ids is bound onto characters, so the roster never becomes a sprite per wristband.
+ * People on the CalHacks floor. Until the database has a crowd, the hall is filled locally.
+ * Once it does, those rows seed who is here: a capped sample, placed from their coordinates
+ * when those land on this plan, then walked on the client. Later position ticks do not
+ * rebuild them, and they are not drawn as wristband icons.
  * They are not the concert simulator.
  */
 import { EntityKind, type EntityFrame, type VenueZone } from '@/contracts/domain'
 import { bbox, newProjectResult, Path, pointInPolygon, type ProjectResult } from '@/lib/geometry'
 import { frames } from '@/stores/frames'
 import { useWorld } from '@/stores/world'
-import { currentCast, setCastRoster, turnCastPage, type CastBand } from '@/stdb/cast'
-import { DEMO_LANE, demoIsActive, demoPath, useDemoRing } from '@/booth/demoRing'
-import { liveBands } from '@/booth/place'
+import { MAP_PEOPLE, sampleCast, type CastBand } from '@/stdb/cast'
+import { DEMO_LANE, demoIsActive, demoRoute, HARDWARE_ID_MAX, useDemoRing } from '@/booth/demoRing'
+import { onStair } from '@/booth/hallRoute'
+import { bandsOnFloor, useHallDemo } from '@/booth/hallDemo'
+import { buyerName, duePurchase, followBuyers, openingClock, pickPiece, placePurchase, type ShopClock } from '@/payments/floorShop'
 import { calhacksTables, calhacksVenue, type TableSpot } from './calhacks'
+import { palaceSponsors } from './palaceTrace'
 import { Rng } from './sim/rng'
 
 /** Simulated attendees on the floor. A smaller page of them carries the live band ids. */
-const COUNT = 1500
+const COUNT = 1000
 const DT = 0.1
 const WALK = ['theater', 'food', 'entrance', 'sponsor', 'broadway', 'atrium', 'mezzanine']
 
@@ -45,6 +50,10 @@ interface Person {
   meetBy: number
   /** Band this character is standing in for. 0 means the page has not assigned one. */
   bandId: number
+  /** Already bought this run. Each person buys once. */
+  bought: boolean
+  /** Walking to a sponsor booth to pay. */
+  errand: { x: number; y: number; since: number } | null
 }
 
 interface Anchor {
@@ -149,7 +158,7 @@ export function floorUse(x: number, y: number): 'walk' | 'seat' | 'closed' | 'ou
 }
 
 function walkable(x: number, y: number): boolean {
-  return floorUse(x, y) === 'walk'
+  return floorUse(x, y) === 'walk' && !onStair(x, y)
 }
 
 /** Points on the chair band, inset from the table ends so nobody sits in the aisle. */
@@ -282,9 +291,18 @@ function shuffle<T>(items: T[], rng: Rng): T[] {
   return copy
 }
 
+export interface CrowdSeed extends CastBand {
+  online?: boolean
+  xM?: number | null
+  yM?: number | null
+  hasPosition?: boolean
+}
+
 export class CalhacksCrowd {
-  readonly people: Person[]
+  people: Person[]
   private readonly rng: Rng
+  /** Ids of the database sample currently on the floor. Empty while the crowd is still local. */
+  private seedKey = ''
   private readonly lanes: Lane[]
   private seq = 0
   private t = 0
@@ -295,17 +313,45 @@ export class CalhacksCrowd {
   private keep: { x: number; y: number; r: number } | null = null
   /** Cleared walk from the entrance, revealed from the door toward the ring. */
   private lane: Path | null = null
+  /** Floor height at each point of the lane. A person on another floor does not step aside for it. */
+  private laneZ: number[] | null = null
   private laneReveal = 0
   private readonly hit: ProjectResult = newProjectResult()
+  /** Purchases at sponsor booths. Off until the hall is actually running, so tests stay still. */
+  private shopping = false
+  private shop: ShopClock = openingClock()
+  private shopOrigin = 0
+  private boothStands: { name: string; x: number; y: number }[] | null = null
 
-  /** Point the characters at this page of band ids. Positions stay where the people already are. */
-  assign(ids: number[]): void {
+  /** The hall starts buying at sponsor booths. */
+  enableShopping(): void {
+    this.shopping = true
+  }
+
+  /** True once the people on the floor were taken from database rows. */
+  seeded(): boolean {
+    return this.seedKey !== ''
+  }
+
+  /**
+   * Replace the local crowd with a capped sample of database people.
+   * The same ids are a no-op, including when only their coordinates changed,
+   * so a live position tick cannot rebuild the hall.
+   */
+  adopt(bands: CrowdSeed[], limit = MAP_PEOPLE): boolean {
+    const pool = bands.filter((band) => band.id > HARDWARE_ID_MAX)
+    if (pool.length === 0) return false
+    const chosen = sampleCast(pool, limit)
+    const key = chosen.map((band) => band.id).join(',')
+    if (key === this.seedKey) return false
+    this.seedKey = key
+    this.people = this.peopleFrom(chosen)
     this.byBand.clear()
-    for (let i = 0; i < this.people.length; i++) {
-      const id = ids[i] ?? 0
-      this.people[i]!.bandId = id
-      if (id) this.byBand.set(id, this.people[i]!)
-    }
+    for (const person of this.people) if (person.bandId) this.byBand.set(person.bandId, person)
+    this.conversations()
+    this.tally()
+    this.seq += 1
+    return true
   }
 
   character(bandId: number): { x: number; y: number } | null {
@@ -330,10 +376,11 @@ export class CalhacksCrowd {
   }
 
   /** Keep the ring empty, and while a hardware SOS is up, clear the entrance path as it draws in. */
-  setDemo(circle: { x: number; y: number; r: number } | null, points: { x: number; y: number }[] | null): void {
+  setDemo(circle: { x: number; y: number; r: number } | null, points: { x: number; y: number }[] | null, z: number[] | null = null): void {
     this.keep = circle
     if (!points || points.length < 2) {
       this.lane = null
+      this.laneZ = null
       this.laneReveal = 0
       return
     }
@@ -343,6 +390,7 @@ export class CalhacksCrowd {
       points.every((point, i) => Math.hypot(point.x - this.lane!.points[i]!.x, point.y - this.lane!.points[i]!.y) < 0.25)
     if (!same) {
       this.lane = new Path(points)
+      this.laneZ = z
       this.laneReveal = 0
     }
   }
@@ -359,7 +407,13 @@ export class CalhacksCrowd {
   step(): void {
     this.t += DT * 1000
     if (this.lane) this.laneReveal = Math.min(this.lane.length, this.laneReveal + 4)
+    this.shopTick()
     for (const person of this.people) {
+      if (person.errand && this.t - person.errand.since > 12000) {
+        person.errand = null
+        this.depart(person)
+        continue
+      }
       if (this.yieldLane(person)) continue
       if (this.leaveRing(person)) continue
       if (person.pose === SEATED) {
@@ -404,9 +458,12 @@ export class CalhacksCrowd {
       person.vy = (dy / dist) * pace
       const nx = person.x + person.vx * DT
       const ny = person.y + person.vy * DT
-      if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny)) {
+      if (pointInPolygon(nx, ny, room.polygon) && this.openSpot(nx, ny, person.zone)) {
         person.x = nx
         person.y = ny
+      } else if (person.errand) {
+        person.vx = 0
+        person.vy = 0
       } else {
         this.retarget(person)
         person.vx = 0
@@ -414,6 +471,7 @@ export class CalhacksCrowd {
       }
     }
     this.tally()
+    this.syncPurchaseMarks()
     this.seq += 1
   }
 
@@ -423,6 +481,7 @@ export class CalhacksCrowd {
     const velocities = new Float32Array(count * 2)
     const kinds = new Uint8Array(count)
     const pose = new Uint8Array(count)
+    const heights = new Float32Array(count)
     for (let i = 0; i < count; i++) {
       const person = this.people[i]
       positions[2 * i] = person.x
@@ -431,8 +490,43 @@ export class CalhacksCrowd {
       velocities[2 * i + 1] = person.vy
       kinds[i] = EntityKind.SimAttendee
       pose[i] = person.pose
+      heights[i] = rooms[person.zone]?.elevationM ?? 0
     }
-    return { seq: this.seq, t: this.t, source: 'simulation', count, positions, velocities, kinds, pose }
+    return { seq: this.seq, t: this.t, source: 'simulation', count, positions, velocities, kinds, pose, heights }
+  }
+
+  /** One person per database row. A coordinate on this plan is the start; anything else is placed locally. */
+  private peopleFrom(seeds: CrowdSeed[]): Person[] {
+    const seats = shuffle(anchors(calhacksTables.flatMap(chairs)), this.rng)
+    const standing = shuffle(anchors(calhacksTables.flatMap(ends)), this.rng)
+    const nSit = Math.min(seats.length, Math.round(seeds.length * 0.56))
+    const nStand = Math.min(standing.length, Math.round(seeds.length * 0.16))
+    const people: Person[] = []
+    let sit = 0
+    let stand = 0
+    for (const seed of seeds) {
+      const known = this.planted(seed)
+      const person = known ?? (sit < nSit ? this.still(seats[sit++]!, SEATED) : stand < nStand ? this.still(standing[stand++]!, STANDING) : this.walker())
+      person.bandId = seed.id
+      people.push(person)
+    }
+    return people
+  }
+
+  /** The database coordinate, when it is a place someone can actually stand or sit on this plan. */
+  private planted(seed: CrowdSeed): Person | null {
+    if (!seed.hasPosition || seed.xM == null || seed.yM == null) return null
+    const zone = zoneAt(seed.xM, seed.yM)
+    if (zone < 0) return null
+    const use = floorUse(seed.xM, seed.yM)
+    if (use !== 'walk' && use !== 'seat') return null
+    const person = this.still({ x: seed.xM, y: seed.yM, zone }, use === 'seat' ? SEATED : WALKING)
+    if (use === 'walk') {
+      person.speed = this.rng.range(0.35, 1.55)
+      person.pose = WALKING
+      this.retarget(person)
+    }
+    return person
   }
 
   private still(at: Anchor, pose: number): Person {
@@ -453,6 +547,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
   }
 
@@ -474,6 +570,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
     this.retarget(person)
     return person
@@ -512,6 +610,8 @@ export class CalhacksCrowd {
       group: 0,
       meetBy: 0,
       bandId: 0,
+      bought: false,
+      errand: null,
     }
     this.retarget(person)
     return person
@@ -526,8 +626,8 @@ export class CalhacksCrowd {
     return 0
   }
 
-  private openSpot(x: number, y: number): boolean {
-    return walkable(x, y) && !this.insideRing(x, y) && !this.insideLane(x, y)
+  private openSpot(x: number, y: number, zone = zoneAt(x, y)): boolean {
+    return walkable(x, y) && !this.insideRing(x, y) && !this.insideLane(x, y, zone)
   }
 
   private insideRing(x: number, y: number): boolean {
@@ -536,31 +636,64 @@ export class CalhacksCrowd {
     return Math.hypot(x - circle.x, y - circle.y) < circle.r + 0.35
   }
 
-  private insideLane(x: number, y: number): boolean {
+  /** Height of the cleared path at a distance along it. */
+  private pathZ(along: number): number {
+    const lane = this.lane
+    const z = this.laneZ
+    if (!lane || !z || z.length !== lane.points.length) return 0
+    const cum = lane.cumulative
+    const t = Math.max(0, Math.min(lane.length, along))
+    let k = 0
+    while (k < cum.length - 2 && cum[k + 1]! < t) k++
+    const span = (cum[k + 1] ?? t) - (cum[k] ?? 0) || 1
+    const f = (t - (cum[k] ?? 0)) / span
+    const z0 = z[k] ?? 0
+    const z1 = z[Math.min(k + 1, z.length - 1)] ?? z0
+    return z0 + (z1 - z0) * f
+  }
+
+  private floorOf(zone: number): number {
+    return rooms[zone]?.elevationM ?? 0
+  }
+
+  /**
+   * Somewhere this person can put a foot: their own floor, not a stair and not off the railing.
+   * Furniture inside the ring does not count, because that spot is being cleared.
+   */
+  private foot(x: number, y: number, person: Person, ignoreFurniture: boolean): boolean {
+    if (onStair(x, y)) return false
+    const room = rooms[person.zone]
+    if (!room || !pointInPolygon(x, y, room.polygon)) return false
+    if (ignoreFurniture) return true
+    const use = floorUse(x, y)
+    return use === 'walk' || use === 'seat'
+  }
+
+  private insideLane(x: number, y: number, zone: number): boolean {
     const lane = this.lane
     if (!lane || this.laneReveal <= 0) return false
     lane.project(x, y, this.hit)
-    return this.hit.distance < DEMO_LANE && this.hit.along <= this.laneReveal + 0.4
+    if (this.hit.distance >= DEMO_LANE || this.hit.along > this.laneReveal + 0.4) return false
+    return Math.abs(this.pathZ(this.hit.along) - this.floorOf(zone)) < 1.5
   }
 
   /** Step sideways off the path. The arrow on the map points the same way. */
   private yieldLane(person: Person): boolean {
     const lane = this.lane
     if (!lane || this.laneReveal <= 0) return false
-    lane.project(person.x, person.y, this.hit)
-    if (this.hit.distance >= DEMO_LANE || this.hit.along > this.laneReveal + 0.4) return false
+    if (!this.insideLane(person.x, person.y, person.zone)) return false
     const pace = 1.35
     let nx = this.hit.nx
     let ny = this.hit.ny
     let tx = person.x + nx * pace * DT
     let ty = person.y + ny * pace * DT
-    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') {
+    if (!this.foot(tx, ty, person, false)) {
       nx = -nx
       ny = -ny
       tx = person.x + nx * pace * DT
       ty = person.y + ny * pace * DT
     }
-    if (floorUse(tx, ty) === 'closed' || floorUse(tx, ty) === 'out') return false
+    if (!this.foot(tx, ty, person, false)) return false
     person.x = tx
     person.y = ty
     person.vx = nx * pace
@@ -581,11 +714,22 @@ export class CalhacksCrowd {
     const dx = person.x - circle.x
     const dy = person.y - circle.y
     const dist = Math.hypot(dx, dy)
-    const nx = dist > 0.05 ? dx / dist : Math.cos((person.bandId || 1) * 0.7)
-    const ny = dist > 0.05 ? dy / dist : Math.sin((person.bandId || 1) * 0.7)
+    let nx = dist > 0.05 ? dx / dist : Math.cos((person.bandId || 1) * 0.7)
+    let ny = dist > 0.05 ? dy / dist : Math.sin((person.bandId || 1) * 0.7)
     const pace = 1.6
-    person.x += nx * pace * DT
-    person.y += ny * pace * DT
+    let tx = person.x + nx * pace * DT
+    let ty = person.y + ny * pace * DT
+    if (!this.foot(tx, ty, person, this.insideRing(tx, ty))) {
+      const sx = -ny
+      const sy = nx
+      nx = sx
+      ny = sy
+      tx = person.x + nx * pace * DT
+      ty = person.y + ny * pace * DT
+      if (!this.foot(tx, ty, person, this.insideRing(tx, ty))) return false
+    }
+    person.x = tx
+    person.y = ty
     person.vx = nx * pace
     person.vy = ny * pace
     person.pose = WALKING
@@ -599,6 +743,14 @@ export class CalhacksCrowd {
   }
 
   private retarget(person: Person): void {
+    if (person.errand) {
+      person.gx = person.errand.x
+      person.gy = person.errand.y
+      person.lane = null
+      const sponsor = rooms.findIndex((room) => room.zoneId === 'sponsor')
+      if (sponsor >= 0) person.zone = sponsor
+      return
+    }
     const lane = person.lane
     if (lane && lane.length > 0) {
       let next = person.laneIndex + person.laneDir
@@ -617,8 +769,8 @@ export class CalhacksCrowd {
     const room = rooms[person.zone]
     if (!room) return
     let at = spotIn(room, this.rng)
-    for (let attempt = 0; attempt < 24 && !this.openSpot(at.x, at.y); attempt++) at = spotIn(room, this.rng)
-    if (!this.openSpot(at.x, at.y)) return
+    for (let attempt = 0; attempt < 24 && !this.openSpot(at.x, at.y, person.zone); attempt++) at = spotIn(room, this.rng)
+    if (!this.openSpot(at.x, at.y, person.zone)) return
     person.gx = at.x
     person.gy = at.y
   }
@@ -723,6 +875,11 @@ export class CalhacksCrowd {
     person.vx = 0
     person.vy = 0
     person.pose = STANDING
+    if (person.errand) {
+      person.errand = null
+      person.holdUntil = this.t + this.rng.range(4000, 8000)
+      return
+    }
     if (person.group) {
       if (this.groupTogether(person)) this.startChat(person)
       else this.waitForGroup(person)
@@ -774,6 +931,111 @@ export class CalhacksCrowd {
     this.retarget(person)
   }
 
+  /** One purchase at a time, from someone already on sponsor row, at the booth nearest them. */
+  private shopTick(): void {
+    if (!this.shopping) return
+    const zone = rooms.findIndex((room) => room.zoneId === 'sponsor')
+    const room = rooms[zone]
+    if (!room) return
+    const booths = this.sponsorBooths(room)
+    if (!booths.length) return
+    const here: { person: Person; index: number }[] = []
+    const free: { person: Person; index: number }[] = []
+    for (let index = 0; index < this.people.length; index++) {
+      const person = this.people[index]!
+      if (person.bought || person.errand || person.pose === SEATED) continue
+      free.push({ person, index })
+      if (person.zone === zone) here.push({ person, index })
+    }
+    const open = here.length ? here : free
+    if (!this.shopOrigin) this.shopOrigin = Date.now()
+    const step = duePurchase(this.shop, Math.max(this.t, Date.now() - this.shopOrigin), this.people.length, open.length > 0)
+    this.shop = step
+    if (!step.buy) return
+    const chosen = open[this.rng.int(open.length)]
+    if (!chosen) return
+    let booth = booths[0]!
+    let best = Infinity
+    for (const candidate of booths) {
+      const dist = Math.hypot(candidate.x - chosen.person.x, candidate.y - chosen.person.y)
+      if (dist < best) {
+        best = dist
+        booth = candidate
+      }
+    }
+    const stand = this.standBeside(booth, room) ?? { x: chosen.person.x, y: chosen.person.y }
+    const piece = pickPiece(this.rng, booth.name)
+    const { person, index } = chosen
+    const onRow = person.zone === zone && pointInPolygon(person.x, person.y, room.polygon)
+    placePurchase({
+      who: index,
+      name: buyerName(index),
+      bandId: person.bandId || 100 + index,
+      booth: booth.name,
+      piece,
+      x: onRow ? person.x : stand.x,
+      y: onRow ? person.y : stand.y,
+      fail: this.rng.next() < 0.025,
+    })
+    person.bought = true
+    person.group = 0
+    person.meetBy = 0
+    person.lane = null
+    person.zone = zone
+    person.gx = stand.x
+    person.gy = stand.y
+    if (onRow && Math.hypot(person.x - stand.x, person.y - stand.y) > 1.4) {
+      person.holdUntil = 0
+      person.pose = WALKING
+      person.speed = Math.max(person.speed, 0.85)
+      person.errand = { x: stand.x, y: stand.y, since: this.t }
+      return
+    }
+    person.x = stand.x
+    person.y = stand.y
+    person.vx = 0
+    person.vy = 0
+    person.pose = STANDING
+    person.holdUntil = this.t + this.rng.range(4000, 8000)
+    person.errand = null
+  }
+
+  private sponsorBooths(room: VenueZone): { name: string; x: number; y: number }[] {
+    if (this.boothStands) return this.boothStands
+    const inside = palaceSponsors.filter((booth) => !booth.mezz && pointInPolygon(booth.x, booth.y, room.polygon))
+    const list = (inside.length ? inside : palaceSponsors.filter((booth) => !booth.mezz)).map((booth) => ({
+      name: booth.name,
+      x: booth.x,
+      y: booth.y,
+    }))
+    this.boothStands = list
+    return list
+  }
+
+  private standBeside(booth: { x: number; y: number }, room: VenueZone): { x: number; y: number } | null {
+    for (let ring = 0; ring < 8; ring++) {
+      const dist = 0.7 + ring * 0.4
+      for (let turn = 0; turn < 8; turn++) {
+        const angle = (turn / 8) * Math.PI * 2 + ring
+        const x = booth.x + Math.cos(angle) * dist
+        const y = booth.y + Math.sin(angle) * dist
+        if (pointInPolygon(x, y, room.polygon) && walkable(x, y)) return { x, y }
+      }
+    }
+    return null
+  }
+
+  private syncPurchaseMarks(): void {
+    if (!this.shopping) return
+    const spots: { who: number; x: number; y: number }[] = []
+    for (let index = 0; index < this.people.length; index++) {
+      const person = this.people[index]!
+      if (!person.bought) continue
+      spots.push({ who: index, x: person.x, y: person.y })
+    }
+    if (spots.length) followBuyers(spots)
+  }
+
   private tally(): void {
     for (const id of WALK) this.counts[id] = 0
     for (const person of this.people) {
@@ -795,16 +1057,19 @@ export function crowdSize(): number {
   return crowd?.people.length ?? 0
 }
 
+export function crowdIsSeeded(): boolean {
+  return crowd?.seeded() ?? false
+}
+
 /** How far the demo path has opened. The map draws its arrows to the same point. */
 export function demoReveal(): number {
   return crowd?.revealed() ?? 0
 }
 
-/** Starts the wanderers once. Safe to call on every CalHacks snapshot. */
-/** Remember the roster and point the characters at the current page. */
-export function bindCrowdCast(bands: CastBand[]): void {
-  setCastRoster(bands)
-  applyCast()
+/** Seed the hall from database people. The same ids leave everyone where they already are. */
+export function bindCrowdCast(bands: CrowdSeed[]): void {
+  if (!crowd) return
+  if (crowd.adopt(bands)) frames.push(crowd.frame())
 }
 
 /** Where the character for this band is standing, if this page is drawing them. */
@@ -812,32 +1077,47 @@ export function characterAt(bandId: number): { x: number; y: number } | null {
   return crowd?.character(bandId) ?? null
 }
 
-function applyCast(): void {
-  if (!crowd) return
-  crowd.assign(currentCast().map((band) => band.id))
+type CrowdHold = { crowd: CalhacksCrowd; timer: ReturnType<typeof setInterval> | null; owner: () => void }
+
+function crowdHold(): { current?: CrowdHold } {
+  const slot = globalThis as typeof globalThis & { __banditCrowd?: { current?: CrowdHold } }
+  if (!slot.__banditCrowd) slot.__banditCrowd = {}
+  return slot.__banditCrowd
 }
 
 export function startCalhacksCrowd(): void {
-  if (crowd || import.meta.env.MODE === 'test') return
-  crowd = new CalhacksCrowd()
-  applyCast()
+  if (import.meta.env.MODE === 'test') return
+  const slot = crowdHold()
+  if (slot.current?.owner === startCalhacksCrowd) {
+    crowd = slot.current.crowd
+    timer = slot.current.timer
+    crowd.enableShopping()
+    return
+  }
+  if (slot.current?.timer) clearInterval(slot.current.timer)
+  crowd = slot.current?.crowd ?? new CalhacksCrowd()
+  crowd.enableShopping()
   frames.push(crowd.frame())
   timer = setInterval(() => {
     if (!crowd) return
     const ring = useDemoRing.getState()
-    const active = demoIsActive(liveBands(), Object.values(useWorld.getState().incidents))
-    crowd.setDemo(ring, active ? demoPath(ring) : null)
+    const alerting = demoIsActive(bandsOnFloor(), Object.values(useWorld.getState().incidents))
+    const route = alerting && useHallDemo.getState().pathOpen ? demoRoute(ring) : null
+    crowd.setDemo(ring, route ? route.points : null, route ? route.z : null)
     crowd.step()
     frames.push(crowd.frame())
     const now = Date.now()
-    if (turnCastPage(now)) applyCast()
     if (now - publishedAt < 1000) return
     publishedAt = now
     publishCounts()
   }, DT * 1000)
+  slot.current = { crowd, timer, owner: startCalhacksCrowd }
 }
 
 export function stopCalhacksCrowd(): void {
+  const slot = crowdHold()
+  if (slot.current?.timer) clearInterval(slot.current.timer)
+  slot.current = undefined
   if (timer) clearInterval(timer)
   timer = null
   crowd = null
@@ -847,6 +1127,7 @@ export function stopCalhacksCrowd(): void {
 function publishCounts(): void {
   if (!crowd) return
   const counts = crowd.counts
+  const seeded = crowd.seeded()
   useWorld.setState((state) => {
     if (state.venue?.venueId !== 'calhacks') return state
     const zones = { ...state.zones }
@@ -864,10 +1145,10 @@ function publishCounts(): void {
         estimatedDensity: density,
         peakDensity: Math.max(current.peakDensity ?? 0, density),
         congestionStatus: density >= packed ? 'critical' : density >= line ? 'caution' : 'normal',
-        source: 'simulation',
+        source: seeded ? 'estimated' : 'simulation',
         updatedAt: Date.now(),
       }
     }
-    return { zones, mode: state.mode === 'live' ? 'hybrid' : state.mode }
+    return { zones, mode: seeded ? 'live' : state.mode === 'live' ? 'hybrid' : state.mode }
   })
 }

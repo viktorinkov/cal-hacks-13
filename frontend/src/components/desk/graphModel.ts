@@ -3,7 +3,7 @@ import louvain from 'graphology-communities-louvain'
 import type { GraphLink } from '@/stdb/catalog'
 import { KIND_NAMES, NODE_VALS, PALETTE, SMALL, type GLink, type GNode, type Kind, type LegendLine, type Mode, type Summary, type SummaryItem, type SummarySection } from './graphView'
 
-/** Names by node id, one map per kind. People are named from the staff attendee list when it is open. */
+/** Names by node id, one map per kind. A person keeps whatever name the page gave them. */
 export interface Labels {
   person: Map<string, string>
   booth: Map<string, string>
@@ -30,7 +30,7 @@ export interface Built {
   links: Map<string, GLink>
   /** A node or link came or went. A rename alone does not count. */
   changed: boolean
-  /** A company name changed, so its floating name needs drawing again. */
+  /** A name changed, so its floating label needs drawing again. */
   renamed: boolean
 }
 
@@ -53,7 +53,7 @@ export function buildGraph(rows: GraphLink[], labels: Labels, prev: Pick<Built, 
     // A name can arrive after the node's first link.
     const label = labelOf(labels, kind, id)
     if (n.label !== label) {
-      if (kind === 'company') renamed = true
+      renamed = true
       n.label = label
     }
     nodes.set(key, n)

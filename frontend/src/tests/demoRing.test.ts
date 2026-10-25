@@ -28,6 +28,11 @@ describe('demo ring', () => {
     expect(patternOf(bandFromRow({ id: 5, online: true, sos: false, state: 4 }, null))).toBe('steady_red')
     expect(patternOf(bandFromRow({ id: 6, online: true, state: 0 }, null))).toBe('ready')
     expect(bandFromRow({ id: 7, online: true }, null).state).toBe(0)
+    // The radio beacon carries distress in the flag byte. Ingest copies that bit onto `sos`.
+    const fromFlags = bandFromRow({ id: 8, online: true, sos: false, fall: false, flags: 1, state: 0 }, null)
+    expect(fromFlags.sos).toBe(true)
+    expect(patternOf(fromFlags)).toBe('sos')
+    expect(bandFromRow({ id: 9, online: true, flags: 2, state: 0 }, null).fall).toBe(true)
   })
 
   it('draws the hardware inside the ring and leaves the crowd roster off the map', () => {
@@ -51,8 +56,9 @@ describe('demo ring', () => {
 
   it('runs the cleared path from the entrance to the rim, and only for a live hardware alert', () => {
     const path = demoPath(DEFAULT_DEMO_RING)
-    expect(path).toHaveLength(2)
-    expect(Math.hypot(path[1]!.x - DEFAULT_DEMO_RING.x, path[1]!.y - DEFAULT_DEMO_RING.y)).toBeCloseTo(DEFAULT_DEMO_RING.r, 1)
+    expect(path.length).toBeGreaterThan(2)
+    const end = path[path.length - 1]!
+    expect(Math.hypot(end.x - DEFAULT_DEMO_RING.x, end.y - DEFAULT_DEMO_RING.y)).toBeCloseTo(DEFAULT_DEMO_RING.r, 0)
     expect(path[0]!.y).toBeGreaterThan(DEFAULT_DEMO_RING.y)
     expect(demoIsActive([band({ id: 2, state: 4 })], [])).toBe(true)
     expect(demoIsActive([band({ id: 2, online: false, sos: true })], [])).toBe(false)
@@ -73,10 +79,28 @@ describe('demo ring', () => {
     }
     const snap = placeOnCalhacks(input)
     expect(snap.incidents.map((incident) => incident.reportedByDeviceId)).toEqual(['band-4'])
+    expect(snap.commands).toEqual([])
     expect(snap.incidents[0]?.location).toEqual({ x: DEFAULT_DEMO_RING.x, y: DEFAULT_DEMO_RING.y })
     expect(snap.incidents[0]?.isSimulated).toBe(false)
     expect(hardwareAlerts(input.bands, DEFAULT_DEMO_RING)).toHaveLength(1)
     expect(snap.sources.find((source) => source.sourceId === 'spacetimedb')?.detail).toMatch(/^2 live in the demo/)
+  })
+
+  it('opens the ring from the beacon flag bit, before an incident row arrives', () => {
+    const raised = bandFromRow({ id: 96, online: true, sos: false, flags: 1, state: 3, xM: -85.4, yM: -7.8 }, null)
+    const neighbour = bandFromRow({ id: 94, online: true, state: 4, xM: -80.9, yM: -9.3 }, null)
+    const snap = placeOnCalhacks({
+      venueName: 'Palace of Fine Arts',
+      timeZone: 'America/Los_Angeles',
+      zones: [],
+      bands: [raised, neighbour, band({ id: 400, sos: true })],
+      incidents: [],
+    })
+    expect(snap.incidents.map((incident) => incident.incidentId)).toEqual(['live-96'])
+    expect(snap.incidents[0]?.location).toEqual({ x: DEFAULT_DEMO_RING.x, y: DEFAULT_DEMO_RING.y })
+    expect(snap.commands).toEqual([])
+    expect(patternOf(neighbour)).toBe('steady_red')
+    expect(layoutDemo([raised, neighbour], DEFAULT_DEMO_RING).map((item) => item.band.id).sort((a, b) => a - b)).toEqual([94, 96])
   })
 
   it('walks simulated people out of the ring and off the path', () => {

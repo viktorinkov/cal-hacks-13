@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { pointInPolygon } from '@/lib/geometry'
 import { calhacksTables, calhacksVenue } from '@/mock/calhacks'
-import { CalhacksCrowd, floorUse } from '@/mock/calhacksCrowd'
+import { CalhacksCrowd, floorUse, type CrowdSeed } from '@/mock/calhacksCrowd'
 
 describe('calhacks crowd', () => {
   it('keeps the fake attendees inside the room they are walking', () => {
@@ -87,5 +87,35 @@ describe('calhacks crowd', () => {
       if (person.pose === 2) continue
       expect(floorUse(person.x, person.y)).toBe('walk')
     }
+  })
+
+  it('seeds people from database rows and leaves them walking when only coordinates change', () => {
+    const crowd = new CalhacksCrowd(30, 5)
+    const seeds: CrowdSeed[] = Array.from({ length: 20 }, (_, index) => ({
+      id: 200 + index,
+      sos: index === 3,
+      fall: false,
+      online: true,
+      hasPosition: false,
+    }))
+    expect(crowd.adopt(seeds, 8)).toBe(true)
+    expect(crowd.people).toHaveLength(8)
+    expect(crowd.people.map((person) => person.bandId)).toContain(203)
+    expect(crowd.people.every((person) => person.bandId > 99)).toBe(true)
+    for (let step = 0; step < 5; step++) crowd.step()
+    const walking = crowd.people.find((person) => person.pose === 0)
+    expect(walking).toBeTruthy()
+    const x = walking!.x
+    const y = walking!.y
+    expect(crowd.adopt(seeds.map((seed) => ({ ...seed, xM: 3, yM: 9, hasPosition: true })), 8)).toBe(false)
+    const same = crowd.people.find((person) => person.bandId === walking!.bandId)
+    expect(same?.x).toBe(x)
+    expect(same?.y).toBe(y)
+    expect(crowd.adopt([{ id: 7, sos: false, fall: false, online: true }], 8)).toBe(false)
+    expect(crowd.people).toHaveLength(8)
+
+    const quiet = new CalhacksCrowd(12, 2)
+    expect(quiet.adopt([{ id: 440, sos: false, fall: false, online: false }], 8)).toBe(true)
+    expect(quiet.people.map((person) => person.bandId)).toEqual([440])
   })
 })
