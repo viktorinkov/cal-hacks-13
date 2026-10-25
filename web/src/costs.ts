@@ -3,6 +3,7 @@
 // cover picks its cost center. J1 reserve is the accrual, J3 the payment run, J2 and J4 cash application.
 
 import { date, h, money } from './lib';
+import { searchable } from './table-search';
 import type { DbConnection } from './module_bindings';
 import type { Claim, LedgerEntry, MedicalRecord } from './module_bindings/types';
 
@@ -137,12 +138,12 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
           td(total.insurerPaid + total.insurerOwes), td(centers.get('Medical')?.notCovered ?? 0n), td(total.accrued))))),
     h('section', {},
       h('h3', {}, `Claims (${claims.length})`),
-      scroll(h('table', {},
+      searchable('cost-claims', scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Claim'), h('th', {}, 'Cost center'), h('th', {}, 'Claimant'), h('th', {}, 'Billed'), h('th', {}, 'Paid'), h('th', {}, 'Insurer'), h('th', {}, 'Venue'), h('th', {}, 'Not covered'), h('th', {}, 'Status')),
         lines.map(({ claim: c, line }) => h('tr', {},
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(c.id) }, `#${c.id}`)),
           h('td', {}, costCenter(c)), h('td', {}, c.claimantName || (c.coverKind === 'property' ? 'the venue' : '')),
-          td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), h('td', {}, status(c))))))),
+          td(line.billed), td(line.paid), td(line.insurerPaid + line.insurerOwes), td(line.venueCost), td(line.notCovered), h('td', {}, status(c)))))))),
     ledger.length > 0 && h('section', {},
       h('h3', {}, 'Trial balance'),
       scroll(h('table', {},
@@ -152,11 +153,11 @@ export function costsTab(conn: DbConnection, openClaim: (id: bigint) => void) {
           h('th', { class: tb.balanced ? 'pass' : 'fail' }, tb.balanced ? 'Balanced' : `Off by ${money(tb.debit - tb.credit)}`))))),
     ledger.length > 0 && h('section', {},
       h('h3', {}, `Journal (${entries.length})`),
-      scroll(h('table', {},
+      searchable('journal', scroll(h('table', {},
         h('tr', {}, h('th', {}, 'Entry'), h('th', {}, 'Claim'), h('th', {}, 'Lines'), h('th', {}, 'Posted')),
         entries.map(e => h('tr', {},
           h('td', {}, `${e[0].journalId} ${e[0].journal}`),
           h('td', {}, h('button', { class: 'link', onclick: () => openClaim(e[0].claimId) }, `#${e[0].claimId}`)),
-          h('td', {}, entryLines(e)), h('td', { class: 'muted' }, date(e[0].postedAt))))))),
+          h('td', {}, entryLines(e)), h('td', { class: 'muted' }, date(e[0].postedAt)))))))),
   ];
 }
