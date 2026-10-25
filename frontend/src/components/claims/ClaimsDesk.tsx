@@ -8,6 +8,7 @@ import { formatCents } from '@/cover/money'
 import { useRoute } from '@/cover/route'
 import { cn } from '@/lib/utils'
 import { SPACETIME_DB, useSession } from '@/stdb/session'
+import { ClaimExtras } from '@/components/claims/ClaimExtras'
 
 /**
  * Claims desk. The rows are the database's claims board. A routed claim still needs
@@ -295,6 +296,7 @@ function Docket({
           {`Read band ${claim.bandId}`}
         </button>
       )}
+      <ClaimExtras claimId={claim.id} />
     </section>
   )
 }

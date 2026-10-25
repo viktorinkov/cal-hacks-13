@@ -36,6 +36,9 @@ const TITLES: Record<string, string> = {
   '/graph': 'Event graph · BandIt',
   '/claims': 'Settlements · BandIt',
   '/costs': 'Costs · BandIt',
+  '/run': 'Run · BandIt',
+  '/test-bands': 'Test bands · BandIt',
+  '/kibana': 'Kibana · BandIt',
   '/join': 'BandIt',
   '/register': 'Register a band · BandIt',
 }

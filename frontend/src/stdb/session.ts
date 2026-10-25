@@ -5,6 +5,7 @@ import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
 import { sha256, uploadBlob, validateMedicalFile, type MedicalDocumentKind } from './uploads'
+import { attachLink, currentLink, dropLink } from './link'
 
 export const SPACETIME_URI = import.meta.env.VITE_SPACETIMEDB_URI || 'https://maincloud.spacetimedb.com'
 export const SPACETIME_DB = import.meta.env.VITE_SPACETIMEDB_DB || 'bandit-calhacks13-sp82j'
@@ -500,6 +501,8 @@ function subscribeAttendeeViews(next: DbConnection) {
 
 function connect(token: string | undefined, played: boolean, host: HostConfig) {
   const key = `bandit-token:${host.database}`
+  // The socket this call handed to the side modules, so a replaced socket closing late leaves the new one alone.
+  let linked: DbConnection | null = null
   return new Promise<void>((resolve, reject) => {
     console.info('[stdb] connecting', { database: host.database, anonymous: !token })
     DbConnection.builder()
@@ -527,6 +530,10 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
             console.info('[stdb] floor subscription applied')
             safePublish()
             resolve()
+            if (conn === next && currentLink() !== next) {
+              linked = next
+              attachLink(next)
+            }
             // One query at a time. A view that never answers must not hold the rest of the desk.
             const pending = [...(token ? STAFF_QUERIES : []), ...DESK_QUERIES]
             const subscribeNext = () => {
@@ -571,6 +578,7 @@ function connect(token: string | undefined, played: boolean, host: HostConfig) {
       .onDisconnect((_ctx, error) => {
         conn = null
         apiSession = null
+        if (linked && currentLink() === linked) dropLink()
         console.warn('[stdb] disconnected', error ? messageOf(error) : '')
         noteDisconnect('Connection lost.')
       })

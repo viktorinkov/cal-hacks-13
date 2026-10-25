@@ -7,8 +7,11 @@ import { AttendeesPage } from '@/components/desk/AttendeesPage'
 import { BandsPage } from '@/components/desk/BandsPage'
 import { CostsPage } from '@/components/desk/CostsPage'
 import { GraphPage } from '@/components/desk/GraphPage'
+import { KibanaPage } from '@/components/desk/KibanaPage'
 import { MerchPage } from '@/components/desk/MerchPage'
 import { PhotosPage } from '@/components/desk/PhotosPage'
+import { RunPage } from '@/components/desk/RunPage'
+import { TestBandsPage } from '@/components/desk/TestBandsPage'
 import { JoinPage } from '@/components/join/JoinPage'
 import { RegisterPage } from '@/components/join/RegisterPage'
 import { Button } from '@/components/ui/button'
@@ -65,11 +68,14 @@ function Pages() {
   if (path === '/register') return <RegisterPage />
   if (path === '/claims') return <ClaimsDesk />
   if (path === '/attendees') return <AttendeesPage />
+  if (path === '/run') return <RunPage />
   if (path === '/bands') return <BandsPage />
+  if (path === '/test-bands') return <TestBandsPage />
   if (path === '/photos') return <PhotosPage />
   if (path === '/merch') return <MerchPage />
   if (path === '/graph') return <GraphPage />
   if (path === '/costs') return <CostsPage />
+  if (path === '/kibana') return <KibanaPage />
   return <Boot />
 }
 

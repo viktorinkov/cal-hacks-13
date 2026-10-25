@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { beginSignIn, finishSignIn, staffSignedIn } from '@/stdb/auth'
 import { loadHostConfig, type HostConfig } from '@/stdb/host'
 import { useRoute } from '@/cover/route'
+import { JoinOrganizerGate } from './JoinOrganizer'
 
 const gateButton =
   'rounded-[3px] px-3 py-2 text-[13px] text-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)] hover:bg-white/5'
@@ -79,7 +80,7 @@ export function OrganizerGate({ children }: { children: ReactNode }) {
     )
   }
 
-  return children
+  return <JoinOrganizerGate>{children}</JoinOrganizerGate>
 }
 
 export function SignInCallback() {

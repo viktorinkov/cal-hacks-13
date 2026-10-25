@@ -1,11 +1,14 @@
 import { formatCents } from '@/cover/money'
 import { useCatalog } from '@/stdb/catalog'
+import { useSession } from '@/stdb/session'
 import { DeskFrame, Figure, when } from './DeskFrame'
+import { MerchExtras } from './MerchExtras'
 
 /** The merch case: pieces for sale, and the orders this desk can see. */
 export function MerchPage() {
   const merch = useCatalog((s) => s.merch)
   const orders = useCatalog((s) => s.orders)
+  const ops = useSession((s) => s.owner || s.roles.includes('ops'))
   const name = new Map(merch.map((piece) => [piece.id, piece.title || piece.name]))
   const sold = orders.reduce((sum, order) => sum + order.amountCents, 0)
 
@@ -40,7 +43,8 @@ export function MerchPage() {
           ))}
         </ul>
       )}
-      {orders.length > 0 && (
+      {/* The organizer gets the full orders table, with shipping, in MerchExtras. */}
+      {!ops && orders.length > 0 && (
         <section className="mt-12">
           <h2 className="text-[13px] text-ink-dim">Orders</h2>
           <ul className="mt-3 divide-y divide-line">
@@ -55,6 +59,7 @@ export function MerchPage() {
           </ul>
         </section>
       )}
+      <MerchExtras />
     </DeskFrame>
   )
 }
