@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use crate::model::{Claude, Failed};
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{clinic, extract, letters, medical, merch, payout, review, venue, verify, wallet};
+use crate::{clinic, extract, letters, medical, merch, payout, photo, review, shop, venue, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -85,7 +85,7 @@ impl Ctx {
 
 /// Kinds this worker runs.
 pub fn handles(kind: &str) -> bool {
-    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND
+    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == venue::KIND || kind == photo::KIND || kind == shop::KIND
 }
 
 /// Runs one job to its result reducer. On `Err` the caller reports `fail_job`.
@@ -102,6 +102,8 @@ pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
         merch::KIND => merch::run(ctx, job, job.payload()?).await,
         medical::KIND => medical::run(ctx, job, job.payload()?).await,
         venue::KIND => venue::run(ctx, job, job.payload()?).await,
+        photo::KIND => photo::run(ctx, job, job.payload()?).await,
+        shop::KIND => shop::run(ctx, job, job.payload()?).await,
         other => Err(JobError::msg(format!("no handler for job kind {other}"))),
     }
 }

@@ -7,6 +7,7 @@
 
 use crate::roles::*;
 use crate::tables::*;
+use crate::live::band_place;
 use crate::venue::zone;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp, ViewContext};
 
@@ -71,7 +72,7 @@ pub struct Incident {
     pub station_id: u8,
     /// The subject band, 0 for property incidents.
     #[index(btree)]
-    pub subject_band: u8,
+    pub subject_band: u32,
     /// `band`, `ops` or `vision`.
     pub opened_by: String,
     pub opened_at: Timestamp,
@@ -101,11 +102,11 @@ pub struct IncidentSnapshot {
     pub band_neigh: u8,
     pub band_battery: u8,
     pub band_seen_at: Timestamp,
-    /// Online bands at the incident's station, ascending.
-    pub bands_present: Vec<u8>,
+    /// Online bands at the incident's station (the crowd's within 10 m of the subject), ascending.
+    pub bands_present: Vec<u32>,
     pub neigh_mean: f32,
     /// Bands showing the light circle at that instant, ascending.
-    pub circle_bands: Vec<u8>,
+    pub circle_bands: Vec<u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -116,7 +117,7 @@ pub struct IncidentBand {
     pub id: u64,
     #[index(btree)]
     pub incident_id: u64,
-    pub band_id: u8,
+    pub band_id: u32,
     /// `subject` or `witness`.
     pub role: String,
     pub zone_id: u64,
@@ -165,8 +166,12 @@ pub fn zone_id_for_station(ctx: &ReducerContext, station_id: u8) -> u64 {
     crate::venue::zone_for_station(ctx, station_id).map(|z| z.id).unwrap_or(0)
 }
 
-/// Opens an incident and freezes its snapshot in the same transaction.
-pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: u8, band_id: u8, opened_by: &str) -> Incident {
+/// The crowd's bands this close to the subject count as present at the incident, in metres.
+const PRESENT_M: f32 = 10.0;
+
+/// Opens an incident, freezes its snapshot in the same transaction and puts it on the 3D floor: at `at`, else
+/// where the subject band stands, else at the station's spot.
+pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: u8, band_id: u32, opened_by: &str, at: Option<(f32, f32)>) -> Incident {
     let incident = ctx.db.incident().insert(Incident {
         id: 0,
         kind,
@@ -184,18 +189,21 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
         resolution: String::new(),
         vision_status: "none".into(),
     });
-    // The crowd stays out of the safety path: only radio and test bands are evidence.
-    let online: Vec<Band> = ctx.db.band().iter().filter(|b| b.id < FIRST_CROWD_BAND).filter(|b| b.online).collect();
-    let mut present: Vec<&Band> = online.iter().filter(|b| station_id != 0 && b.zone == station_id).collect();
+    // Radio and test bands count at the whole station; the crowd only near the subject, where its bands hear it.
+    let online: Vec<Band> = ctx.db.band().iter().filter(|b| b.online).collect();
+    let subject = online.iter().find(|b| band_id != 0 && b.id == band_id);
+    let (x, y) = at.or(subject.map(|b| (b.x_m, b.y_m))).unwrap_or_else(|| crate::venue::station_spot(ctx, station_id));
+    let near = |b: &Band| (b.x_m - x).powi(2) + (b.y_m - y).powi(2) <= PRESENT_M * PRESENT_M;
+    let counts = |b: &Band| if b.id < FIRST_CROWD_BAND { station_id != 0 && b.zone == station_id } else { near(b) };
+    let mut present: Vec<&Band> = online.iter().filter(|b| counts(b)).collect();
     present.sort_by_key(|b| b.id);
     let neigh_mean = if present.is_empty() {
         0.0
     } else {
         present.iter().map(|b| b.neigh as f32).sum::<f32>() / present.len() as f32
     };
-    let mut circle: Vec<u8> = online.iter().filter(|b| b.state == S_NEAR_SOS).filter_map(|b| radio_id(b.id)).collect();
+    let mut circle: Vec<u32> = online.iter().filter(|b| b.state == S_NEAR_SOS && (b.id < FIRST_CROWD_BAND || near(b))).map(|b| b.id).collect();
     circle.sort();
-    let subject = online.iter().find(|b| band_id != 0 && b.id == u32::from(band_id));
     ctx.db.incident_snapshot().insert(IncidentSnapshot {
         id: 0,
         incident_id: incident.id,
@@ -207,7 +215,7 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
         band_neigh: subject.map(|b| b.neigh).unwrap_or(0),
         band_battery: subject.map(|b| b.bat).unwrap_or(0),
         band_seen_at: subject.map(|b| b.last_seen).unwrap_or(ctx.timestamp),
-        bands_present: present.iter().filter_map(|b| radio_id(b.id)).collect(),
+        bands_present: present.iter().map(|b| b.id).collect(),
         neigh_mean,
         circle_bands: circle,
     });
@@ -223,10 +231,32 @@ pub fn open(ctx: &ReducerContext, kind: IncidentKind, zone_id: u64, station_id: 
             last_seen_at: ctx.timestamp,
         });
     }
+    crate::live::mark(ctx, &incident, x, y);
     incident
 }
 
-fn active_band_incident(ctx: &ReducerContext, band_id: u8) -> Option<Incident> {
+/// Records a band in the light circle around an incident, or refreshes when it was last seen there.
+pub fn witness(ctx: &ReducerContext, incident: &Incident, band_id: u32, zone_id: u64, rssi: i8) {
+    match ctx.db.incident_band().incident_id().filter(incident.id).find(|r| r.band_id == band_id) {
+        Some(r) => {
+            ctx.db.incident_band().id().update(IncidentBand { last_seen_at: ctx.timestamp, ..r });
+        }
+        None => {
+            ctx.db.incident_band().insert(IncidentBand {
+                id: 0,
+                incident_id: incident.id,
+                band_id,
+                role: "witness".into(),
+                zone_id,
+                rssi,
+                first_seen_at: ctx.timestamp,
+                last_seen_at: ctx.timestamp,
+            });
+        }
+    }
+}
+
+fn active_band_incident(ctx: &ReducerContext, band_id: u32) -> Option<Incident> {
     ctx.db
         .incident()
         .subject_band()
@@ -235,7 +265,7 @@ fn active_band_incident(ctx: &ReducerContext, band_id: u8) -> Option<Incident> {
         .max_by_key(|i| i.id)
 }
 
-fn resolved_moments_ago(ctx: &ReducerContext, band_id: u8) -> bool {
+fn resolved_moments_ago(ctx: &ReducerContext, band_id: u32) -> bool {
     ctx.db.incident().subject_band().filter(band_id).any(|i| {
         i.resolved_at
             .is_some_and(|t| ctx.timestamp.duration_since(t).is_some_and(|d| d.as_micros() < REOPEN_GRACE_MICROS as u128))
@@ -248,14 +278,7 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
     if ctx.sender() != ctx.database_identity() {
         return Err("watch_bands is internal".into());
     }
-    let online: Vec<(u8, Band)> = ctx
-        .db
-        .band()
-        .iter()
-        .filter(|b| b.id < FIRST_CROWD_BAND)
-        .filter(|b| b.online)
-        .filter_map(|b| Some((radio_id(b.id)?, b)))
-        .collect();
+    let online: Vec<(u32, Band)> = ctx.db.band().iter().filter(|b| b.id < FIRST_CROWD_BAND).filter(|b| b.online).map(|b| (b.id, b)).collect();
     for (id, b) in online.iter().filter(|(_, b)| b.sos || b.fall) {
         match active_band_incident(ctx, *id) {
             Some(i) => {
@@ -264,7 +287,11 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
             None if resolved_moments_ago(ctx, *id) => {}
             None => {
                 let kind = if b.fall { IncidentKind::Fall } else { IncidentKind::Sos };
-                open(ctx, kind, zone_id_for_station(ctx, b.zone), b.zone, *id, "band");
+                let incident = open(ctx, kind, zone_id_for_station(ctx, b.zone), b.zone, *id, "band", None);
+                let who = crate::insurance::people::wearer(ctx, *id).map(|(_, n)| n).unwrap_or_else(|| "someone".into());
+                let place = crate::venue::place_name(ctx, b.x_m, b.y_m);
+                let what = if b.fall { format!("Fall detected: {who} at {place}") } else { format!("SOS: {who} pressed the button at {place}") };
+                crate::live::record(ctx, incident.id, 0, "band", &crate::band_code::band_code(*id), what, "a radio band raised it; the bands around light the circle".into());
             }
         }
     }
@@ -288,32 +315,11 @@ pub fn watch_bands(ctx: &ReducerContext, _timer: IncidentWatchTimer) -> Result<(
         else {
             continue;
         };
-        let existing = ctx.db.incident_band().incident_id().filter(incident.id).find(|r| r.band_id == *id);
-        match existing {
-            Some(r) => {
-                ctx.db.incident_band().id().update(IncidentBand { last_seen_at: ctx.timestamp, ..r });
-            }
-            None => {
-                let rssi = ctx
-                    .db
-                    .link()
-                    .from_id()
-                    .filter(*id)
-                    .find(|l| l.to_id == incident.subject_band)
-                    .map(|l| l.rssi)
-                    .unwrap_or(0);
-                ctx.db.incident_band().insert(IncidentBand {
-                    id: 0,
-                    incident_id: incident.id,
-                    band_id: *id,
-                    role: "witness".into(),
-                    zone_id,
-                    rssi,
-                    first_seen_at: ctx.timestamp,
-                    last_seen_at: ctx.timestamp,
-                });
-            }
-        }
+        let rssi = match (radio_id(*id), radio_id(incident.subject_band)) {
+            (Some(from), Some(to)) => ctx.db.link().from_id().filter(from).find(|l| l.to_id == to).map(|l| l.rssi).unwrap_or(0),
+            _ => 0,
+        };
+        witness(ctx, incident, *id, zone_id, rssi);
     }
     Ok(())
 }
@@ -333,6 +339,11 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
     // Test bands stand a step apart around their zone's centre, so each shows on the venue map.
     let (cx, cy) = crate::venue::station_spot(ctx, station_id);
     let slot = (band_id - TEST_BANDS.start()) as f32;
+    // A band a presenter placed on the 3D floor stays where they put it.
+    let (x_m, y_m) = match ctx.db.band_place().band_id().find(id) {
+        Some(p) => (p.x_m, p.y_m),
+        None => (cx + (slot % 5.0 - 2.0) * 1.5, cy + (slot / 5.0).floor() * 1.5 - 0.75),
+    };
     let row = Band {
         id,
         state,
@@ -351,8 +362,8 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
         has_motor: true,
         online: true,
         last_seen: ctx.timestamp,
-        x_m: cx + (slot % 5.0 - 2.0) * 1.5,
-        y_m: cy + (slot / 5.0).floor() * 1.5 - 0.75,
+        x_m,
+        y_m,
         booth_id: 0,
     };
     let was = |f: fn(&Band) -> bool| prev.as_ref().is_some_and(f);
@@ -383,23 +394,32 @@ pub fn report_test_band(ctx: &ReducerContext, band_id: u8, station_id: u8, state
 #[spacetimedb::reducer]
 pub fn start_safety_watch(ctx: &ReducerContext) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
+    ensure_watch(ctx);
+    Ok(())
+}
+
+pub fn ensure_watch(ctx: &ReducerContext) {
     if ctx.db.incident_watch_timer().count() == 0 {
         ctx.db.incident_watch_timer().insert(IncidentWatchTimer {
             scheduled_id: 0,
             scheduled_at: ScheduleAt::Interval(std::time::Duration::from_millis(WATCH_MILLIS).into()),
         });
     }
-    Ok(())
 }
 
 /// Staff open an incident by hand: the property-damage button, or an injury
 /// nobody's band flagged. `band_id` 0 means no band.
 #[spacetimedb::reducer]
-pub fn open_incident(ctx: &ReducerContext, kind: String, zone_id: u64, band_id: u8, note: String) -> Result<(), String> {
+pub fn open_incident(ctx: &ReducerContext, kind: String, zone_id: u64, band_id: u32, note: String) -> Result<(), String> {
     require_role(ctx, &["ops", "medic"])?;
     let kind = IncidentKind::parse(&kind).ok_or_else(|| format!("unknown incident kind {kind}"))?;
     let zone = ctx.db.zone().id().find(zone_id).ok_or_else(|| format!("no zone {zone_id}"))?;
-    let incident = open(ctx, kind, zone.id, zone.station_id, band_id, "ops");
+    let incident = open(ctx, kind, zone.id, zone.station_id, band_id, "ops", None);
+    let what = match kind {
+        IncidentKind::Property => format!("Damage reported in {}", zone.name),
+        _ => format!("Injury reported in {}", zone.name),
+    };
+    crate::live::record(ctx, incident.id, 0, "organizer", &caller_name(ctx), what, note.clone());
     if !note.trim().is_empty() {
         add_note(ctx, incident.id, note, None);
     }
@@ -414,16 +434,33 @@ pub fn assign_medic(ctx: &ReducerContext, incident_id: u64) -> Result<(), String
     if i.resolved {
         return Err(format!("incident {incident_id} is resolved"));
     }
+    let first = i.assigned_medic.is_none();
     ctx.db.incident().id().update(Incident { status: IncidentStatus::Responding, assigned_medic: Some(ctx.sender()), ..i });
+    if first {
+        crate::live::responding(ctx, incident_id, &caller_name(ctx));
+    }
     Ok(())
 }
 
+/// The caller's staff label ("Ari Ramos", "Ops desk"), else their role.
+pub fn caller_name(ctx: &ReducerContext) -> String {
+    ctx.db
+        .staff_role()
+        .identity()
+        .filter(ctx.sender())
+        .find(|r| STAFF_ROLES.contains(&r.role.as_str()) && !r.label.is_empty())
+        .map(|r| r.label)
+        .unwrap_or_else(|| caller_role(ctx, STAFF_ROLES))
+}
+
 fn add_note(ctx: &ReducerContext, incident_id: u64, text: String, cost_cents: Option<u64>) {
+    let role = caller_role(ctx, STAFF_ROLES);
+    crate::live::noted(ctx, incident_id, &caller_name(ctx), &role, &text, cost_cents);
     ctx.db.incident_note().insert(IncidentNote {
         id: 0,
         incident_id,
         author: ctx.sender(),
-        author_role: caller_role(ctx, STAFF_ROLES),
+        author_role: role,
         text,
         cost_cents,
         created_at: ctx.timestamp,
@@ -460,11 +497,12 @@ pub fn resolve_incident(ctx: &ReducerContext, incident_id: u64, resolution: Stri
         resolved: true,
         resolved_at: Some(ctx.timestamp),
         resolved_by: Some(ctx.sender()),
-        resolution,
+        resolution: resolution.clone(),
         ..i
     });
-    if band_id != 0 && !TEST_BANDS.contains(&band_id) {
-        crate::commands::enqueue(ctx, band_id, "clear", 0, 0);
+    crate::live::resolved(ctx, incident_id, &caller_name(ctx), &caller_role(ctx, STAFF_ROLES), &resolution);
+    if let Some(radio) = radio_id(band_id).filter(|b| *b != 0 && !TEST_BANDS.contains(b)) {
+        crate::commands::enqueue(ctx, radio, "clear", 0, 0);
     }
     crate::insurance::on_incident_resolved(ctx, &resolved)
 }

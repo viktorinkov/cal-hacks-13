@@ -13,7 +13,7 @@ import {
 export default __t.row({
   id: __t.u64(),
   incidentId: __t.u64().name("incident_id"),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u32().name("band_id"),
   role: __t.string(),
   zoneId: __t.u64().name("zone_id"),
   rssi: __t.i8(),

@@ -22,11 +22,19 @@ pub struct EventState {
 
 fn set_ended(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     require_role(ctx, &["ops"])?;
+    set_ended_by(ctx, ended)
+}
+
+/// Ends or reopens the event as the caller, with no role check: the live run's clock ends it.
+pub fn set_ended_by(ctx: &ReducerContext, ended: bool) -> Result<(), String> {
     let row = EventState { id: 0, ended, ended_at: ended.then_some(ctx.timestamp), ended_by: ctx.sender() };
     if ctx.db.event_state().id().find(0).is_some() {
         ctx.db.event_state().id().update(row);
     } else {
         ctx.db.event_state().insert(row);
+    }
+    if ended {
+        crate::merch::on_event_ended(ctx);
     }
     Ok(())
 }
@@ -228,7 +236,7 @@ pub fn my_incidents(ctx: &ViewContext) -> Vec<MyIncident> {
     ctx.db
         .incident()
         .subject_band()
-        .filter(own.band_id)
+        .filter(u32::from(own.band_id))
         .filter(|i| i.kind != IncidentKind::Property && i.opened_at >= own.claimed_at)
         .map(|i| MyIncident {
             incident_id: i.id,
@@ -249,7 +257,7 @@ pub struct UnclaimedInjury {
     /// `sos` or `fall`.
     pub kind: String,
     pub zone_name: String,
-    pub band_id: u8,
+    pub band_id: u32,
     pub wearer_name: String,
     pub opened_at: Timestamp,
     pub resolved_at: Option<Timestamp>,
@@ -266,10 +274,10 @@ pub fn unclaimed_injuries(ctx: &ViewContext) -> Vec<UnclaimedInjury> {
     ctx.db
         .incident()
         .subject_band()
-        .filter(1u8..)
+        .filter(1u32..)
         .filter(|i| i.resolved && i.kind != IncidentKind::Property && claim_id_for(ctx, i.id) == 0)
         .filter_map(|i| {
-            let wearer = ctx.db.band_owner().band_id().find(i.subject_band).filter(|o| o.claimed_at <= i.opened_at)?;
+            let wearer = ctx.db.band_owner().band_id().find(radio_id(i.subject_band)?).filter(|o| o.claimed_at <= i.opened_at)?;
             let mut notes: Vec<IncidentNote> = ctx.db.incident_note().incident_id().filter(i.id).collect();
             notes.sort_by_key(|n| n.id);
             Some(UnclaimedInjury {
@@ -345,6 +353,9 @@ pub struct BoardPhoto {
     pub caption: String,
     /// The graph nodes of the findable people the bands put in it.
     pub node_ids: Vec<u64>,
+    /// The people Claude counted in it, once it has read the photo.
+    pub people_count: u32,
+    pub read: bool,
 }
 
 /// Every event photo with the people in it, for the host portal's photos and event graph.
@@ -370,6 +381,8 @@ pub fn board_photos(ctx: &ViewContext) -> Vec<BoardPhoto> {
             url: p.url,
             taken_at: p.taken_at,
             caption: p.caption,
+            people_count: p.people_count,
+            read: p.features_call_id != 0,
         })
         .collect()
 }

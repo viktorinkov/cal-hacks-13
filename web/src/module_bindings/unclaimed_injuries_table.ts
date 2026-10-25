@@ -14,7 +14,7 @@ export default __t.row({
   incidentId: __t.u64().name("incident_id"),
   kind: __t.string(),
   zoneName: __t.string().name("zone_name"),
-  bandId: __t.u8().name("band_id"),
+  bandId: __t.u32().name("band_id"),
   wearerName: __t.string().name("wearer_name"),
   openedAt: __t.timestamp().name("opened_at"),
   resolvedAt: __t.option(__t.timestamp()).name("resolved_at"),

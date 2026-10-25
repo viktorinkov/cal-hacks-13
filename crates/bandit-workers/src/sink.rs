@@ -25,6 +25,8 @@ pub enum Finish {
     MedicalCard { card_json: String },
     VenueSetup { result: VenueSetupResult },
     ClinicReport { record_json: String, file_hash: String },
+    PhotoFeatures { people_count: u32, caption: String },
+    MerchPicks { picks: Vec<MerchPickIn> },
 }
 
 pub enum Sink {
@@ -134,6 +136,8 @@ impl Sink {
             Finish::MedicalCard { card_json } => reduce!(conn, apply_medical_extract_then(job_id, card_json, required())),
             Finish::VenueSetup { result } => reduce!(conn, finish_venue_setup_then(job_id, result)),
             Finish::ClinicReport { record_json, file_hash } => reduce!(conn, file_clinic_report_then(job_id, record_json, file_hash, required())),
+            Finish::PhotoFeatures { people_count, caption } => reduce!(conn, submit_photo_features_then(job_id, people_count, caption, required())),
+            Finish::MerchPicks { picks } => reduce!(conn, submit_merch_picks_then(job_id, picks, required())),
         }
         .with_context(|| format!("finishing job {job_id}"))
     }
@@ -212,6 +216,14 @@ fn print_finish(job_id: u64, finish: &Finish, call: Option<&ModelCallIn>) {
                 "method": r.method, "model_hash": r.model_hash, "layout_hash": r.layout_hash, "model_bytes": r.model_bytes,
                 "meshes": r.meshes, "triangles": r.triangles, "places": r.places, "size": [r.size_x, r.size_y, r.size_z],
                 "floor_plans": r.floor_plans, "sources": r.sources.iter().map(|f| json!({"label": f.label, "value": f.value})).collect::<Vec<_>>(),
+            }),
+        ),
+        Finish::PhotoFeatures { people_count, caption } => ("submit_photo_features", json!({"people_count": people_count, "caption": caption, "call": call})),
+        Finish::MerchPicks { picks } => (
+            "submit_merch_picks",
+            json!({
+                "picks": picks.iter().map(|p| json!({"template_id": p.template_id, "photo_id": p.photo_id, "line": p.line, "reason": p.reason})).collect::<Vec<_>>(),
+                "call": call,
             }),
         ),
     };

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BandIt live venue</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* Full screen: the venue fills the window and the panels float over it. */
+  :root {
+    --panel: rgba(11, 16, 27, 0.86);
+    --line: rgba(255, 255, 255, 0.09);
+    --text: #e8edf5;
+    --muted: #93a1b6;
+    --accent: #3d8bff;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body { margin: 0; background: #0e1522; color: var(--text); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; outline: none; }
+  body.placing #stage canvas { cursor: crosshair; }
+  .glass { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .muted { color: var(--muted); }
+  button { font: inherit; margin: 0; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); color: var(--text); padding: 6px 12px; }
+  button:hover { background: rgba(255, 255, 255, 0.14); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: #5a9cff; }
+  button.danger { background: #c2410c; border-color: #c2410c; color: #fff; font-weight: 600; }
+  button.ghost { background: transparent; }
+  button.small { padding: 3px 9px; font-size: 12px; }
+  button.link { background: none; border: none; color: #8ab4ff; text-decoration: underline; padding: 0; }
+  input, select { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; box-sizing: border-box; }
+  select option { color: #111; }
+
+  /* Top bar: the phase and clock, the counts, and the staff controls. */
+  #bar { position: fixed; top: 12px; left: 12px; right: 12px; z-index: 3; }
+  #bar > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding: 9px 16px; }
+  .brand { display: flex; flex-direction: column; line-height: 1.1; }
+  .brand b { font-size: 17px; letter-spacing: 0.01em; }
+  .brand span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .clockbox { display: flex; align-items: center; gap: 10px; }
+  .phase { padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .phase.idle { background: #334155; } .phase.running { background: #15803d; } .phase.closing { background: #b45309; } .phase.ended { background: #475569; }
+  #clock { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 600; white-space: nowrap; }
+  .stat { display: flex; flex-direction: column; line-height: 1.15; }
+  .stat b { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+  .claims i { font-style: normal; }
+  .claims .paid { color: #4ade80; } .claims .waiting { color: #facc15; } .claims .refused { color: #f87171; }
+  .spacer { flex: 1; }
+  form.start { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+  form.start label { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 12px; color: var(--muted); }
+  form.start input[type=number] { display: inline-block; width: 66px; max-width: none; padding: 4px 6px; }
+  form.start input[type=checkbox] { display: inline-block; width: auto; margin: 0; }
+  .seed { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .who { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* Decision history, on the right. */
+  #history { position: fixed; top: 84px; right: 12px; bottom: 12px; width: 390px; z-index: 2; display: flex; flex-direction: column; overflow: hidden; }
+  #history-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
+  .history-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .history-title h2 { margin: 0; font-size: 16px; }
+  .history-title span { font-size: 12px; }
+  .focus { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(61, 139, 255, 0.16); border: 1px solid rgba(61, 139, 255, 0.45); }
+  .focus .muted { font-size: 12px; }
+  #history-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
+  #history-list .row { padding: 8px 10px; border-radius: 8px; margin: 0 0 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+  #history-list .row.linked { cursor: pointer; }
+  #history-list .row.linked:hover { background: rgba(255, 255, 255, 0.05); }
+  #history-list .row.on { background: rgba(61, 139, 255, 0.16); box-shadow: inset 3px 0 0 var(--accent); }
+  #history-list .row.dim { opacity: 0.38; }
+  #history-list .row.new { animation: arrive 2.2s ease-out; }
+  @keyframes arrive { from { background: rgba(250, 204, 21, 0.22); } to { background: transparent; } }
+  #history-list .empty { padding: 14px 10px; color: var(--muted); }
+  .meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); min-width: 0; }
+  .meta time { font-variant-numeric: tabular-nums; flex: none; }
+  .actor { background: var(--actor); color: #0b1020; padding: 1px 8px; border-radius: 999px; font-weight: 650; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .what { font-weight: 650; margin-top: 4px; }
+  .why { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  button.approve { margin-top: 8px; background: #facc15; border-color: #facc15; color: #111; font-weight: 700; }
+  button.approve:hover { background: #fde047; }
+
+  /* Our bands, the legend and the overview button, bottom left. */
+  #dock { position: fixed; left: 12px; bottom: 12px; z-index: 2; display: flex; flex-direction: column; gap: 8px; width: 330px; }
+  #place:empty { display: none; }
+  #place > div { padding: 10px 12px; }
+  #place h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  #place p { margin: 4px 0; font-size: 12.5px; }
+  #place form { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 0; }
+  #place select { grid-column: 1 / -1; width: 100%; max-width: none; }
+  #place input { width: 100%; max-width: none; display: block; }
+  ul.placed { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; }
+  ul.placed li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-top: 1px solid var(--line); }
+  #legend > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 12px; font-size: 12px; color: #c8d2e2; }
+  #legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+  #legend i.ring { width: 8px; height: 8px; background: transparent; border: 2px solid; }
+
+  #hint { display: none; position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 4; padding: 9px 16px; border-radius: 10px; background: #1d4ed8; color: #fff; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+  body.placing #hint { display: block; }
+  #error { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: 60vw; padding: 8px 14px; border-radius: 8px; background: #991b1b; color: #fff; }
+  #error:empty { display: none; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 1; pointer-events: none; color: var(--muted); font-size: 15px; transition: opacity 0.6s; }
+  body.loaded #loading { opacity: 0; }
+
+  @media (max-width: 760px) {
+    #history { top: auto !important; left: 12px; width: auto; height: 40vh; }
+    #dock { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="loading">Loading the venue…</div>
+<header id="bar" class="glass"></header>
+<aside id="history" class="glass"><div id="history-head"></div><ul id="history-list"></ul></aside>
+<div id="dock"><div id="place" class="glass"></div><div id="legend" class="glass"></div></div>
+<div id="hint"></div>
+<p id="error" class="error"></p>
+<script type="module" src="/js/live.js"></script>
+</body>
+</html>

@@ -223,7 +223,7 @@ pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), Str
         .db
         .incident()
         .subject_band()
-        .filter(band_id)
+        .filter(u32::from(band_id))
         .find(|i| !i.resolved && matches!(i.kind, IncidentKind::Sos | IncidentKind::Fall));
     let (reason, incident_id) = match &open {
         Some(i) => (format!("open {:?} incident {}", i.kind, i.id).to_lowercase(), i.id),

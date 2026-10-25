@@ -17,9 +17,9 @@ pub struct IncidentSnapshot {
     pub band_neigh: u8,
     pub band_battery: u8,
     pub band_seen_at: __sdk::Timestamp,
-    pub bands_present: Vec<u8>,
+    pub bands_present: Vec<u32>,
     pub neigh_mean: f32,
-    pub circle_bands: Vec<u8>,
+    pub circle_bands: Vec<u32>,
 }
 
 impl __sdk::InModule for IncidentSnapshot {
@@ -40,9 +40,9 @@ pub struct IncidentSnapshotCols {
     pub band_neigh: __sdk::__query_builder::Col<IncidentSnapshot, u8>,
     pub band_battery: __sdk::__query_builder::Col<IncidentSnapshot, u8>,
     pub band_seen_at: __sdk::__query_builder::Col<IncidentSnapshot, __sdk::Timestamp>,
-    pub bands_present: __sdk::__query_builder::Col<IncidentSnapshot, Vec<u8>>,
+    pub bands_present: __sdk::__query_builder::Col<IncidentSnapshot, Vec<u32>>,
     pub neigh_mean: __sdk::__query_builder::Col<IncidentSnapshot, f32>,
-    pub circle_bands: __sdk::__query_builder::Col<IncidentSnapshot, Vec<u8>>,
+    pub circle_bands: __sdk::__query_builder::Col<IncidentSnapshot, Vec<u32>>,
 }
 
 impl __sdk::__query_builder::HasCols for IncidentSnapshot {

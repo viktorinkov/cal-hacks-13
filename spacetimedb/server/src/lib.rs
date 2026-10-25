@@ -10,6 +10,7 @@ pub mod venue;
 pub mod social;
 pub mod insurance;
 pub mod jobs;
+pub mod live;
 pub mod safety;
 pub mod vision;
 pub mod web;
@@ -35,7 +36,9 @@ pub fn init(ctx: &ReducerContext) {
 }
 
 #[spacetimedb::reducer(client_connected)]
-pub fn client_connected(_ctx: &ReducerContext) {}
+pub fn client_connected(ctx: &ReducerContext) {
+    roles::remember_email(ctx);
+}
 
 #[spacetimedb::reducer(client_disconnected)]
 pub fn client_disconnected(ctx: &ReducerContext) {

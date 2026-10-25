@@ -5,8 +5,9 @@
 
 use crate::insurance::*;
 use crate::jobs::{self, *};
-use crate::roles::require_role;
+use crate::roles::*;
 use crate::social::tables::*;
+use crate::tables::*;
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
 pub const KIND_WALLET_OPEN: &str = "wallet_open";
@@ -97,9 +98,39 @@ pub struct MyWallet {
 pub fn my_wallet(ctx: &ViewContext) -> Option<MyWallet> {
     let me = ctx.sender();
     let account = ctx.db.claimant_account().identity().find(me)?;
-    let entries: i64 = ctx.db.wallet_entry().identity().filter(me).map(|e| e.amount_cents).sum();
-    let held: i64 = crate::merch::my_held_cents(ctx, me);
-    Some(MyWallet { account_id: account.account_id, balance_cents: entries - held, opened_at: account.created_at })
+    Some(MyWallet { account_id: account.account_id, balance_cents: balance(ctx, me), opened_at: account.created_at })
+}
+
+fn balance(ctx: &ViewContext, who: Identity) -> i64 {
+    let entries: i64 = ctx.db.wallet_entry().identity().filter(who).map(|e| e.amount_cents).sum();
+    entries - crate::merch::my_held_cents(ctx, who)
+}
+
+/// One attendee's wallet, for the organizer buying merch as them.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct BoardWallet {
+    pub node_id: u64,
+    pub account_id: String,
+    pub balance_cents: i64,
+}
+
+/// Every attendee's wallet and what it can spend, for the organizer (ops) only.
+#[spacetimedb::view(accessor = board_wallets, public)]
+pub fn board_wallets(ctx: &ViewContext) -> Vec<BoardWallet> {
+    let ops = ctx.db.owner().identity().find(ctx.sender()).is_some()
+        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| r.role == "ops");
+    if !ops {
+        return Vec::new();
+    }
+    ctx.db
+        .attendee()
+        .person_id()
+        .filter(0u64..)
+        .filter_map(|a| {
+            let account = ctx.db.claimant_account().identity().find(a.identity)?;
+            Some(BoardWallet { node_id: a.node_id, account_id: account.account_id, balance_cents: balance(ctx, a.identity) })
+        })
+        .collect()
 }
 
 /// The wallet's movements, oldest first.

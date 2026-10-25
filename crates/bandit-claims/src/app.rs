@@ -34,7 +34,7 @@ pub const SPONSOR_ROW: &str = "Sponsor row";
 pub const HACKING_FLOOR: &str = "Hacking floor";
 
 /// Tables the owner connection mirrors (private ones included).
-const TABLES: &[&str] = &[
+pub const TABLES: &[&str] = &[
     "staff_role",
     "medical_document",
     "band",
@@ -132,12 +132,18 @@ impl App {
 
     /// The owner connection, subscribed to every table the CLI reads.
     pub fn db(&self) -> Result<Rc<DbConnection>> {
+        self.db_with(TABLES)
+    }
+
+    /// The owner connection, subscribed to `tables` when this is the first call. The live run uses it to
+    /// leave out the thousand crowd bands it never reads.
+    pub fn db_with(&self, tables: &[&str]) -> Result<Rc<DbConnection>> {
         if let Some(c) = self.owner.borrow().as_ref() {
             return Ok(c.clone());
         }
         let (conn, _, _) = bandit_bindings::connect(&self.uri, &self.database, Some(self.owner_token()?))
             .with_context(|| format!("connecting to {} at {} as the module owner", self.database, self.uri))?;
-        let queries: Vec<String> = TABLES.iter().map(|t| format!("SELECT * FROM {t}")).collect();
+        let queries: Vec<String> = tables.iter().map(|t| format!("SELECT * FROM {t}")).collect();
         let queries: Vec<&str> = queries.iter().map(String::as_str).collect();
         bandit_bindings::subscribe(&conn, &queries)?;
         let conn = Rc::new(conn);

@@ -1,11 +1,26 @@
 //! Who the claimant is: the attendee who wore the subject band (social's tables).
 
-use crate::social::tables::{attendee, band_owner};
+use crate::social::tables::{attendee, band_owner, crowd_member};
+use crate::tables::radio_id;
 use spacetimedb::{Identity, ReducerContext, Timestamp};
 
-/// The band's owner, when they claimed it at or before `at`.
-pub fn wore_band_at(ctx: &ReducerContext, band_id: u8, at: Timestamp) -> Option<Identity> {
-    ctx.db.band_owner().band_id().find(band_id).filter(|o| o.claimed_at <= at).map(|o| o.owner)
+/// The wearer's identity and display name: the owner of a claimed radio or test band, or the crowd's
+/// attendee wearing a crowd band.
+pub fn wearer(ctx: &ReducerContext, band_id: u32) -> Option<(Identity, String)> {
+    let who = match radio_id(band_id) {
+        Some(radio) => ctx.db.band_owner().band_id().find(radio)?.owner,
+        None => ctx.db.crowd_member().band_id().find(band_id)?.identity,
+    };
+    Some((who, display_name(ctx, who)))
+}
+
+/// Who wore the band at `at`: a radio or test band's owner who had claimed it by then, or the crowd's
+/// attendee wearing a crowd band.
+pub fn wore_band_at(ctx: &ReducerContext, band_id: u32, at: Timestamp) -> Option<Identity> {
+    match radio_id(band_id) {
+        Some(radio) => ctx.db.band_owner().band_id().find(radio).filter(|o| o.claimed_at <= at).map(|o| o.owner),
+        None => ctx.db.crowd_member().band_id().find(band_id).map(|m| m.identity),
+    }
 }
 
 /// The attendee's display name, empty when they never saved one.

@@ -141,7 +141,7 @@ pub fn gather(ctx: &ReducerContext, claim: &Claim) -> EvidenceInput {
         ctx.db
             .zone_visit()
             .band_id()
-            .filter(u32::from(inc.subject_band))
+            .filter(inc.subject_band)
             .filter(|v| micros(v.entered) <= opened_at && v.left.is_none_or(|l| micros(l) >= opened_at - PRESENCE_WINDOW_MICROS))
             .map(|v| {
                 let z = zone_for_station(ctx, v.zone);

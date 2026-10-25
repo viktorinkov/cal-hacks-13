@@ -13,6 +13,8 @@ pub struct BoardPhoto {
     pub zone_name: String,
     pub caption: String,
     pub node_ids: Vec<u64>,
+    pub people_count: u32,
+    pub read: bool,
 }
 
 impl __sdk::InModule for BoardPhoto {
@@ -29,6 +31,8 @@ pub struct BoardPhotoCols {
     pub zone_name: __sdk::__query_builder::Col<BoardPhoto, String>,
     pub caption: __sdk::__query_builder::Col<BoardPhoto, String>,
     pub node_ids: __sdk::__query_builder::Col<BoardPhoto, Vec<u64>>,
+    pub people_count: __sdk::__query_builder::Col<BoardPhoto, u32>,
+    pub read: __sdk::__query_builder::Col<BoardPhoto, bool>,
 }
 
 impl __sdk::__query_builder::HasCols for BoardPhoto {
@@ -41,6 +45,8 @@ impl __sdk::__query_builder::HasCols for BoardPhoto {
             zone_name: __sdk::__query_builder::Col::new(table_name, "zone_name"),
             caption: __sdk::__query_builder::Col::new(table_name, "caption"),
             node_ids: __sdk::__query_builder::Col::new(table_name, "node_ids"),
+            people_count: __sdk::__query_builder::Col::new(table_name, "people_count"),
+            read: __sdk::__query_builder::Col::new(table_name, "read"),
         }
     }
 }

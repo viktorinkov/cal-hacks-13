@@ -11,8 +11,8 @@ use super::graph::{link_met, link_visited};
 use super::logic::*;
 use super::onboarding::complete_claim;
 use super::tables::*;
-use crate::tables::{band, encounter, event, radio_id, zone_visit, Encounter, EventKind, ZoneVisit};
-use crate::venue::{zone, zone_for_station};
+use crate::tables::{encounter, event, radio_id, zone_visit, Encounter, EventKind, ZoneVisit};
+use crate::venue::zone_for_station;
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, Timestamp};
 use std::collections::HashMap;
 
@@ -245,26 +245,4 @@ pub fn sync_encounter(ctx: &ReducerContext, enc: &Encounter, a: Identity, b: Ide
             }
         }
     }
-}
-
-/// The wearers of the bands whose stay covered `at` in the zone, longest stay first. Used to suggest who is
-/// in a photo.
-pub fn wearers_in_zone_at(ctx: &ReducerContext, zone_id: u64, at: Timestamp) -> Vec<Identity> {
-    let Some(station) = ctx.db.zone().id().find(zone_id).map(|z| z.station_id) else {
-        return Vec::new();
-    };
-    let t = micros(at);
-    let mut present: Vec<(i64, Identity)> = ctx
-        .db
-        .band()
-        .iter()
-        .filter_map(|b| {
-            let stay = ctx.db.zone_visit().band_id().filter(b.id).find(|v| {
-                v.zone == station && micros(v.entered) <= t && v.left.is_none_or(|l| micros(l) >= t)
-            })?;
-            Some((micros(stay.entered), wearer(ctx, b.id)?.0))
-        })
-        .collect();
-    present.sort_by_key(|(entered, _)| *entered);
-    present.into_iter().map(|(_, o)| o).collect()
 }

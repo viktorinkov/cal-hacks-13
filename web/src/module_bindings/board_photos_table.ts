@@ -17,4 +17,6 @@ export default __t.row({
   zoneName: __t.string().name("zone_name"),
   caption: __t.string(),
   nodeIds: __t.array(__t.u64()).name("node_ids"),
+  peopleCount: __t.u32().name("people_count"),
+  read: __t.bool(),
 });

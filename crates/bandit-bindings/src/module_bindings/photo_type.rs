@@ -14,6 +14,8 @@ pub struct Photo {
     pub caption: String,
     pub added_by: __sdk::Identity,
     pub created_at: __sdk::Timestamp,
+    pub people_count: u32,
+    pub features_call_id: u64,
 }
 
 impl __sdk::InModule for Photo {
@@ -31,6 +33,8 @@ pub struct PhotoCols {
     pub caption: __sdk::__query_builder::Col<Photo, String>,
     pub added_by: __sdk::__query_builder::Col<Photo, __sdk::Identity>,
     pub created_at: __sdk::__query_builder::Col<Photo, __sdk::Timestamp>,
+    pub people_count: __sdk::__query_builder::Col<Photo, u32>,
+    pub features_call_id: __sdk::__query_builder::Col<Photo, u64>,
 }
 
 impl __sdk::__query_builder::HasCols for Photo {
@@ -44,6 +48,8 @@ impl __sdk::__query_builder::HasCols for Photo {
             caption: __sdk::__query_builder::Col::new(table_name, "caption"),
             added_by: __sdk::__query_builder::Col::new(table_name, "added_by"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            people_count: __sdk::__query_builder::Col::new(table_name, "people_count"),
+            features_call_id: __sdk::__query_builder::Col::new(table_name, "features_call_id"),
         }
     }
 }
