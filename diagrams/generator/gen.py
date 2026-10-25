@@ -24,9 +24,11 @@ CLAUDE, VULTR, RUST, CADDY, ESP, NFC, TS, BUN = (logo(n + ".svg") for n in (
     "claude", "vultr", "rust", "caddy", "espressif", "nfc", "typescript", "bun"))
 PYTHON, OPENCV, NUMPY, THREE, SPARK, COLMAP, KIBANA = (logo(n + ".svg") for n in (
     "python", "opencv", "numpy", "threedotjs", "spark", "colmap", "kibana"))
-USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK = (logo(f"icon-{n}.svg") for n in (
-    "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
-    "footprints"))
+USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK, GRAPH3D = (
+    logo(f"icon-{n}.svg") for n in (
+        "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
+        "footprints", "graph-3d"))
+SOCIALS = [logo(n + ".svg") for n in ("instagram", "facebook", "threads")]
 
 
 def L(v, axis="y"):
@@ -277,23 +279,45 @@ def evidence(y0):
          [lambda x, y: SV(x, y, ELASTIC, "ingest pipeline\n(bandit-claims-validate)", w=480, h=160),
           lambda x, y: SV(x, y, ELASTIC, "semantic search\n(similar claims)", w=480, h=160),
           lambda x, y: B(x, y, "submit_claim_checks", "stdb", w=480, h=160)], ["searches", "returns checks"]),
-        ("rank recap (bandit-indexer)",
-         [lambda x, y: SV(x, y, ELASTIC, "bandit-people\nbandit-booths", w=480, h=160),
-          lambda x, y: B(x, y, "bandit-api\nGET /api/recap", "rust", w=480, h=160, icons={0: RUST}),
-          lambda x, y: B(x, y, "recap (/t/code)", "web", w=480, h=160, icons={0: PHONE})], ["ranks", "orders lists"]),
     ]
+    X = [80 + j * 740 for j in range(3)]
     zones = []
     for i, (name, makers, labels) in enumerate(lanes):
         top = 170 + i * 270
         zones.append(Z(40, top, 2040, 250, name, "ext"))
-        boxes = [mk(80 + j * 740, top + 64) for j, mk in enumerate(makers)]
+        boxes = [mk(X[j], top + 64) for j, mk in enumerate(makers)]
         for a, b, lbl in zip(boxes, boxes[1:], labels):
             H(a, b, lbl)
-    # Kibana: the organizer's screen for the event data and the past claims
-    kib = B(2260, 0, "Kibana\n(dashboards)", "ext", w=420, h=380, icons={0: KIBANA}, fill=WHITE,
-            cy=(zones[0].bottom + zones[1].y) / 2 - S.oy)
-    H(zones[0], kib, "shows", y=zones[0].cy)
-    H(zones[1], kib, "shows", y=zones[1].cy)
+    # raw band radio data and event photos, kept as they came for the dashboards
+    top = 170 + 2 * 270
+    zones.append(Z(40, top, 2040, 340, "store raw data (pipeline)", "ext"))
+    raw = SV(X[2], top + 64, ELASTIC, "bandit-raw-radio\nbandit-raw-heard\nbandit-raw-gateway\nbandit-raw-photos",
+             w=480, h=240)
+    scripts = B(X[1], top + 64, "feed.py\nphotos.py", "rust", w=480, h=240, icons={0: PYTHON, 1: PYTHON})
+    gateway = B(X[0], top + 64, "gateway", "device", w=480, h=100, icons={0: RADIO})
+    photos = B(X[0], top + 64 + 140, "event photos", "note", w=480, h=100, icons={0: IMAGE})
+    H(gateway, scripts, "records", y=gateway.cy)
+    H(photos, scripts, "imports", y=photos.cy)
+    H(scripts, raw, "stores")
+    # recap suggestions: interests from the booths with the most minutes, ranked by meaning
+    top = zones[-1].bottom - S.oy + 20
+    zones.append(Z(40, top, 2040, 420, "rank recap (bandit-indexer, bandit-api)", "ext"))
+    r1, r2 = top + 64, top + 64 + BH + 80
+    visit = B(X[0], r1, "visit\ntop 5 booths", "stdb", w=480, icons={0: WALK})
+    indexer = B(X[1], r1, "bandit-indexer", "rust", w=480, icons={0: RUST})
+    people = SV(X[2], r1, ELASTIC, "bandit-people\nbandit-booths\n(semantic search)", w=480, h=r2 + BH - r1)
+    api = B(X[1], r2, "bandit-api\nGET /api/recap", "rust", w=480, icons={0: RUST})
+    recap = B(X[0], r2, "recap (/t/code)", "web", w=480, icons={0: PHONE})
+    H(visit, indexer, "sets interests")
+    H(indexer, people, "copies rows", y=indexer.cy)
+    H(people, api, "ranks", y=api.cy)
+    H(api, recap, "orders lists")
+    # Kibana: the organizer's screen for the event data, the past claims and the raw data
+    first, last = zones[0].cy, zones[2].cy
+    kib = B(2260, 0, "Kibana\n(dashboards)", "ext", w=420, h=last - first + 160, icons={0: KIBANA}, fill=WHITE,
+            cy=(first + last) / 2 - S.oy)
+    for z in zones[:3]:
+        H(z, kib, "shows", y=z.cy)
     return S.end_frame()
 
 
@@ -364,30 +388,38 @@ def claude_jobs(y0):
 def social(y0):
     S.begin_frame("9 · Social and recap flow", 0, y0, 1000, 600)
     title("Social")
-    c1, c2, c3, c4 = 60, 820, 1540, 2240
+    c1, c2, c3, c4 = 60, 820, 1640, 2340
     r1, r2, r3 = 260, 480, 700
+    gh = 4 * 35 + 50  # the event graph box holds four lines
     attendee = B(c1, r1, "attendee\ntap page (/t/code)", "web", w=520, icons={0: USER, 1: PHONE})
     auth = SV(c1, r2, STDB, "SpacetimeAuth (sign-in)", w=520)
     setup = B(c1, r3, "claim_band\nconfirm_medical_card\nconnect_wallet", "stdb", w=520, h=150)
-    photo = B(c2, r1, "photo page (/photo)\nregister_photo", "web", w=480, icons={0: IMAGE})
-    tick = B(c2, r2, "social_tick\nvisit, social_encounter", "stdb", w=480)
-    graph = B(c2, r3, "people graph", "stdb", w=480)
+    photo = B(c2, r1, "photo page (/photo)\nregister_photo", "web", w=560, icons={0: IMAGE})
+    tick = B(c2, r2, "social_tick\nvisit, social_encounter", "stdb", w=560)
+    graph = B(c2, r3, "Event graph\norganizer portal\n(/organizer)\n3d-force-graph, graphology", "web", w=560,
+              h=gh, icons={0: (GRAPH3D, 34), 1: MONITOR})
     org = B(c3, r1, "organizer portal\n(/organizer)", "web", w=440, icons={0: MONITOR})
-    recap = B(c3, r2, "recap (/t/code)", "web", w=440, h=r3 + 150 - r2, icons={0: PHONE})
-    ee = SV(c4, 0, ELASTIC, "(Evidence Engine)", w=440, cy=L(recap.cy))
-    zt, zb = 190, r3 + 150 + 40
+    recap = B(c3, r2, "recap (/t/code)", "web", w=440, h=r3 + gh - r2, icons={0: PHONE})
+    ee = SV(c4, 0, ELASTIC, "(Evidence Engine)", w=440, cy=L(recap.cy) - 70)
+    zt, zb = 190, r3 + gh + 40
     Z(40, zt, 560, zb - zt, "at door", "web")
-    Z(c2 - 20, zt, 520, zb - zt, "during event", "stdb")
+    Z(c2 - 20, zt, 600, zb - zt, "during event", "stdb")
     Z(c3 - 20, zt, c4 + 440 + 20 - (c3 - 20), zb - zt, "after event", "plain")
     V(attendee, auth, "signs in")
     V(auth, setup, "sets up")
     D(setup, "r", 0.3, tick, "l", 0.7, "wears band")
     V(tick, graph, "writes links")
     V(tick, photo, "tags people")
-    H(graph, recap, "lists people", y=graph.cy)
-    D(photo, "r", 0.7, recap, "l", 0.1, "adds photos")
+    H(tick, recap, "lists people", y=tick.cy)
+    D(photo, "r", 0.5, recap, "t", 0.12, "adds photos")
     V(org, recap, "ends event")
     H(ee, recap, "ranks lists", y=ee.cy)
+    # the recap's share button: the photo goes out through the phone's share sheet
+    sy, s = recap.bottom - 70, 44
+    lx = ee.x + 40
+    S.arrow(recap, None, [(recap.right, sy), (lx - 14, sy)], label="shares photo", fs=AFS)
+    for i, path in enumerate(SOCIALS):
+        S.image(lx + i * (s + 22), sy - s / 2, path, s)
     return S.end_frame()
 
 
