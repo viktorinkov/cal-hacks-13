@@ -24,6 +24,7 @@ labels.domElement.className = 'labels';
 view.appendChild(labels.domElement);
 const cam = new THREE.PerspectiveCamera(50, 1, 0.05, 2000);
 const controls = new OrbitControls(cam, renderer.domElement);
+window.bandit = { scene, cam, controls, renderer };
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI * 0.495;
@@ -207,6 +208,7 @@ async function addSplat() {
     const mesh = new SplatMesh({ url: S.splat.url, fileType: 'splat' });
     scene.add(mesh);
     await mesh.initialized;
+    window.bandit.splat = mesh;
     note.textContent = count;
   } catch (e) {
     note.textContent = `the splat did not load (${e.message}); showing the plan`;
