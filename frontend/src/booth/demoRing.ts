@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type { FloorBand } from '@/stdb/floor'
 import type { Device, GuidanceCommand, Incident, LedPattern, Vec2 } from '@/contracts/domain'
-import { routeToRing } from '@/booth/hallRoute'
+import { ensureVenueFloor, routeOnVenueFloor } from '@/booth/floorGuide'
+import { floorZ, routeToRing } from '@/booth/hallRoute'
+import { serverRoute } from '@/booth/serverRoute'
 import { calhacksVenue } from '@/mock/calhacks'
 import { boothHandle } from './circle'
 
@@ -90,9 +92,24 @@ export function demoEntrance(): Vec2 {
   return calhacksVenue.zones.find((zone) => zone.zoneId === 'entrance')?.labelAt ?? { x: 42, y: 196 }
 }
 
-/** The walk from the entrance to the rim of the ring, along the floor and up the stairs when the ring is on the deck. */
+/** The walk from the entrance to the rim of the ring. A `crowd_walk` route wins; the floor grid, then the local walk, fill in when none reaches. */
 export function demoRoute(ring: Pick<DemoRing, 'x' | 'y' | 'r'>): { points: Vec2[]; z: number[] } {
-  return routeToRing(demoEntrance(), ring)
+  const from = demoEntrance()
+  ensureVenueFloor()
+  const dx = ring.x - from.x
+  const dy = ring.y - from.y
+  const len = Math.hypot(dx, dy) || 1
+  const rim = { x: ring.x - (dx / len) * ring.r, y: ring.y - (dy / len) * ring.r }
+  const stored = serverRoute(from, rim)
+  if (stored) {
+    const last = stored[stored.length - 1]!
+    const gap = Math.hypot(last.x - rim.x, last.y - rim.y)
+    const points = gap > 0.4 && gap < 20 ? [...stored, rim] : stored
+    return { points, z: points.map((point) => floorZ(point.x, point.y)) }
+  }
+  const walked = routeOnVenueFloor(from, rim)
+  if (walked) return { points: walked, z: walked.map((point) => floorZ(point.x, point.y)) }
+  return routeToRing(from, ring)
 }
 
 /** Plan of {@link demoRoute}. The line stops where the hardware is standing. */

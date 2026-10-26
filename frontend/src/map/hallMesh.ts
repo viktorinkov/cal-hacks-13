@@ -8,11 +8,8 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { MODEL_MARGIN } from '@/venue/chosenModel'
+import { palaceToPlan } from './palacePlan'
 import type { Camera } from './projection'
-
-/** Same origin shift the traced plan was built with, so meshes and labels share one floor. */
-const OX = 50.84 + 8
-const OY = 106.57 + 8
 
 /** The Palace's ceilings start above this height; its mezzanine tabletops at about 5.6 m stay. */
 const PALACE_ROOF_M = 7.6
@@ -30,7 +27,7 @@ export const PALACE_HALL: HallSource = { url: '/venue/venue.glb', venueId: 'calh
 
 /** A Palace model point (metres, y up) in plan space: x east, y south, h up. */
 export function palacePoint(x: number, y: number, z: number): { x: number; y: number; h: number } {
-  return { x: -z + OX, y: x + OY, h: y }
+  return palaceToPlan(x, y, z)
 }
 
 /**

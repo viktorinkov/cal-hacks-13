@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { BoardClaim, BoardFact, BoardCheck } from '@/cover/liveClaims'
 import { scheduleCatalog } from './catalog'
+import { syncServerWalks } from '@/booth/serverRoute'
 import { syncFloor } from './floor'
 import { loadHostConfig, type HostConfig } from './host'
 import { DbConnection } from './module_bindings'
@@ -29,6 +30,8 @@ const FLOOR_QUERIES = [
   'SELECT * FROM band',
   'SELECT * FROM booth',
   'SELECT * FROM command',
+  // Public routes the module already computed. The yellow responder line uses the one that joins the entrance to the ring.
+  'SELECT * FROM crowd_walk',
   // Public. end_event writes this row, and every band's page reads it to flip to the recap.
   'SELECT * FROM event_state',
 ]
@@ -438,6 +441,7 @@ function publish() {
     recapPhotos: night.photos,
     departure: night.departure,
   })
+  syncServerWalks(db)
   syncFloor(db)
   scheduleCatalog(db)
   schedulePayments(db)
