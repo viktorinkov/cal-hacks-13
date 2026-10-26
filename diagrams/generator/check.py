@@ -17,6 +17,12 @@ for f in frames:
         x0, y0, x1, y1 = bb(k)
         if x0 < fx0 or y0 < fy0 or x1 > fx1 or y1 > fy1:
             print("  OUTSIDE", k["type"], k["id"], (k.get("text") or "")[:40], [round(v) for v in (x0, y0, x1, y1)])
+    # free text: only the title, box labels, arrow labels and zone labels may hold text
+    zr = [k for k in kids if k["type"] == "rectangle" and k.get("roughness") == 0 and k.get("strokeWidth") == 1]
+    for t in [k for k in kids if k["type"] == "text" and not k.get("containerId")]:
+        zone_label = any(z["x"] <= t["x"] <= z["x"] + 320 and z["y"] <= t["y"] <= z["y"] + 20 for z in zr)
+        if t["fontSize"] < 40 and not zone_label:
+            print("  FREE TEXT", t["text"][:40])
     # overlapping boxes (rects/diamonds with bound text), ignoring zones (no bound text)
     boxes = [k for k in kids if k["type"] in ("rectangle", "diamond") and any(b["type"] == "text" for b in k["boundElements"])]
     for a, b in itertools.combinations(boxes, 2):

@@ -1,0 +1,1512 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "insurer-receipt-re2",
+      "type": "rectangle",
+      "x": 60,
+      "y": 90,
+      "width": 800,
+      "height": 940,
+      "angle": 0,
+      "strokeColor": "#b5bfca",
+      "backgroundColor": "#fff3bf",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 556216510,
+      "version": 1,
+      "versionNonce": 624397382,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar32"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramComponent": true
+      }
+    },
+    {
+      "id": "insurer-receipt-im3",
+      "type": "image",
+      "x": 352.5,
+      "y": 145,
+      "width": 215.0,
+      "height": 215,
+      "angle": 0,
+      "strokeColor": "transparent",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1471580327,
+      "version": 1,
+      "versionNonce": 1953222565,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "fileId": "a6bb9a75b12533bd2c83",
+      "status": "saved",
+      "scale": [
+        1,
+        1
+      ],
+      "crop": null,
+      "customData": {
+        "assetSource": "diagrams/logos/icon-file-text.svg"
+      }
+    },
+    {
+      "id": "insurer-receipt-te4",
+      "type": "text",
+      "x": 225.04,
+      "y": 415,
+      "width": 469.92,
+      "height": 70.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1469054727,
+      "version": 1,
+      "versionNonce": 1722291874,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Settled claim",
+      "originalText": "Settled claim",
+      "fontSize": 56,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx5",
+      "type": "rectangle",
+      "x": 95,
+      "y": 615,
+      "width": 730,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx5"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1823935511,
+      "version": 1,
+      "versionNonce": 1911255645,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx6"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re2",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx6",
+      "type": "text",
+      "x": 106.0,
+      "y": 635.0,
+      "width": 708.0,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx5"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 398839631,
+      "version": 1,
+      "versionNonce": 1400180231,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Expected insurer recovery",
+      "originalText": "Expected insurer recovery",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx5",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx7",
+      "type": "rectangle",
+      "x": 95,
+      "y": 730,
+      "width": 730,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx7"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 495120842,
+      "version": 1,
+      "versionNonce": 1430622600,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx8"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re2",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx8",
+      "type": "text",
+      "x": 260.88,
+      "y": 750.0,
+      "width": 398.24,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx7"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 316023505,
+      "version": 1,
+      "versionNonce": 1866659273,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Settled status",
+      "originalText": "Settled status",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx7",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-re9",
+      "type": "rectangle",
+      "x": 1120,
+      "y": 90,
+      "width": 820,
+      "height": 940,
+      "angle": 0,
+      "strokeColor": "#b5bfca",
+      "backgroundColor": "#d0ebff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 483533713,
+      "version": 1,
+      "versionNonce": 1376445029,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar32"
+        },
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar34"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramComponent": true
+      }
+    },
+    {
+      "id": "insurer-receipt-im10",
+      "type": "image",
+      "x": 1422.5,
+      "y": 145,
+      "width": 215.0,
+      "height": 215,
+      "angle": 0,
+      "strokeColor": "transparent",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1576303687,
+      "version": 1,
+      "versionNonce": 402382975,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "fileId": "37214e3ac6bd081fb1cc",
+      "status": "saved",
+      "scale": [
+        1,
+        1
+      ],
+      "crop": null,
+      "customData": {
+        "assetSource": "diagrams/logos/icon-user.svg"
+      }
+    },
+    {
+      "id": "insurer-receipt-te11",
+      "type": "text",
+      "x": 1223.3600000000001,
+      "y": 415,
+      "width": 613.28,
+      "height": 140.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 279630351,
+      "version": 1,
+      "versionNonce": 152099538,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Organizer records\nreceived payment",
+      "originalText": "Organizer records\nreceived payment",
+      "fontSize": 56,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx12",
+      "type": "rectangle",
+      "x": 1155,
+      "y": 615,
+      "width": 750,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx12"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1140989744,
+      "version": 1,
+      "versionNonce": 1816321495,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx13"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re9",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx13",
+      "type": "text",
+      "x": 1316.8,
+      "y": 635.0,
+      "width": 426.40000000000003,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx12"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 459362916,
+      "version": 1,
+      "versionNonce": 1599214264,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Amount received",
+      "originalText": "Amount received",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx12",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx14",
+      "type": "rectangle",
+      "x": 1155,
+      "y": 730,
+      "width": 750,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx14"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 632770569,
+      "version": 1,
+      "versionNonce": 64368631,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx15"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re9",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx15",
+      "type": "text",
+      "x": 1288.6399999999999,
+      "y": 750.0,
+      "width": 482.72,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx14"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 926811702,
+      "version": 1,
+      "versionNonce": 271220033,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Receipt reference",
+      "originalText": "Receipt reference",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx14",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-re16",
+      "type": "rectangle",
+      "x": 2200,
+      "y": 90,
+      "width": 1040,
+      "height": 940,
+      "angle": 0,
+      "strokeColor": "#b5bfca",
+      "backgroundColor": "#dce3ff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1798853661,
+      "version": 1,
+      "versionNonce": 1469224166,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar34"
+        },
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar36"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramComponent": true
+      }
+    },
+    {
+      "id": "insurer-receipt-im17",
+      "type": "image",
+      "x": 2250.0,
+      "y": 145,
+      "width": 939.9999999999999,
+      "height": 141.88679245283018,
+      "angle": 0,
+      "strokeColor": "transparent",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1306533649,
+      "version": 1,
+      "versionNonce": 2143203169,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "fileId": "e1f43fdf9e00452042fa",
+      "status": "saved",
+      "scale": [
+        1,
+        1
+      ],
+      "crop": null,
+      "customData": {
+        "assetSource": "diagrams/logos/spacetimedb.svg"
+      }
+    },
+    {
+      "id": "insurer-receipt-te18",
+      "type": "text",
+      "x": 2341.68,
+      "y": 415,
+      "width": 756.64,
+      "height": 70.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 30993318,
+      "version": 1,
+      "versionNonce": 2132397926,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Post balanced journal",
+      "originalText": "Post balanced journal",
+      "fontSize": 56,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx19",
+      "type": "rectangle",
+      "x": 2235,
+      "y": 615,
+      "width": 970,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx19"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 592355133,
+      "version": 1,
+      "versionNonce": 1791820563,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx20"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re16",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx20",
+      "type": "text",
+      "x": 2534.96,
+      "y": 635.0,
+      "width": 370.08,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx19"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 315058022,
+      "version": 1,
+      "versionNonce": 182430320,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Cash received",
+      "originalText": "Cash received",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx19",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx21",
+      "type": "rectangle",
+      "x": 2235,
+      "y": 730,
+      "width": 970,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx21"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1871069712,
+      "version": 1,
+      "versionNonce": 1705337947,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx22"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re16",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx22",
+      "type": "text",
+      "x": 2422.32,
+      "y": 750.0,
+      "width": 595.36,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx21"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1738902573,
+      "version": 1,
+      "versionNonce": 1907721130,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Close full receivable",
+      "originalText": "Close full receivable",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx21",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx23",
+      "type": "rectangle",
+      "x": 2235,
+      "y": 845,
+      "width": 970,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx23"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1730972404,
+      "version": 1,
+      "versionNonce": 563607821,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx24"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re16",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx24",
+      "type": "text",
+      "x": 2422.32,
+      "y": 865.0,
+      "width": 595.36,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx23"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1774606055,
+      "version": 1,
+      "versionNonce": 968656638,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Adjust claims expense",
+      "originalText": "Adjust claims expense",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx23",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-re25",
+      "type": "rectangle",
+      "x": 3500,
+      "y": 90,
+      "width": 680,
+      "height": 940,
+      "angle": 0,
+      "strokeColor": "#b5bfca",
+      "backgroundColor": "#d3f9d8",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1599338781,
+      "version": 1,
+      "versionNonce": 937946015,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "arrow",
+          "id": "insurer-receipt-ar36"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramComponent": true
+      }
+    },
+    {
+      "id": "insurer-receipt-im26",
+      "type": "image",
+      "x": 3732.5,
+      "y": 145,
+      "width": 215.0,
+      "height": 215,
+      "angle": 0,
+      "strokeColor": "transparent",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 2038656513,
+      "version": 1,
+      "versionNonce": 299589320,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "fileId": "8212369f5a8f36ad156b",
+      "status": "saved",
+      "scale": [
+        1,
+        1
+      ],
+      "crop": null,
+      "customData": {
+        "assetSource": "diagrams/logos/icon-monitor.svg"
+      }
+    },
+    {
+      "id": "insurer-receipt-te27",
+      "type": "text",
+      "x": 3551.2799999999997,
+      "y": 415,
+      "width": 577.44,
+      "height": 70.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1704609278,
+      "version": 1,
+      "versionNonce": 1883374841,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Reconciled claim",
+      "originalText": "Reconciled claim",
+      "fontSize": 56,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx28",
+      "type": "rectangle",
+      "x": 3535,
+      "y": 615,
+      "width": 610,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx28"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 551276187,
+      "version": 1,
+      "versionNonce": 763939708,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx29"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re25",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx29",
+      "type": "text",
+      "x": 3612.72,
+      "y": 635.0,
+      "width": 454.56,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx28"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1825230130,
+      "version": 1,
+      "versionNonce": 502570973,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Payment recorded",
+      "originalText": "Payment recorded",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx28",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-bx30",
+      "type": "rectangle",
+      "x": 3535,
+      "y": 730,
+      "width": 610,
+      "height": 95,
+      "angle": 0,
+      "strokeColor": "#cbd3dc",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx30"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1045363873,
+      "version": 1,
+      "versionNonce": 1928957431,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "insurer-receipt-tx31"
+        }
+      ],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "diagramParentComponent": "insurer-receipt-re25",
+        "diagramSourceColor": {
+          "stroke": "#cbd3dc",
+          "fill": "#ffffff"
+        }
+      }
+    },
+    {
+      "id": "insurer-receipt-tx31",
+      "type": "text",
+      "x": 3654.96,
+      "y": 750.0,
+      "width": 370.08,
+      "height": 55.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "card_bx30"
+      ],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 1621358421,
+      "version": 1,
+      "versionNonce": 1180477523,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "Costs updated",
+      "originalText": "Costs updated",
+      "fontSize": 44,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "insurer-receipt-bx30",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-ar32",
+      "type": "arrow",
+      "x": 860,
+      "y": 560.0,
+      "width": 260,
+      "height": 0.0,
+      "angle": 0,
+      "strokeColor": "#343a40",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1211478407,
+      "version": 1,
+      "versionNonce": 2107586764,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0.0
+        ],
+        [
+          260,
+          0.0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "startBinding": {
+        "elementId": "insurer-receipt-re2",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "insurer-receipt-re9",
+        "focus": 0,
+        "gap": 6
+      }
+    },
+    {
+      "id": "insurer-receipt-te33",
+      "type": "text",
+      "x": 885.6,
+      "y": 435.0,
+      "width": 208.8,
+      "height": 100.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 922510972,
+      "version": 1,
+      "versionNonce": 1440378127,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "expected\nrecovery",
+      "originalText": "expected\nrecovery",
+      "fontSize": 40,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-ar34",
+      "type": "arrow",
+      "x": 1940,
+      "y": 560.0,
+      "width": 260,
+      "height": 0.0,
+      "angle": 0,
+      "strokeColor": "#343a40",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 782119169,
+      "version": 1,
+      "versionNonce": 1908317085,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0.0
+        ],
+        [
+          260,
+          0.0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "startBinding": {
+        "elementId": "insurer-receipt-re9",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "insurer-receipt-re16",
+        "focus": 0,
+        "gap": 6
+      }
+    },
+    {
+      "id": "insurer-receipt-te35",
+      "type": "text",
+      "x": 1952.8,
+      "y": 435.0,
+      "width": 234.4,
+      "height": 100.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 923036299,
+      "version": 1,
+      "versionNonce": 1371478933,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "amount +\nreference",
+      "originalText": "amount +\nreference",
+      "fontSize": 40,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-ar36",
+      "type": "arrow",
+      "x": 3240,
+      "y": 560.0,
+      "width": 260,
+      "height": 0.0,
+      "angle": 0,
+      "strokeColor": "#343a40",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 673797402,
+      "version": 1,
+      "versionNonce": 1407143128,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0.0
+        ],
+        [
+          260,
+          0.0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "startBinding": {
+        "elementId": "insurer-receipt-re16",
+        "focus": 0,
+        "gap": 6
+      },
+      "endBinding": {
+        "elementId": "insurer-receipt-re25",
+        "focus": 0,
+        "gap": 6
+      }
+    },
+    {
+      "id": "insurer-receipt-te37",
+      "type": "text",
+      "x": 3252.8,
+      "y": 435.0,
+      "width": 234.4,
+      "height": 100.0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": "insurer-receipt-frame1",
+      "roundness": null,
+      "seed": 252028787,
+      "version": 1,
+      "versionNonce": 742984738,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "text": "commit +\nreconcile",
+      "originalText": "commit +\nreconcile",
+      "fontSize": 40,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "insurer-receipt-frame1",
+      "type": "frame",
+      "x": 0,
+      "y": 0,
+      "width": 4240,
+      "height": 1130,
+      "angle": 0,
+      "strokeColor": "#bbbbbb",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 1,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1760171314,
+      "version": 1,
+      "versionNonce": 1277055200,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1792828800000,
+      "link": null,
+      "locked": false,
+      "name": "01 \u00b7 Record insurer payment",
+      "customData": {
+        "diagramStyleVersion": 1
+      }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {
+    "a6bb9a75b12533bd2c83": {
+      "mimeType": "image/svg+xml",
+      "id": "a6bb9a75b12533bd2c83",
+      "created": 1792828800000,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZwogIGNsYXNzPSJsdWNpZGUgbHVjaWRlLWZpbGUtdGV4dCIKICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgd2lkdGg9IjI0IgogIGhlaWdodD0iMjQiCiAgdmlld0JveD0iMCAwIDI0IDI0IgogIGZpbGw9Im5vbmUiCiAgc3Ryb2tlPSIjMWUxZTFlIgogIHN0cm9rZS13aWR0aD0iMiIKICBzdHJva2UtbGluZWNhcD0icm91bmQiCiAgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIKPgogIDxwYXRoIGQ9Ik0xNSAySDZhMiAyIDAgMCAwLTIgMnYxNmEyIDIgMCAwIDAgMiAyaDEyYTIgMiAwIDAgMCAyLTJWN1oiIC8+CiAgPHBhdGggZD0iTTE0IDJ2NGEyIDIgMCAwIDAgMiAyaDQiIC8+CiAgPHBhdGggZD0iTTEwIDlIOCIgLz4KICA8cGF0aCBkPSJNMTYgMTNIOCIgLz4KICA8cGF0aCBkPSJNMTYgMTdIOCIgLz4KPC9zdmc+Cg=="
+    },
+    "37214e3ac6bd081fb1cc": {
+      "mimeType": "image/svg+xml",
+      "id": "37214e3ac6bd081fb1cc",
+      "created": 1792828800000,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZwogIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXVzZXIiCiAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogIHdpZHRoPSIyNCIKICBoZWlnaHQ9IjI0IgogIHZpZXdCb3g9IjAgMCAyNCAyNCIKICBmaWxsPSJub25lIgogIHN0cm9rZT0iIzFlMWUxZSIKICBzdHJva2Utd2lkdGg9IjIiCiAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIgogIHN0cm9rZS1saW5lam9pbj0icm91bmQiCj4KICA8cGF0aCBkPSJNMTkgMjF2LTJhNCA0IDAgMCAwLTQtNEg5YTQgNCAwIDAgMC00IDR2MiIgLz4KICA8Y2lyY2xlIGN4PSIxMiIgY3k9IjciIHI9IjQiIC8+Cjwvc3ZnPgo="
+    },
+    "e1f43fdf9e00452042fa": {
+      "mimeType": "image/svg+xml",
+      "id": "e1f43fdf9e00452042fa",
+      "created": 1792828800000,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA0MjQgNjQiIGZpbGw9Im5vbmUiPjxnIHRyYW5zZm9ybT0ic2NhbGUoMC4xKSI+CjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF8xNTkzXzE5NDEpIj4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01MTQuODMyIDMwOC4yNjFDNTEwLjU2NyAyMDguODM2IDUyOS4xNzYgMTUxLjM5OSA2MjIgNDVMNDcwLjgwNSAxOTcuNzkzTDQ1Ny40NSAyMTEuMjlDNDQ1LjQxOSAyMjMuNDQ3IDQ0NC42OCAyNDIuNDkyIDQ1Mi4xNjcgMjU3Ljg3QzQ3OC44MSAzMTIuNTk2IDQ2OS42MDYgMzgwLjYzMyA0MjQuNTUzIDQyNi4xNjJDMzc5LjY5MSA0NzEuNDk4IDMxMi43NDMgNDgwLjkxMyAyNTguNzA4IDQ1NC40MDdDMjQzLjExIDQ0Ni43NTYgMjIzLjcwNSA0NDcuNTA1IDIxMS40ODUgNDU5Ljg1NEwxOTguNTczIDQ3Mi45MDNMMTk4LjcgNDczLjAxTDE0NC4wOTkgNTI4LjU4OUMxODUuMzI2IDUwNC40NTggMjQ4Ljk4OCA1MTEuMzgyIDI4Ny4zOTIgNTE1LjU1OEMyOTguMDI5IDUxNi43MTUgMzA2LjcyOCA1MTcuNjYxIDMxMi40NzYgNTE3LjY3OEMzNjUuMDg0IDUyMC4yOTMgNDE4LjU0OCA1MDEuMyA0NTguNzI3IDQ2MC42OTdDNTAwLjA3NCA0MTguOTEyIDUxOC43NzYgMzYyLjkwOCA1MTQuODMyIDMwOC4yNjFaTTMyNi41MjQgMTIyLjMyMkMzMzIuMjcyIDEyMi4zMzkgMzQwLjk3MSAxMjMuMjg1IDM1MS42MDggMTI0LjQ0MkMzOTAuMDEyIDEyOC42MTkgNDUzLjY3NCAxMzUuNTQyIDQ5NC45MDEgMTExLjQxMkw0NDAuMyAxNjYuOTlMNDQwLjQyNyAxNjcuMDk3TDQyNy41MTUgMTgwLjE0NkM0MTUuMjk1IDE5Mi40OTUgMzk1Ljg5IDE5My4yNDUgMzgwLjI5MiAxODUuNTkzQzMyNi4yNTcgMTU5LjA4NyAyNTkuMzA5IDE2OC41MDIgMjE0LjQ0NyAyMTMuODM4QzE2OS4zOTQgMjU5LjM2NyAxNjAuMTkgMzI3LjQwNCAxODYuODMzIDM4Mi4xMzFDMTk0LjMyIDM5Ny41MDkgMTkzLjU4MSA0MTYuNTUzIDE4MS41NSA0MjguNzFMMTY4LjE5NSA0NDIuMjA3TDE3IDU5NUMxMDkuODI0IDQ4OC42MDEgMTI4LjQzMyA0MzEuMTY0IDEyNC4xNjggMzMxLjc0QzEyMC4yMjQgMjc3LjA5MiAxMzguOTI2IDIyMS4wODggMTgwLjI3MyAxNzkuMzA0QzIyMC40NTIgMTM4LjcwMSAyNzMuOTE2IDExOS43MDcgMzI2LjUyNCAxMjIuMzIyWk00MzUuODQ3IDMyMEM0MzUuODQ3IDM4NC45MzUgMzgzLjc1NyA0MzcuNTc2IDMxOS41IDQzNy41NzZDMjU1LjI0MyA0MzcuNTc2IDIwMy4xNTMgMzg0LjkzNSAyMDMuMTUzIDMyMEMyMDMuMTUzIDI1NS4wNjQgMjU1LjI0MyAyMDIuNDIzIDMxOS41IDIwMi40MjNDMzgzLjc1NyAyMDIuNDIzIDQzNS44NDcgMjU1LjA2NCA0MzUuODQ3IDMyMFpNNDQ0Ljc5NyAzMjBDNDQ0Ljc5NyAzODkuOTMgMzg4LjcgNDQ2LjYyMSAzMTkuNSA0NDYuNjIxQzI1MC4zIDQ0Ni42MjEgMTk0LjIwMyAzODkuOTMgMTk0LjIwMyAzMjBDMTk0LjIwMyAyNTAuMDY5IDI1MC4zIDE5My4zNzggMzE5LjUgMTkzLjM3OEMzODguNyAxOTMuMzc4IDQ0NC43OTcgMjUwLjA2OSA0NDQuNzk3IDMyMFoiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTQzOS4yNSAzMjBDNDM5LjI1IDM4Ni4xMzYgMzg1LjYzNiA0MzkuNzUgMzE5LjUgNDM5Ljc1QzI1My4zNjQgNDM5Ljc1IDE5OS43NSAzODYuMTM2IDE5OS43NSAzMjBDMTk5Ljc1IDI1My44NjQgMjUzLjM2NCAyMDAuMjUgMzE5LjUgMjAwLjI1QzM4NS42MzYgMjAwLjI1IDQzOS4yNSAyNTMuODY0IDQzOS4yNSAzMjBaIiBzdHJva2U9IiMwNjA2MDYiIHN0cm9rZS13aWR0aD0iOCIvPgo8L2c+CjxkZWZzPgo8Y2xpcFBhdGggaWQ9ImNsaXAwXzE1OTNfMTk0MSI+CjxyZWN0IHdpZHRoPSI2NDAiIGhlaWdodD0iNjQwIiBmaWxsPSJ3aGl0ZSIvPgo8L2NsaXBQYXRoPgo8L2RlZnM+CjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NiA2KSI+CjxwYXRoIGQ9Ik0xNi4xNTU0IDQzLjA3MjZDMTAuOTcxMSA0My4wNzI2IDcuMDQ2MzMgNDEuOTA1OSA0LjM4MTE0IDM5LjU3MjZDMS43MTU5NSAzNy4yMzkyIDAuMjU1NTY2IDMzLjk4MzkgMCAyOS44MDY1SDguNDg4NDVDOC43MDc1MSAzMS44NzYzIDkuMzY0NjggMzMuNDk0NiAxMC40NiAzNC42NjEzQzExLjU5MTggMzUuODI4IDEzLjQ5MDIgMzYuNDExMyAxNi4xNTU0IDM2LjQxMTNDMTguMDkwNCAzNi40MTEzIDE5LjY0MjEgMzUuOTIyIDIwLjgxMDQgMzQuOTQzNUMyMi4wMTUyIDMzLjkyNzQgMjIuNjE3NiAzMi42MjkgMjIuNjE3NiAzMS4wNDg0QzIyLjYxNzYgMjkuNDMwMSAyMi4xMDY1IDI4LjI2MzQgMjEuMDg0MiAyNy41NDg0QzIwLjA2MiAyNi44MzMzIDE4LjEwODcgMjYuMjUgMTUuMjI0NCAyNS43OTg0QzEwLjExMzEgMjUuMTIxIDYuNDgwNDMgMjMuODc5IDQuMzI2MzcgMjIuMDcyNkMyLjE3MjMxIDIwLjIyODUgMS4wOTUyOCAxNy4zODcxIDEuMDk1MjggMTMuNTQ4NEMxLjA5NTI4IDEwLjA0ODQgMi4zOTEzNyA3LjE2OTM2IDQuOTgzNTQgNC45MTEyOUM3LjYxMjIyIDIuNjUzMjMgMTEuMDYyNCAxLjUyNDE5IDE1LjMzNCAxLjUyNDE5QzE5Ljc1MTYgMS41MjQxOSAyMy4yMDE4IDIuNTQwMzIgMjUuNjg0NCA0LjU3MjU4QzI4LjIwMzYgNi42MDQ4NCAyOS42NDU3IDkuNjE1NTkgMzAuMDEwOCAxMy42MDQ4SDIxLjg1MDlDMjEuMzAzMyAxMC4wMjk2IDE5LjEzMSA4LjI0MTk0IDE1LjMzNCA4LjI0MTk0QzEzLjQzNTUgOC4yNDE5NCAxMS45NzUxIDguNjU1OTEgMTAuOTUyOCA5LjQ4Mzg3QzkuOTY3MDkgMTAuMzExOCA5LjQ3NDIxIDExLjQyMiA5LjQ3NDIxIDEyLjgxNDVDOS40NzQyMSAxNC4zMTk5IDkuOTQ4ODMgMTUuNDQ4OSAxMC44OTgxIDE2LjIwMTZDMTEuODgzOCAxNi45MTY3IDEzLjgzNzEgMTcuNSAxNi43NTc4IDE3Ljk1MTZDMjEuNzk2MiAxOC42MjkgMjUuNDQ3MSAxOS44NTIyIDI3LjcxMDcgMjEuNjIxQzI5Ljk3NDMgMjMuMzUyMSAzMS4xMDYxIDI2LjIxMjQgMzEuMTA2MSAzMC4yMDE2QzMxLjEwNjEgMzMuODg5OCAyOS43MzcgMzYuOTU3IDI2Ljk5ODggMzkuNDAzMkMyNC4yOTcxIDQxLjg0OTUgMjAuNjgyNiA0My4wNzI2IDE2LjE1NTQgNDMuMDcyNloiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTM2Ljc4MjMgNTIuNVYxMi45Mjc0SDQ0LjcyMzFWMTcuNTU2NUM0NS41NjI4IDE2LjA1MTEgNDYuNzg1OSAxNC43OTAzIDQ4LjM5MjMgMTMuNzc0MkM1MC4wMzUyIDEyLjc1ODEgNTEuODYwNyAxMi4yNSA1My44Njg3IDEyLjI1QzU3LjUxOTcgMTIuMjUgNjAuNTEzNCAxMy41ODYgNjIuODUwMSAxNi4yNTgxQzY1LjE4NjcgMTguOTMwMSA2Ni4zNTUgMjIuNjM3MSA2Ni4zNTUgMjcuMzc5VjI3LjgzMDZDNjYuMzU1IDMyLjU3MjYgNjUuMTg2NyAzNi4yOTg0IDYyLjg1MDEgMzkuMDA4MUM2MC41MTM0IDQxLjcxNzcgNTcuNTE5NyA0My4wNzI2IDUzLjg2ODcgNDMuMDcyNkM1MS43NTEyIDQzLjA3MjYgNDkuODg5MiA0Mi42MDIxIDQ4LjI4MjggNDEuNjYxM0M0Ni42NzY0IDQwLjY4MjggNDUuNDg5OCAzOS40NDA5IDQ0LjcyMzEgMzcuOTM1NVY1Mi41SDM2Ljc4MjNaTTUxLjUxMzkgMzYuNjkzNUM1My43MDQ0IDM2LjY5MzUgNTUuMzgzOSAzNS45NDA5IDU2LjU1MjIgMzQuNDM1NUM1Ny43MjA1IDMyLjkzMDEgNTguMzA0NiAzMC43NDczIDU4LjMwNDYgMjcuODg3MVYyNy40MzU1QzU4LjMwNDYgMjQuNTM3NiA1Ny42ODQgMjIuMzM2IDU2LjQ0MjYgMjAuODMwNkM1NS4yMDEzIDE5LjI4NzYgNTMuNTQwMSAxOC41MTYxIDUxLjQ1OTEgMTguNTE2MUM0OS4zMDUgMTguNTE2MSA0Ny41ODkxIDE5LjI4NzYgNDYuMzExMyAyMC44MzA2QzQ1LjA2OTkgMjIuMzM2IDQ0LjQ0OTMgMjQuNTM3NiA0NC40NDkzIDI3LjQzNTVWMjcuODg3MUM0NC40NDkzIDMwLjc4NDkgNDUuMDY5OSAzMi45ODY2IDQ2LjMxMTMgMzQuNDkxOUM0Ny41NTI2IDM1Ljk1OTcgNDkuMjg2OCAzNi42OTM1IDUxLjUxMzkgMzYuNjkzNVoiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTc5LjM3MzQgNDMuMDcyNkM3Ni41NjIyIDQzLjA3MjYgNzQuMjYyMSA0Mi4zMzg3IDcyLjQ3MzIgNDAuODcxQzcwLjY4NDIgMzkuNDAzMiA2OS43ODk3IDM3LjIwMTYgNjkuNzg5NyAzNC4yNjYxQzY5Ljc4OTcgMjcuOTQzNSA3NC43NTUgMjQuNzgyMyA4NC42ODU2IDI0Ljc4MjNIODcuOTE2N1YyMy41OTY4Qzg3LjkxNjcgMjEuNzUyNyA4Ny41Njk4IDIwLjM5NzggODYuODc2MSAxOS41MzIzQzg2LjE4MjUgMTguNjI5IDg0Ljk3NzcgMTguMTc3NCA4My4yNjE3IDE4LjE3NzRDODAuMzc3NSAxOC4xNzc0IDc4Ljc1MjggMTkuNTY5OSA3OC4zODc3IDIyLjM1NDhINzAuODg1QzcxLjEwNCAxOS4wMDU0IDcyLjM4MTkgMTYuNDgzOSA3NC43MTg1IDE0Ljc5MDNDNzcuMDU1MSAxMy4wOTY4IDgwLjA2NzEgMTIuMjUgODMuNzU0NiAxMi4yNUM5MS43NTAyIDEyLjI1IDk1Ljc0NzkgMTUuOTAwNSA5NS43NDc5IDIzLjIwMTZWNDIuNDUxNkg4OC4wMjYyVjM4Ljg5NTJDODYuMDkxMiA0MS42ODAxIDgzLjIwNjkgNDMuMDcyNiA3OS4zNzM0IDQzLjA3MjZaTTgxLjcyODMgMzcuMzcxQzgzLjUxNzMgMzcuMzcxIDg0Ljk5NTkgMzYuOTAwNSA4Ni4xNjQyIDM1Ljk1OTdDODcuMzMyNSAzNS4wMTg4IDg3LjkxNjcgMzMuNzM5MiA4Ny45MTY3IDMyLjEyMVYyOS42MzcxSDg0Ljg0OTlDODIuNDQwMiAyOS42MzcxIDgwLjYxNDggMjkuOTU3IDc5LjM3MzQgMzAuNTk2OEM3OC4xNjg2IDMxLjIzNjYgNzcuNTY2MiAzMi4zMDkxIDc3LjU2NjIgMzMuODE0NUM3Ny41NjYyIDM2LjE4NTUgNzguOTUzNiAzNy4zNzEgODEuNzI4MyAzNy4zNzFaIiBmaWxsPSIjMDYwNjA2Ii8+CjxwYXRoIGQ9Ik0xMTUuNTQzIDQzLjA3MjZDMTExLjIzNSA0My4wNzI2IDEwNy42OTMgNDEuNzU1NCAxMDQuOTE4IDM5LjEyMUMxMDIuMTggMzYuNDQ4OSAxMDAuODExIDMyLjc2MDcgMTAwLjgxMSAyOC4wNTY0VjI3LjYwNDhDMTAwLjgxMSAyMi45NzU4IDEwMi4yMTcgMTkuMjY4OCAxMDUuMDI4IDE2LjQ4MzlDMTA3Ljg3NiAxMy42NjEzIDExMS4zOTkgMTIuMjUgMTE1LjU5NyAxMi4yNUMxMTkuMjQ4IDEyLjI1IDEyMi4zMTUgMTMuMTcyIDEyNC43OTggMTUuMDE2MUMxMjcuMzE3IDE2Ljg2MDIgMTI4Ljc0MSAxOS43NTgxIDEyOS4wNjkgMjMuNzA5N0gxMjEuNTY3QzEyMS4wMTkgMjAuMzYwMiAxMTkuMDg0IDE4LjY4NTUgMTE1Ljc2MiAxOC42ODU1QzExMy42ODEgMTguNjg1NSAxMTIuMDE5IDE5LjQ1NyAxMTAuNzc4IDIxQzEwOS41MzcgMjIuNTQzIDEwOC45MTYgMjQuNzA3IDEwOC45MTYgMjcuNDkxOVYyNy45NDM1QzEwOC45MTYgMzAuODc5IDEwOS41MTkgMzMuMTE4MyAxMTAuNzIzIDM0LjY2MTNDMTExLjk2NSAzNi4xNjY3IDExMy42OTkgMzYuOTE5NCAxMTUuOTI2IDM2LjkxOTRDMTE3LjU2OSAzNi45MTk0IDExOC45NTYgMzYuNDMwMSAxMjAuMDg4IDM1LjQ1MTZDMTIxLjIyIDM0LjQ3MzEgMTIxLjg3NyAzMy4wNjE4IDEyMi4wNiAzMS4yMTc3SDEyOS4yMzRDMTI5LjAxNSAzNC43OTMgMTI3LjcgMzcuNjcyIDEyNS4yOTEgMzkuODU0OEMxMjIuODgxIDQyIDExOS42MzIgNDMuMDcyNiAxMTUuNTQzIDQzLjA3MjZaIiBmaWxsPSIjMDYwNjA2Ii8+CjxwYXRoIGQ9Ik0xNDcuNDIyIDQzLjA3MjZDMTQzLjAwNSA0My4wNzI2IDEzOS40MDggNDEuNzM2NiAxMzYuNjM0IDM5LjA2NDVDMTMzLjg1OSAzNi4zNTQ4IDEzMi40NzIgMzIuNjg1NSAxMzIuNDcyIDI4LjA1NjRWMjcuNjA0OEMxMzIuNDcyIDIzLjAxMzQgMTMzLjg1OSAxOS4zMDY1IDEzNi42MzQgMTYuNDgzOUMxMzkuNDQ1IDEzLjY2MTMgMTQyLjk2OCAxMi4yNSAxNDcuMjAzIDEyLjI1QzE1MS4yMTkgMTIuMjUgMTU0LjU0MiAxMy41MTA4IDE1Ny4xNyAxNi4wMzIzQzE1OS44MzUgMTguNTUzOCAxNjEuMTY4IDIyLjI5ODQgMTYxLjE2OCAyNy4yNjYxVjI5LjUyNDJIMTQwLjUyMkMxNDAuNjMxIDMxLjk3MDQgMTQxLjMwNyAzMy44NzEgMTQyLjU0OCAzNS4yMjU4QzE0My43OSAzNi41ODA2IDE0NS40ODcgMzcuMjU4MSAxNDcuNjQxIDM3LjI1ODFDMTUxLjA3MyAzNy4yNTgxIDE1My4wNjMgMzUuODg0NCAxNTMuNjExIDMzLjEzNzFIMTYxLjExM0MxNjAuNjM5IDM2LjMzNiAxNTkuMjE1IDM4LjgwMTEgMTU2Ljg0MiA0MC41MzIzQzE1NC40NjkgNDIuMjI1OCAxNTEuMzI5IDQzLjA3MjYgMTQ3LjQyMiA0My4wNzI2Wk0xNDAuNjMxIDI0LjVIMTUzLjQ0NkMxNTMuMTkxIDIwLjA5NjggMTUxLjExIDE3Ljg5NTIgMTQ3LjIwMyAxNy44OTUyQzE0NS40MTQgMTcuODk1MiAxNDMuOTM2IDE4LjQ3ODUgMTQyLjc2NyAxOS42NDUyQzE0MS42MzUgMjAuNzc0MiAxNDAuOTI0IDIyLjM5MjUgMTQwLjYzMSAyNC41WiIgZmlsbD0iIzA2MDYwNiIvPgo8cGF0aCBkPSJNMTc2LjgyNiA0My4wMTYxQzE3My43OTYgNDMuMDE2MSAxNzEuNDk2IDQyLjIyNTggMTY5LjkyNiA0MC42NDUyQzE2OC4zNTYgMzkuMDY0NSAxNjcuNTcxIDM2Ljc1IDE2Ny41NzEgMzMuNzAxNlYxOC43NDE5SDE2My45MDJWMTIuOTI3NEgxNjcuNTcxVjYuNTQ4MzlIMTc1LjQ1N1YxMi45Mjc0SDE4MS40ODFWMTguNzQxOUgxNzUuNDU3VjMyLjk2NzdDMTc1LjQ1NyAzNS4zMDExIDE3Ni41MTYgMzYuNDY3NyAxNzguNjMzIDM2LjQ2NzdDMTc5Ljc2NSAzNi40Njc3IDE4MC43NjkgMzYuMjc5NiAxODEuNjQ1IDM1LjkwMzJWNDIuMjI1OEMxODAuMTg1IDQyLjc1MjcgMTc4LjU3OCA0My4wMTYxIDE3Ni44MjYgNDMuMDE2MVoiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTE4Ny4yMjkgNDIuNDUxNlYxMi45Mjc0SDE5NS4xMTVWNDIuNDUxNkgxODcuMjI5Wk0xOTQuMzQ4IDcuNjc3NDJDMTkzLjQ3MiA4LjUwNTM3IDE5Mi4zOTUgOC45MTkzNSAxOTEuMTE3IDguOTE5MzVDMTg5LjgzOSA4LjkxOTM1IDE4OC43NjIgOC41MDUzNyAxODcuODg2IDcuNjc3NDJDMTg3LjA0NiA2LjgxMTgzIDE4Ni42MjYgNS43MzkyNSAxODYuNjI2IDQuNDU5NjhDMTg2LjYyNiAzLjE4MDExIDE4Ny4wNDYgMi4xMjYzNCAxODcuODg2IDEuMjk4MzlDMTg4Ljc2MiAwLjQzMjc5NiAxODkuODM5IDAgMTkxLjExNyAwQzE5Mi4zOTUgMCAxOTMuNDcyIDAuNDMyNzk2IDE5NC4zNDggMS4yOTgzOUMxOTUuMjI0IDIuMTI2MzQgMTk1LjY2MiAzLjE4MDExIDE5NS42NjIgNC40NTk2OEMxOTUuNjYyIDUuNzM5MjUgMTk1LjIyNCA2LjgxMTgzIDE5NC4zNDggNy42Nzc0MloiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTIwMi40MTIgNDIuNDUxNlYxMi45Mjc0SDIxMC4zNTNWMTcuNDQzNUMyMTEuMTE5IDE1LjkzODIgMjEyLjI2OSAxNC42OTYyIDIxMy44MDMgMTMuNzE3N0MyMTUuMzM2IDEyLjczOTIgMjE3LjEwNyAxMi4yNSAyMTkuMTE1IDEyLjI1QzIyMy4wOTUgMTIuMjUgMjI1Ljc2IDEzLjk2MjQgMjI3LjExMSAxNy4zODcxQzIyOS4zMzggMTMuOTYyNCAyMzIuNTUgMTIuMjUgMjM2Ljc0OSAxMi4yNUMyMzkuNTYgMTIuMjUgMjQxLjgyNCAxMy4xOTA5IDI0My41NCAxNS4wNzI2QzI0NS4yOTIgMTYuOTU0MyAyNDYuMTY5IDE5Ljc3NjkgMjQ2LjE2OSAyMy41NDAzVjQyLjQ1MTZIMjM4LjI4MlYyNC40NDM1QzIzOC4yODIgMjAuNzkzIDIzNi43ODYgMTguOTY3NyAyMzMuNzkyIDE4Ljk2NzdDMjMyLjE4NSAxOC45Njc3IDIzMC44NTMgMTkuNDk0NiAyMjkuNzk0IDIwLjU0ODRDMjI4Ljc3MiAyMS42MDIxIDIyOC4yNjEgMjMuMDg4NyAyMjguMjYxIDI1LjAwODFWNDIuNDUxNkgyMjAuMzc1VjI0LjQ0MzVDMjIwLjM3NSAyMC43OTMgMjE4Ljg3OCAxOC45Njc3IDIxNS44ODQgMTguOTY3N0MyMTQuMjc3IDE4Ljk2NzcgMjEyLjk0NSAxOS40OTQ2IDIxMS44ODYgMjAuNTQ4NEMyMTAuODY0IDIxLjYwMjEgMjEwLjM1MyAyMy4wODg3IDIxMC4zNTMgMjUuMDA4MVY0Mi40NTE2SDIwMi40MTJaIiBmaWxsPSIjMDYwNjA2Ii8+CjxwYXRoIGQ9Ik0yNjYuMTQ5IDQzLjA3MjZDMjYxLjczMiA0My4wNzI2IDI1OC4xMzUgNDEuNzM2NiAyNTUuMzYxIDM5LjA2NDVDMjUyLjU4NiAzNi4zNTQ4IDI1MS4xOTkgMzIuNjg1NSAyNTEuMTk5IDI4LjA1NjRWMjcuNjA0OEMyNTEuMTk5IDIzLjAxMzQgMjUyLjU4NiAxOS4zMDY1IDI1NS4zNjEgMTYuNDgzOUMyNTguMTcyIDEzLjY2MTMgMjYxLjY5NSAxMi4yNSAyNjUuOTMgMTIuMjVDMjY5Ljk0NiAxMi4yNSAyNzMuMjY5IDEzLjUxMDggMjc1Ljg5NyAxNi4wMzIzQzI3OC41NjMgMTguNTUzOCAyNzkuODk1IDIyLjI5ODQgMjc5Ljg5NSAyNy4yNjYxVjI5LjUyNDJIMjU5LjI0OUMyNTkuMzU5IDMxLjk3MDQgMjYwLjAzNCAzMy44NzEgMjYxLjI3NSAzNS4yMjU4QzI2Mi41MTcgMzYuNTgwNiAyNjQuMjE0IDM3LjI1ODEgMjY2LjM2OCAzNy4yNTgxQzI2OS44IDM3LjI1ODEgMjcxLjc5IDM1Ljg4NDQgMjcyLjMzOCAzMy4xMzcxSDI3OS44NEMyNzkuMzY2IDM2LjMzNiAyNzcuOTQyIDM4LjgwMTEgMjc1LjU2OSA0MC41MzIzQzI3My4xOTYgNDIuMjI1OCAyNzAuMDU2IDQzLjA3MjYgMjY2LjE0OSA0My4wNzI2Wk0yNTkuMzU5IDI0LjVIMjcyLjE3M0MyNzEuOTE4IDIwLjA5NjggMjY5LjgzNyAxNy44OTUyIDI2NS45MyAxNy44OTUyQzI2NC4xNDEgMTcuODk1MiAyNjIuNjYzIDE4LjQ3ODUgMjYxLjQ5NCAxOS42NDUyQzI2MC4zNjMgMjAuNzc0MiAyNTkuNjUxIDIyLjM5MjUgMjU5LjM1OSAyNC41WiIgZmlsbD0iIzA2MDYwNiIvPgo8cGF0aCBkPSJNMjg4LjcwNyA0MC43MDE2SDI5Ni41MzlDMzAyLjIzNCA0MC43MDE2IDMwNi41NjEgMzkuMDI2OSAzMDkuNTE4IDM1LjY3NzRDMzEyLjUxMiAzMi4yOTAzIDMxNC4wMDkgMjcuODQ5NSAzMTQuMDA5IDIyLjM1NDhWMjEuOTAzMkMzMTQuMDA5IDE2LjQ4MzkgMzEyLjUzIDEyLjExODMgMzA5LjU3MyA4LjgwNjQ1QzMwNi42MTUgNS40NTY5OSAzMDIuMjUyIDMuNzgyMjYgMjk2LjQ4NCAzLjc4MjI2SDI4OC43MDdWNDAuNzAxNlpNMjg2LjczNiA0Mi40NTE2VjIuMDg4NzFIMjk2Ljc1OEMzMDIuODkxIDIuMDg4NzEgMzA3LjYzOCAzLjkzMjggMzEwLjk5NyA3LjYyMDk3QzMxNC4zNTUgMTEuMzA5MSAzMTYuMDM1IDE2LjA2OTkgMzE2LjAzNSAyMS45MDMyVjIyLjM1NDhDMzE2LjAzNSAyOC4yNjM0IDMxNC4zNzQgMzMuMDk5NSAzMTEuMDUxIDM2Ljg2MjlDMzA3Ljc2NSA0MC41ODg3IDMwMi45NjQgNDIuNDUxNiAyOTYuNjQ4IDQyLjQ1MTZIMjg2LjczNloiIGZpbGw9IiMwNjA2MDYiLz4KPHBhdGggZD0iTTMyMy45NTkgNDIuNDUxNlYyLjA4ODcxSDMzNC42MzhDMzM4LjEwNiAyLjA4ODcxIDM0MC44NjIgMi45MzU0OCAzNDIuOTA3IDQuNjI5MDNDMzQ0Ljk4OCA2LjMyMjU4IDM0Ni4wMjggOC44NDQwOSAzNDYuMDI4IDEyLjE5MzVWMTIuNDE5NEMzNDYuMDI4IDE0LjgyOCAzNDUuMzkgMTYuNzg0OSAzNDQuMTEyIDE4LjI5MDNDMzQyLjg3IDE5Ljc1ODEgMzQxLjExOCAyMC43NTU0IDMzOC44NTQgMjEuMjgyM0MzNDQuOTUxIDIyLjI2MDggMzQ4IDI1LjU3MjYgMzQ4IDMxLjIxNzdWMzEuNDQzNUMzNDggMzQuOTgxMiAzNDYuOTU5IDM3LjcwOTcgMzQ0Ljg3OCAzOS42MjlDMzQyLjc5NyA0MS41MTA4IDMzOS45MzEgNDIuNDUxNiAzMzYuMjggNDIuNDUxNkgzMjMuOTU5Wk0zMjUuODc1IDQwLjc1ODFIMzM2LjIyNkMzMzkuNDM5IDQwLjc1ODEgMzQxLjg4NSAzOS45Njc3IDM0My41NjQgMzguMzg3MUMzNDUuMjQ0IDM2Ljc2ODggMzQ2LjA4MyAzNC40NTQzIDM0Ni4wODMgMzEuNDQzNVYzMS4yMTc3QzM0Ni4wODMgMjguMjgyMyAzNDUuMTM0IDI2LjA2MTggMzQzLjIzNSAyNC41NTY1QzM0MS4zMzcgMjMuMDEzNCAzMzguNTgxIDIyLjI0MTkgMzM0Ljk2NiAyMi4yNDE5SDMyNS44NzVWNDAuNzU4MVpNMzI1Ljg3NSAyMC42MDQ4SDMzNC43NDdDMzM3Ljc3NyAyMC42MDQ4IDM0MC4wNzcgMTkuODg5OCAzNDEuNjQ3IDE4LjQ1OTdDMzQzLjI1NCAxNy4wMjk2IDM0NC4wNTcgMTQuOTk3MyAzNDQuMDU3IDEyLjM2MjlWMTIuMTM3MUMzNDQuMDU3IDkuMzUyMTUgMzQzLjIzNSA3LjI2MzQ0IDM0MS41OTMgNS44NzA5N0MzMzkuOTUgNC40Nzg0OSAzMzcuNjEzIDMuNzgyMjYgMzM0LjU4MyAzLjc4MjI2SDMyNS44NzVWMjAuNjA0OFoiIGZpbGw9IiMwNjA2MDYiLz4KPC9nPjwvc3ZnPg=="
+    },
+    "8212369f5a8f36ad156b": {
+      "mimeType": "image/svg+xml",
+      "id": "8212369f5a8f36ad156b",
+      "created": 1792828800000,
+      "dataURL": "data:image/svg+xml;base64,PHN2ZwogIGNsYXNzPSJsdWNpZGUgbHVjaWRlLW1vbml0b3IiCiAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogIHdpZHRoPSIyNCIKICBoZWlnaHQ9IjI0IgogIHZpZXdCb3g9IjAgMCAyNCAyNCIKICBmaWxsPSJub25lIgogIHN0cm9rZT0iIzFlMWUxZSIKICBzdHJva2Utd2lkdGg9IjIiCiAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIgogIHN0cm9rZS1saW5lam9pbj0icm91bmQiCj4KICA8cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMTQiIHg9IjIiIHk9IjMiIHJ4PSIyIiAvPgogIDxsaW5lIHgxPSI4IiB4Mj0iMTYiIHkxPSIyMSIgeTI9IjIxIiAvPgogIDxsaW5lIHgxPSIxMiIgeDI9IjEyIiB5MT0iMTciIHkyPSIyMSIgLz4KPC9zdmc+Cg=="
+    }
+  }
+}

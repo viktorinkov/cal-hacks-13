@@ -1,0 +1,2391 @@
+{
+ "url": "http://127.0.0.1:5181/home.html",
+ "at": "2026-10-25T10:29:14.899Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 11,
+   "filled": [
+    0.81,
+    0.98,
+    0.98,
+    0.92,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 47,
+    "css": 2,
+    "transitions": 38,
+    "scripted": 7,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 9306,
+     "screens": 10.3,
+     "words": 520,
+     "img": 12,
+     "video": 0,
+     "canvas": 4,
+     "svg": 1,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 11,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "stage-green-2400.jpg",
+      "hands-up-2400.jpg",
+      "mud-2400.jpg",
+      "merch-tee.jpg"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Bandit",
+     "words": 1,
+     "chars": 6,
+     "lines": 1,
+     "size": 216,
+     "vw": 15,
+     "font": "Epilogue Variable",
+     "weight": 900,
+     "tracking": -0.007,
+     "leading": 0.82,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.51,
+     "top": 81,
+     "tag": "span",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Bandit The only band you need",
+     "words": 6,
+     "lines": 2,
+     "size": 38,
+     "font": "Epilogue Variable"
+    },
+    "headings": [
+     {
+      "text": "Bandit",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 216,
+      "vw": 15,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.007,
+      "leading": 0.82,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.51,
+      "top": 81,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "One night, one band",
+      "words": 4,
+      "chars": 19,
+      "lines": 2,
+      "size": 63,
+      "vw": 4.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 1476,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "When someone falls",
+      "words": 3,
+      "chars": 18,
+      "lines": 2,
+      "size": 42.2,
+      "vw": 2.9,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.21,
+      "top": 2459,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Falls start the crush",
+      "words": 4,
+      "chars": 21,
+      "lines": 1,
+      "size": 63,
+      "vw": 4.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 3341,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 331.2,
+      "vw": 23,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.06,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.27,
+      "top": 3563,
+      "tag": "span",
+      "kind": "statement"
+     },
+     {
+      "text": "The front of the crowd",
+      "words": 5,
+      "chars": 22,
+      "lines": 2,
+      "size": 63,
+      "vw": 4.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 4829,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "After the encore",
+      "words": 3,
+      "chars": 16,
+      "lines": 1,
+      "size": 63,
+      "vw": 4.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.38,
+      "top": 6967,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tap in",
+      "words": 2,
+      "chars": 6,
+      "lines": 1,
+      "size": 520.4,
+      "vw": 36.1,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.055,
+      "leading": 0.74,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.99,
+      "top": 8069,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "band1t.vip/organizer",
+      "words": 1,
+      "chars": 20,
+      "lines": 1,
+      "size": 139.3,
+      "vw": 9.7,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 8955,
+      "tag": "a",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 9,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Epilogue Variable",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      15,
+      19,
+      24,
+      42,
+      63,
+      113,
+      139,
+      216,
+      331,
+      520
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Epilogue Variable",
+      "size": 19,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 15.2
+     },
+     "measureChars": 35,
+     "max": {
+      "size": 520.4,
+      "vw": 36.1,
+      "font": "Epilogue Variable",
+      "text": "Tap in"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.02,
+     "centerShare": 0.03,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0b0b0c",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.04,
+      "l": 0.05
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0b0b0c",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.04,
+        "l": 0.05
+       }
+      },
+      {
+       "color": "#d8202a",
+       "top": 1350,
+       "hsl": {
+        "h": 357,
+        "s": 0.74,
+        "l": 0.49
+       }
+      },
+      {
+       "color": "#e7e2d7",
+       "top": 1476,
+       "hsl": {
+        "h": 41,
+        "s": 0.25,
+        "l": 0.87
+       }
+      },
+      {
+       "color": "#dbd5c8",
+       "top": 6959,
+       "hsl": {
+        "h": 41,
+        "s": 0.21,
+        "l": 0.82
+       }
+      },
+      {
+       "color": "#62ec7c",
+       "top": 7920,
+       "hsl": {
+        "h": 131,
+        "s": 0.78,
+        "l": 0.65
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#fffaf3",
+       "share": 0.37
+      },
+      {
+       "color": "#141210",
+       "share": 0.3
+      },
+      {
+       "color": "#e7e2d7",
+       "share": 0.19
+      },
+      {
+       "color": "#5b554d",
+       "share": 0.08
+      },
+      {
+       "color": "#0b0b0c",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#e7e2d7",
+      "hsl": {
+       "h": 41,
+       "s": 0.25,
+       "l": 0.87
+      },
+      "fg": "#141210"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 3,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to the page",
+      "Try a test band"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 15,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [
+     {
+      "type": "canvas",
+      "ratio": 1
+     },
+     {
+      "type": "img",
+      "ratio": 0.22
+     },
+     {
+      "type": "img",
+      "ratio": 0.22
+     },
+     {
+      "type": "canvas",
+      "ratio": 0.22
+     }
+    ],
+    "nav": {
+     "links": 5,
+     "fixed": false,
+     "height": 93,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "epilogue variable"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 9306,
+    "margins": {
+     "left": 40,
+     "right": 40
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 0,
+      "height": 1350,
+      "words": 42,
+      "media": 3,
+      "middle": 131,
+      "heading": null,
+      "left": 40,
+      "right": 40,
+      "textLeft": 40,
+      "textRight": 40,
+      "fullBleed": true,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#night.night",
+      "tag": "section",
+      "top": 1350,
+      "height": 1055,
+      "words": 129,
+      "media": 0,
+      "middle": 473,
+      "heading": {
+       "text": "One night, one band",
+       "size": 63,
+       "tag": "h2"
+      },
+      "left": 40,
+      "right": 76,
+      "textLeft": 40,
+      "textRight": 76,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#safety.safety",
+      "tag": "section",
+      "top": 2405,
+      "height": 828,
+      "words": 48,
+      "media": 0,
+      "middle": 80,
+      "heading": {
+       "text": "When someone falls",
+       "size": 42,
+       "tag": "h2"
+      },
+      "left": 40,
+      "right": 40,
+      "textLeft": 40,
+      "textRight": 64,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#why.why",
+      "tag": "section",
+      "top": 3233,
+      "height": 900,
+      "words": 37,
+      "media": 0,
+      "middle": 357,
+      "heading": {
+       "text": "34",
+       "size": 331,
+       "tag": "span"
+      },
+      "left": 27,
+      "right": 40,
+      "textLeft": 27,
+      "textRight": 40,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 4133,
+      "height": 900,
+      "words": 11,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 40,
+      "right": 911,
+      "textLeft": 40,
+      "textRight": 911,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 5033,
+      "height": 900,
+      "words": 9,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 52,
+      "right": 1085,
+      "textLeft": 52,
+      "textRight": 1085,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 5933,
+      "height": 900,
+      "words": 10,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 52,
+      "right": 896,
+      "textLeft": 52,
+      "textRight": 896,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#merch.merch",
+      "tag": "section",
+      "top": 6833,
+      "height": 1087,
+      "words": 79,
+      "media": 1,
+      "middle": 139,
+      "heading": {
+       "text": "After the encore",
+       "size": 63,
+       "tag": "h2"
+      },
+      "left": 40,
+      "right": 40,
+      "textLeft": 847,
+      "textRight": 40,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "a.cta",
+      "tag": "a",
+      "top": 7920,
+      "height": 558,
+      "words": 15,
+      "media": 0,
+      "middle": 901,
+      "heading": null,
+      "left": 40,
+      "right": 40,
+      "textLeft": 40,
+      "textRight": 989,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 8478,
+      "height": 828,
+      "words": 72,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 34,
+      "right": 14,
+      "textLeft": 34,
+      "textRight": 14,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 8584,
+      "height": 424
+     }
+    ],
+    "h1s": [
+     {
+      "text": "Bandit The only band you need",
+      "size": 38,
+      "top": 81,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 40,
+      "n": 8
+     },
+     {
+      "x": 847,
+      "n": 3
+     },
+     {
+      "x": 876,
+      "n": 3
+     },
+     {
+      "x": 760,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 15,
+    "bodySize": 19,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 12,
+   "filled": [
+    0.79,
+    0.99,
+    0.98,
+    0.78,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 47,
+    "css": 2,
+    "transitions": 38,
+    "scripted": 7,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 11710,
+     "screens": 11.4,
+     "words": 520,
+     "img": 12,
+     "video": 0,
+     "canvas": 4,
+     "svg": 1,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 11,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "stage-green-1200.jpg",
+      "hands-up-1200.jpg",
+      "mud-1200.jpg",
+      "merch-tee.jpg"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Bandit",
+     "words": 1,
+     "chars": 6,
+     "lines": 1,
+     "size": 115.2,
+     "vw": 15,
+     "font": "Epilogue Variable",
+     "weight": 900,
+     "tracking": -0.012,
+     "leading": 0.82,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.5,
+     "top": 92,
+     "tag": "span",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Bandit The only band you need",
+     "words": 6,
+     "lines": 2,
+     "size": 35.8,
+     "font": "Epilogue Variable"
+    },
+    "headings": [
+     {
+      "text": "Bandit",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 115.2,
+      "vw": 15,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.012,
+      "leading": 0.82,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.5,
+      "top": 92,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "One night, one band",
+      "words": 4,
+      "chars": 19,
+      "lines": 1,
+      "size": 45.6,
+      "vw": 5.9,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 1679,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "When someone falls",
+      "words": 3,
+      "chars": 18,
+      "lines": 2,
+      "size": 32,
+      "vw": 4.2,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.3,
+      "top": 2783,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Falls start the crush",
+      "words": 4,
+      "chars": 21,
+      "lines": 1,
+      "size": 45.6,
+      "vw": 5.9,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 4442,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 180,
+      "vw": 23.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.06,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.28,
+      "top": 4670,
+      "tag": "span",
+      "kind": "statement"
+     },
+     {
+      "text": "The front of the crowd",
+      "words": 5,
+      "chars": 22,
+      "lines": 2,
+      "size": 45.6,
+      "vw": 5.9,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.53,
+      "top": 6193,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "After the encore",
+      "words": 3,
+      "chars": 16,
+      "lines": 1,
+      "size": 45.6,
+      "vw": 5.9,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 9265,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tap in",
+      "words": 2,
+      "chars": 6,
+      "lines": 1,
+      "size": 269.2,
+      "vw": 35.1,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.055,
+      "leading": 0.74,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.96,
+      "top": 10545,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "band1t.vip/organizer",
+      "words": 1,
+      "chars": 20,
+      "lines": 1,
+      "size": 72.1,
+      "vw": 9.4,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 11383,
+      "tag": "a",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 9,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Epilogue Variable",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      18,
+      21,
+      32,
+      33,
+      46,
+      61,
+      72,
+      115,
+      180,
+      269
+     ],
+     "sizeCount": 11,
+     "notLoaded": [],
+     "body": {
+      "font": "Epilogue Variable",
+      "size": 17.9,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 15.2
+     },
+     "measureChars": 35,
+     "max": {
+      "size": 269.2,
+      "vw": 35.1,
+      "font": "Epilogue Variable",
+      "text": "Tap in"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.02,
+     "centerShare": 0.03,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0b0b0c",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.04,
+      "l": 0.05
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0b0b0c",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.04,
+        "l": 0.05
+       }
+      },
+      {
+       "color": "#d8202a",
+       "top": 1536,
+       "hsl": {
+        "h": 357,
+        "s": 0.74,
+        "l": 0.49
+       }
+      },
+      {
+       "color": "#e7e2d7",
+       "top": 1885,
+       "hsl": {
+        "h": 41,
+        "s": 0.25,
+        "l": 0.87
+       }
+      },
+      {
+       "color": "#dbd5c8",
+       "top": 8559,
+       "hsl": {
+        "h": 41,
+        "s": 0.21,
+        "l": 0.82
+       }
+      },
+      {
+       "color": "#62ec7c",
+       "top": 10133,
+       "hsl": {
+        "h": 131,
+        "s": 0.78,
+        "l": 0.65
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#fffaf3",
+       "share": 0.37
+      },
+      {
+       "color": "#141210",
+       "share": 0.29
+      },
+      {
+       "color": "#e7e2d7",
+       "share": 0.19
+      },
+      {
+       "color": "#5b554d",
+       "share": 0.09
+      },
+      {
+       "color": "#0b0b0c",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#e7e2d7",
+      "hsl": {
+       "h": 41,
+       "s": 0.25,
+       "l": 0.87
+      },
+      "fg": "#141210"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 3,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to the page",
+      "Try a test band"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 15,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [
+     {
+      "type": "canvas",
+      "ratio": 1
+     },
+     {
+      "type": "img",
+      "ratio": 0.46
+     },
+     {
+      "type": "img",
+      "ratio": 0.46
+     },
+     {
+      "type": "canvas",
+      "ratio": 0.46
+     }
+    ],
+    "nav": {
+     "links": 5,
+     "fixed": false,
+     "height": 91,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "epilogue variable"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 11710,
+    "margins": {
+     "left": 19,
+     "right": 22
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 0,
+      "height": 1536,
+      "words": 42,
+      "media": 3,
+      "middle": 0,
+      "heading": null,
+      "left": 22,
+      "right": 10,
+      "textLeft": 22,
+      "textRight": 52,
+      "fullBleed": true,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#night.night",
+      "tag": "section",
+      "top": 1536,
+      "height": 1186,
+      "words": 129,
+      "media": 0,
+      "middle": 135,
+      "heading": {
+       "text": "One night, one band",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 22,
+      "right": 46,
+      "textLeft": 22,
+      "textRight": 46,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#safety.safety",
+      "tag": "section",
+      "top": 2722,
+      "height": 1597,
+      "words": 48,
+      "media": 0,
+      "middle": 3,
+      "heading": {
+       "text": "When someone falls",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 22,
+      "right": 22,
+      "textLeft": 22,
+      "textRight": 139,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#why.why",
+      "tag": "section",
+      "top": 4319,
+      "height": 1024,
+      "words": 74,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "34",
+       "size": 180,
+       "tag": "span"
+      },
+      "left": 14,
+      "right": 298,
+      "textLeft": 14,
+      "textRight": 298,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 5343,
+      "height": 1024,
+      "words": 11,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 22,
+      "right": 393,
+      "textLeft": 22,
+      "textRight": 393,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 6367,
+      "height": 1024,
+      "words": 9,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 34,
+      "right": 444,
+      "textLeft": 34,
+      "textRight": 444,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 7391,
+      "height": 1024,
+      "words": 10,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 34,
+      "right": 263,
+      "textLeft": 34,
+      "textRight": 263,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#merch.merch",
+      "tag": "section",
+      "top": 8415,
+      "height": 1718,
+      "words": 79,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 22,
+      "right": 22,
+      "textLeft": 22,
+      "textRight": 22,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "a.cta",
+      "tag": "a",
+      "top": 10133,
+      "height": 635,
+      "words": 15,
+      "media": 0,
+      "middle": 310,
+      "heading": null,
+      "left": 22,
+      "right": 22,
+      "textLeft": 22,
+      "textRight": 379,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 10768,
+      "height": 942,
+      "words": 72,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 19,
+      "right": 22,
+      "textLeft": 19,
+      "textRight": 22,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 10892,
+      "height": 548
+     }
+    ],
+    "h1s": [
+     {
+      "text": "Bandit The only band you need",
+      "size": 36,
+      "top": 92,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 22,
+      "n": 12
+     },
+     {
+      "x": 46,
+      "n": 3
+     }
+    ],
+    "leftBlocks": 15,
+    "bodySize": 18,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 12,
+   "filled": [
+    0.43,
+    0.72,
+    0.75,
+    0.65,
+    0.73,
+    0.75,
+    0.75,
+    0.75,
+    0.74,
+    0.75,
+    0.79,
+    0.78
+   ],
+   "motion": {
+    "elements": 44,
+    "css": 2,
+    "transitions": 35,
+    "scripted": 7,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 534,
+     "h": 1156
+    },
+    "page": {
+     "height": 9835,
+     "screens": 8.5,
+     "words": 510,
+     "img": 12,
+     "video": 0,
+     "canvas": 4,
+     "svg": 1,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 11,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "band.webp",
+      "stage-green-1200.jpg",
+      "hands-up-1200.jpg",
+      "mud-1200.jpg",
+      "merch-tee.jpg"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Bandit",
+     "words": 1,
+     "chars": 6,
+     "lines": 1,
+     "size": 97.5,
+     "vw": 18.3,
+     "font": "Epilogue Variable",
+     "weight": 900,
+     "tracking": -0.014,
+     "leading": 0.82,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "left",
+     "widthRatio": 0.61,
+     "top": 74,
+     "tag": "span",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Bandit The only band you need",
+     "words": 6,
+     "lines": 2,
+     "size": 34,
+     "font": "Epilogue Variable"
+    },
+    "headings": [
+     {
+      "text": "Bandit",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 97.5,
+      "vw": 18.3,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.014,
+      "leading": 0.82,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "left",
+      "widthRatio": 0.61,
+      "top": 74,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "One night, one band",
+      "words": 4,
+      "chars": 19,
+      "lines": 2,
+      "size": 40,
+      "vw": 7.5,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.66,
+      "top": 1384,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "When someone falls",
+      "words": 3,
+      "chars": 18,
+      "lines": 2,
+      "size": 28,
+      "vw": 5.2,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.035,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 2876,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Falls start the crush",
+      "words": 4,
+      "chars": 21,
+      "lines": 2,
+      "size": 40,
+      "vw": 7.5,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.66,
+      "top": 4243,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 179.4,
+      "vw": 33.6,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.06,
+      "leading": 0.8,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.4,
+      "top": 4471,
+      "tag": "span",
+      "kind": "statement"
+     },
+     {
+      "text": "The front of the crowd",
+      "words": 5,
+      "chars": 22,
+      "lines": 2,
+      "size": 40,
+      "vw": 7.5,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.67,
+      "top": 5529,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "After the encore",
+      "words": 3,
+      "chars": 16,
+      "lines": 1,
+      "size": 40,
+      "vw": 7.5,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.04,
+      "leading": 0.95,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.66,
+      "top": 7784,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Tap in",
+      "words": 2,
+      "chars": 6,
+      "lines": 1,
+      "size": 127.9,
+      "vw": 24,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.055,
+      "leading": 0.74,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.65,
+      "top": 8940,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "band1t.vip/ organizer",
+      "words": 2,
+      "chars": 21,
+      "lines": 2,
+      "size": 96.6,
+      "vw": 18.1,
+      "font": "Epilogue Variable",
+      "weight": 900,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.66,
+      "top": 9325,
+      "tag": "a",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 9,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 1,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Epilogue Variable",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      17,
+      20,
+      28,
+      40,
+      61,
+      97,
+      98,
+      128,
+      179
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Epilogue Variable",
+      "size": 17,
+      "leading": 1.3,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": null
+     },
+     "measureChars": 34,
+     "max": {
+      "size": 179.4,
+      "vw": 33.6,
+      "font": "Epilogue Variable",
+      "text": "34"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0.02,
+     "centerShare": 0.03,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#0b0b0c",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.04,
+      "l": 0.05
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0b0b0c",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.04,
+        "l": 0.05
+       }
+      },
+      {
+       "color": "#d8202a",
+       "top": 1266,
+       "hsl": {
+        "h": 357,
+        "s": 0.74,
+        "l": 0.49
+       }
+      },
+      {
+       "color": "#e7e2d7",
+       "top": 1617,
+       "hsl": {
+        "h": 41,
+        "s": 0.25,
+        "l": 0.87
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#fffaf3",
+       "share": 0.38
+      },
+      {
+       "color": "#141210",
+       "share": 0.3
+      },
+      {
+       "color": "#e7e2d7",
+       "share": 0.19
+      },
+      {
+       "color": "#5b554d",
+       "share": 0.09
+      },
+      {
+       "color": "#0b0b0c",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#e7e2d7",
+      "hsl": {
+       "h": 41,
+       "s": 0.25,
+       "l": 0.87
+      },
+      "fg": "#141210"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 2,
+     "radius": 3,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to the page",
+      "Try a test band"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 15,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 6,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 0
+      },
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 4944
+      }
+     ]
+    },
+    "heroMedia": [
+     {
+      "type": "canvas",
+      "ratio": 0.53
+     },
+     {
+      "type": "img",
+      "ratio": 0.19
+     },
+     {
+      "type": "img",
+      "ratio": 0.19
+     },
+     {
+      "type": "canvas",
+      "ratio": 0.19
+     }
+    ],
+    "nav": {
+     "links": 2,
+     "fixed": false,
+     "height": 74,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "epilogue variable"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 534,
+     "h": 1156
+    },
+    "pageH": 9835,
+    "margins": {
+     "left": 13,
+     "right": 123
+    },
+    "sections": [
+     {
+      "sel": "section#top.hero",
+      "tag": "section",
+      "top": 0,
+      "height": 1266,
+      "words": 35,
+      "media": 3,
+      "middle": 0,
+      "heading": null,
+      "left": 0,
+      "right": 123,
+      "textLeft": 20,
+      "textRight": 175,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#night.night",
+      "tag": "section",
+      "top": 1266,
+      "height": 1559,
+      "words": 129,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "One night, one band",
+       "size": 40,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 182,
+      "textLeft": 20,
+      "textRight": 182,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#safety.safety",
+      "tag": "section",
+      "top": 2825,
+      "height": 1317,
+      "words": 48,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "When someone falls",
+       "size": 28,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 164,
+      "textLeft": 20,
+      "textRight": 170,
+      "fullBleed": true,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#why.why",
+      "tag": "section",
+      "top": 4142,
+      "height": 803,
+      "words": 37,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "34",
+       "size": 179,
+       "tag": "span"
+      },
+      "left": 13,
+      "right": 178,
+      "textLeft": 13,
+      "textRight": 178,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 4944,
+      "height": 743,
+      "words": 11,
+      "media": 1,
+      "middle": 0,
+      "heading": null,
+      "left": 0,
+      "right": 144,
+      "textLeft": 20,
+      "textRight": 204,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 5687,
+      "height": 743,
+      "words": 9,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 32,
+      "right": 219,
+      "textLeft": 32,
+      "textRight": 219,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "figure.shot",
+      "tag": "figure",
+      "top": 6430,
+      "height": 743,
+      "words": 10,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 32,
+      "right": 236,
+      "textLeft": 32,
+      "textRight": 236,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#merch.merch",
+      "tag": "section",
+      "top": 7173,
+      "height": 1498,
+      "words": 79,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "After the encore",
+       "size": 40,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 164,
+      "textLeft": 20,
+      "textRight": 164,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "a.cta",
+      "tag": "a",
+      "top": 8670,
+      "height": 388,
+      "words": 17,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Tap in",
+       "size": 128,
+       "tag": "span"
+      },
+      "left": 14,
+      "right": 172,
+      "textLeft": 14,
+      "textRight": 172,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 9059,
+      "height": 776,
+      "words": 72,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "band1t.vip/",
+       "size": 97,
+       "tag": "span"
+      },
+      "left": 16,
+      "right": 71,
+      "textLeft": 16,
+      "textRight": 0,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Bandit The only band you need",
+      "size": 34,
+      "top": 74,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 20,
+      "n": 12
+     },
+     {
+      "x": 38,
+      "n": 3
+     }
+    ],
+    "leftBlocks": 15,
+    "bodySize": 17,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1440,
+   "message": "Yellow-cream background (text #fffaf3).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "size-count",
+   "width": 1440,
+   "message": "10 different font sizes (15, 19, 24, 42, 63, 113, 139, 216, 331, 520).",
+   "fix": "A page needs about five: display, heading, lead, body, small.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "no-footage",
+   "width": 1440,
+   "message": "No video anywhere on the page.",
+   "fix": "Look for one honest clip with scripts/assets.mjs --video (the place, the material, the process) and use it as a muted loop with a poster frame. Defend its absence only if no clip fits the subject."
+  },
+  {
+   "level": "FAIL",
+   "id": "late-title",
+   "width": 1440,
+   "message": "The title is not readable 1.2s after the page loaded (something lies over it).",
+   "fix": "Put the headline in the HTML, painted on the first frame; the load sequence only adds arrival and is settled by 1.2s (references/motion.md, \"Load sequence in 1.2 seconds\"). No preloader, no gate, no waiting for the load event.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "empty-middle",
+   "width": 1440,
+   "message": "1 section(s) have content at both edges and 901px of nothing between: a.cta",
+   "fix": "Bring the two parts together on the grid, or put the picture or figure of the section in the middle. An empty middle third reads as a hole, the same as an empty half."
+  },
+  {
+   "level": "WARN",
+   "id": "blank-gap",
+   "width": 1440,
+   "message": "A 424px stretch at 8584px holds nothing.",
+   "fix": "Check that it is a deliberate rest (once per page at most); otherwise close it to the normal section gap.",
+   "alsoAt": [
+    768
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "covered-text",
+   "width": 1440,
+   "message": "Large text lies under another element at some scroll position: \"The front of the crowd\" (screen 8, 100% hidden); \"No band on you? Try one of ours. It opens the sa\" (screen 9, 50% hidden)",
+   "fix": "Nothing may sit on top of a headline or statement. Move the picture, shorten the pinned run, or raise the text above it (z-index) and give it a ground.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "pinned-over-picture",
+   "width": 1440,
+   "message": "Pinned large text slides across pictures while the page scrolls: \"One night, one band\" (screen 3, 100% over a picture); \"The front of the crowd\" (screen 8, 100% over a picture)",
+   "fix": "Jurors read a pinned title crossing drawings or photographs as a collision. Keep the pictures in the column the title does not occupy, or unpin it.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "long-pin",
+   "width": 1440,
+   "message": "The same large text stays on screen for 3 screens in a row: \"The front of the crowd\"",
+   "fix": "A pinned element earns two screens, and something must change at each. Shorten the run or give every screen its own content."
+  },
+  {
+   "level": "WARN",
+   "id": "card-rows",
+   "width": 390,
+   "message": "2 rows of identical boxed cards.",
+   "fix": "Vary the composition; not every section is a card grid."
+  },
+  {
+   "level": "FAIL",
+   "id": "off-centre",
+   "width": 390,
+   "message": "The page sits off-centre: its content comes to 13px from the left edge but only to 123px from the right, at 390px.",
+   "fix": "Give the page one pair of equal margins. Check the wrapper for a max-width without margin-inline: auto, a grid with an empty last column, or padding on one side only. If one side is meant to hold air, it must still be closed by something that reaches the margin (a picture, the navigation's last item, a figure)."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/desktop-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/desktop-page-01.jpg",
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/desktop-page-02.jpg",
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/desktop-page-03.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/tablet-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/tablet-page-01.jpg",
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/tablet-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/mobile-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/mobile-page-01.jpg",
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/home/inspect-r1/mobile-page-02.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

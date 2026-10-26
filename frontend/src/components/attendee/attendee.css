@@ -1,0 +1,40 @@
+/* Attendee sections on the band page and the wallet. They sit on the sign-up's flat surfaces and reuse
+   its tokens (--signup-panel, --signup-raised, --signup-control, --signup-muted, --signup-rule). */
+.attendee-section { min-width: 0; }
+.attendee-section h2 { font-size: 16px; font-weight: 500; line-height: 1.5; }
+.attendee-section > .attendee-lead { margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--signup-muted); }
+.attendee-panel { margin-top: 12px; padding: 18px; border-radius: 16px; background: var(--signup-panel); }
+.attendee-fields { display: grid; gap: 14px; }
+.attendee-fields.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.attendee-label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: var(--color-ink); }
+.attendee-hint { margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--signup-muted); }
+.attendee-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.attendee-quiet { min-height: 40px; padding-inline: 18px; border-radius: 999px; background: var(--signup-raised); color: var(--color-ink); font-size: 14px; transition: background-color 120ms; }
+.attendee-quiet:hover:not(:disabled) { background: var(--signup-control); }
+.attendee-quiet:disabled { color: var(--signup-muted); cursor: default; }
+.attendee-quiet:focus-visible { outline: 2px solid var(--color-champagne); outline-offset: 3px; }
+.attendee-link { min-height: 44px; font-size: 14px; color: var(--color-champagne); text-decoration: underline; text-underline-offset: 4px; }
+.attendee-link:disabled { color: var(--signup-muted); cursor: default; }
+.attendee-person { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+.attendee-face { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: var(--signup-raised); }
+.attendee-quote { margin-top: 10px; padding-left: 12px; border-left: 1px solid var(--signup-control); font-size: 14px; line-height: 1.6; color: var(--signup-muted); overflow-wrap: anywhere; }
+.attendee-error { margin-top: 8px; font-size: 13px; line-height: 1.5; color: var(--color-caution); overflow-wrap: anywhere; }
+.attendee-handles { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; }
+.attendee-handles a { color: var(--color-champagne); text-underline-offset: 4px; }
+.attendee-handles a:hover { text-decoration: underline; }
+.attendee-medic { padding: 22px; border-radius: 20px; background: var(--signup-panel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-signal) 45%, transparent); }
+.attendee-medic .signup-facts { margin-top: 16px; }
+.attendee-address { white-space: pre-line; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .attendee-quiet { min-height: 44px; }
+}
+@media (max-width: 540px) {
+  .attendee-panel, .attendee-medic { padding: 16px; }
+  .attendee-fields.is-three { grid-template-columns: 1fr; }
+  .attendee-person { grid-template-columns: 40px minmax(0, 1fr); }
+  .attendee-face { width: 40px; height: 40px; }
+  .attendee-person > button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attendee-quiet { transition: none; }
+}

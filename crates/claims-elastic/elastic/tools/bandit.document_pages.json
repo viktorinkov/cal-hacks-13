@@ -1,0 +1,25 @@
+{
+  "id": "bandit.document_pages",
+  "type": "esql",
+  "description": "The text of a range of pages of one insurance document, in page order, at most 50 pages per call: page (1-based) and text. Pass the document's SHA-256 exactly as the task gives it. Read a document by calling it from page 1 to its last page.",
+  "tags": [
+    "bandit"
+  ],
+  "configuration": {
+    "query": "FROM bandit*-documents | WHERE document_hash == ?document_hash AND page >= ?from_page AND page <= ?to_page | KEEP page, text | SORT page | LIMIT 50",
+    "params": {
+      "document_hash": {
+        "type": "string",
+        "description": "The document's SHA-256, exactly as given in the task."
+      },
+      "from_page": {
+        "type": "integer",
+        "description": "The first page to return, counting from 1."
+      },
+      "to_page": {
+        "type": "integer",
+        "description": "The last page to return, for example the document's page count."
+      }
+    }
+  }
+}

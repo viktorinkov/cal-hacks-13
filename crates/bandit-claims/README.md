@@ -1,6 +1,6 @@
 # bandit-claims
 
-Drives and shows BandIt's incident-to-claim flow from the terminal. It plays every person and device: simulated bands (ids 90 to 99, never real hardware), the medic, the approvers, the insurer and the vision stub. `bandit-workers` runs the Claude, Elastic and Nessie jobs alongside it.
+Drives and shows BandIt's incident-to-claim flow from the terminal. It plays every person and device: test bands (ids 90 to 99, never real hardware), the medic, the approvers, the insurer and the vision stub. `bandit-workers` runs the Claude, Elastic and Nessie jobs alongside it.
 
 ## Run the story on a local database
 
@@ -20,7 +20,7 @@ SPACETIMEDB_URL=http://127.0.0.1:3088 SPACETIMEDB_DATABASE=bandit-insurance ELAS
 cargo run -p bandit-claims -- story
 ```
 
-`var/stdb` wraps the `spacetime` CLI with this clone's own config, so a local login never touches `~/.config/spacetime`. `setup` creates one identity per actor (tokens in `var/identities`), grants roles as the module owner, imports the venue if none is loaded, claims the simulated bands for the attendees, and seeds the policy, covers and camera. It is safe to run twice.
+`var/stdb` wraps the `spacetime` CLI with this clone's own config, so a local login never touches `~/.config/spacetime`. `setup` creates one identity per actor (tokens in `var/identities`), grants roles as the module owner, imports the venue if none is loaded, claims the test bands for the attendees, and seeds the policy, covers and camera. It is safe to run twice.
 
 ## The story
 
@@ -36,7 +36,7 @@ cargo run -p bandit-claims -- story
 | Command | Does |
 |---|---|
 | `setup`, `status` | prepare the database; show identities and whether the worker is running |
-| `fall --band 90 --witnesses 94,95,96 [--zone "Main stage"] [--witness-zone ...]` | a simulated fall and its light circle |
+| `fall --band 90 --witnesses 94,95,96 [--zone "Main stage"] [--witness-zone ...]` | a fall on a test band and its light circle |
 | `treat --incident N --note "..."`, `resolve --incident N` | the medic's part; resolving opens the claim |
 | `property --zone "Main stage" --note "..." --cost 2400.00 [--camera]` | a property incident, optionally with the vision stub |
 | `attach-record --claim N --template urgent-care-wrist` | renders the synthetic record for the claim's date and zone and files it |
@@ -46,4 +46,4 @@ cargo run -p bandit-claims -- story
 | `wait N --status settled` | block until a claim reaches a status |
 | `scorecard [--rounds 3]` | planted genuine and fake claims; straight-through rate, dollars wrongly paid, precision and recall |
 
-Record templates are in `fixtures/medical-records/`. The Kibana dashboard for the Elastic copy is installed with `crates/claims-elastic/kibana/install.sh`.
+Record templates are in `fixtures/medical-records/`. The Kibana dashboard for the Elastic copy is installed with `kibana/install.sh`.

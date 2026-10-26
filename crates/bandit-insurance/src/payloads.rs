@@ -7,8 +7,6 @@ use crate::letters::LetterData;
 use crate::{Cents, Check, Fact};
 use serde::{Deserialize, Serialize};
 
-/// Claude reads the medical record PDF into a structured record.
-pub const KIND_RECORD_EXTRACT: &str = "claim_record_extract";
 /// Elastic validates the evidence document and finds similar past claims.
 pub const KIND_VERIFY: &str = "claim_verify";
 /// The claims agent reviews the whole pack and gives its verdict.
@@ -19,17 +17,16 @@ pub const KIND_DRAFT: &str = "claim_draft";
 pub const KIND_RECOVERY: &str = "recovery_letter";
 /// Deposits an injury claim's payout into the claimant's Nessie account.
 pub const KIND_PAYOUT: &str = "claim_payout";
+/// The hospital sends its report for an injury claim, written for the case the module drew.
+pub const KIND_CLINIC: &str = "clinic_report";
+/// The attendee pays a charge from their wallet: a Nessie purchase at the venue.
+pub const KIND_CHARGE_PAYMENT: &str = "charge_payment";
 
-pub const INSURANCE_KINDS: &[&str] = &[KIND_RECORD_EXTRACT, KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT];
+/// Claude proposes a payment rule from approved precedents of one shape, for the organizer.
+pub const KIND_RULE_PROPOSAL: &str = "rule_proposal";
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RecordExtractPayload {
-    pub claim_id: u64,
-    pub record_id: u64,
-    /// SHA-256 of the PDF in the blob store.
-    pub file_hash: String,
-    pub page_count: u32,
-}
+pub const INSURANCE_KINDS: &[&str] =
+    &[KIND_VERIFY, KIND_REVIEW, KIND_DRAFT, KIND_RECOVERY, KIND_PAYOUT, KIND_CLINIC, KIND_CHARGE_PAYMENT];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VerifyPayload {
@@ -57,16 +54,45 @@ pub struct VerifyPayload {
     pub payout_cents: Cents,
     /// For property claims: what the staff note says was damaged.
     pub property_description: String,
+    /// The loss staff logged: the repair cost or the item's value, for every kind but an injury.
+    #[serde(default)]
+    pub cost_cents: Cents,
+    /// True when staff named the attendee who broke or took it.
+    #[serde(default)]
+    pub responsible_named: bool,
+    /// SHA-256 of the claimant's newest read health plan PDF, empty when none is on file.
+    #[serde(default)]
+    pub attendee_policy_hash: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
 }
 
-/// A similar past claim Elastic found, as the module stored it.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Precedent {
-    pub reference: String,
-    pub outcome: String,
-    pub payout_cents: Cents,
-    pub narrative: String,
+/// A policy clause the Evidence Engine found for a claim, as the module stored it (`claim_clause`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClauseRef {
+    pub clause_id: String,
+    /// `venue` or `attendee`.
+    pub policy: String,
+    pub section: String,
+    pub page: u32,
+    pub text: String,
     pub score: f32,
+}
+
+/// The charge staff proposed on the claim's incident, for Claude's recommendation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChargeBrief {
+    pub charge_id: u64,
+    pub band_id: u32,
+    pub attendee_name: String,
+    /// What code would charge: the claim's whole loss.
+    pub amount_cents: Cents,
+    pub named_by_role: String,
+    pub note: String,
+    /// Code's checks of the named band: in the zone, at the spot, the cameras.
+    pub checks: Vec<Check>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,9 +115,27 @@ pub struct ReviewPayload {
     /// The record's history of present illness and reason for visit, as extracted.
     pub record_history: String,
     pub record_reason: String,
-    pub precedents: Vec<Precedent>,
+    /// The policy clauses the Evidence Engine found for this pack version, closest first.
+    #[serde(default)]
+    pub clauses: Vec<ClauseRef>,
     /// What the cover pays for and what it excludes, in a few lines.
     pub policy_summary: String,
+    /// What the attendee wrote when they filed the claim, in their own words.
+    #[serde(default)]
+    pub claimant_statement: String,
+    /// The charge staff proposed on this incident, when they named someone.
+    #[serde(default)]
+    pub charge: Option<ChargeBrief>,
+    /// SHA-256 of the claimant's newest read health plan PDF, empty when none is on file: Claude's policy search covers it too.
+    #[serde(default)]
+    pub attendee_policy_hash: String,
+    /// SHA-256 of the confirmed venue policy PDF whose clauses are indexed; empty for the seeded policy.
+    #[serde(default)]
+    pub venue_policy_hash: String,
+    /// What the attendee's own health plan pays first when the venue's cover is
+    /// excess: the covered lines less the copay the cover pays; 0 otherwise.
+    #[serde(default)]
+    pub plan_pays_cents: Cents,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -120,4 +164,92 @@ pub struct PayoutPayload {
     pub account_id: String,
     pub payout_cents: Cents,
     pub memo: String,
+}
+
+/// Input of `charge_payment`: the attendee pays a charge from their wallet.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ChargePaymentPayload {
+    pub charge_id: u64,
+    /// The paying attendee's SpacetimeDB identity, hex.
+    pub payer: String,
+    pub payer_name: String,
+    /// The attendee's Nessie customer and account; empty when they have no wallet yet.
+    pub customer_id: String,
+    pub account_id: String,
+    pub amount_cents: Cents,
+    /// The merchant the purchase is made at: the venue.
+    pub merchant_name: String,
+    pub memo: String,
+}
+
+/// Input of `clinic_report`: everything the hospital's report is written from.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ClinicPayload {
+    pub claim_id: u64,
+    pub report_id: u64,
+    /// `clinic::Scenario::as_str`, drawn by the module.
+    pub scenario: String,
+    /// `YYYY-MM-DD`, set by the module for the scenario.
+    pub visit_date: String,
+    /// The incident's local `YYYY-MM-DD` and `HH:MM`.
+    pub incident_date: String,
+    pub incident_time: String,
+    pub incident_kind: String,
+    pub venue_name: String,
+    pub zone_name: String,
+    pub claimant_name: String,
+    /// The attendee's own words from filing the claim.
+    pub statement: String,
+    /// The staff notes on the incident, oldest first.
+    pub medic_notes: Vec<String>,
+}
+
+/// One approved claim offered to Claude as a precedent for a rule.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ApprovedPrecedent {
+    pub claim_id: u64,
+    pub claimant: String,
+    pub zone: String,
+    pub payout_cents: Cents,
+    pub billed_cents: Cents,
+    pub covered_cents: Cents,
+    pub diagnoses: Vec<String>,
+    pub service_codes: Vec<String>,
+    pub corroboration: String,
+    pub approver: String,
+    /// Local `YYYY-MM-DD HH:MM`.
+    pub decided_at: String,
+}
+
+/// A refused claim of the same shape, for context; a proposal never cites it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RefusedPrecedent {
+    pub claim_id: u64,
+    pub claimant: String,
+    pub zone: String,
+    pub payout_cents: Cents,
+    pub reason: String,
+}
+
+/// The shape's rule in force when the proposal opened.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RuleInForce {
+    pub version: u32,
+    pub ceiling_cents: Cents,
+}
+
+/// Input of `rule_proposal`: one shape's precedents and the policy terms a rule must stay inside.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RuleProposalPayload {
+    pub proposal_id: u64,
+    pub venue_name: String,
+    pub incident_kind: String,
+    pub cover_kind: String,
+    pub policy_number: String,
+    /// The cover's per-claim limit: no rule pays above it.
+    pub limit_cents: Cents,
+    pub minimum_payout_cents: Cents,
+    pub rule_in_force: Option<RuleInForce>,
+    pub approved: Vec<ApprovedPrecedent>,
+    pub refused: Vec<RefusedPrecedent>,
 }

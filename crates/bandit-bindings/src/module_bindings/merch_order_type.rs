@@ -18,6 +18,7 @@ pub struct MerchOrder {
     pub nessie_purchase_id: String,
     pub created_at: __sdk::Timestamp,
     pub updated_at: __sdk::Timestamp,
+    pub line: String,
 }
 
 impl __sdk::InModule for MerchOrder {
@@ -39,6 +40,7 @@ pub struct MerchOrderCols {
     pub nessie_purchase_id: __sdk::__query_builder::Col<MerchOrder, String>,
     pub created_at: __sdk::__query_builder::Col<MerchOrder, __sdk::Timestamp>,
     pub updated_at: __sdk::__query_builder::Col<MerchOrder, __sdk::Timestamp>,
+    pub line: __sdk::__query_builder::Col<MerchOrder, String>,
 }
 
 impl __sdk::__query_builder::HasCols for MerchOrder {
@@ -56,6 +58,7 @@ impl __sdk::__query_builder::HasCols for MerchOrder {
             nessie_purchase_id: __sdk::__query_builder::Col::new(table_name, "nessie_purchase_id"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            line: __sdk::__query_builder::Col::new(table_name, "line"),
         }
     }
 }

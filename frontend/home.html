@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bandit, the only band you need</title>
+    <meta
+      name="description"
+      content="Bandit is a wristband for concerts and big events. Tap it to check in. If someone falls near you, it flashes red and shows you which way to step."
+    />
+    <meta name="theme-color" content="#0b0b0c" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" as="image" href="/src/home/assets/band.webp" />
+    <script>
+      document.documentElement.classList.add('js')
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches && scrollY < 40 && !location.hash) {
+        document.documentElement.classList.add('intro')
+      }
+    </script>
+    <script type="module" src="/src/home/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the page</a>
+
+    <header class="bar" data-enter>
+      <a class="bar-mark" href="/">Bandit</a>
+      <a class="bar-sign" href="/organizer">Organizer sign in</a>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title" data-hero>
+        <div class="stage" data-stage>
+          <canvas class="stage-gl" data-gl aria-hidden="true"></canvas>
+
+          <figure class="act" data-act>
+            <div class="act-tilt" data-act-tilt>
+              <div class="act-spin" data-act-spin>
+                <div class="act-face">
+                  <img
+                    class="act-band"
+                    src="/src/home/assets/band.webp"
+                    width="624"
+                    height="803"
+                    alt="The Bandit wristband: a black case with a frosted white face, a ring of twelve lights round one grey button, on a woven festival strap with a slider bead."
+                  />
+                  <img class="act-shade" data-act-shade src="/src/home/assets/band.webp" width="624" height="803" alt="" />
+                  <canvas class="act-ring" data-ring aria-hidden="true"></canvas>
+                </div>
+                <div class="act-face act-back" aria-hidden="true">
+                  <img class="act-band" src="/src/home/assets/band.webp" width="624" height="803" alt="" />
+                  <img class="act-shade" data-act-shade src="/src/home/assets/band.webp" width="624" height="803" alt="" />
+                  <canvas class="act-ring" data-ring-back></canvas>
+                </div>
+              </div>
+            </div>
+          </figure>
+
+          <div class="hero-copy">
+            <h1 class="title" id="hero-title" data-title>
+              <span class="title-name" data-type>Bandit</span>
+              <span class="title-line" data-type>The only band you need</span>
+            </h1>
+          </div>
+
+          <div class="hero-foot">
+            <button class="hero-hint" type="button" data-hint data-enter>
+              <span class="hint-mouse">Click the crowd to see a fall</span>
+              <span class="hint-touch">Tap the crowd to see a fall</span>
+            </button>
+            <a class="btn btn-accent hero-act" href="/t/AJMN-676X" data-enter>Try a test band</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

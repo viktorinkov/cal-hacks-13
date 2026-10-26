@@ -1,13 +1,14 @@
 //! Medical-ID: at sign-up the attendee uploads a medical history PDF and their health insurance card.
 //! `medical_extract` has Claude read each into the attendee's `medical_card`, which the attendee
-//! confirms. A medic sees a card only by tapping the band of someone with an open SOS or fall
-//! incident, and every tap is written to `medical_access_log`.
+//! confirms. A medic sees the card by tapping the wearer's band, and every tap is written to
+//! `medical_access_log`.
 
 use crate::jobs::{self, *};
 use crate::roles::*;
 use crate::safety::*;
 use crate::tables::*;
 use crate::social::tables::*;
+use crate::view_as::viewed;
 use serde::{Deserialize, Serialize};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp, ViewContext};
 
@@ -101,7 +102,7 @@ pub struct ExtractedCard {
     pub dropped: Vec<String>,
 }
 
-fn empty_card(who: Identity, now: Timestamp) -> MedicalCard {
+pub fn empty_card(who: Identity, now: Timestamp) -> MedicalCard {
     MedicalCard {
         attendee: who,
         blood_type: String::new(),
@@ -213,7 +214,8 @@ pub fn confirm_medical_card(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
-/// A medic taps a band. The card shows only while that band has an open SOS or fall incident.
+/// A medic taps a band and gets the wearer's medical card. The tap is tied to the band's open SOS
+/// or fall incident when there is one, so the incident desk shows the card next to it.
 #[spacetimedb::reducer]
 pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), String> {
     require_role(ctx, &["medic"])?;
@@ -222,11 +224,11 @@ pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), Str
         .db
         .incident()
         .subject_band()
-        .filter(band_id)
+        .filter(u32::from(band_id))
         .find(|i| !i.resolved && matches!(i.kind, IncidentKind::Sos | IncidentKind::Fall));
-    let (granted, reason, incident_id) = match &open {
-        Some(i) => (true, format!("open {:?} incident {}", i.kind, i.id).to_lowercase(), i.id),
-        None => (false, "no open SOS or fall incident for this band".to_string(), 0),
+    let (reason, incident_id) = match &open {
+        Some(i) => (format!("open {:?} incident {}", i.kind, i.id).to_lowercase(), i.id),
+        None => ("tap".to_string(), 0),
     };
     ctx.db.medical_access_log().insert(MedicalAccessLog {
         id: 0,
@@ -234,21 +236,21 @@ pub fn request_medical_card(ctx: &ReducerContext, band_id: u8) -> Result<(), Str
         attendee: owner.owner,
         band_id,
         incident_id,
-        granted,
-        reason: reason.clone(),
+        granted: true,
+        reason,
         read_at: ctx.timestamp,
     });
-    if granted { Ok(()) } else { Err(reason) }
+    Ok(())
 }
 
 #[spacetimedb::view(accessor = my_medical_card, public)]
 pub fn my_medical_card(ctx: &ViewContext) -> Option<MedicalCard> {
-    ctx.db.medical_card().attendee().find(ctx.sender())
+    ctx.db.medical_card().attendee().find(viewed(ctx))
 }
 
 #[spacetimedb::view(accessor = my_medical_documents, public)]
 pub fn my_medical_documents(ctx: &ViewContext) -> Vec<MedicalDocument> {
-    ctx.db.medical_document().attendee().filter(ctx.sender()).collect()
+    ctx.db.medical_document().attendee().filter(viewed(ctx)).collect()
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -260,13 +262,14 @@ pub struct MedicCard {
     pub card: Option<MedicalCard>,
 }
 
-/// The cards this medic tapped for, while the incident is still open.
+/// The card of each band this medic tapped, from the latest tap.
 #[spacetimedb::view(accessor = medic_medical_cards, public)]
 pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {
+    let mut taps: Vec<MedicalAccessLog> = ctx.db.medical_access_log().reader().filter(viewed(ctx)).filter(|l| l.granted).collect();
+    taps.sort_by_key(|l| std::cmp::Reverse(l.id));
     let mut out: Vec<MedicCard> = Vec::new();
-    for log in ctx.db.medical_access_log().reader().filter(ctx.sender()).filter(|l| l.granted) {
-        let open = ctx.db.incident().id().find(log.incident_id).is_some_and(|i| !i.resolved);
-        if !open || out.iter().any(|c| c.incident_id == log.incident_id) {
+    for log in taps {
+        if out.iter().any(|c| c.band_id == log.band_id) {
             continue;
         }
         let card = ctx.db.medical_card().attendee().find(log.attendee);
@@ -279,7 +282,7 @@ pub fn medic_medical_cards(ctx: &ViewContext) -> Vec<MedicCard> {
 /// Every tap, granted or not, for the host portal.
 #[spacetimedb::view(accessor = board_medical_access, public)]
 pub fn board_medical_access(ctx: &ViewContext) -> Vec<MedicalAccessLog> {
-    let staff = ctx.db.owner().identity().find(ctx.sender()).is_some()
-        || ctx.db.staff_role().identity().filter(ctx.sender()).any(|r| ["ops", "medic"].contains(&r.role.as_str()));
+    let staff = ctx.db.owner().identity().find(viewed(ctx)).is_some()
+        || ctx.db.staff_role().identity().filter(viewed(ctx)).any(|r| ["ops", "medic"].contains(&r.role.as_str()));
     if staff { ctx.db.medical_access_log().reader().filter(Identity::ZERO..).collect() } else { Vec::new() }
 }

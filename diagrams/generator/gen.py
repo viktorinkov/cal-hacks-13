@@ -1,10 +1,37 @@
-"""BandIt system design in Excalidraw: five frames stacked top to bottom."""
+"""Band1t system design in Excalidraw: API integrations, feature journeys and engineering details on one board. Labels follow LABELS.md."""
+import json
+import pathlib
 import sys
 
-from lib import KINDS, Scene, measure
+from lib import GLYPH, ICON, Box, Scene, aspect, wrap
 
 S = Scene()
 GAP = 220
+FS, AFS, ZFS, TFS = 28, 24, 26, 48  # box text, arrow labels, zone labels, titles
+BH = 120  # box height for one or two text lines
+WHITE = "#ffffff"
+LOGOS = pathlib.Path(__file__).resolve().parent.parent / "logos"
+
+
+def logo(name):
+    return str(LOGOS / name)
+
+
+# wordmarks (the logo says the name) and icon logos (a name goes beside them)
+STDB, ELASTIC, CAPONE, BRIGHT, SEEED = (logo(n) for n in (
+    "spacetimedb.svg", "elastic.svg", "capital-one.svg", "bright-data.svg", "seeed.png"))
+MARK_H = {STDB: 38, ELASTIC: 46, CAPONE: 46, BRIGHT: 44, SEEED: 26}
+CLAUDE, VULTR, RUST, CADDY, ESP, NFC, TS, BUN = (logo(n + ".svg") for n in (
+    "claude", "vultr", "rust", "caddy", "espressif", "nfc", "typescript", "bun"))
+PYTHON, OPENCV, NUMPY, THREE, SPARK, COLMAP, KIBANA = (logo(n + ".svg") for n in (
+    "python", "opencv", "numpy", "threedotjs", "spark", "colmap", "kibana"))
+USER, PHONE, MONITOR, CAMERA, LAPTOP, FILE, RADIO, WATCH, WALLET, IMAGE, WALK, GRAPH3D = (
+    logo(f"icon-{n}.svg") for n in (
+        "user", "smartphone", "monitor", "camera", "laptop", "file-text", "radio", "watch", "wallet", "image",
+        "footprints", "graph-3d"))
+SHIELD = logo("icon-shield-check.svg")
+HEART, HAMMER, LOCK, BROKEN = (logo(f"icon-{n}.svg") for n in ("heart-pulse", "hammer", "lock-open", "package-x"))
+SOCIALS = [logo(n + ".svg") for n in ("instagram", "facebook", "threads")]
 
 
 def L(v, axis="y"):
@@ -12,454 +39,1278 @@ def L(v, axis="y"):
     return v - (S.oy if axis == "y" else S.ox)
 
 
-def title(t, sub):
-    S.text(40, 28, t, fs=40)
-    S.text(40, 92, sub, fs=20, width=1900, color="#495057")
+def title(t):
+    S.text(40, 28, t, fs=TFS)
 
 
-def legend(x, y):
-    items = [("device", "devices"), ("rust", "Rust services"), ("stdb", "SpacetimeDB"),
-             ("web", "browsers and people"), ("ext", "sponsor and outside APIs"), ("tbd", "TBD Leo")]
-    for i, (k, name) in enumerate(items):
-        cx = x + (i % 3) * 300
-        cy = y + (i // 3) * 46
-        fill, stroke = KINDS[k]
-        S.base("rectangle", S.ox + cx, S.oy + cy, 44, 28, backgroundColor=fill, strokeColor=stroke,
-               strokeStyle="dashed" if k == "tbd" else "solid", roundness={"type": 3})
-        S.text(cx + 56, cy + 2, name, fs=18)
+def need(label, icons=None, wordmark=None, mark_h=44, shape="rectangle"):
+    lines = label.split("\n")
+    ws = [len(s) * FS * 0.6 + 64 for s in lines]
+    if icons:
+        col = max((lg[1] if isinstance(lg, tuple) else ICON) * aspect(lg[0] if isinstance(lg, tuple) else lg)
+                  for lg in icons.values())
+        ws = [col + 12 + max(len(s) for s in lines) * FS * GLYPH + 80]
+    if wordmark:
+        ws.append(mark_h * aspect(wordmark) + 48)
+    return max(ws) / (0.62 if shape == "diamond" else 1)
 
 
-def row(x0, y, w, gap, items, kind="stdb", fs=20):
-    """Boxes side by side with one shared height."""
-    h = max(measure(lbl, w, fs) for lbl, _ in items)
-    return [S.box(x0 + i * (w + gap), y, w, lbl, k or kind, h=h, fs=fs) for i, (lbl, k) in enumerate(items)]
+def B(x, y, label, kind="stdb", w=None, h=BH, **kw):
+    n = need(label, kw.get("icons"), kw.get("wordmark"), kw.get("mark_h", 44), kw.get("shape", "rectangle"))
+    if w is None:
+        w = n
+    elif w < n - 1:
+        print("NARROW", repr(label), round(w), round(n))
+    k = 0.62 if kw.get("shape") == "diamond" else 1
+    if len(wrap(label, w * k, FS)) != label.count("\n") + 1:
+        print("WRAPS", repr(label))
+    return S.box(x, y, w, label, kind, h=h, fs=FS, **kw)
 
 
-# ---------------------------------------------------------------- 1. Architecture
+def SV(x, y, mark, text, kind="ext", h=BH, fill=WHITE, **kw):
+    """A service: its wordmark logo, then the product and (role) as text."""
+    return B(x, y, text, kind, h=h, wordmark=mark, mark_h=MARK_H[mark], fill=fill, **kw)
+
+
+def H(a, b, label=None, **kw):
+    return S.h(a, b, label=label, fs=AFS, **kw)
+
+
+def V(a, b, label=None, **kw):
+    return S.v(a, b, label=label, fs=AFS, **kw)
+
+
+def D(a, sa, fa, b, sb, fb, label=None, **kw):
+    """Straight arrow between two sides, often a diagonal across a gap."""
+    return S.link(a, sa, b, sb, label=label, fa=fa, fb=fb, fs=AFS, **kw)
+
+
+def R(a, sa, b, sb, via, label=None, seg=0, fa=0.5, fb=0.5, **kw):
+    """Arrow through absolute waypoints via, with its label in the middle of segment seg."""
+    pts = [a.side(sa, fa)] + list(via) + [b.side(sb, fb)]
+    if label:
+        mid = lambda p, q: ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+        t = seg + 1
+        pts.insert(t, mid(pts[seg], pts[seg + 1]))
+        while len(pts) != 2 * t + 1:  # the label sits on the middle point, so pad with points on a line
+            if len(pts) < 2 * t + 1:
+                pts.insert(len(pts) - 1, mid(pts[-2], pts[-1]))
+            else:
+                pts.insert(1, mid(pts[0], pts[1]))
+                t += 1
+    return S.arrow(a, b, pts, label=label, fs=AFS, **kw)
+
+
+def Z(x, y, w, h, label, kind, logo_=None, indent=0):
+    return S.zone(x, y, w, h, label, kind, fs=ZFS, logo=logo_, indent=indent)
+
+
+SCREENS = "attendee portal\norganizer desk + portal"
+SCREEN_ICONS = {0: PHONE, 1: MONITOR}
+
+
+
+
+
+USERS, CLOCK, PIN, STORE, SPARKLES, BUILDING, TIMER, HANDS, SEARCH = (logo(f"icon-{n}.svg") for n in (
+    "users", "clock", "map-pin", "store", "sparkles", "building", "timer", "hand", "search"))
+HERE = LOGOS.parent / "medic-routing"
+
+
+def picture(x, y, path, w):
+    """A standalone floor drawing with a thin border."""
+    h = w / aspect(path)
+    el = S.image(S.ox + x, S.oy + y, path, h)
+    S.base("rectangle", S.ox + x, S.oy + y, w, h, strokeColor="#868e96", strokeWidth=2, roughness=0)
+    return Box(el)
+
+
+
+def card(x, y, label, icon, kind="web", w=520, h=240):
+    return B(x, y, label, kind, w=w, h=h, wordmark=icon, mark_h=120, fill=WHITE)
+
+
+
 def architecture(y0):
-    W, H = 2830, 600
-    S.begin_frame("1 · Architecture", 0, y0, W, H)
-    title("1 · BandIt architecture",
-          "SpacetimeDB holds the live, exact state and every write. Elastic validates, organizes and ranks by "
-          "meaning. Claude agents make the judgment calls. Bright Data scrapes the web before the event. "
-          "Nessie moves the money.")
-    legend(1900, 34)
-
-    # browsers across the top
-    ops_l = "Host portal at /organizer\none page for all staff: Live, Attendees, Claims, Imports and Kibana, Simulate; Event ended"
-    app_l = "Attendee page at /t/{token}\nband setup, then a thank-you; turns into the recap live when the event ends"
-    top_h = max(measure(ops_l, 320), measure(app_l, 420))
-    Y0 = 190 + top_h + 80 + 70  # top of the SpacetimeDB, services and Elastic zones
-    ops = S.box(880, 230, 320, ops_l, "web", h=top_h)
-    app = S.box(1230, 230, 420, app_l, "web", h=top_h)
-    auth = S.box(1980, 230, 330, "SpacetimeAuth\nmagic-link sign-in for attendees, staff and the module owner", "ext", h=top_h)
-    kib = S.box(2420, 230, 350, "Kibana\nimport runs, bandit-organizer decisions, three dashboards", "ext", h=top_h)
-
-    # SpacetimeDB
-    S.text(880, Y0 + 50, "Live, exact state. Every write is a reducer call: one transaction, all or nothing. "
-                     "Each change is pushed to every subscribed screen. Scheduled reducers (venue_tick, "
-                     "memory_tick) derive zone state and history inside the database.", fs=18, width=580)
-    y = Y0 + 190
-    venue, social = row(880, y, 280, 20, [
-        ("Venue\nevent_state, zones, organizations, booths, schedule, scraped profiles", None),
-        ("Social\nvisits, people you spent time with, the people graph, people in photos; the simulated crowd on bands 10 to 89", None)])
-    y += venue.h + 30
-    band1t, safety = row(880, y, 280, 20, [
-        ("Band and encounter model (TBD Leo)\nbands, stations, encounters, zone visits", "tbd"),
-        ("Safety\nincidents from SOS and falls; zone risk, exit colours, buzz", None)])
-    y += band1t.h + 30
-    insurance, pay = row(880, y, 280, 20, [
-        ("Insurance\nclaims, evidence packs, learned rules, ledger, claimant_account (the Nessie wallet)", None),
-        ("Payments and merch\nthe wallet_entry ledger, merch templates and orders", None)])
-    y += insurance.h + 30
-    jobs, roles = row(880, y, 280, 20, [
-        ("Jobs\nslow and outside work, done by bandit-workers", None),
-        ("Roles and views\nSpacetimeAuth gives each person one identity; staff roles are ops and medic; views return only the caller's rows", None)])
-    stdb_bottom = L(jobs.bottom) + 30
-
-    # venue floor and laptop
-    bands = S.box(60, 300, 280, "Bands x9\n6 lite, 3 full with IMU and vibration; count neighbours, "
-                                "show colours, SOS", "device")
-    stations = S.box(60, L(bands.bottom) + 80, 200, "Station markers 101 to 105\nzone anchors, exit colours",
-                     "device")
-    gateway = S.box(60, 0, 280, "Gateway\nESP32-C3 on USB", "device", cy=L(band1t.cy))
-    sim = S.box(460, 0, 300, "bandit-claims (command-line tool)\ndrives simulated bands 90 to 99 through report_sim_band and plants the claims", "rust",
-                cy=L(venue.cy))
-    bridge = S.box(460, 0, 300, "bandit-bridge\nserial lines in, ingest_band_reports every 250 ms, directives out",
-                   "rust", cy=L(band1t.cy))
-    camera = S.box(60, 0, 280, "Overhead phone camera\n(TBD Leo)", "tbd", cy=L(jobs.cy))
-    vision = S.box(460, 0, 300, "bandit-vision (TBD Leo)\ncounts, person-down alerts, photo features", "tbd",
-                   cy=L(jobs.cy))
-
-    # Rust services
-    api = S.box(1640, Y0 + 70, 300, "bandit-api\nserves both web apps; POST /api/blobs, GET /recap/order, /api/dev routes; holds the Elastic key", "rust")
-    indexer = S.box(1640, L(api.bottom) + 50, 300, "bandit-indexer\none-way copy of booths and interests into "
-                                                    "Elastic", "rust")
-    bd_label = "Bright Data Web MCP\nscrapes event pages, company pages, the venue on Google Maps and the floor plan"
-    bd_h = measure(bd_label, 250)
-    ingest = S.box(1640, L(indexer.bottom) + 50, 300, "bandit-ingest\nruns once before the event: fetch, organize, "
-                                                       "import", "rust", h=bd_h + 76)
-    cl_label = "Claude API\nagents for the judgment calls: read bills, review causation, draft letters"
-    ns_label = "Nessie (Capital One)\nthe wallet connected at band setup, claim payouts, merch purchases"
-    cl_h, ns_h = measure(cl_label, 250), measure(ns_label, 250)
-    wy = L(ingest.bottom) + 50
-    workers = S.box(1640, wy, 300, "bandit-workers\nruns the jobs: Claude calls, Nessie payments, claim "
-                                   "precedents", "rust", h=cl_h + 80 + ns_h)
-    bd = S.box(2070, L(ingest.y), 250, bd_label, "ext", h=bd_h)
-    claude = S.box(2070, wy, 250, cl_label, "ext", h=cl_h)
-    nessie = S.box(2070, wy + cl_h + 80, 250, ns_label, "ext", h=ns_h)
-
-    # Elastic boxes line up with the services that use them
-    idx = S.box(2420, L(api.y) - 10, 350, "Order by meaning\nbandit-booths and bandit-people: GET /recap/order puts "
-                                          "the people and booths closest to what the attendee is into first", "ext",
-                h=indexer.bottom - api.y + 20)
-    org = S.box(2420, L(ingest.y), 350, "Organize scraped records\nWorkflow bandit-organize: ES|QL joins, then "
-                                        "the bandit-organizer agent, a reason for every merge", "ext", h=ingest.h)
-    claims = S.box(2420, wy, 350, "Validate claim evidence\npipeline bandit-claims-validate; similar past claims "
-                                  "ranked as precedents", "ext", h=workers.h)
-
-    zb = max(stdb_bottom, L(workers.bottom) + 30, L(vision.bottom) + 30)
-    venue_z = S.zone(40, 200, 320, zb - 200, "Venue floor", "device")
-    S.zone(440, 200, 340, zb - 200, "Team laptop, online through a phone hotspot", "rust")
-    S.zone(840, 190, 1950, top_h + 80, "Browsers", "web")
-    stdb = S.zone(860, Y0, 620, zb - Y0, "SpacetimeDB Maincloud: the band1t module", "stdb")
-    S.zone(1620, Y0, 340, zb - Y0, "Rust services on a Vultr server", "rust")
-    ez = S.zone(2400, Y0, 390, zb - Y0, "Elastic Serverless", "ext")
-
-    S.v(stations, bands, x=stations.cx, label="station\nbeacons")
-    S.v(bands, gateway, x=S.ox + 312, label="ESP-NOW\n10 Hz", both=True)
-    S.h(gateway, bridge, label="USB serial")
-    S.h(bridge, band1t, label="reports and\ndirectives", both=True)
-    S.h(sim, stdb, y=sim.cy, label="report_\nsim_band")
-    S.h(camera, vision)
-    S.h(vision, stdb, y=vision.cy, label="alerts")
-    S.v(app, stdb, x=app.cx, label="subscriptions,\nreducer calls", both=True)
-    S.v(ops, stdb, x=ops.cx, label="end_event,\nclaim decisions", both=True)
-    S.link(app, "r", api, "t", fa=0.7, via=[(api.cx, app.y + 0.7 * app.h)], label="PDFs, recap order")
-    S.h(app, auth, y=app.y + 0.3 * app.h, label="sign-in")
-    S.v(kib, ez, x=kib.cx, label="reads")
-    S.h(stdb, api, y=api.cy, label="reads rows")
-    S.h(stdb, indexer, y=indexer.cy, label="subscribes")
-    S.h(ingest, stdb, y=ingest.cy, label="import_event")
-    S.h(stdb, workers, y=workers.cy, label="jobs and\nresults", both=True)
-    S.h(api, idx, y=api.cy, label="recap order")
-    S.h(indexer, idx, y=indexer.cy, label="one-way copy")
-    S.h(ingest, bd, y=bd.cy, label="fetch")
-    S.h(ingest, org, y=bd.bottom + 38, label="records in, bundle back", both=True)
-    S.h(workers, claude, y=claude.cy, label="AI calls")
-    S.h(workers, claims, y=claude.bottom + 40, label="claim copy out, precedents back", both=True)
-    S.h(workers, nessie, y=nessie.cy, label="bank calls")
+    S.begin_frame("Architecture", 0, y0, 4260, 1880)
+    bands = B(60, 730, "radio devices", "device", w=500, h=260, icons={0: WATCH, 1: RADIO})
+    cameras = B(60, 1260, "security cameras", "device", w=500, h=260, wordmark=CAMERA, mark_h=110)
+    bridge = B(800, 730, "radio bridge", "rust", w=540, h=260, icons={0: RADIO, 1: RUST})
+    vision = B(800, 1260, "security view", "rust", w=540, h=260, wordmark=OPENCV, mark_h=110)
+    browser = B(1610, 160, "web clients", "web", w=680, h=260, icons={0: PHONE, 1: MONITOR})
+    module = SV(1610, 730, STDB, "Maincloud module", kind="stdb", w=680, h=790)
+    caddy = B(2610, 160, "Caddy", "ext", w=600, h=260, wordmark=CADDY, mark_h=100)
+    api = B(2610, 730, "bandit-api", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    workers = B(2610, 1130, "bandit-workers", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    indexer = B(2610, 1530, "bandit-indexer", "rust", w=600, h=260, wordmark=RUST, mark_h=100)
+    bright = SV(3580, 160, BRIGHT, "source acquisition", w=600, h=260)
+    elastic = SV(3580, 730, ELASTIC, "search + model tasks", w=600, h=660)
+    wallet = SV(3580, 1530, CAPONE, "Nessie wallet", w=600, h=260)
+    Z(20, 590, 580, 1030, "venue", "device")
+    Z(760, 590, 620, 1030, "venue laptop", "rust", LAPTOP)
+    Z(2570, 50, 680, 1780, "Vultr Cloud Compute", "plain", VULTR)
+    H(bands, bridge, "radio → USB", y=bands.y + 80)
+    H(bridge, bands, "band commands", y=bands.bottom - 70)
+    H(cameras, vision, "video")
+    H(bridge, module, "band reports", y=bridge.y + 70)
+    H(module, bridge, "pending commands", y=bridge.bottom - 70)
+    H(vision, module, "camera sightings")
+    V(browser, module, "reducer calls", x=browser.x + 160)
+    V(module, browser, "live rows", x=browser.right - 160)
+    H(browser, caddy, "HTTPS", both=True)
+    V(caddy, api, "API requests")
+    H(module, api, "event rows")
+    H(module, workers, "jobs", y=workers.y + 70)
+    H(workers, module, "checked results", y=workers.bottom - 70)
+    D(module, "b", .7, indexer, "l", .5, "event rows")
+    H(api, elastic, "search + rerank", both=True, y=api.cy)
+    H(workers, elastic, "tasks + evidence", both=True, y=workers.cy)
+    D(indexer, "r", .5, elastic, "b", .5, "indexes rows")
+    R(workers, "r", bright, "l", [(S.ox + 3400, workers.y + 45), (S.ox + 3400, bright.cy)],
+      label="fetch sources", seg=1, fa=.17, both=True)
+    R(workers, "r", wallet, "r", [(S.ox + 3420, workers.y + workers.h*.85),
+      (S.ox + 3420, S.oy + 1440), (S.ox + 3620, S.oy + 1440),
+      (S.ox + 4220, S.oy + 1440), (S.ox + 4220, wallet.cy)],
+      label="wallet operations", seg=2, fa=.85, both=True)
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 2. Data pipeline
-def pipeline(y0):
-    W, H = 3840, 600
-    S.begin_frame("2 · Event data pipeline", 0, y0, W, H)
-    title("2 · Event data pipeline: Bright Data, then Elastic, then SpacetimeDB",
-          "Runs once before the event from any event's public pages (Cal Hacks 13.0 is the first run), so no live "
-          "step waits on a scrape. Bright Data does every fetch, Rust does the deterministic stages, Elastic "
-          "organizes, and SpacetimeDB loads the checked bundle in one transaction.")
-    L1, L2, L3, L4 = (170, 440), (460, 850), (870, 1300), (1320, 1550)
+def spacetimedb(y0):
+    """Reuse readable live-update and subscription diagrams with stable IDs."""
+    import copy
+    import random
 
-    seed = S.box(300, 0, 260, "Event seed\nstart URLs: the event site, its sponsor list on Devpost, the "
-                              "schedule, the floor plan page", "rust", cy=650)
-    bd = S.box(620, 230, 360, "Bright Data Web MCP\nextract with a schema per page, search_engine, LinkedIn and "
-                              "Crunchbase company tools, the venue on Google Maps, browser screenshots", "ext")
-    fetch = S.box(670, 0, 260, "fetch\none raw snapshot per call, kept as versioned files", "rust", cy=650)
-    mp = S.box(1030, 510, 270, "map\nbooth centres from pixels to metres; each booth gets its nearest "
-                               "station's zone", "rust")
-    parse = S.box(1030, L(mp.bottom) + 40, 270, "parse\nrecords checked against their schema", "rust")
-    claude = S.box(1030, 230, 270, "Claude API\nfloorplan_check reads the booth numbers off the plan image",
-                   "ext")
-    elabels = [
-        (1320, 300, "Raw indices\nbandit-raw-pages, bandit-raw-orgs, bandit-raw-plan"),
-        (1690, 320, "Workflow bandit-organize\nES|QL LOOKUP JOIN: exact matches by domain, booth number and stage"),
-        (2080, 320, "Agent bandit-organizer\nAgent Builder decides the fuzzy matches, a reason for every merge in bandit-organizer-decisions"),
-        (2470, 290, "bandit-bundles\none organized bundle per run, plus the gaps list")]
-    eh = max(measure(t, w) for _, w, t in elabels)
-    e1, e2, e3, e4 = [S.box(x, 930, w, t, "ext", h=eh) for x, w, t in elabels]
-    gapfill = S.box(2080, 230, 320, "Bright Data extract\ngap fill for the agent: at most 10 calls per run, saved as "
-                                    "snapshots", "ext", dashed=True)
-    kib = S.box(1690, L(e1.y) + eh + 50, 1070, "Kibana: the Workflows run view shows every step and every merge "
-                                                "with the agent's reason; dashboards over bandit-pipeline-events: "
-                                                "BandIt · Cal Hacks 13.0 · scrape pipeline, and "
-                                                "BandIt · Cal Hacks 13.0 · sponsors and prizes", "ext")
-    validate = S.box(2470, 0, 290, "validate\nthe same rules as import_event; saved as the last good bundle",
-                     "rust", cy=650)
-    imp = S.box(2830, 1380, 300, "import_event\none transaction: the whole event or nothing; upsert by "
-                                 "source_key", "stdb")
-    tables = S.box(3200, 0, 300, "Live tables\nvenue, hall, organization, booth, schedule_slot, person "
-                                 "(unclaimed profiles)", "stdb", cy=L(imp.cy))
-    indexer = S.box(3200, 0, 300, "bandit-indexer\none-way copy of booths into bandit-booths for the recap "
-                                  "order", "rust", cy=L(e1.cy))
-    ops = S.box(3560, 0, 240, "Host portal\nImports and Kibana tab: import runs and what was loaded", "web", cy=L(imp.cy))
+    source_names = (
+        "spacetimedb-live-updates-source.excalidraw",
+        "spacetimedb-subscriptions-source.excalidraw",
+    )
+    offset = y0
+    existing_ids = {element["id"] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(element for element in source["elements"] if element["type"] == "frame")
+        assert not existing_ids.intersection(element["id"] for element in source["elements"]), filename
+        for original in source["elements"]:
+            element = copy.deepcopy(original)
+            element["y"] += offset - frame["y"]
+            S.elements.append(element)
+            existing_ids.add(element["id"])
+        for file_id, record in source.get("files", {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]["dataURL"] == record["dataURL"]
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame["height"] + GAP
 
-    S.zone(40, L1[0], W - 80, L1[1] - L1[0], "Outside APIs: Bright Data and Claude", "ext")
-    S.zone(40, L2[0], W - 80, L2[1] - L2[0], "bandit-ingest (Rust)", "rust")
-    S.zone(40, L3[0], W - 80, L3[1] - L3[0], "Elastic Serverless: organize and check", "ext")
-    S.zone(40, L4[0], W - 80, L4[1] - L4[0], "SpacetimeDB", "stdb")
+    # Original SpacetimeDB reserves IDs 90 through 168 and 158 random draws.
+    # Preserve downstream IDs and random metadata despite adding two native IDs.
+    S.n = max(S.n + 79, 168)
+    for _ in range(158):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
 
-    S.link(seed, "t", bd, "l", via=[(seed.cx, bd.cy)], label="start URLs")
-    S.v(bd, fetch, x=bd.x + 0.42 * bd.w, label="JSON records,\nimages")
-    S.link(fetch, "r", mp, "l", fa=0.25, via=[(fetch.right + 50, fetch.y + 0.25 * fetch.h), (fetch.right + 50, mp.cy)])
-    S.link(fetch, "r", parse, "l", fa=0.75,
-           via=[(fetch.right + 50, fetch.y + 0.75 * fetch.h), (fetch.right + 50, parse.cy)])
-    S.v(claude, mp, x=claude.cx, label="booth centres")
-    S.link(parse, "r", e1, "t", via=[(e1.x + 40, parse.cy)], fb=40 / e1.w)
-    S.link(mp, "r", e1, "t", via=[(e1.x + 110, mp.cy)], fb=110 / e1.w, label="booth geometry")
-    S.h(e1, e2)
-    S.h(e2, e3)
-    S.h(e3, e4)
-    S.v(e3, gapfill, x=e3.cx, label="capped\ngap fill", dashed=True)
-    S.v(e3, kib, x=e3.cx, dashed=True)
-    S.v(e4, validate, x=e4.cx, label="bundle back")
-    S.link(validate, "r", imp, "t", via=[(imp.cx, validate.cy)], label="last good bundle")
-    S.h(imp, tables, label="rows")
-    S.v(tables, indexer, x=tables.cx, label="subscribes")
-    S.h(tables, ops, label="rows")
+
+def jobs(y0):
+    return _import_acquisition_frame(y0, "server-job-lifecycle-source.excalidraw",
+                                     "queue_jobs_", frame_id="frame425", reserve_ids=52)
+
+
+def band_commands(y0):
+    return _import_acquisition_frame(y0, "band-command-queue-source.excalidraw",
+                                     "queue_commands_")
+
+
+def prepare_event(y0):
+    return _import_acquisition_frame(y0, "event-import-source.excalidraw",
+                                     "event_import_", frame_id="frame477", reserve_ids=62)
+
+
+
+
+def respond_incident(y0):
+    S.begin_frame("Respond to an incident", 0, y0, 3440, 1820)
+    band = B(60, 200, "SOS or fall flags", "device", w=560, h=240, wordmark=WATCH, mark_h=100)
+    telemetry = B(820, 200, "hardware telemetry", "rust", w=560, h=240, icons={0: RADIO, 1: RUST})
+    incident = SV(1580, 200, STDB, "incident transaction", kind="stdb", w=560, h=240)
+    desk = B(2340, 200, "incident on desk", "web", w=560, h=240, wordmark=MONITOR, mark_h=100)
+    assign = B(2340, 720, "medic takes incident", "stdb", w=560, h=240, wordmark=HEART, mark_h=100)
+    medic = B(1580, 720, "assigned medic", "web", w=560, h=240, wordmark=USER, mark_h=100)
+    route = B(820, 720, "route display", "web", w=560, h=240, wordmark=WALK, mark_h=100)
+    attendee = B(60, 720, "attendee", "web", w=560, h=240, wordmark=HEART, mark_h=100)
+    tap = B(60, 1240, "tap band", "web", w=560, h=240, wordmark=NFC, mark_h=100)
+    grant = B(820, 1240, "medical-card grant", "stdb", w=560, h=240, wordmark=SHIELD, mark_h=100)
+    card = B(1580, 1240, "medical card", "web", w=560, h=240, wordmark=FILE, mark_h=100)
+    resolve = B(2340, 1240, "resolve incident", "stdb", w=560, h=240, wordmark=HEART, mark_h=100)
+    H(band, telemetry, "reports state")
+    H(telemetry, incident, "ingest + watch")
+    H(incident, desk, "live rows")
+    V(desk, assign, "Take it")
+    H(assign, medic, "assigns")
+    H(medic, route, "opens route")
+    H(route, attendee, "medic walks")
+    V(attendee, tap, "medic taps")
+    H(tap, grant, "requests access")
+    H(grant, card, "granted view")
+    H(card, resolve, "medic resolves")
+    R(resolve, "b", telemetry, "t", [(resolve.cx, S.oy + 1680), (S.ox + 3320, S.oy + 1680),
+      (S.ox + 3320, S.oy + 80), (telemetry.cx, S.oy + 80)], label="clear command", seg=2)
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 3. Insurance
-def insurance(y0):
-    W, H = 4020, 600
-    S.begin_frame("3 · Insurance claim flow", 0, y0, W, H)
-    title("3 · Insurance claim flow (Hyphenate track)",
-          "An incident becomes a claim with no form. The venue's liability policy pays. Claude reads the bill and "
-          "judges causation, but never sees or sets an amount: code prices every line and decides the route. "
-          "The organizer's approval teaches a rule that settles the next similar claim by itself.")
-    lanes = {"L1": (170, 420), "L2": (440, 900), "L3": (920, 1160), "L4": (1180, 1420), "L5": (1440, 1720),
-             "L6": (1740, 2000)}
-    c = {k: (a + b) / 2 for k, (a, b) in lanes.items()}
-    top2 = 590  # centre of the upper row in the SpacetimeDB lane
+def routes_space(y0):
+    """Keep the native medic route and replace the clearance presentation only."""
+    import copy
+    import random
 
-    fall = S.box(300, 0, 260, "Fall or SOS\nthe band flags it; bands close by pulse blue and become witnesses",
-                 "device", cy=c["L1"] + 15)
-    medic = S.box(610, 0, 260, "Medic (paramedic)\ntreats the fall, files the bill PDF in the host portal, resolves", "web",
-                  cy=c["L1"] + 15)
-    cam = S.box(1500, 0, 260, "Overhead camera (TBD Leo)\na second source for falls; sees property damage", "tbd",
-                cy=c["L1"] + 15)
-    inc = S.box(300, 0, 260, "Incident\nsnapshot and witnesses frozen in one transaction", "stdb", cy=top2)
-    opn = S.box(610, 0, 260, "Claim opens on resolve\none per injured person, one per property incident", "stdb",
-                cy=top2)
-    bill = S.box(900, 0, 270, "Bill reader: claim_record_extract\nClaude reads the bill PDF into lines; it never sees the fee schedule",
-                 "ext", cy=c["L3"] + 10)
-    price = S.box(1200, 0, 260, "Price in code\nthe fee schedule caps each line, billed vs paid; duplicate bill "
-                                "check", "stdb", cy=top2)
-    pack = S.box(1500, 0, 260, "Evidence pack, hashed\nband report, light circle, staff notes, bill, policy", "stdb",
-                 cy=top2)
-    prec = S.box(1500, 0, 320, "Similar past claims\nbandit-claims-validate checks a de-identified copy; the top 3 come "
-                               "back as checks and never refuse", "ext", cy=c["L4"] + 10)
-    checks = S.box(1820, 0, 380, "Code checks at claim open\ncorroboration, staff, cover, payout", "stdb", shape="diamond",
-                   h=220, fs=18, cy=top2)
-    refused = S.box(1880, 0, 260, "Refused\nevery check listed, both values side by side", "bad", cy=810)
-    cause = S.box(2190, 0, 300, "Causation review: claim_review\nClaude: does the injury follow from the fall? doubt sends it "
-                                "to a person", "ext", cy=c["L3"] + 10)
-    rule = S.box(2540, 0, 380, "Rule matches?\nshape, ceiling, corroborated, follows, not mass", "stdb",
-                 shape="diamond", h=220, fs=18, cy=top2)
-    auto = S.box(3030, 0, 260, "Auto-settled\ncites the rule version and who approved it", "good", cy=top2)
-    route = S.box(2580, 0, 300, "The organizer decides\nevery claim no rule settles waits in the host portal's Claims tab, "
-                                "3 or more hurt included", "web", cy=c["L5"] + 10)
-    approve = S.box(3030, 0, 280, "Approve, learn on\nfails closed as stale if the amount or pack changed; writes "
-                                  "rule v1 with the organizer's name", "web", cy=c["L5"] + 10)
-    settle = S.box(3370, 0, 260, "Settling\nledger journals: J1 reserve, J2 approval, J3 paid", "stdb", cy=top2)
-    payout = S.box(3370, 0, 280, "Payout\nclaim_payout deposits into the claimant's Nessie wallet; a property claim pays the "
-                                 "repair vendor", "ext", cy=c["L6"] + 15)
-    letters = S.box(3700, 0, 280, "Letters\nClaude drafts the decision letter and a recovery letter worded as a "
-                                  "question", "ext", cy=c["L3"] + 10)
-    recon = S.box(3700, 0, 280, "Reconciled\nthe insurer pays the receivable (J4)", "good", cy=top2)
+    source_names = (
+        'medic-route-display-source.excalidraw',
+        'make-space-for-help-source.excalidraw',
+    )
+    offset = y0
+    existing_ids = {element['id'] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(element for element in source['elements'] if element['type'] == 'frame')
+        assert not existing_ids.intersection(element['id'] for element in source['elements']), filename
+        for original in source['elements']:
+            element = copy.deepcopy(original)
+            element['y'] += offset - frame['y']
+            S.elements.append(element)
+            existing_ids.add(element['id'])
+        for file_id, record in source.get('files', {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]['dataURL'] == record['dataURL']
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame['height'] + GAP
 
-    names = {"L1": "Bands and staff on the floor", "L2": "SpacetimeDB: claim state; code decides every amount",
-             "L3": "Claude agents, run as jobs by bandit-workers", "L4": "Elastic",
-             "L5": "The organizer, in the host portal's Claims tab", "L6": "Nessie"}
-    kinds = {"L1": "device", "L2": "stdb", "L3": "ext", "L4": "ext", "L5": "web", "L6": "ext"}
-    for k, (a, b) in lanes.items():
-        S.zone(40, a, W - 80, b - a, names[k], kinds[k])
+    # Reserve the original combined route allocation exactly once.
+    # Importing either native scene consumes no new IDs or random draws.
+    S.n = max(S.n + 88, 1018)
+    for _ in range(176):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
 
-    S.v(fall, inc, label="flag")
-    S.v(medic, opn, label="note, bill,\nresolve")
-    S.h(inc, opn)
-    S.link(opn, "r", bill, "t", via=[(bill.cx, opn.cy)], label="bill PDF")
-    S.link(bill, "r", price, "b", via=[(price.cx, bill.cy)], label="lines")
-    S.h(price, pack)
-    S.v(pack, prec, x=pack.x + 0.5 * pack.w, label="precedent\nsearch", dashed=True)
-    S.v(cam, pack, x=pack.cx + 60, dashed=True)
-    S.h(pack, checks, y=checks.cy)
-    S.v(checks, refused, x=checks.cx, label="fails")
-    S.link(checks, "r", cause, "t", via=[(cause.cx, checks.cy)], label="pass, J1 reserve")
-    S.link(cause, "r", rule, "l", via=[(rule.x - 30, cause.cy), (rule.x - 30, rule.cy)], label="verdict")
-    S.h(rule, auto, y=rule.cy, label="yes")
-    S.v(rule, route, x=rule.cx, label="no")
-    S.h(route, approve, label="approve")
-    S.link(route, "l", refused, "b", via=[(refused.cx, route.cy)], label="refuse_claim, J1r")
-    # the learning loop back into the rule check
-    lx = rule.right + 40
-    ly = rule.cy + 55
-    end_x = rule.cx + (rule.w / 2) * (1 - 55 / (rule.h / 2))
-    S.arrow(approve, rule, [(approve.x, approve.y + 22), (lx, approve.y + 22), (lx, ly), (end_x + 6, ly)],
-            dashed=True, color="#2b8a3e")
-    S.text(L(lx, "x") + 14, c["L3"] - 30, "rule v1 settles\nthe next similar\nfall by itself", fs=18, color="#2b8a3e")
-    S.h(auto, settle, label="J2")
-    S.link(approve, "r", settle, "b", fb=0.3, via=[(settle.x + 0.3 * settle.w, approve.cy)])
-    S.v(settle, payout, x=settle.x + 0.72 * settle.w, label="claim_payout")
-    S.h(settle, recon, label="insurer\npays")
-    S.link(settle, "b", letters, "t", fa=0.92, via=[(settle.x + 0.92 * settle.w, S.oy + 870), (letters.cx, S.oy + 870)])
 
-    py = lanes["L6"][1] + 50
-    S.panel(40, py, 1180, "Live learning, as the judges see it",
-            "1. A live fall becomes a claim. No rule exists yet, so it waits for the organizer in the host "
-            "portal's Claims tab.\n2. A late note makes the first tap fail as stale; the organizer approves "
-            "again. The payout lands in the wallet and rule v1 is created with the organizer's name on it.\n3. A "
-            "similar fall from the simulator settles in seconds under rule v1.\n4. A fake with witnesses in "
-            "another zone is refused by code with every check listed.")
-    S.panel(1260, py, 1260, "Edge cases, live or in the stress test",
-            "Injury happened at home: Claude says doubt, a person decides.\nWitness bands in another zone: "
-            "refused at claim open as witness_zone, zones side by side.\nAmount changed while approving: fails "
-            "closed as stale.\nSame bill scanned again: marked duplicate, pays nothing, refused as zero_payout."
-            "\nInjured person is venue staff: refused at claim open; workers' comp applies.\nThree or more hurt in "
-            "one incident: no claim settles by rule; the organizer decides each.\nOnly code at claim open and the "
-            "organizer refuse.", kind="bad")
-    S.panel(2560, py, 1340, "Accuracy run and scorecard, before judging",
-            "bandit-claims plants 3 rounds of 12 genuine claims and 6 decoys (sitting down, dropped phone, fake "
-            "witnesses) through the same reducers a medic uses.\nStraight-through rate per round, rising as rules "
-            "are learned.\nDollars wrongly paid on decoys: target $0.\nAuto-settle precision and recall; bill-review "
-            "savings; incident to payout time; human touches per claim.\nShown in the Claims tab and the Kibana "
-            "dashboard BandIt claims evidence.", kind="good")
+
+
+def elastic_evidence(y0):
+    """Indexed evidence and scoped retrieval, without the feature journeys."""
+    S.begin_frame("Elastic evidence", 0, y0, 3320, 2040)
+    x = [80, 760, 1440, 2120, 2800]
+    w, h = 440, 360
+
+    pages = B(x[0], 160, "Policy pages", "note", w=w, h=h,
+              wordmark=FILE, mark_h=90)
+    indexed = SV(x[1], 160, ELASTIC, "Document index", w=w, h=h)
+    reader = SV(x[2], 160, ELASTIC, "Document reader", w=w, h=h)
+    checked = B(x[3], 160, "Quote validation", "rust", w=w, h=h,
+                wordmark=RUST, mark_h=90)
+    clauses = SV(x[4], 160, ELASTIC, "Clause index", w=w, h=h)
+    H(pages, indexed, "worker indexes")
+    H(indexed, reader, "reads pages")
+    H(reader, checked, "returns quotes")
+    H(checked, clauses, "indexes checked text")
+
+    query = B(x[1], 880, "Worker query", "rust", w=w, h=h,
+              wordmark=RUST, mark_h=90)
+    search = _elastic_component(x[2], 880, w, h, "Hybrid search", "ext", ELASTIC)
+    _elastic_property(search, x[2] + 30, 1090, w - 60, "policy IDs")
+    rerank = SV(x[3], 880, ELASTIC, "Jina rerank", w=w, h=h)
+    citations = B(x[4], 880, "Cited clauses", "good", w=w, h=h,
+                  wordmark=FILE, mark_h=90)
+    H(query, search, "scoped retrieval")
+    H(search, rerank, "ranks candidates")
+    H(rerank, citations, "returns evidence")
+    R(clauses, "b", search, "t",
+      [S.P(3020, 680), S.P(1660, 680)], "searches clauses", seg=1)
+
+    history = B(x[0], 1600, "Approved claims", "note", w=w, h=h,
+                wordmark=FILE, mark_h=90)
+    esql = SV(x[1], 1600, ELASTIC, "ES|QL", w=w, h=h)
+    precedents = B(x[2], 1600, "Precedents", "good", w=w, h=h,
+                   wordmark=SHIELD, mark_h=90)
+    api = B(x[3], 1600, "bandit-api", "rust", w=w, h=h,
+            wordmark=RUST, mark_h=90)
+    matches = B(x[4], 1600, "Ranked people", "good", w=w, h=h,
+                wordmark=USERS, mark_h=90)
+    H(history, esql, "queries offered IDs")
+    H(esql, precedents, "returns prior decisions")
+    V(api, rerank, "query + eligible evidence", x=api.x + 120)
+    R(rerank, "r", matches, "t",
+      [S.P(2670, 1060), S.P(2670, 1440), S.P(3020, 1440)],
+      "returns ranking", seg=2)
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 4. Social and recap
-def social(y0):
-    W, H = 2860, 600
-    S.begin_frame("4 · Social and recap flow", 0, y0, W, H)
-    title("4 · Social and recap flow",
-          "The bands are the identity during the event. Memories come only from band, zone and time; the "
-          "people you see afterwards are the ones you actually spent time with. When the host ends the event, "
-          "every open attendee page turns into the recap live.")
-    zt, zb = 190, 1320
+def elastic_execution(y0):
+    """Import the reviewed investigation while preserving later element identities."""
+    import random
 
-    # 1. at the door
-    a = []
-    y = 260
-    for lbl, k in [("Tap the band with your phone\nits NFC sticker opens your band's page, /t/{token}", "web"),
-                   ("Sign in with SpacetimeAuth\na magic link at the first tap; the same identity on every device", "ext"),
-                   ("Press the band's button when it blinks white\nthe band is now yours", "web"),
-                   ("Your name and Meta socials\nInstagram, Facebook, Threads, typed by you; findable on or off", "web"),
-                   ("Medical history and insurance card PDFs\nClaude reads them into your medical card", "ext"),
-                   ("Are you one of these?\none tap on your scraped speaker or exhibitor profile (claim_person)",
-                    "web"),
-                   ("Check your medical card\nwhat Claude read, confirmed once", "web"),
-                   ("Connect your Capital One wallet\na $200 Nessie account: claim payouts land here, merch is "
-                    "paid from it", "ext"),
-                   ("You're all set\na thank-you; the page shows nothing else until the event ends", "web")]:
-        b = S.box(70, y, 500, lbl, k)
-        a.append(b)
-        y = L(b.bottom) + 46
-    for p, q in zip(a, a[1:]):
-        S.v(p, q, x=p.cx)
+    source_path = LOGOS.parent / "elastic-claim-investigation-source.excalidraw"
+    source = json.loads(source_path.read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    frame_id = "frame" + str(S.n + 1)
+    id_map = {element["id"]: frame_id if element["type"] == "frame" else "exec04v2_" + element["id"]
+              for element in source["elements"]}
+    existing_ids = {element["id"] for element in S.elements}
+    assert not existing_ids.intersection(id_map.values())
 
-    # 2. during the event
-    b1 = S.box(720, 260, 330, "Bands and zones (TBD Leo)\nthe band and encounter model in band1t", "tbd")
-    b2 = S.box(720, L(b1.bottom) + 60, 330, "memory_tick every 5 s\npresence_sample: which band was in which zone, "
-                                            "and when", "stdb")
-    b3 = S.box(720, L(b2.bottom) + 70, 330, "Visits\nsame zone for 2 minutes or more, named by the zone's booth",
-               "stdb")
-    b4 = S.box(1100, 0, 330, "Encounter rule (TBD Leo)\nstarting default: both findable, together for 3 minutes; writes social_encounter",
-               "tbd", cy=L(b3.cy))
-    b5 = S.box(720, L(max(b3.bottom, b4.bottom)) + 70, 710, "People graph: people_link\nmet, visited, works at, "
-                                                           "exhibits; written in the same transaction as the visit "
-                                                           "or encounter", "stdb")
-    b6 = S.box(1480, 260, 320, "Photographer's photo\nuploaded through POST /api/blobs; its zone is the photographer's band zone then",
-               "web")
-    b7 = S.box(1480, L(b2.y), 320, "Who is in the photo\nfindable people whose bands were in that zone when it was "
-                                   "taken", "stdb")
-    b8 = S.box(1480, L(b7.bottom) + 60, 320, "Photo features (TBD Leo)\npeople count and caption", "tbd")
+    # The former frame allocated 58 IDs and generated two random values per element.
+    # Reserve the same sequence so all later IDs, seeds and nonces remain stable.
+    S.n += 58
+    for _ in range(58):
+        original_seed = random.randint(1, 2**31 - 1)
+        random.randint(1, 2**31 - 1)
 
-    # 3. after the event
-    c1 = S.box(1940, 260, 420, "The organizer taps Event ended\nin the host portal: end_event writes event_state; reopen_event undoes it", "web")
-    c2 = S.box(1940, L(c1.bottom) + 50, 420, "Every open attendee page turns into the recap\nlive, by subscription to event_state; /t/{token} "
-                                             "reopens it later on any device", "web")
-    c3 = S.box(1940, L(c2.bottom) + 50, 420, "SpacetimeDB views\nmy_encounters, my_visits, my_photos: the exact lists of who "
-                                             "and what", "stdb")
-    c4 = S.box(2420, 0, 380, "Elastic orders the lists\nGET /recap/order on bandit-api, by meaning against your "
-                             "interests (bandit-people, bandit-booths)", "ext", cy=L(c3.cy))
-    c5 = S.box(1940, L(max(c3.bottom, c4.bottom)) + 60, 860, "Your recap, on the same tap link\n1. where you were: zones over time\n"
-                                                             "2. the people you spent time with, and their Meta socials "
-                                                             "when they allow it\n3. the booths you spent time at\n"
-                                                             "4. your photos with the people you met in them, tap to "
-                                                             "share\n5. make it merch",
-               "web")
-    c6 = S.box(1940, L(c5.bottom) + 60, 420, "Merch suggestions\na photo of you placed in a hand-made template "
-                                             "(tee, mug, poster, sponsor booth items); top 3 by minutes at that booth",
-               "stdb")
-    c7 = S.box(2420, 0, 380, "Buy with one tap\nbuy_merch, with a size for tees, paid from the Capital One wallet through Nessie", "ext",
-               cy=L(c6.cy))
+    def remap(value, key=None):
+        if isinstance(value, dict):
+            return {k: remap(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            if key == "groupIds":
+                return ["exec04v2_" + group for group in value]
+            return [remap(item) for item in value]
+        if isinstance(value, str) and key in {
+            "id", "frameId", "containerId", "elementId", "diagramParentComponent"
+        }:
+            return id_map.get(value, value)
+        return value
 
-    zb = max(L(a[-1].bottom), L(c7.bottom), L(b8.bottom)) + 40
-    S.zone(40, zt, 560, zb - zt, "1. At the door", "web")
-    S.zone(690, zt, 1140, zb - zt, "2. During the event", "stdb")
-    S.zone(1910, zt, 920, zb - zt, "3. After the event", "plain")
+    origin_x, origin_y = frame["x"], frame["y"]
+    for element in remap(source["elements"]):
+        element["x"] -= origin_x
+        element["y"] += y0 - origin_y
+        if element["type"] == "frame":
+            element["seed"] = original_seed
+            element["version"] = 2
+        S.elements.append(element)
 
-    S.link(a[2], "r", b1, "l", via=[(a[2].right + 60, a[2].cy), (a[2].right + 60, b1.cy)], label="your band")
-    S.v(b1, b2, x=b1.cx)
-    S.v(b2, b3, x=b3.cx)
-    S.link(b2, "r", b4, "t", fa=0.75, via=[(b4.cx, b2.y + 0.75 * b2.h)])
-    S.v(b3, b5, x=b3.cx, label="visited")
-    S.v(b4, b5, x=b4.cx, label="met")
-    S.v(b6, b7, x=b6.cx)
-    S.v(b8, b7, x=b8.cx, dashed=True, label="re-cap to\nthe count")
-    S.h(b2, b7, y=b2.y + 0.3 * b2.h, label="who was in that zone")
-    S.link(b5, "r", c3, "l", fa=0.5, fb=0.72, via=[(1870 + S.ox, b5.cy), (1870 + S.ox, c3.y + 0.72 * c3.h)])
-    S.link(b7, "r", c3, "l", fa=0.5, fb=0.3, via=[(1850 + S.ox, b7.cy), (1850 + S.ox, c3.y + 0.3 * c3.h)],
-           label="people\nin photos")
-    S.v(c1, c2, x=c1.cx, label="event_state")
-    S.v(c2, c3, x=c2.cx)
-    S.h(c3, c4)
-    S.v(c3, c5, x=c3.cx)
-    S.link(c4, "b", c5, "t", fb=(c4.cx - c5.x) / c5.w, label="order")
-    S.v(c5, c6, x=c6.cx)
-    S.h(c6, c7, label="order")
-    wallet = a[-2]
-    S.link(wallet, "r", c7, "b", via=[(wallet.right + 60, wallet.cy), (wallet.right + 60, S.oy + zb + 40),
-                                      (c7.cx, S.oy + zb + 40)], dashed=True, label="the same wallet")
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    return frame["height"]
+
+
+def _import_acquisition_frame(y0, filename, prefix, frame_id=None, reserve_ids=0):
+    """Import reviewed native artwork without changing later generated element IDs."""
+    import random
+    source_dir = pathlib.Path(globals().get("_ACQUISITION_SOURCE_DIR", LOGOS.parent))
+    source = json.loads((source_dir / filename).read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    id_map = {element["id"]: prefix + element["id"] for element in source["elements"]}
+    if frame_id:
+        id_map[frame["id"]] = frame_id
+    origin_x, origin_y = frame["x"], frame["y"]
+    height = frame["height"]
+    for element in source["elements"]:
+        element["id"] = id_map[element["id"]]
+        element["x"] -= origin_x
+        element["y"] = y0 + element["y"] - origin_y
+        for key in ("frameId", "containerId"):
+            if element.get(key):
+                element[key] = id_map[element[key]]
+        element["groupIds"] = [prefix + group for group in element.get("groupIds", [])]
+        for bound in element.get("boundElements") or []:
+            bound["id"] = id_map[bound["id"]]
+        for key in ("startBinding", "endBinding"):
+            binding = element.get(key)
+            if binding:
+                binding["elementId"] = id_map[binding["elementId"]]
+        custom = element.get("customData") or {}
+        for key in ("diagramParentComponent",):
+            if custom.get(key) in id_map:
+                custom[key] = id_map[custom[key]]
+        if element["type"] == "frame":
+            custom.update(diagramStyleVersion=1, diagramImportedSource="diagrams/" + filename)
+            element["customData"] = custom
+        S.elements.append(element)
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    # The old generator consumed one ID and two seeded draws per element.
+    # New artwork uses prefixed IDs; reserve the old allocation for later frames.
+    S.n += reserve_ids
+    for _ in range(reserve_ids * 2):
+        random.randint(1, 2**31 - 1)
+    return height
+
+
+def bright_data(y0):
+    return _import_acquisition_frame(y0, "public-source-acquisition-source.excalidraw",
+                                     "public_source_", frame_id="frame296", reserve_ids=55)
+
+
+def capture_venue_map(y0):
+    return _import_acquisition_frame(y0, "venue-map-capture-source.excalidraw",
+                                     "venue_capture_")
+
+
+def _elastic_component(x, y, w, h, label, kind="ext", logo_=None):
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el.update(backgroundColor={"ext": "#c3fae8", "rust": "#e9edf2"}.get(kind, "#dbe4ff"), strokeColor="#b5bfca")
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _elastic_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+
+def _social_component(x, y, w, h, label, kind="stdb", logo_=None):
+    """One owning component; its properties are nested data, not process steps."""
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el["backgroundColor"] = {"stdb": "#dbe4ff", "rust": "#e9edf2", "device": "#ffe8cc", "ext": "#c3fae8"}.get(kind, "#d0ebff")
+    box.el["strokeColor"] = "#b5bfca"
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _social_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+def find_people(y0):
+    S.begin_frame("Find people again", 0, y0, 3380, 1450)
+    query = B(60, 160, "Who did I meet\nat the Meta booth?\n/friends", "web", w=600, h=260,
+              wordmark=PHONE, mark_h=100)
+    api = B(880, 160, "attendee search", "rust", w=560, h=260,
+            wordmark=RUST, mark_h=100)
+    engine = SV(1660, 160, ELASTIC, "candidate ranking", w=600, h=260)
+    result = _social_component(2500, 160, 600, 440, "closest connections", "web", USER)
+    _social_property(result, 2540, 350, 520, "recorded evidence reason", h=100)
+    _social_property(result, 2540, 480, 520, "social links", h=80)
+
+    met = _social_component(60, 660, 600, 420, "candidate evidence", "stdb", STDB)
+    _social_property(met, 100, 850, 520, "your recorded meetings", h=90)
+    _social_property(met, 100, 970, 520, "findable people", h=70)
+    place = B(880, 660, "named-place check", "note", w=560, h=260,
+              wordmark=PIN, mark_h=100)
+    reconnect = B(2500, 820, "reconnect", "web", w=600, h=260,
+                  icons={0: SOCIALS[0], 1: SOCIALS[1], 2: SOCIALS[2]})
+    visits = SV(880, 1140, STDB, "overlapping booth visits", kind="stdb", w=560, h=240)
+
+    H(query, api, "search phrase")
+    H(api, engine, "query + eligible facts", y=api.y + 70)
+    H(engine, api, "ranked candidates", y=api.bottom - 70)
+    R(api, "t", result, "t", [(api.cx, S.oy + 70), (result.cx, S.oy + 70)],
+      label="orders + explains", seg=1)
+    H(met, place, "eligible people")
+    V(visits, place, "booth + time overlap")
+    V(api, place, "place phrase", x=api.x + 100)
+    V(place, api, "eligible facts", x=api.x + 450)
+    V(result, reconnect, "opens socials")
     return S.end_frame()
 
 
-# ---------------------------------------------------------------- 5. Hardware basics
+
+
+def photo_memories(y0):
+    S.begin_frame("Memories engine", 0, y0, 3420, 1680)
+    photo = _social_component(60, 170, 570, 600, "photographer's photo", "web", CAMERA)
+    _social_property(photo, 100, 390, 490, "capture zone", h=100)
+    _social_property(photo, 100, 530, 490, "capture time", h=100)
+    worker = B(880, 170, "photo worker", "rust", w=560, h=260,
+               wordmark=RUST, mark_h=110)
+    engine = SV(1660, 170, ELASTIC, "photo analysis", w=600, h=260)
+    analysis = _social_component(2500, 170, 600, 620, "photo analysis result", "rust", FILE)
+    reading = _social_property(analysis, 2540, 390, 520, "people count", h=100)
+    caption = _social_property(analysis, 2540, 550, 520, "photo caption", h=160)
+    tags = SV(1660, 690, STDB, "band/time candidate tags", kind="stdb", w=600, h=240)
+    recap = B(880, 690, "your tagged photos", "web", w=560, h=240,
+              wordmark=IMAGE, mark_h=110)
+    share = B(60, 1280, "share photo + @handles", "web", w=570, h=280,
+              icons={0: SOCIALS[0], 1: SOCIALS[1], 2: SOCIALS[2]})
+    memories = _social_component(880, 1280, 560, 320, "Memories", "web", STORE)
+    _social_property(memories, 920, 1470, 480, "groups named by booth", h=90)
+    graph = B(1660, 1280, "portal event graph", "web", w=600, h=280,
+              wordmark=GRAPH3D, mark_h=120)
+    relations = _social_component(2500, 1160, 600, 440, "event relationships", "stdb", STDB)
+    _social_property(relations, 2540, 1360, 520, "encounters with minutes", h=80)
+    _social_property(relations, 2540, 1470, 520, "booth visits with minutes", h=80)
+
+    H(photo, worker, "uploads photo")
+    H(worker, engine, "reads photo", y=worker.y + 70)
+    H(engine, worker, "count + caption", y=worker.bottom - 70)
+    R(worker, "t", analysis, "t", [(worker.cx, S.oy + 70), (analysis.cx, S.oy + 70)],
+      label="records result", seg=1)
+    D(reading, "l", .5, tags, "r", .2, "up to count")
+    R(photo, "r", tags, "l", [(S.ox + 740, photo.y + photo.h*.8),
+                                 (S.ox + 740, S.oy + 1000),
+                                 (S.ox + 1550, S.oy + 1000),
+                                 (S.ox + 1550, tags.y + tags.h * .8)],
+      label="bands present then", seg=2, fa=.8, fb=.8)
+    H(tags, recap, "selected candidates")
+    R(caption, "b", recap, "r", [(caption.cx, S.oy + 1060),
+                                  (S.ox + 1510, S.oy + 1060),
+                                  (S.ox + 1510, recap.y + recap.h * .8)],
+      label="caption", seg=1, fb=.8)
+    D(recap, "b", .25, share, "t", .75, "phone share sheet")
+    V(tags, graph, "photo-person links")
+    H(relations, graph, "encounters + visits")
+    H(graph, memories, "groups communities")
+    return S.end_frame()
+
+
+
+def settle_claim(y0):
+    return import_claim_settlement(S, y0, LOGOS.parent / "claim-settlement-source.excalidraw")
+
+
+def policy_amounts(y0):
+    """Related inputs and formulas belong inside their calculation component."""
+    S.begin_frame("Policy amounts", 0, y0, 3920, 2240)
+    medical = _claim_component(60, 80, 1320, 990, "medical basis", "device", HEART)
+    _claim_property(medical, 100, 280, 380, "billed amount")
+    _claim_property(medical, 520, 280, 380, "fee cap per unit")
+    _claim_property(medical, 940, 280, 400, "service units")
+    _claim_property(medical, 100, 410, 1240, "eligible line = min(billed, cap × units)")
+    _claim_property(medical, 100, 540, 1240, "covered bill = sum eligible lines")
+    _claim_property(medical, 100, 670, 1240, "health-plan copay · when available")
+    _claim_property(medical, 100, 800, 1240, "excess cover + copay: min(copay, covered bill)")
+    _claim_property(medical, 100, 930, 1240, "otherwise: covered bill")
+
+    property_ = _claim_component(60, 1130, 1320, 310, "property basis", "device", HAMMER)
+    _claim_property(property_, 100, 1320, 1240, "Recorded property costs")
+
+    payout = _claim_component(1630, 250, 1000, 990, "settlement payout", "stdb", STDB)
+    _claim_property(payout, 1670, 450, 920, "per-claim limit")
+    _claim_property(payout, 1670, 580, 440, "aggregate limit")
+    _claim_property(payout, 2150, 580, 440, "aggregate used")
+    _claim_property(payout, 1670, 710, 920, "remaining = max(aggregate limit − used, 0)")
+    _claim_property(payout, 1670, 840, 920, "payout = min(basis, per-claim, remaining)", h=130)
+    _claim_property(payout, 1670, 1020, 920, "deductible does not reduce payout")
+
+    recovery = _claim_component(2880, 450, 980, 650, "insurer recovery + venue cost", "rust", WALLET)
+    _claim_property(recovery, 2920, 650, 900, "deductible")
+    _claim_property(recovery, 2920, 780, 900, "recovery = max(payout − deductible, 0)")
+    _claim_property(recovery, 2920, 910, 900, "venue cost = payout − recovery")
+    D(medical, "r", .5, payout, "l", .33, "injury basis")
+    R(property_, "r", payout, "l", [S.P(1500, 1285), S.P(1500, 1040)], "property basis", seg=1, fb=.8)
+    H(payout, recovery, "payout")
+    _policy_allocation_example(2760, 1160)
+    return S.end_frame()
+
+
+def _policy_allocation_example(x, y):
+    """A compact worked allocation, exported from these same editable elements."""
+    first = len(S.elements)
+    parent = _claim_component(x, y, 1100, 1020, "One injury claim · calculated split", "stdb")
+
+    def amount(dx, dy, label, value, fill):
+        component = _claim_component(x + dx, y + dy, 480, 240, label, "stdb")
+        component.el["backgroundColor"] = fill
+        component.el["customData"]["diagramParentComponent"] = parent.id
+        number = _claim_property(component, x + dx + 30, y + dy + 100, 420, value, h=110)
+        for element in S.elements:
+            if element.get("containerId") == number.id:
+                element.setdefault("customData", {})["diagramTextSize"] = 96
+        return component
+
+    care = amount(40, 130, "Covered care", "$895", "#ffe8cc")
+    copay = amount(580, 130, "Plan copay", "$55", "#fff3bf")
+    plan = amount(40, 530, "Health-plan share", "$840", "#c3fae8")
+    venue = amount(580, 530, "Venue-cover payout", "$55", "#d3f9d8")
+    V(care, plan, "minus copay")
+    V(copay, venue, "within cover limits")
+    _claim_property(parent, x + 40, y + 830, 1020,
+                    "Excess venue cover · claim limit and cover remaining ≥ $55", h=130)
+    for element in S.elements[first:]:
+        element.setdefault("customData", {})["diagramExcerpt"] = "policy-allocation-example"
+
+
+def _claim_component(x, y, w, h, label, kind="stdb", logo_=None):
+    """A real component, with small filled property cells inside its boundary."""
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el["backgroundColor"] = {"stdb": "#dbe4ff", "rust": "#e9edf2", "device": "#ffe8cc", "ext": "#c3fae8"}.get(kind, "#d0ebff")
+    box.el["strokeColor"] = "#b5bfca"
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _claim_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+def approve_rule(y0):
+    """Simple precedents become explicitly approved, code-bounded authority."""
+    S.begin_frame("Approve a reusable rule", 0, y0, 3700, 980)
+    precedents = _claim_component(60, 150, 560, 680, "approved precedents", "device", FILE)
+    _claim_property(precedents, 100, 350, 480, "at least 3 approved\nsimple claims", h=100)
+    _claim_property(precedents, 100, 500, 480, "same incident kind\nand cover kind", h=100)
+    _claim_property(precedents, 100, 650, 480, "complicated claims\nnever teach a rule", h=100)
+    proposal = SV(760, 350, ELASTIC, "Decision Engine\nproposes from precedents", w=480, h=280)
+    scope = _claim_component(1380, 100, 920, 780, "proposed rule · code-enforced scope", "stdb", STDB)
+    _claim_property(scope, 1420, 300, 400, "incident kind")
+    _claim_property(scope, 1860, 300, 400, "cover kind")
+    _claim_property(scope, 1420, 430, 400, "all event zones")
+    _claim_property(scope, 1860, 430, 400, "corroboration\nrequired")
+    _claim_property(scope, 1420, 560, 840, "ceiling = highest cited payout")
+    _claim_property(scope, 1420, 690, 840, "ceiling ≤ policy per-claim limit")
+    organizer = B(2440, 350, "organizer\nreviews scope + ceiling", "web", w=480, h=280,
+                  wordmark=USER, mark_h=96)
+    rule = SV(3060, 350, STDB, "approved rule version\nfuture guarded authority", kind="stdb", w=560, h=280)
+    H(precedents, proposal, "cites claims")
+    H(proposal, scope, "validated proposal")
+    H(scope, organizer, "shown for approval")
+    H(organizer, rule, "approves")
+    return S.end_frame()
+
+
+
+
 def hardware(y0):
-    W, H = 1860, 600
-    S.begin_frame("5 · Hardware basics", 0, y0, W, H)
-    title("5 · Hardware basics (decided)",
-          "The firmware is used as it is. Cameras and anything about vision are Leo's (TBD Leo).")
-    phone = S.box(80, 190, 460, "Phone\nan NFC tap on the band opens the web app", "web")
-    lite = S.box(80, L(phone.bottom) + 90, 460, "Lite band x6\nSeeed XIAO ESP32-C3, 12-LED WS2812B ring, SOS button "
-                                                "(hold 3 s), NTAG215 NFC sticker, 500 mAh LiPo, printed case", "device")
-    full = S.box(80, L(lite.bottom) + 30, 460, "Full band x3\neverything in a lite band, plus an MPU-6050 IMU for "
-                                               "fall detection and a coin vibration motor", "device")
-    stations = S.box(800, 0, 440, "Station markers x2 to 5\nESP32-C3 SuperMini and a spare LED ring; ids 101 to "
-                                  "105; anchor the zones and glow the exit colour", "device", cy=L(lite.cy))
-    gateway = S.box(800, 0, 440, "Gateway x1\nXIAO ESP32-C3 on USB, id 200; one JSON line per packet; sends each "
-                                 "command 3 times", "device", cy=L(full.cy))
-    bridge = S.box(1400, 0, 400, "bandit-bridge on the team laptop\nUSB serial at 115200 baud", "rust",
-                   cy=L(gateway.cy))
-    cam = S.box(1400, 0, 400, "Overhead phone camera on a stand\n(TBD Leo)", "tbd", cy=L(lite.cy))
-    bands = S.zone(60, L(lite.y) - 50, 500, L(full.bottom) - L(lite.y) + 70, "9 bands, one firmware", "device",
-                   fs=18)
-    note = S.panel(40, L(max(full.bottom, gateway.bottom)) + 60, W - 80, "On the band, with no server",
-                   "Counts the bands it hears and turns that into a green, yellow or red ring.\nIts zone is the "
-                   "station marker it hears loudest; a band never knows a position.\nSOS or a fall: its ring strobes "
-                   "red and the bands close by pulse blue.\nGuidance is the route colour, and the full bands vibrate "
-                   "to move people along the dispersion route.", kind="note")
-    S.v(phone, lite, x=phone.cx, label="NFC")
-    S.h(stations, bands, y=stations.cy, label="station beacons,\n5 Hz")
-    S.h(bands, gateway, y=gateway.cy, label="ESP-NOW channel 1:\nbeacons 10 Hz,\ncommands back", both=True)
-    S.h(gateway, bridge, label="USB serial")
+    S.begin_frame("15 · Band data flow", 0, y0, 4300, 2240)
+
+    band = B(60, 650, "band firmware\nXIAO ESP32-C3", "device",
+             w=520, h=350, wordmark=WATCH, mark_h=150)
+    beacon = B(860, 260,
+               "State beacon · 14 bytes\nid, flags, state, zone\nneigh, bat, seq, find target\n100 ms + jitter",
+               "note", w=600, h=330, icons={0: RADIO})
+    heard = B(860, 1120,
+              "Heard report\nup to 16 peer ID / RSSI pairs\nfresh within 2 s\n1 s + jitter",
+              "note", w=600, h=330, icons={0: RADIO})
+    station = B(1660, 150,
+                "Station beacon\nid + exit color · 5 Hz",
+                "device", w=600, h=260, icons={0: RADIO})
+    gateway = B(1660, 650, "gateway 200\nESP32-C3 SuperMini", "device",
+                w=600, h=350, wordmark=ESP, mark_h=150)
+    bridge = B(2460, 650, "band1t-bridge\nvenue laptop\nparse + route", "rust",
+               w=600, h=350, wordmark=RUST, mark_h=150)
+    ingest_state = B(3360, 470, "ingest_band", "stdb", w=700, h=180)
+    ingest_proximity = B(3360, 810, "ingest_heard", "stdb", w=700, h=180)
+    ingest_marker = B(3360, 1150, "ingest_station", "stdb", w=700, h=180)
+    receipt = B(3360, 1490, "command_sent", "stdb", w=700, h=180)
+    pending = B(3360, 1830, "command rows\npending = true", "stdb", w=700, h=180)
+    Z(3260, 190, 940, 1900, "Maincloud module", "stdb", STDB)
+    serial = B(2460, 1420,
+               "Serial command\ncmd target name [args]",
+               "note", w=600, h=280, icons={0: FILE})
+    radio = B(1660, 1420,
+              "Radio command · 14 bytes\ntarget, cmd, arg, arg2\n3 copies · 40 ms apart\nsame sequence",
+              "note", w=600, h=280, icons={0: RADIO})
+    ack = B(2460, 1860,
+            "Gateway ACK or error\nACK means queued\nfor radio transmission",
+            "note", w=600, h=280, icons={0: RADIO})
+
+    D(band, "r", .25, beacon, "l", .5, "state")
+    D(band, "r", .75, heard, "l", .5, "proximity")
+    D(beacon, "r", .5, gateway, "l", .25, "ESP-NOW")
+    D(heard, "r", .5, gateway, "l", .75, "ESP-NOW")
+    V(station, gateway, "ESP-NOW")
+    H(gateway, bridge, "JSON lines\n115200 baud", y=gateway.y + 100)
+    D(bridge, "r", .2, ingest_state, "l", .5, "band beacon")
+    D(bridge, "r", .45, ingest_proximity, "l", .5, "heard report")
+    D(bridge, "r", .7, ingest_marker, "l", .5, "station beacon")
+    R(pending, "l", bridge, "r",
+      [S.P(3180, L(pending.cy)), S.P(3180, L(bridge.bottom) - 30)],
+      label="new commands", seg=1, fb=.92)
+    V(bridge, serial, "formats")
+    H(serial, radio, "gateway queues")
+    R(radio, "b", band, "b",
+      [S.P(radio.cx, 1740), S.P(band.cx, 1740)],
+      label="ESP-NOW · band deduplicates sequence", seg=1)
+    R(gateway, "b", ack, "t",
+      [S.P(gateway.cx, 1110), S.P(2360, 1110), S.P(2360, 1790), S.P(ack.cx, 1790)],
+      label="queue receipt", seg=2)
+    D(ack, "r", .5, receipt, "l", .5, "bridge calls")
     return S.end_frame()
 
 
+
+def exit_markers_gateway(y0):
+    S.begin_frame("21 · Exit markers and gateway", 0, y0, 3600, 1840)
+
+    def component(x, y, w, h, label, art=None, kind="device"):
+        first = len(S.elements)
+        box = Z(x, y, w, h, label, kind, art)
+        box.el.update(backgroundColor="#ffe8cc" if kind == "device" else "#e9edf2",
+                      strokeColor="#b5bfca")
+        box.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        return box
+
+    def prop(parent, x, y, w, label, h=100):
+        cell = B(x, y, label, "stdb", w=w, h=h)
+        cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+        cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+        return cell
+
+    power = component(60, 800, 300, 220, "Power bank")
+    prop(power, 80, 890, 260, "USB 5 V")
+
+    station = component(500, 500, 900, 1100, "ESP32-C3 SuperMini · exit station", ESP)
+    prop(station, 540, 720, 390, "Station IDs\n101–105")
+    prop(station, 970, 720, 390, "One per exit")
+    prop(station, 540, 850, 820, "Modes\nbreathe · chase · strobe · off")
+    for x, y, label, color in (
+        (540, 980, "101 · blue", "#0000ff"),
+        (970, 980, "102 · magenta", "#ff00ff"),
+        (540, 1100, "103 · cyan", "#00ffff"),
+        (970, 1100, "104 · white", "#ffffff"),
+        (540, 1220, "105 · orange", "#ffa500"),
+        (970, 1220, "Exit color\nsaved in flash", None),
+    ):
+        field = prop(station, x, y, 390, label)
+        if color:
+            S.base("rectangle", S.ox + x + 20, S.oy + y + 29, 42, 42,
+                   backgroundColor=color, strokeColor="#495057", strokeWidth=2,
+                   roughness=0, roundness={"type": 3},
+                   customData={"diagramParentComponent": field.id,
+                               "diagramSignalColor": label.split(" · ")[1]})
+    prop(station, 540, 1340, 820, "Beacon sends station ID + exit color")
+    prop(station, 540, 1460, 390, "Beacon rate\n5 Hz")
+    prop(station, 970, 1460, 390, "Radio power\n21 dBm")
+
+    diode = component(1500, 180, 500, 240, "1N4001 diode")
+    prop(diode, 1520, 280, 460, "Stripe toward ring")
+    resistor = component(1600, 850, 250, 180, "Resistor")
+    prop(resistor, 1620, 920, 210, "330 Ω", h=80)
+
+    ring = component(2000, 500, 600, 680, "Exit LED ring")
+    prop(ring, 2040, 650, 520, "LED count\n12", h=120)
+    prop(ring, 2040, 800, 520, "Brightness\n120", h=120)
+    prop(ring, 2040, 950, 520, "Shows station exit color", h=140)
+
+    gateway = component(2800, 300, 760, 920, "ESP32-C3 SuperMini · gateway", ESP)
+    prop(gateway, 2840, 540, 680, "Gateway ID\n200")
+    prop(gateway, 2840, 680, 680, "Radio\nESP-NOW")
+    prop(gateway, 2840, 820, 320, "Channel\n1")
+    prop(gateway, 3200, 820, 320, "Radio power\n21 dBm")
+    prop(gateway, 2840, 960, 680, "Powered by USB", h=140)
+    laptop = B(2800, 1450, "venue laptop\nband1t-bridge\nBand data flow", "rust",
+               w=760, h=330, wordmark=LAPTOP, mark_h=140)
+
+    H(power, station, "USB-C", y=power.cy)
+    R(station, "t", diode, "l", [(station.cx, diode.cy)], label="5V pin", seg=1)
+    R(diode, "r", ring, "t", [(ring.cx, diode.cy)], label="ring 5V")
+    H(station, resistor, "GPIO10", y=resistor.cy)
+    H(resistor, ring, "DIN", y=resistor.cy)
+    R(station, "b", ring, "b",
+      [(station.x + station.w * 0.8, S.oy + 1710), (ring.cx, S.oy + 1710)],
+      label="G → GND", seg=1, fa=0.8)
+    V(gateway, laptop, "USB-C\npower + serial", both=True)
+    return S.end_frame()
+
+
+
+def vision(y0):
+    S.begin_frame("05 · Vision", 0, y0, 3100, 2010)
+
+    def G(x, y, w, label, items, kind="note", cols=2, image=None):
+        rows = (len(items) + cols - 1) // cols
+        h = 140 + rows * 160
+        zone = S.zone(x, y, w, h, label, "plain", fs=ZFS, logo=image)
+        cell_w = (w - 60 - (cols - 1) * 20) / cols
+        for i, item in enumerate(items):
+            B(x + 30 + (i % cols) * (cell_w + 20), y + 130 + (i // cols) * 160,
+              item, kind, w=cell_w, h=140)
+        return zone
+
+    camera = G(60, 180, 500, "Camera input", ["Video frames", "Frame time"],
+               "device", image=CAMERA)
+    spectrum = G(800, 180, 560, "Flash filter", ["1.5 s window", "4 Hz signal", "Red channel", "Reject nearby rates"],
+                 "rust", image=OPENCV)
+    tracks = G(1580, 180, 560, "Flash tracks", ["Blob grouping", "Stable IDs", "Spot position"],
+               "rust", image=NUMPY)
+    calibration = B(2360, 240, "Camera-to-plan\ntransform", "note",
+                    w=660, h=300, wordmark=GRAPH3D, mark_h=100)
+
+    radio = G(60, 790, 1300, "Radio and ranging inputs",
+              ["Band ID", "SOS/fall flags", "Zone", "Position", "Uncertainty", "Receive time"],
+              "note", cols=3, image=RADIO)
+    fusion = G(1580, 790, 560, "Match calling bands",
+               ["Fresh flags", "Radio match", "Uncertainty gate"], "rust", image=PYTHON)
+    located = G(2360, 790, 660, "Located observation",
+                ["Camera", "Band ID", "Zone", "Image point", "Plan point", "Time", "Radio offset"],
+                "note", cols=3, image=WATCH)
+
+    page = G(60, 1510, 800, "Security page",
+             ["State JSON\nGET /state", "Live video\nGET /live.mjpg", "Acknowledge\nPOST /ack"],
+             "web", image=SPARK)
+    archive = G(1120, 1510, 800, "Local evidence",
+                ["Event log", "Marked image", "3 s clip"], "note", cols=3, image=FILE)
+    module = SV(2220, 1570, STDB, "report_camera_sighting",
+                kind="stdb", w=800, h=300)
+
+    H(camera, spectrum, "timestamped frames")
+    H(spectrum, tracks, "flash blobs")
+    H(calibration, tracks, "maps pixels")
+    V(tracks, fusion, "tracked spots")
+    H(radio, fusion, "fresh radio state")
+    H(fusion, located, "band + spot")
+    D(fusion, "b", .2, page, "t", .9, "local HTTP", both=True)
+    D(located, "b", .15, archive, "t", .85, "saves evidence")
+    V(located, module, "reports sighting")
+    return S.end_frame()
+
+
+def venue_reconstruction(y0):
+    S.begin_frame("24 · Venue reconstruction", 0, y0, 3360, 1690)
+
+    def G(x, y, w, label, items, kind="note", cols=2, image=None):
+        rows = (len(items) + cols - 1) // cols
+        h = 140 + rows * 160
+        zone = S.zone(x, y, w, h, label, "plain", fs=ZFS, logo=image)
+        cell_w = (w - 60 - (cols - 1) * 20) / cols
+        for i, item in enumerate(items):
+            B(x + 30 + (i % cols) * (cell_w + 20), y + 130 + (i // cols) * 160,
+              item, kind, w=cell_w, h=140)
+        return zone
+
+    walk = B(60, 180, "Walk-through video", "device",
+             w=520, h=300, wordmark=PHONE, mark_h=100)
+    frames = G(820, 180, 600, "Frame selection",
+               ["Sharpness score", "Stillness filter"], "rust", image=OPENCV)
+    poses = G(1660, 180, 600, "COLMAP",
+              ["Feature matching", "Camera poses", "3D points", "Undistorted images"], "ext", image=COLMAP)
+    train = G(2500, 180, 780, "Brush",
+              ["Gaussian training", "splat.ply"], "ext", image=GRAPH3D)
+
+    camera = G(60, 900, 520, "Camera registration",
+               ["Camera frame", "Image matching", "Camera pose", "Lens calibration"], "device", image=CAMERA)
+    mapping = G(820, 900, 600, "Camera-to-plan mapping",
+                ["Wrist-height ray", "Plan coordinates"], "note", image=logo("icon-map-pin.svg"))
+    view = G(1660, 900, 600, "Security page",
+             ["venue.splat", "scene.json", "Camera coverage"], "web", image=SPARK)
+    align = G(2500, 900, 780, "Align model to venue",
+              ["Floor plane", "Plan landmarks", "Measured scale", "Venue transform", "Venue bounds"],
+              "rust", image=GRAPH3D)
+
+    H(walk, frames, "video")
+    H(frames, poses, "sharp images")
+    H(poses, train, "poses + images")
+    V(train, align, "trained splat")
+    H(align, view, "venue model")
+    R(poses, "b", camera, "t",
+      [(poses.cx, S.oy + 760), (camera.cx, S.oy + 760)],
+      label="registered model", seg=1)
+    H(camera, mapping, "camera pose")
+    H(mapping, view, "image-to-plan mapping")
+    R(align, "b", mapping, "b",
+      [(align.cx, S.oy + 1640), (mapping.cx, S.oy + 1640)],
+      label="venue transform", seg=1)
+    return S.end_frame()
+
+
+
+def _product_frame(y0, filename, prefix, artwork_sources=None):
+    """Preserve approved native product illustrations on the same editable board."""
+    source_path = LOGOS.parent / filename
+    source = json.loads(source_path.read_text())
+    frame = next(element for element in source["elements"] if element["type"] == "frame")
+    id_map = {element["id"]: prefix + element["id"] for element in source["elements"]}
+    scale = 2
+    origin_x, origin_y = frame["x"], frame["y"]
+    for element in source["elements"]:
+        element["id"] = id_map[element["id"]]
+        element["x"] = (element["x"] - origin_x) * scale
+        element["y"] = y0 + (element["y"] - origin_y) * scale
+        element["width"] *= scale
+        element["height"] *= scale
+        element["strokeWidth"] *= scale
+        if element["type"] == "arrow":
+            element["strokeWidth"] = 6
+        if element.get("fontSize"):
+            element["fontSize"] *= scale
+        if element.get("points"):
+            element["points"] = [[x * scale, y * scale] for x, y in element["points"]]
+        if element.get("frameId"):
+            element["frameId"] = id_map[element["frameId"]]
+        if element.get("containerId"):
+            element["containerId"] = id_map[element["containerId"]]
+        element["groupIds"] = [prefix + group for group in element.get("groupIds", [])]
+        for bound in element.get("boundElements") or []:
+            bound["id"] = id_map[bound["id"]]
+        for key in ("startBinding", "endBinding"):
+            binding = element.get(key)
+            if binding:
+                binding["elementId"] = id_map[binding["elementId"]]
+                if "gap" in binding:
+                    binding["gap"] *= scale
+        if element["type"] == "frame":
+            element.setdefault("customData", {}).update(
+                diagramStyleVersion=1,
+                diagramImportedSource="diagrams/" + filename)
+        if artwork_sources and element.get("customData", {}).get("assetSource") in artwork_sources:
+            element["customData"]["assetSource"] = artwork_sources[element["customData"]["assetSource"]]
+        S.elements.append(element)
+    for file_id, record in source.get("files", {}).items():
+        if file_id in S.files:
+            assert S.files[file_id]["dataURL"] == record["dataURL"]
+            assert S.files[file_id]["mimeType"] == record["mimeType"]
+        else:
+            S.files[file_id] = record
+    return frame["height"]
+
+
+def fire_evacuation(y0):
+    return _product_frame(y0, "fire-evacuation-source.excalidraw", "fire_")
+
+
+def photo_product_flow(y0):
+    names = ("photographer-illustration.svg", "nearby-bands-illustration.svg", "recap-photo-illustration.svg")
+    sources = {"artifacts/devpost/social-photo-flow/" + name: "diagrams/product-assets/" + name for name in names}
+    return _product_frame(y0, "photo-flow-source.excalidraw", "photo_", sources)
+
+
+def merch_product_flow(y0):
+    return _product_frame(y0, "merch-image-source.excalidraw", "merch_")
+
+
+
+"""Import the reviewed settlement parent while preserving later generated IDs and seeds."""
+import copy
+import json
+import random
+
+
+def import_claim_settlement(scene_builder, y0, source_path):
+    """Replacement body for settle_claim; source is already styled and reviewed.
+
+    The original function allocated frame663 through lb747: 85 IDs and
+    170 calls to random.randint. Reserve the same allocation so policy amounts
+    still starts at frame748 and every later generated seed stays unchanged.
+    """
+    source=json.loads(source_path.read_text())
+    frame=next(e for e in source["elements"] if e["type"]=="frame")
+    assert frame["id"]=="frame663" and "Settle a claim" in frame["name"]
+    assert len(source["elements"])==58
+    ids={e["id"] for e in source["elements"]}
+    assert len(ids)==len(source["elements"])
+    assert not (ids&{e["id"] for e in scene_builder.elements})
+    imported=copy.deepcopy(source["elements"])
+    for e in imported:
+        e["x"]-=frame["x"]
+        e["y"]+=y0-frame["y"]
+        if e["type"]=="frame":
+            e.setdefault("customData",{}).update(
+                diagramStyleVersion=1,
+                diagramImportedSource="diagrams/claim-settlement-source.excalidraw")
+    for fid,record in source["files"].items():
+        if fid in scene_builder.files:
+            assert scene_builder.files[fid]==record, f"Different saved asset {fid}"
+        else:
+            scene_builder.files[fid]=copy.deepcopy(record)
+    scene_builder.elements.extend(imported)
+    scene_builder.n+=85
+    for _ in range(170):
+        random.randint(1,2**31-1)
+    return frame["height"]
+
+
+
+"""Import the approved charge scene without consuming the generator's IDs or RNG."""
+import copy
+import json
+
+
+def _import_finance_frame(scene_builder, y0, source_path, prefix="charge_flow_"):
+    source=json.loads(source_path.read_text())
+    frame=next(e for e in source["elements"] if e["type"]=="frame")
+    ids={e["id"]:prefix+e["id"] for e in source["elements"]}
+
+    def remap(value,key=None):
+        if isinstance(value,dict): return {k:remap(v,k) for k,v in value.items()}
+        if isinstance(value,list):
+            if key=="groupIds": return [prefix+g for g in value]
+            return [remap(v) for v in value]
+        if isinstance(value,str) and key in {"id","frameId","containerId","elementId","diagramParentComponent"}:
+            return ids.get(value,value)
+        return value
+
+    imported=remap(copy.deepcopy(source["elements"]))
+    assert not ({e["id"] for e in imported}&{e["id"] for e in scene_builder.elements})
+    for e in imported:
+        e["x"]-=frame["x"]
+        e["y"]+=y0-frame["y"]
+        if e["type"]=="frame":
+            e.setdefault("customData",{})["diagramStyleVersion"]=1
+    scene_builder.elements.extend(imported)
+    for fid,record in source["files"].items():
+        if fid in scene_builder.files: assert scene_builder.files[fid]==record
+        else: scene_builder.files[fid]=record
+    return frame["height"]
+
+
+def review_charge(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "charge-review-source.excalidraw", "charge_flow_")
+
+
+def record_insurer_payment(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "insurer-receipt-source.excalidraw", "receipt_flow_")
+
+
+def event_operating_costs(y0):
+    return _import_finance_frame(S, y0, LOGOS.parent / "event-operating-costs-source.excalidraw", "event_costs_")
+
+
+
+def nessie(y0):
+    """One provider, its operations and references, then local wallet accounting."""
+    S.begin_frame("Capital One Nessie", 0, y0, 4480, 1770)
+    provider = _nessie_component(1000, 100, 1600, 1040, "Nessie API", "ext")
+    brand = S.image(S.ox + 1070, S.oy + 155, CAPONE, 175)
+    brand.setdefault("customData", {})["diagramParentComponent"] = provider.id
+    customer = _nessie_component(1060, 350, 620, 230, "Create customer", "ext", parent=provider)
+    _nessie_property(customer, 1100, 445, 540, "returns customer_id")
+    account = _nessie_component(1920, 350, 620, 230, "Checking account", "ext", parent=provider)
+    _nessie_property(account, 1960, 445, 540, "returns account_id")
+    deposit = _nessie_component(1060, 790, 620, 230, "Deposit", "ext", parent=provider)
+    _nessie_property(deposit, 1100, 885, 540, "returns deposit_id")
+    purchase = _nessie_component(1920, 790, 620, 230, "Purchase", "ext", parent=provider)
+    _nessie_property(purchase, 1960, 885, 540, "returns purchase_id")
+    H(customer, account, "worker uses customer ID")
+
+    setup = B(80, 350, "Wallet setup", "web", w=550, h=230,
+              wordmark=PHONE, mark_h=100)
+    injury = B(80, 790, "Approved injury payout", "good", w=550, h=230,
+               wordmark=HEART, mark_h=100)
+    setup.el.setdefault("customData", {})["diagramArtworkHeight"] = 200
+    injury.el.setdefault("customData", {})["diagramArtworkHeight"] = 200
+    H(setup, customer, "worker POST")
+    H(injury, deposit, "worker POST")
+
+    ledger = _nessie_component(2970, 790, 620, 350, "wallet_entry", "stdb", STDB)
+    _nessie_property(ledger, 3010, 935, 540, "signed amount_cents")
+    _nessie_property(ledger, 3010, 1045, 540, "Nessie reference", h=70)
+    total = _nessie_component(2970, 350, 620, 350, "Spendable balance", "rust", RUST)
+    _nessie_property(total, 3010, 495, 540, "sum wallet_entry cents")
+    _nessie_property(total, 3010, 605, 540, "subtract pending holds", h=70)
+    wallet = SV(3890, 350, STDB, "my_wallet", kind="stdb", w=500, h=350)
+    H(total, wallet, "available cents")
+    V(ledger, total, "wallet entries")
+    R(account, "r", ledger, "l", [S.P(2770, 465), S.P(2770, 877.5)],
+      "worker records opening", seg=1, fb=.25)
+    H(purchase, ledger, "worker records debit", y=purchase.cy)
+    R(deposit, "b", ledger, "b", [S.P(1370, 1210), S.P(2580, 1210), S.P(3280, 1210)],
+      "worker records credit", seg=2)
+
+    approval = B(80, 1390, "Organizer approves charge", "good", w=550, h=300,
+                 wordmark=USER, mark_h=100)
+    payment = B(920, 1390, "Attendee pays", "web", w=550, h=300,
+                wordmark=PHONE, mark_h=100)
+    merch = B(1940, 1390, "Merch checkout", "web", w=550, h=300,
+              wordmark=STORE, mark_h=100)
+    H(approval, payment, "permits payment")
+    R(payment, "t", purchase, "b", [S.P(1195, 1290), S.P(2050, 1290)],
+      "worker POST", seg=1, fb=.21)
+    R(merch, "t", purchase, "b", [S.P(2390, 1240)],
+      "worker POST", seg=0, fa=(2390 - 1940) / 550, fb=(2390 - 1920) / 620)
+    return S.end_frame()
+
+
+
+
+def _nessie_component(x, y, w, h, label, kind="stdb", logo_=None, parent=None):
+    first = len(S.elements)
+    box = Z(x, y, w, h, label, kind, logo_)
+    box.el.update(backgroundColor={"ext": "#c3fae8", "stdb": "#dbe4ff", "rust": "#e9edf2"}.get(kind, "#d0ebff"), strokeColor="#b5bfca")
+    box.el.setdefault("customData", {})["diagramComponent"] = True
+    if parent:
+        box.el["backgroundColor"] = "#e7fbf2"
+        box.el["customData"]["diagramParentComponent"] = parent.id
+    for element in S.elements[first:]:
+        if element["type"] == "text":
+            element["strokeColor"] = "#1e1e1e"
+    return box
+
+
+def _nessie_property(parent, x, y, w, text, h=90):
+    cell = B(x, y, text, "stdb", w=w, h=h)
+    cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+    cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+    return cell
+
+
+
+def band_wiring(y0):
+    S.begin_frame("20 · Band wiring", 0, y0, 3540, 3240)
+
+    def component(x, y, w, h, label, art=None, dashed=False):
+        first = len(S.elements)
+        box = Z(x, y, w, h, label, "device", art)
+        box.el.update(backgroundColor="#ffe8cc", strokeColor="#b5bfca",
+                      strokeStyle="dashed" if dashed else "solid")
+        box.el.setdefault("customData", {})["diagramComponent"] = True
+        for element in S.elements[first:]:
+            if element["type"] == "text":
+                element["strokeColor"] = "#1e1e1e"
+        return box
+
+    def prop(parent, x, y, label, w=310, h=130, dashed=False):
+        cell = B(x, y, label, "stdb", w=w, h=h, dashed=dashed)
+        cell.el.update(backgroundColor="#f5f7ff", strokeColor="#c0cbe4", strokeWidth=1)
+        cell.el.setdefault("customData", {})["diagramParentComponent"] = parent.id
+        return cell
+
+    left, middle, right = 80, 1360, 2800
+    rows = (180, 820, 1460, 2100)
+    board = component(middle - 20, rows[0], 800, 2480,
+                      "XIAO ESP32-C3 · band controller", SEEED)
+    values = (
+        ("Same firmware\nlite + full bands", "USB-C\ncharging + serial"),
+        ("LiPo charger\n380 mA", "3V3 regulator"),
+        ("ESP-NOW transmit\n8 dBm", "5V pin live\nonly on USB"),
+        ("D8 + D9\nnever wired", "D9\nBOOT"),
+        ("No power\nswitch", "Unlit ring\n≈12 mA"),
+        ("One click\ndeep sleep", "One click\nwake"),
+    )
+    for row, pair in enumerate(values):
+        for col, label in enumerate(pair):
+            prop(board, middle + 20 + col * 380, 540 + row * 330,
+                 label, w=350, h=240)
+
+    ring = component(left - 20, rows[0], 720, 560, "LED ring · WS2812B")
+    prop(ring, left, rows[0] + 270, "LED count\n12")
+    prop(ring, left + 350, rows[0] + 270, "Brightness\n64 / 255")
+    prop(ring, left, rows[0] + 420, "Power: battery rail", w=660)
+
+    button = component(left - 20, rows[1], 720, 560, "SOS control · button")
+    prop(button, left, rows[1] + 270, "Under ring\ncentre")
+    prop(button, left + 350, rows[1] + 270, "Pull-up input")
+    prop(button, left, rows[1] + 420, "Wakes deep sleep", w=660)
+
+    imu = component(left - 20, rows[2], 720, 560, "Motion · MPU-6050 · GY-521", dashed=True)
+    prop(imu, left, rows[2] + 270, "Optional\nfull bands", dashed=True)
+    prop(imu, left + 350, rows[2] + 270, "I2C address\n0x68")
+    prop(imu, left, rows[2] + 420, "Range\n±8 g")
+    prop(imu, left + 350, rows[2] + 420, "Read rate\n100 / second")
+
+    motor = component(left - 20, rows[3], 720, 560, "Haptics · coin vibration motor", dashed=True)
+    prop(motor, left, rows[3] + 270, "Optional\nfull bands", dashed=True)
+    prop(motor, left + 350, rows[3] + 270, "Driver\n2N2222")
+    prop(motor, left, rows[3] + 420, "PWM rate\n20 kHz")
+    prop(motor, left + 350, rows[3] + 420, "Duty cycle\n70%")
+
+    battery = component(right - 20, rows[0], 720, 560, "Battery supply · LiPo")
+    prop(battery, right, rows[0] + 270, "Capacity\n500 mAh")
+    prop(battery, right + 350, rows[0] + 270, "Protected cell")
+    prop(battery, right, rows[0] + 420, "Supplies ring + motor", w=660)
+
+    antenna = component(right - 20, rows[1], 720, 560, "FPC antenna", RADIO)
+    prop(antenna, right, rows[1] + 270, "Mounted on lid", w=660)
+    prop(antenna, right, rows[1] + 420, "Outside case", w=660)
+
+    divider = component(right - 20, rows[2], 720, 560, "Battery measurement · divider", dashed=True)
+    prop(divider, right, rows[2] + 270, "Resistance\n2 × 200 kΩ")
+    prop(divider, right + 350, rows[2] + 270, "Not fitted", dashed=True)
+    prop(divider, right, rows[2] + 420, "Battery % when fitted", w=660)
+
+    nfc = component(right - 20, rows[3], 720, 560, "Tap link · NTAG215 NFC sticker", NFC)
+    prop(nfc, right, rows[3] + 270, "No wires", w=660)
+    prop(nfc, right, rows[3] + 420, "Opens\nband1t.vip/t/BANDIT-0N", w=660)
+
+    H(board, ring, "D1 · GPIO3\n330 Ω → DIN", y=ring.cy)
+    H(button, board, "D2 · GPIO4\nbutton → GND", y=button.cy)
+    H(board, imu, "D4 · GPIO6 SDA\nD5 · GPIO7 SCL\n3V3 + GND", y=imu.cy,
+      both=True, dashed=True)
+    H(board, motor, "D6 · GPIO21\n1 kΩ → base", y=motor.cy, dashed=True)
+    H(battery, board, "BAT+ and BAT− pads", y=battery.cy)
+    H(board, antenna, "U.FL", y=antenna.cy, both=True)
+    H(divider, board, "D0 · GPIO2 (A0)", y=divider.cy, dashed=True)
+
+    case = component(2780, 2740, 720, 440, "Printed pill case")
+    prop(case, 2800, 2830, "Size\n64 × 42 mm", h=140)
+    prop(case, 3150, 2830, "Button hole\n6.5 mm", h=140)
+    prop(case, 2800, 3020, "Ring in head · battery below", w=660, h=140)
+    return S.end_frame()
+
+
+
+def band_firmware(y0):
+    """Import the three reviewed firmware questions with stable native identities."""
+    import copy
+    import random
+
+    source_names = (
+        'band-incident-alarms-source.excalidraw',
+        'band-helper-signals-source.excalidraw',
+        'band-exit-colors-source.excalidraw',
+    )
+    offset = y0
+    existing_ids = {element['id'] for element in S.elements}
+    for filename in source_names:
+        source = json.loads((LOGOS.parent / filename).read_text())
+        frame = next(e for e in source['elements'] if e['type'] == 'frame')
+        assert not existing_ids.intersection(e['id'] for e in source['elements']), filename
+        for original in source['elements']:
+            element = copy.deepcopy(original)
+            element['y'] += offset - frame['y']
+            S.elements.append(element)
+            existing_ids.add(element['id'])
+        for file_id, record in source.get('files', {}).items():
+            if file_id in S.files:
+                assert S.files[file_id]['dataURL'] == record['dataURL']
+            else:
+                S.files[file_id] = copy.deepcopy(record)
+        offset += frame['height'] + GAP
+
+    # Reserve the exact old numeric slots and draws; two added frame IDs are named.
+    S.n += 88
+    for _ in range(176):
+        random.randint(1, 2**31 - 1)
+    return offset - y0 - GAP
+
+
+
+
+
+
+
+FRAMES = (architecture, spacetimedb, elastic_evidence, elastic_execution, bright_data,
+          nessie, jobs, band_commands, prepare_event, find_people, photo_memories,
+          settle_claim, policy_amounts, approve_rule, review_charge, record_insurer_payment, event_operating_costs, respond_incident,
+          routes_space, fire_evacuation, photo_product_flow, merch_product_flow, hardware, band_wiring, exit_markers_gateway,
+          band_firmware, vision, venue_reconstruction)
+
+ALIASES = {
+    "overview": ("architecture",), "vultr": ("architecture",),
+    "queues": ("jobs",), "pipeline": ("prepare_event",),
+    "evidence": ("elastic_evidence",), "claude_jobs": ("elastic_execution",),
+    "social": ("find_people", "photo_memories"),
+    "insurance": ("settle_claim", "policy_amounts", "approve_rule"),
+    "medic": ("respond_incident", "routes_space"),
+    "views": ("spacetimedb",),
+}
+requested = sys.argv[2:]
+only = {name for item in requested for name in ALIASES.get(item, (item,))}
+known = {draw.__name__ for draw in FRAMES}
+unknown = only - known
+if unknown:
+    raise SystemExit("Unknown frame: " + ", ".join(sorted(unknown)))
 y = 0
-for draw in (architecture, pipeline, insurance, social, hardware):
-    y += draw(y) + GAP
+for draw in FRAMES:
+    if not only or draw.__name__ in only:
+        y += draw(y) + GAP
 S.dump(sys.argv[1] if len(sys.argv) > 1 else "bandit-system-design.excalidraw")
 print(len(S.elements), "elements")

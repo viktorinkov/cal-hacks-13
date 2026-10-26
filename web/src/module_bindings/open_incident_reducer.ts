@@ -13,6 +13,6 @@ import {
 export default {
   kind: __t.string(),
   zoneId: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   note: __t.string(),
 };

@@ -1,20 +1,34 @@
-//! Incident to claim (Hyphenate track). A resolved incident becomes a claim
-//! with a hashed evidence pack; Claude reads the medical record, Elastic
-//! validates the evidence and finds similar claims, the claims agent reviews
-//! the pack, and code decides coverage, amounts and the route: settle under a
-//! learned rule, send to the organizer, or refuse and show every check. Money moves on a double-entry ledger.
+//! Incident to claim (Hyphenate track). The attendee files a claim for an
+//! injury on their band in their own words; broken or taken property and an
+//! attendee's own things open their claim on resolve. The claim gets a hashed
+//! evidence pack; the hospital report arrives as drawn by the seeded generator,
+//! or Claude reads a filed record; Elastic validates the evidence and finds the
+//! policy clauses that bear on it, Claude investigates and decides, and code
+//! decides coverage, amounts and the route: settle under an approved rule, send
+//! to the organizer, or refuse and show every check. Every organizer decision is
+//! kept as a precedent, and Claude proposes payment rules from them for the
+//! organizer to approve. Whoever broke or took something can be charged for it
+//! (`charges`). Money moves on a double-entry ledger.
 
+pub mod charges;
+pub mod documents;
 pub mod evidence;
+pub mod filing;
 pub mod flow;
 pub mod people;
+pub mod plan_lookup;
+pub mod proposals;
 pub mod setup;
 pub mod tables;
+pub mod venue_policy_lookup;
 pub mod views;
 
 #[cfg(test)]
 mod tests;
 
 pub use flow::{on_incident_resolved, on_job_dead};
+pub use charges::*;
+pub use documents::{FeeScheduleLine, PolicyDocument, PolicyTerm, fee_schedule_line, policy_document, policy_term};
 pub use tables::*;
 
 use spacetimedb::{ReducerContext, Table, Timestamp};

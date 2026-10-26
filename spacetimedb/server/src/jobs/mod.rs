@@ -205,7 +205,13 @@ fn retry_or_bury(ctx: &ReducerContext, job: Job, error: String) {
             ..job
         });
         crate::insurance::on_job_dead(ctx, &dead);
+        crate::insurance::proposals::on_job_dead(ctx, &dead);
+        crate::insurance::documents::on_job_dead(ctx, &dead);
         crate::merch::on_job_dead(ctx, &dead);
+        crate::venue::setup::on_job_dead(ctx, &dead);
+        crate::venue::event_import::on_job_dead(ctx, &dead);
+        crate::insurance::plan_lookup::on_job_dead(ctx, &dead);
+        crate::insurance::venue_policy_lookup::on_job_dead(ctx, &dead);
     } else {
         let backoff = TimeDuration::from_micros(RETRY_MICROS * job.attempts as i64);
         ctx.db.job().id().update(Job {

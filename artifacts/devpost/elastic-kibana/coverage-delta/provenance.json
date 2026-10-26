@@ -1,0 +1,23 @@
+[
+  {
+    "file": "document-reading-workflow.jpg",
+    "source": "https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/workflows/bandit-read-document?executionId=4835318a-98d8-4fdf-a941-8d8a92527025&lastViewedExecutionId=4835318a-98d8-4fdf-a941-8d8a92527025&tab=executions",
+    "capturedAt": "2026-10-25T12:33:32.703Z",
+    "state": "completed execution; not a guarantee of every future document",
+    "nativeView": "Graph, Fit to view then one Zoom out; full viewport"
+  },
+  {
+    "file": "image-reading-workflow.jpg",
+    "source": "https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/workflows/bandit-read-image?executionId=91b6cf68-f1b8-48d4-8f09-3950829fa229&lastViewedExecutionId=91b6cf68-f1b8-48d4-8f09-3950829fa229&stepExecutionId=40971d84fd37c4450e7cb936326453b84a3e2c242bbe6118bfb0cdc8ff87d33e&tab=executions",
+    "capturedAt": "2026-10-25T12:35:47.237Z",
+    "state": "Completed existing photo feature run: count and caption returned; not face recognition",
+    "nativeView": "Graph and native output panel; two Zoom out; full viewport"
+  },
+  {
+    "file": "structured-text-workflow.jpg",
+    "source": "https://bandit-c79b82.kb.us-east4.gcp.elastic.cloud/app/workflows/bandit-run-task?executionId=28c34b7f-6449-4400-bd3b-3dc533a2def5&lastViewedExecutionId=28c34b7f-6449-4400-bd3b-3dc533a2def5&stepExecutionId=d82ff5319c1b542b35b62cdd8fe600d4c15cf72166ad9c4735b6cce0ffdf8b74&tab=executions",
+    "capturedAt": "2026-10-25T12:36:27.948Z",
+    "state": "Completed existing structured task returning venue identity and page candidates. This specific test names Barclays Center, not the Cal Hacks venue.",
+    "nativeView": "Full native graph/output/execution viewport"
+  }
+]

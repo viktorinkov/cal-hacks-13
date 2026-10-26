@@ -1,0 +1,133 @@
+/* Attendee registration: existing Nocturne palette, flat app surfaces. */
+.signup-page {
+  --signup-panel: #151518;
+  --signup-raised: #202023;
+  --signup-control: #303034;
+  --signup-muted: #b4b4bc;
+  --signup-rule: #242427;
+  color-scheme: dark;
+}
+.signup-shell { width: min(100% - 80px, 1152px); margin-inline: auto; padding-block: 20px 48px; }
+.signup-header { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+.signup-header button { min-height: 44px; }
+.signup-nav { display: flex; align-items: center; gap: 24px; font-size: 14px; }
+.signup-nav button { min-width: 44px; }
+.signup-page button, .signup-file { cursor: pointer; }
+.signup-page button:focus-visible, .signup-file:focus-visible { outline: 2px solid var(--color-champagne); outline-offset: 4px; }
+.signup-main { padding-top: 40px; }
+.signup-title { font-family: var(--font-sans); font-size: 28px; font-weight: 500; line-height: 1.2; letter-spacing: -.025em; }
+.signup-intro > p { margin-top: 10px; color: var(--signup-muted); font-size: 14px; line-height: 1.6; }
+.signup-band { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(160px, .65fr); align-items: center; gap: 24px; padding: 22px; margin-top: 24px; border-radius: 20px; background: var(--signup-panel); }
+.signup-strap { position: relative; display: flex; align-items: center; justify-content: center; width: 92px; height: 76px; border-radius: 26px; background: var(--signup-control); }
+.signup-strap::before { content: ''; position: absolute; inset: 9px 0; border-radius: 18px; background: var(--signup-raised); }
+.signup-strap span { position: relative; font-size: 24px; font-weight: 500; padding-right: 6px; font-variant-numeric: tabular-nums; }
+.signup-strap i { position: absolute; top: 27px; right: 16px; width: 4px; height: 4px; background: var(--color-champagne); border-radius: 50%; }
+.signup-band h2 { font-size: 16px; font-weight: 500; line-height: 1.5; }
+.signup-status { margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--signup-muted); }
+.signup-preview { min-width: 0; padding-left: 24px; border-left: 1px solid var(--signup-control); }
+.signup-preview p { overflow-wrap: anywhere; font-size: 16px; font-weight: 500; line-height: 1.5; }
+.signup-preview > span { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--signup-muted); }
+.signup-preview svg { flex-shrink: 0; }
+.signup-form { min-width: 0; margin-top: 32px; }
+.signup-section { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 24px; margin-top: 28px; }
+.signup-section + .signup-section { border-top: 1px solid var(--signup-rule); padding-top: 28px; }
+.signup-section-heading { padding-top: 18px; }
+.signup-section-heading h2 { font-size: 16px; font-weight: 500; line-height: 1.5; }
+.signup-section-heading p { max-width: 27ch; margin-top: 8px; font-size: 14px; line-height: 1.65; color: var(--signup-muted); }
+.signup-panel { min-width: 0; padding: 22px; border-radius: 20px; background: var(--signup-panel); }
+.signup-input { display: block; width: 100%; min-width: 0; height: 44px; border: 1px solid var(--signup-control); border-radius: 10px; padding: 0 12px; background: var(--color-ground); color: var(--color-ink); font-family: inherit; font-size: 14px; outline: none; transition: border-color 120ms; }
+.signup-input:hover { border-color: var(--color-ink-muted); }
+.signup-input:focus-visible { border-color: var(--color-champagne); outline: 2px solid var(--color-champagne); outline-offset: 2px; }
+.signup-input[aria-invalid] { border-color: var(--color-signal); }
+.signup-upload { display: grid; grid-template-columns: minmax(0, 1fr) 240px; align-items: center; gap: 16px; padding: 18px; border-radius: 12px; background: var(--signup-raised); }
+.signup-upload.is-dragging { outline: 2px solid var(--color-champagne); outline-offset: 2px; }
+.signup-upload-copy > span + span { display: block; margin-top: 5px; }
+.signup-file { width: 100%; min-width: 0; color: var(--signup-muted); font-size: 12px; }
+.signup-file::file-selector-button { min-height: 40px; margin-right: 10px; padding-inline: 14px; border: 0; border-radius: 999px; background: var(--signup-control); color: var(--color-ink); font-family: inherit; font-size: 13px; cursor: pointer; }
+.signup-file:hover:not(:disabled)::file-selector-button { background: #414146; }
+.signup-file:disabled { cursor: default; }
+.signup-file:disabled::file-selector-button { color: var(--signup-muted); cursor: default; }
+.signup-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 28px; font-size: 14px; line-height: 1.6; }
+.signup-facts dt { font-size: 13px; }
+.signup-facts dd { margin-top: 4px; overflow-wrap: anywhere; }
+.signup-payment-fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; }
+.signup-page .signup-primary { min-height: 40px; padding-inline: 20px; border: 0; border-radius: 999px; background: var(--color-ink); color: var(--color-ground); transition: background-color 120ms; }
+.signup-page .signup-primary:hover { background: #d7d7dc; }
+.signup-page .signup-primary:disabled { opacity: 1; background: var(--signup-control); color: var(--signup-muted); cursor: default; }
+.signup-privacy { display: flex; align-items: start; gap: 8px; max-width: 62ch; margin: 24px 0 0 288px; color: var(--signup-muted); font-size: 12px; line-height: 1.7; }
+.signup-privacy svg { flex-shrink: 0; margin-top: 2px; }
+.signup-complete { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 64px; padding-block: 56px; }
+.signup-complete [data-ui] { border-radius: 20px; padding: 28px; overflow-wrap: anywhere; }
+.signup-complete [data-ui] .font-display { font-family: var(--font-sans); font-size: 24px; }
+.signup-tap { max-width: 420px; margin: 80px auto; text-align: center; }
+@media (max-width: 900px) {
+  .signup-section { grid-template-columns: 200px minmax(0, 1fr); }
+  .signup-upload { grid-template-columns: 1fr; }
+  .signup-privacy { margin-left: 224px; }
+}
+@media (max-width: 768px) {
+  .signup-shell { width: calc(100% - 40px); padding-top: 12px; }
+  .signup-main { padding-top: 24px; }
+  .signup-section { grid-template-columns: 1fr; gap: 16px; }
+  .signup-section-heading { padding-top: 0; }
+  .signup-section-heading p { max-width: none; margin-top: 4px; }
+  .signup-privacy { margin-left: 0; }
+  .signup-band { gap: 18px; grid-template-columns: 76px minmax(0, 1fr); padding: 18px; }
+  .signup-strap { width: 76px; height: 68px; }
+  .signup-strap i { right: 12px; top: 23px; }
+  .signup-preview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--signup-control); }
+  .signup-preview > span { margin-top: 0; }
+  .signup-preview p { font-size: 14px; }
+  .signup-upload { grid-template-columns: minmax(0, 1fr) 240px; }
+  .signup-complete { grid-template-columns: 1fr; gap: 32px; padding-top: 40px; }
+  .signup-page .signup-primary, .signup-file::file-selector-button { min-height: 44px; }
+}
+@media (max-width: 540px) {
+  .signup-title { font-size: 26px; }
+  .signup-panel { padding: 18px; }
+  .signup-upload { grid-template-columns: 1fr; padding: 16px; }
+  .signup-input { font-size: 16px; }
+  .signup-payment-fields { grid-template-columns: 1fr 1fr; }
+  .signup-payment-fields > div:first-child { grid-column: 1 / -1; }
+  .signup-facts { grid-template-columns: 1fr; gap: 16px; }
+  .signup-save { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signup-page *, .signup-page *::before { transition: none !important; }
+}
+
+/* User-requested concert lighting extends the flat Taste direction. */
+@property --concert-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #f4bfd7;
+}
+.signup-page {
+  --concert-color: #f4bfd7;
+  isolation: isolate;
+  transition: --concert-color 700ms ease;
+}
+.signup-shell { position: relative; z-index: 1; }
+.signup-light-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: var(--signup-muted); }
+.signup-light-toggle[aria-pressed='true'] { color: var(--concert-color); }
+.concert-lights { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.concert-beam { position: absolute; top: -380px; width: 620px; height: 1100px; border-radius: 50%; opacity: .65; }
+.concert-beam-left { left: -260px; transform: rotate(-28deg); background: radial-gradient(ellipse, color-mix(in srgb, var(--concert-color) 24%, transparent), transparent 68%); } /* taste-skill-ignore: user-requested concert glow. */
+.concert-beam-right { right: -230px; transform: rotate(28deg); background: radial-gradient(ellipse, #b7d9f526, transparent 68%); } /* taste-skill-ignore: user-requested concert glow. */
+.concert-cursor { position: absolute; left: 0; top: 0; width: min(900px, 110vw); aspect-ratio: 1; transform: translate3d(calc(var(--light-x, 75vw) - 50%), calc(var(--light-y, 25vh) - 50%), 0); transition: transform 220ms ease-out; }
+.concert-cursor-wash { width: 100%; height: 100%; border-radius: 50%; opacity: .6; background: radial-gradient(circle, color-mix(in srgb, var(--concert-color) 32%, transparent), transparent 68%); } /* taste-skill-ignore: user-requested concert glow. */
+.signup-page[data-lights='on'] .signup-band { background: color-mix(in srgb, var(--signup-panel) 92%, var(--concert-color)); }
+.signup-page[data-lights='on'] .signup-strap { background: color-mix(in srgb, var(--signup-control) 70%, var(--concert-color)); }
+.signup-page[data-lights='on'] .signup-strap i { background: var(--concert-color); }
+.signup-page[data-lights='on'] .signup-primary:not(:disabled) { background: var(--concert-color); }
+.signup-page[data-lights='on'] .signup-primary:not(:disabled):hover { background: color-mix(in srgb, var(--concert-color) 85%, white); }
+.signup-page[data-lights='off'] .concert-lights { display: none; }
+@media (max-width: 540px) {
+  .signup-nav { gap: 14px; }
+  .concert-beam { opacity: .45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signup-page { transition: none; }
+  .concert-cursor { display: none; }
+  .concert-lights * { animation: none !important; }
+}

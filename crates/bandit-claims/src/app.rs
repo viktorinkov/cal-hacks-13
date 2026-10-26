@@ -18,7 +18,7 @@ pub const DEFAULT_DATABASE: &str = "bandit-insurance";
 /// Staff actors: token name, role, label.
 pub const STAFF: &[(&str, &str, &str)] = &[
     ("worker", "worker", "bandit-workers"),
-    ("sim", "simulator", "bandit-claims"),
+    ("tester", "tester", "bandit-claims"),
     ("vision", "vision", "bandit-vision"),
     ("ops", "ops", "Ops desk"),
     ("medic", "medic", "Ari Ramos"),
@@ -34,7 +34,7 @@ pub const SPONSOR_ROW: &str = "Sponsor row";
 pub const HACKING_FLOOR: &str = "Hacking floor";
 
 /// Tables the owner connection mirrors (private ones included).
-const TABLES: &[&str] = &[
+pub const TABLES: &[&str] = &[
     "staff_role",
     "medical_document",
     "band",
@@ -56,13 +56,18 @@ const TABLES: &[&str] = &[
     "claim_check",
     "medical_record",
     "claim_line",
-    "claim_precedent",
+    "claim_clause",
     "claim_review",
+    "decision",
     "approval",
     "settlement_rule",
+    "rule_proposal",
     "ledger_entry",
     "insurance_policy",
     "coverage_rule",
+    "plan_lookup",
+    "policy_document",
+    "policy_term",
     "insurance_settings",
     "claimant_account",
     "job",
@@ -132,12 +137,18 @@ impl App {
 
     /// The owner connection, subscribed to every table the CLI reads.
     pub fn db(&self) -> Result<Rc<DbConnection>> {
+        self.db_with(TABLES)
+    }
+
+    /// The owner connection, subscribed to `tables` when this is the first call. The live run uses it to
+    /// leave out the thousand crowd bands it never reads.
+    pub fn db_with(&self, tables: &[&str]) -> Result<Rc<DbConnection>> {
         if let Some(c) = self.owner.borrow().as_ref() {
             return Ok(c.clone());
         }
         let (conn, _, _) = bandit_bindings::connect(&self.uri, &self.database, Some(self.owner_token()?))
             .with_context(|| format!("connecting to {} at {} as the module owner", self.database, self.uri))?;
-        let queries: Vec<String> = TABLES.iter().map(|t| format!("SELECT * FROM {t}")).collect();
+        let queries: Vec<String> = tables.iter().map(|t| format!("SELECT * FROM {t}")).collect();
         let queries: Vec<&str> = queries.iter().map(String::as_str).collect();
         bandit_bindings::subscribe(&conn, &queries)?;
         let conn = Rc::new(conn);
@@ -252,7 +263,7 @@ impl App {
     }
 
     /// How to start the worker; a local database gets its own Elastic index so
-    /// test claims never become precedents in the live one.
+    /// test claims stay out of the live one.
     pub fn worker_hint(&self) -> String {
         let local = self.uri.contains("127.0.0.1") || self.uri.contains("localhost");
         let index = if local { format!(" ELASTIC_INDEX_PREFIX={}-local", self.database) } else { String::new() };
@@ -375,5 +386,13 @@ pub fn kind_name(k: IncidentKind) -> &'static str {
         IncidentKind::Sos => "sos",
         IncidentKind::Fall => "fall",
         IncidentKind::Property => "property",
+        IncidentKind::Theft => "theft",
+        IncidentKind::Breakage => "breakage",
     }
+}
+
+/// A fall or an SOS: a person who needs the medic and files their own claim. The other kinds are broken or
+/// taken things: security answers them, and resolving one with a cost note opens its claim.
+pub fn is_injury(k: IncidentKind) -> bool {
+    matches!(k, IncidentKind::Sos | IncidentKind::Fall)
 }

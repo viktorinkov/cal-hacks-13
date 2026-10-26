@@ -15,6 +15,12 @@ pub enum Account {
     InsurerReceivable,
     /// Asset.
     Cash,
+    /// Asset: what an attendee owes for something they broke or took.
+    AttendeeReceivable,
+    /// Income: what attendees pay back for losses they caused, the share that is not the insurer's.
+    Recoveries,
+    /// Liability: the insurer's share of a charge, which repays what the insurer paid on the claim.
+    InsurerPayable,
 }
 
 impl Account {
@@ -24,6 +30,9 @@ impl Account {
             Account::ClaimsReserve => "claims_reserve",
             Account::InsurerReceivable => "insurer_receivable",
             Account::Cash => "cash",
+            Account::AttendeeReceivable => "attendee_receivable",
+            Account::Recoveries => "recoveries",
+            Account::InsurerPayable => "insurer_payable",
         }
     }
 }
@@ -38,7 +47,7 @@ pub struct Line {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Journal {
-    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`.
+    /// `J1 reserve`, `J1r reserve reversal`, `J2 receivable`, `J3 claimant payment`, `J4 reconciliation`, `J5 charge`, `J6 charge payment`.
     pub name: String,
     pub lines: Vec<Line>,
 }
@@ -91,6 +100,39 @@ pub fn insurer_payment(received_cents: Cents, recoverable_cents: Cents) -> Journ
         lines.push(line(Account::ClaimsExpense, 0, received_cents - recoverable_cents, "insurer paid more than recoverable"));
     }
     Journal { name: "J4 reconciliation".to_string(), lines }
+}
+
+/// J5 when the organizer approves a charge: debit `attendee_receivable` the whole charge; credit
+/// `insurer_payable` the insurer's share (what it paid on the claim, which the charge repays) and
+/// `recoveries` the rest (the venue's deductible).
+pub fn charge_approved(amount_cents: Cents, insurer_share_cents: Cents) -> Journal {
+    let share = insurer_share_cents.min(amount_cents);
+    Journal {
+        name: "J5 charge".to_string(),
+        lines: vec![
+            line(Account::AttendeeReceivable, amount_cents, 0, "charge to the attendee responsible"),
+            line(Account::InsurerPayable, 0, share, "repays the insurer's payout on the claim"),
+            line(Account::Recoveries, 0, amount_cents - share, "the share the insurer did not pay"),
+        ],
+    }
+}
+
+/// J5r when the organizer waives an approved charge, or the attendee disputes it: J5 reversed.
+pub fn charge_waived(amount_cents: Cents, insurer_share_cents: Cents) -> Journal {
+    let share = insurer_share_cents.min(amount_cents);
+    Journal {
+        name: "J5r charge waived".to_string(),
+        lines: vec![
+            line(Account::InsurerPayable, share, 0, "charge waived"),
+            line(Account::Recoveries, amount_cents - share, 0, "charge waived"),
+            line(Account::AttendeeReceivable, 0, amount_cents, "charge waived"),
+        ],
+    }
+}
+
+/// J6 when the attendee pays the charge from their wallet: debit `cash`, credit `attendee_receivable`.
+pub fn charge_paid(amount_cents: Cents) -> Journal {
+    pair("J6 charge payment", Account::Cash, Account::AttendeeReceivable, amount_cents, "charge paid from the attendee's wallet")
 }
 
 fn line(account: Account, debit_cents: Cents, credit_cents: Cents, memo: &str) -> Line {
@@ -190,6 +232,19 @@ mod tests {
         assert_eq!(balance(&life, Account::InsurerReceivable), 0);
         assert_eq!(balance(&life, Account::ClaimsExpense), 50000);
         assert_eq!(balance(&life, Account::Cash), -50000);
+    }
+
+    #[test]
+    fn a_paid_charge_repays_the_insurer_and_the_venue() {
+        // The speaker: $2,400 charged, the insurer paid $1,900, the venue carried the $500 deductible.
+        let life = [charge_approved(240000, 190000), charge_paid(240000)];
+        assert!(life.iter().all(Journal::is_balanced));
+        assert_eq!(balance(&life, Account::AttendeeReceivable), 0);
+        assert_eq!(balance(&life, Account::Cash), 240000);
+        assert_eq!(balance(&life, Account::InsurerPayable), -190000);
+        assert_eq!(balance(&life, Account::Recoveries), -50000);
+        let waived = [charge_approved(240000, 190000), charge_waived(240000, 190000)];
+        assert!([Account::AttendeeReceivable, Account::InsurerPayable, Account::Recoveries].iter().all(|a| balance(&waived, *a) == 0));
     }
 
     #[test]

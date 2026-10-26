@@ -1,0 +1,56 @@
+{
+  "captured_on": "2026-10-25",
+  "method": "Official OpenAI Chrome browser runtime. Native screenshots; no cropping, pixel edits, DOM changes or rerun scraper jobs. Only existing account results inspected.",
+  "criteria_source": "https://hive.hackberkeley.org/prizes",
+  "criteria_capture": "criteria-source.txt",
+  "screenshots": [
+    {
+      "file": "web-unlocker-source-domains.jpg",
+      "source_url": "https://brightdata.com/cp/web_access/bandit_web_unlocker/stats",
+      "capture": "Native full viewport after UI scrolling to the source-domain table.",
+      "shows": "Existing Web Unlocker requests to public venue, event and insurer domains.",
+      "limits": "Domain activity does not report payload validation or downstream feature success. The table is page 1 of 2. Its displayed rows and overall API total have different scopes.",
+      "suggested_placement": "After the policy-document acquisition diagram.",
+      "suggested_title": "Public document requests",
+      "sha256": "8bd35683dc386c5902bd92d52056ace6be8179129dab74034891799cf9c1a366",
+      "bytes": 87876
+    },
+    {
+      "file": "browser-api-venue-sources.jpg",
+      "source_url": "https://brightdata.com/cp/web_access/mcp_browser/stats",
+      "capture": "Native full viewport after UI scrolling to usage and source domains.",
+      "shows": "Existing Browser API activity for interactive venue and model pages, including the official event portal and embedded venue page.",
+      "limits": "Includes candidate sites and developer reference sites. A visited domain is not proof it produced a usable 3D model. Do not describe every listed site as an exported model.",
+      "suggested_placement": "After the venue-model acquisition diagram.",
+      "suggested_title": "Venue pages opened through Browser API",
+      "sha256": "1b1a5c58fac0a4d6f20091358bf881b9bc7823cafb78fe869029761bd7a83995",
+      "bytes": 86135
+    },
+    {
+      "file": "company-scraper-completed-snapshots.jpg",
+      "source_url": "https://brightdata.com/cp/scrapers/gd_l1vikfnt1wgvvqz95w/pdp/snapshots?nav_from=my_scrapers&id=hl_017620da",
+      "capture": "Native full viewport of Snapshots; endpoint sidebar collapsed through the UI for table width.",
+      "shows": "Completed public-company collections. Four displayed batches contain 41 records each, with provider-reported 100% success.",
+      "limits": "This table verifies completed provider collections, not complete fields or accuracy of every company record. The portal supplies a download action, not an inline record preview.",
+      "suggested_placement": "After the event-preparation diagram.",
+      "suggested_title": "Completed company-data collections",
+      "snapshot_ids": [
+        "sd_mvnrf0sa766rif0xm",
+        "sd_mvno6ys3203z7w71dx",
+        "sd_mvm4zmaj16fq13ajp",
+        "sd_mvm2inum4lkmokzcr",
+        "sd_mvm1lkkd10ygsxaomm"
+      ],
+      "sha256": "2370e4434f48cb11363b2252c4a902fd8a497011c3bea7c016be9e01e44f7a79",
+      "bytes": 95461
+    }
+  ],
+  "local_output_crosscheck": {
+    "file": "crates/bandit-ingest/events/calhacks-13/snapshots/linkedin/dataset-gd-l1vikfnt1wgvvqz95w.json",
+    "fetched_at": "2026-10-24T08:28:28Z",
+    "records": 41,
+    "error_records": 0,
+    "source_sha256": "a69891e2e64f540966f5ba32e069f121ab60e69e3ab214f563d861d7b8706c67",
+    "note": "Existing saved snapshot has company fields such as industry, headquarters, size, about text and logo. Its collection date, dataset and count match the displayed older batch; storage wrapper does not preserve provider snapshot ID, so this is a crosscheck rather than a cryptographic link to that row."
+  }
+}

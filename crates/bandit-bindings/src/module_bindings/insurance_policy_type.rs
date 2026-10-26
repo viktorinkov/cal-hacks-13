@@ -16,6 +16,9 @@ pub struct InsurancePolicy {
     pub medical_used_cents: u64,
     pub property_used_cents: u64,
     pub updated_at: __sdk::Timestamp,
+    pub other_insurance: String,
+    pub staff_excluded: bool,
+    pub period_checked: bool,
 }
 
 impl __sdk::InModule for InsurancePolicy {
@@ -35,6 +38,9 @@ pub struct InsurancePolicyCols {
     pub medical_used_cents: __sdk::__query_builder::Col<InsurancePolicy, u64>,
     pub property_used_cents: __sdk::__query_builder::Col<InsurancePolicy, u64>,
     pub updated_at: __sdk::__query_builder::Col<InsurancePolicy, __sdk::Timestamp>,
+    pub other_insurance: __sdk::__query_builder::Col<InsurancePolicy, String>,
+    pub staff_excluded: __sdk::__query_builder::Col<InsurancePolicy, bool>,
+    pub period_checked: __sdk::__query_builder::Col<InsurancePolicy, bool>,
 }
 
 impl __sdk::__query_builder::HasCols for InsurancePolicy {
@@ -53,6 +59,9 @@ impl __sdk::__query_builder::HasCols for InsurancePolicy {
                 "property_used_cents",
             ),
             updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+            other_insurance: __sdk::__query_builder::Col::new(table_name, "other_insurance"),
+            staff_excluded: __sdk::__query_builder::Col::new(table_name, "staff_excluded"),
+            period_checked: __sdk::__query_builder::Col::new(table_name, "period_checked"),
         }
     }
 }

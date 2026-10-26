@@ -1,0 +1,70 @@
+{
+  "captured_by": "Official OpenAI Chrome browser runtime",
+  "account": "Existing authorized v_minchev@ucsb.edu owner and ops session",
+  "method": "Native browser screenshots clipped to actual rendered sections; no pixel or DOM alteration",
+  "scope": "Read-only navigation, native search filtering and native table-height resizing. No claim creation, financial action, approval, rejection, role or run mutation. Existing historical screenshots retained.",
+  "relationship": "Three historical approvals tied to original proposal #1 support the current scope-review replacement proposal #5. The current proposal is pending; automatic payments remain withheld until scope review.",
+  "independent_review": "All three captures approved by /root/devpost_images_review on 2026-10-25.",
+  "captures": [
+    {
+      "file": "dev-financial-precedents-list.jpg",
+      "captured_at": "2026-10-25T11:41:44.363Z",
+      "url": "https://dev.band1t.vip/organizer#rules",
+      "clip": {
+        "x": 433,
+        "y": 2577,
+        "width": 862,
+        "height": 463
+      },
+      "screen": "Precedents (19), native Search field filtered to #1, 3 found",
+      "visible": "Claim #57 Freya Pham approved $550; #56 Ravi Nowak approved $855; #53 Kenzo Dang approved $940. All list Ops desk and original proposal #1.",
+      "limits": "Historical organizer approvals and recorded amounts. This is not external-payment proof and does not demonstrate a complicated policy-gap case.",
+      "sha256": "12484f4cb463abfa1bb6b983e33c6da7f4a5b04e8fdbc76bb4dd65c2d5cc6211",
+      "dimensions": [
+        862,
+        463
+      ],
+      "format": "JPEG"
+    },
+    {
+      "file": "dev-financial-claim53-justification.jpg",
+      "captured_at": "2026-10-25T11:42:10.678Z",
+      "url": "https://dev.band1t.vip/organizer#claims",
+      "clip": {
+        "x": 449,
+        "y": 4547,
+        "width": 830,
+        "height": 357
+      },
+      "screen": "Claim #53, Decision Engine recommendation: pay",
+      "visible": "Kenzo fall recommendation, $940 amount, witness/medical/time evidence, innocent-readings reasoning, and numbered fact references.",
+      "limits": "Existing recommendation record for a previously approved claim. No new claim, recommendation, approval or payment was requested.",
+      "sha256": "dcf8e4262b661bcb04c171dfee6e474d0f81dd2c656c6f3fe7a67ce39707e381",
+      "dimensions": [
+        830,
+        357
+      ],
+      "format": "JPEG"
+    },
+    {
+      "file": "dev-financial-suggested-rule-review.jpg",
+      "captured_at": "2026-10-25T11:43:11.918Z",
+      "url": "https://dev.band1t.vip/organizer#rules",
+      "clip": {
+        "x": 433,
+        "y": 855,
+        "width": 862,
+        "height": 1119
+      },
+      "screen": "Proposed rules (2), entire first pending proposal #5",
+      "visible": "Three supporting claims (#53, #56, #57), enforced automatic-payment scope, $940 ceiling, $5000 policy limit, rationale-only wording, scope-to-approve warning, Review and approve scope control, rejection reason and Reject control.",
+      "limits": "Proposal remains pending explicit scope review. Diagnosis/treatment rationale does not narrow the enforced scope. No approval or rejection control was activated. Tall native row retains historical rationale text.",
+      "sha256": "2d8c970af59f1de99d8da2875ae576f14fd62849504a0d591396eb6e686d87b7",
+      "dimensions": [
+        862,
+        1119
+      ],
+      "format": "JPEG"
+    }
+  ]
+}

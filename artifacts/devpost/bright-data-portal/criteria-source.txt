@@ -1,0 +1,15 @@
+Bright Data
+Best Agent/App Using Public Web Data sponsored by Bright Data
+
+Judges will look for products where Bright Data is essential to the core experience; if live public web data were removed, the product would no longer work.
+
+Strong submissions solve a clear, real-world problem for a specific user, run live in the demo, handle real web conditions like blocks, slow responses, and empty results, and turn raw data into clean, useful output.
+
+Extra credit goes to teams that choose the right Bright Data tools thoughtfully, combine them where it improves the solution, and tell a clear two-minute story using real results from real websites rather than mocked data.
+
+Submissions will be disqualified if they scrape behind a login or paywall, collect non-public personal data, use mocked or hardcoded data in the demo, or mention Bright Data only in the README without making it part of the working product.
+
+YOUR DESTINATION
+
+1st - $1500 Bright Data credits, $500 amazon card 2nd - $1000 Bright Data credits, $350 amazon card 3rd - $500 Bright Data credits, $250 amazon card
+

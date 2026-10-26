@@ -1,0 +1,53 @@
+version: "1"
+name: bandit-read-image
+description: Reads one temporary image. The worker validates the answer and deletes the upload; the workflow creates no conversation and never indexes the image.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: task
+        type: string
+        required: true
+      - name: system
+        type: string
+        required: true
+      - name: prompt
+        type: string
+        required: true
+      - name: schema
+        type: string
+        required: true
+      - name: file_id
+        type: string
+        required: true
+      - name: mime_type
+        type: string
+        required: true
+steps:
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+  - name: answer
+    type: ai.agent
+    agent-id: bandit-image-reader
+    ephemeral: true
+    create-conversation: false
+    with:
+      configuration_overrides:
+        instructions: "{{ inputs.system }}"
+        tools: []
+        skill_ids: []
+        enable_elastic_capabilities: false
+      message: |
+        Task: {{ inputs.task }}
+        Read the supplied image using attachment_read before answering.
+
+        {{ inputs.prompt }}
+      attachments:
+        - type: image
+          data:
+            file_id: "{{ inputs.file_id }}"
+            name: bandit-image
+            mime_type: "{{ inputs.mime_type }}"
+      schema: "${{ steps.schema.output }}"

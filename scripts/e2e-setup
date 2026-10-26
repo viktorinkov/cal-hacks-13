@@ -1,6 +1,7 @@
 #!/bin/sh
 # After scripts/e2e-publish: load the event (local only), the merch templates, the insurance actors and
-# the services' identities, grant their roles, and start the safety watch, the job reaper and the crowd.
+# the services' identities and the 3D floor's spots and walkable grid, grant their roles, and start the safety
+# watch, the job reaper and the crowd.
 set -e
 . "$(dirname "$0")/e2e-env"
 cd "$ROOT"
@@ -19,8 +20,16 @@ fi
 # Merch: the templates in assets/merch, matched to the sponsors' booths.
 scripts/merch-setup
 
-# Insurance: actors, roles, policy, authority matrix, camera, simulated bands and the four attendees.
+# Insurance: actors, roles, policy, authority matrix, camera, test bands and the four attendees.
 ./target/debug/bandit-claims setup
+
+# The tables, sponsor tables, stage, food line and doors of the 3D floor, for the crowd and the live run.
+echo "spots      web/venue/spots.json"
+call load_venue_spots "$(cat web/venue/spots.json)"
+# Where people can walk on the 3D floor (pipeline/venue_floor.py), so the crowd follows the aisles.
+echo "floor      web/venue/floor.json"
+# Field names with digits take an extra underscore in the call's JSON.
+call load_venue_floor "$(sed 's/"x0"/"x_0"/;s/"z0"/"z_0"/' web/venue/floor.json)"
 
 # Identities for the services and the photographer, saved in the same token store.
 identity() {
@@ -46,5 +55,5 @@ done
 
 call start_safety_watch
 call start_job_reaper
-call start_crowd 30
+call start_crowd 1000
 echo "e2e ready on $E2E_TARGET: run scripts/e2e-services, then open http://$BANDIT_API_ADDR/organizer"

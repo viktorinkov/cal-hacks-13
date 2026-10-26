@@ -11,12 +11,13 @@ use super::handle_out_type::HandleOut;
 pub struct AttendeeOut {
     pub node_id: u64,
     pub display_name: String,
-    pub band_id: u8,
+    pub band_id: u32,
     pub findable: bool,
-    pub simulated: bool,
+    pub crowd: bool,
     pub organization: String,
     pub handles: Vec<HandleOut>,
     pub created_at: __sdk::Timestamp,
+    pub role: String,
 }
 
 impl __sdk::InModule for AttendeeOut {
@@ -29,12 +30,13 @@ impl __sdk::InModule for AttendeeOut {
 pub struct AttendeeOutCols {
     pub node_id: __sdk::__query_builder::Col<AttendeeOut, u64>,
     pub display_name: __sdk::__query_builder::Col<AttendeeOut, String>,
-    pub band_id: __sdk::__query_builder::Col<AttendeeOut, u8>,
+    pub band_id: __sdk::__query_builder::Col<AttendeeOut, u32>,
     pub findable: __sdk::__query_builder::Col<AttendeeOut, bool>,
-    pub simulated: __sdk::__query_builder::Col<AttendeeOut, bool>,
+    pub crowd: __sdk::__query_builder::Col<AttendeeOut, bool>,
     pub organization: __sdk::__query_builder::Col<AttendeeOut, String>,
     pub handles: __sdk::__query_builder::Col<AttendeeOut, Vec<HandleOut>>,
     pub created_at: __sdk::__query_builder::Col<AttendeeOut, __sdk::Timestamp>,
+    pub role: __sdk::__query_builder::Col<AttendeeOut, String>,
 }
 
 impl __sdk::__query_builder::HasCols for AttendeeOut {
@@ -45,10 +47,11 @@ impl __sdk::__query_builder::HasCols for AttendeeOut {
             display_name: __sdk::__query_builder::Col::new(table_name, "display_name"),
             band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
             findable: __sdk::__query_builder::Col::new(table_name, "findable"),
-            simulated: __sdk::__query_builder::Col::new(table_name, "simulated"),
+            crowd: __sdk::__query_builder::Col::new(table_name, "crowd"),
             organization: __sdk::__query_builder::Col::new(table_name, "organization"),
             handles: __sdk::__query_builder::Col::new(table_name, "handles"),
             created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+            role: __sdk::__query_builder::Col::new(table_name, "role"),
         }
     }
 }

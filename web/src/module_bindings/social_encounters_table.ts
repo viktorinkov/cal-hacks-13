@@ -12,7 +12,7 @@ import {
 
 export default __t.row({
   id: __t.u64(),
-  bandPair: __t.u16().name("band_pair"),
+  bandPair: __t.u64().name("band_pair"),
   attendeeA: __t.identity().name("attendee_a"),
   attendeeB: __t.identity().name("attendee_b"),
   zoneId: __t.u64().name("zone_id"),

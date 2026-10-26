@@ -3,6 +3,7 @@
 //! It ranks the recap's suggestions with Elastic for the signed-in attendee and serves the plain
 //! web pages (see `web`).
 
+mod friends;
 mod search;
 mod summary;
 mod web;
@@ -19,11 +20,14 @@ use bandit_bindings::{
     ZoneTableAccess, connect,
 };
 use bandit_common::{BlobStore, Config, TokenStore};
+use futures_util::future::join_all;
 use search::Elastic;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use spacetimedb_sdk::{DbContext, Identity, Table};
+use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tower_http::cors::CorsLayer;
 
 const SERVICE: &str = "bandit-api";
@@ -53,6 +57,10 @@ pub struct App {
 
 pub type AppState = State<Arc<App>>;
 
+/// At most this many of the people who share no booth with the caller get a closest booth of their own,
+/// one Elastic call each; the rest fall back to the place and minutes.
+const MAX_PAIRS: usize = 12;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::load()?;
@@ -69,6 +77,9 @@ async fn main() -> Result<()> {
             .context("set ELASTICSEARCH_API_KEY")?,
         &prefix,
     )?;
+    if let Err(e) = es.ensure_rankings().await {
+        eprintln!("rankings index not ready, rankings will not be logged: {e:#}");
+    }
     let database = config
         .spacetimedb_database
         .clone()
@@ -102,17 +113,23 @@ async fn main() -> Result<()> {
         database: database.clone(),
         kibana_url: config.kibana_url.clone().unwrap_or_default(),
         auth_client_id: std::env::var("SPACETIMEAUTH_CLIENT_ID").unwrap_or_default(),
-        simulate: std::env::var("BANDIT_SIMULATE").is_ok_and(|v| v == "1"),
+        test_mode: std::env::var("BANDIT_TEST_MODE").is_ok_and(|v| v == "1"),
         http: reqwest::Client::new(),
-        sim_bands: Default::default(),
+        test_bands: Default::default(),
     };
     let pages = web::routes(&web);
-    let simulate = web.simulate;
+    let test_mode = web.test_mode;
     let state = Arc::new(App { conn, es, web, blobs: config.blob_store(), tokens });
-    if simulate {
-        // Simulated bands a tester pressed before a restart keep reporting.
-        let known: Vec<(u8, u8)> = state.conn.db.band().iter().filter(|b| web::TAP_SIM_BANDS.contains(&b.id)).map(|b| (b.id, b.zone)).collect();
-        state.web.sim_bands.lock().unwrap().extend(known);
+    if test_mode {
+        // Test bands a tester pressed before a restart keep reporting.
+        let known: Vec<(u8, u8)> = state
+            .conn
+            .db
+            .band()
+            .iter()
+            .filter_map(|b| Some((u8::try_from(b.id).ok().filter(|id| web::TAP_TEST_BANDS.contains(id))?, b.zone)))
+            .collect();
+        state.web.test_bands.lock().unwrap().extend(known);
         tokio::spawn(web::heartbeat(state.clone()));
     }
     let app = Router::new()
@@ -137,11 +154,61 @@ async fn health(State(app): AppState) -> Json<Value> {
     Json(json!({ "status": "ok", "roles": roles }))
 }
 
-/// The summary of `who` from the subscription cache, with the suggestions in Elastic's order.
-/// When Elastic cannot rank, the suggestions keep their minutes order and say so.
+/// The summary of `who` from the subscription cache, with the suggestions in Elastic's order and, for
+/// each person who shares no booth with `who`, the closest pair of booths by meaning. When Elastic
+/// cannot rank, the suggestions keep their minutes order and say so.
 pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary> {
+    let rows = social_rows(app);
+    let mut recap = summary::summary(&rows, who)?;
+    let people: Vec<u64> = recap
+        .suggested_people
+        .iter()
+        .map(|p| p.node_id)
+        .chain(recap.also_there.iter().map(|p| p.node_id))
+        .collect();
+    let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
+    let fallback = summary::visited_text(&rows, who);
+    let attendee_id = who.to_hex().to_string();
+    let first_by_minutes = recap.suggested_booths.first().map(|b| b.name.clone());
+    let mine = summary::booths_of(&rows, who);
+    let theirs = if mine.is_empty() { Vec::new() } else { summary::unshared_booths(&recap) };
+    match app.es.rank(&attendee_id, &fallback, &people, &booths, &theirs).await {
+        Ok(ranking) => {
+            summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths);
+            let picks = summary::their_best_booths(&recap, &ranking.theirs, MAX_PAIRS);
+            let answers = join_all(picks.iter().map(|&id| {
+                let text = summary::booth_text(&rows.booths, id);
+                let mine = &mine;
+                async move { app.es.closest(&text, mine).await }
+            }))
+            .await;
+            let mut yours = BTreeMap::new();
+            for (id, answer) in picks.into_iter().zip(answers) {
+                match answer {
+                    Ok(hits) => {
+                        if let Some(first) = hits.into_iter().next() {
+                            yours.insert(id, first);
+                        }
+                    }
+                    Err(e) => eprintln!("no closest booth for booth {id}: {e:#}"),
+                }
+            }
+            summary::apply_similar(&mut recap, &rows.booths, &ranking.theirs, &yours);
+            let at_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
+            let doc = summary::ranking_doc(&recap, &ranking.interests, first_by_minutes.as_deref(), at_ms);
+            if let Err(e) = app.es.log_ranking(&attendee_id, &doc).await {
+                eprintln!("ranking not logged: {e:#}");
+            }
+        }
+        Err(e) => eprintln!("suggestions left unranked: {e:#}"),
+    }
+    Some(recap)
+}
+
+/// Copy the current subscribed evidence before awaiting an external search.
+fn social_rows(app: &App) -> summary::Rows {
     let db = &app.conn.db;
-    let rows = summary::Rows {
+    summary::Rows {
         zones: db.zone().iter().collect(),
         booths: db.booth().iter().collect(),
         attendees: db.social_attendees().iter().collect(),
@@ -151,17 +218,21 @@ pub async fn ranked_summary(app: &App, who: Identity) -> Option<summary::Summary
         shared_visits: db.social_shared_visits().iter().collect(),
         photos: db.social_photos().iter().collect(),
         photo_tags: db.social_photo_tags().iter().collect(),
-    };
-    let mut recap = summary::summary(&rows, who)?;
-    let people: Vec<u64> = recap.suggested_people.iter().map(|p| p.node_id).collect();
-    let booths: Vec<u64> = recap.suggested_booths.iter().map(|b| b.booth_id).collect();
-    let fallback = summary::visited_text(&rows, who);
-    let attendee_id = who.to_hex().to_string();
-    match app.es.rank(&attendee_id, &fallback, &people, &booths).await {
-        Ok(ranking) => summary::apply_ranking(&mut recap, &ranking.people, &ranking.booths),
-        Err(e) => eprintln!("suggestions left unranked: {e:#}"),
     }
-    Some(recap)
+}
+
+/// Search the caller's actual encounter history. Stored interests never establish eligibility.
+pub async fn searched_friends(app: &App, who: Identity, query: &str) -> Option<friends::FriendSearch> {
+    let rows = social_rows(app);
+    let prepared = friends::prepare(&rows, who, query)?;
+    let documents: Vec<String> = prepared.candidates.iter().map(|c| c.text.clone()).collect();
+    match app.es.rank_evidence(query, &documents).await {
+        Ok(scores) => Some(friends::finish(query.to_string(), prepared, Some(&scores))),
+        Err(e) => {
+            eprintln!("encounter semantic ranking unavailable: {e:#}");
+            Some(friends::finish(query.to_string(), prepared, None))
+        }
+    }
 }
 
 #[cfg(test)]

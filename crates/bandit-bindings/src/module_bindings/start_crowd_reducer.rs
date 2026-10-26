@@ -7,7 +7,7 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct StartCrowdArgs {
-    pub size: u8,
+    pub size: u16,
 }
 
 impl From<StartCrowdArgs> for super::Reducer {
@@ -31,7 +31,7 @@ pub trait start_crowd {
     /// The reducer will run asynchronously in the future,
     ///  and this method provides no way to listen for its completion status.
     /// /// Use [`start_crowd:start_crowd_then`] to run a callback after the reducer completes.
-    fn start_crowd(&self, size: u8) -> __sdk::Result<()> {
+    fn start_crowd(&self, size: u16) -> __sdk::Result<()> {
         self.start_crowd_then(size, |_, _| {})
     }
 
@@ -43,7 +43,7 @@ pub trait start_crowd {
     ///  and its status can be observed with the `callback`.
     fn start_crowd_then(
         &self,
-        size: u8,
+        size: u16,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -54,7 +54,7 @@ pub trait start_crowd {
 impl start_crowd for super::RemoteReducers {
     fn start_crowd_then(
         &self,
-        size: u8,
+        size: u16,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send

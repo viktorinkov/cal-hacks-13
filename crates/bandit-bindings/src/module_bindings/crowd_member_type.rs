@@ -7,10 +7,14 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub struct CrowdMember {
-    pub band_id: u8,
-    pub group_id: u8,
-    pub station: u8,
-    pub next_move_at: __sdk::Timestamp,
+    pub band_id: u32,
+    pub identity: __sdk::Identity,
+    pub joined_at: __sdk::Timestamp,
+    pub group_id: u16,
+    pub dx_m: f32,
+    pub dy_m: f32,
+    pub interests: Vec<String>,
+    pub chat: u32,
 }
 
 impl __sdk::InModule for CrowdMember {
@@ -21,10 +25,14 @@ impl __sdk::InModule for CrowdMember {
 ///
 /// Provides typed access to columns for query building.
 pub struct CrowdMemberCols {
-    pub band_id: __sdk::__query_builder::Col<CrowdMember, u8>,
-    pub group_id: __sdk::__query_builder::Col<CrowdMember, u8>,
-    pub station: __sdk::__query_builder::Col<CrowdMember, u8>,
-    pub next_move_at: __sdk::__query_builder::Col<CrowdMember, __sdk::Timestamp>,
+    pub band_id: __sdk::__query_builder::Col<CrowdMember, u32>,
+    pub identity: __sdk::__query_builder::Col<CrowdMember, __sdk::Identity>,
+    pub joined_at: __sdk::__query_builder::Col<CrowdMember, __sdk::Timestamp>,
+    pub group_id: __sdk::__query_builder::Col<CrowdMember, u16>,
+    pub dx_m: __sdk::__query_builder::Col<CrowdMember, f32>,
+    pub dy_m: __sdk::__query_builder::Col<CrowdMember, f32>,
+    pub interests: __sdk::__query_builder::Col<CrowdMember, Vec<String>>,
+    pub chat: __sdk::__query_builder::Col<CrowdMember, u32>,
 }
 
 impl __sdk::__query_builder::HasCols for CrowdMember {
@@ -32,9 +40,13 @@ impl __sdk::__query_builder::HasCols for CrowdMember {
     fn cols(table_name: &'static str) -> Self::Cols {
         CrowdMemberCols {
             band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
+            identity: __sdk::__query_builder::Col::new(table_name, "identity"),
+            joined_at: __sdk::__query_builder::Col::new(table_name, "joined_at"),
             group_id: __sdk::__query_builder::Col::new(table_name, "group_id"),
-            station: __sdk::__query_builder::Col::new(table_name, "station"),
-            next_move_at: __sdk::__query_builder::Col::new(table_name, "next_move_at"),
+            dx_m: __sdk::__query_builder::Col::new(table_name, "dx_m"),
+            dy_m: __sdk::__query_builder::Col::new(table_name, "dy_m"),
+            interests: __sdk::__query_builder::Col::new(table_name, "interests"),
+            chat: __sdk::__query_builder::Col::new(table_name, "chat"),
         }
     }
 }
@@ -43,8 +55,9 @@ impl __sdk::__query_builder::HasCols for CrowdMember {
 ///
 /// Provides typed access to indexed columns for query building.
 pub struct CrowdMemberIxCols {
-    pub band_id: __sdk::__query_builder::IxCol<CrowdMember, u8>,
-    pub group_id: __sdk::__query_builder::IxCol<CrowdMember, u8>,
+    pub band_id: __sdk::__query_builder::IxCol<CrowdMember, u32>,
+    pub group_id: __sdk::__query_builder::IxCol<CrowdMember, u16>,
+    pub identity: __sdk::__query_builder::IxCol<CrowdMember, __sdk::Identity>,
 }
 
 impl __sdk::__query_builder::HasIxCols for CrowdMember {
@@ -53,6 +66,7 @@ impl __sdk::__query_builder::HasIxCols for CrowdMember {
         CrowdMemberIxCols {
             band_id: __sdk::__query_builder::IxCol::new(table_name, "band_id"),
             group_id: __sdk::__query_builder::IxCol::new(table_name, "group_id"),
+            identity: __sdk::__query_builder::IxCol::new(table_name, "identity"),
         }
     }
 }

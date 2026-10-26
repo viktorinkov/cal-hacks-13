@@ -1,0 +1,18 @@
+{
+  "title": "How your photos find you",
+  "date": "2026-10-25",
+  "verified_ref": "origin/vik-e2e",
+  "verified_revision": "219d48e079651fc5851e32cf0cb172eebededa57",
+  "source_kind": "Native Excalidraw elements and original filled vector illustrations",
+  "contains_app_screenshots": false,
+  "elements": 30,
+  "frames": 1,
+  "images": 3,
+  "renderer": "Official @excalidraw/excalidraw 0.18.0 exportToSvg and exportToBlob",
+  "geometry": "All elements contained in frame; IDs unique; image references resolve",
+  "sha256": {
+    "social-photo-flow.excalidraw": "9136fadf691dfe4b97110a1b5d5166e349179ae9d8935cacec28b67f7b3596a2",
+    "social-photo-flow.svg": "124ba9585f6a0fa887ae0266f6d51f8dec5f1b0f435cad47dafd8cfa4bd96a43",
+    "social-photo-flow.png": "8a7c191fa47c0c658ee7bdd5f039823e14cf967d8d7d8b0d2e5b23a59952f83b"
+  }
+}

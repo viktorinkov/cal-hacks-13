@@ -1,12 +1,12 @@
 //! The accuracy run. Each round plants genuine falls and the four kinds of
 //! fake, lets the flow run, plays the human approvers (approve what is
 //! genuine, refuse what is planted) and scores what the automation paid.
-//! Only the simulated bands 90-99 exist, so each planted claim reuses a band
+//! Only the test bands 90-99 exist, so each planted claim reuses a band
 //! and gives its owner a new display name (patients must differ, or the
 //! module's duplicate check would fire); setup restores the story names.
 
 use crate::app::*;
-use crate::sim::{Pose, SIM_BANDS, Sim};
+use crate::test_bands::{Pose, TEST_BANDS, TestBands};
 use crate::{decide, flow, setup};
 use anyhow::{Context, Result};
 use bandit_bindings::*;
@@ -46,7 +46,7 @@ impl Kind {
 }
 
 const FAKES: [Kind; 4] = [Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::SameBillTwice, Kind::InjuredStaff];
-/// Bands that fall, in turn: the spare simulated bands first, then the story attendees'.
+/// Bands that fall, in turn: the spare test bands first, then the story attendees'.
 const SUBJECTS: [u8; 10] = [94, 95, 96, 97, 98, 99, 90, 91, 92, 93];
 /// The module's occurrence window (5 min) plus slack for when the incident opens.
 const WINDOW: i64 = 330_000_000;
@@ -71,13 +71,13 @@ struct Turns {
 }
 
 pub fn run(app: &App, rounds: u32) -> Result<()> {
-    let sim = setup::run(app)?;
+    let test_bands = setup::run(app)?;
     if !app.worker_active() {
         println!("\nnote: {}", app.worker_hint());
     }
     let main = app.station(MAIN_STAGE)?;
-    let crowd: Vec<(u8, Pose)> = SIM_BANDS.map(|b| (b, sim.pose(b).unwrap_or(Pose::at(main)))).collect();
-    sim.place(&crowd);
+    let crowd: Vec<(u8, Pose)> = TEST_BANDS.map(|b| (b, test_bands.pose(b).unwrap_or(Pose::at(main)))).collect();
+    test_bands.place(&crowd);
     drop_crew(app)?;
     let mut all: Vec<Planted> = Vec::new();
     let mut turns = Turns::default();
@@ -85,7 +85,7 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
         println!("\n== round {round}: 2 genuine falls and 4 fakes ({})", FAKES.map(Kind::label).join(", "));
         let mut planted = Vec::new();
         for kind in [Kind::Genuine, Kind::CircleElsewhere, Kind::InjuryAtHome, Kind::Genuine, Kind::InjuredStaff] {
-            planted.push(plant(app, &sim, kind, None, &mut turns)?);
+            planted.push(plant(app, &test_bands, kind, None, &mut turns)?);
         }
         let first = &planted[0];
         app.quiet.set(true);
@@ -94,7 +94,7 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
         });
         app.quiet.set(false);
         original.context("the first genuine claim never got past reading its record")?;
-        let dup = plant(app, &sim, Kind::SameBillTwice, Some(first), &mut turns)?;
+        let dup = plant(app, &test_bands, Kind::SameBillTwice, Some(first), &mut turns)?;
         planted.push(dup);
 
         println!("  the flow runs:");
@@ -125,9 +125,9 @@ pub fn run(app: &App, rounds: u32) -> Result<()> {
         score(app, &all, "total")?;
     }
     for (name, display, band) in ATTENDEES {
-        setup::ensure_attendee(app, &sim, name, display, *band)?;
+        setup::ensure_attendee(app, &test_bands, name, display, *band)?;
     }
-    drop(sim);
+    drop(test_bands);
     Ok(())
 }
 
@@ -146,9 +146,9 @@ fn drop_crew(app: &App) -> Result<()> {
 }
 
 /// The owner of `band` takes the name `name` (claiming the band first if it is new).
-fn become_person(app: &App, sim: &Sim, band: u8, name: &str) -> Result<Identity> {
+fn become_person(app: &App, test_bands: &TestBands, band: u8, name: &str) -> Result<Identity> {
     let token = ATTENDEES.iter().find(|a| a.2 == band).map(|a| a.0.to_string()).unwrap_or_else(|| format!("sc-{band}"));
-    setup::ensure_attendee(app, sim, &token, name, band)
+    setup::ensure_attendee(app, test_bands, &token, name, band)
 }
 
 /// A fresh patient name for the next claim, so no two planted records share one.
@@ -169,7 +169,7 @@ fn fresh_name(app: &App, kind: Kind) -> Result<String> {
 
 /// Plants one claim: a band (the source's, for the same bill twice) falls in a
 /// zone with room under a fresh name, the medic treats and resolves, a record is filed.
-fn plant(app: &App, sim: &Sim, kind: Kind, source: Option<&Planted>, turns: &mut Turns) -> Result<Planted> {
+fn plant(app: &App, test_bands: &TestBands, kind: Kind, source: Option<&Planted>, turns: &mut Turns) -> Result<Planted> {
     let station = pick_station(app)?;
     let witness_station = match kind {
         Kind::CircleElsewhere if app.station(SPONSOR_ROW)? != station => app.station(SPONSOR_ROW)?,
@@ -185,18 +185,18 @@ fn plant(app: &App, sim: &Sim, kind: Kind, source: Option<&Planted>, turns: &mut
         }
     };
     let n = if kind == Kind::CircleElsewhere { 3 } else { 2 + turns.witness % 2 };
-    let pool: Vec<u8> = SIM_BANDS.filter(|b| *b != band).collect();
+    let pool: Vec<u8> = TEST_BANDS.filter(|b| *b != band).collect();
     let witnesses: Vec<u8> = (0..n).map(|i| pool[(turns.witness + i) % pool.len()]).collect();
     turns.witness += n;
-    let me = become_person(app, sim, band, &name)?;
+    let me = become_person(app, test_bands, band, &name)?;
     let db = app.db()?;
     if kind == Kind::InjuredStaff {
         call!(db, grant_role_then(me, "crew".into(), format!("{name}, stage crew")))?;
     }
-    sim.place(&[(band, Pose::at(station))]);
+    test_bands.place(&[(band, Pose::at(station))]);
     app.quiet.set(true);
     let planted = (|| {
-        let incident = flow::fall(app, sim, band, station, &witnesses, witness_station)?;
+        let incident = flow::fall(app, test_bands, band, station, &witnesses, witness_station)?;
         sleep_ms(flow::RESPONSE_SECS * 1000);
         flow::treat(app, incident.id, kind.note())?;
         let claim = flow::resolve(app, incident.id, "treated on site", "medic")?.context("no claim opened")?;
@@ -250,7 +250,7 @@ fn pick_station(app: &App) -> Result<u8> {
                 .db
                 .incident()
                 .iter()
-                .filter(|i| i.kind != IncidentKind::Property && i.zone_id == zone.id)
+                .filter(|i| is_injury(i.kind) && i.zone_id == zone.id)
                 .map(|i| micros(i.opened_at))
                 .collect();
             let near = |x: i64| times.iter().filter(|y| (**y - x).abs() <= WINDOW).count() + usize::from((x - t).abs() <= WINDOW);
@@ -299,7 +299,7 @@ fn finish_flow(app: &App, planted: &mut [Planted]) -> Result<()> {
     }
 }
 
-/// The named approvers: approve genuine claims (learning a rule), refuse planted fakes.
+/// The named approvers: approve genuine claims, refuse planted fakes, and approve the rules Claude proposes.
 fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
     for p in planted {
         let c = app.claim(p.claim)?;
@@ -309,7 +309,7 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let who = c.routed_to_name.clone();
         app.quiet.set(true);
         let r = if p.kind == Kind::Genuine {
-            decide::approve(app, p.claim, None, None, true, false, false)
+            decide::approve(app, p.claim, None, false, false)
         } else {
             decide::refuse(app, p.claim, None, &format!("planted fake: {}", p.kind.label()), false)
         };
@@ -318,11 +318,18 @@ fn approvers(app: &App, planted: &[Planted]) -> Result<()> {
         let verb = if p.kind == Kind::Genuine { "approves" } else { "refuses" };
         println!("    {who} {verb} claim {} ({}, {}) -> {}", c.id, p.kind.label(), money(c.payout_cents), status_name(c.status));
     }
+    app.quiet.set(true);
+    let rules = decide::approve_proposals(app);
+    app.quiet.set(false);
+    for p in rules? {
+        println!("    the organizer approves Claude's proposed rule from claims {:?}: {} up to {} -> rule v{}", p.claim_ids, p.incident_kind, money(p.ceiling_cents), p.rule_version);
+    }
     Ok(())
 }
 
-/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule,
-/// 2 stopped only by the claims agent, 3 paid.
+/// How far a fake got: 0 refused by code, 1 stopped by a code check or rule
+/// (Claude refuses on its own only on a failed check), 2 stopped only by
+/// Claude's judgment, 3 paid.
 fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled) {
         return (3, "paid".into());
@@ -331,8 +338,11 @@ fn reach(p: &Planted, c: &Claim) -> (u8, String) {
     if c.decided_by == "code" {
         return (0, format!("refused by code ({})", note));
     }
-    if note.starts_with("claims agent") {
-        return (2, "caught only by the claims agent".into());
+    if c.decided_by == "claude" {
+        return (1, format!("refused by Claude on a failed check ({note})"));
+    }
+    if note.starts_with("Claude recommends refusing") || note.starts_with("Claude asks") || note.starts_with("claims agent") {
+        return (2, "caught only by Claude".into());
     }
     if in_pipeline(c.status) {
         return (1, format!("still {}", status_name(c.status)));
@@ -344,7 +354,8 @@ fn score(app: &App, planted: &[Planted], label: &str) -> Result<()> {
     let db = app.db()?;
     let rows: Vec<(&Planted, Claim)> = planted.iter().map(|p| app.claim(p.claim).map(|c| (p, c))).collect::<Result<_>>()?;
     let paid = |c: &Claim| matches!(c.status, ClaimStatus::Paying | ClaimStatus::Settled | ClaimStatus::Reconciled);
-    let auto = |c: &Claim| c.decided_by == "rule";
+    // Settled with no person: Claude's payment inside an approved rule, or the code-only rule.
+    let auto = |c: &Claim| paid(c) && matches!(c.decided_by.as_str(), "claude" | "rule");
     let genuine: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind == Kind::Genuine).collect();
     let fakes: Vec<&(&Planted, Claim)> = rows.iter().filter(|(p, _)| p.kind != Kind::Genuine).collect();
     let tp = genuine.iter().filter(|(_, c)| auto(c)).count();

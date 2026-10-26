@@ -5,14 +5,14 @@
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 use super::check_in_type::CheckIn;
-use super::precedent_in_type::PrecedentIn;
+use super::clause_in_type::ClauseIn;
 
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
 pub(super) struct SubmitClaimChecksArgs {
     pub job_id: u64,
     pub checks: Vec<CheckIn>,
-    pub precedents: Vec<PrecedentIn>,
+    pub clauses: Vec<ClauseIn>,
 }
 
 impl From<SubmitClaimChecksArgs> for super::Reducer {
@@ -20,7 +20,7 @@ impl From<SubmitClaimChecksArgs> for super::Reducer {
         Self::SubmitClaimChecks {
             job_id: args.job_id,
             checks: args.checks,
-            precedents: args.precedents,
+            clauses: args.clauses,
         }
     }
 }
@@ -44,9 +44,9 @@ pub trait submit_claim_checks {
         &self,
         job_id: u64,
         checks: Vec<CheckIn>,
-        precedents: Vec<PrecedentIn>,
+        clauses: Vec<ClauseIn>,
     ) -> __sdk::Result<()> {
-        self.submit_claim_checks_then(job_id, checks, precedents, |_, _| {})
+        self.submit_claim_checks_then(job_id, checks, clauses, |_, _| {})
     }
 
     /// Request that the remote module invoke the reducer `submit_claim_checks` to run as soon as possible,
@@ -59,7 +59,7 @@ pub trait submit_claim_checks {
         &self,
         job_id: u64,
         checks: Vec<CheckIn>,
-        precedents: Vec<PrecedentIn>,
+        clauses: Vec<ClauseIn>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -72,7 +72,7 @@ impl submit_claim_checks for super::RemoteReducers {
         &self,
         job_id: u64,
         checks: Vec<CheckIn>,
-        precedents: Vec<PrecedentIn>,
+        clauses: Vec<ClauseIn>,
 
         callback: impl FnOnce(&super::ReducerEventContext, Result<Result<(), String>, __sdk::InternalError>)
             + Send
@@ -82,7 +82,7 @@ impl submit_claim_checks for super::RemoteReducers {
             SubmitClaimChecksArgs {
                 job_id,
                 checks,
-                precedents,
+                clauses,
             },
             callback,
         )

@@ -1,14 +1,4 @@
-mod brightdata;
-mod bundle;
-mod config;
-mod dashboards;
-mod elastic;
-mod fetch;
-mod load;
-mod map;
-mod organize;
-mod parse;
-mod records;
+use bandit_ingest::{bundle, config, dashboards, fetch, load, map, organize, parse};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};

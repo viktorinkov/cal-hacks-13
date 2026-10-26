@@ -39,6 +39,9 @@ pub fn upsert_insurance_policy(
                 medical_used_cents: 0,
                 property_used_cents: 0,
                 updated_at: ctx.timestamp,
+                other_insurance: "excess".into(),
+                staff_excluded: true,
+                period_checked: false,
             });
         }
     }
@@ -77,6 +80,7 @@ pub fn upsert_coverage_rule(
         service_window_days,
         active,
         updated_at: ctx.timestamp,
+        minimum_payout_cents: 0,
     };
     match ctx.db.coverage_rule().policy_id().filter(policy.id).find(|r| r.cover_kind == cover_kind) {
         Some(old) => {

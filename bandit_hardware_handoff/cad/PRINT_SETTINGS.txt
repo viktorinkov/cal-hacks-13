@@ -1,0 +1,39 @@
+BandIt v2 wristband puck: print files and settings
+====================================================
+
+Files (mm, already oriented for the bed, no rotation needed)
+  bandit_v2_base.stl             case body, prints upright as is. 64 x 42 x 13.6 mm, ~13 g
+  bandit_v2_lid_facedown.stl     lid, already flipped so the flat top is on the bed. 62 x 40 x 1.2 mm, ~3 g
+  bandit_v2_button_facedown.stl  optional button cap, already flipped. 5.8 mm dia x 1.6 mm, ~0.1 g
+
+Colours
+  base + button: black PLA
+  lid: translucent or white PLA (or translucent PETG). The lid has a 0.6 mm thin ring over the
+       LEDs; white PLA glows through it fine, clear/natural glows brighter.
+
+Slicer settings (PrusaSlicer / Prusa CORE One or MK4 profile, 0.4 mm nozzle)
+  Layer height          0.20 mm   (0.20mm STRUCTURAL or BALANCED profile)
+  Perimeters            3
+  Top / bottom layers   profile default (5 / 4)
+  Infill                15 %, gyroid
+  Supports              NONE  (the only overhangs are the 17.5 mm strap channel roof and the
+                               10.6 mm USB window top, both designed as bridges)
+  Brim                  none;  skirt is fine
+  Elephant foot comp.   profile default (0.2 mm). Do not disable: the lid relies on it.
+  Seam                  anywhere / nearest
+  Material              PLA, 215 C nozzle / 60 C bed (Prusament PLA profile defaults)
+
+Orientation check in the slicer
+  base:   open side up, two rails on the bed, USB window in one end wall
+  lid:    the big flat face on the bed, the thin ring and the 6.5 mm hole visible from above
+  button: the small 5.2 mm face on the bed, 5.8 mm step above it
+
+Multiple per bed
+  Core One (250 x 220): 15 bases + 15 buttons fit as a 5 x 3 grid with the parts turned 90 degrees,
+  4 mm apart, 5 mm from the edge; 15 lids the same way. bandit_v2_bed_black.stl and
+  bandit_v2_bed_clear.stl in the zip are those plates ready to slice.
+
+After printing
+  Ring should drop into the 38.3 mm pocket with slight play; battery into the 37 x 32 pocket;
+  the XIAO's end passes between the two posts (18.4 mm gap). Lid sits in the 0.8 mm rebate with
+  0.2 mm clearance per side. If the lid is tight, scrape the first-layer edge with a blade.

@@ -1,0 +1,35 @@
+{
+  "title": "Your photo on your merch",
+  "article_placement": "What it does > Your recap > Shopping",
+  "created_at_utc": "2026-10-25T12:00:14.114393+00:00",
+  "source_commit": "219d48e079651fc5851e32cf0cb172eebededa57",
+  "code_branch": "origin/vik-e2e",
+  "original_assets": [
+    {
+      "path": "assets/merch/tee_figma.png",
+      "sha256": "9ad65627515652852c1dd9ce10b83e8ac14821eea2c672665f84435ea5f49fb3"
+    },
+    {
+      "path": "assets/merch/templates.json",
+      "sha256": "33516412d66aa6ac171ded9e03f8969b043102b6d54d1112c3403b8db6df6bed"
+    },
+    {
+      "path": "diagrams/logos/icon-store.svg",
+      "sha256": "dc44ce54b16d78b9ccfe39e8fd96618a0f2c6093812ccb077d1a0521bab0a9f5"
+    },
+    {
+      "path": "diagrams/logos/icon-box.svg",
+      "sha256": "c2c899b1051548e19ed203eaf5be5be71d42cc9b42c12568300fd1aead48e6a6"
+    }
+  ],
+  "construction": "Editable native Excalidraw shapes plus unchanged original Figma tee PNG. An illustrative event photo is drawn in the input and in the catalog photo rectangle. The line and photo composition follow web/src/recap.ts. This is a product illustration, not a captured user preview. No app screenshots, live photo capture, image-generation API, purchase or fulfillment call.",
+  "renderer": "Official @excalidraw/excalidraw 0.18.0 exportToSvg/exportToBlob via .builds/diagram-review/render.cjs",
+  "files": {
+    "make_merch_visual.py": "f711fdace0f54c81d7e7d971c62f86f367a5a3287c496bd96a3016b8451c1f90",
+    "your-photo-on-your-merch.png": "4f93beb0f72277d282355d958078534d2650cadadebea9b936561feab36d5219",
+    "merch-image-flow.excalidraw": "05c81f623d0e849ac1367743492827e64546b52fe9403ed4eb76bbc3233c2665",
+    "your-photo-on-your-merch.svg": "20835e0fbe8a62b055e7b918ace7e16f76bf95ce4d19364f42b9046f38734686"
+  },
+  "publishing": "Independently reviewed and approved; handed to canonical board and Devpost integration owners. Not yet published by this task.",
+  "review": "review.md"
+}

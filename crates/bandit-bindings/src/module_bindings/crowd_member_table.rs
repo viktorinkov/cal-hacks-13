@@ -172,7 +172,7 @@ impl<'ctx> __sdk::WithUpdate for CrowdMemberTableHandle<'ctx> {
 /// but to directly chain method calls,
 /// like `ctx.db.crowd_member().band_id().find(...)`.
 pub struct CrowdMemberBandIdUnique<'ctx> {
-    imp: __sdk::UniqueConstraintHandle<CrowdMember, u8>,
+    imp: __sdk::UniqueConstraintHandle<CrowdMember, u32>,
     phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
 }
 
@@ -180,7 +180,7 @@ impl<'ctx> CrowdMemberTableHandle<'ctx> {
     /// Get a handle on the `band_id` unique index on the table `crowd_member`.
     pub fn band_id(&self) -> CrowdMemberBandIdUnique<'ctx> {
         CrowdMemberBandIdUnique {
-            imp: self.imp.get_unique_constraint::<u8>("band_id"),
+            imp: self.imp.get_unique_constraint::<u32>("band_id"),
             phantom: std::marker::PhantomData,
         }
     }
@@ -189,7 +189,39 @@ impl<'ctx> CrowdMemberTableHandle<'ctx> {
 impl<'ctx> CrowdMemberBandIdUnique<'ctx> {
     /// Find the subscribed row whose `band_id` column value is equal to `col_val`,
     /// if such a row is present in the client cache.
-    pub fn find(&self, col_val: &u8) -> Option<CrowdMember> {
+    pub fn find(&self, col_val: &u32) -> Option<CrowdMember> {
+        self.imp.find(col_val)
+    }
+}
+
+/// Access to the `identity` unique index on the table `crowd_member`,
+/// which allows point queries on the field of the same name
+/// via the [`CrowdMemberIdentityUnique::find`] method.
+///
+/// Users are encouraged not to explicitly reference this type,
+/// but to directly chain method calls,
+/// like `ctx.db.crowd_member().identity().find(...)`.
+pub struct CrowdMemberIdentityUnique<'ctx> {
+    imp: __sdk::UniqueConstraintHandle<CrowdMember, __sdk::Identity>,
+    phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+impl<'ctx> CrowdMemberTableHandle<'ctx> {
+    /// Get a handle on the `identity` unique index on the table `crowd_member`.
+    pub fn identity(&self) -> CrowdMemberIdentityUnique<'ctx> {
+        CrowdMemberIdentityUnique {
+            imp: self
+                .imp
+                .get_unique_constraint::<__sdk::Identity>("identity"),
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'ctx> CrowdMemberIdentityUnique<'ctx> {
+    /// Find the subscribed row whose `identity` column value is equal to `col_val`,
+    /// if such a row is present in the client cache.
+    pub fn find(&self, col_val: &__sdk::Identity) -> Option<CrowdMember> {
         self.imp.find(col_val)
     }
 }
@@ -197,7 +229,8 @@ impl<'ctx> CrowdMemberBandIdUnique<'ctx> {
 #[doc(hidden)]
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table = client_cache.get_or_make_table::<CrowdMember>("crowd_member");
-    _table.add_unique_constraint::<u8>("band_id", |row| &row.band_id);
+    _table.add_unique_constraint::<u32>("band_id", |row| &row.band_id);
+    _table.add_unique_constraint::<__sdk::Identity>("identity", |row| &row.identity);
 }
 
 #[doc(hidden)]

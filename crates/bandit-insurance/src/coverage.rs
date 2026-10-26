@@ -4,7 +4,7 @@
 use crate::{Cents, CoverKind, IncidentKind};
 use serde::{Deserialize, Serialize};
 
-/// One cover under the venue's general liability policy.
+/// One cover: medical payments in the venue's general liability, property in the venue's property policy.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CoverageRule {
     pub cover_kind: CoverKind,
@@ -12,6 +12,9 @@ pub struct CoverageRule {
     pub per_claim_limit_cents: Cents,
     pub aggregate_limit_cents: Cents,
     pub deductible_cents: Cents,
+    /// A payout below this goes to a person instead of being paid on its own.
+    #[serde(default)]
+    pub minimum_payout_cents: Cents,
     /// Medical services count only when dated on or after the incident date
     /// and at most this many days later.
     pub service_window_days: u32,
@@ -60,6 +63,18 @@ pub fn compute_amounts(cost_cents: Cents, rule: &CoverageRule, aggregate_used_ce
     Amounts { cost_cents, payout_cents, recoverable_cents, venue_cost_cents: payout_cents - recoverable_cents }
 }
 
+/// What the venue's medical payments cover owes of `covered_cents`. A primary
+/// cover pays it all. An excess cover pays second: the attendee's own plan pays
+/// first and leaves them its copay for the visit, so the cover pays that copay,
+/// at most the covered amount. With no plan on file, or no copay for the visit
+/// (first aid), an excess cover pays it all too.
+pub fn venue_share(covered_cents: Cents, other_insurance: &str, plan_copay_cents: Option<Cents>) -> Cents {
+    match plan_copay_cents {
+        Some(copay) if other_insurance == "excess" => copay.min(covered_cents),
+        _ => covered_cents,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,6 +86,7 @@ mod tests {
             per_claim_limit_cents: 500000,
             aggregate_limit_cents: 2500000,
             deductible_cents: 0,
+            minimum_payout_cents: 0,
             service_window_days: 30,
             active: true,
         }
@@ -83,6 +99,7 @@ mod tests {
             per_claim_limit_cents: 1000000,
             aggregate_limit_cents: 5000000,
             deductible_cents: 50000,
+            minimum_payout_cents: 0,
             service_window_days: 0,
             active: true,
         }
@@ -90,6 +107,14 @@ mod tests {
 
     fn amounts(cost: Cents, payout: Cents, recoverable: Cents, venue: Cents) -> Amounts {
         Amounts { cost_cents: cost, payout_cents: payout, recoverable_cents: recoverable, venue_cost_cents: venue }
+    }
+
+    #[test]
+    fn an_excess_cover_pays_what_the_plan_leaves() {
+        assert_eq!(venue_share(89_500, "excess", Some(5_500)), 5_500, "the plan pays the rest of the urgent care visit");
+        assert_eq!(venue_share(89_500, "primary", Some(5_500)), 89_500);
+        assert_eq!(venue_share(18_000, "excess", None), 18_000, "first aid has no copay");
+        assert_eq!(venue_share(3_000, "excess", Some(5_500)), 3_000, "never more than the covered amount");
     }
 
     #[test]

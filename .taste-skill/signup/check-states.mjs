@@ -1,0 +1,63 @@
+import { chromium } from '../../frontend/node_modules/playwright/index.mjs'
+import { mkdir, writeFile } from 'node:fs/promises'
+const out = new URL('./states', import.meta.url).pathname
+await mkdir(out, { recursive: true })
+const browser = await chromium.launch({ headless: true })
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+const errors = []
+page.on('pageerror', error => errors.push(error.message))
+await page.routeWebSocket('**', () => {})
+await page.goto('http://127.0.0.1:5176/__signup-review.html?review=review')
+await page.getByRole('heading', { name: 'Register your band.' }).waitFor()
+// Restore the production inner-scrolling container for the interaction checks.
+await page.addStyleTag({ content: 'html, body, #root { height: 100% !important; overflow: hidden !important; } [data-page] { height: 100% !important; overflow-y: auto !important; overflow-x: hidden !important; }' })
+await page.getByLabel('Name', { exact: true }).fill('Alex Rivera')
+await page.getByLabel('Email', { exact: true }).fill('alex@example.test')
+await page.getByLabel('Emergency contact', { exact: true }).fill('Sam Rivera')
+await page.getByLabel('Emergency phone', { exact: true }).fill('415-555-0123')
+await page.getByLabel('Last four', { exact: true }).fill('4242')
+await page.getByLabel('Expiry', { exact: true }).fill('09/28')
+if ((await page.locator('.signup-preview').innerText()).replace(/\s+/g, ' ') !== 'Alex Rivera Visa ···· 4242 · Demo') throw new Error('Draft preview does not match form')
+await page.getByRole('heading', { name: 'Review your card' }).evaluate(el => el.scrollIntoView({ block: 'start' }))
+await page.screenshot({ path: out + '/review-mobile.png' })
+await page.getByRole('button', { name: 'This is right' }).scrollIntoViewIfNeeded()
+await page.screenshot({ path: out + '/review-action-mobile.png' })
+await page.getByRole('button', { name: 'This is right' }).click()
+await page.getByText('You confirmed this card.').waitFor()
+await page.setViewportSize({ width: 1440, height: 900 })
+await page.locator('[data-page]').evaluate(el => el.scrollTo(0, 0))
+await page.screenshot({ path: out + '/draft-desktop.png' })
+await page.setViewportSize({ width: 320, height: 740 })
+const overflow = await page.evaluate(() => [...document.querySelectorAll('[data-page] *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => el.tagName))
+if (overflow.length) throw new Error('320px overflow: ' + overflow)
+await page.getByRole('button', { name: 'Save this band' }).click()
+await page.getByRole('heading', { name: 'Saved on band 05.' }).waitFor()
+const savedHeading = await page.getByRole('heading', { name: 'Saved on band 05.' }).boundingBox()
+if (savedHeading.y < 0 || savedHeading.y > 400) throw new Error('Saved heading is offscreen')
+if (!(await page.getByRole('heading', { name: 'Saved on band 05.' }).evaluate(el => el === document.activeElement))) throw new Error('Saved heading did not receive focus')
+await page.setViewportSize({ width: 390, height: 844 })
+await page.screenshot({ path: out + '/saved-mobile.png' })
+await page.getByRole('button', { name: 'Edit this band' }).click()
+await page.getByLabel('Name', { exact: true }).focus()
+const focus = await page.getByLabel('Name', { exact: true }).evaluate(el => ({ outline: getComputedStyle(el).outlineStyle, width: getComputedStyle(el).outlineWidth }))
+if (focus.outline !== 'solid' || focus.width === '0px') throw new Error('Missing focus indicator')
+for (const [label, path] of [['Map','/'], ['Claims','/claims'], ['BandIt','/join']]) {
+  await page.getByRole('button', { name: label, exact: true }).click()
+  if (new URL(page.url()).pathname !== path) throw new Error('Broken navigation: ' + label)
+}
+await page.goto('http://127.0.0.1:5176/__signup-review.html?review=waiting')
+await page.getByText(/Press the button on your band to make it yours/).waitFor()
+await page.screenshot({ path: out + '/waiting-mobile.png' })
+if (!(await page.getByLabel(/Insurance card/).isDisabled())) throw new Error('Uploads should wait for band claim')
+await page.evaluate(async () => {
+  const useSession = window.__signupReviewSession
+  useSession.setState({ myBand: { bandId: 5, status: 'waiting_for_press', expiresAt: Date.now() - 1000 }, signupError: 'This band is already claimed by another attendee.' })
+})
+await page.getByRole('button', { name: 'Try claiming again' }).waitFor()
+await page.getByRole('alert').filter({ hasText: 'already claimed' }).waitFor()
+await page.screenshot({ path: out + '/claim-error-mobile.png' })
+const report = { result: 'pass', checks: ['live draft preview matches fields', 'medical review and confirmation', 'save and edit', '320px overflow', 'keyboard focus', 'all header destinations', 'pending claim and disabled uploads', 'expired claim retry and error'], consoleErrors: errors, fixtureOnly: true }
+await writeFile(out + '/checks.json', JSON.stringify(report, null, 2))
+console.log(JSON.stringify(report, null, 2))
+await browser.close()
+if (errors.length) process.exitCode = 1

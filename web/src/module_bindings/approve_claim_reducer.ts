@@ -14,6 +14,4 @@ export default {
   claimId: __t.u64(),
   amountSeenCents: __t.u64(),
   packHashSeen: __t.string(),
-  requestedCeilingCents: __t.option(__t.u64()),
-  learn: __t.bool(),
 };

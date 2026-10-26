@@ -1,0 +1,287 @@
+//! What happens during the live run, in order: what kind of incident, in which zone, what the medic finds and
+//! which clinic record follows. Who it happens to and where they stand comes from the run's seeded generator.
+//! The first beats show every path a claim can take: three alike falls the organizer approves one by one, after
+//! which Claude proposes a payment rule from them; a camera confirms equipment a guest knocked over and the guest
+//! is charged; an SOS with no claim; an attendee's phone taken; a fourth alike fall the approved rule pays on its
+//! own; a bill above the rule's ceiling; an attendee's laptop knocked off a table; an injury from home; a bag gone
+//! with nobody named. After that the run keeps going with everyday falls. Who broke or took it is drawn from the
+//! bands at the spot, and the floor staff name them. Injuries move between zones so no zone has three within five
+//! minutes, which would hand the whole occurrence to the organizer. The medic's notes match the clinic records the
+//! claims get (a first-aid sprain is always a slip on a spilled drink), so any mismatch the Evidence Engine or
+//! Claude flags is a real one.
+
+use super::*;
+use crate::insurance::people::wearer;
+use crate::departure::departure;
+use crate::social::tables::{crowd_group, crowd_member, role_of, HACKER};
+use crate::venue::zone;
+use spacetimedb::rand::rngs::StdRng;
+
+struct Beat {
+    kind: IncidentKind,
+    /// The zone kind it happens in.
+    zone: &'static str,
+    record: &'static str,
+    note: &'static str,
+    resolution: &'static str,
+    cost_cents: u64,
+    /// For broken or taken things: what staff write when they name who did it; empty when nobody is named.
+    naming: &'static str,
+    /// Whether a security camera covers the spot.
+    camera: bool,
+}
+
+const fn fall(zone: &'static str, record: &'static str, note: &'static str) -> Beat {
+    Beat { kind: IncidentKind::Fall, zone, record, note, resolution: "treated on site", cost_cents: 0, naming: "", camera: false }
+}
+
+const fn loss(kind: IncidentKind, zone: &'static str, note: &'static str, resolution: &'static str, cost_cents: u64, naming: &'static str, camera: bool) -> Beat {
+    Beat { kind, zone, record: "", note, resolution, cost_cents, naming, camera }
+}
+
+const BEATS: &[Beat] = &[
+    fall("floor", "first-aid-wrist", "on scene at the tables: slipped on a spilled drink, right wrist pain and mild swelling; ice and a wrap at first aid"),
+    fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
+    fall("food", "first-aid-wrist", "in the food line: slipped on a spilled drink, right wrist sprain; ice and a wrap at first aid"),
+    loss(
+        IncidentKind::Property,
+        "stage",
+        "a floor speaker was knocked off its stand at the stage; cabinet cracked, nobody under it",
+        "area cleared, speaker sent for repair",
+        240_000,
+        "the stage camera shows this guest backing into the speaker stand while dancing",
+        true,
+    ),
+    Beat {
+        kind: IncidentKind::Sos,
+        zone: "food",
+        record: "",
+        note: "",
+        resolution: "felt dizzy in the food line; water and a seat, no treatment needed",
+        cost_cents: 0,
+        naming: "",
+        camera: false,
+    },
+    loss(
+        IncidentKind::Theft,
+        "sponsor",
+        "a sponsor's display laptop is gone from its table at the sponsor booths; the sponsor's receipt puts it at $1,299.00",
+        "security reviewed the footage; the venue's property policy answers it",
+        129_900,
+        "the sponsor-tables camera shows this guest lifting the laptop off the table and walking to the food line",
+        true,
+    ),
+    fall("floor", "first-aid-wrist", "at the tables: slipped on a spilled drink between the rows, right wrist sprain; ice and a wrap at first aid"),
+    fall("stage", "urgent-care-wrist", "in the crowd in front of the stage: fell when the crowd surged, left wrist swelling; referring to urgent care"),
+    loss(
+        IncidentKind::Property,
+        "floor",
+        "a venue monitor was knocked off a hacker table by someone squeezing past; the screen is cracked, $280.00 to replace",
+        "monitor swapped from the spares; the broken one goes for repair",
+        28_000,
+        "the floor camera shows this guest's bag sweeping the monitor off the table",
+        true,
+    ),
+    fall("floor", "urgent-care-ankle-home", "at the tables: right ankle pain and swelling after a stumble; splinting it, referring to urgent care"),
+    fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink by the stools, right wrist sprain; ice and a wrap at first aid"),
+    loss(
+        IncidentKind::Theft,
+        "food",
+        "four hoodies are gone from the merch table by the food line; $160.00 at cost",
+        "security walked the area; no camera covers the merch table",
+        16_000,
+        "",
+        false,
+    ),
+];
+
+/// After the scripted beats: everyday falls, mostly treated at first aid, sometimes nothing at all.
+const EVERYDAY: &[Beat] = &[
+    fall("floor", "first-aid-wrist", "at the tables: slipped on a spilled drink between the rows, right wrist sprain; ice and a wrap at first aid"),
+    Beat { kind: IncidentKind::Fall, zone: "stage", record: "", note: "", resolution: "slipped, got straight up; no injury", cost_cents: 0, naming: "", camera: false },
+    fall("sponsor", "first-aid-wrist", "at the sponsor tables: slipped on a spilled drink at a booth, right wrist sprain; ice and a wrap at first aid"),
+    fall("food", "first-aid-wrist", "in the food line: slipped on spilled soda, right wrist sprain; ice and a wrap at first aid"),
+];
+
+/// Stages incident number `step` of the run.
+pub fn stage(ctx: &ReducerContext, step: u16, rng: &mut StdRng) {
+    let beat = BEATS.get(step as usize).unwrap_or(&EVERYDAY[(step as usize - BEATS.len()) % EVERYDAY.len()]);
+    let Some(zone) = ctx.db.zone().iter().filter(|z| z.station_id != 0).find(|z| z.kind == beat.zone) else {
+        return;
+    };
+    match beat.kind {
+        IncidentKind::Property | IncidentKind::Theft | IncidentKind::Breakage => property(ctx, beat, &zone, rng),
+        IncidentKind::Sos | IncidentKind::Fall => person(ctx, beat, &zone, rng),
+    }
+}
+
+/// The hackers' bands that are up and about: who things happen to, and who breaks or takes them.
+fn hackers(ctx: &ReducerContext, station: Option<u8>) -> Vec<Band> {
+    let down: Vec<u32> = down_bands(ctx).iter().map(|d| d.band_id).collect();
+    ctx.db
+        .crowd_member()
+        .iter()
+        .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
+        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| role_of(&g) == HACKER))
+        .filter_map(|m| ctx.db.band().id().find(m.band_id))
+        .filter(|b| b.online && station.is_none_or(|s| b.zone == s))
+        .collect()
+}
+
+/// Bands this close to the spot count as at it, as the incident snapshot counts them, in metres.
+const AT_SPOT_M: f32 = 8.0;
+
+/// Who broke or took it: a crowd band at the spot, drawn by the run's generator; none when the beat names nobody.
+fn culprit(ctx: &ReducerContext, beat: &Beat, station: u8, x: f32, y: f32, not: u32, rng: &mut StdRng) -> u32 {
+    if beat.naming.is_empty() {
+        return 0;
+    }
+    let near: Vec<u32> = hackers(ctx, Some(station))
+        .into_iter()
+        .filter(|b| b.id != not && (b.x_m - x).powi(2) + (b.y_m - y).powi(2) <= AT_SPOT_M * AT_SPOT_M)
+        .map(|b| b.id)
+        .collect();
+    if near.is_empty() { 0 } else { near[rng.gen_range(0..near.len())] }
+}
+
+/// Someone in the zone falls or presses SOS: their band goes down where they stand and raises it. The crowd
+/// tick lights the circle around them from the next tick.
+fn person(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
+    let mut pool = hackers(ctx, Some(zone.station_id));
+    if pool.is_empty() {
+        pool = hackers(ctx, None);
+    }
+    if pool.is_empty() {
+        return;
+    }
+    // A crowded spot is where people fall: the busiest bands are three times as likely.
+    let weights: Vec<u32> = pool.iter().map(|b| 1 + 2 * b.state.min(2) as u32).collect();
+    let total: u32 = weights.iter().sum();
+    let mut roll = rng.gen_range(0..total);
+    let mut pick = &pool[0];
+    for (b, w) in pool.iter().zip(&weights) {
+        if roll < *w {
+            pick = b;
+            break;
+        }
+        roll -= w;
+    }
+    let fall = beat.kind == IncidentKind::Fall;
+    let b = ctx.db.band().id().update(Band {
+        state: S_SOS,
+        flags: if fall { F_FALL | F_MPU | F_MOTOR } else { F_SOS | F_MPU | F_MOTOR },
+        fall,
+        sos: !fall,
+        last_seen: ctx.timestamp,
+        ..ctx.db.band().id().find(pick.id).unwrap()
+    });
+    let incident = safety::open(ctx, beat.kind, zone.id, b.zone, b.id, "band", Some((b.x_m, b.y_m)));
+    plan(ctx, &incident, beat, 0);
+    let who = wearer(ctx, b.id).map(|(_, n)| n).unwrap_or_else(|| "someone".into());
+    let place = place_name(ctx, b.x_m, b.y_m);
+    let (what, why) = if fall {
+        (format!("Fall detected: {who} at {place}"), "the band's motion sensor saw a fall; the bands around them light the circle and point people away")
+    } else {
+        (format!("SOS: {who} pressed the button at {place}"), "the wearer held the band's button; the bands around them light the circle and point people away")
+    };
+    record(ctx, incident.id, 0, "band", &crate::band_code::band_code(b.id), what, why.into());
+}
+
+/// Someone of the crowd goes home early: a hacker who has walked in, is not down and has not left yet. They
+/// walk to the nearest door, and their night ends as they walk out.
+pub fn send_someone_home(ctx: &ReducerContext, rng: &mut StdRng) {
+    let down: Vec<u32> = down_bands(ctx).iter().map(|d| d.band_id).collect();
+    let mut pool: Vec<(u32, Identity)> = ctx
+        .db
+        .crowd_member()
+        .iter()
+        .filter(|m| !down.contains(&m.band_id) && ctx.db.departure().attendee().find(m.identity).is_none())
+        .filter(|m| ctx.db.crowd_group().id().find(m.group_id).is_some_and(|g| role_of(&g) == HACKER))
+        .filter(|m| ctx.db.band().id().find(m.band_id).is_some_and(|b| b.online))
+        .map(|m| (m.band_id, m.identity))
+        .collect();
+    if pool.is_empty() {
+        return;
+    }
+    pool.sort_by_key(|p| p.0);
+    let (_, who) = pool[rng.gen_range(0..pool.len())];
+    let _ = crate::departure::depart(ctx, who, "live run");
+}
+
+/// Equipment breaks, or something is stolen from the venue, at one of the zone's spots. Whoever did it is
+/// drawn from the bands at the spot.
+fn property(ctx: &ReducerContext, beat: &Beat, zone: &crate::venue::Zone, rng: &mut StdRng) {
+    let spots: Vec<(f32, f32)> = ctx
+        .db
+        .venue_spot()
+        .iter()
+        .filter(|s| s.station_id == zone.station_id && s.kind != "entrance" && s.kind != "exit")
+        .map(|s| (s.x_m, s.y_m))
+        .collect();
+    let at = if spots.is_empty() { None } else { Some(spots[rng.gen_range(0..spots.len())]) };
+    let (x, y) = at.unwrap_or_else(|| crate::venue::station_spot(ctx, zone.station_id));
+    let by = culprit(ctx, beat, zone.station_id, x, y, 0, rng);
+    let theft = beat.kind == IncidentKind::Theft;
+    let incident = safety::open(ctx, beat.kind, zone.id, zone.station_id, 0, if theft { "ops" } else { "vision" }, Some((x, y)));
+    plan(ctx, &incident, beat, by);
+    let place = place_name(ctx, x, y);
+    if theft {
+        record(ctx, incident.id, 0, "organizer", "Security", format!("Theft from the venue at {place}"), beat.note.into());
+    } else {
+        record(ctx, incident.id, 0, "camera", "Overhead camera", format!("Equipment down at {place}"), beat.note.into());
+    }
+}
+
+fn plan(ctx: &ReducerContext, incident: &safety::Incident, beat: &Beat, culprit_band: u32) {
+    ctx.db.live_plan().insert(LivePlan {
+        incident_id: incident.id,
+        record: beat.record.into(),
+        note: beat.note.into(),
+        resolution: beat.resolution.into(),
+        cost_cents: beat.cost_cents,
+        camera: beat.camera,
+        culprit_band,
+        naming: if culprit_band == 0 { String::new() } else { beat.naming.into() },
+    });
+}
+
+/// A chosen bot follows the same staff, evidence and claim path as scheduled incidents.
+pub(super) fn stage_selected(ctx: &ReducerContext, band: &Band, zone: &crate::venue::Zone, action: &str) {
+    let injury = action == "injury";
+    let beat = if injury {
+        fall("", "first-aid-wrist", "slipped on a spilled drink, right wrist pain and mild swelling; ice and a wrap at first aid")
+    } else {
+        loss(
+            IncidentKind::Theft,
+            "",
+            "a venue laptop was taken from its table; the inventory record puts its replacement cost at $1,299.00",
+            "security reviewed the loss; the venue's property policy answers it",
+            129_900,
+            "security identified this crowd attendee taking the venue laptop from the table",
+            true,
+        )
+    };
+    if injury {
+        ctx.db.band().id().update(Band {
+            state: S_SOS,
+            flags: F_FALL | F_MPU | F_MOTOR,
+            fall: true,
+            sos: false,
+            last_seen: ctx.timestamp,
+            ..ctx.db.band().id().find(band.id).expect("validated crowd band")
+        });
+    }
+    let incident = safety::open(ctx, beat.kind, zone.id, zone.station_id, if injury { band.id } else { 0 }, "ops", Some((band.x_m, band.y_m)));
+    plan(ctx, &incident, &beat, if injury { 0 } else { band.id });
+    let who = wearer(ctx, band.id).map(|(_, name)| name).unwrap_or_else(|| format!("band {}", band.id));
+    let place = place_name(ctx, band.x_m, band.y_m);
+    record(
+        ctx,
+        incident.id,
+        0,
+        "organizer",
+        &safety::caller_name(ctx),
+        format!("{}: {who} at {place}", if injury { "Injury selected" } else { "Theft selected" }),
+        "the organizer chose this action for a crowd attendee; the regular staff and claim steps follow".into(),
+    );
+}

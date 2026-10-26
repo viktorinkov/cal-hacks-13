@@ -10,6 +10,13 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AccountEmail = __t.object("AccountEmail", {
+  identity: __t.identity(),
+  email: __t.string(),
+  seenAt: __t.timestamp(),
+});
+export type AccountEmail = __Infer<typeof AccountEmail>;
+
 export const ApiSession = __t.object("ApiSession", {
   tokenHash: __t.string(),
   identity: __t.identity(),
@@ -42,7 +49,7 @@ export const Attendee = __t.object("Attendee", {
   findable: __t.bool(),
   personId: __t.u64(),
   organizationId: __t.u64(),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
 });
@@ -51,14 +58,15 @@ export type Attendee = __Infer<typeof Attendee>;
 export const AttendeeOut = __t.object("AttendeeOut", {
   nodeId: __t.u64(),
   displayName: __t.string(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   findable: __t.bool(),
-  simulated: __t.bool(),
+  crowd: __t.bool(),
   organization: __t.string(),
   get handles() {
     return __t.array(HandleOut);
   },
   createdAt: __t.timestamp(),
+  role: __t.string(),
 });
 export type AttendeeOut = __Infer<typeof AttendeeOut>;
 
@@ -74,7 +82,7 @@ export const AuthorityLimitRow = __t.object("AuthorityLimitRow", {
 export type AuthorityLimitRow = __Infer<typeof AuthorityLimitRow>;
 
 export const Band = __t.object("Band", {
-  id: __t.u8(),
+  id: __t.u32(),
   state: __t.u8(),
   flags: __t.u8(),
   neigh: __t.u8(),
@@ -91,6 +99,9 @@ export const Band = __t.object("Band", {
   hasMotor: __t.bool(),
   online: __t.bool(),
   lastSeen: __t.timestamp(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  boothId: __t.u64(),
 });
 export type Band = __Infer<typeof Band>;
 
@@ -122,6 +133,17 @@ export const BandOwner = __t.object("BandOwner", {
 });
 export type BandOwner = __Infer<typeof BandOwner>;
 
+export const BandPlace = __t.object("BandPlace", {
+  bandId: __t.u32(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  stationId: __t.u8(),
+  label: __t.string(),
+  placedBy: __t.identity(),
+  placedAt: __t.timestamp(),
+});
+export type BandPlace = __Infer<typeof BandPlace>;
+
 export const BlobRef = __t.object("BlobRef", {
   id: __t.u64(),
   hash: __t.string(),
@@ -134,6 +156,56 @@ export const BlobRef = __t.object("BlobRef", {
   createdAt: __t.timestamp(),
 });
 export type BlobRef = __Infer<typeof BlobRef>;
+
+export const BoardMerchOrder = __t.object("BoardMerchOrder", {
+  id: __t.u64(),
+  attendeeName: __t.string(),
+  templateId: __t.u64(),
+  title: __t.string(),
+  size: __t.string(),
+  amountCents: __t.u64(),
+  status: __t.string(),
+  failure: __t.string(),
+  nessiePurchaseId: __t.string(),
+  createdAt: __t.timestamp(),
+  line: __t.string(),
+  photoUrl: __t.string(),
+  nodeId: __t.u64(),
+});
+export type BoardMerchOrder = __Infer<typeof BoardMerchOrder>;
+
+export const BoardMerchPick = __t.object("BoardMerchPick", {
+  id: __t.u64(),
+  nodeId: __t.u64(),
+  attendeeName: __t.string(),
+  rank: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  photoUrl: __t.string(),
+  line: __t.string(),
+  reason: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type BoardMerchPick = __Infer<typeof BoardMerchPick>;
+
+export const BoardPhoto = __t.object("BoardPhoto", {
+  id: __t.u64(),
+  url: __t.string(),
+  takenAt: __t.timestamp(),
+  zoneName: __t.string(),
+  caption: __t.string(),
+  nodeIds: __t.array(__t.u64()),
+  peopleCount: __t.u32(),
+  read: __t.bool(),
+});
+export type BoardPhoto = __Infer<typeof BoardPhoto>;
+
+export const BoardWallet = __t.object("BoardWallet", {
+  nodeId: __t.u64(),
+  accountId: __t.string(),
+  balanceCents: __t.i64(),
+});
+export type BoardWallet = __Infer<typeof BoardWallet>;
 
 export const Booth = __t.object("Booth", {
   id: __t.u64(),
@@ -188,12 +260,60 @@ export const Camera = __t.object("Camera", {
 });
 export type Camera = __Infer<typeof Camera>;
 
+export const Charge = __t.object("Charge", {
+  id: __t.u64(),
+  incidentId: __t.u64(),
+  claimId: __t.u64(),
+  attendee: __t.identity(),
+  attendeeName: __t.string(),
+  bandId: __t.u32(),
+  namedBy: __t.identity(),
+  namedByName: __t.string(),
+  namedByRole: __t.string(),
+  note: __t.string(),
+  amountCents: __t.u64(),
+  packHash: __t.string(),
+  checks: __t.array(__t.string()),
+  checksPassed: __t.bool(),
+  recommendation: __t.string(),
+  recommendationReason: __t.string(),
+  clauseIds: __t.array(__t.string()),
+  status: __t.string(),
+  disputeText: __t.string(),
+  approvedByName: __t.string(),
+  waiveReason: __t.string(),
+  paymentReference: __t.string(),
+  createdAt: __t.timestamp(),
+  decidedAt: __t.option(__t.timestamp()),
+  paidAt: __t.option(__t.timestamp()),
+  updatedAt: __t.timestamp(),
+  insurerCents: __t.u64(),
+  refundCents: __t.u64(),
+});
+export type Charge = __Infer<typeof Charge>;
+
 export const CheckIn = __t.object("CheckIn", {
   name: __t.string(),
   result: __t.string(),
   detail: __t.string(),
 });
 export type CheckIn = __Infer<typeof CheckIn>;
+
+export const ChosenVenue = __t.object("ChosenVenue", {
+  id: __t.u8(),
+  setupId: __t.u64(),
+  chosenBy: __t.identity(),
+  chosenAt: __t.timestamp(),
+});
+export type ChosenVenue = __Infer<typeof ChosenVenue>;
+
+export const ChunkMatch = __t.object("ChunkMatch", {
+  chunkId: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ChunkMatch = __Infer<typeof ChunkMatch>;
 
 export const Claim = __t.object("Claim", {
   id: __t.u64(),
@@ -202,7 +322,7 @@ export const Claim = __t.object("Claim", {
   coverKind: __t.string(),
   claimant: __t.option(__t.identity()),
   claimantName: __t.string(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   zoneId: __t.u64(),
   zoneName: __t.string(),
   policyId: __t.u64(),
@@ -236,6 +356,7 @@ export const Claim = __t.object("Claim", {
   settledAt: __t.option(__t.timestamp()),
   reconciledAt: __t.option(__t.timestamp()),
   updatedAt: __t.timestamp(),
+  statement: __t.string(),
 });
 export type Claim = __Infer<typeof Claim>;
 
@@ -250,6 +371,19 @@ export const ClaimCheck = __t.object("ClaimCheck", {
   createdAt: __t.timestamp(),
 });
 export type ClaimCheck = __Infer<typeof ClaimCheck>;
+
+export const ClaimClause = __t.object("ClaimClause", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  packVersion: __t.u32(),
+  clauseId: __t.string(),
+  policy: __t.string(),
+  section: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ClaimClause = __Infer<typeof ClaimClause>;
 
 export const ClaimLine = __t.object("ClaimLine", {
   id: __t.u64(),
@@ -325,6 +459,34 @@ export const ClaimedPerson = __t.object("ClaimedPerson", {
 });
 export type ClaimedPerson = __Infer<typeof ClaimedPerson>;
 
+export const ClauseIn = __t.object("ClauseIn", {
+  clauseId: __t.string(),
+  policy: __t.string(),
+  section: __t.string(),
+  page: __t.u32(),
+  text: __t.string(),
+  score: __t.f32(),
+});
+export type ClauseIn = __Infer<typeof ClauseIn>;
+
+export const ClinicReport = __t.object("ClinicReport", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  scenario: __t.string(),
+  choice: __t.string(),
+  visitDate: __t.string(),
+  status: __t.string(),
+  jobId: __t.u64(),
+  providerName: __t.string(),
+  fileHash: __t.string(),
+  problems: __t.array(__t.string()),
+  modelCallId: __t.u64(),
+  requestedBy: __t.identity(),
+  requestedAt: __t.timestamp(),
+  receivedAt: __t.option(__t.timestamp()),
+});
+export type ClinicReport = __Infer<typeof ClinicReport>;
+
 export const Command = __t.object("Command", {
   id: __t.u64(),
   pending: __t.bool(),
@@ -350,14 +512,34 @@ export const CoverageRuleRow = __t.object("CoverageRuleRow", {
   serviceWindowDays: __t.u32(),
   active: __t.bool(),
   updatedAt: __t.timestamp(),
+  minimumPayoutCents: __t.u64(),
 });
 export type CoverageRuleRow = __Infer<typeof CoverageRuleRow>;
 
-export const CrowdMember = __t.object("CrowdMember", {
-  bandId: __t.u8(),
-  groupId: __t.u8(),
+export const CrowdGroup = __t.object("CrowdGroup", {
+  id: __t.u16(),
+  staffBooth: __t.u64(),
+  homeStation: __t.u8(),
+  homeXM: __t.f32(),
+  homeYM: __t.f32(),
   station: __t.u8(),
+  boothId: __t.u64(),
+  xM: __t.f32(),
+  yM: __t.f32(),
   nextMoveAt: __t.timestamp(),
+  role: __t.string(),
+});
+export type CrowdGroup = __Infer<typeof CrowdGroup>;
+
+export const CrowdMember = __t.object("CrowdMember", {
+  bandId: __t.u32(),
+  identity: __t.identity(),
+  joinedAt: __t.timestamp(),
+  groupId: __t.u16(),
+  dxM: __t.f32(),
+  dyM: __t.f32(),
+  interests: __t.array(__t.string()),
+  chat: __t.u32(),
 });
 export type CrowdMember = __Infer<typeof CrowdMember>;
 
@@ -367,10 +549,58 @@ export const CrowdTimer = __t.object("CrowdTimer", {
 });
 export type CrowdTimer = __Infer<typeof CrowdTimer>;
 
+export const CrowdWalk = __t.object("CrowdWalk", {
+  bandId: __t.u32(),
+  path: __t.array(__t.f32()),
+  startedAt: __t.timestamp(),
+  arrivesAt: __t.timestamp(),
+  speedMps: __t.f32(),
+});
+export type CrowdWalk = __Infer<typeof CrowdWalk>;
+
+export const Decision = __t.object("Decision", {
+  id: __t.u64(),
+  at: __t.timestamp(),
+  incidentId: __t.u64(),
+  claimId: __t.u64(),
+  actor: __t.string(),
+  who: __t.string(),
+  what: __t.string(),
+  why: __t.string(),
+});
+export type Decision = __Infer<typeof Decision>;
+
+export const DeclarationsIn = __t.object("DeclarationsIn", {
+  policyNumber: __t.string(),
+  fnolContact: __t.string(),
+  periodStart: __t.string(),
+  periodEnd: __t.string(),
+  medicalLimitCents: __t.u64(),
+  medicalAggregateCents: __t.u64(),
+  propertyLimitCents: __t.u64(),
+  propertyDeductibleCents: __t.u64(),
+});
+export type DeclarationsIn = __Infer<typeof DeclarationsIn>;
+
+export const Departure = __t.object("Departure", {
+  attendee: __t.identity(),
+  nodeId: __t.u64(),
+  name: __t.string(),
+  bandId: __t.u32(),
+  door: __t.string(),
+  stationId: __t.u8(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  askedAt: __t.timestamp(),
+  leftAt: __t.option(__t.timestamp()),
+  by: __t.string(),
+});
+export type Departure = __Infer<typeof Departure>;
+
 export const Encounter = __t.object("Encounter", {
-  key: __t.u16(),
-  bandA: __t.u8(),
-  bandB: __t.u8(),
+  key: __t.u64(),
+  bandA: __t.u32(),
+  bandB: __t.u32(),
   firstSeen: __t.timestamp(),
   lastSeen: __t.timestamp(),
   secondsClose: __t.u32(),
@@ -413,6 +643,32 @@ export const EventBundle = __t.object("EventBundle", {
   },
 });
 export type EventBundle = __Infer<typeof EventBundle>;
+
+export const EventImport = __t.object("EventImport", {
+  id: __t.u64(),
+  eventSlug: __t.string(),
+  eventName: __t.string(),
+  runId: __t.string(),
+  status: __t.string(),
+  error: __t.string(),
+  venueId: __t.u64(),
+  get counts() {
+    return __t.array(SectionCount);
+  },
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type EventImport = __Infer<typeof EventImport>;
+
+export const EventImportStep = __t.object("EventImportStep", {
+  id: __t.u64(),
+  importId: __t.u64(),
+  step: __t.string(),
+  detail: __t.string(),
+  at: __t.timestamp(),
+});
+export type EventImportStep = __Infer<typeof EventImportStep>;
 
 // The tagged union or sum type for the algebraic type `EventKind`.
 export const EventKind = __t.enum("EventKind", {
@@ -486,6 +742,15 @@ export const Fact = __t.object("Fact", {
 });
 export type Fact = __Infer<typeof Fact>;
 
+export const FeeScheduleLine = __t.object("FeeScheduleLine", {
+  id: __t.u64(),
+  policyId: __t.u64(),
+  code: __t.string(),
+  description: __t.string(),
+  capCents: __t.u64(),
+});
+export type FeeScheduleLine = __Infer<typeof FeeScheduleLine>;
+
 export const Gateway = __t.object("Gateway", {
   id: __t.u8(),
   mac: __t.string(),
@@ -545,7 +810,7 @@ export const Incident = __t.object("Incident", {
   resolved: __t.bool(),
   zoneId: __t.u64(),
   stationId: __t.u8(),
-  subjectBand: __t.u8(),
+  subjectBand: __t.u32(),
   openedBy: __t.string(),
   openedAt: __t.timestamp(),
   lastSignalAt: __t.timestamp(),
@@ -560,7 +825,7 @@ export type Incident = __Infer<typeof Incident>;
 export const IncidentBand = __t.object("IncidentBand", {
   id: __t.u64(),
   incidentId: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   role: __t.string(),
   zoneId: __t.u64(),
   rssi: __t.i8(),
@@ -574,8 +839,30 @@ export const IncidentKind = __t.enum("IncidentKind", {
   Sos: __t.unit(),
   Fall: __t.unit(),
   Property: __t.unit(),
+  Theft: __t.unit(),
+  Breakage: __t.unit(),
 });
 export type IncidentKind = __Infer<typeof IncidentKind>;
+
+export const IncidentMarker = __t.object("IncidentMarker", {
+  incidentId: __t.u64(),
+  kind: __t.string(),
+  bandId: __t.u32(),
+  person: __t.string(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  stationId: __t.u8(),
+  place: __t.string(),
+  status: __t.string(),
+  medic: __t.string(),
+  openedAt: __t.timestamp(),
+  respondingAt: __t.option(__t.timestamp()),
+  resolvedAt: __t.option(__t.timestamp()),
+  claimId: __t.u64(),
+  claimStatus: __t.string(),
+  payoutCents: __t.u64(),
+});
+export type IncidentMarker = __Infer<typeof IncidentMarker>;
 
 export const IncidentNote = __t.object("IncidentNote", {
   id: __t.u64(),
@@ -599,9 +886,9 @@ export const IncidentSnapshot = __t.object("IncidentSnapshot", {
   bandNeigh: __t.u8(),
   bandBattery: __t.u8(),
   bandSeenAt: __t.timestamp(),
-  bandsPresent: __t.byteArray(),
+  bandsPresent: __t.array(__t.u32()),
   neighMean: __t.f32(),
-  circleBands: __t.byteArray(),
+  circleBands: __t.array(__t.u32()),
 });
 export type IncidentSnapshot = __Infer<typeof IncidentSnapshot>;
 
@@ -629,6 +916,9 @@ export const InsurancePolicy = __t.object("InsurancePolicy", {
   medicalUsedCents: __t.u64(),
   propertyUsedCents: __t.u64(),
   updatedAt: __t.timestamp(),
+  otherInsurance: __t.string(),
+  staffExcluded: __t.bool(),
+  periodChecked: __t.bool(),
 });
 export type InsurancePolicy = __Infer<typeof InsurancePolicy>;
 
@@ -703,6 +993,86 @@ export const Link = __t.object("Link", {
   updated: __t.timestamp(),
 });
 export type Link = __Infer<typeof Link>;
+
+export const LiveEvacuation = __t.object("LiveEvacuation", {
+  id: __t.u8(),
+  startedAt: __t.timestamp(),
+  startedBy: __t.identity(),
+});
+export type LiveEvacuation = __Infer<typeof LiveEvacuation>;
+
+export const LivePause = __t.object("LivePause", {
+  id: __t.u8(),
+  pausedAt: __t.timestamp(),
+  pausedBy: __t.identity(),
+});
+export type LivePause = __Infer<typeof LivePause>;
+
+// The tagged union or sum type for the algebraic type `LivePhase`.
+export const LivePhase = __t.enum("LivePhase", {
+  Idle: __t.unit(),
+  Running: __t.unit(),
+  Closing: __t.unit(),
+  Ended: __t.unit(),
+});
+export type LivePhase = __Infer<typeof LivePhase>;
+
+export const LivePlan = __t.object("LivePlan", {
+  incidentId: __t.u64(),
+  record: __t.string(),
+  note: __t.string(),
+  resolution: __t.string(),
+  costCents: __t.u64(),
+  camera: __t.bool(),
+  culpritBand: __t.u32(),
+  naming: __t.string(),
+});
+export type LivePlan = __Infer<typeof LivePlan>;
+
+export const LiveRun = __t.object("LiveRun", {
+  id: __t.u8(),
+  get phase() {
+    return LivePhase;
+  },
+  crowd: __t.u16(),
+  pace: __t.u8(),
+  startedAt: __t.timestamp(),
+  endsAt: __t.timestamp(),
+  closingAt: __t.option(__t.timestamp()),
+  endedAt: __t.option(__t.timestamp()),
+  nextIncidentAt: __t.timestamp(),
+  step: __t.u16(),
+  seed: __t.u64(),
+  startedBy: __t.identity(),
+});
+export type LiveRun = __Infer<typeof LiveRun>;
+
+export const LiveRunTimer = __t.object("LiveRunTimer", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type LiveRunTimer = __Infer<typeof LiveRunTimer>;
+
+export const LiveShopper = __t.object("LiveShopper", {
+  identity: __t.identity(),
+  bandId: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  size: __t.string(),
+  shippingAddress: __t.string(),
+  selectedAt: __t.timestamp(),
+  pending: __t.bool(),
+});
+export type LiveShopper = __Infer<typeof LiveShopper>;
+
+export const LiveShopping = __t.object("LiveShopping", {
+  id: __t.u8(),
+  nextAt: __t.timestamp(),
+  gapSecs: __t.i64(),
+  target: __t.u16(),
+  selected: __t.u16(),
+});
+export type LiveShopping = __Infer<typeof LiveShopping>;
 
 export const MedicCard = __t.object("MedicCard", {
   incidentId: __t.u64(),
@@ -796,8 +1166,36 @@ export const MerchOrder = __t.object("MerchOrder", {
   nessiePurchaseId: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  line: __t.string(),
 });
 export type MerchOrder = __Infer<typeof MerchOrder>;
+
+export const MerchPick = __t.object("MerchPick", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  rank: __t.u32(),
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  line: __t.string(),
+  reason: __t.string(),
+  modelCallId: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type MerchPick = __Infer<typeof MerchPick>;
+
+export const MerchPickIn = __t.object("MerchPickIn", {
+  templateId: __t.u64(),
+  photoId: __t.u64(),
+  line: __t.string(),
+  reason: __t.string(),
+});
+export type MerchPickIn = __Infer<typeof MerchPickIn>;
+
+export const MerchShipping = __t.object("MerchShipping", {
+  orderId: __t.u64(),
+  shippingAddress: __t.string(),
+});
+export type MerchShipping = __Infer<typeof MerchShipping>;
 
 export const MerchShop = __t.object("MerchShop", {
   id: __t.u8(),
@@ -820,6 +1218,10 @@ export const MerchSuggestion = __t.object("MerchSuggestion", {
   photoH: __t.u32(),
   photoId: __t.u64(),
   photoUrl: __t.string(),
+  line: __t.string(),
+  reason: __t.string(),
+  friends: __t.array(__t.string()),
+  ticks: __t.array(__t.string()),
 });
 export type MerchSuggestion = __Infer<typeof MerchSuggestion>;
 
@@ -898,6 +1300,21 @@ export const MyBand = __t.object("MyBand", {
 });
 export type MyBand = __Infer<typeof MyBand>;
 
+export const MyCharge = __t.object("MyCharge", {
+  id: __t.u64(),
+  incidentId: __t.u64(),
+  incidentKind: __t.string(),
+  zoneName: __t.string(),
+  happenedAt: __t.timestamp(),
+  amountCents: __t.u64(),
+  status: __t.string(),
+  why: __t.string(),
+  clause: __t.string(),
+  disputeText: __t.string(),
+  paidAt: __t.option(__t.timestamp()),
+});
+export type MyCharge = __Infer<typeof MyCharge>;
+
 export const MyClaim = __t.object("MyClaim", {
   id: __t.u64(),
   incidentKind: __t.string(),
@@ -910,6 +1327,8 @@ export const MyClaim = __t.object("MyClaim", {
   payoutReference: __t.string(),
   openedAt: __t.timestamp(),
   settledAt: __t.option(__t.timestamp()),
+  incidentId: __t.u64(),
+  statement: __t.string(),
 });
 export type MyClaim = __Infer<typeof MyClaim>;
 
@@ -925,6 +1344,18 @@ export const MyEncounter = __t.object("MyEncounter", {
   },
 });
 export type MyEncounter = __Infer<typeof MyEncounter>;
+
+export const MyIncident = __t.object("MyIncident", {
+  incidentId: __t.u64(),
+  kind: __t.string(),
+  zoneName: __t.string(),
+  openedAt: __t.timestamp(),
+  resolved: __t.bool(),
+  resolvedAt: __t.option(__t.timestamp()),
+  resolution: __t.string(),
+  claimId: __t.u64(),
+});
+export type MyIncident = __Infer<typeof MyIncident>;
 
 export const MyPhoto = __t.object("MyPhoto", {
   photoId: __t.u64(),
@@ -1020,6 +1451,24 @@ export const OrganizationIn = __t.object("OrganizationIn", {
 });
 export type OrganizationIn = __Infer<typeof OrganizationIn>;
 
+export const OrganizerPrecedent = __t.object("OrganizerPrecedent", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  approvalId: __t.u64(),
+  incidentKind: __t.string(),
+  coverKind: __t.string(),
+  decision: __t.string(),
+  payoutCents: __t.u64(),
+  claimantName: __t.string(),
+  zoneName: __t.string(),
+  complications: __t.string(),
+  reason: __t.string(),
+  decidedByName: __t.string(),
+  proposalId: __t.u64(),
+  decidedAt: __t.timestamp(),
+});
+export type OrganizerPrecedent = __Infer<typeof OrganizerPrecedent>;
+
 export const Owner = __t.object("Owner", {
   identity: __t.identity(),
 });
@@ -1100,6 +1549,8 @@ export const Photo = __t.object("Photo", {
   caption: __t.string(),
   addedBy: __t.identity(),
   createdAt: __t.timestamp(),
+  peopleCount: __t.u32(),
+  featuresCallId: __t.u64(),
 });
 export type Photo = __Infer<typeof Photo>;
 
@@ -1112,14 +1563,108 @@ export const PhotoTag = __t.object("PhotoTag", {
 });
 export type PhotoTag = __Infer<typeof PhotoTag>;
 
-export const PrecedentIn = __t.object("PrecedentIn", {
-  reference: __t.string(),
-  outcome: __t.string(),
-  payoutCents: __t.u64(),
-  narrative: __t.string(),
-  score: __t.f32(),
+export const PlanArea = __t.object("PlanArea", {
+  stationId: __t.u8(),
+  boothId: __t.u64(),
+  name: __t.string(),
+  x0M: __t.f32(),
+  y0M: __t.f32(),
+  x1M: __t.f32(),
+  y1M: __t.f32(),
 });
-export type PrecedentIn = __Infer<typeof PrecedentIn>;
+export type PlanArea = __Infer<typeof PlanArea>;
+
+export const PlanLookup = __t.object("PlanLookup", {
+  id: __t.u64(),
+  attendee: __t.identity(),
+  kind: __t.string(),
+  insurer: __t.string(),
+  plan: __t.string(),
+  state: __t.string(),
+  limitCents: __t.u64(),
+  deductibleCents: __t.u64(),
+  status: __t.string(),
+  sourceUrl: __t.string(),
+  printedInsurer: __t.string(),
+  printedPlan: __t.string(),
+  planYear: __t.string(),
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  jobId: __t.u64(),
+  note: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  reusedFrom: __t.u64(),
+  get matchedChunk() {
+    return __t.option(ChunkMatch);
+  },
+});
+export type PlanLookup = __Infer<typeof PlanLookup>;
+
+export const PlanLookupResult = __t.object("PlanLookupResult", {
+  status: __t.string(),
+  sourceUrl: __t.string(),
+  printedInsurer: __t.string(),
+  printedPlan: __t.string(),
+  planYear: __t.string(),
+  fileHash: __t.string(),
+  sizeBytes: __t.u64(),
+  pageCount: __t.u32(),
+  note: __t.string(),
+  get matchedChunk() {
+    return __t.option(ChunkMatch);
+  },
+});
+export type PlanLookupResult = __Infer<typeof PlanLookupResult>;
+
+export const PolicyDocument = __t.object("PolicyDocument", {
+  id: __t.u64(),
+  kind: __t.string(),
+  attendee: __t.option(__t.identity()),
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  status: __t.string(),
+  jobId: __t.u64(),
+  clauseCount: __t.u32(),
+  dropped: __t.array(__t.string()),
+  error: __t.string(),
+  policyId: __t.u64(),
+  source: __t.string(),
+  sourceUrl: __t.string(),
+  uploadedBy: __t.identity(),
+  uploadedAt: __t.timestamp(),
+  readAt: __t.option(__t.timestamp()),
+  confirmedBy: __t.identity(),
+  confirmedAt: __t.option(__t.timestamp()),
+});
+export type PolicyDocument = __Infer<typeof PolicyDocument>;
+
+export const PolicyForm = __t.object("PolicyForm", {
+  part: __t.string(),
+  url: __t.string(),
+  formNumber: __t.string(),
+  title: __t.string(),
+  firstPage: __t.u32(),
+  pageCount: __t.u32(),
+});
+export type PolicyForm = __Infer<typeof PolicyForm>;
+
+export const PolicyTerm = __t.object("PolicyTerm", {
+  id: __t.u64(),
+  documentId: __t.u64(),
+  coverKind: __t.string(),
+  name: __t.string(),
+  code: __t.string(),
+  value: __t.string(),
+  shown: __t.string(),
+  readValue: __t.string(),
+  quote: __t.string(),
+  page: __t.u32(),
+  clauseId: __t.string(),
+  status: __t.string(),
+  problem: __t.string(),
+});
+export type PolicyTerm = __Infer<typeof PolicyTerm>;
 
 export const PropertyEvent = __t.object("PropertyEvent", {
   id: __t.u64(),
@@ -1133,6 +1678,30 @@ export const PropertyEvent = __t.object("PropertyEvent", {
   incidentId: __t.u64(),
 });
 export type PropertyEvent = __Infer<typeof PropertyEvent>;
+
+export const RuleProposal = __t.object("RuleProposal", {
+  id: __t.u64(),
+  incidentKind: __t.string(),
+  coverKind: __t.string(),
+  status: __t.string(),
+  ceilingCents: __t.u64(),
+  limitCents: __t.u64(),
+  claimIds: __t.array(__t.u64()),
+  rule: __t.string(),
+  summary: __t.string(),
+  jobId: __t.u64(),
+  modelCallId: __t.u64(),
+  proposedBy: __t.identity(),
+  decidedBy: __t.identity(),
+  decidedByName: __t.string(),
+  reason: __t.string(),
+  settlementRuleId: __t.u64(),
+  ruleVersion: __t.u32(),
+  createdAt: __t.timestamp(),
+  proposedAt: __t.option(__t.timestamp()),
+  decidedAt: __t.option(__t.timestamp()),
+});
+export type RuleProposal = __Infer<typeof RuleProposal>;
 
 export const ScheduleSlot = __t.object("ScheduleSlot", {
   id: __t.u64(),
@@ -1203,6 +1772,7 @@ export const SettlementRuleRow = __t.object("SettlementRuleRow", {
   version: __t.u32(),
   status: __t.string(),
   createdAt: __t.timestamp(),
+  proposalId: __t.u64(),
 });
 export type SettlementRuleRow = __Infer<typeof SettlementRuleRow>;
 
@@ -1221,7 +1791,7 @@ export type SharedVisit = __Infer<typeof SharedVisit>;
 
 export const SocialEncounter = __t.object("SocialEncounter", {
   id: __t.u64(),
-  bandPair: __t.u16(),
+  bandPair: __t.u64(),
   attendeeA: __t.identity(),
   attendeeB: __t.identity(),
   zoneId: __t.u64(),
@@ -1249,6 +1819,17 @@ export const SocialTickTimer = __t.object("SocialTickTimer", {
 });
 export type SocialTickTimer = __Infer<typeof SocialTickTimer>;
 
+export const StaffMember = __t.object("StaffMember", {
+  id: __t.u64(),
+  email: __t.string(),
+  role: __t.string(),
+  name: __t.string(),
+  account: __t.option(__t.identity()),
+  addedBy: __t.identity(),
+  addedAt: __t.timestamp(),
+});
+export type StaffMember = __Infer<typeof StaffMember>;
+
 export const StaffRole = __t.object("StaffRole", {
   id: __t.u64(),
   identity: __t.identity(),
@@ -1274,6 +1855,18 @@ export const SweepTimer = __t.object("SweepTimer", {
 });
 export type SweepTimer = __Infer<typeof SweepTimer>;
 
+export const UnclaimedInjury = __t.object("UnclaimedInjury", {
+  incidentId: __t.u64(),
+  kind: __t.string(),
+  zoneName: __t.string(),
+  bandId: __t.u32(),
+  wearerName: __t.string(),
+  openedAt: __t.timestamp(),
+  resolvedAt: __t.option(__t.timestamp()),
+  notes: __t.array(__t.string()),
+});
+export type UnclaimedInjury = __Infer<typeof UnclaimedInjury>;
+
 export const Venue = __t.object("Venue", {
   id: __t.u64(),
   sourceKey: __t.string(),
@@ -1296,6 +1889,28 @@ export const Venue = __t.object("Venue", {
 });
 export type Venue = __Infer<typeof Venue>;
 
+export const VenueFloor = __t.object("VenueFloor", {
+  id: __t.u8(),
+  x0M: __t.f32(),
+  y0M: __t.f32(),
+  cellM: __t.f32(),
+  cols: __t.u32(),
+  rows: __t.u32(),
+  open: __t.byteArray(),
+  loadedAt: __t.timestamp(),
+});
+export type VenueFloor = __Infer<typeof VenueFloor>;
+
+export const VenueFloorIn = __t.object("VenueFloorIn", {
+  x0: __t.f32(),
+  z0: __t.f32(),
+  cell: __t.f32(),
+  cols: __t.u32(),
+  rows: __t.u32(),
+  runs: __t.array(__t.u32()),
+});
+export type VenueFloorIn = __Infer<typeof VenueFloorIn>;
+
 export const VenueIn = __t.object("VenueIn", {
   sourceKey: __t.string(),
   name: __t.string(),
@@ -1315,6 +1930,159 @@ export const VenueIn = __t.object("VenueIn", {
   fetchedAt: __t.timestamp(),
 });
 export type VenueIn = __Infer<typeof VenueIn>;
+
+export const VenuePolicyLookup = __t.object("VenuePolicyLookup", {
+  id: __t.u64(),
+  insurer: __t.string(),
+  state: __t.string(),
+  liabilityForm: __t.string(),
+  propertyForm: __t.string(),
+  policyNumber: __t.string(),
+  fnolContact: __t.string(),
+  periodStart: __t.string(),
+  periodEnd: __t.string(),
+  medicalLimitCents: __t.u64(),
+  medicalAggregateCents: __t.u64(),
+  propertyLimitCents: __t.u64(),
+  propertyDeductibleCents: __t.u64(),
+  status: __t.string(),
+  get forms() {
+    return __t.array(PolicyForm);
+  },
+  fileHash: __t.string(),
+  pageCount: __t.u32(),
+  documentId: __t.u64(),
+  jobId: __t.u64(),
+  note: __t.string(),
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+  get liabilityChunk() {
+    return __t.option(ChunkMatch);
+  },
+  get propertyChunk() {
+    return __t.option(ChunkMatch);
+  },
+});
+export type VenuePolicyLookup = __Infer<typeof VenuePolicyLookup>;
+
+export const VenuePolicyLookupResult = __t.object("VenuePolicyLookupResult", {
+  status: __t.string(),
+  get forms() {
+    return __t.array(PolicyForm);
+  },
+  fileHash: __t.string(),
+  sizeBytes: __t.u64(),
+  pageCount: __t.u32(),
+  note: __t.string(),
+  get liabilityChunk() {
+    return __t.option(ChunkMatch);
+  },
+  get propertyChunk() {
+    return __t.option(ChunkMatch);
+  },
+});
+export type VenuePolicyLookupResult = __Infer<typeof VenuePolicyLookupResult>;
+
+export const VenueSetup = __t.object("VenueSetup", {
+  id: __t.u64(),
+  eventName: __t.string(),
+  status: __t.string(),
+  eventSite: __t.string(),
+  venueName: __t.string(),
+  address: __t.string(),
+  mapUrl: __t.string(),
+  method: __t.string(),
+  modelUrl: __t.string(),
+  layoutUrl: __t.string(),
+  modelBytes: __t.u64(),
+  meshes: __t.u32(),
+  triangles: __t.u32(),
+  places: __t.u32(),
+  sizeX: __t.f32(),
+  sizeY: __t.f32(),
+  sizeZ: __t.f32(),
+  floorPlans: __t.array(__t.string()),
+  get sources() {
+    return __t.array(Fact);
+  },
+  error: __t.string(),
+  requestedBy: __t.identity(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type VenueSetup = __Infer<typeof VenueSetup>;
+
+export const VenueSetupResult = __t.object("VenueSetupResult", {
+  eventSite: __t.string(),
+  venueName: __t.string(),
+  address: __t.string(),
+  mapUrl: __t.string(),
+  method: __t.string(),
+  modelHash: __t.string(),
+  layoutHash: __t.string(),
+  modelBytes: __t.u64(),
+  meshes: __t.u32(),
+  triangles: __t.u32(),
+  places: __t.u32(),
+  sizeX: __t.f32(),
+  sizeY: __t.f32(),
+  sizeZ: __t.f32(),
+  floorPlans: __t.array(__t.string()),
+  get sources() {
+    return __t.array(Fact);
+  },
+});
+export type VenueSetupResult = __Infer<typeof VenueSetupResult>;
+
+export const VenueSetupStep = __t.object("VenueSetupStep", {
+  id: __t.u64(),
+  setupId: __t.u64(),
+  step: __t.string(),
+  detail: __t.string(),
+  at: __t.timestamp(),
+});
+export type VenueSetupStep = __Infer<typeof VenueSetupStep>;
+
+export const VenueSpot = __t.object("VenueSpot", {
+  id: __t.u32(),
+  kind: __t.string(),
+  name: __t.string(),
+  number: __t.u32(),
+  xM: __t.f32(),
+  yM: __t.f32(),
+  angle: __t.f32(),
+  stationId: __t.u8(),
+  boothId: __t.u64(),
+});
+export type VenueSpot = __Infer<typeof VenueSpot>;
+
+export const VenueSpotIn = __t.object("VenueSpotIn", {
+  kind: __t.string(),
+  name: __t.string(),
+  number: __t.u32(),
+  x: __t.f32(),
+  z: __t.f32(),
+  angle: __t.f32(),
+});
+export type VenueSpotIn = __Infer<typeof VenueSpotIn>;
+
+export const ViewablePerson = __t.object("ViewablePerson", {
+  identity: __t.identity(),
+  name: __t.string(),
+  role: __t.string(),
+  bandId: __t.u32(),
+  crowd: __t.bool(),
+});
+export type ViewablePerson = __Infer<typeof ViewablePerson>;
+
+export const ViewingAs = __t.object("ViewingAs", {
+  viewer: __t.identity(),
+  target: __t.identity(),
+  by: __t.identity(),
+  at: __t.timestamp(),
+});
+export type ViewingAs = __Infer<typeof ViewingAs>;
 
 export const VisionAssessment = __t.object("VisionAssessment", {
   id: __t.u64(),
@@ -1337,11 +2105,13 @@ export const Visit = __t.object("Visit", {
   zoneVisitId: __t.u64(),
   attendee: __t.identity(),
   zoneId: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   startedAt: __t.timestamp(),
   endedAt: __t.option(__t.timestamp()),
   minutes: __t.f32(),
   updatedAt: __t.timestamp(),
+  boothId: __t.u64(),
+  open: __t.bool(),
 });
 export type Visit = __Infer<typeof Visit>;
 
@@ -1389,10 +2159,12 @@ export type ZoneIn = __Infer<typeof ZoneIn>;
 
 export const ZoneVisit = __t.object("ZoneVisit", {
   id: __t.u64(),
-  bandId: __t.u8(),
+  bandId: __t.u32(),
   zone: __t.u8(),
   entered: __t.timestamp(),
   left: __t.option(__t.timestamp()),
+  boothId: __t.u64(),
+  open: __t.bool(),
 });
 export type ZoneVisit = __Infer<typeof ZoneVisit>;
 

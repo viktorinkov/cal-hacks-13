@@ -149,11 +149,11 @@ pub fn report_property_event(
     let cam = ctx.db.camera().id().find(camera_id).ok_or_else(|| format!("no camera {camera_id}"))?;
     let incident_id = if incident_id == 0 {
         let station_id = ctx.db.zone().id().find(cam.zone_id).map(|z| z.station_id).unwrap_or(0);
-        safety::open(ctx, IncidentKind::Property, cam.zone_id, station_id, 0, "vision").id
+        safety::open(ctx, IncidentKind::Property, cam.zone_id, station_id, 0, "vision", None).id
     } else {
         let i = ctx.db.incident().id().find(incident_id).ok_or_else(|| format!("no incident {incident_id}"))?;
-        if i.kind != IncidentKind::Property {
-            return Err(format!("incident {incident_id} is not a property incident"));
+        if i.kind.is_injury() {
+            return Err(format!("incident {incident_id} is an injury, not broken or taken property"));
         }
         i.id
     };

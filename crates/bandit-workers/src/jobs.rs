@@ -4,14 +4,15 @@ use std::path::PathBuf;
 
 use bandit_bindings::ModelCallIn;
 use bandit_common::BlobStore;
-use claims_elastic::ClaimsIndex;
+use claims_elastic::{ClaimsIndex, Kibana};
 use bandit_insurance::payloads::*;
+use bandit_insurance::policy::KIND_DOCUMENT_READ;
 use serde::de::DeserializeOwned;
 
-use crate::model::{Claude, Failed};
+use crate::model::Failed;
 use crate::nessie::Nessie;
 use crate::sink::Sink;
-use crate::{extract, letters, medical, merch, payout, review, verify, wallet};
+use crate::{charge, clinic, document, event_import, investigate, letters, medical, merch, payout, photo, plan, propose, shop, venue, venue_policy, verify, wallet};
 
 /// The job fields a handler needs.
 #[derive(Clone, Debug)]
@@ -35,7 +36,7 @@ impl JobIn {
     }
 }
 
-/// A failed attempt: the error for `fail_job` and every Claude call made.
+/// A failed attempt: the error for `fail_job` and every model call made.
 #[derive(Debug)]
 pub struct JobError {
     pub error: String,
@@ -62,11 +63,21 @@ impl From<anyhow::Error> for JobError {
 
 /// Clients and stores shared by every handler.
 pub struct Ctx {
-    pub claude: Claude,
     pub blobs: BlobStore,
     pub elastic: Option<ClaimsIndex>,
     /// Set once `ClaimsIndex::ensure_setup` has succeeded.
     pub elastic_ready: tokio::sync::OnceCell<()>,
+    pub kibana: Option<Kibana>,
+    /// Set once the document indices and the reader's Kibana assets are in place.
+    pub reader_ready: tokio::sync::OnceCell<()>,
+    /// Set once the claims index, the answer index and the proposer's Kibana assets are in place.
+    pub proposer_ready: tokio::sync::OnceCell<()>,
+    /// Set once the bounded Elastic text workflow has been installed.
+    pub tasks_ready: tokio::sync::OnceCell<()>,
+    /// Set once the private claim investigation agent and workflow are installed.
+    pub investigator_ready: tokio::sync::OnceCell<()>,
+    /// Set once the private image agent and workflow are installed.
+    pub image_ready: tokio::sync::OnceCell<()>,
     pub nessie: Option<Nessie>,
     pub data_dir: PathBuf,
     /// Local time for prompts and deposit dates (the venue's offset).
@@ -75,31 +86,90 @@ pub struct Ctx {
 }
 
 impl Ctx {
+    /// Runs bounded text tasks through the configured Elastic workflow.
+    pub async fn elastic_model(&self) -> Result<crate::elastic::Elastic<'_>, JobError> {
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.tasks_ready.get_or_try_init(|| kibana.ensure_tasks()).await?;
+        Ok(crate::elastic::Elastic { kibana })
+    }
+
+    /// The private Agent Builder workflow used for claim investigation.
+    pub async fn investigator(&self) -> Result<&Kibana, JobError> {
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.investigator_ready.get_or_try_init(|| kibana.ensure_investigator()).await?;
+        Ok(kibana)
+    }
+
+    /// Extracts a structured result from a temporary image attachment.
+    pub async fn elastic_image_model(&self) -> Result<crate::elastic_image::ElasticImage<'_>, JobError> {
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.image_ready.get_or_try_init(|| kibana.ensure_images()).await?;
+        Ok(crate::elastic_image::ElasticImage { kibana })
+    }
+
     /// The Elastic client, with the index and pipeline set up.
     pub async fn elastic(&self) -> Result<&ClaimsIndex, JobError> {
         let es = self.elastic.as_ref().ok_or_else(|| JobError::msg("ELASTICSEARCH_URL or ELASTICSEARCH_API_KEY is not set"))?;
         self.elastic_ready.get_or_try_init(|| es.ensure_setup()).await?;
         Ok(es)
     }
+
+    /// The Elastic and Kibana clients for reading a document, with the
+    /// document indices, the clause index and the reader's assets set up.
+    pub async fn reader(&self) -> Result<(&ClaimsIndex, &Kibana), JobError> {
+        let es = self.elastic.as_ref().ok_or_else(|| JobError::msg("ELASTICSEARCH_URL or ELASTICSEARCH_API_KEY is not set"))?;
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.reader_ready
+            .get_or_try_init(|| async {
+                es.ensure_document_indices().await?;
+                es.ensure_clauses_index().await?;
+                kibana.ensure_reader().await
+            })
+            .await?;
+        Ok((es, kibana))
+    }
+
+    /// The Elastic and Kibana clients for proposing a rule, with the claims
+    /// index, the answer index and the proposer's assets set up.
+    pub async fn proposer(&self) -> Result<(&ClaimsIndex, &Kibana), JobError> {
+        let es = self.elastic().await?;
+        let kibana = self.kibana.as_ref().ok_or_else(|| JobError::msg("KIBANA_URL or KIBANA_API_KEY is not set"))?;
+        self.proposer_ready
+            .get_or_try_init(|| async {
+                es.ensure_proposals_index().await?;
+                kibana.ensure_proposer().await
+            })
+            .await?;
+        Ok((es, kibana))
+    }
 }
 
 /// Kinds this worker runs.
 pub fn handles(kind: &str) -> bool {
-    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND
+    INSURANCE_KINDS.contains(&kind) || kind == wallet::KIND || kind == merch::KIND || kind == medical::KIND || kind == event_import::KIND || kind == venue::KIND || kind == photo::KIND || kind == shop::KIND || kind == propose::KIND || kind == plan::KIND || kind == "plan_lookup" || kind == venue_policy::KIND || kind == KIND_DOCUMENT_READ
 }
 
 /// Runs one job to its result reducer. On `Err` the caller reports `fail_job`.
 pub async fn run(ctx: &Ctx, job: &JobIn) -> Result<(), JobError> {
     match job.kind.as_str() {
-        KIND_RECORD_EXTRACT => extract::run(ctx, job, job.payload()?).await,
         KIND_VERIFY => verify::run(ctx, job, job.payload()?).await,
-        KIND_REVIEW => review::run(ctx, job, job.payload()?).await,
+        KIND_REVIEW => investigate::run(ctx, job, job.payload()?).await,
         KIND_DRAFT => letters::run_draft(ctx, job, job.payload()?).await,
         KIND_RECOVERY => letters::run_recovery(ctx, job, job.payload()?).await,
         KIND_PAYOUT => payout::run(ctx, job, job.payload()?).await,
+        KIND_CLINIC => clinic::run(ctx, job, job.payload()?).await,
+        KIND_CHARGE_PAYMENT => charge::run(ctx, job, job.payload()?).await,
         wallet::KIND => wallet::run(ctx, job, job.payload()?).await,
         merch::KIND => merch::run(ctx, job, job.payload()?).await,
         medical::KIND => medical::run(ctx, job, job.payload()?).await,
+        event_import::KIND => event_import::run(ctx, job, job.payload()?).await,
+        venue::KIND => venue::run(ctx, job, job.payload()?).await,
+        plan::KIND | "plan_lookup" => plan::run(ctx, job, job.payload()?).await,
+        venue_policy::KIND => venue_policy::run(ctx, job, job.payload()?).await,
+        photo::KIND => photo::run(ctx, job, job.payload()?).await,
+        shop::KIND => shop::run(ctx, job, job.payload()?).await,
+        propose::KIND => propose::run(ctx, job, job.payload()?).await,
+        KIND_DOCUMENT_READ => document::run(ctx, job, job.payload()?).await,
         other => Err(JobError::msg(format!("no handler for job kind {other}"))),
     }
 }

@@ -32,16 +32,17 @@ pub const LINK_EXHIBITS: &str = "exhibits";
 
 pub const PLATFORMS: &[&str] = &["instagram", "facebook", "threads"];
 
-/// The NFC sticker opens `https://<host>/t/BANDIT-0n`; the app passes the last path part.
+/// The NFC sticker opens `https://<host>/t/<band code>`; the app passes the last path part. The first
+/// stickers say `BANDIT-0n`, which still works. Only radio and test bands can be claimed.
 pub fn band_from_token(token: &str) -> Result<u8, String> {
-    let digits = token
-        .trim()
-        .strip_prefix("BANDIT-")
-        .ok_or_else(|| format!("{token:?} is not a BandIt band token"))?;
-    match digits.parse::<u8>() {
-        Ok(id) if (1..=crate::tables::BAND_ID_MAX).contains(&id) => Ok(id),
-        _ => Err(format!("{token:?} is not a BandIt band token")),
-    }
+    let token = token.trim();
+    let id = match token.strip_prefix("BANDIT-") {
+        Some(digits) => digits.parse::<u32>().ok(),
+        None => crate::band_code::band_from_code(token),
+    };
+    id.and_then(crate::tables::radio_id)
+        .filter(|id| *id >= 1)
+        .ok_or_else(|| format!("{token:?} is not a BandIt band token"))
 }
 
 pub fn clean_handle(platform: &str, handle: &str) -> Result<(String, String), String> {
@@ -129,6 +130,9 @@ mod tests {
         assert!(band_from_token("BANDIT-00").is_err());
         assert!(band_from_token("bandit-03").is_err());
         assert!(band_from_token("BAND-03").is_err());
+        assert_eq!(band_from_token(&crate::band_code::band_code(94)), Ok(94));
+        assert!(band_from_token(&crate::band_code::band_code(100)).is_err());
+        assert!(band_from_token("BANDIT-100").is_err());
     }
 
     #[test]

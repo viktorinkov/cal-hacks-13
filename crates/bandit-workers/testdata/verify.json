@@ -35,5 +35,8 @@
   "billed_cents": 130800,
   "covered_cents": 89500,
   "payout_cents": 89500,
-  "property_description": ""
+  "property_description": "",
+  "cost_cents": 0,
+  "responsible_named": false,
+  "attendee_policy_hash": ""
 }

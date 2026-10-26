@@ -2,7 +2,7 @@
 // were in that zone at that moment, and the photo lands in their recaps.
 
 import { Timestamp } from 'spacetimedb';
-import { act, actors, config, connect, field, h, idToken, mount, playedToken, short, signIn, type Actor } from '../lib';
+import { act, actors, config, connect, field, h, idToken, mount, playedToken, short, signIn, viewing, type Actor } from '../lib';
 import type { DbConnection } from '../module_bindings';
 
 let conn: DbConnection;
@@ -30,9 +30,9 @@ function render() {
   const zones = [...conn.db.zone.iter()].sort((a, b) => a.stationId - b.stationId);
   mount('app',
     h('h2', {}, 'Add event photos'),
-    people.length > 0 && h('p', {}, 'Play as ', h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
+    people.length > 0 && !viewing() && h('p', {}, 'Play as ', h('select', { onchange: (e: Event) => { location.search = `?as=${(e.target as HTMLSelectElement).value}`; } },
       h('option', { value: '' }, 'choose a person'), people.map(p => h('option', { value: p.name, selected: p.name === as || undefined }, p.label)))),
-    h('p', { class: 'muted' }, `Identity ${short(conn.identity!)}: ${roles.length ? roles.join(', ') : 'no photographer role yet'}`),
+    h('p', { class: 'muted' }, `${viewing() ? '' : `Identity ${short(conn.identity!)}: `}${roles.length ? roles.join(', ') : 'no photographer role yet'}`),
     h('form', { onsubmit: (e: Event) => act(() => add(e)) },
       h('label', {}, 'Photo', h('input', { type: 'file', accept: 'image/*', required: true })),
       h('label', {}, 'Where it was taken', h('select', { name: 'zone' }, zones.map(z => h('option', { value: String(z.id) }, z.name)))),
@@ -43,8 +43,8 @@ function render() {
 
 async function main() {
   const cfg = await config();
-  if (cfg.simulate) people = await actors();
-  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.simulate) {
+  if (cfg.test_mode) people = await actors();
+  if (cfg.auth_client_id && !idToken() && !(await playedToken()) && !cfg.test_mode) {
     return mount('app', h('h2', {}, 'Photographer'), h('button', { onclick: signIn }, 'Sign in with email'));
   }
   conn = await connect(['SELECT * FROM zone', 'SELECT * FROM my_roles'], render);

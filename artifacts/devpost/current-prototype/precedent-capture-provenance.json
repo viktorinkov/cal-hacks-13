@@ -1,0 +1,80 @@
+{
+  "captured_scope": "Existing authorized UCSB owner+ops session; read-only Proposed rules tab. No claims, proposals, rules, payments, charges, staff or runs created/changed.",
+  "case": {
+    "pending_proposal": 5,
+    "original_proposal": 1,
+    "prior_approved_claims": [
+      {
+        "claim": 53,
+        "claimant": "Kenzo Dang",
+        "payout_usd": 940
+      },
+      {
+        "claim": 56,
+        "claimant": "Ravi Nowak",
+        "payout_usd": 855
+      },
+      {
+        "claim": 57,
+        "claimant": "Freya Pham",
+        "payout_usd": 550
+      }
+    ],
+    "proposed_ceiling_usd": 940,
+    "policy_limit_usd": 5000,
+    "scope": "Fall claims under medical payments cover; all zones; corroborated evidence required; policy, amount and evidence checks must pass; complications and mass occurrences require individual review; diagnosis and treatment do not restrict the rule.",
+    "current_rule_status": "v9: Needs scope review; automatic payments withheld",
+    "recorded_approver": "Ops desk (ops), Oct25 02:51AM"
+  },
+  "truth_limits": [
+    "This is a pending scope-review proposal, not current active auto-payment proof.",
+    "All19 visible organizer precedent rows had empty Gap in the policy cells; this capture is not evidence of complicated-case precedent retrieval.",
+    "The historical decisions/data already existed; no new data was staged.",
+    "Table height changed only through its normal visible resize handle."
+  ],
+  "captures": [
+    {
+      "file": "dev-precedent-rule-proposal5.jpg",
+      "captured_at_utc": "2026-10-25T11:35:55.012Z",
+      "url": "https://dev.band1t.vip/organizer#rules",
+      "screen": "Pending proposal5: supporting approvals and exact enforced scope",
+      "framing": "Native page clip x433,y903,width470,height758; actual table\u2019s resize handle increased height to reveal complete scope. No pixels/DOM/data altered.",
+      "dimensions": [
+        470,
+        758
+      ],
+      "format": "JPEG",
+      "sha256": "7e53ab1cf40360d78b6348f9f3e3fa8627254aa4d57da291d8cfbdb7ec615a92"
+    },
+    {
+      "file": "dev-precedent-rule-scope-review.jpg",
+      "captured_at_utc": "2026-10-25T11:36:12.306Z",
+      "url": "https://dev.band1t.vip/organizer#rules",
+      "screen": "Current medical rulev9, supporting approvals and withheld-payment status",
+      "framing": "Native page clip x433,y1819,width862,height393; includes full first rule row.",
+      "dimensions": [
+        862,
+        393
+      ],
+      "format": "JPEG",
+      "sha256": "a844ae99095205fd665c121524f4b76fc4587b653e60af74a3307a0384b0193c"
+    },
+    {
+      "file": "dev-organizer-precedents.jpg",
+      "captured_at_utc": "2026-10-25T11:34:21.193Z",
+      "url": "https://dev.band1t.vip/organizer#rules",
+      "screen": "Existing organizer precedent history, first rows",
+      "framing": "Native page clip x433,y2342,width862,height726 before height resize; context only, last row is cut. Prefer proposal/status captures.",
+      "dimensions": [
+        862,
+        726
+      ],
+      "format": "JPEG",
+      "sha256": "24011f89252ae31e70b609c0ee7ac42bac403c65de7457a6545476fd20a00ce4"
+    }
+  ],
+  "created_at_utc": "2026-10-25T11:36:28.518938Z",
+  "recommended_article_file": "dev-precedent-rule-scope-review.jpg",
+  "approved_caption": "A $940 rule links back to three approvals. Automatic payments stay blocked until its scope is reviewed.",
+  "review_status": "Both proposal5 and horizontal scope-review captures independently approved; prefer horizontal for readability. Raw history capture is context only."
+}

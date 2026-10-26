@@ -202,7 +202,7 @@ impl<'ctx> SocialEncounterIdUnique<'ctx> {
 /// but to directly chain method calls,
 /// like `ctx.db.social_encounter().band_pair().find(...)`.
 pub struct SocialEncounterBandPairUnique<'ctx> {
-    imp: __sdk::UniqueConstraintHandle<SocialEncounter, u16>,
+    imp: __sdk::UniqueConstraintHandle<SocialEncounter, u64>,
     phantom: std::marker::PhantomData<&'ctx super::RemoteTables>,
 }
 
@@ -210,7 +210,7 @@ impl<'ctx> SocialEncounterTableHandle<'ctx> {
     /// Get a handle on the `band_pair` unique index on the table `social_encounter`.
     pub fn band_pair(&self) -> SocialEncounterBandPairUnique<'ctx> {
         SocialEncounterBandPairUnique {
-            imp: self.imp.get_unique_constraint::<u16>("band_pair"),
+            imp: self.imp.get_unique_constraint::<u64>("band_pair"),
             phantom: std::marker::PhantomData,
         }
     }
@@ -219,7 +219,7 @@ impl<'ctx> SocialEncounterTableHandle<'ctx> {
 impl<'ctx> SocialEncounterBandPairUnique<'ctx> {
     /// Find the subscribed row whose `band_pair` column value is equal to `col_val`,
     /// if such a row is present in the client cache.
-    pub fn find(&self, col_val: &u16) -> Option<SocialEncounter> {
+    pub fn find(&self, col_val: &u64) -> Option<SocialEncounter> {
         self.imp.find(col_val)
     }
 }
@@ -228,7 +228,7 @@ impl<'ctx> SocialEncounterBandPairUnique<'ctx> {
 pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
     let _table = client_cache.get_or_make_table::<SocialEncounter>("social_encounter");
     _table.add_unique_constraint::<u64>("id", |row| &row.id);
-    _table.add_unique_constraint::<u16>("band_pair", |row| &row.band_pair);
+    _table.add_unique_constraint::<u64>("band_pair", |row| &row.band_pair);
 }
 
 #[doc(hidden)]

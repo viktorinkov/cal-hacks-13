@@ -1,280 +1,354 @@
 # Vision
 
-> (TBD -- LEO) Leo owns vision: the cameras, the models, where they run and how Claude is used. This file fixes what the rest of the system sends in and gets back, and records Leo's defaults below, which Leo may change.
+> (TBD -- LEO) Leo owns the security view: the security cameras, the models, where they run and how the Anthropic Claude API is used. Two parts are built.
+>
+> Leo's security view in `pipeline/` finds a band that calls for help on a security camera and shows the organizer where the person is. The module's camera tables take a camera sighting, judged by the Anthropic Claude API, and property events per incident; today the scripted claims run plays the security view's side of them.
+>
+> The rest of the module interface (the pit head count, person-down alerts and photo features) is not built. This file fixes what it sends in and gets back, with Leo's defaults, which Leo may change.
 
-Vision is the camera side of BandIt. The rest of the system needs five things from it: a head count for the pit, as ground truth and as the Plan B density source; person-down alerts that corroborate falls; a Claude judgment on each incident in the pit, with a staff report and an insurance-ready description; property events on property incidents, such as a fallen speaker; and features of photographer photos. Everything flows into the `band1t` module through reducers under the role `vision`, and the module, not vision, decides what happens next. Vision is never in the safety path: bands alert locally within a second, and vision confirms, counts and writes the report seconds later.
+The security view is the camera side of BandIt. The security camera watches the floor. When a band calls for help, its whole ring flashes red four times a second.
+
+Leo's security view finds that flash in the picture, ties it to the band the radio says is calling, and shows the organizer where the person is: on the live feed, on a snapshot of the same view with the lights on, on the venue plan and in a 3D model of the venue. An alarm sounds until someone acknowledges it. The security view reads the gateway's radio through Leo's recorder on the venue laptop, not through the module, so it keeps working when the internet drops.
+
+Toward the `band1t` module, the security view gives a camera sighting and property events for each incident, and is planned to give a head count for the pit, person-down alerts and features of photographer photos. Everything that reaches the module goes through reducers under the role `vision`, and the module, not the security view, decides what happens next. The security view is never in the safety path: bands alert locally within a second, and the security view locates, confirms and writes the report after that.
 
 ## Role in the system
 
-Responsibilities (the interface):
+Responsibilities, built (Leo's Python code in `pipeline/`, on the venue laptop):
 
-- Write a fresh people count for the pit into `camera_count` through `report_zone_count`.
-- Raise and refresh a person-down alert through `report_ground_alert`.
-- On each new `sos`, `fall` or `property` incident in the pit, have Claude judge the frames and write the result through `submit_vision_assessment`.
-- Report property events through `report_property_event`, attached to a `property` incident; [Hyphenate](../7-integrations/Hyphenate.md) reads them as evidence.
-- Supply photo features through `submit_photo_features` for [Social](../6-features/Social.md)'s photo tagging.
-- Store frames as blobs through `bandit-api` and pass `blob_ref` ids as evidence.
-- Send a `heartbeat` every 5 s like every other Rust service.
+- Record every gateway line with the laptop's clock (`feed.py record`), and hand the same lines to `band1t-bridge` through a mirror port, so the recorder and `band1t-bridge` share the one gateway.
+- Find the 4 Hz red flash of a band in SOS or fall on the security camera, tie it to the band whose beacons carry the flag, and place it on the venue plan (`security.py watch`).
+- Sound an alarm in the security view until it is acknowledged, and keep a record of every SOS it located.
+- Serve the security page: the venue in 3D with the station markers, the bands, each SOS and the security camera, beside the marked live feed.
+- Build the 3D model of the venue from a phone walk-through and place the security camera in it (`splat.py`).
+- Load the radio log and the event photos, with exact times and places, into Elastic for matching against the band data (`feed.py upload`, `photos.py`).
+
+Responsibilities toward the module:
+
+- On an `sos`, `fall` or `property` incident in a security camera's zone, write a camera sighting, the Anthropic Claude API's judgment of the frames, through `submit_vision_assessment`. Built in the module; Test-Bands.md: the `bandit-claims` tool plays this side in the scripted claims run ([Test-Bands](../3-services/Test-Bands.md)).
+- Report property events through `report_property_event`, attached to a `property` incident or opening one; [Insurance](../6-features/Insurance.md) reads them as evidence. Built in the module, played the same way.
+- (TBD -- LEO) Write a fresh people count for the pit through `report_zone_count`.
+- (TBD -- LEO) Raise and refresh a person-down alert through `report_ground_alert`.
+- (TBD -- LEO) Supply photo features through `submit_photo_features` for [Social](../6-features/Social.md)'s photo tags.
+- Store frames as blobs through `bandit-api` and pass their hashes as evidence.
 
 Not responsible for:
 
-- Writing `zone_state`, opening or closing `sos` incidents, or commanding bands. `venue_tick`, `ingest_band_reports` and the directives do that ([Safety](../6-features/Safety.md)).
-- Identifying people. Identity comes from bands (zone and time). Claude never identifies faces, and no face recognition runs anywhere.
-- Being a source of truth. Everything vision knows is a row in SpacetimeDB.
-- Gating anything live. If vision is slow or absent, nothing waits.
+- Opening or closing incidents from the flash. The module opens an `sos` or `fall` incident from the same beacons ([Safety](../6-features/Safety.md)); the security view only shows where to look.
+- Commanding bands through the module. Every command there is a row in the `command` table, written by an `ops` reducer ([Safety](../6-features/Safety.md)). The one command the security view sends is the identify blink during calibration, before doors open, straight to the gateway.
+- Identifying people. Identity comes from bands (zone and time). The Anthropic Claude API never identifies faces, and no face recognition runs anywhere.
+- Gating anything live. If the security view is slow or absent, nothing waits.
 
 ## Interfaces
 
+### The security view and the recorders (built)
+
 | Interface | Direction | Between | What flows | Transport |
 |---|---|---|---|---|
-| Frames | in | phone camera to `bandit-vision` | one JPEG snapshot per second at 1280x720 | HTTP pull over the team phone's hotspot (TBD -- LEO) |
-| `upsert_camera` | out | vision to module | the one `camera` row: name, the pit zone, region map, live flag | SDK reducer, role `vision`, at start |
-| `report_zone_count` | out | vision to module | camera id, zone id (the pit), count, counts per cell of the 3 by 3 grid, light circle visible yes or no, confidence; overwrites `camera_count` in place | SDK reducer, role `vision`, every 3 s |
-| `report_ground_alert` | out | vision to module | camera id, zone id, cell hint, confidence, frame `blob_ref`; refreshed every second while the person stays down; sets `incident.camera_corroborated` when it lands in the zone of an open `sos` or `fall` incident within 3 s of the flag (starting value) | SDK reducer, role `vision` |
-| `submit_vision_assessment` | out | vision to module | incident id, confirmed yes or no, confidence, description, recommended action, incident description, camera id, frame `blob_ref` ids with capture times, `model_call` id; sets `incident.vision_status` | SDK reducer, role `vision` |
-| `report_property_event` | out | vision to module | camera id, zone id, kind, description, confidence, frame `blob_ref` ids, incident id when one is open; with an incident id it attaches to that `property` incident, without one the module opens a `property` incident with `opened_by` `vision` | SDK reducer, role `vision` |
-| `submit_photo_features` | out | vision to module | photo id, people count, caption, `model_call` id; checks the job lease | SDK reducer, role `vision` |
-| `heartbeat` | out | vision to module | service `vision`, version, `backlog` (frames waiting for the detector) and a `note` with the camera name, detector frame rate and the time of the last Claude call | SDK reducer, every 5 s |
-| Subscriptions | in | module to vision | `zone`, `camera`, the view `vision_incidents`, and `worker_jobs` for job kind `photo_features` | SDK subscription |
-| Frame upload | out | vision to `bandit-api` | JPEG frames; `bandit-api` stores them on its volume and calls `register_blob` with access class `staff`; returns the `blob_ref` id | HTTPS to the public host ([Rust-Backend](../3-services/Rust-Backend.md)) |
-| Photo fetch | in | `bandit-api` to vision | the photographer photo named by a `photo_features` job | HTTPS |
-| Claude API | out | vision to Claude | incident bundles (frames plus text) and, after the event, photographer photos; structured JSON output; every call recorded in `model_call` | HTTPS through `claude-client` ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)) |
+| Gateway serial | in | gateway to `feed.py record` | every gateway line ([Hardware](Hardware.md)) | USB serial, 115200 baud |
+| Radio log | out | `feed.py` to `security.py` | `pipeline/data/radio_<session>_<time>.jsonl`: per gateway line, the laptop's time of reading it, the time the gateway heard it (its uptime anchored to the laptop clock), the session and the raw line | a file that `security.py` follows as it grows |
+| Mirror port | both | `feed.py --mirror` and `band1t-bridge` | the same gateway lines out; `band1t-bridge`'s commands back to the gateway ([Gateway-Bridge](../3-services/Gateway-Bridge.md)) | a pseudo-terminal on the laptop, whose path `band1t-bridge` opens instead of the USB port |
+| Identify blink | out | `security.py calibrate` to one band | `cmd <band> state 8 60`: the band blinks white (IDENT) for 6 s (the hold is in tenths of a second), sent again every 5 s while a spot is pending | the gateway port, or the mirror port while the recorder runs |
+| Camera feed | in | security camera to `security.py` | live video at the camera's rate (30 fps); below 12 fps a 4 Hz flash cannot be seen, and the status line says so | a camera the laptop reads directly, or a video file |
+| Radio positions | in | Leo's ranging tool (TBD -- LEO) to `security.py` | `pipeline/data/positions_<name>.jsonl`: per band, its position on the plan and the radius it is good to (about half a metre to a metre) | a file that `security.py` follows |
+| Station markers on the plan | in | `security.py anchors` | station markers 101 to 105 and the gateway placed on the plan, and the plan's metres per pixel, for the ranging tool and the 3D page | `pipeline/data/security/anchors.json` |
+| Venue plan | in | the repo | `pipeline/venues/palace-of-fine-arts.json`: the ground-floor plan image of the Palace of Fine Arts, its sections (halls, breakout rooms, entrances) and notes on orientation | file |
+| Security window | out | `security.py watch` to the organizer | the live feed, the lit snapshot, the plan and a zoomed plan, all marked; the alarm; `a` acknowledges, `q` quits | a window on the laptop |
+| Security page | out | `security.py watch --serve 8770` to a browser | `/scene.json` (venue, plan, anchors, model, camera pose), `/state` (bands, open SOS calls, flashes, status lines), `/live.mjpg` (the marked feed), `POST /ack` | HTTP on the laptop; on the venue's network with `--host 0.0.0.0` |
+| SOS record | out | `security.py watch` | one `events.jsonl` line per event (`sos`, `radio_position`, `located`, `flash_without_sos`, `acknowledged`, `cleared`, `dropped`), and per located SOS a folder with `view.jpg` and `last_3s.mp4` | files under `pipeline/data/security/` |
+| 3D venue model | out | `splat.py` to the security page | `venue.splat` and `scene.json` (model to venue transform) under `pipeline/data/venue/splat/`; the camera's pose and lens in `pipeline/data/security/cameras/<name>.json` | files |
+| Elastic.md: raw radio and photos | out | `feed.py --upload`, `feed.py upload`, `photos.py --upload` | the indices `bandit-raw-radio`, `bandit-raw-heard`, `bandit-raw-gateway` and `bandit-raw-photos` ([Elastic](../7-integrations/Elastic.md)) | Elastic Bulk API |
+
+### The module interface
+
+| Interface | Direction | Between | What flows | Transport |
+|---|---|---|---|---|
+| `upsert_camera` | out | security view to module | one `camera` row per security camera: name, the zone it covers, mount (`overhead` or `side`); marks it live | SDK reducer, roles `vision` and `ops` |
+| `submit_vision_assessment` | out | security view to module | the camera sighting: incident id, trigger, confirmed yes or no, confidence, description for staff, recommended action, insurance-ready incident description, camera id, frame hashes with their capture times, `model_call` id; sets `incident.vision_status` | SDK reducer, role `vision` |
+| `report_property_event` | out | security view to module | incident id, camera id, kind, description, confidence, frame hashes; with incident id 0 the module opens a `property` incident in the camera's zone with `opened_by` `vision`, otherwise the event attaches to that `property` incident | SDK reducer, role `vision` |
+| Frame upload | out | security view to `bandit-api` | JPEG frames; `bandit-api` stores them and calls `register_blob` with access class `staff` and purpose `frame` | HTTPS to the public host ([Rust-Backend](../3-services/Rust-Backend.md)) |
+| (TBD -- LEO) `report_zone_count` | out | security view to module | camera id, zone id (the pit), count, counts per cell of the 3 by 3 grid, light circle visible yes or no, confidence; overwrites `camera_count` in place | SDK reducer, role `vision`, every 3 s |
+| (TBD -- LEO) `report_ground_alert` | out | security view to module | camera id, zone id, cell hint, confidence, frame hash; refreshed every second while the person stays down | SDK reducer, role `vision` |
+| (TBD -- LEO) `submit_photo_features` | out | security view to module | photo id, people count, caption, `model_call` id; checks the job lease | SDK reducer, role `vision` |
+| (TBD -- LEO) Subscriptions | in | module to security view | `zone`, `camera`, the view `vision_incidents`, and `worker_jobs` for job kind `photo_features` | SDK subscription |
+| Anthropic Claude API | out | security view to the Anthropic Claude API | incident bundles (frames plus text) and, after the event, photographer photos; structured JSON output; every call recorded in `model_call` | HTTPS through `claude-client` ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)) |
 
 ## Design
 
-### Leo's defaults (TBD -- LEO): `bandit-vision`
+### The security view
 
-One Rust process, `bandit-vision`, on the venue laptop. All of this is Leo's to change.
-
-- Camera. One phone on a light stand looking straight down on the pit. It serves JPEG snapshots over the team phone's hotspot. The camera covers one zone, the pit.
-- Frames. `bandit-vision` pulls one frame per second at 1280x720 into a 10 s ring buffer, so an event can be looked at from 4 s before to 3 s after the moment.
-- Detector. YOLO person and pose models run through ONNX Runtime inside `bandit-vision`, with no sidecar process. They yield boxes and pose keypoints for each frame.
-- Pit check, on every third frame (every 3 s). From the boxes, the people count inside the taped square and the count per cell of a 3 by 3 grid over it; from the frame's colours, whether a ring of blue lights (the light circle) is visible. It goes out through `report_zone_count`. Every 10 s one frame is also uploaded for the Ops dashboard's camera tile.
-- Person down, on every frame. From the pose: a torso near horizontal and low in two consecutive frames (starting value) raises a `ground_alert` through `report_ground_alert`, refreshed every second while the person stays down.
-- Claude, live, on incidents only. When `vision_incidents` delivers a new `sos`, `fall` or `property` incident in the pit, `bandit-vision` waits until 3 s after the incident's first signal, then builds a bundle: the 8 frames from 4 s before to 3 s after, labelled with their time offset; the detector's boxes and a pose summary as text; and the snapshot's band rows as text (band ids in the zone, states, flags, light-circle members). It calls `claude-opus-5-5` at medium effort with structured JSON output, through `claude-client` with the workers' Anthropic key, and caches the system prompt and an empty-pit reference frame. The judgment (confirmed yes or no, confidence, a description for staff, a recommended action) and the insurance-ready incident description go out through `submit_vision_assessment`, which also sets `incident.vision_status`. For a `property` incident the result also goes out through `report_property_event` with the incident id, so [Hyphenate](../7-integrations/Hyphenate.md) has the event row and its frames. There is no periodic Claude loop.
-- Photo features, after the event. For each `photo_features` job (Social.md's `register_photo` enqueues one per photographer photo), `bandit-vision` fetches the photo from `bandit-api` and asks Claude (`claude-opus-5-5`, medium effort, through Message Batches) for how many people are in it and a one-line caption. It writes them through `submit_photo_features`. Social combines the count with band zone and time to suggest who is in the photo. Identity always comes from bands, never faces.
-- Every Claude call goes through `claude-client` and is recorded in `model_call` ([Anthropic-Agent](../7-integrations/Anthropic-Agent.md)). Claude reads and writes words; code decides safety, money, coverage and access.
-
-An unmatched person-down alert becomes an incident on its own: when an alert with no band flag in its zone persists for 5 s (starting value), `report_ground_alert` opens a `fall` incident with `opened_by` `vision` and no band, because people without a band fall too ([Safety](../6-features/Safety.md)). That incident then reaches `vision_incidents` like any other, so it gets the same Claude judgment.
-
-The flowchart shows the interface: what vision sends in, what the module stores, and who reads it. Vision nodes are dashed because their internals are Leo's.
+The question this diagram answers: what feeds the security view, and what it gives back.
 
 ```mermaid
 flowchart LR
-    Cam["Overhead phone camera (TBD -- LEO)"] -->|"JPEG, 1 per second, hotspot"| Vis["bandit-vision: YOLO and pose, 10 s ring buffer (TBD -- LEO)"]
-    Vis <-->|"incident bundles, photos out; JSON back"| Claude["Claude API"]
+    GW["Gateway (USB)"] -->|"gateway lines"| REC["feed.py record"]
+    REC -->|"radio_*.jsonl"| SEC["security.py watch"]
+    REC <-->|"mirror port"| BR["band1t-bridge"]
+    BR -->|"ingest_band"| MOD["band1t module"]
+    CAM["Security camera"] -->|"live video"| SEC
+    RNG["Ranging tool (TBD -- LEO)"] -->|"positions_*.jsonl"| SEC
+    CAL[("Camera calibration and lit snapshot")] --> SEC
+    SPL["splat.py: 3D venue model"] -->|"venue.splat, scene.json, camera pose"| SEC
+    SEC -->|"window and alarm"| OPR["Organizer"]
+    SEC -->|"/scene.json, /state, /live.mjpg"| PAGE["Security page in a browser"]
+    PAGE -->|"POST /ack"| SEC
+    SEC -->|"events.jsonl, view.jpg, last_3s.mp4"| LOG[("pipeline/data/security")]
+    REC -->|"--upload"| ES[("Elastic raw indices")]
+    classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
+    classDef leo fill:#FFF8E1,stroke:#F57F17,color:#1A1A1A
+    classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
+    classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
+    classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
+    class RNG tbd
+    class REC,SEC,SPL,CAL,PAGE,LOG leo
+    class MOD stdb
+    class BR rust
+    class ES ext
+```
+
+**The security camera.** One security camera, read directly by the venue laptop (an iPhone used as the Mac's camera works, with Center Stage off so the picture does not pan). It hangs above head height and tilts down at the floor, and it stays still after calibration. It runs at 30 fps; the flash finder needs at least 12.
+
+**Calibration, once, with the lights on.** `security.py calibrate` takes the first second of video as the lit snapshot. A helper wearing a band stands on a spot, and the organizer clicks that spot on the plan. The security view puts that band into identify through the gateway, so it blinks white at 2.5 Hz, and finds the blink in the picture.
+
+Once the blink holds still for a second, the pair of points (picture and plan) is recorded. Four spots or more, spread over the floor and not in a line, give the mapping from the picture to the plan at wrist height (0.9 m), which is saved with the lit snapshot under `pipeline/data/security/cameras/`.
+
+`splat.py camera` gives the same mapping another way: it registers one frame from the security camera against the 3D model, which fixes the camera's exact position, direction and lens.
+
+**Finding the flash.** A band whose beacons carry the SOS or fall flag flashes its whole ring red at 4 Hz ([Hardware](Hardware.md)). The security view keeps the last 1.5 s of a reduced picture (640 px wide) and, every third frame, measures for each point how strongly its red level swings at 4 Hz. A point counts when the swing is large enough and at least twice the swing at 2.5 Hz and at 5.5 Hz.
+
+Neighbouring points join into a spot, and a spot is kept only if its swing is mostly red. Steady red such as exit signs, other colours and other rates fall away. A spot seen twice in a row becomes a flash; one unseen for 1.5 s is dropped.
+
+**Tying a flash to a band.** The security view follows the radio log. A fresh beacon (heard in the last 6 s) with the SOS or fall flag opens an SOS call in the security view, logs it and sounds the alarm.
+
+With a radio position for that band and a calibrated security camera, the call takes the flash nearest to that position on the plan, if it is within 3 m or twice the position's radius. With several calls at once, each flash goes to the band whose radio position is nearest. Without a radio position, the call takes the strongest free flash.
+
+A red 4 Hz flash with no call on the radio gets only a quiet yellow mark.
+
+**What the organizer sees.** The located call is marked on the live feed, on the lit snapshot (useful when the venue is dark), on the plan and in 3D. Before the flash is found, or while it is hidden, the band's radio position shows as an amber circle, so the organizer knows where to look. The alarm repeats every 5 s until someone presses `a` in the window or Acknowledge on the page.
+
+The call stays on screen until a fresh beacon from the band no longer carries the flag. If the radio loses the band, the call turns stale and is dropped 60 s after the last beacon once it has been acknowledged.
+
+When a call is first located, the security view saves the marked view and the last 3 s of video in a folder for that call, and logs how long locating took and how far the camera and the radio positions disagreed.
+
+The sequence answers: what the security view does when a band calls for help.
+
+```mermaid
+sequenceDiagram
+    participant B as Band 4
+    participant G as Gateway
+    participant R as feed.py record
+    participant S as security.py watch
+    participant O as Organizer
+    B->>B: button hold or fall, ring flashes red at 4 Hz
+    B->>G: beacons with the SOS flag (ESP-NOW)
+    G->>R: one line per beacon (USB serial)
+    R->>R: write radio_*.jsonl with the laptop's time
+    S->>R: follow the file, see the flag on band 4
+    S->>O: alarm sound, call on screen, amber radio circle
+    S->>S: 4 Hz red spot nearest band 4's radio position
+    S->>O: flash marked on the feed, lit snapshot, plan and 3D
+    S->>S: save view.jpg and last_3s.mp4, log located
+    O->>S: acknowledge (a, or the page button)
+    B->>G: beacons without the flag
+    S->>S: log cleared, the call leaves the screen
+```
+
+### The 3D venue model and the security page
+
+`splat.py` builds the venue in 3D from one phone walk-through video: the sharpest 300 frames (`frames`), where the phone was for each (`poses`, COLMAP on the laptop's CPU), a Gaussian splat trained on the Mac's GPU (`train`, Brush, colour only), and the alignment to the plan (`align`). The alignment finds the floor, shows the model from above beside the plan, and takes two or more pairs of matching points, such as wall corners, pillars and doors.
+
+The plan's scale comes from `anchors.json`, which `security.py anchors` writes after two points a known distance apart are clicked. The result is `scene.json` (model to venue, in metres on the plan) and `venue.splat`, the model moved into that frame and trimmed to the venue.
+
+`security.py watch --serve 8770` serves the security page. It shows the venue in 3D (the splat, or the plan as the floor when there is no splat) with the station markers, every placed band, each SOS as a red column with its radio circle, and the security camera with what it covers and the line from it to the flash it found. Beside it is the live feed with the same marks.
+
+Keys 1, 2 and 3 show the 3D view, the feed, or both. The page loads three.js and Spark from jsDelivr once and keeps them in `pipeline/data/web-vendor`, so it works offline afterwards.
+
+Bright-Data.md: the splat is not the venue model in `web/venue/venue.glb`, which is the 3D model from the Cal Hacks venue map, exported through the Bright Data Browser API and shown only on its preview page ([Bright-Data](../7-integrations/Bright-Data.md)).
+
+### The recorders
+
+`feed.py record` reads the gateway at 115200 baud and writes one line per gateway line with two times: when the laptop read it, and when the gateway heard it (the gateway's uptime, anchored to the laptop clock and re-anchored when the gateway restarts). With `--mirror` it opens a pseudo-terminal that carries the same lines and passes commands back, so `band1t-bridge` reads the gateway through it while the recorder runs.
+
+With `--upload` it also sends the lines to Elastic every 2 s; `feed.py upload` sends recorded files afterwards. Each document's id comes from its time and text, so uploading a file again never makes duplicates.
+
+`photos.py` imports photos with exact times and places for matching against the band data. iPhone photos dropped in one folder keep their own clock and location; a camera's SD card is corrected from a photo of a phone showing a clock with seconds (one such photo fixes the offset, two also the drift). Records go to `pipeline/data/photos_<session>_<time>.jsonl` and, with `--upload`, to Elastic.
+
+Elastic.md: the four raw indices hold, per session, band beacons and station marker beacons (`bandit-raw-radio`: flags, zone, battery, state, sequence), the RSSI each band hears from its neighbours and the five station markers (`bandit-raw-heard`, with the station marker RSSIs as a 5-number vector), the gateway's own lines (`bandit-raw-gateway`) and the photos with time, camera and location (`bandit-raw-photos`) ([Elastic](../7-integrations/Elastic.md)).
+
+### The module side
+
+The module defines three tables for the security view: `camera`, `vision_assessment` (the camera sightings) and `property_event`, with the reducers `upsert_camera`, `submit_vision_assessment` and `report_property_event`.
+
+Test-Bands.md: `bandit-claims setup` registers the camera "overhead pit" on the main stage zone, and `bandit-claims property --camera` plays the security view's side for the property incident in the scripted claims run: a frame in the blob store, a `fallen_object` event and a confirmed camera sighting ([Test-Bands](../3-services/Test-Bands.md)).
+
+Nothing in `pipeline/` calls these reducers yet; the service that will is `bandit-vision` (TBD -- LEO), under the identity of that name.
+
+`camera`: one row per security camera.
+
+| Field | Meaning |
+|---|---|
+| `id` | assigned by SpacetimeDB |
+| `name` | unique, such as "overhead pit" |
+| `zone_id` | the zone it covers |
+| `mount` | `overhead` or `side` |
+| `live` | set when `upsert_camera` runs |
+| `last_frame_at` | the time of the last camera sighting from this camera |
+
+`vision_assessment`: one camera sighting per incident check.
+
+| Field | Meaning |
+|---|---|
+| `id` | assigned by SpacetimeDB |
+| `incident_id` | the incident judged |
+| `trigger` | `band_sos`, `band_fall`, `ground_alert` or `staff_button`: what opened the incident |
+| `confirmed` | yes or no; sets `incident.vision_status` to `confirmed` or `not_confirmed` (it starts as `none`) |
+| `confidence` | 0 to 1; anything else is refused |
+| `description` | what the frames show, for staff |
+| `recommended_action` | one line |
+| `incident_description` | the insurance-ready paragraph Insurance copies into the evidence pack |
+| `camera_id` | which camera, so Insurance can check the camera's zone against the band's zone |
+| `frame_hashes`, `frame_times` | each frame's SHA-256 in the blob store with its capture time; the two lists must be the same length |
+| `model_call_id` | the `model_call` row, for audit and replay |
+| `created_at` | the module's time |
+
+`property_event`: something other than a person that needs a record, such as a fallen speaker.
+
+| Field | Meaning |
+|---|---|
+| `id` | assigned by SpacetimeDB |
+| `camera_id`, `zone_id` | where; the zone is the camera's |
+| `kind` | `fallen_object`, `spill`, `damage` or `other` |
+| `description`, `confidence` | from the judgment of the frames |
+| `observed_at` | the module's time |
+| `frame_hashes` | evidence frames |
+| `incident_id` | the `property` incident this event opened or attached to; attaching to an incident of another kind is refused |
+
+### Leo's defaults for the rest (TBD -- LEO)
+
+None of this is built. It is what the rest of the system expects, and Leo may change any of it.
+
+- The pit check. A security camera over the pit counts people inside the taped square and per cell of a 3 by 3 grid over it, and sees whether the ring of blue lights (the light circle) is visible, every 3 s, through `report_zone_count` into `camera_count`. `camera_count` is overwritten in place per camera and zone and is fresh for 6 s (starting value). The Live tab's zone table shows the fresh count next to the bands' own average for that zone ([Organizer-Portal](../5-apps/Organizer-Portal.md)).
+- Person down. From the pose, a torso near horizontal and low in two consecutive frames (starting value) raises a `ground_alert` through `report_ground_alert`, refreshed every second while the person stays down and expired 10 s after the last refresh. An alert with no band flag in its zone that persists for 5 s opens a `fall` incident with `opened_by` `vision` and no band, because people without a band fall too ([Safety](../6-features/Safety.md)).
+- The Anthropic Claude API on incidents. When the view `vision_incidents` (role `vision`: the open `sos`, `fall` and `property` incidents in the camera's zone with their `incident_snapshot`, and no display name) delivers a new incident, the security view waits 3 s, sends the Anthropic Claude API, at medium effort, the 8 frames from 4 s before to 3 s after, the detector's boxes and the band rows as text, and writes the answer as a camera sighting through `submit_vision_assessment`; for a `property` incident it also writes `report_property_event`. While the call runs, `incident.vision_status` would read `pending`. There is no periodic loop of Anthropic Claude API calls.
+- Photo features, after the event. Social.md's `register_photo` would enqueue a `photo_features` job per photographer photo. The security view takes it with the `vision` role, asks the Anthropic Claude API through Message Batches for the people count and a one-line caption, and writes them through `submit_photo_features`. Social caps a photo's tags at that count; identity always comes from bands, never faces.
+- Every Anthropic Claude API call goes through `claude-client` and is recorded in `model_call` ([Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md)). The Anthropic Claude API reads and writes words; code decides safety, money, coverage and access.
+
+The flowchart shows the module interface: what the security view sends in, what the module stores, and who reads it. Dashed nodes are not built.
+
+```mermaid
+flowchart LR
+    Vis["bandit-vision (TBD -- LEO)"] <-->|"incident bundles, photos out; JSON back"| Claude["Anthropic Claude API"]
     Vis -->|"frames (HTTPS)"| Api["bandit-api, blob store"]
     subgraph M["band1t module (SpacetimeDB)"]
-        CC["camera_count"]
-        GA["ground_alert"]
-        VA["vision_assessment"]
+        CAMT["camera"]
+        VA["vision_assessment: camera sightings"]
         PE["property_event"]
-        PF["photo features on photo (Social.md)"]
+        CC["camera_count (TBD -- LEO)"]
+        GA["ground_alert (TBD -- LEO)"]
+        PF["photo features (TBD -- LEO)"]
         BL["blob_ref"]
     end
     Api -->|"register_blob, class staff"| BL
-    Vis -->|"report_zone_count, every 3 s"| CC
-    Vis -->|"report_ground_alert, 1 Hz while down"| GA
+    Vis -->|"upsert_camera"| CAMT
     Vis -->|"submit_vision_assessment"| VA
     Vis -->|"report_property_event"| PE
-    Vis -->|"submit_photo_features"| PF
-    M -->|"vision_incidents, photo_features jobs"| Vis
-    CC -->|"camera density estimate"| Tick["venue_tick and incident logic"]
-    GA -->|"fall corroboration"| Tick
-    VA -->|"assessment per incident"| Ops["Ops dashboard"]
-    VA -->|"evidence facts"| Hyph["Hyphenate claim flow"]
-    PE -->|"property incidents"| Hyph
-    PF -->|"people count, caption"| Soc["Social photo tagging"]
+    Vis -.->|"report_zone_count"| CC
+    Vis -.->|"report_ground_alert"| GA
+    Vis -.->|"submit_photo_features"| PF
+    VA -->|"evidence facts"| Ins["Insurance claim flow"]
+    PE -->|"property incidents"| Ins
+    CC -.->|"count beside the bands' average"| Live["Live tab zone table"]
+    GA -.->|"fall corroboration, falls with no band"| Inc["incident"]
+    PF -.->|"people count, caption"| Soc["Social photo tags"]
     classDef tbd fill:#F5F5F5,stroke:#757575,color:#1A1A1A,stroke-dasharray:5 5
     classDef ext fill:#E0F2F1,stroke:#00695C,color:#1A1A1A
     classDef rust fill:#FBE9E7,stroke:#BF360C,color:#1A1A1A
     classDef stdb fill:#E8EAF6,stroke:#283593,color:#1A1A1A
     classDef web fill:#E3F2FD,stroke:#1565C0,color:#1A1A1A
-    class Cam,Vis tbd
+    class Vis,CC,GA,PF tbd
     class Claude ext
-    class Api,Hyph,Soc rust
-    class CC,GA,VA,PE,PF,BL,Tick stdb
-    class Ops web
+    class Api,Ins,Soc rust
+    class CAMT,VA,PE,BL,Inc stdb
+    class Live web
 ```
-
-### Tables and the view
-
-All five tables and the view are owned by this file. The module defines them only while Vision exists.
-
-`camera`: one row per camera; the event has one.
-
-| Field | Meaning |
-|---|---|
-| id | assigned by SpacetimeDB |
-| name | "overhead pit" |
-| zone id | the zone it covers: the pit |
-| region map | the taped square's four corners in image pixels, which define the 3 by 3 grid |
-| live | whether frames are arriving |
-| last frame at | server time of the last report from this camera |
-
-`camera_count`: the latest count per (camera, zone), overwritten in place so the table stays small.
-
-| Field | Meaning |
-|---|---|
-| camera id, zone id | the pair; one row each |
-| count | people the detector sees in the taped square |
-| cell counts | counts per cell of the 3 by 3 grid |
-| light circle visible | yes or no |
-| confidence | 0 to 1 |
-| observed at | server time at ingest; the tick treats a row older than 6 s (starting value) as stale |
-| frame blob ref | the latest of the frames uploaded every 10 s, for the camera tile |
-
-`ground_alert`: a person who looks down.
-
-| Field | Meaning |
-|---|---|
-| id | assigned by SpacetimeDB |
-| camera id, zone id | where |
-| region hint | grid cell |
-| confidence | 0 to 1 |
-| first seen at, last seen at | the alert expires 10 s after the last refresh (starting value) |
-| status | `open`, `matched`, `expired`, `dismissed` |
-| incident id | the incident it corroborated or opened, when any |
-| frame blob ref | the frame at first detection |
-
-`property_event`: something other than a person that needs a record.
-
-| Field | Meaning |
-|---|---|
-| id | assigned by SpacetimeDB |
-| camera id, zone id | where |
-| kind | `fallen_object`, `spill`, `damage`, `other` |
-| description | one paragraph, from the assessment |
-| confidence | 0 to 1 |
-| observed at | server time |
-| frame blob refs | evidence frames |
-| incident id | the `property` incident this event opened or attached to |
-
-`vision_assessment`: one per incident check.
-
-| Field | Meaning |
-|---|---|
-| id | assigned by SpacetimeDB |
-| incident id | the incident judged |
-| trigger | `band_sos`, `band_fall`, `ground_alert`, `staff_button`: what opened the incident |
-| confirmed | yes or no |
-| confidence | 0 to 1 |
-| description | what the frames show, for staff |
-| recommended action | one line |
-| incident description | the insurance-ready paragraph Hyphenate copies into the evidence pack |
-| camera id | which camera, so Hyphenate can check the camera's zone against the band's zone |
-| frame blob refs | the frames sent to Claude, each with its capture time |
-| model call id | the `model_call` row, for audit and replay |
-| created at | server time |
-
-`vision_incidents`: a view for role `vision`. It returns the open `sos`, `fall` and `property` incidents in the camera's zone, each with its `incident_snapshot`, and no display name. Vision needs the zone and the band facts, never who the person is.
 
 ### Role `vision`
 
-`bandit-vision` connects as its own identity; it prints the identity on first start and the owner grants `vision` with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)). The vision reducers and `upsert_camera` accept this role, and `heartbeat` accepts any service role. The job reducers `claim_job`, `extend_job_lease`, `complete_job` and `fail_job` accept `vision` for jobs of kind `photo_features` only, so the vision service takes those jobs without holding the broader `worker` role. Nothing else in the module accepts `vision`, so a compromised camera process cannot command bands, and it reaches incidents only through its two columns, the incidents it opens and its own rows.
+`bandit-vision` connects as its own identity, and the owner grants it `vision` with `grant_role` ([SpacetimeDB](../2-data/SpacetimeDB.md)). `submit_vision_assessment` and `report_property_event` accept only this role; `upsert_camera` also accepts `ops`. `record_model_call` and `register_blob` accept it too, for the Anthropic Claude API record and the frames.
 
-### Rates and freshness
+(TBD -- LEO) For photo features, the job reducers would accept `vision` as well, so the service can take `photo_features` jobs without the broader `worker` role.
 
-| Signal | Rate | Fresh for | Then |
-|---|---|---|---|
-| `report_zone_count` | every 3 s, one call for the pit | 6 s (starting value) | `venue_tick` drops the camera estimate and uses the band estimate alone |
-| `report_ground_alert` | on detection, refreshed every 1 s while down; matched to a band flag in the same zone within 3 s (starting value) | 10 s after the last refresh | status `expired`; an incident it corroborated or opened stays open on its own |
-| `submit_vision_assessment` | once per incident, about 3 s after its first signal plus the Claude call | not time-bound | stays on the incident |
-| `report_property_event` | once per event, with a 60 s dedupe window per camera and kind | not time-bound | stays |
-| `submit_photo_features` | once per `photo_features` job, in batches after the event | not time-bound | the job's lease is 60 s; batch waits use `extend_job_lease` |
-| frames as blobs | one every 10 s for the camera tile, 8 per assessment | event lifetime | kept for the evidence pack |
-| `heartbeat` | every 5 s | 15 s | the service-health card goes red |
+Nothing else in the module accepts `vision`, so a compromised camera process cannot command bands, and it reaches incidents only through its own rows, `vision_status` and the `property` incidents it opens.
 
-### What each consumer does, with and without vision
+### What each consumer does, with and without the security view
 
-| Consumer | With vision | Without vision (file deleted or service down) |
+| Consumer | With the security view | Without the security view (file deleted or service down) |
 |---|---|---|
-| `venue_tick` density ([Safety](../6-features/Safety.md)) | the pit's density is the higher of the fresh band estimate and the camera estimate (count divided by the taped square's area); both stored in `zone_state` | band estimate only; the camera field stays empty |
-| Plan B ([Safety](../6-features/Safety.md)) | ops sets `fleet_config.density_override` through `set_fleet_config`: bands stop their own density colours, the camera count is the only fresh estimate, and ops drives band colours from the zone's risk; SOS, fall and the light circle keep working on the bands | no camera half of Plan B; `set_zone_risk` and forced states remain |
-| Incident corroboration ([Safety](../6-features/Safety.md)) | a `ground_alert` in the same zone within 3 s (starting value) of a band fall or SOS sets `incident.camera_corroborated`, is linked in `incident_snapshot` and marked `matched`; a second source, never a gate. An unmatched alert that persists 5 s opens a `fall` incident with `opened_by` `vision` | falls rely on the band's IMU alone |
-| Incident assessment | `incident.vision_status` goes `pending` when the bundle is sent and `confirmed` or `not_confirmed` when the `vision_assessment` lands, seconds later, with confidence, description, recommended action and frames | `vision_status` stays `none`; ops reads band facts and witnesses only |
-| [Hyphenate](../7-integrations/Hyphenate.md) | `property` incidents from the staff button and from `report_property_event`; `vision_assessment`, `property_event` rows and frames become evidence facts in the pack, and the camera's zone is checked against the band's zone | no property incidents from cameras; claims proceed on band facts and staff notes |
-| [Social](../6-features/Social.md) photo tagging | `submit_photo_features` fills the people count and caption on the `photo`; tag suggestions are capped by the people count | `register_photo` stands alone; tagging by zone and time co-presence with the default cap |
-| [Ops-Dashboard](../5-apps/Ops-Dashboard.md) | the camera tile, the detector count beside the bands' own count for the pit, person-down alerts, assessments on incidents | the Vision rows are removed |
+| The security view | the organizer sees where each calling band is on a security camera, on the plan and in 3D, with an alarm until acknowledged | the organizer has only the incidents and zones in the organizer portal (/organizer) ([Organizer-Portal](../5-apps/Organizer-Portal.md)) |
+| [Insurance](../6-features/Insurance.md) | `property` incidents from `report_property_event`; `vision_assessment` and `property_event` rows and their frames become evidence facts in the pack, and the camera's zone is checked against the band's zone | no camera evidence; claims proceed on band facts, staff notes and the `property` incidents staff open with `open_incident` |
+| (TBD -- LEO) The Live tab's zone table ([Organizer-Portal](../5-apps/Organizer-Portal.md)) | the camera count for the pit's zone shows next to the bands' own average | the bands' average only |
+| (TBD -- LEO) Incident corroboration ([Safety](../6-features/Safety.md)) | a person-down alert marks the incident corroborated, a second source and never a gate | falls rely on the band's IMU alone |
+| (TBD -- LEO) [Social](../6-features/Social.md) photo tags | the people count caps the tags and fills the caption | tags by zone and time with the default cap |
 
-Anthropic-Agent.md: without it, `bandit-vision` sends nothing to Claude, so there are no assessments and no photo features; counts and alerts keep working, and `vision_status` stays `none`.
-
-The sequence shows an assessment from the band's alert to the result on the incident.
-
-```mermaid
-sequenceDiagram
-    participant Band as Band 4
-    participant Bridge as bandit-bridge
-    participant Mod as band1t module
-    participant Vis as bandit-vision (TBD -- LEO)
-    participant Claude as Claude API
-    participant Api as bandit-api
-    participant Ops as Ops dashboard
-    Band->>Bridge: beacons with fall flag (ESP-NOW, serial)
-    Bridge->>Mod: ingest_band_reports (250 ms batch)
-    Mod->>Mod: open fall incident, snapshot, escalation timer
-    Mod-->>Ops: incident row, alarm
-    Mod-->>Vis: incident row (vision_incidents)
-    Vis->>Vis: wait 3 s, take 8 frames (4 s before to 3 s after), boxes, pose summary, band rows
-    Vis->>Claude: images plus text, structured output (claude-client)
-    Claude-->>Vis: confirmed, confidence, description, recommended action
-    Vis->>Api: upload the 8 frames (HTTPS)
-    Api->>Mod: register_blob, class staff
-    Vis->>Mod: submit_vision_assessment (role vision), model_call recorded
-    Mod-->>Ops: vision_assessment row on the incident
-    Note over Band,Ops: bands and medics acted on the band alert seconds earlier. Vision confirms and writes the report.
-```
+Anthropic-Claude-API.md: without it, the security view sends nothing to the Anthropic Claude API, so there are no camera sightings and no photo features. The security window and page, counts and alerts keep working, and `vision_status` stays `none`.
 
 ## Failure modes and fallbacks
 
 | Failure | Effect | Design answer |
 |---|---|---|
-| Frames stop (the phone sleeps or leaves the hotspot) | `camera_count` goes stale and `camera.live` turns false | the tick uses the band estimate after 6 s; the camera tile and the service-health card show stale; nothing waits |
-| Claude is slow or refuses | no assessment yet | the incident is already open and handled; `vision_status` stays `pending` and the `model_call` row records why |
-| The detector counts bystanders without bands | the camera count exceeds the band count | expected and wanted: the camera is ground truth, and the density takes the higher estimate |
-| A false person-down from someone sitting or kneeling | a `ground_alert` with no band fall | an unmatched alert opens an incident only after it persists 5 s, and the alert alone never changes band lights |
+| The internet drops at the venue | the module on SpacetimeDB Maincloud and the organizer portal are out of reach | the recorder, the security view and the page run on the laptop from local files and need no network |
+| The flash is hidden (a body, a pillar) or the camera does not cover that spot | no flash for the call | the call is on screen with the alarm from the radio alone, and the band's radio position shows as an amber circle |
+| Two bands call at once | two calls and two flashes | each flash goes to the band whose radio position is nearest |
+| Something else flashes red at 4 Hz | a flash with no call | it gets only a quiet yellow mark and an `events.jsonl` line, never an alarm |
+| The security camera runs below 12 fps | a 4 Hz flash cannot be seen | the status line turns amber and says so |
+| The radio loses a calling band | the call can neither clear nor refresh | it is marked stale and, once acknowledged, dropped 60 s after the last beacon |
+| The security camera is moved after calibration | the marks land in the wrong place | the camera stays still after calibrating; calibrating again takes a few spots |
 
 ## Dependencies
 
 **Depends on**
 
-- [SpacetimeDB](../2-data/SpacetimeDB.md): `incident` (its two Vision columns `camera_corroborated` and `vision_status`, and the `opened_by` value `vision`), `incident_snapshot`, `zone`, `job`, `blob_ref`, `model_call` (Anthropic-Agent.md), `service_heartbeat`; reducers `claim_job`, `extend_job_lease`, `complete_job`, `fail_job`, `heartbeat`, `grant_role`; the view `worker_jobs`.
-- [Rust-Backend](../3-services/Rust-Backend.md): the blob upload and photo fetch through `bandit-api`, `register_blob`, the service identity pattern.
-- [Anthropic-Agent](../7-integrations/Anthropic-Agent.md): `claude-client`, structured outputs, prompt caching, Message Batches, `model_call` recording.
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): staff open the `property` incidents that `report_property_event` attaches to with `open_incident` (Hyphenate.md: the Report property damage button).
-- [Hardware](Hardware.md): the overhead camera stand.
+- [Hardware](Hardware.md): the SOS red strobe at 4 Hz and the IDENT white blink at 2.5 Hz, the gateway's serial lines and `cmd` lines, the station markers 101 to 105.
+- [Gateway-Bridge](../3-services/Gateway-Bridge.md): `band1t-bridge` opens the recorder's mirror port while the recorder runs.
+- [SpacetimeDB](../2-data/SpacetimeDB.md): `incident` (its column `vision_status` and the `opened_by` value `vision`), `zone`, `blob_ref`, `model_call` (Anthropic-Claude-API.md); `grant_role`; for the planned parts, `incident_snapshot`, `job` and the view `worker_jobs`.
+- [Rust-Backend](../3-services/Rust-Backend.md): the blob upload through `bandit-api` and `register_blob`.
+- [Anthropic-Claude-API](../7-integrations/Anthropic-Claude-API.md): `claude-client`, structured outputs, Message Batches, `model_call` recording.
+- [Elastic](../7-integrations/Elastic.md): the raw indices for the radio log and the photos.
 
 **Used by**
 
-- [Safety](../6-features/Safety.md): the camera density estimate, the Plan B density source, fall corroboration.
-- [Ops-Dashboard](../5-apps/Ops-Dashboard.md): the camera tile and the assessment on incidents.
-- [Hyphenate](../7-integrations/Hyphenate.md): `property` incidents, `vision_assessment`, frames as evidence.
-- [Social](../6-features/Social.md): photo features for tagging.
+- [Insurance](../6-features/Insurance.md): `property` incidents, camera sightings (`vision_assessment`), frames as evidence.
+- (TBD -- LEO) [Safety](../6-features/Safety.md): fall corroboration, and `fall` incidents for people without a band.
+- (TBD -- LEO) [Organizer-Portal](../5-apps/Organizer-Portal.md): the camera count in the Live tab's zone table, and the camera sighting on incidents.
+- (TBD -- LEO) [Social](../6-features/Social.md): photo features for tagging.
 
 **If you delete this file**
 
-- Drop the five tables, the view `vision_incidents`, the vision reducers (`report_zone_count`, `report_ground_alert`, `submit_vision_assessment`, `report_property_event`, `submit_photo_features`), `upsert_camera`, the job kind `photo_features` and the role `vision`.
-- SpacetimeDB.md and Safety.md: remove the two Vision columns on `incident`, the `opened_by` value `vision`, the camera estimate from the density rule and the camera half of Plan B.
-- Ops-Dashboard.md: remove the "Vision.md" rows (camera tile, corroboration and assessment on incidents) and the `vision` service card.
-- Hyphenate.md: remove the camera-sourced property incidents and the vision evidence facts.
-- Social.md: remove the photo-features fields and the cap by people count; `register_photo` runs without features and enqueues no job.
-- Architecture.md, Requirements.md (F15), Decisions.md and README.md: remove the Vision rows. Hardware.md: remove the overhead camera row and subsection.
-- Rust-Backend.md: remove the `bandit-vision` row from the process table, the Vision node from the workspace diagram, the Vision row from the crate table and the `photo_features` row in the handler registry.
-- Anthropic-Agent.md: remove the two Vision rows (event judgment and `photo_features`) from the use-case table and the Vision bullet from its deletion list.
+- Drop `pipeline/` (the recorder, the security view, the 3D model, the photo importer and the venue file); `band1t-bridge` then opens the gateway's USB port directly.
+- Bright-Data.md: keep `pipeline/venue_model.py` and `pipeline/elastic.py`, which it reads the `.env` settings through.
+- Drop the tables `camera`, `vision_assessment` and `property_event`, the reducers `upsert_camera`, `submit_vision_assessment` and `report_property_event`, and the role `vision`; for the planned parts, `camera_count`, `ground_alert`, the view `vision_incidents`, `report_zone_count`, `report_ground_alert`, `submit_photo_features` and the job kind `photo_features`.
+- SpacetimeDB.md and Safety.md: remove `incident.vision_status`, the `opened_by` value `vision` and the planned fall corroboration.
+- Organizer-Portal.md: remove the "Vision.md" rows.
+- Insurance.md: remove the camera-sourced property incidents and the security view's evidence facts. Test-Bands.md: remove the camera from `bandit-claims setup` and the `--camera` option of `property`.
+- Social.md: remove the photo-features fields and the cap by people count.
+- Elastic.md: remove the raw radio and photo indices.
+- Architecture.md, Requirements.md (F15), Decisions.md and README.md: remove the Vision rows. Hardware.md: remove the security camera rows and subsection.
+- Rust-Backend.md: remove the `bandit-vision` rows and the `photo_features` row in the handler registry.
+- Anthropic-Claude-API.md: remove the two Vision rows from the use-case table and the Vision bullet from its deletion list.
 
 ## Decisions
 
 | Decision | Why |
 |---|---|
-| (TBD -- LEO) One overhead phone camera on a light stand over the pit | the pit is where the crowd density step, the fall and the SOS happen |
-| (TBD -- LEO) The phone serves JPEG snapshots over the hotspot; `bandit-vision` pulls 1 frame per second at 1280x720 into a 10 s ring buffer; the pit check uses every third frame | 1280x720 is the size Claude reads well; one frame a second fills the 8-frame bundle around an event, and a pit reading every 3 s is enough for a tick that already smooths over seconds |
-| (TBD -- LEO) YOLO person and pose models through ONNX Runtime inside `bandit-vision`, no sidecar | one Rust process to run and restart on the laptop |
-| (TBD -- LEO) Live, Claude is used only for event assessment (fall or SOS confirmation, property damage), with the same Anthropic key and account as the workers | Claude makes the judgment; counting and person-down run locally; one key to manage |
-| (TBD -- LEO) The camera maps to one zone, the pit | the `camera` row's region map is just the taped square's corners |
-| (TBD -- LEO) After the event, Claude also reads each photographer photo for its people count and a one-line caption, through Message Batches | Social.md takes both from `submit_photo_features`; a caption needs a model that reads the image, and batches suit work nobody waits for |
-| (TBD -- LEO) Live, Claude has one trigger: a new `sos`, `fall` or `property` incident in the pit | an unmatched person-down alert opens its own `fall` incident, so it needs no separate trigger |
-| (TBD -- LEO) The bundle is the 8 frames from 4 s before to 3 s after the incident's first signal | at one frame a second that is the whole moment, and it waits only 3 s |
-| (TBD -- LEO) A person is down after two consecutive frames with the torso near horizontal and low (starting value) | at one frame a second this matches the band's 1.5 s stillness window |
-| `camera_count` is fresh for 6 s (starting value) | the pit check arrives every 3 s, so two missed readings mark it stale |
-| Vision reads incidents through its own view `vision_incidents`, with no display name | it needs the zone and the band facts, never who the person is |
-| A failed or refused Claude call writes no assessment; `vision_status` stays `pending` | the incident is already handled by bands and staff; the `model_call` row records the reason |
+| (TBD -- LEO) The security view finds a calling band by its 4 Hz red flash on a security camera, and ties it to the band through the radio | the band already flashes when it calls for help, so the camera needs no model and no face; the radio says which band, the camera says exactly where |
+| (TBD -- LEO) Only red that swings at exactly 4 Hz counts, checked against 2.5 Hz and 5.5 Hz | exit signs and stage lights are red too; the rate is what only a calling band has |
+| (TBD -- LEO) The security view reads the gateway through the recorder's file and mirror port, not through the module | the security view keeps working without the internet, and the recorder and `band1t-bridge` share one gateway |
+| (TBD -- LEO) Calibration blinks a worn band in identify at wrist height on four or more spots | the same flash finder finds the blink, so the mapping is measured at the height the SOS flash will be |
+| (TBD -- LEO) A radio position picks between flashes, within 3 m or twice its radius | radio positions are off by half a metre to a metre; the camera's flash is exact |
+| (TBD -- LEO) The lit snapshot is taken at calibration and shown beside the live feed | the venue may be dark during the event; the organizer still sees the spot in a lit picture |
+| (TBD -- LEO) The alarm repeats every 5 s until acknowledged, and the call stays until the radio clears it | a call is never silently lost; acknowledging stops the sound, not the call |
+| (TBD -- LEO) The venue in 3D is a Gaussian splat from one phone walk-through, aligned to the plan | one walk gives a model the organizer recognises, and the plan keeps it in the same metres as the station markers |
+| (TBD -- LEO) Every located SOS saves the marked view and the last 3 s of video | a record of what the camera saw, kept on the laptop |
+| The module's camera tables take one camera sighting per incident and property events, under the role `vision` | Insurance reads them as evidence; the module, not the security view, decides what happens next |
+| A failed or refused Anthropic Claude API call writes no camera sighting; `vision_status` stays as it was | the incident is already handled by bands and staff; the `model_call` row records the reason |
+| (TBD -- LEO) Live, the Anthropic Claude API is used only to judge an incident, with the same Anthropic key as the workers; counting and person-down would run locally | the Anthropic Claude API makes the judgment; one key to manage |

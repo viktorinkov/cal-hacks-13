@@ -8,10 +8,14 @@ publish = false
 [dependencies]
 anyhow.workspace = true
 bandit-bindings = { path = "../bandit-bindings" }
+bandit-ingest = { path = "../bandit-ingest" }
 bandit-common = { path = "../bandit-common" }
 claims-elastic = { path = "../claims-elastic" }
 claude-client = { path = "../claude-client" }
 bandit-insurance = { path = "../bandit-insurance" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+lopdf = { version = "0.46", default-features = false }
+regex = "1"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

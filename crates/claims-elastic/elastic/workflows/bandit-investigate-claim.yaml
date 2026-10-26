@@ -1,0 +1,30 @@
+version: "1"
+name: bandit-investigate-claim-v3
+description: Runs one bounded claim-investigation turn. The worker supplies this claim's transcript and executes only scoped evidence requests; this workflow never writes business state or indexes evidence.
+enabled: true
+tags: [bandit]
+triggers:
+  - type: manual
+    inputs:
+      - name: task
+        type: string
+        required: true
+        description: Instructions, available worker requests and this claim's history.
+      - name: schema
+        type: string
+        required: true
+        description: The evidence-request or decision envelope's JSON schema.
+steps:
+  - name: schema
+    type: data.parseJson
+    source: "{{ inputs.schema }}"
+
+  - name: investigate
+    type: ai.agent
+    # Keep the connector tested with this worker protocol; workspace defaults can change.
+    connector-id: .anthropic-claude-4.5-sonnet-chat_completion
+    agent-id: bandit-claim-investigator-v3
+    create-conversation: false
+    with:
+      message: "{{ inputs.task }}"
+      schema: "${{ steps.schema.output }}"

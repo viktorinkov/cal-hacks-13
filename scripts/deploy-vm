@@ -1,20 +1,21 @@
 #!/bin/sh
 # Deploy BandIt to the Debian VM: scripts/deploy-vm root@band1t.vip (the Vultr server).
 # Copies the service keys from .env, the module owner's token and the Maincloud identities over SSH straight
-# to the VM, then runs deploy/setup.sh there with sudo, which builds $BANDIT_BRANCH (default vik-deploy) and
-# serves it on https://<dns name> and www. Run it again to update the VM.
+# to the VM, then runs deploy/setup.sh there with sudo, which builds $BANDIT_BRANCH (default vik-e2e) and
+# serves it on https://<dns name> and www. Run it again to update the VM. The VM also deploys vik-e2e by itself
+# whenever it moves on GitHub (deploy/autodeploy.sh), which is how cloud threads ship.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="$1"
 [ -n "$TARGET" ] || { echo "usage: scripts/deploy-vm <user>@<dns name>" >&2; exit 2; }
 ENV_FILE="${ENV_FILE:-$ROOT/.env}"
 IDENTITIES="${IDENTITIES:-$ROOT/.dev/e2e-maincloud/identities}"
-BRANCH="${BANDIT_BRANCH:-vik-deploy}"
+BRANCH="${BANDIT_BRANCH:-vik-e2e}"
 HOST="${TARGET#*@}"
 SSH="ssh -o StrictHostKeyChecking=accept-new $TARGET"
 
 {
-  grep -E '^(SPACETIMEDB_URL|SPACETIMEDB_DATABASE|NESSIE_BASE_URL|NESSIE_API_KEY|ELASTICSEARCH_URL|ELASTICSEARCH_API_KEY|KIBANA_URL|ANTHROPIC_API_KEY|ANTHROPIC_MODEL)=' "$ENV_FILE"
+  grep -E '^(SPACETIMEDB_URL|SPACETIMEDB_DATABASE|NESSIE_BASE_URL|NESSIE_API_KEY|ELASTICSEARCH_URL|ELASTICSEARCH_API_KEY|KIBANA_URL|KIBANA_API_KEY|ANTHROPIC_API_KEY|ANTHROPIC_MODEL|BRIGHTDATA_[A-Z_]+)=' "$ENV_FILE"
   printf 'BANDIT_OWNER_TOKEN=%s\n' "$(sed -n 's/^spacetimedb_token *= *"\(.*\)"/\1/p' "$HOME/.config/spacetime/cli.toml")"
 } | $SSH 'sudo install -d -m 700 /opt/bandit && sudo sh -c "umask 077 && cat > /opt/bandit/.env"'
 COPYFILE_DISABLE=1 tar --no-xattrs -C "$IDENTITIES" -cz . \

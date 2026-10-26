@@ -111,8 +111,20 @@ pub fn show(app: &App, id: u64) -> Result<()> {
         println!("  billed {}  covered {}", money(billed), money(covered));
     }
 
+    let mut history: Vec<Decision> = db.db.decision().iter().filter(|d| d.claim_id == id).collect();
+    history.sort_by_key(|d| d.id);
+    if !history.is_empty() {
+        println!("\nhow it was decided");
+        for d in &history {
+            println!("  {:<16} {}", d.actor, d.what);
+            if !d.why.is_empty() {
+                println!("  {:<16}   {}", "", d.why);
+            }
+        }
+    }
+
     for r in db.db.claim_review().iter().filter(|r| r.claim_id == id && r.pack_version == v) {
-        println!("\nclaims agent (v{v})  {}  causation {}", r.verdict, if r.causation.is_empty() { "-" } else { &r.causation });
+        println!("\nClaude's decision (v{v})  {}  causation {}", r.verdict, if r.causation.is_empty() { "-" } else { &r.causation });
         if !r.summary.is_empty() {
             println!("  summary  {}", r.summary);
         }
@@ -133,12 +145,13 @@ pub fn show(app: &App, id: u64) -> Result<()> {
         }
     }
 
-    let mut precedents: Vec<ClaimPrecedent> = db.db.claim_precedent().iter().filter(|p| p.claim_id == id && p.pack_version == v).collect();
-    precedents.sort_by(|a, b| b.score.total_cmp(&a.score));
-    if !precedents.is_empty() {
-        println!("\nprecedents from Elastic (v{v})");
-        for p in precedents {
-            println!("  {:.2}  {}  {}  {}  {}", p.score, p.reference, p.outcome, money(p.payout_cents), p.narrative);
+    let mut clauses: Vec<ClaimClause> = db.db.claim_clause().iter().filter(|k| k.claim_id == id && k.pack_version == v).collect();
+    clauses.sort_by(|a, b| b.score.total_cmp(&a.score));
+    if !clauses.is_empty() {
+        println!("\npolicy clauses from Elastic (v{v})");
+        for k in clauses {
+            println!("  {:.2}  {}  {} policy, {}, page {}", k.score, k.clause_id, k.policy, k.section.replace('_', " "), k.page);
+            println!("        {}", clip(k.text.trim(), 160));
         }
     }
 
@@ -150,22 +163,21 @@ pub fn show(app: &App, id: u64) -> Result<()> {
     approvals.sort_by_key(|a| a.id);
     for a in &approvals {
         println!(
-            "approval {}  {} ({}) {}  saw {} on {}  learn {}{}{}",
+            "approval {}  {} ({}) {}  saw {} on {}{}",
             app.hms(a.decided_at),
             a.approver_name,
             a.approver_role,
             a.decision,
             money(a.amount_seen_cents),
             short_hash(&a.pack_hash_seen),
-            if a.learn { "yes" } else { "no" },
-            a.requested_ceiling_cents.map(|c| format!(", ceiling asked {}", money(c))).unwrap_or_default(),
             if a.reason.is_empty() { String::new() } else { format!(", reason: {}", a.reason) }
         );
     }
-    for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
-        println!("learned  {}", rule_line(app, &r));
+    for p in db.db.rule_proposal().iter().filter(|p| p.claim_ids.contains(&id)) {
+        println!("proposal {}  {}  from claims {:?}  {}", p.id, p.status, p.claim_ids, p.rule);
     }
-    if c.decided_by == "rule"
+    if matches!(c.decided_by.as_str(), "rule" | "claude")
+        && c.settlement_rule_id != 0
         && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
     {
         println!("settled under {}", rule_line(app, &r));
@@ -308,7 +320,7 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
         }
     }
     if let Some(r) = db.db.claim_review().iter().filter(|r| r.claim_id == id && r.pack_version == v).max_by_key(|r| r.id) {
-        println!("  agent    {} (causation {}): {}", r.verdict, r.causation, r.summary);
+        println!("  Claude   {} (causation {}): {}", r.verdict, r.causation, r.summary);
         for x in &r.concerns {
             println!("    concern {x}");
         }
@@ -324,10 +336,11 @@ pub fn summary(app: &App, id: u64) -> Result<()> {
             short_hash(&a.pack_hash_seen)
         );
     }
-    for r in db.db.settlement_rule().iter().filter(|r| approvals.iter().any(|a| a.id == r.approval_id)) {
-        println!("  learned  {}", rule_line(app, &r));
+    for p in db.db.rule_proposal().iter().filter(|p| p.claim_ids.contains(&id)) {
+        println!("  proposal {} {} from claims {:?}: {}", p.id, p.status, p.claim_ids, p.rule);
     }
-    if c.decided_by == "rule"
+    if matches!(c.decided_by.as_str(), "rule" | "claude")
+        && c.settlement_rule_id != 0
         && let Some(r) = db.db.settlement_rule().id().find(&c.settlement_rule_id)
     {
         println!("  under    {}", rule_line(app, &r));

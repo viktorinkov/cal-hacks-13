@@ -11,7 +11,12 @@ pub type Cents = u64;
 pub enum IncidentKind {
     Sos,
     Fall,
+    /// The venue's own equipment was broken.
     Property,
+    /// Someone stole from the venue: its equipment, merch or a sponsor's gear at its booth.
+    Theft,
+    /// Kept from an earlier design; nothing opens it, and it is answered like `property`.
+    Breakage,
 }
 
 impl IncidentKind {
@@ -20,6 +25,8 @@ impl IncidentKind {
             IncidentKind::Sos => "sos",
             IncidentKind::Fall => "fall",
             IncidentKind::Property => "property",
+            IncidentKind::Theft => "theft",
+            IncidentKind::Breakage => "breakage",
         }
     }
 
@@ -28,6 +35,8 @@ impl IncidentKind {
             "sos" => Some(IncidentKind::Sos),
             "fall" => Some(IncidentKind::Fall),
             "property" => Some(IncidentKind::Property),
+            "theft" => Some(IncidentKind::Theft),
+            "breakage" => Some(IncidentKind::Breakage),
             _ => None,
         }
     }
@@ -35,6 +44,11 @@ impl IncidentKind {
     /// `sos` and `fall` are injuries paid from medical-payments cover.
     pub fn is_injury(self) -> bool {
         matches!(self, IncidentKind::Sos | IncidentKind::Fall)
+    }
+
+    /// Someone can have broken or taken it, and be charged for it: every kind but an injury.
+    pub fn can_be_caused(self) -> bool {
+        !self.is_injury()
     }
 }
 
@@ -61,8 +75,8 @@ impl CoverKind {
         }
     }
 
-    /// The venue's general liability policy pays injuries from medical-payments
-    /// cover and the venue's own equipment from property cover.
+    /// The venue's general liability pays injuries from medical-payments cover;
+    /// the venue's property policy pays for its own equipment, broken or stolen.
     pub fn for_incident(kind: IncidentKind) -> Self {
         if kind.is_injury() { CoverKind::MedicalPayments } else { CoverKind::Property }
     }
@@ -81,6 +95,8 @@ pub enum Source {
     VisionAssessment,
     MedicalRecord,
     Policy,
+    /// The person staff named as responsible, and that their band was at the spot.
+    ResponsibleParty,
 }
 
 impl Source {
@@ -95,6 +111,7 @@ impl Source {
             Source::VisionAssessment => "vision_assessment",
             Source::MedicalRecord => "medical_record",
             Source::Policy => "policy",
+            Source::ResponsibleParty => "responsible_party",
         }
     }
 }

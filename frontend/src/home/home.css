@@ -1,0 +1,488 @@
+:root {
+  --stage: #0b0b0c;
+  --bone: #e7e2d7;
+  --stage-muted: #a8a196;
+  --accent: #62ec7c;
+  --accent-ink: #0b0b0c;
+
+  --m: clamp(20px, 2.8vw, 40px);
+  --gap: clamp(16px, 1.7vw, 24px);
+  --radius: 3px;
+
+  --step-small: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-lead: clamp(1.25rem, 1.1rem + 0.5vw, 1.5rem);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* The page scrolls only to turn the band; the track loops, so its scrollbar would only jump about. */
+html {
+  background: var(--stage);
+  -webkit-text-size-adjust: 100%;
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  background: var(--stage);
+  color: var(--bone);
+  font-family: 'Epilogue Variable', 'Epilogue', system-ui, sans-serif;
+  font-size: var(--step-body);
+  font-weight: 400;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+img,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+figure,
+h1 {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.skip {
+  position: fixed;
+  left: var(--m);
+  top: -100px;
+  z-index: 50;
+  padding: 12px 16px;
+  background: var(--bone);
+  color: var(--stage);
+}
+
+.skip:focus {
+  top: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 30px;
+  border: 0;
+  border-radius: var(--radius);
+  font-size: var(--step-lead);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-accent:hover {
+  background: var(--bone);
+}
+
+/* ---------- Header ---------- */
+
+.bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap);
+  padding: 22px var(--m);
+  font-size: var(--step-small);
+  font-weight: 500;
+  color: var(--bone);
+}
+
+.bar-mark {
+  font-size: var(--step-body);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.bar a {
+  padding-block: 10px;
+  transition: color 160ms var(--ease-out);
+}
+
+.bar a:hover {
+  color: var(--accent);
+}
+
+/* ---------- The stage ---------- */
+
+/* A long track under a pinned stage: scrolling it turns the band, and the script loops it. */
+.hero {
+  position: relative;
+  height: 800svh;
+  background: var(--stage);
+}
+
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  min-height: 560px;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--stage);
+  touch-action: pan-y;
+}
+
+.stage-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The face of the band (30.14% across, 38.28% down the photo) sits on the stage's centre line, and
+   the turntable's axis runs straight down through it. */
+.act {
+  --act-h: 60svh;
+  --face-y: 59svh;
+  position: absolute;
+  left: 50%;
+  top: calc(var(--face-y) - var(--act-h) * 0.3828);
+  height: var(--act-h);
+  aspect-ratio: 624 / 803;
+  translate: calc(var(--act-h) * 0.7771 * -0.3014) 0;
+  perspective: 1200px;
+  perspective-origin: 30.14% 38.28%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.act-tilt,
+.act-spin,
+.act-face,
+.act-edge {
+  position: absolute;
+  inset: 0;
+  transform-origin: 30.14% 38.28%;
+}
+
+.act-tilt,
+.act-spin {
+  transform-style: preserve-3d;
+}
+
+/* The cut-out is extruded: a lit face front and back with dark slices between, so edge-on it still has
+   a body and from behind it reads as its own mirror image. */
+.act-spin {
+  --pose: -6deg;
+  --half: 8px;
+}
+
+.act-face {
+  transform: translateZ(var(--half)) rotate(var(--pose));
+}
+
+.act-back {
+  transform: translateZ(calc(var(--half) * -1)) rotate(var(--pose));
+}
+
+.act-edge {
+  width: 100%;
+  height: 100%;
+  transform: translateZ(var(--z)) rotate(var(--pose));
+  filter: brightness(0.3);
+}
+
+.act-band,
+.act-shade,
+.act-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.act-shade {
+  filter: brightness(0.07);
+  opacity: 0;
+}
+
+/* The modelled band; the script sizes and places it round the turntable's axis. */
+.band-3d {
+  position: absolute;
+  z-index: 2;
+  max-width: none;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out);
+}
+
+.has-3d .band-3d {
+  opacity: 1;
+}
+
+/* The cut-out only shows if the model can't be drawn. */
+.js .act {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.no-3d .act {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 600ms var(--ease-out);
+}
+
+.hero-copy {
+  position: absolute;
+  inset: 0 var(--m) auto;
+  top: clamp(72px, 9svh, 96px);
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.title {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-align: center;
+  color: var(--bone);
+  transform-origin: 50% 0;
+  pointer-events: auto;
+}
+
+.title-name {
+  font-size: min(15vw, 30svh);
+  line-height: 0.82;
+  white-space: nowrap;
+}
+
+/* Set to the width of the name by the fit script; this is its first guess. */
+.title-line {
+  font-size: calc(min(15vw, 30svh) * 0.262);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+  margin-top: 0.12em;
+}
+
+.title .ch {
+  display: inline;
+}
+
+.title .ch.is-off {
+  visibility: hidden;
+}
+
+.caret {
+  position: absolute;
+  width: 0.09em;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.hero-foot {
+  position: absolute;
+  inset: auto var(--m) clamp(20px, 3.4svh, 36px);
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap);
+  pointer-events: none;
+}
+
+.hero-foot > * {
+  pointer-events: auto;
+}
+
+.hero-hint {
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font-size: var(--step-small);
+  font-weight: 500;
+  color: var(--bone);
+  cursor: pointer;
+  transition: color 160ms var(--ease-out);
+}
+
+.hero-hint:hover {
+  color: var(--accent);
+}
+
+.hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .hint-mouse {
+    display: none;
+  }
+  .hint-touch {
+    display: inline;
+  }
+}
+
+.hero-act {
+  flex: none;
+}
+
+/* ---------- Entrances (motion allowed only) ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero {
+    height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* While the title types, everything else waits. The animations only fire if the script never ran. */
+  .intro .title:not(.is-ready) {
+    visibility: hidden;
+    animation: failsafe-show 0s 3s forwards;
+  }
+
+  .intro [data-enter] {
+    opacity: 0;
+    translate: 0 18px;
+    animation: failsafe-in 0s 5s forwards;
+  }
+
+  .intro .act-shade {
+    opacity: 1;
+    animation: failsafe-out 0s 5s forwards;
+  }
+
+  .js [data-enter] {
+    transition:
+      opacity 700ms var(--ease-out),
+      translate 900ms var(--ease-expo);
+    transition-delay: var(--d, 0ms);
+  }
+
+  .hero-act {
+    --d: 200ms;
+  }
+
+  .hero-hint {
+    --d: 900ms;
+  }
+
+  @keyframes failsafe-show {
+    to {
+      visibility: visible;
+    }
+  }
+
+  @keyframes failsafe-in {
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  @keyframes failsafe-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  .title.is-rising {
+    transition: transform 1050ms var(--ease-expo);
+  }
+
+  .caret {
+    animation: caret 900ms steps(1) infinite;
+  }
+
+  .caret.is-typing {
+    animation: none;
+  }
+
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+/* ---------- Phone ---------- */
+
+@media (max-width: 600px) {
+  .bar {
+    padding-block: 14px;
+  }
+  .act {
+    --act-h: 42svh;
+    --face-y: 44svh;
+  }
+  .act-spin {
+    --half: 6px;
+  }
+  .hero-copy {
+    top: 74px;
+  }
+  .title-name {
+    font-size: 25vw;
+  }
+  .title-line {
+    font-size: calc(25vw * 0.262);
+  }
+  .hero-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .hero-hint {
+    order: 2;
+    padding-block: 2px;
+  }
+  .hero-act {
+    width: 100%;
+  }
+}

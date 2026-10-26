@@ -21,13 +21,14 @@ pub struct Attendee {
     /// Organisation of the claimed profile, 0 when none.
     #[index(btree)]
     pub organization_id: u64,
-    /// A fake attendee wearing a simulated band, so the graph shows a crowd.
-    pub simulated: bool,
+    /// One of the crowd's attendees, not a person who tapped a band.
+    pub crowd: bool,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
 }
 
-/// Which attendee wears which band. Separate from band1t's hardware `band` row.
+/// Which attendee wears which radio or test band. Separate from band1t's hardware `band` row; the crowd's
+/// bands are worn by the attendees in `crowd_member`.
 #[spacetimedb::table(accessor = band_owner)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct BandOwner {
@@ -98,11 +99,16 @@ pub struct Visit {
     pub attendee: Identity,
     #[index(btree)]
     pub zone_id: u64,
-    pub band_id: u8,
+    pub band_id: u32,
     pub started_at: Timestamp,
     pub ended_at: Option<Timestamp>,
     pub minutes: f32,
     pub updated_at: Timestamp,
+    /// The booth of the stay, 0 when only the zone is known.
+    pub booth_id: u64,
+    /// True while the stay runs.
+    #[index(btree)]
+    pub open: bool,
 }
 
 /// Two findable attendees whose bands heard each other up close: people who hung out together.
@@ -115,7 +121,7 @@ pub struct SocialEncounter {
     pub id: u64,
     /// band1t `encounter.key` of the two bands.
     #[unique]
-    pub band_pair: u16,
+    pub band_pair: u64,
     /// The pair, lower identity first.
     #[index(btree)]
     pub attendee_a: Identity,
@@ -196,6 +202,12 @@ pub struct Photo {
     pub caption: String,
     pub added_by: Identity,
     pub created_at: Timestamp,
+    /// The people Claude counted in the photo; the tags are capped at it. 0 until the photo is read.
+    #[default(0)]
+    pub people_count: u32,
+    /// The model call that read the photo, 0 until it is read.
+    #[default(0)]
+    pub features_call_id: u64,
 }
 
 /// A findable attendee whose band was in the photo's zone when it was taken.
@@ -222,16 +234,79 @@ pub struct SocialTickTimer {
     pub scheduled_at: ScheduleAt,
 }
 
-/// State of one fake attendee in the simulated crowd.
+/// Friends who move through the venue together: a team of hackers with a home table on the hacking
+/// floor, one sponsor's staff member whose home is their booth, or an organizer, photographer or speaker
+/// on their own rounds.
+#[spacetimedb::table(accessor = crowd_group)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CrowdGroup {
+    #[primary_key]
+    pub id: u16,
+    /// The booth this group staffs, 0 for hackers.
+    pub staff_booth: u64,
+    pub home_station: u8,
+    pub home_x_m: f32,
+    pub home_y_m: f32,
+    /// Where the group stands now.
+    pub station: u8,
+    pub booth_id: u64,
+    pub x_m: f32,
+    pub y_m: f32,
+    pub next_move_at: Timestamp,
+    /// What the group does at the event: `hacker`, `booth_staff`, `organizer`, `photographer` or `speaker`.
+    #[default("")]
+    pub role: String,
+}
+
+pub const HACKER: &str = "hacker";
+pub const BOOTH_STAFF: &str = "booth_staff";
+pub const ORGANIZER: &str = "organizer";
+pub const PHOTOGRAPHER: &str = "photographer";
+pub const SPEAKER: &str = "speaker";
+
+/// A group's role. A crowd started before roles were kept has hackers and booth staff only.
+pub fn role_of(g: &CrowdGroup) -> &str {
+    match g.role.as_str() {
+        "" if g.staff_booth != 0 => BOOTH_STAFF,
+        "" => HACKER,
+        r => r,
+    }
+}
+
+/// One attendee of the crowd: their band, their group, where they stand within it and what they care about.
 #[spacetimedb::table(accessor = crowd_member)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct CrowdMember {
     #[primary_key]
-    pub band_id: u8,
+    pub band_id: u32,
+    /// The attendee wearing the band, and since when.
+    #[unique]
+    pub identity: Identity,
+    pub joined_at: Timestamp,
     #[index(btree)]
-    pub group_id: u8,
-    pub station: u8,
-    pub next_move_at: Timestamp,
+    pub group_id: u16,
+    /// Offset from the group's spot, in metres.
+    pub dx_m: f32,
+    pub dy_m: f32,
+    /// Booth tags this attendee is drawn to.
+    pub interests: Vec<String>,
+    /// The band of the stranger this attendee is talking to, 0 when none.
+    pub chat: u32,
+}
+
+/// The last walk of one attendee of the crowd: the corners of the way they walk, from where they stood to where
+/// they stand now or soon, at a steady speed. The band stands at the path's end once it arrives, so the 3D view
+/// draws everyone from these rows and the bands' own spots.
+#[spacetimedb::table(accessor = crowd_walk, public)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct CrowdWalk {
+    #[primary_key]
+    pub band_id: u32,
+    /// x and y of each corner in turn, in metres.
+    pub path: Vec<f32>,
+    pub started_at: Timestamp,
+    pub arrives_at: Timestamp,
+    pub speed_mps: f32,
 }
 
 #[spacetimedb::table(accessor = crowd_timer, scheduled(crate::social::crowd::crowd_tick))]

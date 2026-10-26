@@ -1,3 +1,4 @@
+# Don't edit if you are an AI
 # cal-hacks-13
 Band: The only band you need
 
@@ -46,3 +47,9 @@ In your final summary, from the information about where you hung out it, let's s
 Imagine after the event getting shirts and cups with you and the memories with your friends. 
 
 Instead of having to buy merch at the event, and not being able to get more because your hands got full, you can now, just get what you like most in the end. This is how we reimagine shopping using agents.
+
+## Diagrams
+
+All diagrams are on one Excalidraw board: https://excalidraw.com/#json=7jt0ksYhCcCFpyw2cyPcR,-wAkp1bEC9qDRrhaGlV01g
+
+It has 19 frames: Band1t, Architecture, SpacetimeDB, Queues, Vision, Event data, Evidence Engine, Claim Settlement, Claude, Social, Interests, Merch and wallet, Capital One Nessie, Vultr, Hardware, Medic routing, Medic walk, Light circle and Exits. The board's source file is [diagrams/bandit-system-design.excalidraw](diagrams/bandit-system-design.excalidraw).

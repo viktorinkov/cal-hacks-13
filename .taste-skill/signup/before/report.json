@@ -1,0 +1,1944 @@
+{
+ "url": "http://127.0.0.1:5176/__signup-review.html",
+ "at": "2026-10-25T07:06:25.971Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.29
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 900,
+     "screens": 1,
+     "words": 222,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 6,
+     "sections": 4,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 64,
+     "vw": 4.4,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 181,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Make it yours.",
+     "words": 3,
+     "lines": 2,
+     "size": 64,
+     "font": "Instrument Serif"
+    },
+    "headings": [
+     {
+      "text": "BandIt",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "left",
+      "widthRatio": 0.05,
+      "top": 32,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "The person wearing it",
+      "words": 4,
+      "chars": 21,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.17,
+      "top": 172,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Make it yours.",
+      "words": 3,
+      "chars": 14,
+      "lines": 2,
+      "size": 64,
+      "vw": 4.4,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": -0.02,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.18,
+      "top": 181,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "05",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Geist Mono Variable",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": true,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.26,
+      "top": 435,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "Your documents",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.19,
+      "top": 493,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A second look",
+      "words": 3,
+      "chars": 13,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.16,
+      "top": 1088,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A card for the night",
+      "words": 5,
+      "chars": 20,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.16,
+      "top": 1267,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 7,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Geist Variable",
+       "share": 0.92,
+       "mono": false
+      },
+      {
+       "family": "Instrument Serif",
+       "share": 0.08,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono Variable",
+       "share": 0.01,
+       "mono": true
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      64
+     ],
+     "sizeCount": 8,
+     "notLoaded": [],
+     "body": {
+      "font": "Geist Variable",
+      "size": 13,
+      "leading": 1.85,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.9
+     },
+     "measureChars": 96,
+     "max": {
+      "size": 64,
+      "vw": 4.4,
+      "font": "Instrument Serif",
+      "text": "Make it yours."
+     },
+     "monoShare": 0.01,
+     "monoProseShare": 0.01,
+     "monoFamilies": [
+      "Geist Mono Variable"
+     ],
+     "monoSamples": [
+      "05",
+      "01",
+      "02",
+      "03",
+      "04"
+     ],
+     "microLabels": 2,
+     "microLabelShare": 0.028,
+     "microSamples": [
+      "One band. Your night.",
+      "Demo payment"
+     ],
+     "upperShare": 0.03,
+     "centerShare": 0.02,
+     "smallText": 4
+    },
+    "eyebrows": [],
+    "numbered": [
+     {
+      "text": "05",
+      "size": 30,
+      "top": 435
+     },
+     {
+      "text": "01",
+      "size": 11,
+      "top": 172
+     },
+     {
+      "text": "02",
+      "size": 11,
+      "top": 493
+     },
+     {
+      "text": "03",
+      "size": 11,
+      "top": 1088
+     },
+     {
+      "text": "04",
+      "size": 11,
+      "top": 1267
+     }
+    ],
+    "color": {
+     "bodyBg": "#0a0a0b",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.05,
+      "l": 0.04
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0a0a0b",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.05,
+        "l": 0.04
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#a3a3a8",
+       "share": 0.62
+      },
+      {
+       "color": "#ecebe6",
+       "share": 0.17
+      },
+      {
+       "color": "#85858b",
+       "share": 0.14
+      },
+      {
+       "color": "#dcc79f",
+       "share": 0.04
+      },
+      {
+       "color": "#6fb7ad",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#dcc79f",
+      "hsl": {
+       "h": 39,
+       "s": 0.47,
+       "l": 0.74
+      },
+      "fg": "#17140f"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 0,
+     "radius": 4,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 4,
+     "hairlineSamples": [
+      "section.border-t.border-line 624px",
+      "section.border-t.border-line 624px",
+      "section.border-t.border-line 624px",
+      "section.border-t.border-line 624px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 2,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 143
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 31,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "geist variable",
+     "geist mono variable",
+     "instrument serif"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 900,
+    "margins": {
+     "left": 160,
+     "right": 160
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Make it yours.",
+      "size": 64,
+      "top": 181,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 685,
+      "n": 4
+     },
+     {
+      "x": 160,
+      "n": 2
+     },
+     {
+      "x": 181,
+      "n": 1
+     },
+     {
+      "x": 292,
+      "n": 1
+     },
+     {
+      "x": 656,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 9,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.12,
+    "voidBox": {
+     "x": 0,
+     "y": 660,
+     "w": 660,
+     "h": 240
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": true,
+    "ground": "#0a0a0b",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 160,
+     "right": 160
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 64,
+     "vw": 4.4,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 181,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 5,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 7,
+     "radii": [
+      [
+       0,
+       4
+      ],
+      [
+       4,
+       3
+      ]
+     ],
+     "heavyBorders": 7,
+     "borderSamples": [
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 5,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.17,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      64
+     ]
+    },
+    "title": {
+     "text": "Make it yours.",
+     "size": 64,
+     "top": 181
+    },
+    "colourShare": 0
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.44
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 222,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 6,
+     "sections": 4,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 42,
+     "vw": 5.5,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 181,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Make it yours.",
+     "words": 3,
+     "lines": 2,
+     "size": 42,
+     "font": "Instrument Serif"
+    },
+    "headings": [
+     {
+      "text": "BandIt",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "left",
+      "widthRatio": 0.09,
+      "top": 32,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "The person wearing it",
+      "words": 4,
+      "chars": 21,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.31,
+      "top": 172,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Make it yours.",
+      "words": 3,
+      "chars": 14,
+      "lines": 2,
+      "size": 42,
+      "vw": 5.5,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": -0.02,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.23,
+      "top": 181,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "05",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Geist Mono Variable",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": true,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.26,
+      "top": 392,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "Your documents",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.36,
+      "top": 493,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A second look",
+      "words": 3,
+      "chars": 13,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.3,
+      "top": 1152,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A card for the night",
+      "words": 5,
+      "chars": 20,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.3,
+      "top": 1355,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 7,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Geist Variable",
+       "share": 0.92,
+       "mono": false
+      },
+      {
+       "family": "Instrument Serif",
+       "share": 0.08,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono Variable",
+       "share": 0.01,
+       "mono": true
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      42
+     ],
+     "sizeCount": 8,
+     "notLoaded": [],
+     "body": {
+      "font": "Geist Variable",
+      "size": 13,
+      "leading": 1.85,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.9
+     },
+     "measureChars": 56,
+     "max": {
+      "size": 42,
+      "vw": 5.5,
+      "font": "Instrument Serif",
+      "text": "Make it yours."
+     },
+     "monoShare": 0.01,
+     "monoProseShare": 0.01,
+     "monoFamilies": [
+      "Geist Mono Variable"
+     ],
+     "monoSamples": [
+      "05",
+      "01",
+      "02",
+      "03",
+      "04"
+     ],
+     "microLabels": 2,
+     "microLabelShare": 0.028,
+     "microSamples": [
+      "One band. Your night.",
+      "Demo payment"
+     ],
+     "upperShare": 0.03,
+     "centerShare": 0.02,
+     "smallText": 4
+    },
+    "eyebrows": [],
+    "numbered": [
+     {
+      "text": "05",
+      "size": 30,
+      "top": 392
+     },
+     {
+      "text": "01",
+      "size": 11,
+      "top": 172
+     },
+     {
+      "text": "02",
+      "size": 11,
+      "top": 493
+     },
+     {
+      "text": "03",
+      "size": 11,
+      "top": 1152
+     },
+     {
+      "text": "04",
+      "size": 11,
+      "top": 1355
+     }
+    ],
+    "color": {
+     "bodyBg": "#0a0a0b",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.05,
+      "l": 0.04
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0a0a0b",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.05,
+        "l": 0.04
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#a3a3a8",
+       "share": 0.62
+      },
+      {
+       "color": "#ecebe6",
+       "share": 0.17
+      },
+      {
+       "color": "#85858b",
+       "share": 0.14
+      },
+      {
+       "color": "#dcc79f",
+       "share": 0.04
+      },
+      {
+       "color": "#6fb7ad",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#dcc79f",
+      "hsl": {
+       "h": 39,
+       "s": 0.47,
+       "l": 0.74
+      },
+      "fg": "#17140f"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 0,
+     "radius": 4,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 4,
+     "hairlineSamples": [
+      "section.border-t.border-line 365px",
+      "section.border-t.border-line 365px",
+      "section.border-t.border-line 365px",
+      "section.border-t.border-line 365px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 2,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 143
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 31,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "geist variable",
+     "geist mono variable",
+     "instrument serif"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 40,
+     "right": 40
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Make it yours.",
+      "size": 42,
+      "top": 181,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 392,
+      "n": 4
+     },
+     {
+      "x": 40,
+      "n": 2
+     },
+     {
+      "x": 61,
+      "n": 1
+     },
+     {
+      "x": 172,
+      "n": 1
+     },
+     {
+      "x": 363,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 9,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": true,
+    "ground": "#0a0a0b",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 40,
+     "right": 40
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 42,
+     "vw": 5.5,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 181,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 5,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 7,
+     "radii": [
+      [
+       0,
+       4
+      ],
+      [
+       4,
+       3
+      ]
+     ],
+     "heavyBorders": 7,
+     "borderSamples": [
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 5,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.17,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      42
+     ]
+    },
+    "title": {
+     "text": "Make it yours.",
+     "size": 42,
+     "top": 181
+    },
+    "colourShare": 0
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.46
+   ],
+   "motion": {
+    "elements": 0,
+    "css": 0,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 222,
+     "img": 0,
+     "video": 0,
+     "canvas": 0,
+     "svg": 6,
+     "sections": 4,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 42,
+     "vw": 10.8,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 149,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Make it yours.",
+     "words": 3,
+     "lines": 2,
+     "size": 42,
+     "font": "Instrument Serif"
+    },
+    "headings": [
+     {
+      "text": "BandIt",
+      "words": 1,
+      "chars": 6,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "left",
+      "widthRatio": 0.18,
+      "top": 24,
+      "tag": "button",
+      "kind": "heading"
+     },
+     {
+      "text": "Make it yours.",
+      "words": 3,
+      "chars": 14,
+      "lines": 2,
+      "size": 42,
+      "vw": 10.8,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": -0.02,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.45,
+      "top": 149,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "05",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Geist Mono Variable",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": true,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.79,
+      "top": 360,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "The person wearing it",
+      "words": 4,
+      "chars": 21,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.61,
+      "top": 639,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Your documents",
+      "words": 2,
+      "chars": 14,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.71,
+      "top": 1146,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A second look",
+      "words": 3,
+      "chars": 13,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.6,
+      "top": 1805,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "A card for the night",
+      "words": 5,
+      "chars": 20,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "Instrument Serif",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.6,
+      "top": 2008,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 7,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": 3,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Geist Variable",
+       "share": 0.92,
+       "mono": false
+      },
+      {
+       "family": "Instrument Serif",
+       "share": 0.08,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono Variable",
+       "share": 0.01,
+       "mono": true
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      42
+     ],
+     "sizeCount": 8,
+     "notLoaded": [],
+     "body": {
+      "font": "Geist Variable",
+      "size": 13,
+      "leading": 1.85,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 7.9
+     },
+     "measureChars": 54,
+     "max": {
+      "size": 42,
+      "vw": 10.8,
+      "font": "Instrument Serif",
+      "text": "Make it yours."
+     },
+     "monoShare": 0.01,
+     "monoProseShare": 0.01,
+     "monoFamilies": [
+      "Geist Mono Variable"
+     ],
+     "monoSamples": [
+      "05",
+      "01",
+      "02",
+      "03",
+      "04"
+     ],
+     "microLabels": 2,
+     "microLabelShare": 0.028,
+     "microSamples": [
+      "One band. Your night.",
+      "Demo payment"
+     ],
+     "upperShare": 0.03,
+     "centerShare": 0.02,
+     "smallText": 4
+    },
+    "eyebrows": [
+     {
+      "text": "One band. Your night.",
+      "above": "Make it yours.",
+      "upper": true,
+      "tracked": true,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 111
+     }
+    ],
+    "numbered": [
+     {
+      "text": "05",
+      "size": 30,
+      "top": 360
+     },
+     {
+      "text": "01",
+      "size": 11,
+      "top": 639
+     },
+     {
+      "text": "02",
+      "size": 11,
+      "top": 1146
+     },
+     {
+      "text": "03",
+      "size": 11,
+      "top": 1805
+     },
+     {
+      "text": "04",
+      "size": 11,
+      "top": 2008
+     }
+    ],
+    "color": {
+     "bodyBg": "#0a0a0b",
+     "bodyBgHsl": {
+      "h": 240,
+      "s": 0.05,
+      "l": 0.04
+     },
+     "dark": true,
+     "sectionBgs": [
+      {
+       "color": "#0a0a0b",
+       "top": 0,
+       "hsl": {
+        "h": 240,
+        "s": 0.05,
+        "l": 0.04
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#a3a3a8",
+       "share": 0.62
+      },
+      {
+       "color": "#ecebe6",
+       "share": 0.17
+      },
+      {
+       "color": "#85858b",
+       "share": 0.14
+      },
+      {
+       "color": "#dcc79f",
+       "share": 0.04
+      },
+      {
+       "color": "#6fb7ad",
+       "share": 0.03
+      }
+     ],
+     "button": {
+      "bg": "#dcc79f",
+      "hsl": {
+       "h": 39,
+       "s": 0.47,
+       "l": 0.74
+      },
+      "fg": "#17140f"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 0,
+     "radius": 4,
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 4,
+     "hairlineSamples": [
+      "section.border-t.border-line 350px",
+      "section.border-t.border-line 350px",
+      "section.border-t.border-line 350px",
+      "section.border-t.border-line 350px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 2,
+     "blurred": 0,
+     "roundedBoxes": 0,
+     "boxRadius": 0,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": false,
+       "top": 610
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 31,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "geist variable",
+     "geist mono variable",
+     "instrument serif"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 20,
+     "right": 20
+    },
+    "sections": [
+     {
+      "sel": "aside.min-w-0.md:sticky",
+      "tag": "aside",
+      "top": 111,
+      "height": 451,
+      "words": 51,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Make it yours.",
+       "size": 42,
+       "tag": "h1"
+      },
+      "left": 20,
+      "right": 40,
+      "textLeft": 20,
+      "textRight": 40,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "section.border-t.border-line",
+      "tag": "section",
+      "top": 610,
+      "height": 467,
+      "words": 19,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "The person wearing it",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 102,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.border-t.border-line",
+      "tag": "section",
+      "top": 1117,
+      "height": 619,
+      "words": 71,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Your documents",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 23,
+      "textLeft": 20,
+      "textRight": 23,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.border-t.border-line",
+      "tag": "section",
+      "top": 1776,
+      "height": 163,
+      "words": 24,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "A second look",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 43,
+      "textLeft": 20,
+      "textRight": 43,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.border-t.border-line",
+      "tag": "section",
+      "top": 1979,
+      "height": 604,
+      "words": 55,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "A card for the night",
+       "size": 30,
+       "tag": "h2"
+      },
+      "left": 20,
+      "right": 20,
+      "textLeft": 20,
+      "textRight": 55,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Make it yours.",
+      "size": 42,
+      "top": 149,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 41,
+      "n": 5
+     },
+     {
+      "x": 20,
+      "n": 3
+     },
+     {
+      "x": 152,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 9,
+    "bodySize": 13,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": true,
+    "ground": "#0a0a0b",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 20,
+     "right": 20
+    },
+    "hero": {
+     "text": "Make it yours.",
+     "words": 3,
+     "chars": 14,
+     "lines": 2,
+     "size": 42,
+     "vw": 10.8,
+     "font": "Instrument Serif",
+     "weight": 400,
+     "tracking": -0.02,
+     "leading": 0.98,
+     "top": 149,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 5,
+     "firstScreen": 2,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 7,
+     "radii": [
+      [
+       0,
+       4
+      ],
+      [
+       4,
+       3
+      ]
+     ],
+     "heavyBorders": 7,
+     "borderSamples": [
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)",
+      "#cdcdd5 on #0a0a0b (12.52:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 5,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.17,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      30,
+      42
+     ]
+    },
+    "title": {
+     "text": "Make it yours.",
+     "size": 42,
+     "top": 149
+    },
+    "colourShare": 0
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "2 tiny uppercase letter-spaced label(s): \"One band. Your night.\", \"Demo payment\"",
+   "fix": "Prefer sentence case at body size.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "heavy-borders",
+   "width": 1440,
+   "message": "7 panel borders are dark against their ground: #cdcdd5 on #0a0a0b (12.52:1) | #cdcdd5 on #0a0a0b (12.52:1) | #cdcdd5 on #0a0a0b (12.52:1)",
+   "fix": "A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "app-title-size",
+   "width": 1440,
+   "message": "The h1 is 64px (\"Make it yours.\").",
+   "fix": "An app screen is not a landing page: the title is 18-32px (20-24px on a phone).",
+   "alsoAt": [
+    768,
+    390
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/desktop-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/tablet-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/mobile-fold.jpg",
+   "pages": [
+    "/Users/elai410/Projects/cal-hacks-13/.taste-skill/signup/before/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
