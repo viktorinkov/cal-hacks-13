@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>splat renderer</title>
+<script type="importmap">
+{"imports": {"three": "/vendor/three@0.180.0/build/three.module.js",
+             "three/addons/": "/vendor/three@0.180.0/examples/jsm/",
+             "@sparkjsdev/spark": "/vendor/@sparkjsdev/spark@2.4.0/dist/spark.module.js"}}
+</script>
+<style>html, body { margin: 0; background: #000; }</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { SparkRenderer, SplatMesh, dyno as D } from '@sparkjsdev/spark';
+
+const scene = await (await fetch('/scene.json')).json();
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const world = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 500);
+const spark = new SparkRenderer({ renderer });
+world.add(spark);
+
+function place(mesh) {
+  mesh.matrixAutoUpdate = false;
+  mesh.matrix.fromArray(scene.matrix);
+  world.add(mesh);
+  return mesh;
+}
+
+const colour = place(new SplatMesh({ url: scene.splat }));
+const depth = place(new SplatMesh({ url: scene.splat, maxSh: 0 }));
+const k = (v) => D.dynoConst('float', v);
+depth.enableWorldToView = true;
+depth.worldModifier = D.dynoBlock({ gsplat: D.Gsplat }, { gsplat: D.Gsplat }, ({ gsplat }) => {
+  let { center } = D.splitGsplat(gsplat).outputs;
+  center = depth.context.worldToView.apply(center);
+  const z = D.neg(D.split(center).outputs.z);
+  const band = (range) => D.clamp(D.div(z, k(range)), k(0), k(1));
+  return { gsplat: D.combineGsplat({ gsplat, r: band(100), g: band(25), b: band(6) }) };
+});
+depth.updateGenerator();
+depth.visible = false;
+
+const frame = () => new Promise((done) => requestAnimationFrame(() => { renderer.render(world, camera); done(); }));
+
+async function shot(c2w, fovY, w, h, frames, asDepth) {
+  colour.visible = !asDepth;
+  depth.visible = asDepth;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = fovY;
+  camera.updateProjectionMatrix();
+  new THREE.Matrix4().fromArray(c2w).decompose(camera.position, camera.quaternion, camera.scale);
+  camera.updateMatrixWorld(true);
+  let n = 0;
+  for (; n < 240; n++) {
+    await frame();
+    if (n + 1 >= frames && !spark.sorting && !spark.sortDirty && spark.sortedCenter.distanceTo(camera.position) < 1e-3) break;
+  }
+  await frame();
+  window.lastFrames = n + 2;
+  return renderer.domElement.toDataURL(asDepth ? 'image/png' : 'image/jpeg', 0.92).split(',')[1];
+}
+
+window.render = async (c2w, fovY, w, h, dw, dh, frames = 6) => ({
+  colour: await shot(c2w, fovY, w, h, frames, false),
+  depth: dw ? await shot(c2w, fovY, dw, dh, frames, true) : null,
+});
+window.ready = Promise.all([colour.initialized, depth.initialized]).then(() => 'ready');
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Places</title>
+<link rel="stylesheet" href="/style.css">
+<script type="importmap">
+{"imports": {"three": "/vendor/three@0.180.0/build/three.module.js",
+             "three/addons/": "/vendor/three@0.180.0/examples/jsm/",
+             "@sparkjsdev/spark": "/vendor/@sparkjsdev/spark@2.4.0/dist/spark.module.js"}}
+</script>
+</head>
+<body>
+<main id="stage">
+  <div id="world"></div>
+  <div id="lens" hidden>
+    <img id="lens-photo" alt="">
+    <div id="lens-wipe"></div>
+  </div>
+  <header id="bar">
+    <div class="brand">Photo places <span id="count"></span></div>
+    <div class="tools">
+      <button id="overview" type="button">Whole hall</button>
+      <button id="through" type="button" disabled>Through the lens</button>
+      <label id="blend-wrap" hidden>scan <input id="blend" type="range" min="0" max="100" value="100"> photo</label>
+    </div>
+  </header>
+  <div id="status">loading the hall</div>
+</main>
+<aside id="panel">
+  <section id="detail" hidden>
+    <img id="detail-photo" alt="">
+    <h2 id="detail-where"></h2>
+    <dl id="detail-facts"></dl>
+    <h3>In this photo</h3>
+    <ul id="detail-shows" class="chips"></ul>
+    <h3>Send to</h3>
+    <ul id="detail-send" class="bands"></ul>
+    <p id="detail-note" class="note"></p>
+  </section>
+  <section>
+    <h3 id="list-title">Photos</h3>
+    <ol id="list"></ol>
+  </section>
+</aside>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
