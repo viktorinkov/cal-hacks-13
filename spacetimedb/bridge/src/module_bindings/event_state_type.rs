@@ -1,0 +1,49 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct EventState {
+    pub id: u8,
+    pub ended: bool,
+    pub ended_at: Option<__sdk::Timestamp>,
+    pub ended_by: __sdk::Identity,
+}
+
+impl __sdk::InModule for EventState {
+    type Module = super::RemoteModule;
+}
+
+pub struct EventStateCols {
+    pub id: __sdk::__query_builder::Col<EventState, u8>,
+    pub ended: __sdk::__query_builder::Col<EventState, bool>,
+    pub ended_at: __sdk::__query_builder::Col<EventState, Option<__sdk::Timestamp>>,
+    pub ended_by: __sdk::__query_builder::Col<EventState, __sdk::Identity>,
+}
+
+impl __sdk::__query_builder::HasCols for EventState {
+    type Cols = EventStateCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        EventStateCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            ended: __sdk::__query_builder::Col::new(table_name, "ended"),
+            ended_at: __sdk::__query_builder::Col::new(table_name, "ended_at"),
+            ended_by: __sdk::__query_builder::Col::new(table_name, "ended_by"),
+        }
+    }
+}
+
+pub struct EventStateIxCols {
+    pub id: __sdk::__query_builder::IxCol<EventState, u8>,
+}
+
+impl __sdk::__query_builder::HasIxCols for EventState {
+    type IxCols = EventStateIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        EventStateIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for EventState {}

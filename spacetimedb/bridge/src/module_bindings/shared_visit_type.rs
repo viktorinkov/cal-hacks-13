@@ -1,0 +1,70 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct SharedVisit {
+    pub id: u64,
+    pub attendee_a: __sdk::Identity,
+    pub attendee_b: __sdk::Identity,
+    pub zone_id: u64,
+    pub visit_a: u64,
+    pub visit_b: u64,
+    pub started_at: __sdk::Timestamp,
+    pub overlap_minutes: f32,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for SharedVisit {
+    type Module = super::RemoteModule;
+}
+
+pub struct SharedVisitCols {
+    pub id: __sdk::__query_builder::Col<SharedVisit, u64>,
+    pub attendee_a: __sdk::__query_builder::Col<SharedVisit, __sdk::Identity>,
+    pub attendee_b: __sdk::__query_builder::Col<SharedVisit, __sdk::Identity>,
+    pub zone_id: __sdk::__query_builder::Col<SharedVisit, u64>,
+    pub visit_a: __sdk::__query_builder::Col<SharedVisit, u64>,
+    pub visit_b: __sdk::__query_builder::Col<SharedVisit, u64>,
+    pub started_at: __sdk::__query_builder::Col<SharedVisit, __sdk::Timestamp>,
+    pub overlap_minutes: __sdk::__query_builder::Col<SharedVisit, f32>,
+    pub updated_at: __sdk::__query_builder::Col<SharedVisit, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for SharedVisit {
+    type Cols = SharedVisitCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        SharedVisitCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            attendee_a: __sdk::__query_builder::Col::new(table_name, "attendee_a"),
+            attendee_b: __sdk::__query_builder::Col::new(table_name, "attendee_b"),
+            zone_id: __sdk::__query_builder::Col::new(table_name, "zone_id"),
+            visit_a: __sdk::__query_builder::Col::new(table_name, "visit_a"),
+            visit_b: __sdk::__query_builder::Col::new(table_name, "visit_b"),
+            started_at: __sdk::__query_builder::Col::new(table_name, "started_at"),
+            overlap_minutes: __sdk::__query_builder::Col::new(table_name, "overlap_minutes"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct SharedVisitIxCols {
+    pub attendee_a: __sdk::__query_builder::IxCol<SharedVisit, __sdk::Identity>,
+    pub attendee_b: __sdk::__query_builder::IxCol<SharedVisit, __sdk::Identity>,
+    pub id: __sdk::__query_builder::IxCol<SharedVisit, u64>,
+    pub zone_id: __sdk::__query_builder::IxCol<SharedVisit, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for SharedVisit {
+    type IxCols = SharedVisitIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        SharedVisitIxCols {
+            attendee_a: __sdk::__query_builder::IxCol::new(table_name, "attendee_a"),
+            attendee_b: __sdk::__query_builder::IxCol::new(table_name, "attendee_b"),
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            zone_id: __sdk::__query_builder::IxCol::new(table_name, "zone_id"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for SharedVisit {}

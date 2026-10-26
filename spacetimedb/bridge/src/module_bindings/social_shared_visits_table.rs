@@ -1,0 +1,145 @@
+#![allow(unused, clippy::all)]
+use super::shared_visit_type::SharedVisit;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct SocialSharedVisitsTableHandle<'ctx> {
+    imp: __sdk::TableHandle<SharedVisit>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct SocialSharedVisitsTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for SocialSharedVisitsTableAccessor {
+    type Row = SharedVisit;
+    type Handle<'db> = SocialSharedVisitsTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.social_shared_visits()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait SocialSharedVisitsTableAccess {
+    #[allow(non_snake_case)]
+    fn social_shared_visits(&self) -> SocialSharedVisitsTableHandle<'_>;
+}
+
+impl SocialSharedVisitsTableAccess for super::RemoteTables {
+    fn social_shared_visits(&self) -> SocialSharedVisitsTableHandle<'_> {
+        SocialSharedVisitsTableHandle {
+            imp: self.imp.get_table::<SharedVisit>("social_shared_visits"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct SocialSharedVisitsInsertCallbackId(__sdk::CallbackId);
+pub struct SocialSharedVisitsDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for SocialSharedVisitsTableHandle<'ctx> {
+    type Row = SharedVisit;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = SharedVisit> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for SocialSharedVisitsTableHandle<'ctx> {
+    type Row = SharedVisit;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = SharedVisit> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = SocialSharedVisitsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> SocialSharedVisitsInsertCallbackId {
+        SocialSharedVisitsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: SocialSharedVisitsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = SocialSharedVisitsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> SocialSharedVisitsDeleteCallbackId {
+        SocialSharedVisitsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: SocialSharedVisitsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for SocialSharedVisitsTableHandle<'ctx> {
+    type InsertCallbackId = SocialSharedVisitsInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> SocialSharedVisitsInsertCallbackId {
+        SocialSharedVisitsInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: SocialSharedVisitsInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for SocialSharedVisitsTableHandle<'ctx> {
+    type DeleteCallbackId = SocialSharedVisitsDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> SocialSharedVisitsDeleteCallbackId {
+        SocialSharedVisitsDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: SocialSharedVisitsDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<SharedVisit>("social_shared_visits");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<SharedVisit>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<SharedVisit>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait social_shared_visitsQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn social_shared_visits(&self) -> __sdk::__query_builder::Table<SharedVisit>;
+}
+
+impl social_shared_visitsQueryTableAccess for __sdk::QueryTableAccessor {
+    fn social_shared_visits(&self) -> __sdk::__query_builder::Table<SharedVisit> {
+        __sdk::__query_builder::Table::new("social_shared_visits")
+    }
+}

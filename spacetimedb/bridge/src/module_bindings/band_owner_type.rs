@@ -1,0 +1,48 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct BandOwner {
+    pub band_id: u8,
+    pub owner: __sdk::Identity,
+    pub claimed_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for BandOwner {
+    type Module = super::RemoteModule;
+}
+
+pub struct BandOwnerCols {
+    pub band_id: __sdk::__query_builder::Col<BandOwner, u8>,
+    pub owner: __sdk::__query_builder::Col<BandOwner, __sdk::Identity>,
+    pub claimed_at: __sdk::__query_builder::Col<BandOwner, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for BandOwner {
+    type Cols = BandOwnerCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        BandOwnerCols {
+            band_id: __sdk::__query_builder::Col::new(table_name, "band_id"),
+            owner: __sdk::__query_builder::Col::new(table_name, "owner"),
+            claimed_at: __sdk::__query_builder::Col::new(table_name, "claimed_at"),
+        }
+    }
+}
+
+pub struct BandOwnerIxCols {
+    pub band_id: __sdk::__query_builder::IxCol<BandOwner, u8>,
+    pub owner: __sdk::__query_builder::IxCol<BandOwner, __sdk::Identity>,
+}
+
+impl __sdk::__query_builder::HasIxCols for BandOwner {
+    type IxCols = BandOwnerIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        BandOwnerIxCols {
+            band_id: __sdk::__query_builder::IxCol::new(table_name, "band_id"),
+            owner: __sdk::__query_builder::IxCol::new(table_name, "owner"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for BandOwner {}

@@ -1,0 +1,83 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct MerchTemplate {
+    pub id: u64,
+    pub name: String,
+    pub title: String,
+    pub kind: String,
+    pub price_cents: u64,
+    pub image_url: String,
+    pub width: u32,
+    pub height: u32,
+    pub photo_x: u32,
+    pub photo_y: u32,
+    pub photo_w: u32,
+    pub photo_h: u32,
+    pub booth_ids: Vec<u64>,
+    pub updated_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for MerchTemplate {
+    type Module = super::RemoteModule;
+}
+
+pub struct MerchTemplateCols {
+    pub id: __sdk::__query_builder::Col<MerchTemplate, u64>,
+    pub name: __sdk::__query_builder::Col<MerchTemplate, String>,
+    pub title: __sdk::__query_builder::Col<MerchTemplate, String>,
+    pub kind: __sdk::__query_builder::Col<MerchTemplate, String>,
+    pub price_cents: __sdk::__query_builder::Col<MerchTemplate, u64>,
+    pub image_url: __sdk::__query_builder::Col<MerchTemplate, String>,
+    pub width: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub height: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub photo_x: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub photo_y: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub photo_w: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub photo_h: __sdk::__query_builder::Col<MerchTemplate, u32>,
+    pub booth_ids: __sdk::__query_builder::Col<MerchTemplate, Vec<u64>>,
+    pub updated_at: __sdk::__query_builder::Col<MerchTemplate, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for MerchTemplate {
+    type Cols = MerchTemplateCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        MerchTemplateCols {
+            id: __sdk::__query_builder::Col::new(table_name, "id"),
+            name: __sdk::__query_builder::Col::new(table_name, "name"),
+            title: __sdk::__query_builder::Col::new(table_name, "title"),
+            kind: __sdk::__query_builder::Col::new(table_name, "kind"),
+            price_cents: __sdk::__query_builder::Col::new(table_name, "price_cents"),
+            image_url: __sdk::__query_builder::Col::new(table_name, "image_url"),
+            width: __sdk::__query_builder::Col::new(table_name, "width"),
+            height: __sdk::__query_builder::Col::new(table_name, "height"),
+            photo_x: __sdk::__query_builder::Col::new(table_name, "photo_x"),
+            photo_y: __sdk::__query_builder::Col::new(table_name, "photo_y"),
+            photo_w: __sdk::__query_builder::Col::new(table_name, "photo_w"),
+            photo_h: __sdk::__query_builder::Col::new(table_name, "photo_h"),
+            booth_ids: __sdk::__query_builder::Col::new(table_name, "booth_ids"),
+            updated_at: __sdk::__query_builder::Col::new(table_name, "updated_at"),
+        }
+    }
+}
+
+pub struct MerchTemplateIxCols {
+    pub id: __sdk::__query_builder::IxCol<MerchTemplate, u64>,
+    pub name: __sdk::__query_builder::IxCol<MerchTemplate, String>,
+    pub price_cents: __sdk::__query_builder::IxCol<MerchTemplate, u64>,
+}
+
+impl __sdk::__query_builder::HasIxCols for MerchTemplate {
+    type IxCols = MerchTemplateIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        MerchTemplateIxCols {
+            id: __sdk::__query_builder::IxCol::new(table_name, "id"),
+            name: __sdk::__query_builder::IxCol::new(table_name, "name"),
+            price_cents: __sdk::__query_builder::IxCol::new(table_name, "price_cents"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for MerchTemplate {}

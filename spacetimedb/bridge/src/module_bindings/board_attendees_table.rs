@@ -1,0 +1,146 @@
+#![allow(unused, clippy::all)]
+use super::attendee_out_type::AttendeeOut;
+use super::handle_out_type::HandleOut;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct BoardAttendeesTableHandle<'ctx> {
+    imp: __sdk::TableHandle<AttendeeOut>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct BoardAttendeesTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for BoardAttendeesTableAccessor {
+    type Row = AttendeeOut;
+    type Handle<'db> = BoardAttendeesTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.board_attendees()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait BoardAttendeesTableAccess {
+    #[allow(non_snake_case)]
+    fn board_attendees(&self) -> BoardAttendeesTableHandle<'_>;
+}
+
+impl BoardAttendeesTableAccess for super::RemoteTables {
+    fn board_attendees(&self) -> BoardAttendeesTableHandle<'_> {
+        BoardAttendeesTableHandle {
+            imp: self.imp.get_table::<AttendeeOut>("board_attendees"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct BoardAttendeesInsertCallbackId(__sdk::CallbackId);
+pub struct BoardAttendeesDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for BoardAttendeesTableHandle<'ctx> {
+    type Row = AttendeeOut;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = AttendeeOut> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for BoardAttendeesTableHandle<'ctx> {
+    type Row = AttendeeOut;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = AttendeeOut> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = BoardAttendeesInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardAttendeesInsertCallbackId {
+        BoardAttendeesInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: BoardAttendeesInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = BoardAttendeesDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardAttendeesDeleteCallbackId {
+        BoardAttendeesDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: BoardAttendeesDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for BoardAttendeesTableHandle<'ctx> {
+    type InsertCallbackId = BoardAttendeesInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardAttendeesInsertCallbackId {
+        BoardAttendeesInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: BoardAttendeesInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for BoardAttendeesTableHandle<'ctx> {
+    type DeleteCallbackId = BoardAttendeesDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> BoardAttendeesDeleteCallbackId {
+        BoardAttendeesDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: BoardAttendeesDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<AttendeeOut>("board_attendees");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<AttendeeOut>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<AttendeeOut>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait board_attendeesQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn board_attendees(&self) -> __sdk::__query_builder::Table<AttendeeOut>;
+}
+
+impl board_attendeesQueryTableAccess for __sdk::QueryTableAccessor {
+    fn board_attendees(&self) -> __sdk::__query_builder::Table<AttendeeOut> {
+        __sdk::__query_builder::Table::new("board_attendees")
+    }
+}

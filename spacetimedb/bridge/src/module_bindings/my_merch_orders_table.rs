@@ -1,0 +1,145 @@
+#![allow(unused, clippy::all)]
+use super::merch_order_type::MerchOrder;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct MyMerchOrdersTableHandle<'ctx> {
+    imp: __sdk::TableHandle<MerchOrder>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct MyMerchOrdersTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for MyMerchOrdersTableAccessor {
+    type Row = MerchOrder;
+    type Handle<'db> = MyMerchOrdersTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.my_merch_orders()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait MyMerchOrdersTableAccess {
+    #[allow(non_snake_case)]
+    fn my_merch_orders(&self) -> MyMerchOrdersTableHandle<'_>;
+}
+
+impl MyMerchOrdersTableAccess for super::RemoteTables {
+    fn my_merch_orders(&self) -> MyMerchOrdersTableHandle<'_> {
+        MyMerchOrdersTableHandle {
+            imp: self.imp.get_table::<MerchOrder>("my_merch_orders"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct MyMerchOrdersInsertCallbackId(__sdk::CallbackId);
+pub struct MyMerchOrdersDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for MyMerchOrdersTableHandle<'ctx> {
+    type Row = MerchOrder;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MerchOrder> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for MyMerchOrdersTableHandle<'ctx> {
+    type Row = MerchOrder;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MerchOrder> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = MyMerchOrdersInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchOrdersInsertCallbackId {
+        MyMerchOrdersInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyMerchOrdersInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = MyMerchOrdersDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchOrdersDeleteCallbackId {
+        MyMerchOrdersDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyMerchOrdersDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for MyMerchOrdersTableHandle<'ctx> {
+    type InsertCallbackId = MyMerchOrdersInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchOrdersInsertCallbackId {
+        MyMerchOrdersInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyMerchOrdersInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for MyMerchOrdersTableHandle<'ctx> {
+    type DeleteCallbackId = MyMerchOrdersDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyMerchOrdersDeleteCallbackId {
+        MyMerchOrdersDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyMerchOrdersDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<MerchOrder>("my_merch_orders");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<MerchOrder>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<MerchOrder>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait my_merch_ordersQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn my_merch_orders(&self) -> __sdk::__query_builder::Table<MerchOrder>;
+}
+
+impl my_merch_ordersQueryTableAccess for __sdk::QueryTableAccessor {
+    fn my_merch_orders(&self) -> __sdk::__query_builder::Table<MerchOrder> {
+        __sdk::__query_builder::Table::new("my_merch_orders")
+    }
+}

@@ -1,0 +1,49 @@
+#![allow(unused, clippy::all)]
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+#[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
+#[sats(crate = __lib)]
+pub struct ClaimantAccount {
+    pub identity: __sdk::Identity,
+    pub customer_id: String,
+    pub account_id: String,
+    pub created_at: __sdk::Timestamp,
+}
+
+impl __sdk::InModule for ClaimantAccount {
+    type Module = super::RemoteModule;
+}
+
+pub struct ClaimantAccountCols {
+    pub identity: __sdk::__query_builder::Col<ClaimantAccount, __sdk::Identity>,
+    pub customer_id: __sdk::__query_builder::Col<ClaimantAccount, String>,
+    pub account_id: __sdk::__query_builder::Col<ClaimantAccount, String>,
+    pub created_at: __sdk::__query_builder::Col<ClaimantAccount, __sdk::Timestamp>,
+}
+
+impl __sdk::__query_builder::HasCols for ClaimantAccount {
+    type Cols = ClaimantAccountCols;
+    fn cols(table_name: &'static str) -> Self::Cols {
+        ClaimantAccountCols {
+            identity: __sdk::__query_builder::Col::new(table_name, "identity"),
+            customer_id: __sdk::__query_builder::Col::new(table_name, "customer_id"),
+            account_id: __sdk::__query_builder::Col::new(table_name, "account_id"),
+            created_at: __sdk::__query_builder::Col::new(table_name, "created_at"),
+        }
+    }
+}
+
+pub struct ClaimantAccountIxCols {
+    pub identity: __sdk::__query_builder::IxCol<ClaimantAccount, __sdk::Identity>,
+}
+
+impl __sdk::__query_builder::HasIxCols for ClaimantAccount {
+    type IxCols = ClaimantAccountIxCols;
+    fn ix_cols(table_name: &'static str) -> Self::IxCols {
+        ClaimantAccountIxCols {
+            identity: __sdk::__query_builder::IxCol::new(table_name, "identity"),
+        }
+    }
+}
+
+impl __sdk::__query_builder::CanBeLookupTable for ClaimantAccount {}

@@ -1,109 +1,540 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
+pub mod add_incident_note_reducer;
+pub mod api_session_type;
+pub mod api_sessions_table;
+pub mod apply_medical_record_reducer;
+pub mod approval_type;
+pub mod approve_claim_reducer;
+pub mod assign_medic_reducer;
+pub mod attach_claim_letters_reducer;
+pub mod attach_recovery_letter_reducer;
+pub mod attendee_out_type;
+pub mod attendee_type;
+pub mod authority_limit_row_type;
 pub mod band_beacon_type;
+pub mod band_claim_type;
+pub mod band_owner_type;
 pub mod band_table;
 pub mod band_type;
+pub mod blob_ref_type;
+pub mod board_approvals_table;
+pub mod board_attendees_table;
+pub mod board_authority_table;
+pub mod board_checks_table;
+pub mod board_facts_table;
+pub mod board_ledger_table;
+pub mod board_lines_table;
+pub mod board_notes_table;
+pub mod board_policies_table;
+pub mod board_precedents_table;
+pub mod board_records_table;
+pub mod board_reviews_table;
+pub mod board_rules_table;
+pub mod booth_in_type;
+pub mod booth_table;
+pub mod booth_type;
 pub mod bridge_type;
+pub mod buy_merch_reducer;
+pub mod camera_table;
+pub mod camera_type;
+pub mod check_in_type;
+pub mod claim_band_reducer;
+pub mod claim_check_type;
+pub mod claim_checks_table;
+pub mod claim_facts_table;
+pub mod claim_job_reducer;
+pub mod claim_ledger_table;
+pub mod claim_line_type;
+pub mod claim_lines_table;
+pub mod claim_person_reducer;
+pub mod claim_precedent_type;
+pub mod claim_review_type;
+pub mod claim_reviews_table;
+pub mod claim_status_type;
+pub mod claim_type;
+pub mod claimant_account_type;
+pub mod claimed_people_table;
+pub mod claimed_person_type;
+pub mod claims_board_table;
 pub mod clear_reducer;
 pub mod command_sent_reducer;
 pub mod command_table;
 pub mod command_type;
-pub mod complete_payment_reducer;
-pub mod decline_payment_reducer;
+pub mod complete_job_reducer;
+pub mod coverage_rule_row_type;
+pub mod crowd_member_type;
+pub mod crowd_timer_type;
 pub mod encounter_table;
 pub mod encounter_type;
+pub mod end_event_reducer;
+pub mod event_bundle_type;
+pub mod event_graph_table;
 pub mod event_kind_type;
+pub mod event_link_type;
+pub mod event_state_table;
+pub mod event_state_type;
 pub mod event_table;
 pub mod event_type;
+pub mod evidence_fact_type;
+pub mod evidence_pack_type;
+pub mod extend_job_lease_reducer;
+pub mod fact_type;
+pub mod fail_job_reducer;
 pub mod force_state_reducer;
 pub mod gateway_table;
 pub mod gateway_type;
 pub mod gateway_up_reducer;
+pub mod grant_role_reducer;
+pub mod graph_link_type;
+pub mod handle_out_type;
 pub mod haptic_reducer;
 pub mod heard_entry_type;
+pub mod import_event_reducer;
+pub mod import_run_table;
+pub mod import_run_type;
+pub mod incident_band_type;
+pub mod incident_bands_table;
+pub mod incident_kind_type;
+pub mod incident_note_type;
+pub mod incident_snapshot_type;
+pub mod incident_status_type;
+pub mod incident_type;
+pub mod incident_watch_timer_type;
 pub mod ingest_band_reducer;
 pub mod ingest_heard_reducer;
 pub mod ingest_station_reducer;
+pub mod insurance_policy_type;
+pub mod insurance_settings_type;
+pub mod job_reaper_timer_type;
+pub mod job_status_type;
+pub mod job_type;
+pub mod ledger_entry_type;
 pub mod link_table;
 pub mod link_type;
+pub mod load_merch_templates_reducer;
+pub mod medical_record_type;
+pub mod merch_order_type;
+pub mod merch_shop_type;
+pub mod merch_suggestion_type;
+pub mod merch_template_in_type;
+pub mod merch_template_table;
+pub mod merch_template_type;
+pub mod model_call_in_type;
+pub mod model_call_type;
+pub mod my_attendee_table;
+pub mod my_band_table;
+pub mod my_band_type;
+pub mod my_claim_queue_table;
+pub mod my_claim_type;
+pub mod my_claims_table;
+pub mod my_encounter_type;
+pub mod my_encounters_table;
+pub mod my_graph_table;
+pub mod my_handles_table;
+pub mod my_merch_orders_table;
+pub mod my_merch_suggestions_table;
+pub mod my_photo_type;
+pub mod my_photos_table;
+pub mod my_roles_table;
+pub mod my_shared_visit_type;
+pub mod my_shared_visits_table;
+pub mod my_visit_type;
+pub mod my_visits_table;
+pub mod my_wallet_entries_table;
+pub mod my_wallet_table;
+pub mod my_wallet_type;
+pub mod open_api_session_reducer;
+pub mod open_claim_reducer;
+pub mod open_incident_reducer;
+pub mod open_incidents_table;
+pub mod organization_in_type;
+pub mod organization_table;
+pub mod organization_type;
 pub mod owner_type;
-pub mod payment_status_type;
-pub mod payment_table;
-pub mod payment_type;
+pub mod people_link_type;
+pub mod person_card_type;
+pub mod person_claim_type;
+pub mod person_in_type;
+pub mod person_table;
+pub mod person_type;
+pub mod photo_tag_type;
+pub mod photo_type;
+pub mod place_booth_reducer;
+pub mod precedent_in_type;
+pub mod property_event_type;
+pub mod record_claim_payout_reducer;
+pub mod record_insurer_payment_reducer;
+pub mod record_model_call_reducer;
+pub mod record_wallet_reducer;
+pub mod refuse_claim_reducer;
+pub mod register_blob_reducer;
 pub mod register_bridge_reducer;
-pub mod request_payment_reducer;
+pub mod register_photo_reducer;
+pub mod remove_social_handle_reducer;
+pub mod reopen_event_reducer;
+pub mod report_property_event_reducer;
+pub mod report_sim_band_reducer;
+pub mod request_recovery_letter_reducer;
 pub mod reset_bridge_reducer;
+pub mod resolve_incident_reducer;
+pub mod respond_photo_tag_reducer;
+pub mod retry_claim_payout_reducer;
+pub mod revoke_role_reducer;
+pub mod schedule_slot_in_type;
+pub mod schedule_slot_table;
+pub mod schedule_slot_type;
+pub mod section_count_type;
 pub mod send_command_reducer;
+pub mod set_authority_limit_reducer;
 pub mod set_exit_reducer;
+pub mod set_insurance_settings_reducer;
 pub mod set_low_vis_reducer;
 pub mod set_override_reducer;
 pub mod set_rssi_reducer;
+pub mod set_social_handle_reducer;
 pub mod set_thresholds_reducer;
+pub mod set_zone_station_reducer;
 pub mod settings_table;
 pub mod settings_type;
+pub mod settle_merch_order_reducer;
+pub mod settlement_rule_row_type;
+pub mod shared_visit_type;
 pub mod sleep_bands_reducer;
+pub mod social_attendees_table;
+pub mod social_encounter_type;
+pub mod social_encounters_table;
+pub mod social_handle_type;
+pub mod social_handles_table;
+pub mod social_photo_tags_table;
+pub mod social_photos_table;
+pub mod social_shared_visits_table;
+pub mod social_tick_timer_type;
+pub mod social_visits_table;
+pub mod staff_role_type;
+pub mod start_crowd_reducer;
 pub mod start_find_reducer;
+pub mod start_job_reaper_reducer;
+pub mod start_safety_watch_reducer;
 pub mod station_table;
 pub mod station_type;
+pub mod stop_crowd_reducer;
 pub mod stop_find_reducer;
+pub mod submit_claim_checks_reducer;
+pub mod submit_claim_review_reducer;
+pub mod submit_medical_record_reducer;
+pub mod submit_vision_assessment_reducer;
 pub mod sweep_timer_type;
+pub mod update_profile_reducer;
+pub mod upsert_camera_reducer;
+pub mod upsert_coverage_rule_reducer;
+pub mod upsert_insurance_policy_reducer;
+pub mod venue_in_type;
+pub mod venue_table;
+pub mod venue_type;
+pub mod vision_assessment_type;
+pub mod visit_type;
+pub mod wallet_entry_type;
+pub mod worker_jobs_table;
+pub mod zone_in_type;
+pub mod zone_table;
+pub mod zone_type;
 pub mod zone_visit_table;
 pub mod zone_visit_type;
 
+pub use add_incident_note_reducer::add_incident_note;
+pub use api_session_type::ApiSession;
+pub use api_sessions_table::*;
+pub use apply_medical_record_reducer::apply_medical_record;
+pub use approval_type::Approval;
+pub use approve_claim_reducer::approve_claim;
+pub use assign_medic_reducer::assign_medic;
+pub use attach_claim_letters_reducer::attach_claim_letters;
+pub use attach_recovery_letter_reducer::attach_recovery_letter;
+pub use attendee_out_type::AttendeeOut;
+pub use attendee_type::Attendee;
+pub use authority_limit_row_type::AuthorityLimitRow;
 pub use band_beacon_type::BandBeacon;
+pub use band_claim_type::BandClaim;
+pub use band_owner_type::BandOwner;
 pub use band_table::*;
 pub use band_type::Band;
+pub use blob_ref_type::BlobRef;
+pub use board_approvals_table::*;
+pub use board_attendees_table::*;
+pub use board_authority_table::*;
+pub use board_checks_table::*;
+pub use board_facts_table::*;
+pub use board_ledger_table::*;
+pub use board_lines_table::*;
+pub use board_notes_table::*;
+pub use board_policies_table::*;
+pub use board_precedents_table::*;
+pub use board_records_table::*;
+pub use board_reviews_table::*;
+pub use board_rules_table::*;
+pub use booth_in_type::BoothIn;
+pub use booth_table::*;
+pub use booth_type::Booth;
 pub use bridge_type::Bridge;
+pub use buy_merch_reducer::buy_merch;
+pub use camera_table::*;
+pub use camera_type::Camera;
+pub use check_in_type::CheckIn;
+pub use claim_band_reducer::claim_band;
+pub use claim_check_type::ClaimCheck;
+pub use claim_checks_table::*;
+pub use claim_facts_table::*;
+pub use claim_job_reducer::claim_job;
+pub use claim_ledger_table::*;
+pub use claim_line_type::ClaimLine;
+pub use claim_lines_table::*;
+pub use claim_person_reducer::claim_person;
+pub use claim_precedent_type::ClaimPrecedent;
+pub use claim_review_type::ClaimReview;
+pub use claim_reviews_table::*;
+pub use claim_status_type::ClaimStatus;
+pub use claim_type::Claim;
+pub use claimant_account_type::ClaimantAccount;
+pub use claimed_people_table::*;
+pub use claimed_person_type::ClaimedPerson;
+pub use claims_board_table::*;
 pub use clear_reducer::clear;
 pub use command_sent_reducer::command_sent;
 pub use command_table::*;
 pub use command_type::Command;
-pub use complete_payment_reducer::complete_payment;
-pub use decline_payment_reducer::decline_payment;
+pub use complete_job_reducer::complete_job;
+pub use coverage_rule_row_type::CoverageRuleRow;
+pub use crowd_member_type::CrowdMember;
+pub use crowd_timer_type::CrowdTimer;
 pub use encounter_table::*;
 pub use encounter_type::Encounter;
+pub use end_event_reducer::end_event;
+pub use event_bundle_type::EventBundle;
+pub use event_graph_table::*;
 pub use event_kind_type::EventKind;
+pub use event_link_type::EventLink;
+pub use event_state_table::*;
+pub use event_state_type::EventState;
 pub use event_table::*;
 pub use event_type::Event;
+pub use evidence_fact_type::EvidenceFact;
+pub use evidence_pack_type::EvidencePack;
+pub use extend_job_lease_reducer::extend_job_lease;
+pub use fact_type::Fact;
+pub use fail_job_reducer::fail_job;
 pub use force_state_reducer::force_state;
 pub use gateway_table::*;
 pub use gateway_type::Gateway;
 pub use gateway_up_reducer::gateway_up;
+pub use grant_role_reducer::grant_role;
+pub use graph_link_type::GraphLink;
+pub use handle_out_type::HandleOut;
 pub use haptic_reducer::haptic;
 pub use heard_entry_type::HeardEntry;
+pub use import_event_reducer::import_event;
+pub use import_run_table::*;
+pub use import_run_type::ImportRun;
+pub use incident_band_type::IncidentBand;
+pub use incident_bands_table::*;
+pub use incident_kind_type::IncidentKind;
+pub use incident_note_type::IncidentNote;
+pub use incident_snapshot_type::IncidentSnapshot;
+pub use incident_status_type::IncidentStatus;
+pub use incident_type::Incident;
+pub use incident_watch_timer_type::IncidentWatchTimer;
 pub use ingest_band_reducer::ingest_band;
 pub use ingest_heard_reducer::ingest_heard;
 pub use ingest_station_reducer::ingest_station;
+pub use insurance_policy_type::InsurancePolicy;
+pub use insurance_settings_type::InsuranceSettings;
+pub use job_reaper_timer_type::JobReaperTimer;
+pub use job_status_type::JobStatus;
+pub use job_type::Job;
+pub use ledger_entry_type::LedgerEntry;
 pub use link_table::*;
 pub use link_type::Link;
+pub use load_merch_templates_reducer::load_merch_templates;
+pub use medical_record_type::MedicalRecord;
+pub use merch_order_type::MerchOrder;
+pub use merch_shop_type::MerchShop;
+pub use merch_suggestion_type::MerchSuggestion;
+pub use merch_template_in_type::MerchTemplateIn;
+pub use merch_template_table::*;
+pub use merch_template_type::MerchTemplate;
+pub use model_call_in_type::ModelCallIn;
+pub use model_call_type::ModelCall;
+pub use my_attendee_table::*;
+pub use my_band_table::*;
+pub use my_band_type::MyBand;
+pub use my_claim_queue_table::*;
+pub use my_claim_type::MyClaim;
+pub use my_claims_table::*;
+pub use my_encounter_type::MyEncounter;
+pub use my_encounters_table::*;
+pub use my_graph_table::*;
+pub use my_handles_table::*;
+pub use my_merch_orders_table::*;
+pub use my_merch_suggestions_table::*;
+pub use my_photo_type::MyPhoto;
+pub use my_photos_table::*;
+pub use my_roles_table::*;
+pub use my_shared_visit_type::MySharedVisit;
+pub use my_shared_visits_table::*;
+pub use my_visit_type::MyVisit;
+pub use my_visits_table::*;
+pub use my_wallet_entries_table::*;
+pub use my_wallet_table::*;
+pub use my_wallet_type::MyWallet;
+pub use open_api_session_reducer::open_api_session;
+pub use open_claim_reducer::open_claim;
+pub use open_incident_reducer::open_incident;
+pub use open_incidents_table::*;
+pub use organization_in_type::OrganizationIn;
+pub use organization_table::*;
+pub use organization_type::Organization;
 pub use owner_type::Owner;
-pub use payment_status_type::PaymentStatus;
-pub use payment_table::*;
-pub use payment_type::Payment;
+pub use people_link_type::PeopleLink;
+pub use person_card_type::PersonCard;
+pub use person_claim_type::PersonClaim;
+pub use person_in_type::PersonIn;
+pub use person_table::*;
+pub use person_type::Person;
+pub use photo_tag_type::PhotoTag;
+pub use photo_type::Photo;
+pub use place_booth_reducer::place_booth;
+pub use precedent_in_type::PrecedentIn;
+pub use property_event_type::PropertyEvent;
+pub use record_claim_payout_reducer::record_claim_payout;
+pub use record_insurer_payment_reducer::record_insurer_payment;
+pub use record_model_call_reducer::record_model_call;
+pub use record_wallet_reducer::record_wallet;
+pub use refuse_claim_reducer::refuse_claim;
+pub use register_blob_reducer::register_blob;
 pub use register_bridge_reducer::register_bridge;
-pub use request_payment_reducer::request_payment;
+pub use register_photo_reducer::register_photo;
+pub use remove_social_handle_reducer::remove_social_handle;
+pub use reopen_event_reducer::reopen_event;
+pub use report_property_event_reducer::report_property_event;
+pub use report_sim_band_reducer::report_sim_band;
+pub use request_recovery_letter_reducer::request_recovery_letter;
 pub use reset_bridge_reducer::reset_bridge;
+pub use resolve_incident_reducer::resolve_incident;
+pub use respond_photo_tag_reducer::respond_photo_tag;
+pub use retry_claim_payout_reducer::retry_claim_payout;
+pub use revoke_role_reducer::revoke_role;
+pub use schedule_slot_in_type::ScheduleSlotIn;
+pub use schedule_slot_table::*;
+pub use schedule_slot_type::ScheduleSlot;
+pub use section_count_type::SectionCount;
 pub use send_command_reducer::send_command;
+pub use set_authority_limit_reducer::set_authority_limit;
 pub use set_exit_reducer::set_exit;
+pub use set_insurance_settings_reducer::set_insurance_settings;
 pub use set_low_vis_reducer::set_low_vis;
 pub use set_override_reducer::set_override;
 pub use set_rssi_reducer::set_rssi;
+pub use set_social_handle_reducer::set_social_handle;
 pub use set_thresholds_reducer::set_thresholds;
+pub use set_zone_station_reducer::set_zone_station;
 pub use settings_table::*;
 pub use settings_type::Settings;
+pub use settle_merch_order_reducer::settle_merch_order;
+pub use settlement_rule_row_type::SettlementRuleRow;
+pub use shared_visit_type::SharedVisit;
 pub use sleep_bands_reducer::sleep_bands;
+pub use social_attendees_table::*;
+pub use social_encounter_type::SocialEncounter;
+pub use social_encounters_table::*;
+pub use social_handle_type::SocialHandle;
+pub use social_handles_table::*;
+pub use social_photo_tags_table::*;
+pub use social_photos_table::*;
+pub use social_shared_visits_table::*;
+pub use social_tick_timer_type::SocialTickTimer;
+pub use social_visits_table::*;
+pub use staff_role_type::StaffRole;
+pub use start_crowd_reducer::start_crowd;
 pub use start_find_reducer::start_find;
+pub use start_job_reaper_reducer::start_job_reaper;
+pub use start_safety_watch_reducer::start_safety_watch;
 pub use station_table::*;
 pub use station_type::Station;
+pub use stop_crowd_reducer::stop_crowd;
 pub use stop_find_reducer::stop_find;
+pub use submit_claim_checks_reducer::submit_claim_checks;
+pub use submit_claim_review_reducer::submit_claim_review;
+pub use submit_medical_record_reducer::submit_medical_record;
+pub use submit_vision_assessment_reducer::submit_vision_assessment;
 pub use sweep_timer_type::SweepTimer;
+pub use update_profile_reducer::update_profile;
+pub use upsert_camera_reducer::upsert_camera;
+pub use upsert_coverage_rule_reducer::upsert_coverage_rule;
+pub use upsert_insurance_policy_reducer::upsert_insurance_policy;
+pub use venue_in_type::VenueIn;
+pub use venue_table::*;
+pub use venue_type::Venue;
+pub use vision_assessment_type::VisionAssessment;
+pub use visit_type::Visit;
+pub use wallet_entry_type::WalletEntry;
+pub use worker_jobs_table::*;
+pub use zone_in_type::ZoneIn;
+pub use zone_table::*;
+pub use zone_type::Zone;
 pub use zone_visit_table::*;
 pub use zone_visit_type::ZoneVisit;
 
 #[derive(Clone, PartialEq, Debug)]
 
+
 pub enum Reducer {
+    AddIncidentNote {
+        incident_id: u64,
+        text: String,
+        cost_cents: Option<u64>,
+    },
+    ApplyMedicalRecord {
+        job_id: u64,
+        record_json: String,
+        call: ModelCallIn,
+    },
+    ApproveClaim {
+        claim_id: u64,
+        amount_seen_cents: u64,
+        pack_hash_seen: String,
+        requested_ceiling_cents: Option<u64>,
+        learn: bool,
+    },
+    AssignMedic {
+        incident_id: u64,
+    },
+    AttachClaimLetters {
+        job_id: u64,
+        fnol_hash: String,
+        summary_hash: String,
+        determination_hash: String,
+        call: Option<ModelCallIn>,
+    },
+    AttachRecoveryLetter {
+        job_id: u64,
+        recovery_hash: String,
+        call: Option<ModelCallIn>,
+    },
+    BuyMerch {
+        template_id: u64,
+        photo_id: u64,
+        size: String,
+    },
+    ClaimBand {
+        token: String,
+    },
+    ClaimJob {
+        job_id: u64,
+    },
+    ClaimPerson {
+        person_id: u64,
+    },
     Clear {
         target: u8,
     },
@@ -111,12 +542,18 @@ pub enum Reducer {
         id: u64,
         error: Option<String>,
     },
-    CompletePayment {
-        payment_id: u64,
-        purchase_ref: String,
+    CompleteJob {
+        job_id: u64,
+        result: String,
     },
-    DeclinePayment {
-        payment_id: u64,
+    EndEvent,
+    ExtendJobLease {
+        job_id: u64,
+    },
+    FailJob {
+        job_id: u64,
+        error: String,
+        call: Option<ModelCallIn>,
     },
     ForceState {
         target: u8,
@@ -127,9 +564,17 @@ pub enum Reducer {
         mac: String,
         fw: String,
     },
+    GrantRole {
+        identity: __sdk::Identity,
+        role: String,
+        label: String,
+    },
     Haptic {
         target: u8,
         pattern: u8,
+    },
+    ImportEvent {
+        bundle: EventBundle,
     },
     IngestBand {
         beacon: BandBeacon,
@@ -143,22 +588,132 @@ pub enum Reducer {
         exit_colour: u8,
         rssi: i8,
     },
-    RegisterBridge,
-    RequestPayment {
+    LoadMerchTemplates {
+        templates: Vec<MerchTemplateIn>,
+    },
+    OpenApiSession {
+        token_hash: String,
+    },
+    OpenClaim {
+        incident_id: u64,
+    },
+    OpenIncident {
+        kind: String,
+        zone_id: u64,
         band_id: u8,
-        amount_cents: u32,
-        merchant: String,
+        note: String,
+    },
+    PlaceBooth {
+        booth_id: u64,
+        zone_id: u64,
+        plan_x_m: f32,
+        plan_y_m: f32,
+    },
+    RecordClaimPayout {
+        job_id: u64,
+        customer_id: String,
+        account_id: String,
+        deposit_id: String,
+    },
+    RecordInsurerPayment {
+        claim_id: u64,
+        amount_cents: u64,
+        reference: String,
+    },
+    RecordModelCall {
+        call: ModelCallIn,
+    },
+    RecordWallet {
+        job_id: u64,
+        customer_id: String,
+        account_id: String,
+    },
+    RefuseClaim {
+        claim_id: u64,
+        pack_hash_seen: String,
+        reason: String,
+    },
+    RegisterBlob {
+        hash: String,
+        owner: Option<__sdk::Identity>,
+        access: String,
+        purpose: String,
+        content_type: String,
+        size_bytes: u64,
+    },
+    RegisterBridge,
+    RegisterPhoto {
+        url: String,
+        taken_at: __sdk::Timestamp,
+        zone_id: u64,
+        caption: String,
+    },
+    RemoveSocialHandle {
+        platform: String,
+    },
+    ReopenEvent,
+    ReportPropertyEvent {
+        incident_id: u64,
+        camera_id: u64,
+        kind: String,
+        description: String,
+        confidence: f32,
+        frame_hashes: Vec<String>,
+    },
+    ReportSimBand {
+        band_id: u8,
+        station_id: u8,
+        state: u8,
+        neigh: u8,
+        sos: bool,
+        fall: bool,
+        press: bool,
+    },
+    RequestRecoveryLetter {
+        claim_id: u64,
+        counterparty_name: String,
+        counterparty_contact: String,
     },
     ResetBridge,
+    ResolveIncident {
+        incident_id: u64,
+        resolution: String,
+    },
+    RespondPhotoTag {
+        tag_id: u64,
+        confirm: bool,
+    },
+    RetryClaimPayout {
+        claim_id: u64,
+    },
+    RevokeRole {
+        identity: __sdk::Identity,
+        role: String,
+    },
     SendCommand {
         target: u8,
         name: String,
         arg: u8,
         arg_2: u8,
     },
+    SetAuthorityLimit {
+        role: String,
+        rank: u8,
+        ceiling_cents: Option<u64>,
+        assignee: Option<__sdk::Identity>,
+        assignee_name: String,
+    },
     SetExit {
         target: u8,
         colour: u8,
+    },
+    SetInsuranceSettings {
+        venue_name: String,
+        photo_window_secs: i64,
+        note_window_secs: i64,
+        min_witnesses: u32,
+        tz_offset_minutes: i32,
+        review_required: bool,
     },
     SetLowVis {
         on: bool,
@@ -170,21 +725,94 @@ pub enum Reducer {
         neigh_rssi: i8,
         circle_rssi: i8,
     },
+    SetSocialHandle {
+        platform: String,
+        handle: String,
+    },
     SetThresholds {
         yellow: u8,
         red: u8,
     },
+    SetZoneStation {
+        zone_id: u64,
+        station_id: u8,
+    },
+    SettleMerchOrder {
+        job_id: u64,
+        merchant_id: String,
+        purchase_id: String,
+    },
     SleepBands {
         target: u8,
         minutes: u8,
+    },
+    StartCrowd {
+        size: u8,
     },
     StartFind {
         seeker: u8,
         friend: u8,
         colour: u8,
     },
+    StartJobReaper,
+    StartSafetyWatch,
+    StopCrowd,
     StopFind {
         seeker: u8,
+    },
+    SubmitClaimChecks {
+        job_id: u64,
+        checks: Vec<CheckIn>,
+        precedents: Vec<PrecedentIn>,
+    },
+    SubmitClaimReview {
+        job_id: u64,
+        review_json: String,
+        call: ModelCallIn,
+    },
+    SubmitMedicalRecord {
+        claim_id: u64,
+        file_hash: String,
+        page_count: u32,
+    },
+    SubmitVisionAssessment {
+        incident_id: u64,
+        trigger: String,
+        confirmed: bool,
+        confidence: f32,
+        description: String,
+        recommended_action: String,
+        incident_description: String,
+        camera_id: u64,
+        frame_hashes: Vec<String>,
+        frame_times: Vec<__sdk::Timestamp>,
+        model_call_id: u64,
+    },
+    UpdateProfile {
+        display_name: String,
+        findable: bool,
+    },
+    UpsertCamera {
+        name: String,
+        zone_id: u64,
+        mount: String,
+    },
+    UpsertCoverageRule {
+        policy_number: String,
+        cover_kind: String,
+        incident_kinds: Vec<String>,
+        per_claim_limit_cents: u64,
+        aggregate_limit_cents: u64,
+        deductible_cents: u64,
+        service_window_days: u32,
+        active: bool,
+    },
+    UpsertInsurancePolicy {
+        policy_number: String,
+        insurer_name: String,
+        fnol_contact: String,
+        period_start: __sdk::Timestamp,
+        period_end: __sdk::Timestamp,
     },
 }
 
@@ -195,34 +823,167 @@ impl __sdk::InModule for Reducer {
 impl __sdk::Reducer for Reducer {
     fn reducer_name(&self) -> &'static str {
         match self {
+            Reducer::AddIncidentNote { .. } => "add_incident_note",
+            Reducer::ApplyMedicalRecord { .. } => "apply_medical_record",
+            Reducer::ApproveClaim { .. } => "approve_claim",
+            Reducer::AssignMedic { .. } => "assign_medic",
+            Reducer::AttachClaimLetters { .. } => "attach_claim_letters",
+            Reducer::AttachRecoveryLetter { .. } => "attach_recovery_letter",
+            Reducer::BuyMerch { .. } => "buy_merch",
+            Reducer::ClaimBand { .. } => "claim_band",
+            Reducer::ClaimJob { .. } => "claim_job",
+            Reducer::ClaimPerson { .. } => "claim_person",
             Reducer::Clear { .. } => "clear",
             Reducer::CommandSent { .. } => "command_sent",
-            Reducer::CompletePayment { .. } => "complete_payment",
-            Reducer::DeclinePayment { .. } => "decline_payment",
+            Reducer::CompleteJob { .. } => "complete_job",
+            Reducer::EndEvent => "end_event",
+            Reducer::ExtendJobLease { .. } => "extend_job_lease",
+            Reducer::FailJob { .. } => "fail_job",
             Reducer::ForceState { .. } => "force_state",
             Reducer::GatewayUp { .. } => "gateway_up",
+            Reducer::GrantRole { .. } => "grant_role",
             Reducer::Haptic { .. } => "haptic",
+            Reducer::ImportEvent { .. } => "import_event",
             Reducer::IngestBand { .. } => "ingest_band",
             Reducer::IngestHeard { .. } => "ingest_heard",
             Reducer::IngestStation { .. } => "ingest_station",
+            Reducer::LoadMerchTemplates { .. } => "load_merch_templates",
+            Reducer::OpenApiSession { .. } => "open_api_session",
+            Reducer::OpenClaim { .. } => "open_claim",
+            Reducer::OpenIncident { .. } => "open_incident",
+            Reducer::PlaceBooth { .. } => "place_booth",
+            Reducer::RecordClaimPayout { .. } => "record_claim_payout",
+            Reducer::RecordInsurerPayment { .. } => "record_insurer_payment",
+            Reducer::RecordModelCall { .. } => "record_model_call",
+            Reducer::RecordWallet { .. } => "record_wallet",
+            Reducer::RefuseClaim { .. } => "refuse_claim",
+            Reducer::RegisterBlob { .. } => "register_blob",
             Reducer::RegisterBridge => "register_bridge",
-            Reducer::RequestPayment { .. } => "request_payment",
+            Reducer::RegisterPhoto { .. } => "register_photo",
+            Reducer::RemoveSocialHandle { .. } => "remove_social_handle",
+            Reducer::ReopenEvent => "reopen_event",
+            Reducer::ReportPropertyEvent { .. } => "report_property_event",
+            Reducer::ReportSimBand { .. } => "report_sim_band",
+            Reducer::RequestRecoveryLetter { .. } => "request_recovery_letter",
             Reducer::ResetBridge => "reset_bridge",
+            Reducer::ResolveIncident { .. } => "resolve_incident",
+            Reducer::RespondPhotoTag { .. } => "respond_photo_tag",
+            Reducer::RetryClaimPayout { .. } => "retry_claim_payout",
+            Reducer::RevokeRole { .. } => "revoke_role",
             Reducer::SendCommand { .. } => "send_command",
+            Reducer::SetAuthorityLimit { .. } => "set_authority_limit",
             Reducer::SetExit { .. } => "set_exit",
+            Reducer::SetInsuranceSettings { .. } => "set_insurance_settings",
             Reducer::SetLowVis { .. } => "set_low_vis",
             Reducer::SetOverride { .. } => "set_override",
             Reducer::SetRssi { .. } => "set_rssi",
+            Reducer::SetSocialHandle { .. } => "set_social_handle",
             Reducer::SetThresholds { .. } => "set_thresholds",
+            Reducer::SetZoneStation { .. } => "set_zone_station",
+            Reducer::SettleMerchOrder { .. } => "settle_merch_order",
             Reducer::SleepBands { .. } => "sleep_bands",
+            Reducer::StartCrowd { .. } => "start_crowd",
             Reducer::StartFind { .. } => "start_find",
+            Reducer::StartJobReaper => "start_job_reaper",
+            Reducer::StartSafetyWatch => "start_safety_watch",
+            Reducer::StopCrowd => "stop_crowd",
             Reducer::StopFind { .. } => "stop_find",
+            Reducer::SubmitClaimChecks { .. } => "submit_claim_checks",
+            Reducer::SubmitClaimReview { .. } => "submit_claim_review",
+            Reducer::SubmitMedicalRecord { .. } => "submit_medical_record",
+            Reducer::SubmitVisionAssessment { .. } => "submit_vision_assessment",
+            Reducer::UpdateProfile { .. } => "update_profile",
+            Reducer::UpsertCamera { .. } => "upsert_camera",
+            Reducer::UpsertCoverageRule { .. } => "upsert_coverage_rule",
+            Reducer::UpsertInsurancePolicy { .. } => "upsert_insurance_policy",
             _ => unreachable!(),
         }
     }
     #[allow(clippy::clone_on_copy)]
     fn args_bsatn(&self) -> Result<Vec<u8>, __sats::bsatn::EncodeError> {
         match self {
+            Reducer::AddIncidentNote {
+                incident_id,
+                text,
+                cost_cents,
+            } => __sats::bsatn::to_vec(&add_incident_note_reducer::AddIncidentNoteArgs {
+                incident_id: incident_id.clone(),
+                text: text.clone(),
+                cost_cents: cost_cents.clone(),
+            }),
+            Reducer::ApplyMedicalRecord {
+                job_id,
+                record_json,
+                call,
+            } => __sats::bsatn::to_vec(&apply_medical_record_reducer::ApplyMedicalRecordArgs {
+                job_id: job_id.clone(),
+                record_json: record_json.clone(),
+                call: call.clone(),
+            }),
+            Reducer::ApproveClaim {
+                claim_id,
+                amount_seen_cents,
+                pack_hash_seen,
+                requested_ceiling_cents,
+                learn,
+            } => __sats::bsatn::to_vec(&approve_claim_reducer::ApproveClaimArgs {
+                claim_id: claim_id.clone(),
+                amount_seen_cents: amount_seen_cents.clone(),
+                pack_hash_seen: pack_hash_seen.clone(),
+                requested_ceiling_cents: requested_ceiling_cents.clone(),
+                learn: learn.clone(),
+            }),
+            Reducer::AssignMedic { incident_id } => {
+                __sats::bsatn::to_vec(&assign_medic_reducer::AssignMedicArgs {
+                    incident_id: incident_id.clone(),
+                })
+            }
+            Reducer::AttachClaimLetters {
+                job_id,
+                fnol_hash,
+                summary_hash,
+                determination_hash,
+                call,
+            } => __sats::bsatn::to_vec(&attach_claim_letters_reducer::AttachClaimLettersArgs {
+                job_id: job_id.clone(),
+                fnol_hash: fnol_hash.clone(),
+                summary_hash: summary_hash.clone(),
+                determination_hash: determination_hash.clone(),
+                call: call.clone(),
+            }),
+            Reducer::AttachRecoveryLetter {
+                job_id,
+                recovery_hash,
+                call,
+            } => __sats::bsatn::to_vec(&attach_recovery_letter_reducer::AttachRecoveryLetterArgs {
+                job_id: job_id.clone(),
+                recovery_hash: recovery_hash.clone(),
+                call: call.clone(),
+            }),
+            Reducer::BuyMerch {
+                template_id,
+                photo_id,
+                size,
+            } => __sats::bsatn::to_vec(&buy_merch_reducer::BuyMerchArgs {
+                template_id: template_id.clone(),
+                photo_id: photo_id.clone(),
+                size: size.clone(),
+            }),
+            Reducer::ClaimBand { token } => {
+                __sats::bsatn::to_vec(&claim_band_reducer::ClaimBandArgs {
+                    token: token.clone(),
+                })
+            }
+            Reducer::ClaimJob { job_id } => {
+                __sats::bsatn::to_vec(&claim_job_reducer::ClaimJobArgs {
+                    job_id: job_id.clone(),
+                })
+            }
+            Reducer::ClaimPerson { person_id } => {
+                __sats::bsatn::to_vec(&claim_person_reducer::ClaimPersonArgs {
+                    person_id: person_id.clone(),
+                })
+            }
             Reducer::Clear { target } => __sats::bsatn::to_vec(&clear_reducer::ClearArgs {
                 target: target.clone(),
             }),
@@ -232,18 +993,27 @@ impl __sdk::Reducer for Reducer {
                     error: error.clone(),
                 })
             }
-            Reducer::CompletePayment {
-                payment_id,
-                purchase_ref,
-            } => __sats::bsatn::to_vec(&complete_payment_reducer::CompletePaymentArgs {
-                payment_id: payment_id.clone(),
-                purchase_ref: purchase_ref.clone(),
-            }),
-            Reducer::DeclinePayment { payment_id } => {
-                __sats::bsatn::to_vec(&decline_payment_reducer::DeclinePaymentArgs {
-                    payment_id: payment_id.clone(),
+            Reducer::CompleteJob { job_id, result } => {
+                __sats::bsatn::to_vec(&complete_job_reducer::CompleteJobArgs {
+                    job_id: job_id.clone(),
+                    result: result.clone(),
                 })
             }
+            Reducer::EndEvent => __sats::bsatn::to_vec(&end_event_reducer::EndEventArgs {}),
+            Reducer::ExtendJobLease { job_id } => {
+                __sats::bsatn::to_vec(&extend_job_lease_reducer::ExtendJobLeaseArgs {
+                    job_id: job_id.clone(),
+                })
+            }
+            Reducer::FailJob {
+                job_id,
+                error,
+                call,
+            } => __sats::bsatn::to_vec(&fail_job_reducer::FailJobArgs {
+                job_id: job_id.clone(),
+                error: error.clone(),
+                call: call.clone(),
+            }),
             Reducer::ForceState {
                 target,
                 state,
@@ -259,10 +1029,24 @@ impl __sdk::Reducer for Reducer {
                     fw: fw.clone(),
                 })
             }
+            Reducer::GrantRole {
+                identity,
+                role,
+                label,
+            } => __sats::bsatn::to_vec(&grant_role_reducer::GrantRoleArgs {
+                identity: identity.clone(),
+                role: role.clone(),
+                label: label.clone(),
+            }),
             Reducer::Haptic { target, pattern } => {
                 __sats::bsatn::to_vec(&haptic_reducer::HapticArgs {
                     target: target.clone(),
                     pattern: pattern.clone(),
+                })
+            }
+            Reducer::ImportEvent { bundle } => {
+                __sats::bsatn::to_vec(&import_event_reducer::ImportEventArgs {
+                    bundle: bundle.clone(),
                 })
             }
             Reducer::IngestBand { beacon } => {
@@ -285,20 +1069,192 @@ impl __sdk::Reducer for Reducer {
                 exit_colour: exit_colour.clone(),
                 rssi: rssi.clone(),
             }),
+            Reducer::LoadMerchTemplates { templates } => {
+                __sats::bsatn::to_vec(&load_merch_templates_reducer::LoadMerchTemplatesArgs {
+                    templates: templates.clone(),
+                })
+            }
+            Reducer::OpenApiSession { token_hash } => {
+                __sats::bsatn::to_vec(&open_api_session_reducer::OpenApiSessionArgs {
+                    token_hash: token_hash.clone(),
+                })
+            }
+            Reducer::OpenClaim { incident_id } => {
+                __sats::bsatn::to_vec(&open_claim_reducer::OpenClaimArgs {
+                    incident_id: incident_id.clone(),
+                })
+            }
+            Reducer::OpenIncident {
+                kind,
+                zone_id,
+                band_id,
+                note,
+            } => __sats::bsatn::to_vec(&open_incident_reducer::OpenIncidentArgs {
+                kind: kind.clone(),
+                zone_id: zone_id.clone(),
+                band_id: band_id.clone(),
+                note: note.clone(),
+            }),
+            Reducer::PlaceBooth {
+                booth_id,
+                zone_id,
+                plan_x_m,
+                plan_y_m,
+            } => __sats::bsatn::to_vec(&place_booth_reducer::PlaceBoothArgs {
+                booth_id: booth_id.clone(),
+                zone_id: zone_id.clone(),
+                plan_x_m: plan_x_m.clone(),
+                plan_y_m: plan_y_m.clone(),
+            }),
+            Reducer::RecordClaimPayout {
+                job_id,
+                customer_id,
+                account_id,
+                deposit_id,
+            } => __sats::bsatn::to_vec(&record_claim_payout_reducer::RecordClaimPayoutArgs {
+                job_id: job_id.clone(),
+                customer_id: customer_id.clone(),
+                account_id: account_id.clone(),
+                deposit_id: deposit_id.clone(),
+            }),
+            Reducer::RecordInsurerPayment {
+                claim_id,
+                amount_cents,
+                reference,
+            } => __sats::bsatn::to_vec(&record_insurer_payment_reducer::RecordInsurerPaymentArgs {
+                claim_id: claim_id.clone(),
+                amount_cents: amount_cents.clone(),
+                reference: reference.clone(),
+            }),
+            Reducer::RecordModelCall { call } => {
+                __sats::bsatn::to_vec(&record_model_call_reducer::RecordModelCallArgs {
+                    call: call.clone(),
+                })
+            }
+            Reducer::RecordWallet {
+                job_id,
+                customer_id,
+                account_id,
+            } => __sats::bsatn::to_vec(&record_wallet_reducer::RecordWalletArgs {
+                job_id: job_id.clone(),
+                customer_id: customer_id.clone(),
+                account_id: account_id.clone(),
+            }),
+            Reducer::RefuseClaim {
+                claim_id,
+                pack_hash_seen,
+                reason,
+            } => __sats::bsatn::to_vec(&refuse_claim_reducer::RefuseClaimArgs {
+                claim_id: claim_id.clone(),
+                pack_hash_seen: pack_hash_seen.clone(),
+                reason: reason.clone(),
+            }),
+            Reducer::RegisterBlob {
+                hash,
+                owner,
+                access,
+                purpose,
+                content_type,
+                size_bytes,
+            } => __sats::bsatn::to_vec(&register_blob_reducer::RegisterBlobArgs {
+                hash: hash.clone(),
+                owner: owner.clone(),
+                access: access.clone(),
+                purpose: purpose.clone(),
+                content_type: content_type.clone(),
+                size_bytes: size_bytes.clone(),
+            }),
             Reducer::RegisterBridge => {
                 __sats::bsatn::to_vec(&register_bridge_reducer::RegisterBridgeArgs {})
             }
-            Reducer::RequestPayment {
-                band_id,
-                amount_cents,
-                merchant,
-            } => __sats::bsatn::to_vec(&request_payment_reducer::RequestPaymentArgs {
-                band_id: band_id.clone(),
-                amount_cents: amount_cents.clone(),
-                merchant: merchant.clone(),
+            Reducer::RegisterPhoto {
+                url,
+                taken_at,
+                zone_id,
+                caption,
+            } => __sats::bsatn::to_vec(&register_photo_reducer::RegisterPhotoArgs {
+                url: url.clone(),
+                taken_at: taken_at.clone(),
+                zone_id: zone_id.clone(),
+                caption: caption.clone(),
             }),
+            Reducer::RemoveSocialHandle { platform } => {
+                __sats::bsatn::to_vec(&remove_social_handle_reducer::RemoveSocialHandleArgs {
+                    platform: platform.clone(),
+                })
+            }
+            Reducer::ReopenEvent => {
+                __sats::bsatn::to_vec(&reopen_event_reducer::ReopenEventArgs {})
+            }
+            Reducer::ReportPropertyEvent {
+                incident_id,
+                camera_id,
+                kind,
+                description,
+                confidence,
+                frame_hashes,
+            } => __sats::bsatn::to_vec(&report_property_event_reducer::ReportPropertyEventArgs {
+                incident_id: incident_id.clone(),
+                camera_id: camera_id.clone(),
+                kind: kind.clone(),
+                description: description.clone(),
+                confidence: confidence.clone(),
+                frame_hashes: frame_hashes.clone(),
+            }),
+            Reducer::ReportSimBand {
+                band_id,
+                station_id,
+                state,
+                neigh,
+                sos,
+                fall,
+                press,
+            } => __sats::bsatn::to_vec(&report_sim_band_reducer::ReportSimBandArgs {
+                band_id: band_id.clone(),
+                station_id: station_id.clone(),
+                state: state.clone(),
+                neigh: neigh.clone(),
+                sos: sos.clone(),
+                fall: fall.clone(),
+                press: press.clone(),
+            }),
+            Reducer::RequestRecoveryLetter {
+                claim_id,
+                counterparty_name,
+                counterparty_contact,
+            } => __sats::bsatn::to_vec(
+                &request_recovery_letter_reducer::RequestRecoveryLetterArgs {
+                    claim_id: claim_id.clone(),
+                    counterparty_name: counterparty_name.clone(),
+                    counterparty_contact: counterparty_contact.clone(),
+                },
+            ),
             Reducer::ResetBridge => {
                 __sats::bsatn::to_vec(&reset_bridge_reducer::ResetBridgeArgs {})
+            }
+            Reducer::ResolveIncident {
+                incident_id,
+                resolution,
+            } => __sats::bsatn::to_vec(&resolve_incident_reducer::ResolveIncidentArgs {
+                incident_id: incident_id.clone(),
+                resolution: resolution.clone(),
+            }),
+            Reducer::RespondPhotoTag { tag_id, confirm } => {
+                __sats::bsatn::to_vec(&respond_photo_tag_reducer::RespondPhotoTagArgs {
+                    tag_id: tag_id.clone(),
+                    confirm: confirm.clone(),
+                })
+            }
+            Reducer::RetryClaimPayout { claim_id } => {
+                __sats::bsatn::to_vec(&retry_claim_payout_reducer::RetryClaimPayoutArgs {
+                    claim_id: claim_id.clone(),
+                })
+            }
+            Reducer::RevokeRole { identity, role } => {
+                __sats::bsatn::to_vec(&revoke_role_reducer::RevokeRoleArgs {
+                    identity: identity.clone(),
+                    role: role.clone(),
+                })
             }
             Reducer::SendCommand {
                 target,
@@ -311,12 +1267,40 @@ impl __sdk::Reducer for Reducer {
                 arg: arg.clone(),
                 arg_2: arg_2.clone(),
             }),
+            Reducer::SetAuthorityLimit {
+                role,
+                rank,
+                ceiling_cents,
+                assignee,
+                assignee_name,
+            } => __sats::bsatn::to_vec(&set_authority_limit_reducer::SetAuthorityLimitArgs {
+                role: role.clone(),
+                rank: rank.clone(),
+                ceiling_cents: ceiling_cents.clone(),
+                assignee: assignee.clone(),
+                assignee_name: assignee_name.clone(),
+            }),
             Reducer::SetExit { target, colour } => {
                 __sats::bsatn::to_vec(&set_exit_reducer::SetExitArgs {
                     target: target.clone(),
                     colour: colour.clone(),
                 })
             }
+            Reducer::SetInsuranceSettings {
+                venue_name,
+                photo_window_secs,
+                note_window_secs,
+                min_witnesses,
+                tz_offset_minutes,
+                review_required,
+            } => __sats::bsatn::to_vec(&set_insurance_settings_reducer::SetInsuranceSettingsArgs {
+                venue_name: venue_name.clone(),
+                photo_window_secs: photo_window_secs.clone(),
+                note_window_secs: note_window_secs.clone(),
+                min_witnesses: min_witnesses.clone(),
+                tz_offset_minutes: tz_offset_minutes.clone(),
+                review_required: review_required.clone(),
+            }),
             Reducer::SetLowVis { on } => {
                 __sats::bsatn::to_vec(&set_low_vis_reducer::SetLowVisArgs { on: on.clone() })
             }
@@ -330,17 +1314,42 @@ impl __sdk::Reducer for Reducer {
                 neigh_rssi: neigh_rssi.clone(),
                 circle_rssi: circle_rssi.clone(),
             }),
+            Reducer::SetSocialHandle { platform, handle } => {
+                __sats::bsatn::to_vec(&set_social_handle_reducer::SetSocialHandleArgs {
+                    platform: platform.clone(),
+                    handle: handle.clone(),
+                })
+            }
             Reducer::SetThresholds { yellow, red } => {
                 __sats::bsatn::to_vec(&set_thresholds_reducer::SetThresholdsArgs {
                     yellow: yellow.clone(),
                     red: red.clone(),
                 })
             }
+            Reducer::SetZoneStation {
+                zone_id,
+                station_id,
+            } => __sats::bsatn::to_vec(&set_zone_station_reducer::SetZoneStationArgs {
+                zone_id: zone_id.clone(),
+                station_id: station_id.clone(),
+            }),
+            Reducer::SettleMerchOrder {
+                job_id,
+                merchant_id,
+                purchase_id,
+            } => __sats::bsatn::to_vec(&settle_merch_order_reducer::SettleMerchOrderArgs {
+                job_id: job_id.clone(),
+                merchant_id: merchant_id.clone(),
+                purchase_id: purchase_id.clone(),
+            }),
             Reducer::SleepBands { target, minutes } => {
                 __sats::bsatn::to_vec(&sleep_bands_reducer::SleepBandsArgs {
                     target: target.clone(),
                     minutes: minutes.clone(),
                 })
+            }
+            Reducer::StartCrowd { size } => {
+                __sats::bsatn::to_vec(&start_crowd_reducer::StartCrowdArgs { size: size.clone() })
             }
             Reducer::StartFind {
                 seeker,
@@ -351,11 +1360,122 @@ impl __sdk::Reducer for Reducer {
                 friend: friend.clone(),
                 colour: colour.clone(),
             }),
+            Reducer::StartJobReaper => {
+                __sats::bsatn::to_vec(&start_job_reaper_reducer::StartJobReaperArgs {})
+            }
+            Reducer::StartSafetyWatch => {
+                __sats::bsatn::to_vec(&start_safety_watch_reducer::StartSafetyWatchArgs {})
+            }
+            Reducer::StopCrowd => __sats::bsatn::to_vec(&stop_crowd_reducer::StopCrowdArgs {}),
             Reducer::StopFind { seeker } => {
                 __sats::bsatn::to_vec(&stop_find_reducer::StopFindArgs {
                     seeker: seeker.clone(),
                 })
             }
+            Reducer::SubmitClaimChecks {
+                job_id,
+                checks,
+                precedents,
+            } => __sats::bsatn::to_vec(&submit_claim_checks_reducer::SubmitClaimChecksArgs {
+                job_id: job_id.clone(),
+                checks: checks.clone(),
+                precedents: precedents.clone(),
+            }),
+            Reducer::SubmitClaimReview {
+                job_id,
+                review_json,
+                call,
+            } => __sats::bsatn::to_vec(&submit_claim_review_reducer::SubmitClaimReviewArgs {
+                job_id: job_id.clone(),
+                review_json: review_json.clone(),
+                call: call.clone(),
+            }),
+            Reducer::SubmitMedicalRecord {
+                claim_id,
+                file_hash,
+                page_count,
+            } => __sats::bsatn::to_vec(&submit_medical_record_reducer::SubmitMedicalRecordArgs {
+                claim_id: claim_id.clone(),
+                file_hash: file_hash.clone(),
+                page_count: page_count.clone(),
+            }),
+            Reducer::SubmitVisionAssessment {
+                incident_id,
+                trigger,
+                confirmed,
+                confidence,
+                description,
+                recommended_action,
+                incident_description,
+                camera_id,
+                frame_hashes,
+                frame_times,
+                model_call_id,
+            } => __sats::bsatn::to_vec(
+                &submit_vision_assessment_reducer::SubmitVisionAssessmentArgs {
+                    incident_id: incident_id.clone(),
+                    trigger: trigger.clone(),
+                    confirmed: confirmed.clone(),
+                    confidence: confidence.clone(),
+                    description: description.clone(),
+                    recommended_action: recommended_action.clone(),
+                    incident_description: incident_description.clone(),
+                    camera_id: camera_id.clone(),
+                    frame_hashes: frame_hashes.clone(),
+                    frame_times: frame_times.clone(),
+                    model_call_id: model_call_id.clone(),
+                },
+            ),
+            Reducer::UpdateProfile {
+                display_name,
+                findable,
+            } => __sats::bsatn::to_vec(&update_profile_reducer::UpdateProfileArgs {
+                display_name: display_name.clone(),
+                findable: findable.clone(),
+            }),
+            Reducer::UpsertCamera {
+                name,
+                zone_id,
+                mount,
+            } => __sats::bsatn::to_vec(&upsert_camera_reducer::UpsertCameraArgs {
+                name: name.clone(),
+                zone_id: zone_id.clone(),
+                mount: mount.clone(),
+            }),
+            Reducer::UpsertCoverageRule {
+                policy_number,
+                cover_kind,
+                incident_kinds,
+                per_claim_limit_cents,
+                aggregate_limit_cents,
+                deductible_cents,
+                service_window_days,
+                active,
+            } => __sats::bsatn::to_vec(&upsert_coverage_rule_reducer::UpsertCoverageRuleArgs {
+                policy_number: policy_number.clone(),
+                cover_kind: cover_kind.clone(),
+                incident_kinds: incident_kinds.clone(),
+                per_claim_limit_cents: per_claim_limit_cents.clone(),
+                aggregate_limit_cents: aggregate_limit_cents.clone(),
+                deductible_cents: deductible_cents.clone(),
+                service_window_days: service_window_days.clone(),
+                active: active.clone(),
+            }),
+            Reducer::UpsertInsurancePolicy {
+                policy_number,
+                insurer_name,
+                fnol_contact,
+                period_start,
+                period_end,
+            } => __sats::bsatn::to_vec(
+                &upsert_insurance_policy_reducer::UpsertInsurancePolicyArgs {
+                    policy_number: policy_number.clone(),
+                    insurer_name: insurer_name.clone(),
+                    fnol_contact: fnol_contact.clone(),
+                    period_start: period_start.clone(),
+                    period_end: period_end.clone(),
+                },
+            ),
             _ => unreachable!(),
         }
     }
@@ -365,15 +1485,71 @@ impl __sdk::Reducer for Reducer {
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct DbUpdate {
+    api_sessions: __sdk::TableUpdate<ApiSession>,
     band: __sdk::TableUpdate<Band>,
+    board_approvals: __sdk::TableUpdate<Approval>,
+    board_attendees: __sdk::TableUpdate<AttendeeOut>,
+    board_authority: __sdk::TableUpdate<AuthorityLimitRow>,
+    board_checks: __sdk::TableUpdate<ClaimCheck>,
+    board_facts: __sdk::TableUpdate<EvidenceFact>,
+    board_ledger: __sdk::TableUpdate<LedgerEntry>,
+    board_lines: __sdk::TableUpdate<ClaimLine>,
+    board_notes: __sdk::TableUpdate<IncidentNote>,
+    board_policies: __sdk::TableUpdate<InsurancePolicy>,
+    board_precedents: __sdk::TableUpdate<ClaimPrecedent>,
+    board_records: __sdk::TableUpdate<MedicalRecord>,
+    board_reviews: __sdk::TableUpdate<ClaimReview>,
+    board_rules: __sdk::TableUpdate<SettlementRuleRow>,
+    booth: __sdk::TableUpdate<Booth>,
+    camera: __sdk::TableUpdate<Camera>,
+    claim_checks: __sdk::TableUpdate<ClaimCheck>,
+    claim_facts: __sdk::TableUpdate<EvidenceFact>,
+    claim_ledger: __sdk::TableUpdate<LedgerEntry>,
+    claim_lines: __sdk::TableUpdate<ClaimLine>,
+    claim_reviews: __sdk::TableUpdate<ClaimReview>,
+    claimed_people: __sdk::TableUpdate<ClaimedPerson>,
+    claims_board: __sdk::TableUpdate<Claim>,
     command: __sdk::TableUpdate<Command>,
     encounter: __sdk::TableUpdate<Encounter>,
     event: __sdk::TableUpdate<Event>,
+    event_graph: __sdk::TableUpdate<EventLink>,
+    event_state: __sdk::TableUpdate<EventState>,
     gateway: __sdk::TableUpdate<Gateway>,
+    import_run: __sdk::TableUpdate<ImportRun>,
+    incident_bands: __sdk::TableUpdate<IncidentBand>,
     link: __sdk::TableUpdate<Link>,
-    payment: __sdk::TableUpdate<Payment>,
+    merch_template: __sdk::TableUpdate<MerchTemplate>,
+    my_attendee: __sdk::TableUpdate<Attendee>,
+    my_band: __sdk::TableUpdate<MyBand>,
+    my_claim_queue: __sdk::TableUpdate<Claim>,
+    my_claims: __sdk::TableUpdate<MyClaim>,
+    my_encounters: __sdk::TableUpdate<MyEncounter>,
+    my_graph: __sdk::TableUpdate<GraphLink>,
+    my_handles: __sdk::TableUpdate<SocialHandle>,
+    my_merch_orders: __sdk::TableUpdate<MerchOrder>,
+    my_merch_suggestions: __sdk::TableUpdate<MerchSuggestion>,
+    my_photos: __sdk::TableUpdate<MyPhoto>,
+    my_roles: __sdk::TableUpdate<StaffRole>,
+    my_shared_visits: __sdk::TableUpdate<MySharedVisit>,
+    my_visits: __sdk::TableUpdate<MyVisit>,
+    my_wallet: __sdk::TableUpdate<MyWallet>,
+    my_wallet_entries: __sdk::TableUpdate<WalletEntry>,
+    open_incidents: __sdk::TableUpdate<Incident>,
+    organization: __sdk::TableUpdate<Organization>,
+    person: __sdk::TableUpdate<Person>,
+    schedule_slot: __sdk::TableUpdate<ScheduleSlot>,
     settings: __sdk::TableUpdate<Settings>,
+    social_attendees: __sdk::TableUpdate<Attendee>,
+    social_encounters: __sdk::TableUpdate<SocialEncounter>,
+    social_handles: __sdk::TableUpdate<SocialHandle>,
+    social_photo_tags: __sdk::TableUpdate<PhotoTag>,
+    social_photos: __sdk::TableUpdate<Photo>,
+    social_shared_visits: __sdk::TableUpdate<SharedVisit>,
+    social_visits: __sdk::TableUpdate<Visit>,
     station: __sdk::TableUpdate<Station>,
+    venue: __sdk::TableUpdate<Venue>,
+    worker_jobs: __sdk::TableUpdate<Job>,
+    zone: __sdk::TableUpdate<Zone>,
     zone_visit: __sdk::TableUpdate<ZoneVisit>,
 }
 
@@ -383,9 +1559,78 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_update in __sdk::transaction_update_iter_table_updates(raw) {
             match &table_update.table_name[..] {
+                "api_sessions" => db_update
+                    .api_sessions
+                    .append(api_sessions_table::parse_table_update(table_update)?),
                 "band" => db_update
                     .band
                     .append(band_table::parse_table_update(table_update)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(board_approvals_table::parse_table_update(table_update)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(board_attendees_table::parse_table_update(table_update)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(board_authority_table::parse_table_update(table_update)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(board_checks_table::parse_table_update(table_update)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(board_facts_table::parse_table_update(table_update)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(board_ledger_table::parse_table_update(table_update)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(board_lines_table::parse_table_update(table_update)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(board_notes_table::parse_table_update(table_update)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(board_policies_table::parse_table_update(table_update)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(board_precedents_table::parse_table_update(table_update)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(board_records_table::parse_table_update(table_update)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(board_reviews_table::parse_table_update(table_update)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(board_rules_table::parse_table_update(table_update)?),
+                "booth" => db_update
+                    .booth
+                    .append(booth_table::parse_table_update(table_update)?),
+                "camera" => db_update
+                    .camera
+                    .append(camera_table::parse_table_update(table_update)?),
+                "claim_checks" => db_update
+                    .claim_checks
+                    .append(claim_checks_table::parse_table_update(table_update)?),
+                "claim_facts" => db_update
+                    .claim_facts
+                    .append(claim_facts_table::parse_table_update(table_update)?),
+                "claim_ledger" => db_update
+                    .claim_ledger
+                    .append(claim_ledger_table::parse_table_update(table_update)?),
+                "claim_lines" => db_update
+                    .claim_lines
+                    .append(claim_lines_table::parse_table_update(table_update)?),
+                "claim_reviews" => db_update
+                    .claim_reviews
+                    .append(claim_reviews_table::parse_table_update(table_update)?),
+                "claimed_people" => db_update
+                    .claimed_people
+                    .append(claimed_people_table::parse_table_update(table_update)?),
+                "claims_board" => db_update
+                    .claims_board
+                    .append(claims_board_table::parse_table_update(table_update)?),
                 "command" => db_update
                     .command
                     .append(command_table::parse_table_update(table_update)?),
@@ -395,21 +1640,120 @@ impl TryFrom<__ws::v2::TransactionUpdate> for DbUpdate {
                 "event" => db_update
                     .event
                     .append(event_table::parse_table_update(table_update)?),
+                "event_graph" => db_update
+                    .event_graph
+                    .append(event_graph_table::parse_table_update(table_update)?),
+                "event_state" => db_update
+                    .event_state
+                    .append(event_state_table::parse_table_update(table_update)?),
                 "gateway" => db_update
                     .gateway
                     .append(gateway_table::parse_table_update(table_update)?),
+                "import_run" => db_update
+                    .import_run
+                    .append(import_run_table::parse_table_update(table_update)?),
+                "incident_bands" => db_update
+                    .incident_bands
+                    .append(incident_bands_table::parse_table_update(table_update)?),
                 "link" => db_update
                     .link
                     .append(link_table::parse_table_update(table_update)?),
-                "payment" => db_update
-                    .payment
-                    .append(payment_table::parse_table_update(table_update)?),
+                "merch_template" => db_update
+                    .merch_template
+                    .append(merch_template_table::parse_table_update(table_update)?),
+                "my_attendee" => db_update
+                    .my_attendee
+                    .append(my_attendee_table::parse_table_update(table_update)?),
+                "my_band" => db_update
+                    .my_band
+                    .append(my_band_table::parse_table_update(table_update)?),
+                "my_claim_queue" => db_update
+                    .my_claim_queue
+                    .append(my_claim_queue_table::parse_table_update(table_update)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(my_claims_table::parse_table_update(table_update)?),
+                "my_encounters" => db_update
+                    .my_encounters
+                    .append(my_encounters_table::parse_table_update(table_update)?),
+                "my_graph" => db_update
+                    .my_graph
+                    .append(my_graph_table::parse_table_update(table_update)?),
+                "my_handles" => db_update
+                    .my_handles
+                    .append(my_handles_table::parse_table_update(table_update)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(my_merch_orders_table::parse_table_update(table_update)?),
+                "my_merch_suggestions" => db_update.my_merch_suggestions.append(
+                    my_merch_suggestions_table::parse_table_update(table_update)?,
+                ),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(my_photos_table::parse_table_update(table_update)?),
+                "my_roles" => db_update
+                    .my_roles
+                    .append(my_roles_table::parse_table_update(table_update)?),
+                "my_shared_visits" => db_update
+                    .my_shared_visits
+                    .append(my_shared_visits_table::parse_table_update(table_update)?),
+                "my_visits" => db_update
+                    .my_visits
+                    .append(my_visits_table::parse_table_update(table_update)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(my_wallet_table::parse_table_update(table_update)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
+                    .append(my_wallet_entries_table::parse_table_update(table_update)?),
+                "open_incidents" => db_update
+                    .open_incidents
+                    .append(open_incidents_table::parse_table_update(table_update)?),
+                "organization" => db_update
+                    .organization
+                    .append(organization_table::parse_table_update(table_update)?),
+                "person" => db_update
+                    .person
+                    .append(person_table::parse_table_update(table_update)?),
+                "schedule_slot" => db_update
+                    .schedule_slot
+                    .append(schedule_slot_table::parse_table_update(table_update)?),
                 "settings" => db_update
                     .settings
                     .append(settings_table::parse_table_update(table_update)?),
+                "social_attendees" => db_update
+                    .social_attendees
+                    .append(social_attendees_table::parse_table_update(table_update)?),
+                "social_encounters" => db_update
+                    .social_encounters
+                    .append(social_encounters_table::parse_table_update(table_update)?),
+                "social_handles" => db_update
+                    .social_handles
+                    .append(social_handles_table::parse_table_update(table_update)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(social_photo_tags_table::parse_table_update(table_update)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(social_photos_table::parse_table_update(table_update)?),
+                "social_shared_visits" => db_update.social_shared_visits.append(
+                    social_shared_visits_table::parse_table_update(table_update)?,
+                ),
+                "social_visits" => db_update
+                    .social_visits
+                    .append(social_visits_table::parse_table_update(table_update)?),
                 "station" => db_update
                     .station
                     .append(station_table::parse_table_update(table_update)?),
+                "venue" => db_update
+                    .venue
+                    .append(venue_table::parse_table_update(table_update)?),
+                "worker_jobs" => db_update
+                    .worker_jobs
+                    .append(worker_jobs_table::parse_table_update(table_update)?),
+                "zone" => db_update
+                    .zone
+                    .append(zone_table::parse_table_update(table_update)?),
                 "zone_visit" => db_update
                     .zone_visit
                     .append(zone_visit_table::parse_table_update(table_update)?),
@@ -442,6 +1786,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.band = cache
             .apply_diff_to_table::<Band>("band", &self.band)
             .with_updates_by_pk(|row| &row.id);
+        diff.booth = cache
+            .apply_diff_to_table::<Booth>("booth", &self.booth)
+            .with_updates_by_pk(|row| &row.id);
+        diff.camera = cache
+            .apply_diff_to_table::<Camera>("camera", &self.camera)
+            .with_updates_by_pk(|row| &row.id);
         diff.command = cache
             .apply_diff_to_table::<Command>("command", &self.command)
             .with_updates_by_pk(|row| &row.id);
@@ -451,14 +1801,29 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.event = cache
             .apply_diff_to_table::<Event>("event", &self.event)
             .with_updates_by_pk(|row| &row.id);
+        diff.event_state = cache
+            .apply_diff_to_table::<EventState>("event_state", &self.event_state)
+            .with_updates_by_pk(|row| &row.id);
         diff.gateway = cache
             .apply_diff_to_table::<Gateway>("gateway", &self.gateway)
+            .with_updates_by_pk(|row| &row.id);
+        diff.import_run = cache
+            .apply_diff_to_table::<ImportRun>("import_run", &self.import_run)
             .with_updates_by_pk(|row| &row.id);
         diff.link = cache
             .apply_diff_to_table::<Link>("link", &self.link)
             .with_updates_by_pk(|row| &row.key);
-        diff.payment = cache
-            .apply_diff_to_table::<Payment>("payment", &self.payment)
+        diff.merch_template = cache
+            .apply_diff_to_table::<MerchTemplate>("merch_template", &self.merch_template)
+            .with_updates_by_pk(|row| &row.id);
+        diff.organization = cache
+            .apply_diff_to_table::<Organization>("organization", &self.organization)
+            .with_updates_by_pk(|row| &row.id);
+        diff.person = cache
+            .apply_diff_to_table::<Person>("person", &self.person)
+            .with_updates_by_pk(|row| &row.id);
+        diff.schedule_slot = cache
+            .apply_diff_to_table::<ScheduleSlot>("schedule_slot", &self.schedule_slot)
             .with_updates_by_pk(|row| &row.id);
         diff.settings = cache
             .apply_diff_to_table::<Settings>("settings", &self.settings)
@@ -466,9 +1831,100 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.station = cache
             .apply_diff_to_table::<Station>("station", &self.station)
             .with_updates_by_pk(|row| &row.id);
+        diff.venue = cache
+            .apply_diff_to_table::<Venue>("venue", &self.venue)
+            .with_updates_by_pk(|row| &row.id);
+        diff.zone = cache
+            .apply_diff_to_table::<Zone>("zone", &self.zone)
+            .with_updates_by_pk(|row| &row.id);
         diff.zone_visit = cache
             .apply_diff_to_table::<ZoneVisit>("zone_visit", &self.zone_visit)
             .with_updates_by_pk(|row| &row.id);
+        diff.api_sessions =
+            cache.apply_diff_to_table::<ApiSession>("api_sessions", &self.api_sessions);
+        diff.board_approvals =
+            cache.apply_diff_to_table::<Approval>("board_approvals", &self.board_approvals);
+        diff.board_attendees =
+            cache.apply_diff_to_table::<AttendeeOut>("board_attendees", &self.board_attendees);
+        diff.board_authority = cache
+            .apply_diff_to_table::<AuthorityLimitRow>("board_authority", &self.board_authority)
+            .with_updates_by_pk(|row| &row.role);
+        diff.board_checks =
+            cache.apply_diff_to_table::<ClaimCheck>("board_checks", &self.board_checks);
+        diff.board_facts =
+            cache.apply_diff_to_table::<EvidenceFact>("board_facts", &self.board_facts);
+        diff.board_ledger =
+            cache.apply_diff_to_table::<LedgerEntry>("board_ledger", &self.board_ledger);
+        diff.board_lines = cache.apply_diff_to_table::<ClaimLine>("board_lines", &self.board_lines);
+        diff.board_notes =
+            cache.apply_diff_to_table::<IncidentNote>("board_notes", &self.board_notes);
+        diff.board_policies = cache
+            .apply_diff_to_table::<InsurancePolicy>("board_policies", &self.board_policies)
+            .with_updates_by_pk(|row| &row.id);
+        diff.board_precedents =
+            cache.apply_diff_to_table::<ClaimPrecedent>("board_precedents", &self.board_precedents);
+        diff.board_records =
+            cache.apply_diff_to_table::<MedicalRecord>("board_records", &self.board_records);
+        diff.board_reviews =
+            cache.apply_diff_to_table::<ClaimReview>("board_reviews", &self.board_reviews);
+        diff.board_rules = cache
+            .apply_diff_to_table::<SettlementRuleRow>("board_rules", &self.board_rules)
+            .with_updates_by_pk(|row| &row.id);
+        diff.claim_checks =
+            cache.apply_diff_to_table::<ClaimCheck>("claim_checks", &self.claim_checks);
+        diff.claim_facts =
+            cache.apply_diff_to_table::<EvidenceFact>("claim_facts", &self.claim_facts);
+        diff.claim_ledger =
+            cache.apply_diff_to_table::<LedgerEntry>("claim_ledger", &self.claim_ledger);
+        diff.claim_lines = cache.apply_diff_to_table::<ClaimLine>("claim_lines", &self.claim_lines);
+        diff.claim_reviews =
+            cache.apply_diff_to_table::<ClaimReview>("claim_reviews", &self.claim_reviews);
+        diff.claimed_people =
+            cache.apply_diff_to_table::<ClaimedPerson>("claimed_people", &self.claimed_people);
+        diff.claims_board = cache.apply_diff_to_table::<Claim>("claims_board", &self.claims_board);
+        diff.event_graph = cache.apply_diff_to_table::<EventLink>("event_graph", &self.event_graph);
+        diff.incident_bands =
+            cache.apply_diff_to_table::<IncidentBand>("incident_bands", &self.incident_bands);
+        diff.my_attendee = cache.apply_diff_to_table::<Attendee>("my_attendee", &self.my_attendee);
+        diff.my_band = cache.apply_diff_to_table::<MyBand>("my_band", &self.my_band);
+        diff.my_claim_queue =
+            cache.apply_diff_to_table::<Claim>("my_claim_queue", &self.my_claim_queue);
+        diff.my_claims = cache.apply_diff_to_table::<MyClaim>("my_claims", &self.my_claims);
+        diff.my_encounters =
+            cache.apply_diff_to_table::<MyEncounter>("my_encounters", &self.my_encounters);
+        diff.my_graph = cache.apply_diff_to_table::<GraphLink>("my_graph", &self.my_graph);
+        diff.my_handles = cache.apply_diff_to_table::<SocialHandle>("my_handles", &self.my_handles);
+        diff.my_merch_orders =
+            cache.apply_diff_to_table::<MerchOrder>("my_merch_orders", &self.my_merch_orders);
+        diff.my_merch_suggestions = cache.apply_diff_to_table::<MerchSuggestion>(
+            "my_merch_suggestions",
+            &self.my_merch_suggestions,
+        );
+        diff.my_photos = cache.apply_diff_to_table::<MyPhoto>("my_photos", &self.my_photos);
+        diff.my_roles = cache.apply_diff_to_table::<StaffRole>("my_roles", &self.my_roles);
+        diff.my_shared_visits =
+            cache.apply_diff_to_table::<MySharedVisit>("my_shared_visits", &self.my_shared_visits);
+        diff.my_visits = cache.apply_diff_to_table::<MyVisit>("my_visits", &self.my_visits);
+        diff.my_wallet = cache.apply_diff_to_table::<MyWallet>("my_wallet", &self.my_wallet);
+        diff.my_wallet_entries =
+            cache.apply_diff_to_table::<WalletEntry>("my_wallet_entries", &self.my_wallet_entries);
+        diff.open_incidents =
+            cache.apply_diff_to_table::<Incident>("open_incidents", &self.open_incidents);
+        diff.social_attendees =
+            cache.apply_diff_to_table::<Attendee>("social_attendees", &self.social_attendees);
+        diff.social_encounters = cache
+            .apply_diff_to_table::<SocialEncounter>("social_encounters", &self.social_encounters);
+        diff.social_handles =
+            cache.apply_diff_to_table::<SocialHandle>("social_handles", &self.social_handles);
+        diff.social_photo_tags =
+            cache.apply_diff_to_table::<PhotoTag>("social_photo_tags", &self.social_photo_tags);
+        diff.social_photos =
+            cache.apply_diff_to_table::<Photo>("social_photos", &self.social_photos);
+        diff.social_shared_visits = cache
+            .apply_diff_to_table::<SharedVisit>("social_shared_visits", &self.social_shared_visits);
+        diff.social_visits =
+            cache.apply_diff_to_table::<Visit>("social_visits", &self.social_visits);
+        diff.worker_jobs = cache.apply_diff_to_table::<Job>("worker_jobs", &self.worker_jobs);
 
         diff
     }
@@ -476,8 +1932,77 @@ impl __sdk::DbUpdate for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_rows in raw.tables {
             match &table_rows.table[..] {
+                "api_sessions" => db_update
+                    .api_sessions
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "band" => db_update
                     .band
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "booth" => db_update
+                    .booth
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "camera" => db_update
+                    .camera
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claim_checks" => db_update
+                    .claim_checks
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claim_facts" => db_update
+                    .claim_facts
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claim_ledger" => db_update
+                    .claim_ledger
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claim_lines" => db_update
+                    .claim_lines
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claim_reviews" => db_update
+                    .claim_reviews
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claimed_people" => db_update
+                    .claimed_people
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "claims_board" => db_update
+                    .claims_board
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "command" => db_update
                     .command
@@ -488,20 +2013,119 @@ impl __sdk::DbUpdate for DbUpdate {
                 "event" => db_update
                     .event
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "event_graph" => db_update
+                    .event_graph
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "event_state" => db_update
+                    .event_state
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "gateway" => db_update
                     .gateway
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "import_run" => db_update
+                    .import_run
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "incident_bands" => db_update
+                    .incident_bands
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
-                "payment" => db_update
-                    .payment
+                "merch_template" => db_update
+                    .merch_template
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_attendee" => db_update
+                    .my_attendee
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_band" => db_update
+                    .my_band
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_claim_queue" => db_update
+                    .my_claim_queue
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_encounters" => db_update
+                    .my_encounters
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_graph" => db_update
+                    .my_graph
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_handles" => db_update
+                    .my_handles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_merch_suggestions" => db_update
+                    .my_merch_suggestions
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_roles" => db_update
+                    .my_roles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_shared_visits" => db_update
+                    .my_shared_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_visits" => db_update
+                    .my_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "open_incidents" => db_update
+                    .open_incidents
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "organization" => db_update
+                    .organization
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "person" => db_update
+                    .person
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "schedule_slot" => db_update
+                    .schedule_slot
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "settings" => db_update
                     .settings
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_attendees" => db_update
+                    .social_attendees
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_encounters" => db_update
+                    .social_encounters
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_handles" => db_update
+                    .social_handles
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_shared_visits" => db_update
+                    .social_shared_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "social_visits" => db_update
+                    .social_visits
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "station" => db_update
                     .station
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "venue" => db_update
+                    .venue
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "worker_jobs" => db_update
+                    .worker_jobs
+                    .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
+                "zone" => db_update
+                    .zone
                     .append(__sdk::parse_row_list_as_inserts(table_rows.rows)?),
                 "zone_visit" => db_update
                     .zone_visit
@@ -519,8 +2143,77 @@ impl __sdk::DbUpdate for DbUpdate {
         let mut db_update = DbUpdate::default();
         for table_rows in raw.tables {
             match &table_rows.table[..] {
+                "api_sessions" => db_update
+                    .api_sessions
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "band" => db_update
                     .band
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_approvals" => db_update
+                    .board_approvals
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_attendees" => db_update
+                    .board_attendees
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_authority" => db_update
+                    .board_authority
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_checks" => db_update
+                    .board_checks
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_facts" => db_update
+                    .board_facts
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_ledger" => db_update
+                    .board_ledger
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_lines" => db_update
+                    .board_lines
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_notes" => db_update
+                    .board_notes
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_policies" => db_update
+                    .board_policies
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_precedents" => db_update
+                    .board_precedents
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_records" => db_update
+                    .board_records
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_reviews" => db_update
+                    .board_reviews
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "board_rules" => db_update
+                    .board_rules
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "booth" => db_update
+                    .booth
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "camera" => db_update
+                    .camera
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claim_checks" => db_update
+                    .claim_checks
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claim_facts" => db_update
+                    .claim_facts
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claim_ledger" => db_update
+                    .claim_ledger
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claim_lines" => db_update
+                    .claim_lines
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claim_reviews" => db_update
+                    .claim_reviews
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claimed_people" => db_update
+                    .claimed_people
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "claims_board" => db_update
+                    .claims_board
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "command" => db_update
                     .command
@@ -531,20 +2224,119 @@ impl __sdk::DbUpdate for DbUpdate {
                 "event" => db_update
                     .event
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "event_graph" => db_update
+                    .event_graph
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "event_state" => db_update
+                    .event_state
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "gateway" => db_update
                     .gateway
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "import_run" => db_update
+                    .import_run
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "incident_bands" => db_update
+                    .incident_bands
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "link" => db_update
                     .link
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
-                "payment" => db_update
-                    .payment
+                "merch_template" => db_update
+                    .merch_template
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_attendee" => db_update
+                    .my_attendee
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_band" => db_update
+                    .my_band
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_claim_queue" => db_update
+                    .my_claim_queue
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_claims" => db_update
+                    .my_claims
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_encounters" => db_update
+                    .my_encounters
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_graph" => db_update
+                    .my_graph
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_handles" => db_update
+                    .my_handles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_merch_orders" => db_update
+                    .my_merch_orders
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_merch_suggestions" => db_update
+                    .my_merch_suggestions
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_photos" => db_update
+                    .my_photos
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_roles" => db_update
+                    .my_roles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_shared_visits" => db_update
+                    .my_shared_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_visits" => db_update
+                    .my_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_wallet" => db_update
+                    .my_wallet
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "my_wallet_entries" => db_update
+                    .my_wallet_entries
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "open_incidents" => db_update
+                    .open_incidents
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "organization" => db_update
+                    .organization
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "person" => db_update
+                    .person
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "schedule_slot" => db_update
+                    .schedule_slot
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "settings" => db_update
                     .settings
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_attendees" => db_update
+                    .social_attendees
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_encounters" => db_update
+                    .social_encounters
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_handles" => db_update
+                    .social_handles
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_photo_tags" => db_update
+                    .social_photo_tags
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_photos" => db_update
+                    .social_photos
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_shared_visits" => db_update
+                    .social_shared_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "social_visits" => db_update
+                    .social_visits
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "station" => db_update
                     .station
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "venue" => db_update
+                    .venue
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "worker_jobs" => db_update
+                    .worker_jobs
+                    .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
+                "zone" => db_update
+                    .zone
                     .append(__sdk::parse_row_list_as_deletes(table_rows.rows)?),
                 "zone_visit" => db_update
                     .zone_visit
@@ -564,15 +2356,71 @@ impl __sdk::DbUpdate for DbUpdate {
 #[allow(non_snake_case)]
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
+    api_sessions: __sdk::TableAppliedDiff<'r, ApiSession>,
     band: __sdk::TableAppliedDiff<'r, Band>,
+    board_approvals: __sdk::TableAppliedDiff<'r, Approval>,
+    board_attendees: __sdk::TableAppliedDiff<'r, AttendeeOut>,
+    board_authority: __sdk::TableAppliedDiff<'r, AuthorityLimitRow>,
+    board_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
+    board_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
+    board_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
+    board_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
+    board_notes: __sdk::TableAppliedDiff<'r, IncidentNote>,
+    board_policies: __sdk::TableAppliedDiff<'r, InsurancePolicy>,
+    board_precedents: __sdk::TableAppliedDiff<'r, ClaimPrecedent>,
+    board_records: __sdk::TableAppliedDiff<'r, MedicalRecord>,
+    board_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
+    board_rules: __sdk::TableAppliedDiff<'r, SettlementRuleRow>,
+    booth: __sdk::TableAppliedDiff<'r, Booth>,
+    camera: __sdk::TableAppliedDiff<'r, Camera>,
+    claim_checks: __sdk::TableAppliedDiff<'r, ClaimCheck>,
+    claim_facts: __sdk::TableAppliedDiff<'r, EvidenceFact>,
+    claim_ledger: __sdk::TableAppliedDiff<'r, LedgerEntry>,
+    claim_lines: __sdk::TableAppliedDiff<'r, ClaimLine>,
+    claim_reviews: __sdk::TableAppliedDiff<'r, ClaimReview>,
+    claimed_people: __sdk::TableAppliedDiff<'r, ClaimedPerson>,
+    claims_board: __sdk::TableAppliedDiff<'r, Claim>,
     command: __sdk::TableAppliedDiff<'r, Command>,
     encounter: __sdk::TableAppliedDiff<'r, Encounter>,
     event: __sdk::TableAppliedDiff<'r, Event>,
+    event_graph: __sdk::TableAppliedDiff<'r, EventLink>,
+    event_state: __sdk::TableAppliedDiff<'r, EventState>,
     gateway: __sdk::TableAppliedDiff<'r, Gateway>,
+    import_run: __sdk::TableAppliedDiff<'r, ImportRun>,
+    incident_bands: __sdk::TableAppliedDiff<'r, IncidentBand>,
     link: __sdk::TableAppliedDiff<'r, Link>,
-    payment: __sdk::TableAppliedDiff<'r, Payment>,
+    merch_template: __sdk::TableAppliedDiff<'r, MerchTemplate>,
+    my_attendee: __sdk::TableAppliedDiff<'r, Attendee>,
+    my_band: __sdk::TableAppliedDiff<'r, MyBand>,
+    my_claim_queue: __sdk::TableAppliedDiff<'r, Claim>,
+    my_claims: __sdk::TableAppliedDiff<'r, MyClaim>,
+    my_encounters: __sdk::TableAppliedDiff<'r, MyEncounter>,
+    my_graph: __sdk::TableAppliedDiff<'r, GraphLink>,
+    my_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    my_merch_orders: __sdk::TableAppliedDiff<'r, MerchOrder>,
+    my_merch_suggestions: __sdk::TableAppliedDiff<'r, MerchSuggestion>,
+    my_photos: __sdk::TableAppliedDiff<'r, MyPhoto>,
+    my_roles: __sdk::TableAppliedDiff<'r, StaffRole>,
+    my_shared_visits: __sdk::TableAppliedDiff<'r, MySharedVisit>,
+    my_visits: __sdk::TableAppliedDiff<'r, MyVisit>,
+    my_wallet: __sdk::TableAppliedDiff<'r, MyWallet>,
+    my_wallet_entries: __sdk::TableAppliedDiff<'r, WalletEntry>,
+    open_incidents: __sdk::TableAppliedDiff<'r, Incident>,
+    organization: __sdk::TableAppliedDiff<'r, Organization>,
+    person: __sdk::TableAppliedDiff<'r, Person>,
+    schedule_slot: __sdk::TableAppliedDiff<'r, ScheduleSlot>,
     settings: __sdk::TableAppliedDiff<'r, Settings>,
+    social_attendees: __sdk::TableAppliedDiff<'r, Attendee>,
+    social_encounters: __sdk::TableAppliedDiff<'r, SocialEncounter>,
+    social_handles: __sdk::TableAppliedDiff<'r, SocialHandle>,
+    social_photo_tags: __sdk::TableAppliedDiff<'r, PhotoTag>,
+    social_photos: __sdk::TableAppliedDiff<'r, Photo>,
+    social_shared_visits: __sdk::TableAppliedDiff<'r, SharedVisit>,
+    social_visits: __sdk::TableAppliedDiff<'r, Visit>,
     station: __sdk::TableAppliedDiff<'r, Station>,
+    venue: __sdk::TableAppliedDiff<'r, Venue>,
+    worker_jobs: __sdk::TableAppliedDiff<'r, Job>,
+    zone: __sdk::TableAppliedDiff<'r, Zone>,
     zone_visit: __sdk::TableAppliedDiff<'r, ZoneVisit>,
     __unused: std::marker::PhantomData<&'r ()>,
 }
@@ -587,15 +2435,207 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         event: &EventContext,
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
+        callbacks.invoke_table_row_callbacks::<ApiSession>(
+            "api_sessions",
+            &self.api_sessions,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Band>("band", &self.band, event);
+        callbacks.invoke_table_row_callbacks::<Approval>(
+            "board_approvals",
+            &self.board_approvals,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<AttendeeOut>(
+            "board_attendees",
+            &self.board_attendees,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<AuthorityLimitRow>(
+            "board_authority",
+            &self.board_authority,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimCheck>(
+            "board_checks",
+            &self.board_checks,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<EvidenceFact>(
+            "board_facts",
+            &self.board_facts,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LedgerEntry>(
+            "board_ledger",
+            &self.board_ledger,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimLine>("board_lines", &self.board_lines, event);
+        callbacks.invoke_table_row_callbacks::<IncidentNote>(
+            "board_notes",
+            &self.board_notes,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<InsurancePolicy>(
+            "board_policies",
+            &self.board_policies,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimPrecedent>(
+            "board_precedents",
+            &self.board_precedents,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MedicalRecord>(
+            "board_records",
+            &self.board_records,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimReview>(
+            "board_reviews",
+            &self.board_reviews,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SettlementRuleRow>(
+            "board_rules",
+            &self.board_rules,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Booth>("booth", &self.booth, event);
+        callbacks.invoke_table_row_callbacks::<Camera>("camera", &self.camera, event);
+        callbacks.invoke_table_row_callbacks::<ClaimCheck>(
+            "claim_checks",
+            &self.claim_checks,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<EvidenceFact>(
+            "claim_facts",
+            &self.claim_facts,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<LedgerEntry>(
+            "claim_ledger",
+            &self.claim_ledger,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimLine>("claim_lines", &self.claim_lines, event);
+        callbacks.invoke_table_row_callbacks::<ClaimReview>(
+            "claim_reviews",
+            &self.claim_reviews,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<ClaimedPerson>(
+            "claimed_people",
+            &self.claimed_people,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Claim>("claims_board", &self.claims_board, event);
         callbacks.invoke_table_row_callbacks::<Command>("command", &self.command, event);
         callbacks.invoke_table_row_callbacks::<Encounter>("encounter", &self.encounter, event);
         callbacks.invoke_table_row_callbacks::<Event>("event", &self.event, event);
+        callbacks.invoke_table_row_callbacks::<EventLink>("event_graph", &self.event_graph, event);
+        callbacks.invoke_table_row_callbacks::<EventState>("event_state", &self.event_state, event);
         callbacks.invoke_table_row_callbacks::<Gateway>("gateway", &self.gateway, event);
+        callbacks.invoke_table_row_callbacks::<ImportRun>("import_run", &self.import_run, event);
+        callbacks.invoke_table_row_callbacks::<IncidentBand>(
+            "incident_bands",
+            &self.incident_bands,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Link>("link", &self.link, event);
-        callbacks.invoke_table_row_callbacks::<Payment>("payment", &self.payment, event);
+        callbacks.invoke_table_row_callbacks::<MerchTemplate>(
+            "merch_template",
+            &self.merch_template,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Attendee>("my_attendee", &self.my_attendee, event);
+        callbacks.invoke_table_row_callbacks::<MyBand>("my_band", &self.my_band, event);
+        callbacks.invoke_table_row_callbacks::<Claim>(
+            "my_claim_queue",
+            &self.my_claim_queue,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MyClaim>("my_claims", &self.my_claims, event);
+        callbacks.invoke_table_row_callbacks::<MyEncounter>(
+            "my_encounters",
+            &self.my_encounters,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<GraphLink>("my_graph", &self.my_graph, event);
+        callbacks.invoke_table_row_callbacks::<SocialHandle>("my_handles", &self.my_handles, event);
+        callbacks.invoke_table_row_callbacks::<MerchOrder>(
+            "my_merch_orders",
+            &self.my_merch_orders,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MerchSuggestion>(
+            "my_merch_suggestions",
+            &self.my_merch_suggestions,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MyPhoto>("my_photos", &self.my_photos, event);
+        callbacks.invoke_table_row_callbacks::<StaffRole>("my_roles", &self.my_roles, event);
+        callbacks.invoke_table_row_callbacks::<MySharedVisit>(
+            "my_shared_visits",
+            &self.my_shared_visits,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<MyVisit>("my_visits", &self.my_visits, event);
+        callbacks.invoke_table_row_callbacks::<MyWallet>("my_wallet", &self.my_wallet, event);
+        callbacks.invoke_table_row_callbacks::<WalletEntry>(
+            "my_wallet_entries",
+            &self.my_wallet_entries,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Incident>(
+            "open_incidents",
+            &self.open_incidents,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Organization>(
+            "organization",
+            &self.organization,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Person>("person", &self.person, event);
+        callbacks.invoke_table_row_callbacks::<ScheduleSlot>(
+            "schedule_slot",
+            &self.schedule_slot,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<Settings>("settings", &self.settings, event);
+        callbacks.invoke_table_row_callbacks::<Attendee>(
+            "social_attendees",
+            &self.social_attendees,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SocialEncounter>(
+            "social_encounters",
+            &self.social_encounters,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SocialHandle>(
+            "social_handles",
+            &self.social_handles,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<PhotoTag>(
+            "social_photo_tags",
+            &self.social_photo_tags,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Photo>("social_photos", &self.social_photos, event);
+        callbacks.invoke_table_row_callbacks::<SharedVisit>(
+            "social_shared_visits",
+            &self.social_shared_visits,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<Visit>("social_visits", &self.social_visits, event);
         callbacks.invoke_table_row_callbacks::<Station>("station", &self.station, event);
+        callbacks.invoke_table_row_callbacks::<Venue>("venue", &self.venue, event);
+        callbacks.invoke_table_row_callbacks::<Job>("worker_jobs", &self.worker_jobs, event);
+        callbacks.invoke_table_row_callbacks::<Zone>("zone", &self.zone, event);
         callbacks.invoke_table_row_callbacks::<ZoneVisit>("zone_visit", &self.zone_visit, event);
     }
 }
@@ -1155,27 +3195,133 @@ impl __sdk::SpacetimeModule for RemoteModule {
     type QueryBuilder = __sdk::QueryBuilder;
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
+        api_sessions_table::register_table(client_cache);
         band_table::register_table(client_cache);
+        board_approvals_table::register_table(client_cache);
+        board_attendees_table::register_table(client_cache);
+        board_authority_table::register_table(client_cache);
+        board_checks_table::register_table(client_cache);
+        board_facts_table::register_table(client_cache);
+        board_ledger_table::register_table(client_cache);
+        board_lines_table::register_table(client_cache);
+        board_notes_table::register_table(client_cache);
+        board_policies_table::register_table(client_cache);
+        board_precedents_table::register_table(client_cache);
+        board_records_table::register_table(client_cache);
+        board_reviews_table::register_table(client_cache);
+        board_rules_table::register_table(client_cache);
+        booth_table::register_table(client_cache);
+        camera_table::register_table(client_cache);
+        claim_checks_table::register_table(client_cache);
+        claim_facts_table::register_table(client_cache);
+        claim_ledger_table::register_table(client_cache);
+        claim_lines_table::register_table(client_cache);
+        claim_reviews_table::register_table(client_cache);
+        claimed_people_table::register_table(client_cache);
+        claims_board_table::register_table(client_cache);
         command_table::register_table(client_cache);
         encounter_table::register_table(client_cache);
         event_table::register_table(client_cache);
+        event_graph_table::register_table(client_cache);
+        event_state_table::register_table(client_cache);
         gateway_table::register_table(client_cache);
+        import_run_table::register_table(client_cache);
+        incident_bands_table::register_table(client_cache);
         link_table::register_table(client_cache);
-        payment_table::register_table(client_cache);
+        merch_template_table::register_table(client_cache);
+        my_attendee_table::register_table(client_cache);
+        my_band_table::register_table(client_cache);
+        my_claim_queue_table::register_table(client_cache);
+        my_claims_table::register_table(client_cache);
+        my_encounters_table::register_table(client_cache);
+        my_graph_table::register_table(client_cache);
+        my_handles_table::register_table(client_cache);
+        my_merch_orders_table::register_table(client_cache);
+        my_merch_suggestions_table::register_table(client_cache);
+        my_photos_table::register_table(client_cache);
+        my_roles_table::register_table(client_cache);
+        my_shared_visits_table::register_table(client_cache);
+        my_visits_table::register_table(client_cache);
+        my_wallet_table::register_table(client_cache);
+        my_wallet_entries_table::register_table(client_cache);
+        open_incidents_table::register_table(client_cache);
+        organization_table::register_table(client_cache);
+        person_table::register_table(client_cache);
+        schedule_slot_table::register_table(client_cache);
         settings_table::register_table(client_cache);
+        social_attendees_table::register_table(client_cache);
+        social_encounters_table::register_table(client_cache);
+        social_handles_table::register_table(client_cache);
+        social_photo_tags_table::register_table(client_cache);
+        social_photos_table::register_table(client_cache);
+        social_shared_visits_table::register_table(client_cache);
+        social_visits_table::register_table(client_cache);
         station_table::register_table(client_cache);
+        venue_table::register_table(client_cache);
+        worker_jobs_table::register_table(client_cache);
+        zone_table::register_table(client_cache);
         zone_visit_table::register_table(client_cache);
     }
     const ALL_TABLE_NAMES: &'static [&'static str] = &[
+        "api_sessions",
         "band",
+        "board_approvals",
+        "board_attendees",
+        "board_authority",
+        "board_checks",
+        "board_facts",
+        "board_ledger",
+        "board_lines",
+        "board_notes",
+        "board_policies",
+        "board_precedents",
+        "board_records",
+        "board_reviews",
+        "board_rules",
+        "booth",
+        "camera",
+        "claimed_people",
+        "claims_board",
         "command",
         "encounter",
         "event",
+        "event_graph",
+        "event_state",
         "gateway",
+        "import_run",
         "link",
-        "payment",
+        "merch_template",
+        "my_attendee",
+        "my_band",
+        "my_claim_queue",
+        "my_claims",
+        "my_encounters",
+        "my_graph",
+        "my_handles",
+        "my_merch_orders",
+        "my_merch_suggestions",
+        "my_photos",
+        "my_roles",
+        "my_shared_visits",
+        "my_visits",
+        "my_wallet",
+        "my_wallet_entries",
+        "open_incidents",
+        "organization",
+        "person",
+        "schedule_slot",
         "settings",
+        "social_attendees",
+        "social_encounters",
+        "social_handles",
+        "social_photo_tags",
+        "social_photos",
+        "social_shared_visits",
+        "social_visits",
         "station",
+        "venue",
+        "worker_jobs",
+        "zone",
         "zone_visit",
     ];
 }

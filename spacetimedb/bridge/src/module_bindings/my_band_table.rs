@@ -1,0 +1,145 @@
+#![allow(unused, clippy::all)]
+use super::my_band_type::MyBand;
+use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
+
+pub struct MyBandTableHandle<'ctx> {
+    imp: __sdk::TableHandle<MyBand>,
+    ctx: std::marker::PhantomData<&'ctx super::RemoteTables>,
+}
+
+pub struct MyBandTableAccessor;
+
+impl __sdk::TableAccessor<super::RemoteTables> for MyBandTableAccessor {
+    type Row = MyBand;
+    type Handle<'db> = MyBandTableHandle<'db>;
+
+    fn get<'db>(db: &'db super::RemoteTables) -> Self::Handle<'db> {
+        db.my_band()
+    }
+}
+
+#[allow(non_camel_case_types)]
+pub trait MyBandTableAccess {
+    #[allow(non_snake_case)]
+    fn my_band(&self) -> MyBandTableHandle<'_>;
+}
+
+impl MyBandTableAccess for super::RemoteTables {
+    fn my_band(&self) -> MyBandTableHandle<'_> {
+        MyBandTableHandle {
+            imp: self.imp.get_table::<MyBand>("my_band"),
+            ctx: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct MyBandInsertCallbackId(__sdk::CallbackId);
+pub struct MyBandDeleteCallbackId(__sdk::CallbackId);
+
+impl<'ctx> __sdk::TableLike for MyBandTableHandle<'ctx> {
+    type Row = MyBand;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MyBand> + '_ {
+        self.imp.iter()
+    }
+}
+
+impl<'ctx> __sdk::Table for MyBandTableHandle<'ctx> {
+    type Row = MyBand;
+    type EventContext = super::EventContext;
+
+    fn count(&self) -> u64 {
+        self.imp.count()
+    }
+    fn iter(&self) -> impl Iterator<Item = MyBand> + '_ {
+        self.imp.iter()
+    }
+
+    type InsertCallbackId = MyBandInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyBandInsertCallbackId {
+        MyBandInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyBandInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+
+    type DeleteCallbackId = MyBandDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyBandDeleteCallbackId {
+        MyBandDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyBandDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithInsert for MyBandTableHandle<'ctx> {
+    type InsertCallbackId = MyBandInsertCallbackId;
+
+    fn on_insert(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyBandInsertCallbackId {
+        MyBandInsertCallbackId(self.imp.on_insert(Box::new(callback)))
+    }
+
+    fn remove_on_insert(&self, callback: MyBandInsertCallbackId) {
+        self.imp.remove_on_insert(callback.0)
+    }
+}
+
+impl<'ctx> __sdk::WithDelete for MyBandTableHandle<'ctx> {
+    type DeleteCallbackId = MyBandDeleteCallbackId;
+
+    fn on_delete(
+        &self,
+        callback: impl FnMut(&Self::EventContext, &Self::Row) + Send + 'static,
+    ) -> MyBandDeleteCallbackId {
+        MyBandDeleteCallbackId(self.imp.on_delete(Box::new(callback)))
+    }
+
+    fn remove_on_delete(&self, callback: MyBandDeleteCallbackId) {
+        self.imp.remove_on_delete(callback.0)
+    }
+}
+
+#[doc(hidden)]
+pub(super) fn register_table(client_cache: &mut __sdk::ClientCache<super::RemoteModule>) {
+    let _table = client_cache.get_or_make_table::<MyBand>("my_band");
+}
+
+#[doc(hidden)]
+pub(super) fn parse_table_update(
+    raw_updates: __ws::v2::TableUpdate,
+) -> __sdk::Result<__sdk::TableUpdate<MyBand>> {
+    __sdk::TableUpdate::parse_table_update(raw_updates).map_err(|e| {
+        __sdk::InternalError::failed_parse("TableUpdate<MyBand>", "TableUpdate")
+            .with_cause(e)
+            .into()
+    })
+}
+
+#[allow(non_camel_case_types)]
+pub trait my_bandQueryTableAccess {
+    #[allow(non_snake_case)]
+    fn my_band(&self) -> __sdk::__query_builder::Table<MyBand>;
+}
+
+impl my_bandQueryTableAccess for __sdk::QueryTableAccessor {
+    fn my_band(&self) -> __sdk::__query_builder::Table<MyBand> {
+        __sdk::__query_builder::Table::new("my_band")
+    }
+}
